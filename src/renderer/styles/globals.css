@@ -410,7 +410,14 @@ button, a, input, select, textarea,
   background: var(--bg-surface);
   border-radius: var(--radius-xl);
   padding: 12px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.widget:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .widget-header {
@@ -536,11 +543,14 @@ button, a, input, select, textarea,
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   transition: all var(--duration-fast) var(--ease-out);
 }
 
 .media-btn:hover {
   background: var(--bg-hover);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
 }
 
 .media-btn.play-btn {
@@ -548,10 +558,13 @@ button, a, input, select, textarea,
   height: 48px;
   background: var(--accent);
   color: white;
+  box-shadow: 0 4px 16px rgba(10, 132, 255, 0.35);
 }
 
 .media-btn.play-btn:hover {
   background: var(--accent-hover);
+  box-shadow: 0 6px 24px rgba(10, 132, 255, 0.5);
+  transform: translateY(-2px);
 }
 
 /* Apps Grid - 4x4 compact grid */
@@ -573,6 +586,8 @@ button, a, input, select, textarea,
 
 .app-item:hover {
   background: var(--bg-inset);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
 }
 
 .app-icon {
@@ -582,6 +597,7 @@ button, a, input, select, textarea,
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .app-label {
@@ -2265,4 +2281,88 @@ button, a, input, select, textarea,
   .top-time {
     font-size: 11px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEX v2.0 — Bold & Slick Global Polish
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* All buttons: active press-in with shadow inversion */
+button:active:not(:disabled),
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 40ms;
+}
+
+/* Nav dock items — stronger shadow on hover */
+.nav-items {
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.nav-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.nav-item.active {
+  box-shadow: 0 2px 12px rgba(10, 132, 255, 0.25);
+}
+
+/* Cards and panels: stronger depth + subtle border glow on hover */
+.widget:hover .widget-header,
+.widget:hover .widget-title {
+  color: var(--text-primary);
+}
+
+/* Task items: bolder on hover */
+.task-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+/* Search box shadow */
+.search-box {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.search-box:focus-within {
+  box-shadow: 0 4px 16px rgba(10, 132, 255, 0.2), 0 0 0 1px rgba(10, 132, 255, 0.3);
+}
+
+/* Top bar: subtle glass depth */
+.top-bar {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* App name: bolder */
+.app-name {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* List row hover lift */
+.recent-item:hover,
+.list-row:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transform: translateX(2px);
+  transition: all 0.15s ease;
+}
+
+/* Badge/tag elements pop */
+.widget-count {
+  box-shadow: 0 2px 6px rgba(10, 132, 255, 0.2);
+}
+
+/* Scrollbar: cleaner on dark bg */
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+  background-clip: padding-box;
 }

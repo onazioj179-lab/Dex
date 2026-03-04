@@ -130,9 +130,9 @@ export interface Achievement {
 
 // ── Helper: generate tiered achievements ─────────────────────────────────
 
-// Hard-mode scaling -- all count-based thresholds multiplied by 5x.
+// Hard-mode scaling -- all count-based thresholds multiplied by 10x.
 // Streak and capped categories keep natural thresholds.
-const DIFFICULTY_SCALE = 5;
+const DIFFICULTY_SCALE = 10;
 const NO_SCALE_BASES = new Set([
   'streak', 'best-streak', 'night', 'morning', 'weekend', 'lunch',
   'multi-app', 'switch', 'favorites', 'ach-count',
@@ -156,7 +156,7 @@ function tiered(
       icon,
       category,
       condition: (s: UserStats) => getValue(s) >= threshold,
-      points: Math.round(points * (scale > 1 ? 1.5 : 1)),
+      points,
       rarity,
     };
   });
@@ -184,7 +184,7 @@ function appVeteran(appId: string, appName: string, icon: string, count: number,
     icon,
     category: 'mastery',
     condition: s => (s.appUsageCounts[appId] || 0) >= scaled,
-    points: Math.round(pts * 1.5),
+    points: pts,
     rarity,
   };
 }

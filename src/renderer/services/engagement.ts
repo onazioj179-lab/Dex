@@ -166,11 +166,11 @@ export function checkAchievements(
     let passes = false;
     if (ach.id.startsWith('ach-count-')) {
       const idx = parseInt(ach.id.split('-').pop() || '0') - 1;
-      const thresholds = [10, 25, 50, 100, 200, 300, 400, 500];
+      const thresholds = [15, 40, 75, 150, 250, 350, 425, 500];
       passes = unlockedCount >= (thresholds[idx] || 999);
     } else if (ach.id.startsWith('points-')) {
       const idx = parseInt(ach.id.split('-').pop() || '0') - 1;
-      const thresholds = [100, 250, 500, 1000, 2500, 5000, 10000, 25000];
+      const thresholds = [200, 500, 1000, 2500, 5000, 10000, 20000, 40000];
       passes = pts >= (thresholds[idx] || 999999);
     } else if (ach.id.startsWith('rank-')) {
       const rank = getUserRank(pts);
@@ -211,13 +211,13 @@ export function getTotalPoints(unlocked: string[]): number {
 
 /** Get user rank based on points -- no emojis, icon names only */
 export function getUserRank(points: number): { title: string; icon: string; next: string; pointsNeeded: number; level: number } {
-  if (points >= 5000)  return { title: 'Transcendent', icon: 'diamond',  next: 'Max rank!',    pointsNeeded: 0, level: 6 };
-  if (points >= 2000)  return { title: 'Legend',       icon: 'crown',    next: 'Transcendent', pointsNeeded: 5000 - points, level: 5 };
-  if (points >= 800)   return { title: 'Expert',       icon: 'award',    next: 'Legend',        pointsNeeded: 2000 - points, level: 4 };
-  if (points >= 300)   return { title: 'Pro',          icon: 'star',     next: 'Expert',        pointsNeeded: 800 - points, level: 3 };
-  if (points >= 100)   return { title: 'Regular',      icon: 'shield',   next: 'Pro',           pointsNeeded: 300 - points, level: 2 };
-  if (points >= 25)    return { title: 'Beginner',     icon: 'seedling', next: 'Regular',       pointsNeeded: 100 - points, level: 1 };
-  return { title: 'Newcomer', icon: 'hand-wave', next: 'Beginner', pointsNeeded: 25 - points, level: 0 };
+  if (points >= 15000) return { title: 'Transcendent', icon: 'diamond',  next: 'Max rank!',    pointsNeeded: 0, level: 6 };
+  if (points >= 6000)  return { title: 'Legend',       icon: 'crown',    next: 'Transcendent', pointsNeeded: 15000 - points, level: 5 };
+  if (points >= 2500)  return { title: 'Expert',       icon: 'award',    next: 'Legend',        pointsNeeded: 6000 - points, level: 4 };
+  if (points >= 1000)  return { title: 'Pro',          icon: 'star',     next: 'Expert',        pointsNeeded: 2500 - points, level: 3 };
+  if (points >= 350)   return { title: 'Regular',      icon: 'shield',   next: 'Pro',           pointsNeeded: 1000 - points, level: 2 };
+  if (points >= 75)    return { title: 'Beginner',     icon: 'seedling', next: 'Regular',       pointsNeeded: 350 - points, level: 1 };
+  return { title: 'Newcomer', icon: 'hand-wave', next: 'Beginner', pointsNeeded: 75 - points, level: 0 };
 }
 
 /** Get achievement stats summary */

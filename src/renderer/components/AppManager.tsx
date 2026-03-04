@@ -561,6 +561,7 @@ export const AppManager: React.FC<{ renderApp?: (appId: string) => React.ReactNo
     const toolApps = ['calculator','passwordgenerator','transfers','rewind'];
     const entApps = ['games'];
     const pmApps = ['kanban'];
+    const specialApps = ['achievements'];
     sysApps.forEach(a => { appToCat[a] = 'System'; });
     prodApps.forEach(a => { appToCat[a] = 'Productivity'; });
     creativeApps.forEach(a => { appToCat[a] = 'Creative Suite'; });
@@ -568,6 +569,7 @@ export const AppManager: React.FC<{ renderApp?: (appId: string) => React.ReactNo
     toolApps.forEach(a => { appToCat[a] = 'Tools'; });
     entApps.forEach(a => { appToCat[a] = 'Entertainment'; });
     pmApps.forEach(a => { appToCat[a] = 'Project Management'; });
+    specialApps.forEach(a => { appToCat[a] = 'Entertainment'; });
     LAUNCHPAD_APPS.forEach(app => {
       const cat = appToCat[app.id] || 'Other';
       if (!catMap[cat]) catMap[cat] = [];
