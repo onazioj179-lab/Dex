@@ -1,0 +1,7 @@
+# DEX - Electron App Browser Targets
+# Only targeting Chromium (Electron's rendering engine)
+# This silences all Safari/Firefox compatibility warnings
+
+# Electron 28 uses Chromium 120
+electron >= 28
+chrome >= 120

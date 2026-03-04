@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DEX App Icon - Timeless, Symbolic, System-Native -->
+<!-- A single hexagonal prism representing precision, structure, and execution -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle (for rounded app icon contexts) -->
+  <circle cx="512" cy="512" r="512" fill="#0A0A0C"/>
+  
+  <!-- Outer Hexagon - Structure -->
+  <path 
+    d="M512 144L824 324V684L512 864L200 684V324L512 144Z" 
+    fill="none" 
+    stroke="url(#iconGradient)" 
+    stroke-width="32"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Inner Prism Form - Execution -->
+  <path 
+    d="M512 240L736 372V636L512 768L288 636V372L512 240Z" 
+    fill="url(#innerGradient)"
+    opacity="0.15"
+  />
+  
+  <!-- Central Diamond - Core -->
+  <path 
+    d="M512 340L620 428V596L512 684L404 596V428L512 340Z" 
+    fill="url(#coreGradient)"
+    opacity="0.9"
+  />
+  
+  <!-- Light Accent Line -->
+  <path 
+    d="M512 340L620 428M512 340L404 428" 
+    stroke="white" 
+    stroke-width="4" 
+    stroke-linecap="round"
+    opacity="0.6"
+  />
+  
+  <defs>
+    <!-- Main gradient - subtle blue-white -->
+    <linearGradient id="iconGradient" x1="200" y1="144" x2="824" y2="864" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#E8EAED" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#A8B4C2" stop-opacity="0.75"/>
+    </linearGradient>
+    
+    <!-- Inner fill gradient -->
+    <linearGradient id="innerGradient" x1="288" y1="240" x2="736" y2="768" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#8899AA"/>
+    </linearGradient>
+    
+    <!-- Core gradient -->
+    <linearGradient id="coreGradient" x1="404" y1="340" x2="620" y2="684" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.4" stop-color="#E0E4E8"/>
+      <stop offset="1" stop-color="#C0C8D0"/>
+    </linearGradient>
+  </defs>
+</svg>

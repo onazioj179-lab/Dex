@@ -1,0 +1,39 @@
+[package]
+name = "dex-native"
+version = "1.0.0"
+edition = "2021"
+description = "DEX native performance modules — system monitoring, file scanning, power management"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# NAPI-RS — Node-API bindings for Rust (ABI-stable, no rebuild needed per Node version)
+napi = { version = "2", features = ["napi9", "async", "serde-json"] }
+napi-derive = "2"
+
+# System monitoring — replaces Python psutil + JS systeminformation + ps-list
+sysinfo = "0.30"
+
+# Parallel directory walking — replaces sync readdirSync recursive scans
+jwalk = "0.8"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Platform-specific user directories
+dirs = "5"
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = "symbols"
+codegen-units = 1

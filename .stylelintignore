@@ -1,0 +1,4 @@
+# DEX - Stylelint Ignore
+# Disable all CSS linting - Electron app targeting Chromium only
+
+**/*

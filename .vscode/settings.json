@@ -1,0 +1,106 @@
+{
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DEX - VS Code Workspace Settings
+  // Electron App (Chromium only) - CSS browser warnings are irrelevant
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CSS/SCSS/LESS - DISABLE ALL VALIDATION (Electron = Chromium only)
+  // ─────────────────────────────────────────────────────────────────────────────
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false,
+  "css.lint.vendorPrefix": "ignore",
+  "css.lint.unknownProperties": "ignore",
+  "css.lint.compatibleVendorPrefixes": "ignore",
+  "css.lint.unknownVendorSpecificProperties": "ignore",
+  "css.lint.propertyIgnoredDueToDisplay": "ignore",
+  "css.lint.important": "ignore",
+  "css.lint.float": "ignore",
+  "css.lint.idSelector": "ignore",
+  "css.lint.universalSelector": "ignore",
+  "css.lint.zeroUnits": "ignore",
+  "css.lint.fontFaceProperties": "ignore",
+  "css.lint.hexColorLength": "ignore",
+  "css.lint.argumentsInColorFunction": "ignore",
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.ieHack": "ignore",
+  "css.lint.duplicateProperties": "ignore",
+  "css.lint.emptyRules": "ignore",
+  "scss.lint.vendorPrefix": "ignore",
+  "scss.lint.unknownProperties": "ignore",
+  "scss.lint.compatibleVendorPrefixes": "ignore",
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HTML Validation
+  // ─────────────────────────────────────────────────────────────────────────────
+  "html.validate.styles": false,
+  "html.validate.scripts": true,
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Linters - DISABLED (using TypeScript compiler only)
+  // ─────────────────────────────────────────────────────────────────────────────
+  "eslint.enable": false,
+  "stylelint.enable": false,
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TypeScript/JavaScript - ENABLED
+  // ─────────────────────────────────────────────────────────────────────────────
+  "typescript.validate.enable": true,
+  "javascript.validate.enable": true,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  "typescript.preferences.importModuleSpecifier": "relative",
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Editor Settings
+  // ─────────────────────────────────────────────────────────────────────────────
+  "editor.codeActionsOnSave": {},
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Problems Panel - Show only TypeScript errors
+  // ─────────────────────────────────────────────────────────────────────────────
+  "problems.decorations.enabled": true,
+  "problems.showCurrentInStatus": true,
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // File Exclusions - Hide noise from explorer
+  // ─────────────────────────────────────────────────────────────────────────────
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": false,
+    "**/.git": true,
+    "**/out": true
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Search Exclusions
+  // ─────────────────────────────────────────────────────────────────────────────
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/*.map": true,
+    "**/out": true
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Edge DevTools / Browser Compat - DISABLE (Electron = Chromium only)
+  // ─────────────────────────────────────────────────────────────────────────────
+  "vscode-edge-devtools.enableNetwork": false,
+  "vscode-edge-devtools.webhint": false,
+  "editor.showUnused": false
+}

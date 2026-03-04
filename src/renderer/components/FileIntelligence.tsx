@@ -1,0 +1,1 @@
+export { FileIntelligence } from './SystemHealth';

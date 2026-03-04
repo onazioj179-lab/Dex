@@ -1,0 +1,42 @@
+node_modules/
+dist/
+release/
+*.log
+.DS_Store
+Thumbs.db
+*.local
+# Compiled output in source folders
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts.map
+!src/**/*.d.ts
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test artifacts
+test-results/
+
+# Rust / Native build artifacts
+native/target/
+native/node_modules/
+native/*.node
+native/npm/
+coverage/
+playwright-report/
+
+# Build debris
+*.bak
+tsc-output.txt

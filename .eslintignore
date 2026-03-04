@@ -1,0 +1,10 @@
+# DEX - ESLint Ignore
+# Skip all CSS/style files - Electron app doesn't need browser compat
+
+**/*.css
+**/*.scss
+**/*.less
+dist/
+node_modules/
+out/
+release/

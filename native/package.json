@@ -1,0 +1,25 @@
+{
+  "name": "dex-native",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DEX Rust native modules via NAPI-RS",
+  "main": "index.js",
+  "napi": {
+    "name": "dex-native",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "artifacts": "napi artifacts"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  }
+}

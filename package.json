@@ -1,0 +1,251 @@
+{
+  "name": "dex",
+  "version": "2.0.0",
+  "description": "DEX - Personal Control Hub for Desktop Automation",
+  "main": "dist/main/main.js",
+  "author": "Onazi Treasure OJ <onazi.treasure@outlook.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/onazioj/dex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onazioj/dex.git"
+  },
+  "scripts": {
+    "clean": "rimraf dist release",
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
+    "dev:renderer": "vite",
+    "dev:main": "tsc -p tsconfig.main.json && electron .",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:native": "cd native && npm install && npx napi build --platform --release",
+    "build:native:debug": "cd native && npm install && npx napi build --platform",
+    "build:all": "npm run build:native && npm run build",
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:legacy": "node tests/run-tests.js",
+    "package": "npm run build && electron-builder",
+    "package:win": "npm run build && electron-builder --win",
+    "package:win:portable": "npm run build && electron-builder --win portable",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:linux": "npm run build && electron-builder --linux",
+    "package:all": "npm run build && electron-builder -mwl",
+    "postinstall": "electron-builder install-app-deps",
+    "generate-icons": "node scripts/generate-icons.js",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.3.1",
+    "electron-log": "^5.0.3",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.7.3",
+    "loudness": "^0.4.2",
+    "node-schedule": "^2.1.1",
+    "ps-list": "^8.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "systeminformation": "^5.21.22",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/dompurify": "^3.0.5",
+    "@types/node": "^20.10.0",
+    "@types/node-schedule": "^2.1.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "happy-dom": "^20.3.9",
+    "jsdom": "^27.4.0",
+    "postcss": "^8.4.32",
+    "rimraf": "^5.0.5",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vitest": "^4.0.18"
+  },
+  "build": {
+    "appId": "com.onazioj.dex",
+    "productName": "DEX",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "copyright": "Copyright © 2026 Onazi Treasure OJ. All Rights Reserved.",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "native",
+        "to": "native",
+        "filter": [
+          "*.node"
+        ]
+      },
+      {
+        "from": "src/python",
+        "to": "python",
+        "filter": [
+          "**/*.py",
+          "requirements.txt"
+        ]
+      },
+      {
+        "from": "assets/config/update-server.json",
+        "to": "config/update-server.json"
+      },
+      {
+        "from": "docs/CHANGELOG.md",
+        "to": "CHANGELOG.md"
+      }
+    ],
+    "asar": true,
+    "compression": "maximum",
+    "removePackageScripts": true,
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "publisherName": "Onazi Treasure OJ"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DEX",
+      "license": "LICENSE"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.inherit.plist",
+      "darkModeSupport": true,
+      "type": "distribution",
+      "minimumSystemVersion": "10.15",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Dex needs permission to control other applications for automation.",
+        "NSSystemAdministrationUsageDescription": "Dex needs elevated privileges for certain system automation tasks.",
+        "NSHighResolutionCapable": true,
+        "NSSupportsAutomaticGraphicsSwitching": true,
+        "CFBundleDocumentTypes": [],
+        "LSApplicationCategoryType": "public.app-category.utilities",
+        "LSMinimumSystemVersion": "10.15"
+      }
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility",
+      "maintainer": "Dex Team",
+      "vendor": "Dex",
+      "synopsis": "Personal Control Hub",
+      "description": "Dex - Desktop automation and system control tool"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "deb": {
+      "depends": [
+        "libnotify4",
+        "libxtst6",
+        "libnss3"
+      ],
+      "afterInstall": "assets/linux/after-install.sh",
+      "afterRemove": "assets/linux/after-remove.sh"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "onazioj",
+      "repo": "dex",
+      "releaseType": "release"
+    }
+  }
+}
