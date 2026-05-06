@@ -1,14 +1,14 @@
 {
   "name": "dex",
-  "version": "3.7.2",
+  "version": "3.7.3",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/onazioj/dex",
+  "homepage": "https://github.com/onazioj179-lab/Dex",
   "repository": {
     "type": "git",
-    "url": "https://github.com/onazioj/dex.git"
+    "url": "https://github.com/onazioj179-lab/Dex.git"
   },
   "scripts": {
     "clean": "rimraf dist release",

@@ -5,6 +5,17 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.3] - 2026-05-06 -- CI Package Pipeline Fix
+
+### Fixed
+
+- **Tag-driven Package job failed with HTTP 404** because `package.json`
+  pointed at the wrong GitHub repo (`onazioj/dex`) and electron-builder
+  attempted to publish a release. Repository + homepage URLs are now
+  `onazioj179-lab/Dex`, and CI invokes electron-builder with
+  `--publish=never` (the dedicated `release` job already uses
+  `softprops/action-gh-release` to upload artifacts).
+
 ## [3.7.2] - 2026-05-06 -- CI Watermark Fix
 
 ### Fixed

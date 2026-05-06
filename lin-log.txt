@@ -1,0 +1,463 @@
+﻿2026-05-06T15:28:39.5730726Z Current runner version: '2.334.0'
+2026-05-06T15:28:39.5765155Z ##[group]Runner Image Provisioner
+2026-05-06T15:28:39.5766413Z Hosted Compute Agent
+2026-05-06T15:28:39.5767284Z Version: 20260213.493
+2026-05-06T15:28:39.5768236Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-05-06T15:28:39.5769404Z Build Date: 2026-02-13T00:28:41Z
+2026-05-06T15:28:39.5770436Z Worker ID: {72ffa9f1-0999-4a04-9ee0-b5d9a619d317}
+2026-05-06T15:28:39.5771592Z Azure Region: westus3
+2026-05-06T15:28:39.5772458Z ##[endgroup]
+2026-05-06T15:28:39.5774951Z ##[group]Operating System
+2026-05-06T15:28:39.5776021Z Ubuntu
+2026-05-06T15:28:39.5776794Z 24.04.4
+2026-05-06T15:28:39.5777564Z LTS
+2026-05-06T15:28:39.5778332Z ##[endgroup]
+2026-05-06T15:28:39.5779346Z ##[group]Runner Image
+2026-05-06T15:28:39.5780296Z Image: ubuntu-24.04
+2026-05-06T15:28:39.5781122Z Version: 20260413.86.1
+2026-05-06T15:28:39.5783197Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260413.86/images/ubuntu/Ubuntu2404-Readme.md
+2026-05-06T15:28:39.5786252Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260413.86
+2026-05-06T15:28:39.5787819Z ##[endgroup]
+2026-05-06T15:28:39.5789524Z ##[group]GITHUB_TOKEN Permissions
+2026-05-06T15:28:39.5792284Z Contents: read
+2026-05-06T15:28:39.5793105Z Metadata: read
+2026-05-06T15:28:39.5794181Z Packages: read
+2026-05-06T15:28:39.5795103Z ##[endgroup]
+2026-05-06T15:28:39.5797971Z Secret source: Actions
+2026-05-06T15:28:39.5799110Z Prepare workflow directory
+2026-05-06T15:28:39.6513108Z Prepare all required actions
+2026-05-06T15:28:39.6569950Z Getting action download info
+2026-05-06T15:28:40.1811629Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-05-06T15:28:41.7367435Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-05-06T15:28:42.1780890Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-05-06T15:28:42.3931155Z Complete job name: Package (ubuntu-latest)
+2026-05-06T15:28:42.4619185Z ##[group]Run actions/checkout@v4
+2026-05-06T15:28:42.4619871Z with:
+2026-05-06T15:28:42.4620190Z   repository: onazioj179-lab/Dex
+2026-05-06T15:28:42.4620707Z   token: ***
+2026-05-06T15:28:42.4621003Z   ssh-strict: true
+2026-05-06T15:28:42.4621299Z   ssh-user: git
+2026-05-06T15:28:42.4621593Z   persist-credentials: true
+2026-05-06T15:28:42.4621922Z   clean: true
+2026-05-06T15:28:42.4622220Z   sparse-checkout-cone-mode: true
+2026-05-06T15:28:42.4622569Z   fetch-depth: 1
+2026-05-06T15:28:42.4622854Z   fetch-tags: false
+2026-05-06T15:28:42.4623155Z   show-progress: true
+2026-05-06T15:28:42.4623457Z   lfs: false
+2026-05-06T15:28:42.4623732Z   submodules: false
+2026-05-06T15:28:42.4624258Z   set-safe-directory: true
+2026-05-06T15:28:42.4624844Z env:
+2026-05-06T15:28:42.4625120Z   NODE_VERSION: 20.x
+2026-05-06T15:28:42.4625418Z ##[endgroup]
+2026-05-06T15:28:42.5905491Z Syncing repository: onazioj179-lab/Dex
+2026-05-06T15:28:42.5908735Z ##[group]Getting Git version info
+2026-05-06T15:28:42.5910778Z Working directory is '/home/runner/work/Dex/Dex'
+2026-05-06T15:28:42.5913886Z [command]/usr/bin/git version
+2026-05-06T15:28:42.5915857Z git version 2.53.0
+2026-05-06T15:28:42.5920763Z ##[endgroup]
+2026-05-06T15:28:42.5928014Z Temporarily overriding HOME='/home/runner/work/_temp/73d233b3-463d-4337-abfc-b6937f0056ba' before making global git config changes
+2026-05-06T15:28:42.5929965Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-06T15:28:42.5932117Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Dex/Dex
+2026-05-06T15:28:42.5970701Z Deleting the contents of '/home/runner/work/Dex/Dex'
+2026-05-06T15:28:42.5975469Z ##[group]Initializing the repository
+2026-05-06T15:28:42.5980598Z [command]/usr/bin/git init /home/runner/work/Dex/Dex
+2026-05-06T15:28:42.6077245Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-05-06T15:28:42.6085294Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-05-06T15:28:42.6087062Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-05-06T15:28:42.6095432Z hint: call:
+2026-05-06T15:28:42.6096507Z hint:
+2026-05-06T15:28:42.6097897Z hint: 	git config --global init.defaultBranch <name>
+2026-05-06T15:28:42.6099039Z hint:
+2026-05-06T15:28:42.6105992Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-05-06T15:28:42.6107707Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-05-06T15:28:42.6109428Z hint:
+2026-05-06T15:28:42.6110397Z hint: 	git branch -m <name>
+2026-05-06T15:28:42.6111905Z hint:
+2026-05-06T15:28:42.6113256Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-05-06T15:28:42.6115748Z Initialized empty Git repository in /home/runner/work/Dex/Dex/.git/
+2026-05-06T15:28:42.6119567Z [command]/usr/bin/git remote add origin https://github.com/onazioj179-lab/Dex
+2026-05-06T15:28:42.6127530Z ##[endgroup]
+2026-05-06T15:28:42.6129127Z ##[group]Disabling automatic garbage collection
+2026-05-06T15:28:42.6131679Z [command]/usr/bin/git config --local gc.auto 0
+2026-05-06T15:28:42.6163727Z ##[endgroup]
+2026-05-06T15:28:42.6165831Z ##[group]Setting up auth
+2026-05-06T15:28:42.6171119Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-06T15:28:42.6202417Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-06T15:28:42.7373183Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-06T15:28:42.7393198Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-06T15:28:42.7401950Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-06T15:28:42.7406737Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-06T15:28:42.7417147Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-05-06T15:28:42.7421533Z ##[endgroup]
+2026-05-06T15:28:42.7423042Z ##[group]Fetching the repository
+2026-05-06T15:28:42.7425662Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4100b61d88c0b4836b2d69c500f191a4508c6222:refs/tags/v3.7.2
+2026-05-06T15:28:45.6956541Z From https://github.com/onazioj179-lab/Dex
+2026-05-06T15:28:45.6957664Z  * [new ref]         4100b61d88c0b4836b2d69c500f191a4508c6222 -> v3.7.2
+2026-05-06T15:28:45.7004531Z ##[endgroup]
+2026-05-06T15:28:45.7005629Z ##[group]Determining the checkout info
+2026-05-06T15:28:45.7021619Z ##[endgroup]
+2026-05-06T15:28:45.7022497Z [command]/usr/bin/git sparse-checkout disable
+2026-05-06T15:28:45.7072806Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-05-06T15:28:45.7097084Z ##[group]Checking out the ref
+2026-05-06T15:28:45.7098154Z [command]/usr/bin/git checkout --progress --force refs/tags/v3.7.2
+2026-05-06T15:28:45.8897450Z Note: switching to 'refs/tags/v3.7.2'.
+2026-05-06T15:28:45.8899532Z 
+2026-05-06T15:28:45.8901390Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-05-06T15:28:45.8902636Z changes and commit them, and you can discard any commits you make in this
+2026-05-06T15:28:45.8915568Z state without impacting any branches by switching back to a branch.
+2026-05-06T15:28:45.8916410Z 
+2026-05-06T15:28:45.8916981Z If you want to create a new branch to retain commits you create, you may
+2026-05-06T15:28:45.8918067Z do so (now or later) by using -c with the switch command. Example:
+2026-05-06T15:28:45.8918760Z 
+2026-05-06T15:28:45.8919099Z   git switch -c <new-branch-name>
+2026-05-06T15:28:45.8920001Z 
+2026-05-06T15:28:45.8920351Z Or undo this operation with:
+2026-05-06T15:28:45.8920878Z 
+2026-05-06T15:28:45.8921243Z   git switch -
+2026-05-06T15:28:45.8923023Z 
+2026-05-06T15:28:45.8923786Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-05-06T15:28:45.8925113Z 
+2026-05-06T15:28:45.8925665Z HEAD is now at 4100b61 fix(3.7.2): restore watermarks so CI lint passes
+2026-05-06T15:28:45.8931292Z ##[endgroup]
+2026-05-06T15:28:45.9018212Z [command]/usr/bin/git log -1 --format=%H
+2026-05-06T15:28:45.9041985Z 4100b61d88c0b4836b2d69c500f191a4508c6222
+2026-05-06T15:28:45.9266135Z ##[group]Run actions/setup-node@v4
+2026-05-06T15:28:45.9266406Z with:
+2026-05-06T15:28:45.9266588Z   node-version: 20.x
+2026-05-06T15:28:45.9266783Z   cache: npm
+2026-05-06T15:28:45.9266950Z   always-auth: false
+2026-05-06T15:28:45.9267141Z   check-latest: false
+2026-05-06T15:28:45.9267451Z   token: ***
+2026-05-06T15:28:45.9267638Z env:
+2026-05-06T15:28:45.9267795Z   NODE_VERSION: 20.x
+2026-05-06T15:28:45.9267999Z ##[endgroup]
+2026-05-06T15:28:46.1034362Z Found in cache @ /opt/hostedtoolcache/node/20.20.2/x64
+2026-05-06T15:28:46.1041165Z ##[group]Environment details
+2026-05-06T15:28:46.5135082Z node: v20.20.2
+2026-05-06T15:28:46.5149953Z npm: 10.8.2
+2026-05-06T15:28:46.5155093Z yarn: 1.22.22
+2026-05-06T15:28:46.5158603Z ##[endgroup]
+2026-05-06T15:28:46.5196097Z [command]/opt/hostedtoolcache/node/20.20.2/x64/bin/npm config get cache
+2026-05-06T15:28:46.6600792Z /home/runner/.npm
+2026-05-06T15:28:46.9103571Z Cache hit for: node-cache-Linux-x64-npm-61d12ba90415e666702e00a9eae60248baa856ac4d65270c0f8ed235ed48785c
+2026-05-06T15:28:48.1265907Z Received 16777216 of 129346671 (13.0%), 16.0 MBs/sec
+2026-05-06T15:28:48.9629434Z Received 129346671 of 129346671 (100.0%), 67.1 MBs/sec
+2026-05-06T15:28:48.9630402Z Cache Size: ~123 MB (129346671 B)
+2026-05-06T15:28:48.9719809Z [command]/usr/bin/tar -xf /home/runner/work/_temp/62971557-43be-4eb3-a853-1bab37c39e72/cache.tzst -P -C /home/runner/work/Dex/Dex --use-compress-program unzstd
+2026-05-06T15:28:49.3268320Z Cache restored successfully
+2026-05-06T15:28:49.3385529Z Cache restored from key: node-cache-Linux-x64-npm-61d12ba90415e666702e00a9eae60248baa856ac4d65270c0f8ed235ed48785c
+2026-05-06T15:28:49.3525436Z ##[group]Run npm ci
+2026-05-06T15:28:49.3525703Z [36;1mnpm ci[0m
+2026-05-06T15:28:49.3625730Z shell: /usr/bin/bash -e {0}
+2026-05-06T15:28:49.3625982Z env:
+2026-05-06T15:28:49.3626155Z   NODE_VERSION: 20.x
+2026-05-06T15:28:49.3626354Z ##[endgroup]
+2026-05-06T15:28:53.6298536Z npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+2026-05-06T15:28:53.7882363Z npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+2026-05-06T15:28:53.9306255Z npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2026-05-06T15:28:54.0346149Z npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+2026-05-06T15:28:54.1796850Z npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+2026-05-06T15:29:08.1204787Z 
+2026-05-06T15:29:08.1205751Z > dex@3.7.2 postinstall
+2026-05-06T15:29:08.1206596Z > npx electron-builder install-app-deps
+2026-05-06T15:29:08.1207088Z 
+2026-05-06T15:29:09.1520707Z   • electron-builder  version=24.13.3
+2026-05-06T15:29:09.1537028Z   • loaded configuration  file=package.json ("build" field)
+2026-05-06T15:29:09.1772293Z   • rebuilding native dependencies  dependencies=better-sqlite3@11.6.0 platform=linux arch=x64
+2026-05-06T15:29:09.1773462Z   • install prebuilt binary  name=better-sqlite3 version=11.6.0 platform=linux arch=x64 napi=
+2026-05-06T15:29:09.8341510Z 
+2026-05-06T15:29:09.8342688Z added 658 packages, and audited 659 packages in 20s
+2026-05-06T15:29:09.8344172Z 
+2026-05-06T15:29:09.8350424Z 122 packages are looking for funding
+2026-05-06T15:29:09.8351122Z   run `npm fund` for details
+2026-05-06T15:29:09.9549909Z 
+2026-05-06T15:29:09.9550700Z 23 vulnerabilities (4 low, 5 moderate, 14 high)
+2026-05-06T15:29:09.9551374Z 
+2026-05-06T15:29:09.9567176Z To address issues that do not require attention, run:
+2026-05-06T15:29:09.9584628Z   npm audit fix
+2026-05-06T15:29:09.9592999Z 
+2026-05-06T15:29:09.9593679Z To address all issues (including breaking changes), run:
+2026-05-06T15:29:09.9594675Z   npm audit fix --force
+2026-05-06T15:29:09.9595018Z 
+2026-05-06T15:29:09.9595302Z Run `npm audit` for details.
+2026-05-06T15:29:10.0179027Z ##[group]Run npm run build
+2026-05-06T15:29:10.0179313Z [36;1mnpm run build[0m
+2026-05-06T15:29:10.0212716Z shell: /usr/bin/bash -e {0}
+2026-05-06T15:29:10.0212962Z env:
+2026-05-06T15:29:10.0213132Z   NODE_VERSION: 20.x
+2026-05-06T15:29:10.0213327Z ##[endgroup]
+2026-05-06T15:29:10.1431762Z 
+2026-05-06T15:29:10.1436869Z > dex@3.7.2 build
+2026-05-06T15:29:10.1437677Z > npm run build:renderer && npm run build:main
+2026-05-06T15:29:10.1438406Z 
+2026-05-06T15:29:10.3054516Z 
+2026-05-06T15:29:10.3074869Z > dex@3.7.2 build:renderer
+2026-05-06T15:29:10.3094869Z > vite build
+2026-05-06T15:29:10.3095420Z 
+2026-05-06T15:29:10.5207118Z [33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+2026-05-06T15:29:10.5486070Z [36mvite v5.4.21 [32mbuilding for production...[36m[39m
+2026-05-06T15:29:10.6071639Z transforming...
+2026-05-06T15:29:17.2431111Z [32m✓[39m 294 modules transformed.
+2026-05-06T15:29:17.9835585Z rendering chunks...
+2026-05-06T15:29:18.5845357Z computing gzip size...
+2026-05-06T15:29:18.6385051Z [2m../../dist/renderer/[22m[32mindex.html                                                               [39m[1m[2m     4.13 kB[22m[1m[22m[2m │ gzip:   1.60 kB[22m
+2026-05-06T15:29:18.6387803Z [2m../../dist/renderer/[22m[2massets/[22m[32mnexus-DSkd-nw8.png                                                [39m[1m[2m    68.42 kB[22m[1m[22m
+2026-05-06T15:29:18.6390354Z [2m../../dist/renderer/[22m[2massets/[22m[32mvinx-CP4dVCHC.png                                                 [39m[1m[2m   357.01 kB[22m[1m[22m
+2026-05-06T15:29:18.6392736Z [2m../../dist/renderer/[22m[2massets/[22m[32mforge-DfE0FH0e.png                                                [39m[1m[2m   386.13 kB[22m[1m[22m
+2026-05-06T15:29:18.6395266Z [2m../../dist/renderer/[22m[2massets/[22m[32mimosion-B_J7zYYR.png                                              [39m[1m[2m   470.47 kB[22m[1m[22m
+2026-05-06T15:29:18.6397756Z [2m../../dist/renderer/[22m[2massets/[22m[32msand-dunes-tower-tranquil-black-white-generative-ai-CdMFlqrW.jpg  [39m[1m[2m 7,875.44 kB[22m[1m[22m
+2026-05-06T15:29:18.6400382Z [2m../../dist/renderer/[22m[2massets/[22m[32misland-dark-DU1WltMg.jpg                                          [39m[1m[2m10,179.89 kB[22m[1m[22m
+2026-05-06T15:29:18.6403026Z [2m../../dist/renderer/[22m[2massets/[22m[35mindex-DwdwLP8S.css                                                [39m[1m[2m   223.07 kB[22m[1m[22m[2m │ gzip:  42.49 kB[22m
+2026-05-06T15:29:18.6406020Z [2m../../dist/renderer/[22m[2massets/[22m[36museRecentFiles-C-nEMp6L.js                                        [39m[1m[2m     0.57 kB[22m[1m[22m[2m │ gzip:   0.35 kB[22m
+2026-05-06T15:29:18.6408752Z [2m../../dist/renderer/[22m[2massets/[22m[36mKeyboardShortcuts-BqYX0mDI.js                                     [39m[1m[2m     3.61 kB[22m[1m[22m[2m │ gzip:   1.43 kB[22m
+2026-05-06T15:29:18.6411497Z [2m../../dist/renderer/[22m[2massets/[22m[36mPolicyViewer-BRsmufwW.js                                          [39m[1m[2m     4.15 kB[22m[1m[22m[2m │ gzip:   1.53 kB[22m
+2026-05-06T15:29:18.6413768Z [2m../../dist/renderer/[22m[2massets/[22m[36mSelect-C-wbR7rD.js                                                [39m[1m[2m     5.56 kB[22m[1m[22m[2m │ gzip:   2.13 kB[22m
+2026-05-06T15:29:18.6415510Z [33m
+2026-05-06T15:29:18.6417198Z [2m../../dist/renderer/[22m[2massets/[22m[36mzustand-vendor-D-WJDdhR.js                                        [39m[1m[2m     8.46 kB[22m[1m[22m[2m │ gzip:   3.25 kB[22m
+2026-05-06T15:29:18.6419861Z [2m../../dist/renderer/[22m[2massets/[22m[36mDiagnosticsPanel-DcfSKNqe.js                                      [39m[1m[2m     8.47 kB[22m[1m[22m[2m │ gzip:   2.80 kB[22m
+2026-05-06T15:29:18.6444784Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-05-06T15:29:18.6447021Z [2m../../dist/renderer/[22m[2massets/[22m[36md3-vendor-CF2J4uHN.js                                             [39m[1m[2m    14.84 kB[22m[1m[22m[2m │ gzip:   5.68 kB[22m
+2026-05-06T15:29:18.6485186Z - Using dynamic import() to code-split the application
+2026-05-06T15:29:18.6487193Z [2m../../dist/renderer/[22m[2massets/[22m[36mLockScreen-DrAQ-hWb.js                                            [39m[1m[2m    18.23 kB[22m[1m[22m[2m │ gzip:   5.52 kB[22m
+2026-05-06T15:29:18.6506473Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-05-06T15:29:18.6509102Z [2m../../dist/renderer/[22m[2massets/[22m[36mdex-shared-CI-0HFko.js                                            [39m[1m[2m    19.16 kB[22m[1m[22m[2m │ gzip:   6.78 kB[22m
+2026-05-06T15:29:18.6511339Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-05-06T15:29:18.6513450Z [2m../../dist/renderer/[22m[2massets/[22m[36msanitize-vendor-Af_97_HO.js                                       [39m[1m[2m    22.57 kB[22m[1m[22m[2m │ gzip:   8.71 kB[22m
+2026-05-06T15:29:18.6530384Z [2m../../dist/renderer/[22m[2massets/[22m[36mTasks-WI4srDSY.js                                                 [39m[1m[2m    25.09 kB[22m[1m[22m[2m │ gzip:   6.89 kB[22m
+2026-05-06T15:29:18.6533227Z [2m../../dist/renderer/[22m[2massets/[22m[36mTransfers-CbjUChAo.js                                             [39m[1m[2m    39.47 kB[22m[1m[22m[2m │ gzip:   9.59 kB[22m
+2026-05-06T15:29:18.6536907Z [2m../../dist/renderer/[22m[2massets/[22m[36mWorkflows-DRm8Rl-H.js                                             [39m[1m[2m    44.27 kB[22m[1m[22m[2m │ gzip:  11.48 kB[22m
+2026-05-06T15:29:18.6539763Z [2m../../dist/renderer/[22m[2massets/[22m[36mPower-BrVlyXCI.js                                                 [39m[1m[2m    47.20 kB[22m[1m[22m[2m │ gzip:  11.64 kB[22m
+2026-05-06T15:29:18.6563416Z [2m../../dist/renderer/[22m[2massets/[22m[36mAudio-CiBgPKlz.js                                                 [39m[1m[2m    51.27 kB[22m[1m[22m[2m │ gzip:  13.44 kB[22m
+2026-05-06T15:29:18.6566491Z [2m../../dist/renderer/[22m[2massets/[22m[36mBrowser-CfOWuzpS.js                                               [39m[1m[2m    61.89 kB[22m[1m[22m[2m │ gzip:  16.05 kB[22m
+2026-05-06T15:29:18.6569757Z [2m../../dist/renderer/[22m[2massets/[22m[36mHome-C27R7PvB.js                                                  [39m[1m[2m    66.79 kB[22m[1m[22m[2m │ gzip:  17.19 kB[22m
+2026-05-06T15:29:18.6572478Z [2m../../dist/renderer/[22m[2massets/[22m[36mFiles-BUUflpDi.js                                                 [39m[1m[2m    68.62 kB[22m[1m[22m[2m │ gzip:  15.69 kB[22m
+2026-05-06T15:29:18.6576404Z [2m../../dist/renderer/[22m[2massets/[22m[36mGallery-vWgeZ6ta.js                                               [39m[1m[2m    79.15 kB[22m[1m[22m[2m │ gzip:  18.56 kB[22m
+2026-05-06T15:29:18.6579162Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-notes-nGK6NCp-.js                                             [39m[1m[2m    81.27 kB[22m[1m[22m[2m │ gzip:  21.26 kB[22m
+2026-05-06T15:29:18.6582437Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-rewind-Dlxd1TYD.js                                            [39m[1m[2m    94.72 kB[22m[1m[22m[2m │ gzip:  22.96 kB[22m
+2026-05-06T15:29:18.6585768Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-forge-DI_tNffe.js                                             [39m[1m[2m   112.33 kB[22m[1m[22m[2m │ gzip:  25.38 kB[22m
+2026-05-06T15:29:18.6589100Z [2m../../dist/renderer/[22m[2massets/[22m[36mSettings-BPR0R2j4.js                                              [39m[1m[2m   121.25 kB[22m[1m[22m[2m │ gzip:  28.87 kB[22m
+2026-05-06T15:29:18.6592152Z [2m../../dist/renderer/[22m[2massets/[22m[36mreact-vendor-yZg-IhKN.js                                          [39m[1m[2m   141.64 kB[22m[1m[22m[2m │ gzip:  45.35 kB[22m
+2026-05-06T15:29:18.6619270Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-flux-HtE2vH2n.js                                              [39m[1m[2m   219.47 kB[22m[1m[22m[2m │ gzip:  46.31 kB[22m
+2026-05-06T15:29:18.6622038Z [2m../../dist/renderer/[22m[2massets/[22m[36mindex-CaAO0v75.js                                                 [39m[1m[2m   233.28 kB[22m[1m[22m[2m │ gzip:  65.54 kB[22m
+2026-05-06T15:29:18.6625604Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-vinx-DkK0Oc8R.js                                              [39m[1m[2m   235.98 kB[22m[1m[22m[2m │ gzip:  52.02 kB[22m
+2026-05-06T15:29:18.6628357Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-prism-DSWZlHft.js                                             [39m[1m[2m   238.68 kB[22m[1m[22m[2m │ gzip:  49.73 kB[22m
+2026-05-06T15:29:18.6631783Z [2m../../dist/renderer/[22m[2massets/[22m[36mAppManager-CPT0Ebgi.js                                            [39m[1m[2m   282.14 kB[22m[1m[22m[2m │ gzip:  74.22 kB[22m
+2026-05-06T15:29:18.6634997Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-standalone-By4G4nOY.js                                        [39m[1m[2m   328.69 kB[22m[1m[22m[2m │ gzip:  82.66 kB[22m
+2026-05-06T15:29:18.6638367Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-imosion-DB4R2jKD.js                                           [39m[1m[2m   408.67 kB[22m[1m[22m[2m │ gzip:  78.56 kB[22m
+2026-05-06T15:29:18.6641214Z [2m../../dist/renderer/[22m[2massets/[22m[36mapp-axl-CKmVoKM7.js                                               [39m[1m[33m   508.18 kB[39m[22m[2m │ gzip: 120.35 kB[22m
+2026-05-06T15:29:18.6643349Z [32m✓ built in 8.07s[39m
+2026-05-06T15:29:18.8539163Z 
+2026-05-06T15:29:18.8539892Z > dex@3.7.2 build:main
+2026-05-06T15:29:18.8542455Z > tsc -p tsconfig.main.json
+2026-05-06T15:29:18.8542774Z 
+2026-05-06T15:29:37.5777782Z ##[group]Run npx electron-builder --linux
+2026-05-06T15:29:37.5778150Z [36;1mnpx electron-builder --linux[0m
+2026-05-06T15:29:37.5799155Z shell: /usr/bin/bash -e {0}
+2026-05-06T15:29:37.5799389Z env:
+2026-05-06T15:29:37.5799557Z   NODE_VERSION: 20.x
+2026-05-06T15:29:37.5799970Z   GH_TOKEN: ***
+2026-05-06T15:29:37.5800163Z ##[endgroup]
+2026-05-06T15:29:38.3874302Z   • electron-builder  version=24.13.3 os=6.17.0-1010-azure
+2026-05-06T15:29:38.4055508Z   • artifacts will be published  reason=tag is defined tag=v3.7.2
+2026-05-06T15:29:38.4074926Z   • loaded configuration  file=package.json ("build" field)
+2026-05-06T15:29:38.5756909Z   • rebuilding native dependencies  dependencies=better-sqlite3@11.6.0 platform=linux arch=x64
+2026-05-06T15:29:38.5760188Z   • install prebuilt binary  name=better-sqlite3 version=11.6.0 platform=linux arch=x64 napi=
+2026-05-06T15:29:38.6982228Z   • packaging       platform=linux arch=x64 electron=28.3.3 appOutDir=release/linux-unpacked
+2026-05-06T15:29:38.9635404Z   • downloading     url=https://github.com/electron/electron/releases/download/v28.3.3/electron-v28.3.3-linux-x64.zip size=102 MB parts=4
+2026-05-06T15:29:39.3018396Z   • downloaded      url=https://github.com/electron/electron/releases/download/v28.3.3/electron-v28.3.3-linux-x64.zip duration=599ms
+2026-05-06T15:29:46.1144948Z   • building        target=AppImage arch=x64 file=release/DEX-3.7.2.AppImage
+2026-05-06T15:29:46.5220950Z   • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/appimage-12.0.1/appimage-12.0.1.7z size=1.6 MB parts=1
+2026-05-06T15:29:46.6413167Z   • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/appimage-12.0.1/appimage-12.0.1.7z duration=485ms
+2026-05-06T15:30:41.5277685Z   • building        target=deb arch=x64 file=release/DEX-3.7.2-linux-amd64.deb
+2026-05-06T15:30:41.5285147Z   • publishing      publisher=Github (owner: onazioj, project: dex, version: 3.7.2)
+2026-05-06T15:30:41.5313098Z   • uploading       file=DEX-3.7.2.AppImage provider=github
+2026-05-06T15:30:41.5663167Z   • adding autoupdate files for: deb. (Beta feature)  resourceDir=/home/runner/work/Dex/Dex/release/linux-unpacked/resources
+2026-05-06T15:30:41.9189423Z   • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/fpm-1.9.3-2.3.1-linux-x86_64/fpm-1.9.3-2.3.1-linux-x86_64.7z size=5.0 MB parts=1
+2026-05-06T15:30:42.0691504Z   • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/fpm-1.9.3-2.3.1-linux-x86_64/fpm-1.9.3-2.3.1-linux-x86_64.7z duration=494ms
+2026-05-06T15:32:18.8346770Z   • uploading       file=DEX-3.7.2-linux-amd64.deb provider=github
+2026-05-06T15:32:18.8724902Z   ⨯ Cannot cleanup: 
+2026-05-06T15:32:18.8725250Z 
+2026-05-06T15:32:18.8726136Z Error #1 --------------------------------------------------------------------------------
+2026-05-06T15:32:18.8727800Z HttpError: 404 Not Found
+2026-05-06T15:32:18.8735812Z "method: GET url: https://api.github.com/repos/onazioj/dex/releases\n\nPlease double check that your authentication token is correct. Due to security reasons, actual status maybe not reported, but 404.\n"
+2026-05-06T15:32:18.8738636Z Headers: {
+2026-05-06T15:32:18.8739869Z   "date": "Wed, 06 May 2026 15:30:41 GMT",
+2026-05-06T15:32:18.8745328Z   "content-type": "application/json; charset=utf-8",
+2026-05-06T15:32:18.8746226Z   "content-length": "121",
+2026-05-06T15:32:18.8747224Z   "x-github-media-type": "github.v3; format=json",
+2026-05-06T15:32:18.8754750Z   "x-accepted-github-permissions": "contents=read",
+2026-05-06T15:32:18.8755436Z   "x-github-api-version-selected": "2022-11-28",
+2026-05-06T15:32:18.8758455Z   "access-control-expose-headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset",
+2026-05-06T15:32:18.8760904Z   "access-control-allow-origin": "*",
+2026-05-06T15:32:18.8761686Z   "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+2026-05-06T15:32:18.8762397Z   "x-frame-options": "deny",
+2026-05-06T15:32:18.8762866Z   "x-content-type-options": "nosniff",
+2026-05-06T15:32:18.8763325Z   "x-xss-protection": "0",
+2026-05-06T15:32:18.8764315Z   "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+2026-05-06T15:32:18.8765214Z   "content-security-policy": "default-src 'none'",
+2026-05-06T15:32:18.8765864Z   "vary": "Accept-Encoding, Accept, X-Requested-With",
+2026-05-06T15:32:18.8766566Z   "x-github-request-id": "F800:1E77:85690E6:2019591A:69FB5EA1",
+2026-05-06T15:32:18.8767088Z   "server": "github.com",
+2026-05-06T15:32:18.8767493Z   "x-ratelimit-limit": "5000",
+2026-05-06T15:32:18.8767921Z   "x-ratelimit-remaining": "4993",
+2026-05-06T15:32:18.8768372Z   "x-ratelimit-reset": "1778082067",
+2026-05-06T15:32:18.8768793Z   "x-ratelimit-used": "7",
+2026-05-06T15:32:18.8769186Z   "x-ratelimit-resource": "core"
+2026-05-06T15:32:18.8769558Z }
+2026-05-06T15:32:18.8770313Z     at createHttpError (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:30:10)
+2026-05-06T15:32:18.8771754Z     at NodeHttpExecutor.handleResponse (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:162:9)
+2026-05-06T15:32:18.8773649Z     at ClientRequest.<anonymous> (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:117:16)
+2026-05-06T15:32:18.8775280Z     at Object.onceWrapper (node:events:639:26)
+2026-05-06T15:32:18.8775860Z     at ClientRequest.emit (node:events:524:28)
+2026-05-06T15:32:18.8776582Z     at HTTPParser.parserOnIncomingClient (node:_http_client:702:27)
+2026-05-06T15:32:18.8777419Z     at HTTPParser.parserOnHeadersComplete (node:_http_common:118:17)
+2026-05-06T15:32:18.8778129Z     at TLSSocket.socketOnData (node:_http_client:544:22)
+2026-05-06T15:32:18.8778688Z     at TLSSocket.emit (node:events:524:28)
+2026-05-06T15:32:18.8779231Z     at addChunk (node:internal/streams/readable:561:12)
+2026-05-06T15:32:18.8779981Z     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+2026-05-06T15:32:18.8780824Z     at TLSSocket.Readable.push (node:internal/streams/readable:392:5)
+2026-05-06T15:32:18.8781607Z     at TLSWrap.onStreamRead (node:internal/stream_base_commons:191:23)
+2026-05-06T15:32:18.8782056Z 
+2026-05-06T15:32:18.8782536Z Error #2 --------------------------------------------------------------------------------
+2026-05-06T15:32:18.8783145Z HttpError: 404 Not Found
+2026-05-06T15:32:18.8785319Z "method: GET url: https://api.github.com/repos/onazioj/dex/releases\n\nPlease double check that your authentication token is correct. Due to security reasons, actual status maybe not reported, but 404.\n"
+2026-05-06T15:32:18.8786768Z Headers: {
+2026-05-06T15:32:18.8787121Z   "date": "Wed, 06 May 2026 15:30:41 GMT",
+2026-05-06T15:32:18.8787703Z   "content-type": "application/json; charset=utf-8",
+2026-05-06T15:32:18.8788213Z   "content-length": "121",
+2026-05-06T15:32:18.8788710Z   "x-github-media-type": "github.v3; format=json",
+2026-05-06T15:32:18.8789338Z   "x-accepted-github-permissions": "contents=read",
+2026-05-06T15:32:18.8789960Z   "x-github-api-version-selected": "2022-11-28",
+2026-05-06T15:32:18.8792648Z   "access-control-expose-headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset",
+2026-05-06T15:32:18.8795251Z   "access-control-allow-origin": "*",
+2026-05-06T15:32:18.8796010Z   "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+2026-05-06T15:32:18.8796704Z   "x-frame-options": "deny",
+2026-05-06T15:32:18.8797153Z   "x-content-type-options": "nosniff",
+2026-05-06T15:32:18.8797770Z   "x-xss-protection": "0",
+2026-05-06T15:32:18.8798457Z   "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+2026-05-06T15:32:18.8799285Z   "content-security-policy": "default-src 'none'",
+2026-05-06T15:32:18.8799927Z   "vary": "Accept-Encoding, Accept, X-Requested-With",
+2026-05-06T15:32:18.8800621Z   "x-github-request-id": "F800:1E77:85690E6:2019591A:69FB5EA1",
+2026-05-06T15:32:18.8801175Z   "server": "github.com",
+2026-05-06T15:32:18.8801575Z   "x-ratelimit-limit": "5000",
+2026-05-06T15:32:18.8802026Z   "x-ratelimit-remaining": "4993",
+2026-05-06T15:32:18.8802564Z   "x-ratelimit-reset": "1778082067",
+2026-05-06T15:32:18.8803032Z   "x-ratelimit-used": "7",
+2026-05-06T15:32:18.8803443Z   "x-ratelimit-resource": "core"
+2026-05-06T15:32:18.8803786Z }
+2026-05-06T15:32:18.8804787Z     at createHttpError (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:30:10)
+2026-05-06T15:32:18.8806344Z     at NodeHttpExecutor.handleResponse (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:162:9)
+2026-05-06T15:32:18.8807968Z     at ClientRequest.<anonymous> (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:117:16)
+2026-05-06T15:32:18.8809004Z     at Object.onceWrapper (node:events:639:26)
+2026-05-06T15:32:18.8809561Z     at ClientRequest.emit (node:events:524:28)
+2026-05-06T15:32:18.8810263Z     at HTTPParser.parserOnIncomingClient (node:_http_client:702:27)
+2026-05-06T15:32:18.8811285Z     at HTTPParser.parserOnHeadersComplete (node:_http_common:118:17)
+2026-05-06T15:32:18.8811993Z     at TLSSocket.socketOnData (node:_http_client:544:22)
+2026-05-06T15:32:18.8812537Z     at TLSSocket.emit (node:events:524:28)
+2026-05-06T15:32:18.8813089Z     at addChunk (node:internal/streams/readable:561:12)
+2026-05-06T15:32:18.8813860Z     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+2026-05-06T15:32:18.8815024Z     at TLSSocket.Readable.push (node:internal/streams/readable:392:5)
+2026-05-06T15:32:18.8816227Z     at TLSWrap.onStreamRead (node:internal/stream_base_commons:191:23)  failedTask=build stackTrace=Error: Cannot cleanup: 
+2026-05-06T15:32:18.8834380Z                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               Error #1 --------------------------------------------------------------------------------
+2026-05-06T15:32:18.8846913Z HttpError: 404 Not Found
+2026-05-06T15:32:18.8848674Z "method: GET url: https://api.github.com/repos/onazioj/dex/releases\n\nPlease double check that your authentication token is correct. Due to security reasons, actual status maybe not reported, but 404.\n"
+2026-05-06T15:32:18.8850162Z Headers: {
+2026-05-06T15:32:18.8850536Z   "date": "Wed, 06 May 2026 15:30:41 GMT",
+2026-05-06T15:32:18.8851168Z   "content-type": "application/json; charset=utf-8",
+2026-05-06T15:32:18.8851736Z   "content-length": "121",
+2026-05-06T15:32:18.8852284Z   "x-github-media-type": "github.v3; format=json",
+2026-05-06T15:32:18.8852953Z   "x-accepted-github-permissions": "contents=read",
+2026-05-06T15:32:18.8853863Z   "x-github-api-version-selected": "2022-11-28",
+2026-05-06T15:32:18.8856946Z   "access-control-expose-headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset",
+2026-05-06T15:32:18.8859268Z   "access-control-allow-origin": "*",
+2026-05-06T15:32:18.8859756Z   "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+2026-05-06T15:32:18.8860176Z   "x-frame-options": "deny",
+2026-05-06T15:32:18.8860464Z   "x-content-type-options": "nosniff",
+2026-05-06T15:32:18.8860739Z   "x-xss-protection": "0",
+2026-05-06T15:32:18.8861171Z   "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+2026-05-06T15:32:18.8861656Z   "content-security-policy": "default-src 'none'",
+2026-05-06T15:32:18.8862035Z   "vary": "Accept-Encoding, Accept, X-Requested-With",
+2026-05-06T15:32:18.8862443Z   "x-github-request-id": "F800:1E77:85690E6:2019591A:69FB5EA1",
+2026-05-06T15:32:18.8862770Z   "server": "github.com",
+2026-05-06T15:32:18.8863012Z   "x-ratelimit-limit": "5000",
+2026-05-06T15:32:18.8863272Z   "x-ratelimit-remaining": "4993",
+2026-05-06T15:32:18.8863539Z   "x-ratelimit-reset": "1778082067",
+2026-05-06T15:32:18.8863786Z   "x-ratelimit-used": "7",
+2026-05-06T15:32:18.8865308Z   "x-ratelimit-resource": "core"
+2026-05-06T15:32:18.8866087Z }
+2026-05-06T15:32:18.8866988Z     at createHttpError (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:30:10)
+2026-05-06T15:32:18.8868106Z     at NodeHttpExecutor.handleResponse (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:162:9)
+2026-05-06T15:32:18.8869022Z     at ClientRequest.<anonymous> (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:117:16)
+2026-05-06T15:32:18.8869613Z     at Object.onceWrapper (node:events:639:26)
+2026-05-06T15:32:18.8869945Z     at ClientRequest.emit (node:events:524:28)
+2026-05-06T15:32:18.8870357Z     at HTTPParser.parserOnIncomingClient (node:_http_client:702:27)
+2026-05-06T15:32:18.8870858Z     at HTTPParser.parserOnHeadersComplete (node:_http_common:118:17)
+2026-05-06T15:32:18.8871319Z     at TLSSocket.socketOnData (node:_http_client:544:22)
+2026-05-06T15:32:18.8871667Z     at TLSSocket.emit (node:events:524:28)
+2026-05-06T15:32:18.8872005Z     at addChunk (node:internal/streams/readable:561:12)
+2026-05-06T15:32:18.8872470Z     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+2026-05-06T15:32:18.8872978Z     at TLSSocket.Readable.push (node:internal/streams/readable:392:5)
+2026-05-06T15:32:18.8873456Z     at TLSWrap.onStreamRead (node:internal/stream_base_commons:191:23)
+2026-05-06T15:32:18.8885609Z                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               Error #2 --------------------------------------------------------------------------------
+2026-05-06T15:32:18.8892624Z HttpError: 404 Not Found
+2026-05-06T15:32:18.8893724Z "method: GET url: https://api.github.com/repos/onazioj/dex/releases\n\nPlease double check that your authentication token is correct. Due to security reasons, actual status maybe not reported, but 404.\n"
+2026-05-06T15:32:18.8895481Z Headers: {
+2026-05-06T15:32:18.8895720Z   "date": "Wed, 06 May 2026 15:30:41 GMT",
+2026-05-06T15:32:18.8896075Z   "content-type": "application/json; charset=utf-8",
+2026-05-06T15:32:18.8896376Z   "content-length": "121",
+2026-05-06T15:32:18.8896681Z   "x-github-media-type": "github.v3; format=json",
+2026-05-06T15:32:18.8897047Z   "x-accepted-github-permissions": "contents=read",
+2026-05-06T15:32:18.8897412Z   "x-github-api-version-selected": "2022-11-28",
+2026-05-06T15:32:18.8898900Z   "access-control-expose-headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset",
+2026-05-06T15:32:18.8900241Z   "access-control-allow-origin": "*",
+2026-05-06T15:32:18.8900680Z   "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+2026-05-06T15:32:18.8901094Z   "x-frame-options": "deny",
+2026-05-06T15:32:18.8901369Z   "x-content-type-options": "nosniff",
+2026-05-06T15:32:18.8901634Z   "x-xss-protection": "0",
+2026-05-06T15:32:18.8902043Z   "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+2026-05-06T15:32:18.8902697Z   "content-security-policy": "default-src 'none'",
+2026-05-06T15:32:18.8903065Z   "vary": "Accept-Encoding, Accept, X-Requested-With",
+2026-05-06T15:32:18.8903469Z   "x-github-request-id": "F800:1E77:85690E6:2019591A:69FB5EA1",
+2026-05-06T15:32:18.8903792Z   "server": "github.com",
+2026-05-06T15:32:18.8904339Z   "x-ratelimit-limit": "5000",
+2026-05-06T15:32:18.8904809Z   "x-ratelimit-remaining": "4993",
+2026-05-06T15:32:18.8905289Z   "x-ratelimit-reset": "1778082067",
+2026-05-06T15:32:18.8905709Z   "x-ratelimit-used": "7",
+2026-05-06T15:32:18.8906144Z   "x-ratelimit-resource": "core"
+2026-05-06T15:32:18.8906532Z }
+2026-05-06T15:32:18.8907372Z     at createHttpError (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:30:10)
+2026-05-06T15:32:18.8909004Z     at NodeHttpExecutor.handleResponse (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:162:9)
+2026-05-06T15:32:18.8910767Z     at ClientRequest.<anonymous> (/home/runner/work/Dex/Dex/node_modules/builder-util-runtime/src/httpExecutor.ts:117:16)
+2026-05-06T15:32:18.8911986Z     at Object.onceWrapper (node:events:639:26)
+2026-05-06T15:32:18.8912615Z     at ClientRequest.emit (node:events:524:28)
+2026-05-06T15:32:18.8913449Z     at HTTPParser.parserOnIncomingClient (node:_http_client:702:27)
+2026-05-06T15:32:18.8914743Z     at HTTPParser.parserOnHeadersComplete (node:_http_common:118:17)
+2026-05-06T15:32:18.8915603Z     at TLSSocket.socketOnData (node:_http_client:544:22)
+2026-05-06T15:32:18.8916268Z     at TLSSocket.emit (node:events:524:28)
+2026-05-06T15:32:18.8916932Z     at addChunk (node:internal/streams/readable:561:12)
+2026-05-06T15:32:18.8917809Z     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+2026-05-06T15:32:18.8918764Z     at TLSSocket.Readable.push (node:internal/streams/readable:392:5)
+2026-05-06T15:32:18.8919679Z     at TLSWrap.onStreamRead (node:internal/stream_base_commons:191:23)
+2026-05-06T15:32:18.8920812Z     at throwError (/home/runner/work/Dex/Dex/node_modules/builder-util/src/asyncTaskManager.ts:89:11)
+2026-05-06T15:32:18.8922179Z     at checkErrors (/home/runner/work/Dex/Dex/node_modules/builder-util/src/asyncTaskManager.ts:53:9)
+2026-05-06T15:32:18.8923679Z     at AsyncTaskManager.awaitTasks (/home/runner/work/Dex/Dex/node_modules/builder-util/src/asyncTaskManager.ts:58:5)
+2026-05-06T15:32:18.8925691Z     at PublishManager.awaitTasks (/home/runner/work/Dex/Dex/node_modules/app-builder-lib/src/publish/PublishManager.ts:236:28)
+2026-05-06T15:32:18.8927360Z     at /home/runner/work/Dex/Dex/node_modules/app-builder-lib/src/index.ts:119:32
+2026-05-06T15:32:18.8928588Z     at executeFinally (/home/runner/work/Dex/Dex/node_modules/builder-util/src/promise.ts:23:9)
+2026-05-06T15:32:18.8996448Z ##[error]Process completed with exit code 1.
+2026-05-06T15:32:18.9104582Z Post job cleanup.
+2026-05-06T15:32:19.0106574Z [command]/usr/bin/git version
+2026-05-06T15:32:19.0147744Z git version 2.53.0
+2026-05-06T15:32:19.0194667Z Temporarily overriding HOME='/home/runner/work/_temp/156e88b6-7b0f-4995-90e4-b895d089a12c' before making global git config changes
+2026-05-06T15:32:19.0196599Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-06T15:32:19.0200846Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Dex/Dex
+2026-05-06T15:32:19.0247348Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-06T15:32:19.0283595Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-06T15:32:19.0521792Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-06T15:32:19.0546484Z http.https://github.com/.extraheader
+2026-05-06T15:32:19.0560464Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-05-06T15:32:19.0595106Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-06T15:32:19.0822268Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-06T15:32:19.0856326Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-06T15:32:19.1372275Z Cleaning up orphan processes
+2026-05-06T15:32:19.1650581Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-node@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
