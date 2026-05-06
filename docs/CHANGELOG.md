@@ -5,6 +5,20 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.2] - 2026-05-06 -- Hotfix: Production Renderer Boot
+
+### Fixed
+
+- **Blank window on launch (regression in 3.6.1)**: in the packaged build the
+  Vite manual-chunks split `react` and `react-dom` into separate vendor bundles.
+  When `react-dom-vendor` evaluated before `react-vendor` in `index.html`, React
+  18 threw `Cannot read properties of undefined (reading
+  '__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED')` and no UI ever
+  mounted. `react`, `react-dom`, `scheduler`, and `react-is` now share a single
+  `react-vendor` chunk, eliminating the load-order race.
+- Smoke-tested with `--enable-logging=stderr --v=1`; no uncaught exceptions on
+  cold start of the packaged installer.
+
 ## [3.6.1] - 2026-05-06 -- Sharp Pass: Permissions, Network Modes, Terminal & Native Fuzzy
 
 ### Added

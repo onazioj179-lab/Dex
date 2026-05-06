@@ -32,16 +32,28 @@ export default defineConfig({
         // Item 133: granular manual chunks for efficient caching
         manualChunks: (id: string) => {
           // Vendor chunks
-          if (id.includes('node_modules/react-dom')) return 'react-dom-vendor';
-          if (id.includes('node_modules/react')) return 'react-vendor';
+          // NOTE: react and react-dom MUST share a chunk. Splitting them causes
+          // "Cannot read properties of undefined (reading '__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED')"
+          // when react-dom evaluates before react in production index.html script order.
+          if (
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/scheduler') ||
+            id.endsWith('node_modules/react') ||
+            id.includes('node_modules/react-is')
+          ) {
+            return 'react-vendor';
+          }
           if (id.includes('node_modules/zustand')) return 'zustand-vendor';
           if (id.includes('node_modules/lucide-react')) return 'icons-vendor';
           if (id.includes('node_modules/dompurify')) return 'sanitize-vendor';
           if (id.includes('node_modules/d3-force')) return 'd3-vendor';
           // DEX sub-apps into their own chunks (lazy-loadable)
           if (id.includes('DEXAPPLICATIONS/')) {
-            if (id.includes('DEXAPPLICATIONS/axl/engine') || id.includes('DEXAPPLICATIONS/axl/stores/')) return 'app-axl-core';
-            if (id.includes('DEXAPPLICATIONS/axl/components/') || id.includes('DEXAPPLICATIONS/axl/utils/')) return 'app-axl-ui';
+            // NOTE: axl was previously split into axl-core (engine+stores) and
+            // axl-ui (components+utils). That created a circular dependency
+            // between the two chunks, producing "Cannot access 'S' before
+            // initialization" in production. Keep all axl in one chunk.
             const match = id.match(/DEXAPPLICATIONS\/([^/]+)/);
             return match ? `app-${match[1].toLowerCase()}` : 'dex-apps';
           }

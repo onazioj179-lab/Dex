@@ -1,8 +1,12 @@
 # DEX - Personal Control Hub
 
-> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.6.1 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
+> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.6.2 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
 
 A cross-platform desktop automation app that lets you define rules, modes, and actions to locally control your computer with full transparency.
+
+## What's New in 3.6.2
+
+- **Hotfix**: fixes the blank-window regression that appeared in 3.6.1 packaged builds. React and react-dom now share a single vendor chunk so renderer boot never races with the React internals lookup. See `docs/CHANGELOG.md` for details.
 
 ## What's New in 3.6.1
 
