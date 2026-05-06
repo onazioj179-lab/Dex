@@ -1828,7 +1828,7 @@ class DexApp {
     // the watchdog so it can detect frozen renderers.
     // ---------------------------------------------------------------------------
     let _firstHeartbeat = true;
-    ipcMain.on('renderer:heartbeat', (_event, payload: {
+    ipcMain.handle('renderer:heartbeat', (_event, payload: {
       t: number;
       frameTimeMs: number;
       heapUsedMB: number;

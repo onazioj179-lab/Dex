@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, getRequiredPolicyVersions } from '../../shared/policies';
+import { DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, type PolicySlug } from '../../shared/policies';
 import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 
 const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
@@ -325,65 +325,144 @@ const PolicyAcceptanceScreen: React.FC<{
   onAccept: () => void;
 }> = ({ onAccept }) => {
   const [accepted, setAccepted] = useState(false);
-  const required = getRequiredPolicyVersions();
+  const [viewerSlug, setViewerSlug] = useState<PolicySlug | null>(null);
+  const requiredPolicies = useMemo(() => POLICY_METADATA.filter(p => p.requiredForUse), []);
+  const optionalPolicies = useMemo(() => POLICY_METADATA.filter(p => !p.requiredForUse), []);
 
   return (
-    <div style={{ padding: '24px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', textAlign: 'center' }}>
+    <div style={{ padding: '20px 0' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px', textAlign: 'center' }}>
         Terms & Privacy
       </h2>
-      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 18px', textAlign: 'center', lineHeight: 1.55 }}>
-        DEX requires acceptance of the current Terms and Privacy Policy before use.
+      <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 20px', textAlign: 'center', lineHeight: 1.55 }}>
+        Review and accept the required policies to continue.
       </p>
 
-      <div style={{ ...CARD_STYLE, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
-          Required acceptance
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          {Object.entries(required).map(([slug, version]) => (
-            <div key={slug} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>{slug}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 700 }}>v{version}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+        {requiredPolicies.map(policy => (
+          <div
+            key={policy.slug}
+            style={{
+              background: '#0A0A0A',
+              border: '1px solid var(--color-bg-hover)',
+              borderRadius: 10,
+              padding: '12px 14px',
+              display: 'flex',
+              gap: 12,
+              alignItems: 'flex-start',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {policy.title}
+                </span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                  background: 'rgba(74,158,255,0.12)', color: 'var(--color-accent, #4A9EFF)',
+                  letterSpacing: '0.04em', textTransform: 'uppercase',
+                }}>
+                  Required
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>v{policy.version}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+                {policy.summary}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setViewerSlug(policy.slug)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--color-border)',
+                borderRadius: 6,
+                padding: '6px 10px',
+                color: 'var(--color-text-secondary)',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              Read
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {optionalPolicies.length > 0 && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 6,
+          marginBottom: 16,
+          padding: '0 2px',
+        }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', alignSelf: 'center', marginRight: 4 }}>
+            Also available:
+          </span>
+          {optionalPolicies.map(policy => (
+            <button
+              key={policy.slug}
+              type="button"
+              onClick={() => setViewerSlug(policy.slug)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--color-border)',
+                borderRadius: 6,
+                padding: '4px 8px',
+                color: 'var(--color-text-secondary)',
+                fontSize: 11,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {policy.title}
+            </button>
           ))}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-          Data policy v{DATA_POLICY_VERSION}. Contact: {POLICY_CONTACT_EMAIL}.
-        </div>
-      </div>
+      )}
 
-      <div style={{ maxHeight: 260, overflow: 'hidden', marginBottom: 12 }}>
-        <React.Suspense fallback={null}>
-          <PolicyViewer compact initialPolicy="terms" />
-        </React.Suspense>
-      </div>
-
-      <div style={{ ...CARD_STYLE, marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
-          Data categories
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {DATA_CATEGORIES.slice(0, 6).map(category => (
-            <div key={category.id} style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
-              <span style={{ color: 'var(--color-text-secondary)', fontWeight: 700 }}>{category.label}:</span> {category.defaultState}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 18, cursor: 'pointer' }}>
-        <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} style={{ marginTop: 3 }} />
-        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-          I accept the DEX Terms of Use and Privacy Policy, including required diagnostics and permitted product-improvement data use described in the policies.
+      <label style={{
+        display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16,
+        padding: '12px 14px', borderRadius: 10,
+        background: accepted ? 'rgba(74,158,255,0.06)' : 'rgba(255,255,255,0.02)',
+        border: `1px solid ${accepted ? 'rgba(74,158,255,0.25)' : 'var(--color-bg-hover)'}`,
+        cursor: 'pointer',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}>
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={e => setAccepted(e.target.checked)}
+          style={{ marginTop: 2, accentColor: 'var(--color-accent, #4A9EFF)' }}
+        />
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
+          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>, including required diagnostics and the permitted product-improvement data use described in those policies.
         </span>
       </label>
 
-      <div style={{ textAlign: 'center' }}>
-        <button style={{ ...ACCENT_BTN, opacity: accepted ? 1 : 0.45, cursor: accepted ? 'pointer' : 'not-allowed' }} disabled={!accepted} onClick={onAccept}>
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <button
+          style={{ ...ACCENT_BTN, opacity: accepted ? 1 : 0.4, cursor: accepted ? 'pointer' : 'not-allowed' }}
+          disabled={!accepted}
+          onClick={onAccept}
+        >
           Accept and Continue
         </button>
       </div>
+
+      <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.5 }}>
+        Data policy v{DATA_POLICY_VERSION} &middot; Contact {POLICY_CONTACT_EMAIL}
+      </div>
+
+      {viewerSlug && (
+        <React.Suspense fallback={null}>
+          <PolicyViewer initialPolicy={viewerSlug} onClose={() => setViewerSlug(null)} />
+        </React.Suspense>
+      )}
     </div>
   );
 };
@@ -451,12 +530,21 @@ const SampleDataScreen: React.FC<{
       <button
         onClick={() => onNext(true)}
         style={{
-          ...CARD_STYLE, border: '1px solid rgba(74, 158, 255, 0.2)',
+          ...CARD_STYLE, border: '1px solid rgba(74, 158, 255, 0.25)',
           cursor: 'pointer', textAlign: 'left',
-          transition: 'border-color 0.2s',
+          transition: 'border-color 0.2s, background 0.2s',
         }}
       >
-        <div style={{ fontSize: 20, marginBottom: 8 }}>+</div>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, marginBottom: 10,
+          background: 'rgba(74,158,255,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--color-accent, #4A9EFF)',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </div>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Load Samples</div>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
           Pre-built workflows, sample notes, and demo automations to explore.
@@ -466,10 +554,19 @@ const SampleDataScreen: React.FC<{
         onClick={() => onNext(false)}
         style={{
           ...CARD_STYLE, cursor: 'pointer', textAlign: 'left',
-          transition: 'border-color 0.2s',
+          transition: 'border-color 0.2s, background 0.2s',
         }}
       >
-        <div style={{ fontSize: 20, marginBottom: 8 }}>-</div>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, marginBottom: 10,
+          background: 'rgba(255,255,255,0.05)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--color-text-secondary)',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+          </svg>
+        </div>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Start Empty</div>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
           Clean slate. Build your workspace from scratch.
@@ -608,7 +705,7 @@ export const OnboardingWizard: React.FC<{
         }
       `}</style>
       <div style={{
-        width: '100%', maxWidth: 520, padding: '0 32px',
+        width: '100%', maxWidth: 600, padding: '0 32px',
         animation: 'onboardFadeIn 0.4s ease',
       }}>
         <StepIndicator current={screenIndex} total={screens.length} />

@@ -1881,7 +1881,7 @@ const invokePrefixAllowlist = [
   'user:',
 ];
 
-const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline']);
+const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline', 'renderer:heartbeat']);
 const listenerWrappers = new WeakMap<(...args: any[]) => void, (...args: any[]) => void>();
 
 function isAllowedDynamicInvokeChannel(channel: string): boolean {
