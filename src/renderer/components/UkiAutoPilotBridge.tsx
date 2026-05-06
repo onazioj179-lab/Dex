@@ -73,13 +73,13 @@ export async function runUkiSlashIfApplicable(text: string): Promise<RunResult> 
     const reply = summarizeResults(plan, results);
     try {
       window.dispatchEvent(new CustomEvent('uki:autopilot-result', {
-        detail: { planId: plan.id, reply, results },
+        detail: { planId: plan.id, utterance: plan.utterance, reply, results },
       }));
     } catch { /* best effort */ }
   }).catch((err) => {
     try {
       window.dispatchEvent(new CustomEvent('uki:autopilot-result', {
-        detail: { planId: plan.id, reply: `Plan failed: ${err?.message || err}`, results: [] },
+        detail: { planId: plan.id, utterance: plan.utterance, reply: `Plan failed: ${err?.message || err}`, results: [] },
       }));
     } catch { /* best effort */ }
   });
@@ -109,12 +109,12 @@ export const UkiAutoPilotBridge: React.FC = () => {
     const offFinished = ActionBus.on('plan:finished', ({ planId }) => clear(planId));
     const offFailed = ActionBus.on('plan:failed', ({ planId }) => clear(planId));
     const onResult = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { planId: string; reply: string } | undefined;
+      const detail = (e as CustomEvent).detail as { planId: string; utterance?: string; reply: string } | undefined;
       if (!detail?.reply) return;
       try {
         useUkiStore.getState().addConversationTurn({
           id: `autopilot-${detail.planId}`,
-          userText: '',
+          userText: detail.utterance || 'AutoPilot',
           response: detail.reply,
           intent: 'autopilot-result',
           success: true,

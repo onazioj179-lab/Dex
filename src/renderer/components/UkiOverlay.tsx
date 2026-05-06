@@ -53,7 +53,7 @@ function handleSlashCommand(text: string): SlashResult | null {
   switch (cmd) {
     case 'help':
     case '?':
-      return { intent: 'slash-help', reply: 'Slash commands: /open <app>, /note <text>, /task <text>, /find <query>, /run <workflow>, /help.' };
+      return { intent: 'slash-help', reply: 'Slash commands: /open <app>, /note <text>, /task <text>, /find <query>, /run <workflow>, /summarize <text>, /timer <time>, /screenshot, /clipboard, /focus, /mute, /notify <title> | <body>, /help.' };
     case 'open': {
       if (!arg) return { intent: 'slash-open', reply: 'Usage: /open <app name>. Try /open notes or /open vinx.' };
       const ok = tryLaunchApp(arg);
@@ -88,7 +88,7 @@ function handleSlashCommand(text: string): SlashResult | null {
       return { intent: 'slash-run', reply: arg ? `Running workflow “${arg}”…` : 'Workflows opened.' };
     }
     default:
-      return { intent: 'slash-unknown', reply: `Unknown command “/${cmd}”. Type /help to list commands.` };
+      return null;
   }
 }
 
@@ -1259,6 +1259,11 @@ const UkiOverlay: React.FC = () => {
     const autopilot = await runUkiSlashIfApplicable(text);
     if (autopilot.handled) {
       streamResponse(autopilot.reply || 'Running…', 'autopilot', text, false);
+      return;
+    }
+
+    if (text.startsWith('/')) {
+      streamResponse('Unknown slash command. Type /help to list commands.', 'slash-unknown', text, false);
       return;
     }
 
