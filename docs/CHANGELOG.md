@@ -5,6 +5,23 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.1] - 2026-05-06 -- UKI AutoPilot Slash Commands
+
+### Added
+
+- 14 new UKI slash commands wired through ActionBus: `/summarize`,
+  `/translate`, `/diff`, `/screenshot`, `/clipboard`, `/timer`, `/toast`,
+  `/focus`, `/mute`, `/open-link`, `/snapshot`, `/count`, `/notify`,
+  `/dismiss`. Each one parses to a typed `PlanGraph` and runs through the
+  approval-gated executor.
+- 15 first-batch ActionBus handlers covering clipboard, notifications,
+  timers, link opening, text utilities, focus toggle, media mute,
+  screenshot capture, workspace snapshot, and ambient hints. All handlers
+  prefer the preload bridge with safe browser-API fallbacks.
+- Auto-registration on renderer boot so every app can submit plans the
+  moment the window is ready.
+- 11 new unit tests; total now **657 passing across 49 suites**.
+
 ## [3.8.0] - 2026-05-06 -- UKI AutoPilot Foundation
 
 ### Added

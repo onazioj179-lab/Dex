@@ -1,16 +1,17 @@
 # DEX - Personal Control Hub
 
-> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.8.0 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
+> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.8.1 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
 
 A cross-platform desktop automation app that lets you define rules, modes, and actions to locally control your computer with full transparency.
 
 ## What's New in 3.8 -- UKI AutoPilot
 
+- **14 new slash commands**: `/summarize`, `/translate`, `/timer`, `/screenshot`, `/clipboard`, `/notify`, `/diff`, `/focus`, `/mute`, `/toast`, `/open-link`, `/count`, `/snapshot`, `/dismiss` -- every one runs through the typed plan executor.
 - **Multi-step plans**: ask UKI to do several things at once. It builds a typed plan, shows it to you, runs it step by step, and reports progress.
 - **Approval gate**: anything destructive (deletes, exports, sends) pauses inline for one-click Run / Cancel before it touches your stuff.
 - **Pattern learner**: UKI quietly notices what you do in each context and suggests your top likely next actions. 100% on-device.
 - **AutoPilot scheduler**: schedule any UKI action to fire on a cron, on idle, or on system events (suspend, resume, lock, unlock).
-- 646 tests passing across 48 suites, TypeScript clean.
+- 657 tests passing across 49 suites, TypeScript clean.
 
 ## What's New in 3.7
 

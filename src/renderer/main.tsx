@@ -39,6 +39,10 @@ startHeapMonitor();
 import { initPerformanceSystems } from './utils/performanceIndex';
 const _cleanupPerf = initPerformanceSystems();
 
+// Wave 1: register UKI AutoPilot ActionBus handlers as soon as renderer boots
+import { registerUkiActionHandlers } from './services/UkiActionHandlers';
+registerUkiActionHandlers();
+
 // Window focus tracking -- pause animations & hide decorative elements when DEX is background
 (() => {
   const root = document.documentElement;
