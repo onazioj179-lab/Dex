@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // File-system bridge for DexCode (open / save / recent files).
 
 const RECENT_FILES_KEY = 'dex-code-recent-files-v1';

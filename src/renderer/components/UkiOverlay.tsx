@@ -958,7 +958,7 @@ function trySystemTool(text: string): ToolResult {
     const mem = navigator.deviceMemory ? `${navigator.deviceMemory}GB RAM` : 'RAM info unavailable';
     const cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} CPU cores` : 'cores unknown';
     const platform = navigator.userAgentData?.platform || navigator.platform || 'unknown';
-    return { handled: true, response: `DEX v3.7.0 on ${platform}. ${cores}, ${mem}. Display: ${window.screen.width}×${window.screen.height} @ ${window.devicePixelRatio}x.` };
+    return { handled: true, response: `DEX v3.7.2 on ${platform}. ${cores}, ${mem}. Display: ${window.screen.width}×${window.screen.height} @ ${window.devicePixelRatio}x.` };
   }
 
   // Battery
