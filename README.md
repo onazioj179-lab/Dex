@@ -1,8 +1,16 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.2 - Copyright (c) 2026 - MIT Licensed
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.5 - Copyright (c) 2026 - MIT Licensed
 
 DEX is your personal command bar for the desktop. One key, one bar, anything done. Take notes, run timers, open files, snap a screenshot, focus your screen, mute the room, jump between apps -- without ever leaving the keyboard. Everything happens on your machine.
+
+## What is new in 3.8.5 -- Nexus Futurism
+
+DEX's knowledge graph just grew up.
+
+- **Ten ways to look at your world.** Switch the Nexus view between grid, circle, spiral, radial, cluster, hex, tree, random, weight-sorted and timeline layouts. Pick the shape that fits the question you are asking.
+- **Smart "find similar".** Type a phrase and Nexus surfaces the most related items in your graph in milliseconds, on-device. No cloud calls, no model download.
+- **Collab seeds.** A typed message protocol for shared graph editing landed under the hood, ready for the LAN p2p sessions arriving in the next wave.
 
 ## Why people use DEX
 

@@ -5,6 +5,19 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.5] - 2026-05-06 -- Nexus Futurism
+
+### Added
+
+- Ten Nexus layout modes: grid, circle, spiral, radial, cluster, hex, tree,
+  random, weight-sorted, and timeline. Each is pure, deterministic, and
+  testable.
+- On-device "find similar" search across the knowledge graph using a local
+  hashed-token embedding plus cosine similarity. Nothing leaves the device.
+- Typed peer-to-peer protocol for collaborative Nexus editing, with a pure
+  validator and an in-process transport for tests and a preview demo. Real
+  LAN sockets land in a later wave.
+
 ## [3.8.2] - 2026-05-06 -- AutoPilot wired in + friendlier surfaces
 
 ### Added
