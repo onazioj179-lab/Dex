@@ -22,7 +22,8 @@ import { useUkiStore } from '../store/ukiStore';
 import { liquidGlassDock, glassModal, adaptiveShadow } from '../styles/glassMenu';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
-import { SpotlightSearch } from '../shell/SpotlightSearch';
+// SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
+// The Home page still uses SpotlightSearch's `home` variant; that import lives in pages/Home.tsx.
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
 import { setSoundEnabled, isSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
@@ -533,7 +534,7 @@ export const AppManager: React.FC = () => {
   const { pins: dockPins, pinApp, unpinApp, isPinned: isDockPinned, mode: dockMode, magnification: dockMagnification, magnificationScale, iconSize: dockIconSize } = useDockPins();
 
   const [showUnifiedSearch, setShowUnifiedSearch] = useState(false);
-  const [showSpotlight, setShowSpotlight] = useState(false);
+  // showSpotlight retired — Ctrl+K now toggles CommandPalette (App.tsx) and Ctrl+Space toggles UKI panel
   const [showAppMenu, setShowAppMenu] = useState(false);
   const showAppMenuRef = useRef(false);
   showAppMenuRef.current = showAppMenu;
@@ -1484,9 +1485,14 @@ export const AppManager: React.FC = () => {
       }
       if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); return; }
       if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); goForward(); return; }
-      // Ctrl+Space opens Spotlight search (Ctrl+K also opens it — Command Palette)
-      if ((e.ctrlKey || e.metaKey) && e.key === ' ') { e.preventDefault(); setShowSpotlight(p => !p); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setShowSpotlight(p => !p); return; }
+      // Ctrl+Space toggles UKI assistant panel; Ctrl+K is the canonical Command Palette
+      // (handled inside useCommandPalette in App.tsx). We deliberately do NOT bind Ctrl+K
+      // here to avoid double-toggling.
+      if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
+        e.preventDefault();
+        try { useUkiStore.getState().togglePanel(); } catch { /* store may not be hydrated yet */ }
+        return;
+      }
       // Ctrl+N -- quick-open Notes app
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'n') { e.preventDefault(); setCurrentApp('notes' as AppId); return; }
       // Ctrl+Shift+T -- quick-open Tasks app
@@ -1680,7 +1686,6 @@ export const AppManager: React.FC = () => {
       const detail = (e as CustomEvent).detail;
       if (detail?.appId) {
         const appId = detail.appId as AppId;
-        setShowSpotlight(false);
         setShowAppMenu(false);
         // Open apps as floating windows over Home (keeps Home visible)
         // Home itself switches to full view
@@ -3180,7 +3185,6 @@ export const AppManager: React.FC = () => {
       <a href="#dex-main-content" className="dex-skip-nav">Skip to content</a>
       <div aria-live="polite" aria-atomic="true" className="dex-sr-only" id="dex-live-region" />
       <UnifiedSearch isOpen={showUnifiedSearch} onClose={() => setShowUnifiedSearch(false)} onNavigate={(p) => setCurrentApp(p as AppId)} />
-      <SpotlightSearch variant="overlay" isOpen={showSpotlight} onClose={() => setShowSpotlight(false)} onNavigate={(p) => setCurrentApp(p as AppId)} />
 
       {renderTitleBar()}
       {renderAppTabBar()}

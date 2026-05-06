@@ -3,11 +3,9 @@
  * Full-featured project management with drag-and-drop columns
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  */
-import React, { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
 
-// ============================================================================
-// TYPES
-// ============================================================================
+// -- Types --------------------------------------------------------------
 
 interface KanbanCard {
   id: string;
@@ -35,9 +33,7 @@ interface KanbanBoard {
   createdAt: number;
 }
 
-// ============================================================================
-// PERSISTENCE
-// ============================================================================
+// -- Persistence --------------------------------------------------------
 
 const STORAGE_KEY = 'dex-kanban-boards';
 
@@ -89,9 +85,7 @@ function generateId(): string {
   return `card-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 }
 
-// ============================================================================
-// ICONS
-// ============================================================================
+// -- Icons --------------------------------------------------------------
 
 const Icons = {
   plus: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
@@ -103,9 +97,7 @@ const Icons = {
   flag: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>,
 };
 
-// ============================================================================
-// PRIORITY COLORS
-// ============================================================================
+// -- Priority colors ----------------------------------------------------
 
 const PRIORITY_CONFIG = {
   low: { color: '#22c55e', label: 'Low' },
@@ -116,9 +108,7 @@ const PRIORITY_CONFIG = {
 
 const LABEL_COLORS = ['var(--color-error)', '#ff6723', 'var(--color-warning)', '#22c55e', '#64d2ff', 'var(--color-accent)', '#bf5af2', '#ff375f'];
 
-// ============================================================================
-// CARD DETAIL MODAL
-// ============================================================================
+// -- Card detail modal --------------------------------------------------
 
 const CardDetail: React.FC<{
   card: KanbanCard;
@@ -250,9 +240,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   saveBtn: { padding: '8px 20px', borderRadius: 8, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
 };
 
-// ============================================================================
-// MAIN KANBAN APP
-// ============================================================================
+// -- Main app -----------------------------------------------------------
 
 const KanbanApp: React.FC = () => {
   const [boards, setBoards] = useState<KanbanBoard[]>(loadBoards);
@@ -563,9 +551,7 @@ const KanbanApp: React.FC = () => {
   );
 };
 
-// ============================================================================
-// STYLES
-// ============================================================================
+// -- Styles -------------------------------------------------------------
 
 const styles: Record<string, React.CSSProperties> = {
   container: { height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base, #0e0e0e)', overflow: 'hidden' },

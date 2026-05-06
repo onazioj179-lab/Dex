@@ -1,16 +1,13 @@
 /**
  * DEX Platform - Calendar
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * Professional calendar with event management
+ *
+ * Apple-Calendar-inspired event manager with month / week views,
+ * drag-to-create slots, recurring events, and ICS import/export.
  */
 import React, { useState, useEffect, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
-
-// ===========================================================================
-// DEX CALENDAR - Professional Event Management
-// Clean, minimal, Apple Calendar-inspired design
-// ===========================================================================
 
 interface CalendarEvent {
   id: string;

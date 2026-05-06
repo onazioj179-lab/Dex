@@ -16,6 +16,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import { getMaxConcurrentApps, getStoredTier } from '../services/TierManager';
+import { ContextBus } from '../services/ContextBus';
 
 export interface RunningApp {
   id: string;
@@ -60,7 +61,7 @@ export const useRunningApps = create<RunningAppsState>()(
       sessionHistory: [],
   
       launchApp: (app) => {
-        const { runningApps } = get();
+        const { runningApps, currentAppId } = get();
         const existing = runningApps.find(a => a.id === app.id);
     
         if (existing) {
@@ -74,6 +75,7 @@ export const useRunningApps = create<RunningAppsState>()(
                 : a
             ),
           }));
+          if (currentAppId !== app.id) ContextBus.emit('app:focused', { appId: app.id, ts: Date.now() });
         } else {
           // Check max concurrent app limit based on device tier
           const tier = getStoredTier() || 'mid';
@@ -103,6 +105,7 @@ export const useRunningApps = create<RunningAppsState>()(
             sessionHistory: pushHistory(state.sessionHistory, app.id),
             runningApps: [...state.runningApps, newApp],
           }));
+          ContextBus.emit('app:opened', { appId: app.id, ts: Date.now() });
         }
         // Report to Xenon background optimizer (fire and forget, ignore errors)
         (window as any).dex?.invoke?.('xenon:reportActiveApp', app.id)?.catch?.(() => {});
@@ -133,14 +136,22 @@ export const useRunningApps = create<RunningAppsState>()(
           runningApps: newRunning,
           currentAppId: newCurrentId,
         });
+        ContextBus.emit('app:closed', { appId, ts: Date.now() });
+        if (newCurrentId !== currentAppId) {
+          ContextBus.emit('app:focused', { appId: newCurrentId, ts: Date.now() });
+        }
       },
 
       closeAllApps: () => {
+        const { runningApps } = get();
         set({ runningApps: [], currentAppId: 'home' });
+        for (const a of runningApps) {
+          ContextBus.emit('app:closed', { appId: a.id, ts: Date.now() });
+        }
       },
   
       setCurrentApp: (appId) => {
-        const { runningApps } = get();
+        const { runningApps, currentAppId } = get();
         set(state => ({
           currentAppId: appId,
           sessionHistory: pushHistory(state.sessionHistory, appId),
@@ -150,6 +161,7 @@ export const useRunningApps = create<RunningAppsState>()(
               : a
           ),
         }));
+        if (currentAppId !== appId) ContextBus.emit('app:focused', { appId, ts: Date.now() });
         // Report to Xenon background optimizer (fire and forget, ignore errors)
         (window as any).dex?.invoke?.('xenon:reportActiveApp', appId)?.catch?.(() => {});
       },

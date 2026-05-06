@@ -147,12 +147,18 @@ export class ReleaseManager {
     autoUpdater.autoDownload = false; // We control downloads
     autoUpdater.autoInstallOnAppQuit = false; // We control installs
     autoUpdater.allowPrerelease = this.config.channel === 'beta';
+    // Feed URL: by default electron-updater reads the `build.publish` block from
+    // package.json (GitHub provider for DEX). Only override when an admin has
+    // configured a private generic update server via update-server.json.
     if (this.updateServerUrl && this.isHttpsUrl(this.updateServerUrl)) {
       try {
         (autoUpdater as any).setFeedURL({ provider: 'generic', url: this.updateServerUrl });
+        log.info('[ReleaseManager] Using generic feed URL override:', this.updateServerUrl);
       } catch (error) {
         log.warn('[ReleaseManager] Feed URL setup failed:', error);
       }
+    } else {
+      log.info('[ReleaseManager] Using default GitHub provider from package.json publish config');
     }
 
     // Event handlers

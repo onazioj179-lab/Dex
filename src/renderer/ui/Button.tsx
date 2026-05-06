@@ -11,7 +11,8 @@
 // `leftIcon` / `rightIcon`.
 // ===========================================================================
 import React, { forwardRef } from 'react';
-import { space, radius, fontSize, fontWeight, transition, button as buttonTokens } from '../styles/tokens';
+import { space, radius, fontSize, fontWeight, button as buttonTokens } from '../styles/tokens';
+import { cssTransitions } from '../utils/MotionController';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -117,7 +118,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
         fontFamily: 'inherit',
         fontWeight: fontWeight.semibold,
         whiteSpace: 'nowrap',
-        transition: `background ${transition.fast}, color ${transition.fast}, border-color ${transition.fast}, opacity ${transition.fast}`,
+        transition: cssTransitions(['background', 'color', 'border-color', 'opacity'], 'micro'),
         width: fullWidth ? '100%' : undefined,
         ...v,
         ...s,

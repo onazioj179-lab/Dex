@@ -14,6 +14,81 @@
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+
+// ===========================================================================
+// SLASH COMMANDS — power-user surface for the UKI panel
+// /open <app>      — launch an app from the registry
+// /note <text>     — open Notes; payload becomes new note title
+// /task <text>     — open Tasks; payload becomes new task
+// /find <query>    — open Files and run a search
+// /run <workflow>  — open Workflows and trigger by name
+// /help            — list available commands
+// ===========================================================================
+
+interface SlashResult { reply: string; intent: string; }
+
+function tryLaunchApp(name: string): boolean {
+  const norm = name.toLowerCase().trim();
+  if (!norm) return false;
+  const entries = Object.entries(APP_DEFINITIONS);
+  let hit = entries.find(([id]) => id === norm);
+  if (!hit) hit = entries.find(([, d]) => d.name.toLowerCase() === norm);
+  if (!hit) hit = entries.find(([, d]) => d.name.toLowerCase().startsWith(norm));
+  if (!hit) return false;
+  const [id, def] = hit;
+  try {
+    useRunningApps.getState().launchApp({ id, name: def.name, icon: def.icon || id, color: def.color });
+    return true;
+  } catch { return false; }
+}
+
+function handleSlashCommand(text: string): SlashResult | null {
+  if (!text.startsWith('/')) return null;
+  const space = text.indexOf(' ');
+  const cmd = (space === -1 ? text.slice(1) : text.slice(1, space)).toLowerCase();
+  const arg = (space === -1 ? '' : text.slice(space + 1)).trim();
+  switch (cmd) {
+    case 'help':
+    case '?':
+      return { intent: 'slash-help', reply: 'Slash commands: /open <app>, /note <text>, /task <text>, /find <query>, /run <workflow>, /help.' };
+    case 'open': {
+      if (!arg) return { intent: 'slash-open', reply: 'Usage: /open <app name>. Try /open notes or /open vinx.' };
+      const ok = tryLaunchApp(arg);
+      return { intent: 'slash-open', reply: ok ? `Opening ${arg}…` : `No app matches "${arg}". Try /help.` };
+    }
+    case 'note': {
+      tryLaunchApp('notes');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:create-note', { detail: { text: arg } })); } catch { /* best effort */ }
+      }
+      return { intent: 'slash-note', reply: arg ? `Note drafted: “${arg.slice(0, 80)}”` : 'Notes opened.' };
+    }
+    case 'task': {
+      tryLaunchApp('tasks');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:create-task', { detail: { text: arg } })); } catch { /* best effort */ }
+      }
+      return { intent: 'slash-task', reply: arg ? `Task added: “${arg.slice(0, 80)}”` : 'Tasks opened.' };
+    }
+    case 'find': {
+      tryLaunchApp('files');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:files-search', { detail: { query: arg } })); } catch { /* best effort */ }
+      }
+      return { intent: 'slash-find', reply: arg ? `Searching files for “${arg}”…` : 'Files opened. Type a query.' };
+    }
+    case 'run': {
+      tryLaunchApp('workflows');
+      if (arg) {
+        try { window.dispatchEvent(new CustomEvent('uki:workflow-run', { detail: { name: arg } })); } catch { /* best effort */ }
+      }
+      return { intent: 'slash-run', reply: arg ? `Running workflow “${arg}”…` : 'Workflows opened.' };
+    }
+    default:
+      return { intent: 'slash-unknown', reply: `Unknown command “/${cmd}”. Type /help to list commands.` };
+  }
+}
 
 // ===========================================================================
 // SMART TEXT UNDERSTANDING - Typo Correction & Fuzzy Matching
@@ -1174,6 +1249,13 @@ const UkiOverlay: React.FC = () => {
     setInputText('');
     // Cancel any in-progress streaming animation
     if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+
+    // Slash commands take priority (no AI round-trip required)
+    const slash = handleSlashCommand(text);
+    if (slash) {
+      streamResponse(slash.reply, slash.intent, text, false);
+      return;
+    }
 
     // Normalize text for better understanding
     const normalized = normalizeText(text);

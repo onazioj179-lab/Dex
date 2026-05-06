@@ -11,6 +11,7 @@
 // ===========================================================================
 import React, { forwardRef } from 'react';
 import { space, radius } from '../styles/tokens';
+import { cssTransitions } from '../utils/MotionController';
 
 export type CardVariant = 'default' | 'elevated' | 'inset' | 'outline';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
@@ -88,7 +89,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(({
         borderRadius: radius.lg,
         padding: PAD[padding],
         cursor: interactive ? 'pointer' : 'default',
-        transition: interactive ? 'background 100ms ease, border-color 100ms ease' : undefined,
+        transition: interactive ? cssTransitions(['background', 'border-color'], 'hover') : undefined,
         color: 'var(--color-text-primary, #fff)',
         ...v,
         ...style,

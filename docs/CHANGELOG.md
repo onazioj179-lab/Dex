@@ -5,6 +5,50 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-05-07 -- Boil-the-Ocean: Bus / Motion / Palette / UKI
+
+### Added
+
+- **ContextBus** ([src/renderer/services/ContextBus.ts](src/renderer/services/ContextBus.ts)):
+  typed pub/sub for cross-app activity with a 200-event ring buffer,
+  16-ms throttle (test-disable via `_setThrottle(0)`), and `onWithReplay`
+  for late subscribers. Channels: `app:opened/closed/focused`,
+  `selection:changed`, `clipboard:updated`, `file:saved/opened`,
+  `task:created/completed`, `note:opened/saved`, `workflow:trigger`,
+  `idle:enter/exit`, `ambient:hint`. See [docs/CONTEXT_BUS.md](docs/CONTEXT_BUS.md).
+- **`runningApps` lifecycle now emits to ContextBus** for `launchApp`,
+  `closeApp`, `closeAllApps`, and `setCurrentApp` — wiring ambient AI
+  context, the UKI overlay, and any future presence-aware surface.
+- **`LINEAR_PRESETS` + `cssTransition` / `cssTransitions` helpers** in
+  [src/renderer/utils/MotionController.ts](src/renderer/utils/MotionController.ts):
+  hybrid motion model where springs handle layout and linear presets
+  (`instant`, `micro`, `hover`, `focusGlow`, `fade`, `reveal`, `progress`,
+  `scrub`) handle input feedback. All reduce-motion-safe. See
+  [docs/MOTION.md](docs/MOTION.md).
+- **UKI slash commands**: `/help`, `/open`, `/note`, `/task`, `/find`,
+  `/run` — slash bypass executes before LLM normalization. Apps respond via
+  `uki:create-note`, `uki:create-task`, `uki:files-search`, and
+  `uki:workflow-run` DOM events. See [docs/UKI.md](docs/UKI.md).
+
+### Changed
+
+- **Palette consolidation**: `Ctrl+K` is now the single canonical command
+  launcher (CommandPalette); `Ctrl+Space` toggles the UKI overlay; the
+  standalone overlay variant of `SpotlightSearch` has been retired (the
+  home-page search variant remains). See [docs/PALETTE.md](docs/PALETTE.md).
+- **UI primitives** (`Button`, `TextInput`, `Card`) now use linear motion
+  presets via `cssTransitions(...)` instead of raw `transition.fast`
+  template strings — eliminates four near-duplicate transition strings and
+  ensures every interactive surface respects reduce-motion.
+- **Calendar** + **Kanban** banner clutter stripped: ASCII section banners
+  removed, JSDoc copyright headers retained.
+
+### Removed
+
+- Unused `useMemo` import in `KanbanApp.tsx`.
+- AppManager's duplicate `Ctrl+K` binding (`CommandPalette`'s own
+  `useCommandPalette` hook is now the only owner).
+
 ## [3.6.2] - 2026-05-06 -- Hotfix: Production Renderer Boot
 
 ### Fixed

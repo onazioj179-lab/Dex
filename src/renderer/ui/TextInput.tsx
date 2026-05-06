@@ -9,7 +9,10 @@
 // Tokenized text controls with consistent focus ring + invalid state.
 // ===========================================================================
 import React, { forwardRef } from 'react';
-import { fontSize, radius, transition, input as inputTokens } from '../styles/tokens';
+import { fontSize, radius, input as inputTokens } from '../styles/tokens';
+import { cssTransitions } from '../utils/MotionController';
+
+const FOCUS_TRANSITION = cssTransitions(['border-color', 'box-shadow'], 'focusGlow');
 
 export type InputSize = 'sm' | 'md' | 'lg';
 
@@ -31,7 +34,7 @@ const sharedField = (size: InputSize, invalid: boolean): React.CSSProperties => 
   border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border, rgba(255,255,255,0.14))'}`,
   borderRadius: radius.md,
   outline: 'none',
-  transition: `border-color ${transition.fast}, box-shadow ${transition.fast}`,
+  transition: FOCUS_TRANSITION,
 });
 
 const focusOn = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, invalid: boolean) => {
@@ -62,7 +65,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(({
           height: inputTokens.height[inputSize],
           padding: '0 8px',
           gap: 6,
-          transition: `border-color ${transition.fast}, box-shadow ${transition.fast}`,
+          transition: FOCUS_TRANSITION,
         }}
       >
         {leftAddon && <span style={{ display: 'inline-flex', color: 'var(--color-text-tertiary)' }}>{leftAddon}</span>}

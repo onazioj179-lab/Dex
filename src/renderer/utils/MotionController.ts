@@ -65,6 +65,65 @@ export interface SpringConfig {
 }
 
 // ---------------------------------------------------------------------------
+// LINEAR / EASE PRESETS  (input + micro-interactions)
+// ---------------------------------------------------------------------------
+// Hybrid motion model: use spring presets for layout/spatial moves (windows,
+// panels, sheets, list reorder). Use linear/ease presets below for input,
+// typing, scrubbing, hover, toggles, and any moment where precision and
+// instant feedback matter more than physical settle.
+//
+// Each preset is an object with `duration` (ms) and `easing` (CSS timing
+// function) so it can drop straight into a CSS transition or a
+// requestAnimationFrame interpolator.
+
+export interface LinearConfig {
+  duration: number; // milliseconds
+  easing: string;   // CSS timing function
+}
+
+export const LINEAR_PRESETS = {
+  // Instant — selection highlights, focus rings, color flips
+  instant:     { duration: 60,  easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)' },
+  // Buttons, toggles, small icon swaps
+  micro:       { duration: 80,  easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)' },
+  // Hover scale, dock icon lift, fader knob during drag
+  hover:       { duration: 100, easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)' },
+  // Scrub / drag follow (use during pointer movement, not on release)
+  scrub:       { duration: 0,   easing: 'linear' },
+  // Linear fades for autosave indicators, "saved 2s ago", meter decay
+  fade:        { duration: 120, easing: 'linear' },
+  // Tab switch chrome, dropdown open, autocomplete reveal
+  reveal:      { duration: 140, easing: 'cubic-bezier(0.0, 0.0, 0.2, 1)' },
+  // Focus glow on text inputs
+  focusGlow:   { duration: 100, easing: 'cubic-bezier(0.0, 0.0, 0.2, 1)' },
+  // Progress bar fill, ETA countdown, meter peak hold decay
+  progress:    { duration: 200, easing: 'linear' },
+} as const;
+
+export type LinearPresetName = keyof typeof LINEAR_PRESETS;
+
+/** Build a CSS transition string from a linear preset, e.g.
+ *  `style.transition = cssTransition('opacity', 'micro')` */
+export function cssTransition(
+  property: string,
+  preset: LinearPresetName | LinearConfig = 'micro',
+): string {
+  const cfg = typeof preset === 'string' ? LINEAR_PRESETS[preset] : preset;
+  if (_reduceMotion) return `${property} 0ms linear`;
+  return `${property} ${cfg.duration}ms ${cfg.easing}`;
+}
+
+/** Build a multi-property CSS transition string. */
+export function cssTransitions(
+  properties: string[],
+  preset: LinearPresetName | LinearConfig = 'micro',
+): string {
+  const cfg = typeof preset === 'string' ? LINEAR_PRESETS[preset] : preset;
+  if (_reduceMotion) return properties.map(p => `${p} 0ms linear`).join(', ');
+  return properties.map(p => `${p} ${cfg.duration}ms ${cfg.easing}`).join(', ');
+}
+
+// ---------------------------------------------------------------------------
 // REDUCE MOTION
 // ---------------------------------------------------------------------------
 
