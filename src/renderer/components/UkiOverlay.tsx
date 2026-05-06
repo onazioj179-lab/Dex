@@ -1597,7 +1597,63 @@ const UkiOverlay: React.FC = () => {
           borderTop: '1px solid var(--color-bg-hover)',
           padding: '8px 10px',
           display: 'flex', alignItems: 'center', gap: 6,
+          position: 'relative',
         }}>
+          {inputText.startsWith('/') && (() => {
+            const all = [
+              { cmd: '/help', hint: 'list every slash command' },
+              { cmd: '/open', hint: 'launch an app -- /open notes' },
+              { cmd: '/note', hint: 'jot a note -- /note buy bread' },
+              { cmd: '/task', hint: 'add a task -- /task call mom' },
+              { cmd: '/find', hint: 'search files -- /find report' },
+              { cmd: '/run', hint: 'run a workflow -- /run nightly' },
+              { cmd: '/summarize', hint: 'shorten text -- /summarize <text>' },
+              { cmd: '/translate', hint: 'translate -- /translate fr <text>' },
+              { cmd: '/diff', hint: 'compare two snippets -- /diff a | b' },
+              { cmd: '/screenshot', hint: 'capture the screen' },
+              { cmd: '/clipboard', hint: 'read or copy -- /clipboard <text>' },
+              { cmd: '/timer', hint: 'start a timer -- /timer 5m tea' },
+              { cmd: '/toast', hint: 'show a toast -- /toast hello' },
+              { cmd: '/focus', hint: 'toggle focus mode' },
+              { cmd: '/mute', hint: 'toggle mute on media' },
+              { cmd: '/open-link', hint: 'open a url -- /open-link https://...' },
+              { cmd: '/snapshot', hint: 'snapshot current context' },
+              { cmd: '/count', hint: 'count words -- /count <text>' },
+              { cmd: '/notify', hint: 'send a notification -- /notify Title | Body' },
+              { cmd: '/dismiss', hint: 'dismiss an ambient hint by id' },
+            ];
+            const q = inputText.toLowerCase();
+            const matches = all.filter(c => c.cmd.startsWith(q)).slice(0, 6);
+            if (matches.length === 0) return null;
+            return (
+              <div role="listbox" aria-label="Slash command suggestions" style={{
+                position: 'absolute', left: 10, right: 10, bottom: '100%',
+                marginBottom: 6, padding: 6,
+                background: 'var(--color-bg-elevated, rgba(28,28,30,0.95))',
+                border: '1px solid var(--color-border-subtle)',
+                borderRadius: 8, fontSize: 11,
+                maxHeight: 220, overflowY: 'auto',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                zIndex: 2,
+              }}>
+                {matches.map(m => (
+                  <div
+                    key={m.cmd}
+                    role="option"
+                    aria-selected={false}
+                    onMouseDown={(e) => { e.preventDefault(); setInputText(m.cmd + ' '); inputRef.current?.focus(); }}
+                    style={{
+                      display: 'flex', alignItems: 'baseline', gap: 8,
+                      padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'monospace', color: 'var(--color-accent)', fontWeight: 600 }}>{m.cmd}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>{m.hint}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <input
             ref={inputRef}
             type="text"

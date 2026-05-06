@@ -1,92 +1,58 @@
-# DEX - Personal Control Hub
+# DEX -- Personal Control Hub
 
-> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.8.1 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.1 - Copyright (c) 2026 - MIT Licensed
 
-A cross-platform desktop automation app that lets you define rules, modes, and actions to locally control your computer with full transparency.
+DEX is your personal command bar for the desktop. One key, one bar, anything done. Take notes, run timers, open files, snap a screenshot, focus your screen, mute the room, jump between apps -- without ever leaving the keyboard. Everything happens on your machine.
 
-## What's New in 3.8 -- UKI AutoPilot
+## Why people use DEX
 
-- **14 new slash commands**: `/summarize`, `/translate`, `/timer`, `/screenshot`, `/clipboard`, `/notify`, `/diff`, `/focus`, `/mute`, `/toast`, `/open-link`, `/count`, `/snapshot`, `/dismiss` -- every one runs through the typed plan executor.
-- **Multi-step plans**: ask UKI to do several things at once. It builds a typed plan, shows it to you, runs it step by step, and reports progress.
-- **Approval gate**: anything destructive (deletes, exports, sends) pauses inline for one-click Run / Cancel before it touches your stuff.
-- **Pattern learner**: UKI quietly notices what you do in each context and suggests your top likely next actions. 100% on-device.
-- **AutoPilot scheduler**: schedule any UKI action to fire on a cron, on idle, or on system events (suspend, resume, lock, unlock).
-- 657 tests passing across 49 suites, TypeScript clean.
+- **One assistant for everything.** Tap UKI, type what you want, get it done. No menu hunting.
+- **Plans you can preview.** Anything risky is shown to you first as a clear list of steps. You hit Run or Cancel.
+- **Apps that work together.** Notes, Tasks, Files, Workflows, Vinx, Axl, Rewind and more share context, so your work follows you.
+- **Yours, on your machine.** Patterns, history, and shortcuts stay on this device. Optional analytics is off by default.
+- **Built for keyboards.** Every action has a shortcut. Press `/` to see the command menu.
+- **Always improving.** Free updates roll in, the changelog is one click away.
 
-## What's New in 3.7
+## What is new in 3.8 -- UKI AutoPilot
 
-- **ContextBus**: a typed activity bus across the shell — apps, files, tasks, and clipboard activity all flow through one observable seam, making the assistant context-aware without ad-hoc wiring.
-- **Hybrid motion system**: input feedback (hover, focus, fade, progress) is now driven by tuned linear presets, while layout still uses springs. Every surface honours `prefers-reduced-motion`.
-- **Unified palette**: `Ctrl+K` is the canonical command launcher; `Ctrl+Space` opens the UKI conversational panel. One hotkey per intent — no more overlapping search overlays.
-- **UKI slash commands**: `/help`, `/open`, `/note`, `/task`, `/find`, `/run` work directly from the assistant panel; voice input still works alongside.
-- **Cleaner UI primitives**: `Button`, `TextInput`, and `Card` use the new motion presets — interactions feel snappier and more consistent.
-- **Type-tight globals** for the Battery Status, `Performance.memory`, and `Navigator.userAgentData` APIs so the assistant's system replies are checked at compile time.
-- 632 tests passing across 45 suites, TypeScript clean.
+DEX got an upgrade you can feel.
 
-## About DEX (Non-Technical)
+- **A bigger command menu.** Type `/` and pick from `summarize`, `translate`, `timer`, `screenshot`, `clipboard`, `notify`, `diff`, `focus`, `mute`, `toast`, `open-link`, `count`, `snapshot`, `dismiss` (plus the originals `open`, `note`, `task`, `find`, `run`).
+- **Smart multi-step requests.** Ask UKI to do several things at once. It plans them out, shows you the plan, runs the steps, and tells you when it is done.
+- **A safety gate for risky stuff.** Anything destructive pauses on screen with a one-click Run or Cancel. Nothing happens behind your back.
+- **A pattern learner.** UKI quietly notices what you tend to do in each context and suggests your next likely action. 100% on-device.
+- **A scheduler.** Tell UKI to run something on a clock, when you go idle, when the system suspends, resumes, locks, or unlocks.
 
-DEX helps you control your computer faster with less manual work.
+## What was new in 3.7
 
-- Automate repeated tasks
-- Organize your day with notes, tasks, and timers
-- Manage system performance with simple power profiles
-- Keep your data local by default
-- Update safely with backup and rollback support
+- **Shared activity feed.** Apps, files, tasks, and clipboard activity all flow through one stream so the assistant always has context.
+- **Smoother feel.** New motion presets across hover, focus, fade, and progress. Reduced-motion is fully respected.
+- **One hotkey per intent.** `Ctrl+K` is the command launcher. `Ctrl+Space` is the UKI panel. No more overlap.
+- **First wave of slash commands.** `/help`, `/open`, `/note`, `/task`, `/find`, `/run`.
 
-## Full Documentation
-
-**Everything is in one place ** [docs/APP_DOCUMENTATION.md](docs/APP_DOCUMENTATION.md)
-
-Architecture, features, updates, commands, security, known gaps -- all in one file.
-
-## Quick Start
+## Quickstart
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Build Native Modules (Rust)
+That is it. The first time you run DEX it sets itself up.
 
-```bash
-# Requires Rust toolchain (https://rustup.rs/)
-npm run build:native      # Release build (dex-native)
-npm run build:core        # dex-core native module
-npm run build:all         # Everything (native + core + app)
-```
+## Get DEX
 
-## Build & Package
+Pre-built installers and updates roll in automatically. Read the in-app About page or the changelog for what is shipping next.
 
-```bash
-npm run build
-npm run package:win       # Windows
-npm run package:mac       # macOS
-npm run package:linux     # Linux
-```
+## Help and feedback
 
-## Test
-
-```bash
-npm run test              # Unit + integration
-npm run test:e2e          # E2E (Playwright)
-npm run test:coverage     # With V8 coverage
-```
-
-## Links
-
-- [Full App Documentation](docs/APP_DOCUMENTATION.md)
-- [Security Policy](docs/SECURITY.md)
-- [Contributing Guide](docs/CONTRIBUTING.md)
+- [Documentation](docs/APP_DOCUMENTATION.md)
 - [Changelog](docs/CHANGELOG.md)
-- [Project TODO](docs/TODO.md)
+- [Privacy](PRIVACY.md)
+- [Terms](TERMS.md)
+- [Security](docs/SECURITY.md)
 - [License](LICENSE)
-- [Notice](NOTICE)
-- [Authors](AUTHORS)
-- [Terms of Use](TERMS.md)
-- [Privacy Policy](PRIVACY.md)
-- [Code Owners](CODEOWNERS)
 
 ---
 
-**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ** &lt;onazi75@gmail.com&gt;
+**DEX** - Designed, built, and maintained by **Onazi Treasure OJ** &lt;onazi75@gmail.com&gt;.
 Copyright (c) 2026 Onazi Treasure OJ. All rights reserved. Licensed under the MIT License.
