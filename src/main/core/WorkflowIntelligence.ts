@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Workflow Intelligence System
 // Phase 43: Advisory suggestions - subtle, never auto-run, always dismissible
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type SuggestionType = 
   | 'workflow-shortcut'
@@ -55,9 +62,9 @@ export interface ParameterHistory {
   values: Array<{ value: unknown; frequency: number; lastUsed: number }>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const intelligenceStore = new Store<{
   config: WorkflowIntelligenceConfig;
@@ -74,7 +81,7 @@ const intelligenceStore = new Store<{
   name: 'workflow-intelligence',
   defaults: {
     config: {
-      enabled: false,             // Off by default
+      enabled: true,              // Enabled by default
       suggestShortcuts: true,
       prefillParameters: true,
       rankCommands: true,
@@ -95,9 +102,9 @@ const intelligenceStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // WORKFLOW INTELLIGENCE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class WorkflowIntelligence {
   private static instance: WorkflowIntelligence;
@@ -112,9 +119,9 @@ class WorkflowIntelligence {
     return WorkflowIntelligence.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -123,7 +130,7 @@ class WorkflowIntelligence {
     this.cleanupExpiredSuggestions();
 
     this.initialized = true;
-    console.log('[WorkflowIntelligence] Initialized');
+    log.info('[WorkflowIntelligence] Initialized');
   }
 
   private setupIPC(): void {
@@ -141,9 +148,9 @@ class WorkflowIntelligence {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): WorkflowIntelligenceConfig {
     return intelligenceStore.get('config');
@@ -160,9 +167,9 @@ class WorkflowIntelligence {
     return intelligenceStore.get('config').enabled;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LEARNING (ONLY WHEN ENABLED)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordCommandUse(commandId: string, context?: Record<string, unknown>): void {
     if (!this.isEnabled()) return;
@@ -244,9 +251,9 @@ class WorkflowIntelligence {
     return isWorkHours ? 0.8 : 0.5;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUGGESTIONS (ADVISORY ONLY)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async generateSuggestions(): Promise<WorkflowSuggestion[]> {
     if (!this.isEnabled()) return [];
@@ -342,9 +349,9 @@ class WorkflowIntelligence {
     return suggestion;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // COMMAND RANKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getCommandRankings(limit: number = 20): CommandRanking[] {
     if (!this.isEnabled()) return [];
@@ -367,9 +374,9 @@ class WorkflowIntelligence {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PARAMETER PREFILL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getPrefill(parameterId: string): unknown | null {
     if (!this.isEnabled()) return null;
@@ -397,9 +404,9 @@ class WorkflowIntelligence {
     return param.values.map(v => v.value);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): { suggestionsShown: number; suggestionsAccepted: number; suggestionsDismissed: number; acceptRate: number } {
     const stats = intelligenceStore.get('stats');
@@ -410,9 +417,9 @@ class WorkflowIntelligence {
     return { ...stats, acceptRate };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private cleanupExpiredSuggestions(): void {
     const suggestions = intelligenceStore.get('suggestions');
@@ -421,9 +428,9 @@ class WorkflowIntelligence {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const workflowIntelligence = WorkflowIntelligence.getInstance();
 export default workflowIntelligence;

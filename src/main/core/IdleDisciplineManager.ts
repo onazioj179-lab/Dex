@@ -1,9 +1,15 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - SYSTEM 11: Idle Discipline & Long-Term Health (PERFORMANCE)
 // ===========================================================================
 // The app MUST be invisible when not in use. Zero idle CPU. Zero memory bloat.
 // Long-term stability guarantees. Proactive health monitoring.
-// User can rely on Dex being there when needed—and not there when not.
+// User can rely on Dex being there when needed--and not there when not.
 // ===========================================================================
 
 import { EventEmitter } from 'events';
@@ -719,7 +725,7 @@ class IdleDisciplineManagerClass extends EventEmitter {
         averageUsedMB: avgMemory,
         peakUsedMB: peakMemory,
         leakSuspected,
-        gcEfficiency: 0.85,  // Placeholder
+        gcEfficiency: this.calculateGCEfficiency(relevantMetrics),
       },
       cpu: {
         averagePercent: avgCPU,
@@ -734,6 +740,28 @@ class IdleDisciplineManagerClass extends EventEmitter {
       },
       recommendations,
     };
+  }
+
+  /**
+   * Compute GC efficiency from metrics: ratio of freed memory to total heap allocation.
+   * A high ratio means GC is effectively reclaiming memory.
+   */
+  private calculateGCEfficiency(metrics: any[]): number {
+    if (metrics.length < 2) return 1;
+
+    const heapUsages = metrics.map(m => m.memory.heapUsed / 1024 / 1024);
+    const heapTotals = metrics.map(m => m.memory.heapTotal / 1024 / 1024);
+
+    // Average ratio of free heap to total heap 
+    let freeRatioSum = 0;
+    for (let i = 0; i < heapUsages.length; i++) {
+      const total = heapTotals[i] || 1;
+      freeRatioSum += 1 - (heapUsages[i] / total);
+    }
+    const avgFreeRatio = freeRatioSum / heapUsages.length;
+
+    // Clamp to [0, 1]
+    return Math.max(0, Math.min(1, avgFreeRatio));
   }
 
   private emptyHealthReport(start: number, end: number): HealthReport {

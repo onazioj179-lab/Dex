@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // Global type declarations for the Dex API exposed via preload
 
 export {};
@@ -37,6 +43,7 @@ declare global {
         isWindows: boolean;
         isLinux: boolean;
         os: string;
+        homeDir: string;
       };
       window: {
         minimize: () => void;
@@ -88,9 +95,16 @@ declare global {
       };
       power: {
         getStats: () => Promise<any>;
+        getProfile: () => Promise<string>;
         setProfile: (profile: string) => Promise<any>;
+        quickBoost: (durationMinutes?: number) => Promise<any>;
+        getResourceHogs: () => Promise<any[]>;
         freeMemory: () => Promise<any>;
         closeProcess: (pid: number, force: boolean) => Promise<any>;
+        getSuggestedCleanup: () => Promise<any>;
+        setCpuLimit: (val: number) => Promise<any>;
+        setGpuLimit: (val: number) => Promise<any>;
+        setFanCurve: (val: number) => Promise<any>;
       };
       sessions: {
         getCurrent: () => Promise<any>;
@@ -166,6 +180,10 @@ declare global {
         updateConfig: (updates: any) => Promise<{ success: boolean }>;
         lock: () => Promise<void>;
         clearCredentials: (currentPassword?: string) => Promise<{ success: boolean; error?: string }>;
+        changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+        changePin: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
+        generateRecoveryCodes: () => Promise<{ success: boolean; codes?: string[] }>;
+        authenticateRecovery: (code: string) => Promise<{ success: boolean; error?: string; token?: string }>;
         verifySession: (token: string) => Promise<boolean>;
         getLockoutStatus: () => Promise<{ isLockedOut: boolean; remainingMinutes: number; attemptsRemaining: number }>;
         onStateChange: (callback: (state: any) => void) => void;
@@ -388,6 +406,10 @@ declare global {
         exportData: () => Promise<any>;
         deleteAllData: () => Promise<any>;
         generateReport: (period?: any) => Promise<any>;
+      };
+      // User Profile API
+      user: {
+        getProfile: () => Promise<{ username: string; displayName: string; hostname: string; platform: string; arch: string }>;
       };
       // ULTRA-LOW RESOURCE MODE: Resource Governor API
       resource: {
@@ -833,11 +855,45 @@ declare global {
       };
       // HTTP Transfer API
       httpTransfer: {
-        start: () => Promise<{ success: boolean; url?: string }>;
+        start: (config?: { password?: string; speedLimit?: number; downloadDir?: string; autoAccept?: boolean }) => Promise<{ success: boolean; url?: string }>;
         stop: () => Promise<void>;
         info: () => Promise<{ isRunning: boolean; url?: string; sharedFiles: any[] }>;
         pickAndShare: () => Promise<void>;
         acceptUpload: (uploadId: string, accept: boolean) => Promise<void>;
+      };
+      // DTP: DEX Transfer Protocol - high-speed device-to-device transfers
+      dtp: {
+        startServer: () => Promise<any>;
+        stopServer: () => Promise<any>;
+        startDiscovery: () => Promise<any>;
+        stopDiscovery: () => Promise<any>;
+        getDevices: () => Promise<any[]>;
+        refreshDevices: () => Promise<any>;
+        sendFiles: (args: { files: string[]; targetAddress: string; targetPort?: number; sessionToken: string }) => Promise<any>;
+        cancelSend: (transferId: string) => Promise<any>;
+        pauseSend: (transferId: string) => Promise<any>;
+        resumeSend: (transferId: string) => Promise<any>;
+        approveDevice: (deviceId: string) => Promise<any>;
+        denyDevice: (deviceId: string) => Promise<any>;
+        pauseReceive: (transferId: string) => Promise<any>;
+        cancelReceive: (transferId: string) => Promise<any>;
+        getHistory: (limit?: number) => Promise<any[]>;
+        getTrustedDevices: () => Promise<any[]>;
+        removeTrustedDevice: (deviceId: string) => Promise<any>;
+        measureBandwidth: (args: { address: string; port?: number }) => Promise<any>;
+        onDeviceFound: (callback: (device: any) => void) => void;
+        onDeviceLost: (callback: (device: any) => void) => void;
+        onDevicePending: (callback: (info: any) => void) => void;
+        onSendProgress: (callback: (progress: any) => void) => void;
+        onSendComplete: (callback: (result: any) => void) => void;
+        onSendError: (callback: (error: any) => void) => void;
+        onTransferProgress: (callback: (info: any) => void) => void;
+        onTransferComplete: (callback: (info: any) => void) => void;
+        onTransferError: (callback: (info: any) => void) => void;
+        offDeviceFound: (callback: (device: any) => void) => void;
+        offDeviceLost: (callback: (device: any) => void) => void;
+        offSendProgress: (callback: (progress: any) => void) => void;
+        offTransferProgress: (callback: (info: any) => void) => void;
       };
       // Updates
       updates: {

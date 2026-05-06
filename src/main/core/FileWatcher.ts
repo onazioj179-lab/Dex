@@ -1,16 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Background File Watcher
 // Phase 38: Event-based, non-intrusive file monitoring
 // Pauses under system load, user can disable at any time
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EventEmitter } from 'events';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface FileChangeEvent {
   type: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir';
@@ -37,9 +44,9 @@ export interface WatcherStatus {
   errors: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // File Watcher Service
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class FileWatcherService extends EventEmitter {
   private static instance: FileWatcherService;
@@ -65,9 +72,9 @@ export class FileWatcherService extends EventEmitter {
     return FileWatcherService.instance;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Watch Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /**
    * Start watching a directory
@@ -93,7 +100,7 @@ export class FileWatcherService extends EventEmitter {
     
     // Validate path exists
     if (!fs.existsSync(fullConfig.path)) {
-      console.error(`[FileWatcher] Path does not exist: ${fullConfig.path}`);
+      log.error(`[FileWatcher] Path does not exist: ${fullConfig.path}`);
       return false;
     }
     
@@ -123,12 +130,12 @@ export class FileWatcherService extends EventEmitter {
         errors: 0,
       });
       
-      console.log(`[FileWatcher] Started watching: ${fullConfig.path}`);
+      log.info(`[FileWatcher] Started watching: ${fullConfig.path}`);
       this.emit('watchStarted', fullConfig.path);
       
       return true;
     } catch (error) {
-      console.error(`[FileWatcher] Failed to watch ${fullConfig.path}:`, error);
+      log.error(`[FileWatcher] Failed to watch ${fullConfig.path}:`, error);
       return false;
     }
   }
@@ -155,7 +162,7 @@ export class FileWatcherService extends EventEmitter {
         this.debounceTimers.delete(dirPath);
       }
       
-      console.log(`[FileWatcher] Stopped watching: ${dirPath}`);
+      log.info(`[FileWatcher] Stopped watching: ${dirPath}`);
       this.emit('watchStopped', dirPath);
     }
   }
@@ -169,9 +176,9 @@ export class FileWatcherService extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Event Handling
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   private handleWatchEvent(
     basePath: string, 
@@ -286,7 +293,7 @@ export class FileWatcherService extends EventEmitter {
   }
   
   private handleWatchError(basePath: string, error: Error): void {
-    console.error(`[FileWatcher] Error on ${basePath}:`, error);
+    log.error(`[FileWatcher] Error on ${basePath}:`, error);
     
     const status = this.status.get(basePath);
     if (status) {
@@ -299,7 +306,7 @@ export class FileWatcherService extends EventEmitter {
     const config = this.configs.get(basePath);
     if (config && status && status.errors < 5) {
       setTimeout(() => {
-        console.log(`[FileWatcher] Attempting to recover watcher for ${basePath}`);
+        log.info(`[FileWatcher] Attempting to recover watcher for ${basePath}`);
         this.watch(config);
       }, 5000);
     }
@@ -332,16 +339,16 @@ export class FileWatcherService extends EventEmitter {
     return filename === pattern || filename.includes(pattern);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Pause/Resume
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /**
    * Pause all watchers (e.g., during high system load)
    */
   pause(): void {
     this.isPaused = true;
-    console.log('[FileWatcher] Paused all watchers');
+    log.info('[FileWatcher] Paused all watchers');
     this.emit('paused');
   }
   
@@ -350,7 +357,7 @@ export class FileWatcherService extends EventEmitter {
    */
   resume(): void {
     this.isPaused = false;
-    console.log('[FileWatcher] Resumed all watchers');
+    log.info('[FileWatcher] Resumed all watchers');
     this.emit('resumed');
   }
   
@@ -359,7 +366,7 @@ export class FileWatcherService extends EventEmitter {
    */
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
-    console.log(`[FileWatcher] Service ${enabled ? 'enabled' : 'disabled'}`);
+    log.info(`[FileWatcher] Service ${enabled ? 'enabled' : 'disabled'}`);
     this.emit('enabledChanged', enabled);
   }
   
@@ -375,19 +382,19 @@ export class FileWatcherService extends EventEmitter {
       
       if (normalizedLoad > this.systemLoadThreshold && !this.isPaused) {
         this.pause();
-        console.log(`[FileWatcher] Paused due to high system load: ${normalizedLoad.toFixed(2)}`);
+        log.info(`[FileWatcher] Paused due to high system load: ${normalizedLoad.toFixed(2)}`);
       } else if (normalizedLoad <= this.systemLoadThreshold * 0.8 && this.isPaused) {
         this.resume();
-        console.log(`[FileWatcher] Resumed after system load normalized: ${normalizedLoad.toFixed(2)}`);
+        log.info(`[FileWatcher] Resumed after system load normalized: ${normalizedLoad.toFixed(2)}`);
       }
     } catch (error) {
       // Ignore errors in load checking
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Status & Info
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getStatus(dirPath: string): WatcherStatus | undefined {
     return this.status.get(dirPath);

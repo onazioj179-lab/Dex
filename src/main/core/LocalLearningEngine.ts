@@ -1,10 +1,23 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - SYSTEM 6: Local Learning & Reflection (PRIVACY-FIRST)
 // ===========================================================================
-// Dex should learn the user's patterns and preferences—
+// Dex should learn the user's patterns and preferences--
 // but ALL learning stays LOCAL. No cloud. No leakage.
 // Patterns are EXPLAINABLE to the user and deletable.
 // User can inspect what Dex has "learned" and reset it anytime.
+// ===========================================================================
+// Rules 76-80: Intelligence / Learning Architecture
+// 76. Confidence scoring with Bayesian-style weight decay
+// 77. Pattern decay over time (unused lower confidence)
+// 78. Prediction accuracy tracking (predicted vs actual)
+// 79. Cold-start heuristics for new users
+// 80. Pattern deduplication and merging
 // ===========================================================================
 
 import { EventEmitter } from 'events';
@@ -706,6 +719,12 @@ class LocalLearningEngineClass extends EventEmitter {
     const now = Date.now();
     const retentionMs = this.preferences.retentionDays * 24 * 60 * 60 * 1000;
 
+    // Rule 77: Apply confidence decay before cleanup
+    this.applyConfidenceDecay();
+
+    // Rule 80: Merge duplicate patterns
+    this.deduplicatePatterns();
+
     for (const [id, pattern] of this.patterns) {
       // Remove old patterns with low confidence
       if (now - pattern.lastObserved > retentionMs && pattern.confidence < 0.5) {
@@ -725,6 +744,165 @@ class LocalLearningEngineClass extends EventEmitter {
       const toRemove = sorted.slice(0, sorted.length - this.MAX_PATTERNS + 10);
       for (const pattern of toRemove) {
         this.patterns.delete(pattern.id);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Rule 76: Bayesian-style confidence scoring
+  // -------------------------------------------------------------------------
+
+  private computeConfidence(observationCount: number, daysSinceFirst: number, userConfirmed: boolean): number {
+    // Prior: start at 0.1
+    const prior = 0.1;
+    // Observation factor: log growth, caps at ~0.7 with 50 observations
+    const obsFactor = Math.min(0.7, Math.log(1 + observationCount) / Math.log(51));
+    // Time factor: patterns observed longer are more reliable (caps at 0.2 over 30 days)
+    const timeFactor = Math.min(0.2, daysSinceFirst / 150);
+    // User confirmation bonus
+    const confirmBonus = userConfirmed ? 0.15 : 0;
+
+    return Math.min(1.0, prior + obsFactor + timeFactor + confirmBonus);
+  }
+
+  // -------------------------------------------------------------------------
+  // Rule 77: Pattern decay over time
+  // -------------------------------------------------------------------------
+
+  private readonly DECAY_RATE = 0.02; // 2% per day of inactivity
+  private readonly MIN_DECAY_CONFIDENCE = 0.05;
+
+  private applyConfidenceDecay(): void {
+    const now = Date.now();
+    const ONE_DAY = 86_400_000;
+
+    for (const pattern of this.patterns.values()) {
+      if (pattern.userConfirmed) continue; // User-confirmed patterns don't decay
+
+      const daysSinceLastObserved = (now - pattern.lastObserved) / ONE_DAY;
+      if (daysSinceLastObserved > 1) {
+        const decayFactor = Math.pow(1 - this.DECAY_RATE, daysSinceLastObserved);
+        pattern.confidence = Math.max(this.MIN_DECAY_CONFIDENCE, pattern.confidence * decayFactor);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Rule 78: Prediction accuracy tracking
+  // -------------------------------------------------------------------------
+
+  private predictionLog: Array<{ patternId: string; predicted: any; actual: any; correct: boolean; timestamp: number }> = [];
+  private readonly MAX_PREDICTION_LOG = 500;
+
+  recordPrediction(patternId: string, predicted: any, actual: any): void {
+    const correct = JSON.stringify(predicted) === JSON.stringify(actual);
+    this.predictionLog.push({ patternId, predicted, actual, correct, timestamp: Date.now() });
+
+    if (this.predictionLog.length > this.MAX_PREDICTION_LOG) {
+      this.predictionLog = this.predictionLog.slice(-this.MAX_PREDICTION_LOG);
+    }
+
+    // Adjust confidence based on prediction accuracy
+    const pattern = this.patterns.get(patternId);
+    if (pattern) {
+      if (correct) {
+        pattern.confidence = Math.min(1.0, pattern.confidence + 0.02);
+      } else {
+        pattern.confidence = Math.max(0.05, pattern.confidence - 0.05);
+      }
+    }
+  }
+
+  getPredictionAccuracy(patternId?: string): { total: number; correct: number; accuracy: number } {
+    const relevant = patternId
+      ? this.predictionLog.filter(p => p.patternId === patternId)
+      : this.predictionLog;
+
+    const correct = relevant.filter(p => p.correct).length;
+    return {
+      total: relevant.length,
+      correct,
+      accuracy: relevant.length > 0 ? correct / relevant.length : 0,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Rule 79: Cold-start heuristics for new users
+  // -------------------------------------------------------------------------
+
+  applyColdStartDefaults(): void {
+    if (this.patterns.size > 0) return; // Not a cold start
+
+    // Sensible defaults for new users
+    const defaults: Array<{ category: PatternCategory; name: string; description: string; data: PatternData }> = [
+      {
+        category: 'work-hours',
+        name: 'Default Work Hours',
+        description: 'Assumed weekday 9-5 schedule (will learn your actual pattern)',
+        data: {
+          type: 'work-hours',
+          peakHours: [{ start: 9, end: 17 }],
+          peakDays: [1, 2, 3, 4, 5], // Mon-Fri
+          averageSessionLength: 60,
+        },
+      },
+      {
+        category: 'focus-patterns',
+        name: 'Default Focus Pattern',
+        description: 'Default 25-minute focus sessions (Pomodoro-style)',
+        data: {
+          type: 'focus-patterns',
+          averageFocusDuration: 25,
+          preferredFocusTimes: [{ start: 9, end: 12 }, { start: 14, end: 17 }],
+          commonDistractions: [],
+        },
+      },
+    ];
+
+    for (const def of defaults) {
+      this.updateOrCreatePattern({
+        ...def,
+        confidence: 0.2, // Low confidence -- will be overridden by actual data
+      });
+    }
+
+    log.info('[Learning] Rule 79: Applied cold-start defaults for new user');
+  }
+
+  // -------------------------------------------------------------------------
+  // Rule 80: Pattern deduplication and merging
+  // -------------------------------------------------------------------------
+
+  private deduplicatePatterns(): void {
+    const byCategoryAndName = new Map<string, LearnedPattern[]>();
+
+    for (const pattern of this.patterns.values()) {
+      const key = `${pattern.category}::${pattern.name}`;
+      const group = byCategoryAndName.get(key) || [];
+      group.push(pattern);
+      byCategoryAndName.set(key, group);
+    }
+
+    for (const [, group] of byCategoryAndName) {
+      if (group.length <= 1) continue;
+
+      // Keep the one with highest confidence
+      group.sort((a, b) => b.confidence - a.confidence);
+      const keeper = group[0];
+
+      for (let i = 1; i < group.length; i++) {
+        const dup = group[i];
+        // Merge observations
+        keeper.observationCount += dup.observationCount;
+        keeper.confidence = Math.min(1.0, keeper.confidence + dup.confidence * 0.1);
+        keeper.lastObserved = Math.max(keeper.lastObserved, dup.lastObserved);
+        keeper.firstObserved = Math.min(keeper.firstObserved, dup.firstObserved);
+        // Merge evidence (capped)
+        keeper.evidence = [...keeper.evidence, ...dup.evidence]
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, this.MAX_EVIDENCE_PER_PATTERN);
+        // Remove duplicate
+        this.patterns.delete(dup.id);
       }
     }
   }

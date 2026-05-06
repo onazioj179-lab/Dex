@@ -1,4 +1,10 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX Computer Tasks Module - Email, Browser, and Productivity Automation
 // Handles email management, web tasks, and proactive suggestions
 // =============================================================================
@@ -169,7 +175,7 @@ class ComputerTasksManager extends EventEmitter {
           browserAutomation: true,
         },
       },
-    });
+    }) as unknown as Store;
 
     this.config = this.store.get('config') as ComputerTasksConfig;
     this.loadData();
@@ -347,12 +353,15 @@ class ComputerTasksManager extends EventEmitter {
 
     for (const account of accounts) {
       try {
-        // Real email sync requires OS-level mail API integration (e.g., MAPI on Windows,
-        // Mail.framework on macOS). Currently disabled — future work to integrate native mail.
-        // Mark account as connected but don't fabricate fake emails.
+        const fetched = await this.fetchNativeEmails(account);
+        for (const email of fetched) {
+          if (!this.emails.has(email.id)) {
+            this.emails.set(email.id, email);
+            synced++;
+          }
+        }
         account.lastSync = Date.now();
         account.connected = true;
-        // synced count remains 0 until real mail integration is implemented
       } catch (error) {
         errors.push(`Failed to sync ${account.email}: ${error}`);
         account.connected = false;
@@ -371,12 +380,111 @@ class ComputerTasksManager extends EventEmitter {
   }
 
   /**
-   * Placeholder for real email retrieval.
-   * Will integrate with native mail APIs when available.
+   * Attempt to fetch emails from native mail clients.
+   * Windows: Outlook COM via PowerShell. macOS: Mail.app via osascript.
+   * Returns empty array if no native mail client is available.
    */
-  private generateSampleEmails(_account: EmailAccount): Email[] {
-    // No more fake emails — return empty until real mail integration
-    return [];
+  private async fetchNativeEmails(account: EmailAccount): Promise<Email[]> {
+    const platform = process.platform;
+    const emails: Email[] = [];
+
+    try {
+      if (platform === 'win32') {
+        // Try Outlook COM automation via PowerShell
+        const ps = `
+          try {
+            $outlook = [Runtime.InteropServices.Marshal]::GetActiveComObject('Outlook.Application')
+            $ns = $outlook.GetNamespace('MAPI')
+            $inbox = $ns.GetDefaultFolder(6)
+            $items = $inbox.Items
+            $items.Sort('[ReceivedTime]', $true)
+            $count = [Math]::Min($items.Count, 20)
+            $results = @()
+            for ($i = 1; $i -le $count; $i++) {
+              $m = $items.Item($i)
+              $results += @{
+                subject = $m.Subject
+                from = $m.SenderEmailAddress
+                fromName = $m.SenderName
+                date = $m.ReceivedTime.ToString('o')
+                body = $m.Body.Substring(0, [Math]::Min($m.Body.Length, 500))
+                read = !$m.UnRead
+                id = $m.EntryID
+              }
+            }
+            $results | ConvertTo-Json -Depth 3
+          } catch { Write-Output '[]' }
+        `.trim();
+
+        const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
+          exec(`powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "${ps.replace(/"/g, '\\"')}"`,
+            { timeout: 10000, windowsHide: true },
+            (err, stdout) => err ? reject(err) : resolve({ stdout }));
+        });
+
+        const parsed = JSON.parse(stdout || '[]');
+        const items = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of items) {
+          if (!item.subject) continue;
+          emails.push({
+            id: `outlook_${Buffer.from(item.id || item.subject).toString('base64').slice(0, 24)}`,
+            accountId: account.id,
+            from: { name: item.fromName, email: item.from },
+            to: [{ email: account.email }],
+            subject: item.subject,
+            body: item.body || '',
+            date: new Date(item.date).getTime() || Date.now(),
+            read: !!item.read,
+            starred: false,
+            labels: ['inbox'],
+            attachments: [],
+            priority: 'normal',
+          });
+        }
+      } else if (platform === 'darwin') {
+        // Try Mail.app via osascript
+        const script = `
+          tell application "Mail"
+            set msgs to messages 1 thru 20 of inbox
+            set results to ""
+            repeat with m in msgs
+              set results to results & "---DELIM---" & subject of m & "|||" & sender of m & "|||" & (date received of m as string)
+            end repeat
+            return results
+          end tell
+        `.trim();
+
+        const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
+          exec(`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`,
+            { timeout: 10000 },
+            (err, stdout) => err ? reject(err) : resolve({ stdout }));
+        });
+
+        const entries = stdout.split('---DELIM---').filter(Boolean);
+        for (const entry of entries) {
+          const [subject, sender, dateStr] = entry.split('|||');
+          if (!subject) continue;
+          emails.push({
+            id: `mail_${Buffer.from(subject + dateStr).toString('base64').slice(0, 24)}`,
+            accountId: account.id,
+            from: { email: sender || '' },
+            to: [{ email: account.email }],
+            subject: subject.trim(),
+            body: '',
+            date: new Date(dateStr).getTime() || Date.now(),
+            read: false,
+            starred: false,
+            labels: ['inbox'],
+            attachments: [],
+            priority: 'normal',
+          });
+        }
+      }
+    } catch {
+      // Native mail not available — fall through with empty array
+    }
+
+    return emails;
   }
 
   getEmails(options?: {
@@ -462,10 +570,16 @@ class ComputerTasksManager extends EventEmitter {
   }
 
   async sendEmail(draft: EmailDraft): Promise<{ success: boolean; message: string }> {
-    // In a real implementation, this would use the email account's SMTP settings
-    // For now, open the system email client
     const { previewUrl } = this.composeEmail(draft);
     if (previewUrl) {
+      try {
+        const parsed = new URL(previewUrl);
+        if (parsed.protocol !== 'mailto:') {
+          return { success: false, message: 'Invalid email URL protocol' };
+        }
+      } catch {
+        return { success: false, message: 'Invalid email URL' };
+      }
       await shell.openExternal(previewUrl);
       return { success: true, message: 'Email opened in default mail client' };
     }
@@ -616,6 +730,33 @@ class ComputerTasksManager extends EventEmitter {
     return this.getCalendarEvents({ start: now, end });
   }
 
+  private checkCalendarReminders(): void {
+    const now = Date.now();
+    for (const event of this.calendarEvents.values()) {
+      if (event.reminders && event.start > now) {
+        for (const minutesBefore of event.reminders) {
+          const reminderTime = event.start - minutesBefore * 60 * 1000;
+          // Fire reminder if within sync interval window
+          if (reminderTime <= now && reminderTime > now - this.config.calendarSyncInterval) {
+            try {
+              const { Notification } = require('electron');
+              if (Notification.isSupported()) {
+                new Notification({
+                  title: `Upcoming: ${event.title}`,
+                  body: event.location
+                    ? `In ${minutesBefore} minutes at ${event.location}`
+                    : `In ${minutesBefore} minutes`,
+                }).show();
+              }
+            } catch {
+              // Notification not available
+            }
+          }
+        }
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Web Automation
   // ---------------------------------------------------------------------------
@@ -697,6 +838,14 @@ class ComputerTasksManager extends EventEmitter {
     switch (step.type) {
       case 'navigate':
         if (processedUrl) {
+          try {
+            const parsed = new URL(processedUrl);
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+              return { navigated: null, error: 'Only http/https URLs are allowed' };
+            }
+          } catch {
+            return { navigated: null, error: 'Invalid URL' };
+          }
           await shell.openExternal(processedUrl);
           return { navigated: processedUrl };
         }
@@ -714,9 +863,8 @@ class ComputerTasksManager extends EventEmitter {
       case 'click':
       case 'extract':
       case 'screenshot':
-        // These would require a browser automation library like Puppeteer
-        // For now, return a placeholder
-        return { step: step.type, status: 'not_implemented' };
+        // Browser automation requires Puppeteer/Playwright — not available
+        return { step: step.type, status: 'error', message: 'Browser automation not available — requires external library' };
     }
 
     return { step: step.type, status: 'completed' };
@@ -732,6 +880,10 @@ class ComputerTasksManager extends EventEmitter {
 
   async openUrl(url: string): Promise<boolean> {
     try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+        return false;
+      }
       await shell.openExternal(url);
       return true;
     } catch {
@@ -883,11 +1035,17 @@ class ComputerTasksManager extends EventEmitter {
       const platform = process.platform;
       
       if (platform === 'win32') {
-        exec(`start "" "${appInfo.path}"`);
+        const child = spawn('cmd', ['/c', 'start', '', appInfo.path], { detached: true, stdio: 'ignore' });
+        child.on('error', (err) => { console.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
+        child.unref();
       } else if (platform === 'darwin') {
-        exec(`open "${appInfo.path}"`);
+        const child = spawn('open', [appInfo.path], { detached: true, stdio: 'ignore' });
+        child.on('error', (err) => { console.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
+        child.unref();
       } else {
-        spawn('xdg-open', [appInfo.path], { detached: true });
+        const child = spawn('xdg-open', [appInfo.path], { detached: true, stdio: 'ignore' });
+        child.on('error', (err) => { console.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
+        child.unref();
       }
 
       // Update usage stats
@@ -1089,7 +1247,7 @@ class ComputerTasksManager extends EventEmitter {
         completed: 0,
         pending: 0,
         overdue: 0,
-        productivity: 75, // Placeholder
+        productivity: 0, // No task tracking data available
         topCategories: [],
       },
     };
@@ -1156,9 +1314,9 @@ class ComputerTasksManager extends EventEmitter {
     }, this.config.emailSyncInterval);
     this.syncIntervals.set('email', emailInterval);
 
-    // Calendar sync (placeholder)
+    // Calendar reminder check  
     const calendarInterval = setInterval(() => {
-      // Would sync calendar here
+      this.checkCalendarReminders();
     }, this.config.calendarSyncInterval);
     this.syncIntervals.set('calendar', calendarInterval);
 

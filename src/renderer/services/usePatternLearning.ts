@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Pattern Learning Hook
  * Local-only usage pattern learning - runs in background
@@ -29,7 +35,7 @@ export const usePatternLearning = () => {
   // Record app open
   const recordAppOpen = useCallback((appId: string, context?: string) => {
     appOpenTime.current.set(appId, Date.now());
-    window.electron?.invoke('patterns:recordAppOpen', appId, context).catch(() => {});
+    window.electron?.invoke('patterns:recordAppOpen', appId, context).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record app close (with duration)
@@ -37,22 +43,22 @@ export const usePatternLearning = () => {
     const openTime = appOpenTime.current.get(appId);
     const duration = openTime ? Date.now() - openTime : undefined;
     appOpenTime.current.delete(appId);
-    window.electron?.invoke('patterns:recordAppClose', appId, duration).catch(() => {});
+    window.electron?.invoke('patterns:recordAppClose', appId, duration).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record file open
   const recordFileOpen = useCallback((filePath: string, appId?: string) => {
-    window.electron?.invoke('patterns:recordFileOpen', filePath, appId).catch(() => {});
+    window.electron?.invoke('patterns:recordFileOpen', filePath, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record tool use
   const recordToolUse = useCallback((toolId: string, appId?: string) => {
-    window.electron?.invoke('patterns:recordToolUse', toolId, appId).catch(() => {});
+    window.electron?.invoke('patterns:recordToolUse', toolId, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Record generic action
   const recordAction = useCallback((actionId: string, context?: string) => {
-    window.electron?.invoke('patterns:recordAction', actionId, context).catch(() => {});
+    window.electron?.invoke('patterns:recordAction', actionId, context).catch((e: unknown) => { console.warn('[DEX]', e); });
   }, []);
 
   // Get suggestions
@@ -127,7 +133,7 @@ export const useToolTracking = (appId: string) => {
     
     // Record tool combinations if we have a previous tool
     if (lastTool.current && lastTool.current !== toolId) {
-      window.electron?.invoke('patterns:recordToolCombo', lastTool.current, toolId, appId).catch(() => {});
+      window.electron?.invoke('patterns:recordToolCombo', lastTool.current, toolId, appId).catch((e: unknown) => { console.warn('[DEX]', e); });
     }
     lastTool.current = toolId;
   }, [recordToolUse, appId]);

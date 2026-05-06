@@ -2,7 +2,7 @@
  * DEX Platform - HTTP Transfer Server
  * Local network file sharing via HTTP server + QR code + web UI
  * Receivers scan QR or visit URL to download files; senders get accept/reject flow.
- * Copyright (c) 2026 DEX. All rights reserved.
+ * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  */
 
 import { ipcMain, BrowserWindow, dialog, app } from 'electron';
@@ -14,9 +14,9 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SharedFile {
   id: string;
@@ -38,9 +38,9 @@ interface PendingUpload {
   resolveAccept?: (accept: boolean) => void;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// QR CODE GENERATOR (minimal inline — no external dependency)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// QR CODE GENERATOR (minimal inline -- no external dependency)
+// ===========================================================================
 
 function generateQRCodeSVG(data: string, size: number = 200): string {
   // Simplified QR-like representation using a data URI approach
@@ -59,9 +59,9 @@ function getQRData(url: string): string {
   return url; // The renderer will generate the actual QR image from this URL
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MIME TYPE MAP
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
@@ -79,14 +79,14 @@ function getMimeType(filePath: string): string {
   return MIME_TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // WEB UI HTML (served inline to receivers)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 function generateWebUI(files: SharedFile[], hostName: string): string {
   const fileListHTML = files.map(f => `
     <div class="file-card">
-      <div class="file-icon">${getFileEmoji(f.name)}</div>
+      <div class="file-icon">${getFileLabel(f.name)}</div>
       <div class="file-info">
         <div class="file-name">${escapeHtml(f.name)}</div>
         <div class="file-size">${formatFileSize(f.size)}</div>
@@ -173,7 +173,7 @@ function generateWebUI(files: SharedFile[], hostName: string): string {
 </html>`;
 }
 
-function getFileEmoji(name: string): string {
+function getFileLabel(name: string): string {
   const ext = path.extname(name).toLowerCase();
   if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'].includes(ext)) return '[IMG]';
   if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'].includes(ext)) return '[AUD]';
@@ -196,9 +196,9 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1073741824).toFixed(2)} GB`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GET LOCAL IP
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 function getLocalIP(): string {
   const interfaces = os.networkInterfaces();
@@ -212,9 +212,9 @@ function getLocalIP(): string {
   return '127.0.0.1';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HTTP TRANSFER SERVER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class HttpTransferServer {
   private server: http.Server | null = null;
@@ -377,7 +377,7 @@ class HttpTransferServer {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     
     // CORS headers for mobile browsers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:47633');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -473,14 +473,27 @@ class HttpTransferServer {
     }
 
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    let totalSize = 0;
+    const MAX_UPLOAD_SIZE = 500 * 1024 * 1024; // 500MB limit
+    req.on('data', (chunk: Buffer) => {
+      totalSize += chunk.length;
+      if (totalSize > MAX_UPLOAD_SIZE) {
+        req.destroy();
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'File too large (500MB limit)' }));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       const body = Buffer.concat(chunks);
       
       // Simple multipart parser: extract filename and file data
       const bodyStr = body.toString('binary');
       const filenameMatch = bodyStr.match(/filename="([^"]+)"/);
-      const fileName = filenameMatch ? filenameMatch[1] : `upload-${Date.now()}`;
+      // Sanitize filename: strip path components to prevent directory traversal
+      const rawName = filenameMatch ? filenameMatch[1] : `upload-${Date.now()}`;
+      const fileName = path.basename(rawName).replace(/[<>:"|?*\x00-\x1f]/g, '_') || `upload-${Date.now()}`;
       
       // Find the file data between the headers and the boundary
       const headerEnd = bodyStr.indexOf('\r\n\r\n');
@@ -579,7 +592,7 @@ class HttpTransferServer {
           win.webContents.send(channel, data);
         }
       });
-    } catch {}
+    } catch (err) { log.warn('[HttpTransfer] Broadcast failed:', err); }
   }
 }
 

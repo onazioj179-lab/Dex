@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Event Monitor
 // Watches system state: processes, battery, network, etc.
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import * as si from 'systeminformation';
 import { SystemStatus, ProcessInfo } from '../../shared/types';
@@ -29,12 +35,12 @@ export class EventMonitor {
     this.isRunning = true;
     this.logger.info('Event Monitor started');
 
-    // Monitor every 15 seconds for better performance
+    // Monitor every 120 seconds — WMI/systeminformation calls are expensive on Windows
     this.monitorInterval = setInterval(() => {
       this.monitor();
-    }, 15000);
+    }, 120000);
 
-    // Initial fetch after 5 seconds
+    // Initial fetch after 5 seconds (let UI render first)
     setTimeout(() => this.monitor(), 5000);
   }
 
@@ -205,14 +211,14 @@ export class EventMonitor {
     // Detect new processes
     for (const name of currentNames) {
       if (!this.previousProcesses.has(name)) {
-        // New process started - could emit event
+        this.logger.info(`[EventMonitor] Process started: ${name}`);
       }
     }
 
     // Detect stopped processes
     for (const name of this.previousProcesses) {
       if (!currentNames.has(name)) {
-        // Process stopped - could emit event
+        this.logger.info(`[EventMonitor] Process stopped: ${name}`);
       }
     }
 

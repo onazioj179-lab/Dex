@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Execution Optimizer
 // Phase 15: Deep Internal Micro-Optimization
 // Optimizes hot paths and reduces redundant operations
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import log from 'electron-log';
 import { BrowserWindow, ipcMain } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // IPC BATCHING - Reduce cross-process communication
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface BatchedRequest {
   id: string;
@@ -109,9 +115,9 @@ class IPCBatcherClass {
 
 export const ipcBatcher = new IPCBatcherClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STATE COALESCING - Reduce redundant state updates
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class StateCoalescer<T> {
   private pendingUpdate: T | null = null;
@@ -157,9 +163,9 @@ export class StateCoalescer<T> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // RENDER BATCH - Batch renderer updates
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class RenderBatcherClass {
   private pendingUpdates: Map<string, { channel: string; data: any; timestamp: number }> = new Map();
@@ -228,9 +234,9 @@ class RenderBatcherClass {
 
 export const renderBatcher = new RenderBatcherClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HOT PATH INSTRUMENTATION - Measure and optimize hot paths
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface PathMetrics {
   name: string;
@@ -340,27 +346,27 @@ class HotPathProfilerClass {
   report(): string {
     const metrics = this.getMetrics();
     const lines = [
-      '╔════════════════════════════════════════════════════════════════╗',
-      '║                     HOT PATH PROFILER REPORT                   ║',
-      '╠════════════════════════════════════════════════════════════════╣',
+      '================================================================',
+      '                    HOT PATH PROFILER REPORT                   ',
+      '================================================================',
     ];
 
     for (const m of metrics.slice(0, 20)) {
       lines.push(
-        `║ ${m.name.padEnd(30)} │ calls: ${String(m.calls).padStart(6)} │ avg: ${m.avgMs.toFixed(2).padStart(8)}ms ║`
+        `${m.name.padEnd(30)} calls: ${String(m.calls).padStart(6)} avg: ${m.avgMs.toFixed(2).padStart(8)}ms `
       );
     }
 
-    lines.push('╚════════════════════════════════════════════════════════════════╝');
+    lines.push('================================================================');
     return lines.join('\n');
   }
 }
 
 export const hotPathProfiler = new HotPathProfilerClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DETERMINISTIC OPERATIONS - Ensure consistent execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class DeterministicExecutor {
   private locks: Map<string, Promise<void>> = new Map();

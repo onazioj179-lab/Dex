@@ -1,13 +1,20 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // AUTH STORE - Authentication State Management
 // Zustand store for auth state in renderer
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface AuthState {
   isLocked: boolean;
@@ -62,16 +69,32 @@ interface AuthStore extends AuthState {
   updateConfig: (updates: Partial<AuthConfig>) => Promise<void>;
   clearCredentials: (currentPassword?: string) => Promise<{ success: boolean; error?: string }>;
   
+  // Change credentials (requires current credential verification)
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  changePin: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Recovery
+  generateRecoveryCodes: () => Promise<{ success: boolean; codes?: string[] }>;
+  authenticateWithRecovery: (code: string) => Promise<boolean>;
+  
+  // Idle warning
+  idleWarning: { active: boolean; seconds: number } | null;
+  setIdleWarning: (warning: { active: boolean; seconds: number } | null) => void;
+  
   // Internal
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Store
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+// Store cleanup function for state change listener
+let _authStateCleanup: (() => void) | null = null;
+
+export const useAuthStore = create<AuthStore>()(devtools(
+  (set, get) => ({
   // Initial state
   isLocked: true,
   isEnabled: false,
@@ -119,8 +142,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ isLoading: false, isLocked: false });
       }
       
-      // Listen for state changes
-      window.dex?.auth?.onStateChange?.((newState: any) => {
+      // Listen for state changes - cleanup previous listener first
+      if (typeof _authStateCleanup === 'function') {
+        _authStateCleanup();
+        _authStateCleanup = null;
+      }
+      const unsubscribe = window.dex?.auth?.onStateChange?.((newState: any) => {
         set({
           isLocked: newState.isLocked,
           isEnabled: newState.isEnabled,
@@ -131,6 +158,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           lockoutStatus: newState.lockoutStatus,
         });
       });
+      _authStateCleanup = typeof unsubscribe === 'function' ? unsubscribe : null;
     } catch (error) {
       console.error('[AuthStore] Failed to initialize:', error);
       set({ isLoading: false, isLocked: false, error: 'Failed to initialize authentication' });
@@ -312,9 +340,79 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  // Change credentials (requires current credential verification)
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await window.dex?.auth?.changePassword(currentPassword, newPassword);
+      set({ isLoading: false });
+      if (result?.success) {
+        await get().refreshState();
+        return { success: true };
+      }
+      return { success: false, error: result?.error || 'Failed to change password' };
+    } catch (error) {
+      set({ isLoading: false });
+      return { success: false, error: 'Failed to change password' };
+    }
+  },
+
+  changePin: async (currentPin: string, newPin: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await window.dex?.auth?.changePin(currentPin, newPin);
+      set({ isLoading: false });
+      if (result?.success) {
+        await get().refreshState();
+        return { success: true };
+      }
+      return { success: false, error: result?.error || 'Failed to change PIN' };
+    } catch (error) {
+      set({ isLoading: false });
+      return { success: false, error: 'Failed to change PIN' };
+    }
+  },
+
+  // Recovery
+  generateRecoveryCodes: async () => {
+    try {
+      const result = await window.dex?.auth?.generateRecoveryCodes();
+      return result || { success: false };
+    } catch {
+      return { success: false };
+    }
+  },
+
+  authenticateWithRecovery: async (code: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await window.dex?.auth?.authenticateRecovery(code);
+      if (result?.success) {
+        set({ isLocked: false, sessionToken: result.token, isLoading: false, error: null });
+        return true;
+      }
+      set({ error: result?.error || 'Invalid recovery code', isLoading: false });
+      return false;
+    } catch {
+      set({ error: 'Recovery authentication failed', isLoading: false });
+      return false;
+    }
+  },
+
+  // Idle warning
+  idleWarning: null,
+  setIdleWarning: (warning) => set({ idleWarning: warning }),
+
   // Internal
   setError: (error: string | null) => set({ error }),
   setLoading: (isLoading: boolean) => set({ isLoading }),
-}));
+}), { name: 'AuthStore', enabled: import.meta.env.DEV }));
+
+// ---- Selectors ----
+export const selectIsLocked = (s: AuthStore) => s.isLocked;
+export const selectAuthMethod = (s: AuthStore) => s.method;
+export const selectAuthLoading = (s: AuthStore) => s.isLoading;
+export const selectAuthError = (s: AuthStore) => s.error;
+export const selectLockoutStatus = (s: AuthStore) => s.lockoutStatus;
 
 export default useAuthStore;

@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX TEST SETUP
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Global test setup and mocks for Vitest
  */
@@ -9,9 +15,9 @@
 import { vi, beforeAll, afterAll, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MOCK ELECTRON
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const mockElectron = {
   app: {
@@ -119,9 +125,9 @@ const mockElectron = {
 
 vi.mock('electron', () => mockElectron);
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MOCK NODE MODULES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
@@ -155,65 +161,75 @@ vi.mock('fs', async () => {
   };
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MOCK WINDOW / DOM APIs
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// MOCK WINDOW / DOM APIs (guarded for node-environment test files)
+// ===========================================================================
 
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 
-Object.defineProperty(window, 'ResizeObserver', {
-  writable: true,
-  value: vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  })),
-});
+  Object.defineProperty(window, 'ResizeObserver', {
+    writable: true,
+    value: class MockResizeObserver {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+    },
+  });
+  (globalThis as any).ResizeObserver = (window as any).ResizeObserver;
 
-Object.defineProperty(window, 'IntersectionObserver', {
-  writable: true,
-  value: vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  })),
-});
+  Object.defineProperty(window, 'IntersectionObserver', {
+    writable: true,
+    value: class MockIntersectionObserver {
+      root = null;
+      rootMargin = '';
+      thresholds: number[] = [];
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      takeRecords = vi.fn(() => []);
+    },
+  });
+  (globalThis as any).IntersectionObserver = (window as any).IntersectionObserver;
+}
 
 // Mock dexAPI (preload bridge)
-Object.defineProperty(window, 'dexAPI', {
-  writable: true,
-  value: {
-    invoke: vi.fn(() => Promise.resolve(null)),
-    send: vi.fn(),
-    on: vi.fn(() => vi.fn()), // Returns cleanup function
-    platform: 'win32',
-    versions: {
-      node: '20.0.0',
-      chrome: '120.0.0',
-      electron: '28.0.0',
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'dexAPI', {
+    writable: true,
+    value: {
+      invoke: vi.fn(() => Promise.resolve(null)),
+      send: vi.fn(),
+      on: vi.fn(() => vi.fn()), // Returns cleanup function
+      platform: 'win32',
+      versions: {
+        node: '20.0.0',
+        chrome: '120.0.0',
+        electron: '28.0.0',
+      },
     },
-  },
-});
+  });
+}
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GLOBAL TEST HOOKS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 beforeAll(() => {
   // Global setup before all tests
-  console.log('🧪 DEX Test Suite Starting...');
+  console.log('DEX Test Suite Starting...');
 });
 
 afterEach(() => {
@@ -224,12 +240,12 @@ afterEach(() => {
 afterAll(() => {
   // Cleanup after all tests
   vi.restoreAllMocks();
-  console.log('✅ DEX Test Suite Complete');
+  console.log('DEX Test Suite Complete');
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TEST UTILITIES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const mockElectronModule = mockElectron;
 
@@ -245,6 +261,7 @@ export function mockIPCResponse(channel: string, response: any) {
 }
 
 export function mockDexAPIResponse(channel: string, response: any) {
+  if (typeof window === 'undefined') return;
   (window.dexAPI as any).invoke.mockImplementation((ch: string) => {
     if (ch === channel) return Promise.resolve(response);
     return Promise.resolve(null);

@@ -1,0 +1,669 @@
+/* DEX Print Stylesheet
+   Covers Notes, Tasks, Kanban, Calendar, Analytics, Rewind, time tracking, and personal changelog.
+   Applied via media query: @media print.
+*/
+
+@media print {
+  /* -- Reset / Global Print Rules -- */
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    font-size: 12pt;
+    line-height: 1.5;
+    font-family: 'Times New Roman', 'Georgia', serif;
+    overflow: visible !important;
+  }
+
+  /* -- Hide Non-Printable Elements -- */
+  .dex-sidebar,
+  .dex-titlebar,
+  .dex-statusbar,
+  .dex-toolbar,
+  .dex-dock,
+  .dex-floating-panel,
+  .dex-modal-overlay,
+  .dex-tooltip,
+  .dex-toast,
+  .dex-contextmenu,
+  .dex-dropdown,
+  .dex-resize-handle,
+  .dex-scrollbar,
+  .dex-command-palette,
+  .dex-skip-nav,
+  .dex-live-announcer,
+  .dex-loading-spinner,
+  .dex-splash,
+  .dex-no-print,
+  button,
+  input[type="button"],
+  input[type="submit"],
+  nav,
+  footer,
+  video,
+  audio,
+  iframe,
+  [data-no-print],
+  [aria-hidden="true"] {
+    display: none !important;
+  }
+
+  /* Ensure main content fills page */
+  .dex-main-content,
+  .dex-app-container,
+  .dex-content-area {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: static !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  /* -- Page Setup -- */
+  @page {
+    size: A4;
+    margin: 2cm 1.5cm;
+  }
+
+  @page :first {
+    margin-top: 3cm;
+  }
+
+  /* -- Links -- */
+  a[href] {
+    text-decoration: underline;
+    word-wrap: break-word;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    font-style: italic;
+    color: #555 !important;
+  }
+
+  a[href^="#"]::after,
+  a[href^="javascript"]::after {
+    content: "";
+  }
+
+  /* -- Typography -- */
+  h1 {
+    font-size: 22pt;
+    margin-top: 0;
+    margin-bottom: 8pt;
+    page-break-after: avoid;
+    border-bottom: 1pt solid #ccc;
+    padding-bottom: 4pt;
+  }
+
+  h2 {
+    font-size: 18pt;
+    margin-top: 16pt;
+    margin-bottom: 6pt;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 14pt;
+    margin-top: 12pt;
+    margin-bottom: 4pt;
+    page-break-after: avoid;
+  }
+
+  h4, h5, h6 {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-top: 10pt;
+    margin-bottom: 4pt;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 6pt 0;
+    orphans: 3;
+    widows: 3;
+  }
+
+  blockquote {
+    margin: 8pt 0 8pt 20pt;
+    padding-inline-start: 10pt;
+    border-inline-start: 2pt solid #999;
+    font-style: italic;
+    color: #333 !important;
+  }
+
+  pre, code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt;
+  }
+
+  pre {
+    border: 1pt solid #ddd;
+    padding: 8pt;
+    overflow-x: visible;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    page-break-inside: avoid;
+  }
+
+  code {
+    padding: 1pt 3pt;
+    border: 0.5pt solid #ccc;
+  }
+
+  pre code {
+    border: none;
+    padding: 0;
+  }
+
+  /* -- Tables -- */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    page-break-inside: auto;
+    margin: 8pt 0;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  th, td {
+    border: 0.5pt solid #999;
+    padding: 4pt 6pt;
+    text-align: start;
+    vertical-align: top;
+    font-size: 10pt;
+  }
+
+  th {
+    font-weight: bold;
+    background-color: #f0f0f0 !important;
+  }
+
+  /* -- Images -- */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+
+  figure {
+    page-break-inside: avoid;
+    margin: 8pt 0;
+  }
+
+  figcaption {
+    font-size: 9pt;
+    font-style: italic;
+    text-align: center;
+    margin-top: 4pt;
+  }
+
+  /* -- Lists -- */
+  ul, ol {
+    margin: 6pt 0;
+    padding-inline-start: 20pt;
+  }
+
+  li {
+    margin-bottom: 3pt;
+  }
+
+  /* -- Notes Print -- */
+  .dex-notes-editor {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .dex-notes-toolbar,
+  .dex-notes-sidebar,
+  .dex-notes-word-suggestions,
+  .dex-notes-breadcrumb {
+    display: none !important;
+  }
+
+  .dex-notes-title {
+    font-size: 22pt;
+    font-weight: bold;
+    margin-bottom: 8pt;
+    border-bottom: 1pt solid #ccc;
+    padding-bottom: 4pt;
+  }
+
+  .dex-notes-metadata {
+    font-size: 9pt;
+    color: #666 !important;
+    margin-bottom: 12pt;
+    border-bottom: 0.5pt solid #eee;
+    padding-bottom: 6pt;
+  }
+
+  .dex-notes-content {
+    line-height: 1.6;
+  }
+
+  .dex-notes-checkbox {
+    display: inline-block;
+    width: 10pt;
+    height: 10pt;
+    border: 1pt solid #000;
+    margin-inline-end: 6pt;
+    vertical-align: middle;
+  }
+
+  .dex-notes-checkbox.checked::after {
+    content: "\2713";
+    font-size: 8pt;
+    line-height: 10pt;
+    text-align: center;
+    display: block;
+  }
+
+  .dex-notes-tag {
+    font-size: 9pt;
+    border: 0.5pt solid #999;
+    padding: 1pt 4pt;
+    border-radius: 2pt;
+    margin-inline-end: 4pt;
+  }
+
+  .dex-notes-callout {
+    border: 1pt solid #999;
+    padding: 8pt;
+    margin: 8pt 0;
+    page-break-inside: avoid;
+  }
+
+  /* -- Tasks Print -- */
+  .dex-tasks-controls,
+  .dex-tasks-add-button,
+  .dex-tasks-drag-handle {
+    display: none !important;
+  }
+
+  .dex-task-item {
+    border-bottom: 0.5pt solid #ddd;
+    padding: 6pt 0;
+    page-break-inside: avoid;
+  }
+
+  .dex-task-checkbox {
+    display: inline-block;
+    width: 10pt;
+    height: 10pt;
+    border: 1pt solid #000;
+    margin-inline-end: 8pt;
+    vertical-align: middle;
+  }
+
+  .dex-task-checkbox.completed::after {
+    content: "\2713";
+    font-size: 8pt;
+  }
+
+  .dex-task-title {
+    font-weight: bold;
+    font-size: 11pt;
+  }
+
+  .dex-task-title.completed {
+    text-decoration: line-through;
+  }
+
+  .dex-task-description {
+    font-size: 10pt;
+    margin-top: 2pt;
+    color: #333 !important;
+  }
+
+  .dex-task-due {
+    font-size: 9pt;
+    color: #555 !important;
+  }
+
+  .dex-task-due.overdue {
+    color: #c00 !important;
+    font-weight: bold;
+  }
+
+  .dex-task-priority-indicator {
+    display: inline-block;
+    width: 8pt;
+    height: 8pt;
+    border-radius: 50%;
+    margin-inline-end: 4pt;
+    vertical-align: middle;
+    border: 0.5pt solid #000;
+  }
+
+  .dex-task-priority-high {
+    background-color: #333 !important;
+  }
+
+  .dex-task-priority-medium {
+    background-color: #999 !important;
+  }
+
+  .dex-task-priority-low {
+    background-color: #ddd !important;
+  }
+
+  /* -- Kanban Print -- */
+  .dex-kanban-board {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 8pt;
+  }
+
+  .dex-kanban-column {
+    flex: 1;
+    min-width: 150pt;
+    border: 0.5pt solid #ccc;
+    padding: 6pt;
+    page-break-inside: avoid;
+  }
+
+  .dex-kanban-column-title {
+    font-weight: bold;
+    font-size: 12pt;
+    margin-bottom: 6pt;
+    padding-bottom: 4pt;
+    border-bottom: 1pt solid #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+  }
+
+  .dex-kanban-card {
+    border: 0.5pt solid #ddd;
+    padding: 4pt 6pt;
+    margin-bottom: 4pt;
+    page-break-inside: avoid;
+    font-size: 10pt;
+  }
+
+  .dex-kanban-card-badge,
+  .dex-kanban-card-actions {
+    display: none !important;
+  }
+
+  /* -- Calendar Print -- */
+  .dex-calendar-nav,
+  .dex-calendar-add-event {
+    display: none !important;
+  }
+
+  .dex-calendar-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr);
+    border: 1pt solid #999;
+ }
+
+  .dex-calendar-header-cell {
+    font-weight: bold;
+    text-align: center;
+    padding: 4pt;
+    border-bottom: 1pt solid #999;
+    font-size: 10pt;
+  }
+
+  .dex-calendar-day {
+    border: 0.5pt solid #ddd;
+    min-height: 60pt;
+    padding: 2pt;
+    font-size: 9pt;
+  }
+
+  .dex-calendar-day-number {
+    font-weight: bold;
+    font-size: 10pt;
+    margin-bottom: 2pt;
+  }
+
+  .dex-calendar-event {
+    font-size: 8pt;
+    padding: 1pt 2pt;
+    margin-bottom: 1pt;
+    border-inline-start: 2pt solid #666;
+  }
+
+  .dex-calendar-today {
+    border: 1.5pt solid #000 !important;
+  }
+
+  /* -- Analytics Print -- */
+  .dex-analytics-controls,
+  .dex-analytics-filter,
+  .dex-analytics-date-picker {
+    display: none !important;
+  }
+
+  .dex-analytics-card {
+    border: 0.5pt solid #ccc;
+    padding: 8pt;
+    margin-bottom: 8pt;
+    page-break-inside: avoid;
+  }
+
+  .dex-analytics-card-title {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 4pt;
+  }
+
+  .dex-analytics-metric {
+    font-size: 20pt;
+    font-weight: bold;
+    margin: 4pt 0;
+  }
+
+  .dex-analytics-chart {
+    max-width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+  }
+
+  canvas.dex-chart {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* -- Rewind / Timeline Print -- */
+  .dex-rewind-controls,
+  .dex-rewind-playback {
+    display: none !important;
+  }
+
+  .dex-rewind-timeline {
+    width: 100% !important;
+  }
+
+  .dex-rewind-entry {
+    border-inline-start: 2pt solid #999;
+    padding-inline-start: 12pt;
+    margin-bottom: 8pt;
+    position: relative;
+    page-break-inside: avoid;
+  }
+
+  .dex-rewind-entry::before {
+    content: "";
+    width: 6pt;
+    height: 6pt;
+    border-radius: 50%;
+    background: #000 !important;
+    position: absolute;
+    inset-inline-start: -4pt;
+    top: 4pt;
+  }
+
+  .dex-rewind-timestamp {
+    font-size: 9pt;
+    color: #666 !important;
+    margin-bottom: 2pt;
+  }
+
+  .dex-rewind-description {
+    font-size: 10pt;
+  }
+
+  /* -- Time Tracking Print -- */
+  .dex-timetrack-controls,
+  .dex-timetrack-timer {
+    display: none !important;
+  }
+
+  .dex-timetrack-summary {
+    margin-bottom: 12pt;
+  }
+
+  .dex-timetrack-summary-total {
+    font-size: 16pt;
+    font-weight: bold;
+  }
+
+  .dex-timetrack-entry {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 0.5pt solid #ddd;
+    padding: 4pt 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  .dex-timetrack-project {
+    font-weight: bold;
+  }
+
+  .dex-timetrack-duration {
+    font-family: 'Courier New', monospace;
+  }
+
+  /* -- Personal Changelog Print -- */
+  .dex-changelog-add,
+  .dex-changelog-filter {
+    display: none !important;
+  }
+
+  .dex-changelog-date-group {
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
+  }
+
+  .dex-changelog-date-heading {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 6pt;
+    border-bottom: 0.5pt solid #ccc;
+    padding-bottom: 2pt;
+  }
+
+  .dex-changelog-entry {
+    padding: 3pt 0;
+    font-size: 10pt;
+  }
+
+  .dex-changelog-category {
+    font-weight: bold;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+    margin-inline-end: 6pt;
+  }
+
+  /* -- Page Header / Footer for Print -- */
+  .dex-print-header {
+    display: block !important;
+    text-align: center;
+    font-size: 9pt;
+    color: #999 !important;
+    margin-bottom: 12pt;
+    border-bottom: 0.5pt solid #ddd;
+    padding-bottom: 4pt;
+  }
+
+  .dex-print-footer {
+    display: block !important;
+    text-align: center;
+    font-size: 8pt;
+    color: #aaa !important;
+    margin-top: 12pt;
+    border-top: 0.5pt solid #ddd;
+    padding-top: 4pt;
+    position: fixed;
+    bottom: 0;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+  }
+
+  /* -- Orphan / Widow / Page Break Control -- */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  ul, ol, dl {
+    page-break-before: avoid;
+  }
+
+  .dex-keep-together {
+    page-break-inside: avoid;
+  }
+
+  .dex-page-break {
+    page-break-before: always;
+  }
+
+  /* -- Accessibility in Print -- */
+  abbr[title]::after {
+    content: " (" attr(title) ")";
+    font-size: 9pt;
+  }
+
+  /* -- Misc -- */
+  .dex-badge {
+    border: 0.5pt solid #999;
+    padding: 1pt 4pt;
+    font-size: 8pt;
+    border-radius: 2pt;
+  }
+
+  .dex-divider {
+    border: none;
+    border-top: 0.5pt solid #ccc;
+    margin: 8pt 0;
+  }
+
+  .dex-empty-state,
+  .dex-error-state {
+    border: 1pt dashed #ccc;
+    padding: 12pt;
+    text-align: center;
+    font-style: italic;
+    color: #666 !important;
+  }
+
+  /* Force color for priority/status indicators */
+  [data-print-label]::before {
+    content: attr(data-print-label) ": ";
+    font-weight: bold;
+  }
+}

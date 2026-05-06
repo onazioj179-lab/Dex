@@ -1,4 +1,10 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Plugin System (Enhanced Extension Framework)
 // User-installable plugins with sandboxed execution
 // =============================================================================
@@ -9,6 +15,22 @@ import log from 'electron-log';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+
+// Node fs adapter compatible with PluginPublisher.FsLike
+function makeNodeFsLike() {
+  return {
+    join: (...parts: string[]) => path.join(...parts),
+    exists: async (p: string) => fs.existsSync(p),
+    readFile: async (p: string) => fs.promises.readFile(p),
+    writeFile: async (p: string, data: Uint8Array | string) => fs.promises.writeFile(p, data),
+    readDir: async (p: string) => fs.promises.readdir(p),
+    stat: async (p: string) => {
+      const s = await fs.promises.stat(p);
+      return { isDirectory: s.isDirectory(), isFile: s.isFile(), size: s.size };
+    },
+    mkdirP: async (p: string) => { await fs.promises.mkdir(p, { recursive: true }); },
+  };
+}
 
 // -----------------------------------------------------------------------------
 // Types
@@ -247,6 +269,84 @@ class PluginManager {
     ipcMain.handle('plugins:execute-action', (_, pluginId: string, actionId: string, inputs: Record<string, any>) => {
       return this.executeAction(pluginId, actionId, inputs);
     });
+
+    // ----- Marketplace (C2/C3): package / publish / browse / install ---------
+    ipcMain.handle('plugins:package', async (_, srcDir: string) => {
+      const { packagePlugin, envelopeToString } = await import('../plugins/PluginPublisher.js');
+      const fsAdapter = makeNodeFsLike();
+      const env = await packagePlugin(srcDir, fsAdapter, {});
+      return { envelope: env, text: envelopeToString(env) };
+    });
+    ipcMain.handle('plugins:publish', async (_, envelope: any, registryUrl?: string) => {
+      const { verifyEnvelope } = await import('../plugins/PluginPublisher.js');
+      const verify = verifyEnvelope(envelope);
+      if (!verify.ok) return { ok: false, reason: verify.reason, scanIssues: verify.scanIssues };
+      // Append to local registry stub (no remote push by default)
+      const registryPath = path.join(app.getPath('userData'), 'plugin-registry.json');
+      const existing = (() => {
+        try { return JSON.parse(fs.readFileSync(registryPath, 'utf-8')); }
+        catch { return { entries: [] }; }
+      })();
+      existing.entries = (existing.entries || []).filter(
+        (e: any) => !(e.manifest?.id === envelope.manifest?.id && e.published?.version === envelope.published?.version)
+      );
+      existing.entries.push(envelope);
+      fs.writeFileSync(registryPath, JSON.stringify(existing, null, 2), 'utf-8');
+      return { ok: true, registryUrl: registryUrl ?? `file://${registryPath}` };
+    });
+    ipcMain.handle('plugins:browseRegistry', async () => {
+      const stubPath = path.join(__dirname, '..', '..', '..', 'assets', 'config', 'dex-plugin-registry-stub.json');
+      const userPath = path.join(app.getPath('userData'), 'plugin-registry.json');
+      const merged: any[] = [];
+      for (const p of [stubPath, userPath]) {
+        try {
+          const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+          if (Array.isArray(data?.entries)) merged.push(...data.entries);
+        } catch { /* missing is fine */ }
+      }
+      return merged;
+    });
+    ipcMain.handle('plugins:downloadAndInstall', async (_, source: string | any) => {
+      const { parseEnvelope, verifyEnvelope } = await import('../plugins/PluginPublisher.js');
+      let envelope: any;
+      if (typeof source === 'string') {
+        // URL: fetch JSON envelope
+        const { net } = require('electron');
+        const text = await new Promise<string>((resolve, reject) => {
+          const req = net.request(source);
+          const chunks: Buffer[] = [];
+          req.on('response', (r: any) => {
+            if (r.statusCode !== 200) return reject(new Error(`HTTP ${r.statusCode}`));
+            r.on('data', (c: Buffer) => chunks.push(c));
+            r.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+          });
+          req.on('error', reject);
+          req.end();
+        });
+        envelope = parseEnvelope(text);
+      } else {
+        envelope = source;
+      }
+      const verify = verifyEnvelope(envelope);
+      if (!verify.ok) throw new Error(`Envelope failed verification: ${verify.reason}`);
+      // Materialize to temp dir then call installPlugin(localPath)
+      const tmpDir = path.join(app.getPath('temp'), 'dex-plug-' + crypto.randomBytes(4).toString('hex'));
+      fs.mkdirSync(tmpDir, { recursive: true });
+      for (const [rel, b64] of Object.entries(envelope.files as Record<string, string>)) {
+        const full = path.join(tmpDir, rel);
+        if (path.relative(tmpDir, full).startsWith('..')) {
+          throw new Error('Path traversal blocked: ' + rel);
+        }
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, Buffer.from(b64, 'base64'));
+      }
+      // Ensure manifest.json exists at root
+      const manifestPath = path.join(tmpDir, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) {
+        fs.writeFileSync(manifestPath, JSON.stringify(envelope.manifest, null, 2), 'utf-8');
+      }
+      return this.installPlugin(tmpDir);
+    });
   }
 
   // List all plugins
@@ -267,9 +367,41 @@ class PluginManager {
     let pluginPath: string;
     
     // Handle different source types
-    if (source.startsWith('http://') || source.startsWith('https://')) {
-      // Download from URL
-      throw new Error('URL installation not yet implemented');
+    if (source.startsWith('http://')) {
+      throw new Error('Plugin downloads require HTTPS. Refusing insecure HTTP source.');
+    }
+    if (source.startsWith('https://')) {
+      // Download plugin archive from URL
+      const { net } = require('electron');
+      const tmpDir = path.join(app.getPath('temp'), 'dex-plugin-' + crypto.randomBytes(4).toString('hex'));
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const zipPath = path.join(tmpDir, 'plugin.zip');
+
+      const res = await new Promise<Buffer>((resolve, reject) => {
+        const req = net.request(source);
+        const chunks: Buffer[] = [];
+        req.on('response', (response: any) => {
+          if (response.statusCode !== 200) return reject(new Error(`HTTP ${response.statusCode}`));
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => resolve(Buffer.concat(chunks)));
+        });
+        req.on('error', reject);
+        req.end();
+      });
+
+      fs.writeFileSync(zipPath, res);
+
+      // Extract with built-in zlib if tar.gz, otherwise expect directory
+      try {
+        const AdmZip = require('adm-zip');
+        const zip = new AdmZip(zipPath);
+        zip.extractAllTo(tmpDir, true);
+      } catch {
+        // If adm-zip unavailable, assume file is the manifest itself
+        throw new Error('Plugin archive extraction requires adm-zip. Install it or use a local path.');
+      }
+      pluginPath = tmpDir;
+      manifestPath = path.join(tmpDir, 'manifest.json');
     } else if (fs.existsSync(source)) {
       // Local path
       pluginPath = source;

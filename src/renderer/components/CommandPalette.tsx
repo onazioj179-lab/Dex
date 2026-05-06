@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Command Palette
  * Quick actions via Ctrl+K / Cmd+K
@@ -5,7 +11,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useRunningApps } from '../store/runningApps';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { toggleTheme } from '../utils/theme';
+import { useFocusTrap } from '../utils/useFocusTrap';
+import { safeMath, formatResult } from '../utils/safeMath';
 
 // ==================== TYPES ====================
 
@@ -45,7 +54,96 @@ const Icons = {
   theme: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   newNote: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14"/></svg>,
   newTask: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14"/></svg>,
+  power: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>,
+  transfers: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+  stopwatch: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M10 2h4"/></svg>,
+  kanban: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
+  pomodoro: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  qrcode: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>,
+  colorpicker: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>,
+  converter: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>,
+  trash: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  trophy: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2"/><path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><path d="M4 22h16"/><path d="M10 22V12"/><path d="M14 22V12"/><rect x="6" y="2" width="12" height="10" rx="2"/></svg>,
+  weather: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>,
+  worldclock: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  noise: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
+  markdown: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
 };
+
+// ==================== MATH EVALUATOR ====================
+
+function tryEvalMath(query: string): string | null {
+  const expr = query.trim();
+  // Normalize ^ for exponent and handle percent
+  const normalized = expr.replace(/\^/g, '^').replace(/%/g, '/100*');
+  const result = safeMath(normalized);
+  return result !== null ? formatResult(result) : null;
+}
+
+// ==================== UNIT CONVERSION ====================
+
+const UNIT_MAP: Record<string, Record<string, number>> = {
+  // Length (base: meters)
+  m: { m: 1 }, km: { m: 1000 }, cm: { m: 0.01 }, mm: { m: 0.001 }, mi: { m: 1609.344 }, ft: { m: 0.3048 }, 'in': { m: 0.0254 }, yd: { m: 0.9144 },
+  // Weight (base: grams)
+  g: { g: 1 }, kg: { g: 1000 }, mg: { g: 0.001 }, lb: { g: 453.592 }, lbs: { g: 453.592 }, oz: { g: 28.3495 },
+  // Temperature handled separately
+  c: { t: 1 }, f: { t: 1 }, k: { t: 1 },
+  // Volume (base: liters)
+  l: { l: 1 }, ml: { l: 0.001 }, gal: { l: 3.78541 }, qt: { l: 0.946353 }, pt: { l: 0.473176 }, cup: { l: 0.236588 },
+};
+
+function tryUnitConvert(query: string): string | null {
+  const m = query.trim().match(/^([\d.]+)\s*([\w]+)\s+(?:to|in|as)\s+([\w]+)$/i);
+  if (!m) return null;
+  const val = parseFloat(m[1]);
+  const from = m[2].toLowerCase();
+  const to = m[3].toLowerCase();
+  if (isNaN(val)) return null;
+
+  // Temperature special handling
+  const temps = ['c', 'f', 'k'];
+  if (temps.includes(from) && temps.includes(to)) {
+    let celsius = from === 'c' ? val : from === 'f' ? (val - 32) * 5 / 9 : val - 273.15;
+    let result = to === 'c' ? celsius : to === 'f' ? celsius * 9 / 5 + 32 : celsius + 273.15;
+    return `${Math.round(result * 100) / 100} ${to.toUpperCase()}`;
+  }
+
+  const fromInfo = UNIT_MAP[from];
+  const toInfo = UNIT_MAP[to];
+  if (!fromInfo || !toInfo) return null;
+
+  // Check same base unit type
+  const fromBase = Object.keys(fromInfo)[0];
+  const toBase = Object.keys(toInfo)[0];
+  if (fromBase !== toBase) return null;
+
+  const baseVal = val * fromInfo[fromBase];
+  const result = baseVal / toInfo[toBase];
+  return `${Math.round(result * 1e6) / 1e6} ${to}`;
+}
+
+// ==================== FUZZY MATCH ====================
+
+function fuzzyScore(query: string, text: string): number {
+  const q = query.toLowerCase();
+  const t = text.toLowerCase();
+  if (t.includes(q)) return 100 + (q.length / t.length) * 50;
+  let qi = 0;
+  let score = 0;
+  let consecutive = 0;
+  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+    if (t[ti] === q[qi]) {
+      qi++;
+      consecutive++;
+      score += consecutive * 2;
+      if (ti === 0 || t[ti - 1] === ' ') score += 5;
+    } else {
+      consecutive = 0;
+    }
+  }
+  return qi === q.length ? score : 0;
+}
 
 // ==================== COMPONENT ====================
 
@@ -54,46 +152,112 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const { setCurrentApp } = useRunningApps();
+  const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
+  const { launchApp } = useRunningApps();
+
+  // Helper: launch an app by id using the canonical APP_DEFINITIONS registry
+  const openApp = useCallback((appId: string) => {
+    const def = APP_DEFINITIONS[appId];
+    if (def) launchApp({ id: appId, name: def.name, icon: def.icon || appId, color: def.color });
+  }, [launchApp]);
 
   // Build command list
   const commands: Command[] = useMemo(() => [
-    // Apps
-    { id: 'home', title: 'Go to Home', icon: Icons.home, category: 'app', action: () => setCurrentApp('home'), keywords: ['dashboard', 'main'] },
-    { id: 'files', title: 'Open Files', icon: Icons.files, category: 'app', action: () => setCurrentApp('files'), keywords: ['folder', 'documents'] },
-    { id: 'notes', title: 'Open Notes', icon: Icons.notes, category: 'app', action: () => setCurrentApp('notes'), keywords: ['write', 'text'] },
-    { id: 'tasks', title: 'Open Tasks', icon: Icons.tasks, category: 'app', action: () => setCurrentApp('tasks'), keywords: ['todo', 'reminders'] },
-    { id: 'browser', title: 'Open Browser', icon: Icons.browser, category: 'app', action: () => setCurrentApp('browser'), keywords: ['web', 'internet'] },
-    { id: 'gallery', title: 'Open Gallery', icon: Icons.gallery, category: 'app', action: () => setCurrentApp('gallery'), keywords: ['photos', 'images'] },
-    { id: 'audio', title: 'Open Audio', icon: Icons.audio, category: 'app', action: () => setCurrentApp('audio'), keywords: ['music', 'player'] },
-    { id: 'video', title: 'Open Video', icon: Icons.video, category: 'app', action: () => setCurrentApp('video'), keywords: ['movies', 'player'] },
-    { id: 'settings', title: 'Open Settings', icon: Icons.settings, category: 'app', action: () => setCurrentApp('settings'), keywords: ['preferences', 'config'], shortcut: 'Ctrl+,' },
-    { id: 'calculator', title: 'Open Calculator', icon: Icons.calculator, category: 'app', action: () => setCurrentApp('calculator'), keywords: ['math', 'calc'] },
-    { id: 'calendar', title: 'Open Calendar', icon: Icons.calendar, category: 'app', action: () => setCurrentApp('calendar'), keywords: ['events', 'schedule'] },
-    { id: 'password', title: 'Open Password Manager', icon: Icons.password, category: 'app', action: () => setCurrentApp('password'), keywords: ['vault', 'security'] },
-    { id: 'workflows', title: 'Open Workflows', icon: Icons.workflows, category: 'app', action: () => setCurrentApp('workflows'), keywords: ['automation', 'shortcuts'] },
-    
+    // Apps — System
+    { id: 'home', title: 'Go to Home', icon: Icons.home, category: 'app', action: () => openApp('home'), keywords: ['dashboard', 'main'] },
+    { id: 'files', title: 'Open Files', icon: Icons.files, category: 'app', action: () => openApp('files'), keywords: ['folder', 'documents'] },
+    { id: 'browser', title: 'Open Browser', icon: Icons.browser, category: 'app', action: () => openApp('browser'), keywords: ['web', 'internet', 'safari'] },
+    { id: 'settings', title: 'Open Settings', icon: Icons.settings, category: 'app', action: () => openApp('settings'), keywords: ['preferences', 'config'], shortcut: 'Ctrl+,' },
+    { id: 'power', title: 'Open Power Manager', icon: Icons.power, category: 'app', action: () => openApp('power'), keywords: ['battery', 'cpu', 'performance'] },
+    { id: 'recyclebin', title: 'Open Recycle Bin', icon: Icons.trash, category: 'app', action: () => openApp('recyclebin'), keywords: ['trash', 'deleted', 'restore'] },
+
+    // Apps — Productivity
+    { id: 'notes', title: 'Open Notes', icon: Icons.notes, category: 'app', action: () => openApp('notes'), keywords: ['write', 'text'] },
+    { id: 'tasks', title: 'Open Tasks', icon: Icons.tasks, category: 'app', action: () => openApp('tasks'), keywords: ['todo', 'reminders'] },
+    { id: 'calendar', title: 'Open Calendar', icon: Icons.calendar, category: 'app', action: () => openApp('calendar'), keywords: ['events', 'schedule'] },
+    { id: 'workflows', title: 'Open Workflows', icon: Icons.workflows, category: 'app', action: () => openApp('workflows'), keywords: ['automation', 'shortcuts'] },
+    { id: 'kanban', title: 'Open Kanban Board', icon: Icons.kanban, category: 'app', action: () => openApp('kanban'), keywords: ['board', 'columns', 'project'] },
+    { id: 'dexcode', title: 'Open DexCode Editor', icon: Icons.markdown, category: 'app', action: () => openApp('dexcode'), keywords: ['code', 'dexscript', 'editor', 'programming'] },
+
+    // Apps — Creative Suite
+    { id: 'videoeditor', title: 'Open VINX Video Editor', icon: Icons.video, category: 'app', action: () => openApp('videoeditor'), keywords: ['video', 'edit', 'timeline', 'cut', 'vinx'] },
+    { id: 'imosion', title: 'Open Imosion DAW', icon: Icons.audio, category: 'app', action: () => openApp('imosion'), keywords: ['daw', 'music', 'audio', 'record', 'mix', 'master'] },
+    { id: 'prism', title: 'Open PRISM Image Editor', icon: Icons.gallery, category: 'app', action: () => openApp('prism'), keywords: ['image', 'photo', 'edit', 'layers', 'paint'] },
+    { id: 'flux', title: 'Open FLUX Motion Graphics', icon: Icons.gallery, category: 'app', action: () => openApp('flux'), keywords: ['motion', 'animation', 'keyframe', 'particle', 'vfx'] },
+    { id: 'forge', title: 'Open FORGE Encoder', icon: Icons.files, category: 'app', action: () => openApp('forge'), keywords: ['encode', 'transcode', 'export', 'render', 'batch'] },
+    { id: 'axl', title: 'Open AXL CAD', icon: Icons.files, category: 'app', action: () => openApp('axl'), keywords: ['cad', '3d', 'model', 'engineering', 'parametric'] },
+
+    // Apps — Media
+    { id: 'gallery', title: 'Open Gallery', icon: Icons.gallery, category: 'app', action: () => openApp('gallery'), keywords: ['photos', 'images'] },
+    { id: 'audio', title: 'Open Audio', icon: Icons.audio, category: 'app', action: () => openApp('audio'), keywords: ['music', 'player'] },
+
+    // Apps — Tools
+    { id: 'calculator', title: 'Open Calculator', icon: Icons.calculator, category: 'app', action: () => openApp('calculator'), keywords: ['math', 'calc'] },
+    { id: 'passwordgenerator', title: 'Open Password Manager', icon: Icons.password, category: 'app', action: () => openApp('passwordgenerator'), keywords: ['vault', 'security'] },
+    { id: 'transfers', title: 'Open Transfers', icon: Icons.transfers, category: 'app', action: () => openApp('transfers'), keywords: ['send', 'receive', 'share'] },
+    { id: 'rewind', title: 'Open Rewind', icon: Icons.audio, category: 'app', action: () => openApp('rewind'), keywords: ['history', 'timeline', 'version', 'undo', 'time machine'] },
+    { id: 'stopwatch', title: 'Open Stopwatch', icon: Icons.stopwatch, category: 'app', action: () => openApp('stopwatch'), keywords: ['timer', 'lap'] },
+    { id: 'unitconverter', title: 'Open Unit Converter', icon: Icons.converter, category: 'app', action: () => openApp('unitconverter'), keywords: ['length', 'weight', 'temperature'] },
+    { id: 'pomodoro', title: 'Open Pomodoro Timer', icon: Icons.pomodoro, category: 'app', action: () => openApp('pomodoro'), keywords: ['focus', 'break', 'timer'] },
+    { id: 'qrcode', title: 'Open QR Generator', icon: Icons.qrcode, category: 'app', action: () => openApp('qrcode'), keywords: ['barcode', 'scan', 'link'] },
+    { id: 'colorpicker', title: 'Open Color Picker', icon: Icons.colorpicker, category: 'app', action: () => openApp('colorpicker'), keywords: ['hsl', 'rgb', 'hex', 'palette'] },
+    { id: 'weather', title: 'Open Weather', icon: Icons.weather, category: 'app', action: () => openApp('weather'), keywords: ['forecast', 'temperature', 'rain'] },
+    { id: 'worldclock', title: 'Open World Clock', icon: Icons.worldclock, category: 'app', action: () => openApp('worldclock'), keywords: ['timezone', 'time', 'international'] },
+    { id: 'noisegenerator', title: 'Open Noise Generator', icon: Icons.noise, category: 'app', action: () => openApp('noisegenerator'), keywords: ['white', 'pink', 'brown', 'ambient', 'focus'] },
+    { id: 'achievements', title: 'Open Achievements', icon: Icons.trophy, category: 'app', action: () => openApp('achievements'), keywords: ['progress', 'goals', 'badges'] },
+
     // Actions
-    { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { setCurrentApp('notes'); }, keywords: ['add', 'create'] },
-    { id: 'new-task', title: 'Create New Task', subtitle: 'Add a new task', icon: Icons.newTask, category: 'action', action: () => { setCurrentApp('tasks'); }, keywords: ['add', 'todo'] },
+    { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { openApp('notes'); }, keywords: ['add', 'create'] },
+    { id: 'new-task', title: 'Create New Task', subtitle: 'Add a new task', icon: Icons.newTask, category: 'action', action: () => { openApp('tasks'); }, keywords: ['add', 'todo'] },
+    { id: 'new-workflow', title: 'Create New Workflow', subtitle: 'Build automation', icon: Icons.workflows, category: 'action', action: () => { openApp('workflows'); }, keywords: ['automate', 'create'] },
+    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: 'Ctrl+L' },
+    { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
+    { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { localStorage.removeItem('dex-clipboard-history'); }, keywords: ['clean', 'privacy'] },
+    { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
     
     // Settings
-    { id: 'toggle-theme', title: 'Toggle Dark/Light Theme', subtitle: 'Switch appearance', icon: Icons.theme, category: 'settings', action: () => {
-      const current = document.documentElement.getAttribute('data-theme');
-      document.documentElement.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
-      localStorage.setItem('dex-theme', current === 'dark' ? 'light' : 'dark');
-    }, keywords: ['dark', 'light', 'appearance'] },
-  ], [setCurrentApp]);
+    { id: 'toggle-theme', title: 'Toggle Dark/Light Theme', subtitle: 'Switch appearance', icon: Icons.theme, category: 'settings', action: () => { toggleTheme(); }, keywords: ['dark', 'light', 'appearance'] },
+    { id: 'open-appearance', title: 'Appearance Settings', subtitle: 'Colors, fonts, accent', icon: Icons.colorpicker, category: 'settings', action: () => { openApp('settings'); }, keywords: ['theme', 'color', 'font', 'accent'] },
+    { id: 'open-keyboard', title: 'Keyboard Shortcuts', subtitle: 'View all shortcuts', icon: Icons.calculator, category: 'settings', action: () => { openApp('settings'); }, keywords: ['hotkey', 'keybind', 'shortcut'] },
+    { id: 'open-privacy', title: 'Privacy Settings', subtitle: 'Security and privacy options', icon: Icons.password, category: 'settings', action: () => { openApp('settings'); }, keywords: ['security', 'privacy', 'encryption'] },
+  ], [openApp]);
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands;
     const q = query.toLowerCase();
-    return commands.filter(cmd => 
-      cmd.title.toLowerCase().includes(q) ||
-      cmd.subtitle?.toLowerCase().includes(q) ||
-      cmd.keywords?.some(k => k.includes(q))
-    );
+
+    // Math evaluation
+    const mathResult = tryEvalMath(query);
+    const unitResult = tryUnitConvert(query);
+    const inlineResults: Command[] = [];
+    if (mathResult) inlineResults.push({
+      id: 'math-result',
+      title: `= ${mathResult}`,
+      subtitle: 'Copy result to clipboard',
+      icon: Icons.calculator,
+      category: 'action',
+      action: () => { navigator.clipboard.writeText(mathResult); },
+      keywords: [],
+    });
+    if (unitResult) inlineResults.push({
+      id: 'unit-result',
+      title: `= ${unitResult}`,
+      subtitle: 'Copy conversion to clipboard',
+      icon: Icons.converter,
+      category: 'action',
+      action: () => { navigator.clipboard.writeText(unitResult); },
+      keywords: [],
+    });
+
+    const scored = commands.map(cmd => {
+      const titleScore = fuzzyScore(q, cmd.title);
+      const keywordScore = cmd.keywords ? Math.max(...cmd.keywords.map(k => fuzzyScore(q, k))) : 0;
+      const subtitleScore = cmd.subtitle ? fuzzyScore(q, cmd.subtitle) : 0;
+      return { cmd, score: Math.max(titleScore, keywordScore, subtitleScore) };
+    }).filter(x => x.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    return [...inlineResults, ...scored.map(x => x.cmd)];
   }, [commands, query]);
 
   // Reset state when opened
@@ -144,9 +308,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     overlay: {
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      backdropFilter: 'blur(4px)',
-      zIndex: 10000,
+      background: 'rgba(0, 0, 0, 0.75)',
+      zIndex: 'var(--z-overlay)' as any,
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'center',
@@ -270,8 +433,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   let itemIndex = -1;
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.container} onClick={e => e.stopPropagation()}>
+    <div style={styles.overlay} onMouseDown={onClose} role="presentation">
+      <div ref={trapRef} style={styles.container} onMouseDown={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Command palette">
         <div style={styles.inputWrapper}>
           <span style={styles.searchIcon}>{Icons.search}</span>
           <input
@@ -282,11 +445,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
             style={styles.input}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="cmd-palette-list"
+            aria-activedescendant={filteredCommands[selectedIndex] ? `cmd-${filteredCommands[selectedIndex].id}` : undefined}
+            aria-autocomplete="list"
           />
           <span style={styles.shortcut}>ESC</span>
         </div>
         
-        <div style={styles.list} ref={listRef}>
+        <div style={styles.list} ref={listRef} id="cmd-palette-list" role="listbox" aria-label="Commands">
           {filteredCommands.length === 0 ? (
             <div style={styles.empty}>No commands found</div>
           ) : (
@@ -295,21 +463,25 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                 <div style={styles.category}>{categoryLabels[category] || category}</div>
                 {cmds.map(cmd => {
                   itemIndex++;
-                  const isSelected = itemIndex === selectedIndex;
+                  const currentIndex = itemIndex;
+                  const isSelected = currentIndex === selectedIndex;
                   return (
                     <div
                       key={cmd.id}
+                      id={`cmd-${cmd.id}`}
+                      role="option"
+                      aria-selected={isSelected}
                       style={{
                         ...styles.item,
                         ...(isSelected ? styles.itemSelected : {}),
                         color: isSelected ? '#fff' : undefined,
                       }}
                       onClick={() => { cmd.action(); onClose(); }}
-                      onMouseEnter={() => setSelectedIndex(itemIndex)}
+                      onMouseEnter={() => setSelectedIndex(currentIndex)}
                     >
                       <div style={{
                         ...styles.itemIcon,
-                        background: isSelected ? 'rgba(255,255,255,0.2)' : styles.itemIcon.background,
+                        background: isSelected ? 'var(--color-text-tertiary)' : styles.itemIcon.background,
                         color: isSelected ? '#fff' : styles.itemIcon.color,
                       }}>
                         {cmd.icon}
@@ -322,14 +494,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                         {cmd.subtitle && (
                           <div style={{
                             ...styles.itemSubtitle,
-                            color: isSelected ? 'rgba(255,255,255,0.7)' : styles.itemSubtitle.color,
+                            color: isSelected ? 'var(--color-text-secondary)' : styles.itemSubtitle.color,
                           }}>{cmd.subtitle}</div>
                         )}
                       </div>
                       {cmd.shortcut && (
                         <span style={{
                           ...styles.itemShortcut,
-                          background: isSelected ? 'rgba(255,255,255,0.2)' : styles.itemShortcut.background,
+                          background: isSelected ? 'var(--color-text-tertiary)' : styles.itemShortcut.background,
                           color: isSelected ? '#fff' : styles.itemShortcut.color,
                         }}>{cmd.shortcut}</span>
                       )}
@@ -356,8 +528,8 @@ export const useCommandPalette = (enabled: boolean = true) => {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Use Ctrl+Shift+P for command palette (Ctrl+K reserved for global search)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+      // Ctrl+K opens the command palette
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'k') {
         e.preventDefault();
         setIsOpen(prev => !prev);
       }

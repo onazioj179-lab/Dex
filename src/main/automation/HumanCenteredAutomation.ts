@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - SYSTEM 5: Human-Centered Automation (READABLE, PREVIEWABLE)
 // ===========================================================================
@@ -192,6 +198,7 @@ export interface AutomationPreview {
 class HumanCenteredAutomationClass extends EventEmitter {
   private rules: Map<string, AutomationRule> = new Map();
   private executions: Map<string, AutomationExecution> = new Map();
+  private static readonly MAX_EXECUTIONS = 200;
   private activeExecution: AutomationExecution | null = null;
   private dataPath: string;
   private isInitialized: boolean = false;
@@ -606,6 +613,14 @@ class HumanCenteredAutomationClass extends EventEmitter {
     }
 
     this.executions.set(execution.id, execution);
+    // Evict oldest completed executions when map grows too large
+    if (this.executions.size > HumanCenteredAutomationClass.MAX_EXECUTIONS) {
+      const completed = [...this.executions.entries()]
+        .filter(([, e]) => e.status === 'completed' || e.status === 'cancelled' || e.status === 'failed')
+        .sort((a, b) => (a[1].completedAt ?? a[1].startedAt) - (b[1].completedAt ?? b[1].startedAt));
+      const toRemove = completed.slice(0, this.executions.size - HumanCenteredAutomationClass.MAX_EXECUTIONS);
+      for (const [id] of toRemove) this.executions.delete(id);
+    }
     this.activeExecution = execution;
 
     // Notify user

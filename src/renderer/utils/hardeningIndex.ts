@@ -1,7 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+import { sharedTick } from '../services/SharedTick';
+
+// ===========================================================================
 // DEX - Phase 32: Final Hardening Index
 // Central export for all release hardening utilities
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // System Audit
 export {
@@ -54,9 +62,9 @@ export {
   type ReleaseCandidateInfo,
 } from './releaseValidation';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // INITIALIZATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 import { initCrashRecovery } from './crashRecovery';
 import { quickHealthCheck } from './systemAudit';
@@ -83,14 +91,14 @@ export function initHardeningSystems(): () => void {
   }
 
   // Set up periodic health checks (every 5 minutes)
-  const healthCheckInterval = setInterval(() => {
+  sharedTick.subscribe('hardening-health', () => {
     const health = quickHealthCheck();
     if (!health.healthy) {
       console.warn('[Hardening] Periodic health check issues:', health.issues);
     }
   }, 5 * 60 * 1000);
 
-  cleanups.push(() => clearInterval(healthCheckInterval));
+  cleanups.push(() => sharedTick.unsubscribe('hardening-health'));
 
   initialized = true;
 

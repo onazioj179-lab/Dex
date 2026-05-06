@@ -1,4 +1,10 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX Home Automation Module - Smart Device Control
 // Control appliances, security, lighting, and energy management
 // =============================================================================
@@ -8,6 +14,8 @@ import Store from 'electron-store';
 import { EventEmitter } from 'events';
 import * as dgram from 'dgram';
 import * as net from 'net';
+import * as http from 'http';
+import log from 'electron-log';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -196,7 +204,7 @@ class HomeAutomationManager extends EventEmitter {
           occupancySimulation: false,
         },
       },
-    });
+    }) as unknown as Store;
 
     this.config = this.store.get('config') as HomeConfig;
     this.loadData();
@@ -693,7 +701,8 @@ class HomeAutomationManager extends EventEmitter {
     command: string,
     params?: unknown
   ): Promise<{ success: boolean; message: string; state?: DeviceState }> {
-    // MQTT would require mqtt library - return simulated success
+    // MQTT library not installed — log attempt and return error
+    log.warn(`[HomeAutomation] MQTT not configured for device ${device.name}`);
     const newState: DeviceState = {};
     
     switch (command) {
@@ -709,8 +718,8 @@ class HomeAutomationManager extends EventEmitter {
     }
 
     return {
-      success: true,
-      message: `${command} command sent via MQTT`,
+      success: false,
+      message: `MQTT not configured — install mqtt library to enable ${command}`,
       state: newState,
     };
   }
@@ -719,10 +728,11 @@ class HomeAutomationManager extends EventEmitter {
     device: SmartDevice,
     payload: string
   ): Promise<{ success: boolean; message: string; state?: DeviceState }> {
-    // WebSocket would require ws library - return simulated success
+    // WebSocket library not installed
+    log.warn(`[HomeAutomation] WebSocket not configured for device ${device.name}`);
     return {
-      success: true,
-      message: 'Command sent via WebSocket',
+      success: false,
+      message: 'WebSocket not configured — install ws library to enable device control',
     };
   }
 
@@ -1178,11 +1188,57 @@ class HomeAutomationManager extends EventEmitter {
       return { success: false };
     }
 
-    // Would fetch actual camera snapshot
-    return {
-      success: true,
-      data: 'data:image/jpeg;base64,...', // Placeholder
-    };
+    if (!device.isOnline || !device.address) {
+      return { success: false };
+    }
+
+    // Attempt HTTP snapshot from common IP camera endpoints
+    const snapshotPaths = ['/snapshot.jpg', '/cgi-bin/snapshot.cgi', '/image/jpeg.cgi', '/snap.jpg', '/capture'];
+    const port = device.port || 80;
+
+    for (const snapPath of snapshotPaths) {
+      try {
+        const imageData = await new Promise<string>((resolve, reject) => {
+          const req = http.get({
+            hostname: device.address,
+            port,
+            path: snapPath,
+            timeout: 5000,
+          }, (res) => {
+            if (res.statusCode !== 200) {
+              req.destroy();
+              return reject(new Error(`HTTP ${res.statusCode}`));
+            }
+            const contentType = res.headers['content-type'] || '';
+            if (!contentType.startsWith('image/')) {
+              req.destroy();
+              return reject(new Error('Not an image response'));
+            }
+            const chunks: Buffer[] = [];
+            let totalSize = 0;
+            const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+            res.on('data', (chunk: Buffer) => {
+              totalSize += chunk.length;
+              if (totalSize > MAX_IMAGE_SIZE) { req.destroy(); reject(new Error('Image too large')); return; }
+              chunks.push(chunk);
+            });
+            res.on('end', () => {
+              const buf = Buffer.concat(chunks);
+              resolve(`data:${contentType};base64,${buf.toString('base64')}`);
+            });
+            res.on('error', reject);
+          });
+          req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+          req.on('error', reject);
+        });
+
+        return { success: true, data: imageData };
+      } catch {
+        // Try next endpoint
+      }
+    }
+
+    return { success: false };
   }
 
   private occupancyInterval: NodeJS.Timeout | null = null;

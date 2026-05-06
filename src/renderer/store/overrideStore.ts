@@ -1,10 +1,17 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 34: Override Panel Store
 // Emergency control system state management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import type {
   OverrideState,
   OverrideAction,
@@ -17,17 +24,17 @@ import {
   OVERRIDE_ACTIONS 
 } from '../../shared/overrideTypes';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // UTILITY
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // STORE INTERFACE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface OverrideStore extends OverrideState {
   // Log
@@ -71,9 +78,9 @@ interface OverrideStore extends OverrideState {
   clearLog: () => void;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // STORE IMPLEMENTATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const useOverridePanel = create<OverrideStore>()(
   persist(
@@ -82,9 +89,9 @@ export const useOverridePanel = create<OverrideStore>()(
       ...INITIAL_OVERRIDE_STATE,
       log: [],
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Panel controls
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       showPanel: () => set({ panelVisible: true }),
       hidePanel: () => set({ panelVisible: false }),
@@ -92,9 +99,9 @@ export const useOverridePanel = create<OverrideStore>()(
       unlockPanel: () => set({ panelLocked: false }),
       lockPanel: () => set({ panelLocked: true }),
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Execute action
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       executeAction: (action, reason) => {
         const state = get();
@@ -174,9 +181,9 @@ export const useOverridePanel = create<OverrideStore>()(
         window.dex?.override?.execute?.(action, reason);
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Individual controls
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       setWorkflowsRunning: (running) => {
         set({ workflowsRunning: running });
@@ -208,9 +215,9 @@ export const useOverridePanel = create<OverrideStore>()(
         set({ level: newLevel });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Quick actions
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       stopAllWorkflows: () => get().executeAction('stop_all_workflows'),
       freezeBackground: () => get().executeAction('freeze_background'),
@@ -221,18 +228,18 @@ export const useOverridePanel = create<OverrideStore>()(
       fullLockdown: () => get().executeAction('full_lockdown'),
       restoreNormal: () => get().executeAction('restore_normal'),
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Status queries
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       getLevel: () => get().level,
       isElevated: () => get().level !== 'normal',
       isLockdown: () => get().level === 'lockdown' || get().level === 'emergency',
       isEmergency: () => get().level === 'emergency',
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Log queries
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       getRecentLog: (limit = 50) => {
         return get().log.slice(-limit).reverse();
@@ -242,6 +249,7 @@ export const useOverridePanel = create<OverrideStore>()(
     }),
     {
       name: 'dex-override-panel',
+      storage: debouncedJsonStorage,
       partialize: (state) => ({
         level: state.level,
         activeSince: state.activeSince,

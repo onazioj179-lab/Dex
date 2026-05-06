@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Core Module Exports
 // Phase 15-16: Optimization & Security Systems
 // Phase 47: Safe Mode & Startup Protection
 // Phase 1 (Patch): Stability Systems (Immediate Patch Cycle)
 // ULTRA-LOW RESOURCE MODE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Phase 1 Stability Systems (Immediate Patch Cycle)
 // Makes Dex boringly reliable. No crashes. No data loss. No surprises.
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export {
   phase1Integration,
@@ -65,7 +71,7 @@ export {
   type SearchQuality,
 } from './SearchCorrectness';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Safe Mode & Startup Protection (Phase 47)
 export { safeMode, type SafeModeState, type StartupStage } from './SafeMode';
@@ -80,6 +86,9 @@ export {
   type ResourceSnapshot,
   type SubsystemBudget,
 } from './ResourceGovernor';
+
+// Xenon - Background Resource Optimizer
+export { xenon, initializeXenon, shutdownXenon } from './Xenon';
 
 // Memory Management
 export { 
@@ -149,9 +158,9 @@ export {
   type EncryptedData,
 } from './EncryptionService';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Phase 17-18: Security Lockdown & Long-Term Trust
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Security Audit
 export {
@@ -221,9 +230,9 @@ export {
   type ExtensionStatus,
 } from './ExtensionFramework';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PHASE 19-20: FILE MANAGEMENT, WORKFLOWS, AUTOMATION
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // File Manager
 export {
@@ -305,9 +314,9 @@ export {
   type ExecutionContext as WorkflowExecutionContext,
 } from './WorkflowEngine';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PHASE 41-42: CUSTOMIZATION, THEMING & OPTIMIZATION
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Dashboard Widget System
 export {
@@ -373,9 +382,9 @@ export {
   type Advisory,
   type AdvisoryConfig,
 } from './SystemAdvisoryService';
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PHASE 43-45: MATURITY, GOVERNANCE & OPERATIONAL HARDENING
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Pattern Detection Engine
 export {
@@ -485,9 +494,9 @@ export {
   type FeedbackMessage,
 } from './VoiceFeedbackSystem';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PHASE 69: SYSTEM INTELLIGENCE, ACCURACY & FINAL CONSOLIDATION
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Single Source of Truth State Layer
 export {
@@ -569,9 +578,9 @@ export {
   type RecoveryStrategy,
 } from './FailurePathHandler';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // USER-REQUESTED, HIGH-VALUE FEATURES (DONE RIGHT)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Universal Search Hub - One search box finds everything
 export {
@@ -648,9 +657,9 @@ export {
   type OrganizeOptions,
 } from './BatchActionPreviewer';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ADVANCED POWER + SECURITY MILESTONE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Workspace Snapshot - Full workspace snapshot and restore
 export {
@@ -738,10 +747,10 @@ export {
   type ActivityPolicy,
 } from './PanicLockdownSystem';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // OS-LEVEL FEATURES (SYSTEM 2 & 3)
 // Stay inside DEX for daily work
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Clipboard History Manager - Full clipboard history with search
 export {
@@ -900,9 +909,9 @@ export {
   type NotificationStats,
 } from './NotificationCenter';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SYSTEM 3 — MEDIA & CREATION CORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// SYSTEM 3 -- MEDIA & CREATION CORE
+// ===========================================================================
 
 // Universal Media Engine - Single engine for all media types
 export {
@@ -986,10 +995,10 @@ export {
   type OrganizationConfig,
 } from './MediaOrganization';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SYSTEM 5: Security Hardening & Trust Foundation
 // "Make Dex safe enough to trust as OS-level tool"
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Encrypted Local Logs - Local-only encrypted logging with search
 export {
@@ -1031,10 +1040,10 @@ export {
   type SelfTestConfig,
 } from './SecuritySelfTest';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SYSTEM 6: Reliability, Stability, Final Lock
 // "Make Dex run for days/weeks/years without degradation"
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Crash Recovery System - Silent crash handling and auto-recovery
 export {
@@ -1081,8 +1090,455 @@ export {
   type ChangeRecord,
 } from './MaintenanceModeLock';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // END OF CORE SYSTEMS
 // NO FURTHER CORE SYSTEMS AFTER SYSTEM 6
 // Dex enters maintenance-first mode
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+
+// ===========================================================================
+// OS-LEVEL FEATURE LAYER  (70 features)
+// Lightweight operating environment beneath every inner app
+// ===========================================================================
+
+// Features 1-4: Memory Compression, Pressure Monitor, App Nap, Buffer Pool
+export {
+  sharedBufferPool,
+  memoryCompression,
+  memoryPressureMonitor,
+  appNapManager,
+  initializeMemoryCompression,
+  shutdownMemoryCompression,
+  initializeMemoryPressureMonitor,
+  shutdownMemoryPressureMonitor,
+  initializeAppNap,
+  shutdownAppNap,
+  type MemoryPressureLevel,
+} from './MemoryCompression';
+
+// Features 5-10: QoS Scheduler, CPU Monitor, Thermal, Suspension, Boost, Work-Stealing
+export {
+  processScheduler,
+  initializeProcessScheduler,
+  shutdownProcessScheduler,
+  type QoSClass,
+  type ScheduledWork,
+  type CpuSnapshot,
+  type ThermalState,
+} from './ProcessScheduler';
+
+// Features 11-18: Atomic Writes, Clone, Watch, Snapshots, Hotfile, Media Cache, Chunked, Dedup
+export {
+  fileWatchCoordinator,
+  snapshotManager,
+  hotfilePreLoader,
+  mediaBufferCache,
+  contentDeduplicator,
+  atomicWriteFile,
+  atomicWriteFileSync,
+  cloneFile,
+  readFileChunked,
+  initializeStorageEngine,
+  shutdownStorageEngine,
+} from './StorageEngine';
+
+// Features 19-27: Key Vault, Integrity, Sandbox, DB Encryption, IPC Validation, Signed Exports, Capabilities, Audit, Refs
+export {
+  secureKeyVault,
+  runtimeIntegrity,
+  pluginSandbox,
+  databaseEncryption,
+  ipcValidation,
+  signedExports,
+  capabilityAccess,
+  auditLog,
+  referenceValidator,
+  safeDeref,
+  safeAccess,
+  safeArrayAccess,
+  validateRef,
+  isValidRef,
+  initializeSecurityKernel,
+  shutdownSecurityKernel,
+  type PluginCapability,
+  type AuditLogEntry,
+} from './SecurityKernel';
+
+// Features 28-32: Battery, Idle States, Display Sleep, Suspend/Resume, Charge-State Pre-Compute
+export {
+  powerManager,
+  initializePowerManager,
+  shutdownPowerManager,
+  type PowerSource,
+  type BatteryState,
+  type IdleTier,
+} from './PowerManagement';
+
+// Features 33-35: Network QoS, Background Transfers, Local Discovery
+export {
+  networkQoS,
+  backgroundTransfers,
+  serviceDiscovery,
+  initializeNetworkManager,
+  shutdownNetworkManager,
+  type NetworkPriority,
+  type PersistentTransfer,
+} from './NetworkManager';
+
+// Features 36-39: Adaptive Refresh, Compositing, Render Batching, Offscreen Pre-Render
+export {
+  adaptiveRefresh,
+  compositingLayers,
+  renderBatcher as renderingBatcher,
+  offscreenPreRenderer,
+  initializeRenderingEngine,
+  shutdownRenderingEngine,
+  type DisplayInfo,
+} from './RenderingEngine';
+
+// Features 40-41: Audio Device Monitor, Shared Audio Context
+export {
+  audioDeviceMonitor,
+  sharedAudioContext,
+  initializeAudioManager,
+  shutdownAudioManager,
+  type AudioDevice,
+} from './AudioManager';
+
+// Features 42-45: IPC Contracts, Worker Lifecycle, Distributed Events, Guaranteed Delivery
+export {
+  ipcContracts,
+  workerLifecycle,
+  distributedEvents,
+  guaranteedDelivery,
+  initializeIPCKernel,
+  shutdownIPCKernel,
+  type IPCCapability,
+  type IPCContract as IPCKernelContract,
+  type WorkerState,
+  type DeliveryStatus,
+} from './IPCKernel';
+
+// Features 46-50: Classifier, Predictive Pre-Warm, Search Ranker, Proactive Prep, Usage Patterns
+export {
+  bayesClassifier,
+  predictivePreWarmer,
+  searchRanker,
+  proactivePrep,
+  usagePreLoader,
+  initializeIntelligenceEngine,
+  shutdownIntelligenceEngine,
+  type RankedResult,
+} from './IntelligenceEngine';
+
+// Features 51-54: Crash Capture, Circular Log, Perf Sampling, Diagnostic Packaging
+export {
+  crashCapture,
+  circularLogBuffer,
+  performanceSampler,
+  diagnosticPackager,
+  initializeDiagnosticsEngine,
+  shutdownDiagnosticsEngine,
+  type CrashSnapshot,
+  type LogBufferEntry,
+} from './DiagnosticsEngine';
+
+// Features 55-58: Staged Updates, Rollback, Silent Download, Module Patching
+export {
+  stagedUpdater,
+  rollbackManager,
+  silentDownloader,
+  modulePatcher,
+  initializeUpdateManager,
+  shutdownUpdateManager,
+  type UpdateStage,
+  type RollbackPoint,
+  type BackgroundDownload,
+  type ModulePatch,
+} from './UpdateManager';
+
+// Features 59-60: Spell Check, Autocorrect
+export {
+  spellCheck,
+  autocorrect,
+  initializeTextServices,
+  shutdownTextServices,
+  type SpellCheckResult,
+  type AutocorrectRule,
+} from './TextServices';
+
+// Features 61-62: Accessibility Events, Semantic UI Tree
+export {
+  accessibilityEvents,
+  semanticUITree,
+  initializeAccessibilityManager,
+  shutdownAccessibilityManager,
+  type AccessibilityEventType,
+  type AccessibilityEvent,
+  type UITreeNode,
+  type UITreeSnapshot,
+} from './AccessibilityManager';
+
+// Features 63-70: Plugin Verify Cache, Assets, Tasks, Watchdog, Conflicts, Pre-Fetch, Credentials, Sessions
+export {
+  pluginVerificationCache,
+  onDemandAssetLoader,
+  backgroundTaskFramework,
+  extensionWatchdog,
+  conflictResolver,
+  predictiveAssetPreFetcher,
+  credentialStorage,
+  sessionMigrator,
+  initializeMiscSystems,
+  shutdownMiscSystems,
+  type PluginVerificationEntry,
+  type AssetDescriptor,
+  type BackgroundTask as MiscBackgroundTask,
+  type TaskPriority as MiscTaskPriority,
+  type ExtensionHealth,
+  type ConflictStrategy,
+  type ConflictRecord,
+  type StoredCredential,
+  type SessionState as MiscSessionState,
+} from './MiscSystems';
+
+// ===========================================================================
+// END OF OS-LEVEL FEATURE LAYER
+// ===========================================================================
+
+// ===========================================================================
+// BACKEND PERFORMANCE AND OPTIMIZATION LAYER (100 techniques)
+// ===========================================================================
+
+// --- Part 1: Performance Primitives (Techniques 10-14, 70-80) ---
+export {
+  ObjectPool,
+  ipcMessagePool,
+  eventObjectPool,
+  logEntryPool,
+  taskObjectPool,
+  perfSamplePool,
+  dbRowPool,
+  TypedArrays,
+  encodeIPCBinary,
+  decodeIPCBinary,
+  encodeEventBinary,
+  decodeEventBinary,
+  registerHandler,
+  getHandler,
+  invokeHandler,
+  WeakRefCache,
+  thumbnailPreviewCache,
+  screenshotCache,
+  analyticsResultCache,
+  pluginDataCache,
+  FLAG,
+  hasFlag,
+  setFlag,
+  clearFlag,
+  toggleFlag,
+  setCapabilityTier,
+  isFeatureAvailable,
+  memoize,
+  memoizedExtensionType,
+  memoizedShortcutFormat,
+  stringIntern,
+  initializeFullObject,
+  enforceHiddenClass,
+  coerceToInt,
+  coerceToFloat,
+  coerceToString,
+  coerceToBool,
+  intDiv,
+  intMod,
+  intMin,
+  intMax,
+  intClamp,
+  cachedLength,
+  SOA,
+  ActivityLogSOA,
+  PerfSampleSOA,
+  SearchScoreSOA,
+  FixedPointTimeline,
+  initializePerformancePrimitives,
+  shutdownPerformancePrimitives,
+} from './PerformancePrimitives';
+
+// --- Part 2: Advanced Data Structures (Techniques 40-49) ---
+export {
+  Trie,
+  BloomFilter,
+  dbKeyExistenceFilter,
+  urlVisitedFilter,
+  duplicateEventFilter,
+  pluginBlacklistFilter,
+  SkipList,
+  RadixTree,
+  LRUCache,
+  queryResultCache,
+  thumbnailCache,
+  rewindSnapshotCache,
+  ipcResponseCache,
+  routeHandlerCache,
+  FibonacciHeap,
+  SuffixAutomaton,
+  LockFreeQueue,
+  RingBuffer,
+  logRingBuffer,
+  eventRingBuffer,
+  perfRingBuffer,
+  InvertedIndex,
+  CompactBitset,
+  initializeAdvancedDataStructures,
+  shutdownAdvancedDataStructures,
+} from './AdvancedDataStructures';
+
+// --- Part 3: Compression Codecs (Techniques 50-56) ---
+export {
+  lz4Compress,
+  lz4Decompress,
+  computeDelta,
+  applyDelta,
+  deltaEncode,
+  deltaDecode,
+  deltaEncodeInt32,
+  deltaDecodeInt32,
+  rleEncode,
+  rleDecode,
+  rleEncodeInt32,
+  rleDecodeInt32,
+  compressIPCPayload,
+  decompressIPCPayload,
+  compressIPCPayloadAsync,
+  decompressIPCPayloadAsync,
+  DictionaryCompressor,
+  eventTypeDictionary,
+  appNameDictionary,
+  filePathDictionary,
+  logSourceDictionary,
+  initializeCompressionCodecs,
+  shutdownCompressionCodecs,
+} from './CompressionCodecs';
+
+// --- Part 4: Worker Accelerator (Techniques 5-9, 57-58) ---
+export {
+  SharedArrayBufferPool,
+  sabPool,
+  AtomicsHelper,
+  SPSCQueue,
+  DisruptorRingBuffer,
+  WorkerThreadPool,
+  workerPoolRegistry,
+  initializeWorkerAccelerator,
+  shutdownWorkerAccelerator,
+} from './WorkerAccelerator';
+
+// --- Part 5: Module Accelerator (Techniques 1-4, 15-21, 27-31) ---
+export {
+  LazyInit,
+  AsyncLazyInit,
+  lazyRegistry,
+  asyncLazyRegistry,
+  registerLazy,
+  registerAsyncLazy,
+  getLazy,
+  getAsyncLazy,
+  dynamicImports,
+  V8CodeCache,
+  takeHeapSnapshot,
+  getHeapStatistics,
+  getHeapSpaceStatistics,
+  StatementParamPool,
+  stmtParamPool,
+  PARAM_TEMPLATES,
+  SQLiteOptimization,
+  ReadBatcher,
+  inMemoryConfig,
+  TickOptimizer,
+  StreamConfig,
+  createOptimizedReadStream,
+  createOptimizedWriteStream,
+  pipelineAsync,
+  createBatchTransform,
+  initializeModuleAccelerator,
+  shutdownModuleAccelerator,
+} from './ModuleAccelerator';
+
+// --- Part 6: IO Accelerator (Techniques 22-26, 32-39, 60-69) ---
+export {
+  messageChannelManager,
+  broadcastChannels,
+  BufferTransfer,
+  sha256,
+  sha256Buffer,
+  FilePermissions,
+  LinkHelpers,
+  structuredDeepCopy,
+  advisoryMemoryLock,
+  advisoryMemoryUnlock,
+  ProcessPriority,
+  getCPUTemperature,
+  frameBatchedDispatcher,
+  SocketOptimizer,
+  PlatformSyscalls,
+  PlatformDispatch,
+  setThreadAffinityHint,
+  initializeIOAccelerator,
+  shutdownIOAccelerator,
+} from './IOAccelerator';
+
+// --- Part 7: Timing Profiler (Techniques 81-85, 90) ---
+export {
+  hrtimeNow,
+  hrtimeElapsedMs,
+  hrtimeElapsedUs,
+  hrtimeElapsedNs,
+  timingBuffer,
+  TIMING_LABELS,
+  ScopeTimer,
+  scopeTimer,
+  timedAsync,
+  trampoline,
+  trampolineSum,
+  performanceBudgets,
+  eventLoopMonitor,
+  gcTracker,
+  hotPathTracker,
+  startupTracker,
+  computePerformanceScore,
+  runReleaseProfileCheck,
+  initializeTimingProfiler,
+  shutdownTimingProfiler,
+} from './TimingProfiler';
+
+// --- Part 8: App Performance Integration (Cross-app wiring) ---
+export {
+  vinxPerf,
+  imosionPerf,
+  forgePerf,
+  prismPerf,
+  fluxPerf,
+  rewindPerf,
+  tasksPerf,
+  notesPerf,
+  mediaLibPerf,
+  analyticsPerf,
+  securityPerf,
+  pluginPerf,
+  browserPerf,
+  filesPerf,
+  calendarPerf,
+  workflowsPerf,
+  kanbanPerf,
+  achievementsPerf,
+  audioAppPerf,
+  eventBusPerf,
+  startupPerf,
+  databasePerf,
+  initializeAppPerformanceIntegration,
+  shutdownAppPerformanceIntegration,
+} from './AppPerformanceIntegration';
+
+// ===========================================================================
+// END OF BACKEND PERFORMANCE AND OPTIMIZATION LAYER
+// ===========================================================================

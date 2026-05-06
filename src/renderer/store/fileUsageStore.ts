@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - File Usage Store (Zustand)
 // ===========================================================================
@@ -262,8 +268,8 @@ export const useFileUsageStore = create<FileUsageState>((set, get) => ({
       await ipc.invoke('fileUsage:recordAccess', filePath, intentId);
       set({ currentFilePath: filePath });
       
-      // Refresh suggestions after file access
-      get().loadSuggestions();
+      // Refresh suggestions after file access - await to prevent race
+      await get().loadSuggestions();
     } catch (error) {
       console.error('Failed to record file access:', error);
     }

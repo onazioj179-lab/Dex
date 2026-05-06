@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX CONTROLLER TESTS
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Unit tests for core controllers:
  * - ActionController
@@ -11,11 +17,11 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Mock Setup
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
-console.log('🧪 DEX Controller Test Suite Starting...');
+console.log('DEX Controller Test Suite Starting...');
 
 // Mock Electron
 vi.mock('electron', () => ({
@@ -101,9 +107,9 @@ vi.mock('systeminformation', () => ({
   })),
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ActionController Tests
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 describe('ActionController', () => {
   // Mock PermissionManager
@@ -141,7 +147,7 @@ describe('ActionController', () => {
         type: 'open-app',
         target: 'notepad.exe',
         args: [],
-        icon: '📝',
+        icon: '',
         color: '#blue',
         enabled: true,
         createdAt: Date.now(),
@@ -164,7 +170,7 @@ describe('ActionController', () => {
         type: 'run-command',
         target: 'dangerous-command',
         args: [],
-        icon: '⚠️',
+        icon: '',
         color: '#red',
         enabled: true,
         createdAt: Date.now(),
@@ -185,7 +191,7 @@ describe('ActionController', () => {
         type: 'open-app',
         target: 'notepad.exe',
         args: [],
-        icon: '📝',
+        icon: '',
         color: '#blue',
         enabled: true,
         createdAt: Date.now(),
@@ -203,7 +209,7 @@ describe('ActionController', () => {
         type: 'open-url',
         target: 'https://example.com',
         args: [],
-        icon: '🌐',
+        icon: '',
         color: '#green',
         enabled: true,
         createdAt: Date.now(),
@@ -221,7 +227,7 @@ describe('ActionController', () => {
         type: 'invalid-type' as any,
         target: 'something',
         args: [],
-        icon: '❓',
+        icon: '',
         color: '#gray',
         enabled: true,
         createdAt: Date.now(),
@@ -242,7 +248,7 @@ describe('ActionController', () => {
         type: 'notification',
         target: 'Test message',
         args: [],
-        icon: '🔔',
+        icon: '',
         color: '#yellow',
         enabled: true,
         createdAt: Date.now(),
@@ -265,7 +271,7 @@ describe('ActionController', () => {
         type: 'open-app',
         target: 'test.exe',
         args: [],
-        icon: '❌',
+        icon: '',
         color: '#red',
         enabled: true,
         createdAt: Date.now(),
@@ -276,9 +282,9 @@ describe('ActionController', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PowerController Tests
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 describe('PowerController', () => {
   const mockLogger = {
@@ -322,7 +328,7 @@ describe('PowerController', () => {
       
       expect(result.success).toBe(true);
       expect(controller.getCurrentProfile()).toBe('eco');
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('balanced → eco'));
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('balanced eco'));
     });
 
     it('should switch to boost profile', async () => {
@@ -365,9 +371,9 @@ describe('PowerController', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DataController Tests
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 describe('DataController', () => {
   beforeEach(() => {
@@ -440,9 +446,9 @@ describe('DataController', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Helper Functions
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 function createMockActionController(permissionManager: any, logger: any) {
   return {
@@ -500,7 +506,7 @@ function createMockPowerController(dataStore: any, logger: any) {
         return { success: true, message: `Already in ${profile} mode`, changes: [] };
       }
 
-      logger.info(`Switching power profile: ${previousProfile} → ${profile}`);
+      logger.info(`Switching power profile: ${previousProfile} ${profile}`);
 
       currentState = {
         currentProfile: profile,
@@ -548,8 +554,8 @@ function validateImportData(data: any): boolean {
   return true;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Test Summary
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-console.log('✅ DEX Controller Test Suite Complete');
+console.log('DEX Controller Test Suite Complete');

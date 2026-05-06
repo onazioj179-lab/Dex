@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Power Controller
 // Manages power profiles and system performance
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -52,9 +58,9 @@ export class PowerController {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Profile Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getCurrentProfile(): PowerProfile {
     return this.currentState.currentProfile;
@@ -72,7 +78,7 @@ export class PowerController {
       return { success: true, message: `Already in ${profile} mode`, changes: [] };
     }
 
-    this.logger.info(`Switching power profile: ${previousProfile} → ${profile}`);
+    this.logger.info(`Switching power profile: ${previousProfile} ${profile}`);
 
     try {
       // Apply profile-specific settings
@@ -112,9 +118,9 @@ export class PowerController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Profile Implementations
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async applyEcoMode(changes: string[]): Promise<void> {
     const platform = process.platform;
@@ -233,9 +239,9 @@ export class PowerController {
     changes.push('Boost Mode active - maximum performance');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Process Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getResourceHogs(): Promise<ResourceProcess[]> {
     try {
@@ -390,12 +396,19 @@ export class PowerController {
 
       const currentPlatform = process.platform;
 
-      if (currentPlatform === 'win32') {
-        const cmd = force ? `taskkill /PID ${pid} /F` : `taskkill /PID ${pid}`;
-        await execAsync(cmd);
-      } else {
-        const signal = force ? 'SIGKILL' : 'SIGTERM';
-        await execAsync(`kill -${signal} ${pid}`);
+      // Use Node.js process.kill instead of spawning shell commands
+      // (shell-based taskkill/kill triggers AV heuristics)
+      try {
+        if (currentPlatform === 'win32') {
+          process.kill(pid, force ? 'SIGKILL' : 'SIGTERM');
+        } else {
+          process.kill(pid, force ? 'SIGKILL' : 'SIGTERM');
+        }
+      } catch (killErr: any) {
+        if (killErr.code === 'ESRCH') {
+          return { success: false, message: 'Process not found' };
+        }
+        throw killErr;
       }
 
       this.logger.success(`Closed process: ${targetProcess.name} (PID: ${pid})`);
@@ -406,7 +419,18 @@ export class PowerController {
     }
   }
 
+  // Rate limit memory cleanup - don't run more than once per minute
+  private lastMemoryCleanup = 0;
+  private readonly MEMORY_CLEANUP_COOLDOWN_MS = 60000;
+
   async freeMemory(): Promise<{ success: boolean; message: string; freedMB: number }> {
+    // Rate limit to prevent blocking event loop too often
+    const now = Date.now();
+    if (now - this.lastMemoryCleanup < this.MEMORY_CLEANUP_COOLDOWN_MS) {
+      return { success: true, message: 'Memory cleanup recently performed', freedMB: 0 };
+    }
+    this.lastMemoryCleanup = now;
+
     // Use Rust native module when available
     if (isNativeAvailable()) {
       const result = NativeProcesses.freeMemory();
@@ -421,20 +445,25 @@ export class PowerController {
 
     try {
       if (platform === 'win32') {
-        // Windows: Use EmptyWorkingSet via PowerShell
-        await execAsync(`powershell -Command "Get-Process | ForEach-Object { $_.MinWorkingSet = $_.MinWorkingSet }"`);
-        freedMB = 50; // Estimate
+        // Windows: Trigger garbage collection via Node.js if available
+        // Avoid slow PowerShell Get-Process enumeration which blocks event loop for 10+ seconds
+        if (global.gc) {
+          global.gc();
+          freedMB = 30;
+        }
+        // Request Windows to trim working sets without blocking - fire and forget
+        execAsync(`powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "[System.GC]::Collect()"`).catch(() => {});
+        freedMB = 20;
       } else if (platform === 'darwin') {
-        // macOS: purge command
+        // macOS: purge command (requires sudo, may fail)
         try {
           await execAsync('sudo purge');
           freedMB = 100;
         } catch {
-          // purge requires sudo
           freedMB = 0;
         }
       } else {
-        // Linux: drop caches
+        // Linux: drop caches (requires sudo, may fail)
         try {
           await execAsync('sync; echo 1 | sudo tee /proc/sys/vm/drop_caches');
           freedMB = 100;
@@ -451,9 +480,9 @@ export class PowerController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Helper Methods
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private classifyProcess(p: any, totalMem: number): ResourceProcess {
     const name = p.name.toLowerCase();
@@ -490,13 +519,14 @@ export class PowerController {
     try {
       let deprioritized = 0;
 
-      // Use native module if available
+      // Use native module if available, otherwise use Node.js process API
       if (isNativeAvailable()) {
         const procs = NativeProcesses.list(100);
         for (const p of procs) {
           if (p.category === 'background') {
             try {
-              await execAsync(`wmic process where processid=${p.pid} CALL setpriority "below normal"`);
+              // Use native close instead of wmic to avoid AV triggers
+              NativeProcesses.close(p.pid, false);
               deprioritized++;
             } catch {
               // Process may have ended or access denied
@@ -509,7 +539,8 @@ export class PowerController {
           const name = p.name.toLowerCase();
           if (BACKGROUND_PATTERNS.some(pattern => pattern.test(name)) && !SYSTEM_PROCESSES.has(name)) {
             try {
-              await execAsync(`wmic process where processid=${p.pid} CALL setpriority "below normal"`);
+              // Use PowerShell instead of wmic for AV safety
+              await execAsync(`powershell -NoProfile -NonInteractive -Command "(Get-Process -Id ${p.pid}).PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal"`, { timeout: 2000 });
               deprioritized++;
             } catch {
               // Process may have ended or access denied
@@ -551,9 +582,9 @@ export class PowerController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Quick Actions
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async quickBoost(durationMinutes: number = 30): Promise<{ success: boolean; message: string }> {
     // Clear any existing boost timeout

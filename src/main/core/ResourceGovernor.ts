@@ -1,69 +1,138 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Resource Governor
-// MAXIMUM PERFORMANCE MODE
-// ═══════════════════════════════════════════════════════════════════════════
-// TARGETS:
-// - RAM: up to 8 GB when needed, full power
-// - CPU: 95% power for maximum performance
-// - GPU: 80% power during app operations
-// - Maximum performance during use
-// - 120Hz smooth interaction support
-// ═══════════════════════════════════════════════════════════════════════════
+// ADAPTIVE PERFORMANCE MODE (Hardware Tier Detection)
+// ===========================================================================
+// Detects hardware at boot and picks low/mid/high tier automatically.
+// Low-end (≤4 cores or ≤4GB): Conservative — 1GB RAM, 70% CPU, 30fps
+// Mid (≤8 cores, ≤8GB):       Balanced    — 2GB RAM, 90% CPU, 60fps
+// High (>8 cores or >8GB):    Full power  — 4GB RAM, 100% CPU, 120fps
+// ===========================================================================
 
 import log from 'electron-log';
+import os from 'os';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// HARDWARE TIER DETECTION — Adapts DEX to the machine it runs on
+// ===========================================================================
+
+export type HardwareTier = 'low' | 'mid' | 'high';
+
+export interface HardwareProfile {
+  tier: HardwareTier;
+  cpuCores: number;
+  totalRAMMB: number;
+  cpuModel: string;
+}
+
+function detectHardwareTier(): HardwareProfile {
+  const cpuCores = os.cpus().length;
+  const totalRAMMB = Math.round(os.totalmem() / 1024 / 1024);
+  const cpuModel = os.cpus()[0]?.model ?? 'Unknown';
+
+  // Low-end: <=4 cores OR <=4GB RAM (Chromebooks, budget laptops, old hardware)
+  // Mid:     <=8 cores AND <=8GB RAM
+  // High:    >8 cores OR >8GB RAM
+  let tier: HardwareTier;
+  if (cpuCores <= 4 || totalRAMMB <= 4096) {
+    tier = 'low';
+  } else if (cpuCores <= 8 && totalRAMMB <= 8192) {
+    tier = 'mid';
+  } else {
+    tier = 'high';
+  }
+
+  return { tier, cpuCores, totalRAMMB, cpuModel };
+}
+
+// Detect once at import time (before any subsystem starts)
+export const hardwareProfile = detectHardwareTier();
+
+// ===========================================================================
+// TIER-AWARE LIMITS
+// ===========================================================================
+
+function limitsForTier(tier: HardwareTier) {
+  switch (tier) {
+    case 'low':
+      return {
+        MAX_TOTAL_MEMORY_MB: 1024,
+        MAX_HEAP_MEMORY_MB: 512,
+        MAX_RENDERER_MEMORY_MB: 384,
+        BUDGET_UI: 192, BUDGET_WORKFLOWS: 96, BUDGET_STORAGE: 96,
+        BUDGET_INDEXING: 48, BUDGET_CACHE: 64, BUDGET_PYTHON: 128, BUDGET_RESERVE: 64,
+        MAX_IDLE_CPU_PERCENT: 30,
+        MAX_ACTIVE_CPU_PERCENT: 70,
+        GPU_IDLE_TARGET: 0, GPU_MINIMAL_THRESHOLD: 30, GPU_BURST_ALLOWED: false,
+        TARGET_FRAME_TIME_MS: 16.67, MAX_FRAME_TIME_MS: 33.33, MAX_PAINT_TIME_MS: 8,
+        MAX_EVENT_LOOP_LAG_MS: 32,
+        MAX_OPERATION_DURATION_MS: 8000,
+        MAX_BACKGROUND_TASK_MS: 2000,
+        MAX_TASK_QUEUE_SIZE: 20,
+        MAX_PENDING_OPERATIONS: 4,
+        MEMORY_CHECK_INTERVAL_MS: 60000,
+        IDLE_DETECTION_MS: 3000,
+        GC_FORCE_INTERVAL_MS: 300000,
+      } as const;
+    case 'mid':
+      return {
+        MAX_TOTAL_MEMORY_MB: 2048,
+        MAX_HEAP_MEMORY_MB: 1024,
+        MAX_RENDERER_MEMORY_MB: 512,
+        BUDGET_UI: 256, BUDGET_WORKFLOWS: 128, BUDGET_STORAGE: 128,
+        BUDGET_INDEXING: 64, BUDGET_CACHE: 128, BUDGET_PYTHON: 256, BUDGET_RESERVE: 96,
+        MAX_IDLE_CPU_PERCENT: 60,
+        MAX_ACTIVE_CPU_PERCENT: 90,
+        GPU_IDLE_TARGET: 5, GPU_MINIMAL_THRESHOLD: 60, GPU_BURST_ALLOWED: true,
+        TARGET_FRAME_TIME_MS: 16.67, MAX_FRAME_TIME_MS: 16.67, MAX_PAINT_TIME_MS: 6,
+        MAX_EVENT_LOOP_LAG_MS: 16,
+        MAX_OPERATION_DURATION_MS: 5000,
+        MAX_BACKGROUND_TASK_MS: 1000,
+        MAX_TASK_QUEUE_SIZE: 35,
+        MAX_PENDING_OPERATIONS: 6,
+        MEMORY_CHECK_INTERVAL_MS: 120000,
+        IDLE_DETECTION_MS: 5000,
+        GC_FORCE_INTERVAL_MS: 600000,
+      } as const;
+    case 'high':
+    default:
+      return {
+        MAX_TOTAL_MEMORY_MB: 4096,
+        MAX_HEAP_MEMORY_MB: 2048,
+        MAX_RENDERER_MEMORY_MB: 1024,
+        BUDGET_UI: 512, BUDGET_WORKFLOWS: 256, BUDGET_STORAGE: 256,
+        BUDGET_INDEXING: 128, BUDGET_CACHE: 256, BUDGET_PYTHON: 512, BUDGET_RESERVE: 128,
+        MAX_IDLE_CPU_PERCENT: 90,
+        MAX_ACTIVE_CPU_PERCENT: 100,
+        GPU_IDLE_TARGET: 10, GPU_MINIMAL_THRESHOLD: 80, GPU_BURST_ALLOWED: true,
+        TARGET_FRAME_TIME_MS: 8.33, MAX_FRAME_TIME_MS: 16.67, MAX_PAINT_TIME_MS: 4,
+        MAX_EVENT_LOOP_LAG_MS: 16,
+        MAX_OPERATION_DURATION_MS: 5000,
+        MAX_BACKGROUND_TASK_MS: 1000,
+        MAX_TASK_QUEUE_SIZE: 50,
+        MAX_PENDING_OPERATIONS: 10,
+        MEMORY_CHECK_INTERVAL_MS: 180000,
+        IDLE_DETECTION_MS: 5000,
+        GC_FORCE_INTERVAL_MS: 600000,
+      } as const;
+  }
+}
+
+// ===========================================================================
 // MAXIMUM LIMITS - Full Performance
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-export const HARD_LIMITS = {
-  // Memory limits (bytes) - 4GB mode
-  MAX_TOTAL_MEMORY_MB: 4096,           // 4 GB maximum for all apps
-  MAX_HEAP_MEMORY_MB: 2048,            // 2 GB heap limit
-  MAX_RENDERER_MEMORY_MB: 1024,        // 1 GB per renderer
-  
-  // Subsystem memory budgets (MB)
-  BUDGET_UI: 512,
-  BUDGET_WORKFLOWS: 256,
-  BUDGET_STORAGE: 256,
-  BUDGET_INDEXING: 128,
-  BUDGET_CACHE: 256,
-  BUDGET_PYTHON: 512,
-  BUDGET_RESERVE: 128,
-  
-  // CPU limits - FULL POWER
-  MAX_IDLE_CPU_PERCENT: 90,            // Allow heavy background processing
-  MAX_ACTIVE_CPU_PERCENT: 100,         // Maximum power when needed
-  
-  // GPU limits - FULL POWER
-  GPU_IDLE_TARGET: 10,                 // Some GPU at idle for smooth UI
-  GPU_MINIMAL_THRESHOLD: 80,           // Maximum GPU for instant rendering
-  GPU_BURST_ALLOWED: true,             // Burst allowed during transitions
-  
-  // Frame timing (120Hz support)
-  TARGET_FRAME_TIME_MS: 8.33,          // 120Hz target
-  MAX_FRAME_TIME_MS: 16.67,            // 60Hz fallback
-  MAX_PAINT_TIME_MS: 4,                // Half frame for painting
-  
-  // Timing limits (ms)
-  MAX_EVENT_LOOP_LAG_MS: 16,           // 60fps responsiveness
-  MAX_OPERATION_DURATION_MS: 5000,     // 5 second max for any operation
-  MAX_BACKGROUND_TASK_MS: 1000,        // 1 second max for background work
-  
-  // Queue limits
-  MAX_TASK_QUEUE_SIZE: 50,
-  MAX_PENDING_OPERATIONS: 10,
-  
-  // Intervals (ms) - Event-driven preferred, but some monitoring needed
-  MEMORY_CHECK_INTERVAL_MS: 180000,    // Check memory every 3 minutes (reduced overhead)
-  IDLE_DETECTION_MS: 5000,             // 5 seconds to consider idle
-  GC_FORCE_INTERVAL_MS: 600000,        // Force GC every 10 minutes if needed
-} as const;
+export const HARD_LIMITS = limitsForTier(hardwareProfile.tier);
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ResourcePressure = 'nominal' | 'elevated' | 'high' | 'critical';
 export type ThrottleLevel = 'none' | 'light' | 'moderate' | 'aggressive' | 'emergency';
@@ -107,9 +176,9 @@ interface ThrottleConfig {
   limitConcurrency: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // RESOURCE GOVERNOR - Enforces hard limits
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ResourceGovernorClass {
   private isRunning = false;
@@ -136,9 +205,9 @@ class ResourceGovernorClass {
     this.initializeSubsystemBudgets();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private initializeSubsystemBudgets(): void {
     this.subsystems.set('ui', { name: 'UI', budgetMB: HARD_LIMITS.BUDGET_UI, currentMB: 0, violations: 0 });
@@ -149,15 +218,15 @@ class ResourceGovernorClass {
     this.subsystems.set('python', { name: 'Python', budgetMB: HARD_LIMITS.BUDGET_PYTHON, currentMB: 0, violations: 0 });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // START / STOP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
     if (this.isRunning) return;
     this.isRunning = true;
 
-    log.info(' [ResourceGovernor] Starting - PERFORMANCE MODE (4GB RAM, 100% CPU, 80% GPU)');
+    log.info(` [ResourceGovernor] Starting - Hardware tier: ${hardwareProfile.tier.toUpperCase()} (${hardwareProfile.cpuCores} cores, ${hardwareProfile.totalRAMMB}MB RAM, ${hardwareProfile.cpuModel})`);
     log.info(` [ResourceGovernor] Limits: ${HARD_LIMITS.MAX_TOTAL_MEMORY_MB}MB RAM, ${HARD_LIMITS.MAX_ACTIVE_CPU_PERCENT}% CPU, ${HARD_LIMITS.GPU_MINIMAL_THRESHOLD}% GPU`);
 
     // Single monitoring interval - minimal polling
@@ -192,9 +261,9 @@ class ResourceGovernorClass {
     log.info(' [ResourceGovernor] Stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC HANDLERS (GPU & Render Tracking)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPCHandlers(): void {
     // Renderer reports render activity
@@ -221,6 +290,10 @@ class ResourceGovernorClass {
     
     // Check if rendering is allowed
     ipcMain.handle('gpu:shouldRender', () => this.shouldRender());
+
+    // Hardware tier query — renderer can adapt UI accordingly
+    ipcMain.handle('resource-governor:getHardwareProfile', () => hardwareProfile);
+    ipcMain.handle('resource-governor:getThrottleLevel', () => this.currentThrottle);
   }
 
   private setRenderState(rendering: boolean): void {
@@ -244,9 +317,9 @@ class ResourceGovernorClass {
     this.renderCallbacks.forEach(cb => cb(rendering));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RESOURCE CHECKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private checkResources(): void {
     const snapshot = this.takeSnapshot();
@@ -382,9 +455,9 @@ class ResourceGovernorClass {
     return 'none';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ENFORCEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private enforceResourceLimits(pressure: ResourcePressure, snapshot: ResourceSnapshot): void {
     const config = this.getThrottleConfig(this.currentThrottle);
@@ -460,9 +533,9 @@ class ResourceGovernorClass {
     this.notifyThrottleChange('emergency');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CACHE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private clearNonEssentialCaches(): void {
     // This will be connected to MemoryManager
@@ -492,9 +565,9 @@ class ResourceGovernorClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // USER ACTIVITY TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordUserActivity(): void {
     this.lastUserActivity = Date.now();
@@ -504,9 +577,9 @@ class ResourceGovernorClass {
     return (Date.now() - this.lastUserActivity) > HARD_LIMITS.IDLE_DETECTION_MS;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // THROTTLE NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   onThrottleChange(callback: (level: ThrottleLevel) => void): () => void {
     this.throttleCallbacks.add(callback);
@@ -523,9 +596,9 @@ class ResourceGovernorClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUBSYSTEM BUDGET TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   reportSubsystemUsage(subsystem: string, memoryMB: number): void {
     const budget = this.subsystems.get(subsystem);
@@ -542,9 +615,9 @@ class ResourceGovernorClass {
     return Array.from(this.subsystems.values());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getSnapshot(): ResourceSnapshot | null {
     return this.lastSnapshot;
@@ -566,9 +639,9 @@ class ResourceGovernorClass {
     return this.getThrottleConfig(this.currentThrottle).limitConcurrency;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUDGET CHECKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   canAllocate(requestedMB: number): boolean {
     if (!this.lastSnapshot) return true;
@@ -581,9 +654,9 @@ class ResourceGovernorClass {
     return Math.max(0, HARD_LIMITS.MAX_TOTAL_MEMORY_MB - this.lastSnapshot.memory.rssMB);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // GPU MANAGEMENT (Visual Smoothness Mode)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   shouldRender(): boolean {
     // Don't render during critical resource pressure
@@ -623,10 +696,35 @@ class ResourceGovernorClass {
     }
     return HARD_LIMITS.TARGET_FRAME_TIME_MS; // 120Hz normally
   }
+
+  // -------------------------------------------------------------------------
+  // USER-CONFIGURABLE RAM LIMIT
+  // -------------------------------------------------------------------------
+
+  /** Apply a user-specified max RAM in GB (0 = auto-detect, min 0.5GB). Scales subsystem budgets proportionally. */
+  applyUserMaxRam(maxGigabytes: number): void {
+    if (maxGigabytes <= 0) {
+      // Auto mode: already using hardware-detected tier
+      log.info('[ResourceGovernor] RAM limit set to auto (tier: ' + hardwareProfile.tier + ', ' + HARD_LIMITS.MAX_TOTAL_MEMORY_MB + 'MB)');
+      return;
+    }
+    const capMB = Math.max(512, Math.round(maxGigabytes * 1024));
+    const baseLimits = limitsForTier(hardwareProfile.tier);
+    const scale = capMB / baseLimits.MAX_TOTAL_MEMORY_MB;
+
+    // Scale subsystem budgets proportionally
+    for (const [key, budget] of this.subsystems.entries()) {
+      const baseKey = 'BUDGET_' + key.toUpperCase();
+      const baseVal = (baseLimits as any)[baseKey] || budget.budgetMB;
+      budget.budgetMB = Math.max(32, Math.round(baseVal * scale));
+    }
+
+    log.info(`[ResourceGovernor] User RAM limit applied: ${capMB}MB (scale: ${scale.toFixed(2)}x)`);
+  }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const resourceGovernor = new ResourceGovernorClass();

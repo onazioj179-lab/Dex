@@ -1,10 +1,16 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Panic Lockdown System
 // One-click full lockdown / panic mode
 // Safe Mode boot (disables all advanced features)
 // Zero background activity when Dex is idle
 // Permission-scoped file access with per-feature security toggles
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, session, shell } from 'electron';
@@ -13,9 +19,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type LockdownLevel = 'none' | 'partial' | 'full' | 'panic';
 export type BootMode = 'normal' | 'safe' | 'recovery';
@@ -76,9 +82,9 @@ export interface ActivityPolicy {
   idleTimeoutMinutes: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PANIC LOCKDOWN SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PanicLockdownSystemClass extends EventEmitter {
   private lockdownState: LockdownState;
@@ -132,9 +138,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     this.configPath = path.join(app.getPath('userData'), 'security');
@@ -243,9 +249,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Lockdown controls
@@ -295,9 +301,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PANIC MODE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   activatePanicMode(): { success: boolean } {
     log.warn('[PanicLockdown] PANIC MODE ACTIVATED');
@@ -337,9 +343,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LOCKDOWN MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   activateLockdown(level: LockdownLevel, reason?: string): { success: boolean } {
     const previousLevel = this.lockdownState.level;
@@ -451,9 +457,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SAFE MODE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   activateSafeMode(reason?: string): { success: boolean } {
     // Disable all non-essential features
@@ -499,9 +505,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FEATURE TOGGLES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   listFeatures(): FeatureToggle[] {
     return Array.from(this.featureToggles.values());
@@ -541,9 +547,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     return feature?.enabled ?? false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERMISSION SCOPES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   listScopes(): PermissionScope[] {
     return Array.from(this.permissionScopes.values());
@@ -605,9 +611,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     return { allowed: false, reason: 'No permission scope covers this path' };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IDLE MONITORING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startIdleMonitoring(): void {
     const checkIdle = () => {
@@ -656,9 +662,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     this.emit('idle:end');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setConfig(config: Partial<SecurityConfig>): { success: boolean } {
     this.securityConfig = { ...this.securityConfig, ...config };
@@ -672,9 +678,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadConfig(): Promise<void> {
     try {
@@ -717,9 +723,9 @@ class PanicLockdownSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private killManagedProcesses(): void {
     // Emit event for other services to handle
@@ -734,9 +740,9 @@ class PanicLockdownSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const PanicLockdownSystem = new PanicLockdownSystemClass();
 export default PanicLockdownSystem;

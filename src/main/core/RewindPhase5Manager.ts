@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Rewind - Phase 5 Orchestrator
  *
@@ -517,7 +523,7 @@ class RewindPhase5Manager {
 
     if (backups.length <= 5) return;
     for (const old of backups.slice(5)) {
-      try { fs.unlinkSync(old.fp); } catch (_) {}
+      try { fs.unlinkSync(old.fp); } catch (e) { log.warn('[RewindPhase5] Backup cleanup failed:', e); }
     }
   }
 

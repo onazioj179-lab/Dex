@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Workflow Controller
 // Phase 20: IPC handlers for workflow management and execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { Logger } from '../utils/Logger';
@@ -18,13 +24,14 @@ import {
 import { taskQueue, TaskChainBuilder } from '../core/TaskQueue';
 import { documentCreator, DocumentRequest, DocumentTemplate } from '../core/DocumentCreator';
 import { externalConnectors, ConnectorConfig } from '../core/ExternalConnectors';
+import { IPCCrypto } from '../security/IPCCrypto';
 
 const log = new Logger();
 import { browserBridge } from '../core/BrowserBridge';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // WORKFLOW CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class WorkflowControllerClass {
   private initialized = false;
@@ -35,9 +42,9 @@ class WorkflowControllerClass {
   initialize(): void {
     if (this.initialized) return;
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // WORKFLOW MANAGEMENT
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('workflow:getAll', async () => {
       return workflowEngine.getWorkflows();
@@ -73,15 +80,34 @@ class WorkflowControllerClass {
       };
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // WORKFLOW EXECUTION
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
-    ipcMain.handle('workflow:execute', async (_, workflowId: string, inputs: Record<string, any>, options?: ExecutionOptions) => {
+    ipcMain.handle('workflow:execute', async (event, workflowId: string, inputs: Record<string, any>, options?: ExecutionOptions) => {
       const workflow = workflowEngine.getWorkflow(workflowId);
       if (!workflow) {
         throw new Error(`Workflow not found: ${workflowId}`);
       }
+
+      // Safety gate: require explicit opt-in for non-dry-run execution
+      if (!options?.dryRun) {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        if (win) {
+          const { response } = await dialog.showMessageBox(win, {
+            type: 'question',
+            buttons: ['Execute', 'Preview Only', 'Cancel'],
+            defaultId: 1,
+            cancelId: 2,
+            title: 'Workflow Execution',
+            message: `Execute workflow "${workflow.name}"?`,
+            detail: `This workflow has ${workflow.nodes?.length || 0} steps. Choose "Preview Only" to see what will happen without making changes.`,
+          });
+          if (response === 2) return { cancelled: true };
+          if (response === 1) return workflowEngine.execute(workflow, inputs, { ...options, dryRun: true });
+        }
+      }
+
       return workflowEngine.execute(workflow, inputs, options);
     });
 
@@ -116,9 +142,36 @@ class WorkflowControllerClass {
       return workflowEngine.getExecution(executionId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    ipcMain.handle('workflow:runScript', async (_, script: string) => {
+      if (!script || typeof script !== 'string') {
+        return { output: '', exitCode: 1, error: 'No script provided' };
+      }
+      // Security: Block dangerous commands
+      const blocked = /rm\s+-rf|del\s+\/[sfq]|format\s+[a-z]:|mkfs|dd\s+if=|shutdown|reboot|reg\s+delete|net\s+user|netsh|powershell\s+-e|iex\s*\(|invoke-expression|wget|curl.*\|.*sh|chmod\s+[0-7]{3,4}\s+\/|chown.*\/|sudo/i;
+      if (blocked.test(script)) {
+        return { output: '', exitCode: 1, error: 'Blocked: script contains a restricted command' };
+      }
+      // Security: Limit script length to prevent abuse
+      if (script.length > 2000) {
+        return { output: '', exitCode: 1, error: 'Script too long (max 2000 chars)' };
+      }
+      return new Promise<{ output: string; exitCode: number; error?: string }>((resolve) => {
+        const shell = process.platform === 'win32' ? 'powershell' : '/bin/sh';
+        const args = process.platform === 'win32' ? ['-NoProfile', '-NoLogo', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script] : ['-c', script];
+        const { execFile } = require('child_process');
+        execFile(shell, args, { timeout: 30000, maxBuffer: 1024 * 512, windowsHide: true }, (err: any, stdout: string, stderr: string) => {
+          if (err) {
+            resolve({ output: stderr || err.message, exitCode: err.code || 1, error: err.message });
+          } else {
+            resolve({ output: stdout, exitCode: 0 });
+          }
+        });
+      });
+    });
+
+    // -------------------------------------------------------------------------
     // TASK QUEUE
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('tasks:add', async (_, task: { type: string; name: string; params: Record<string, any>; priority?: string }) => {
       return taskQueue.addTask({
@@ -177,9 +230,9 @@ class WorkflowControllerClass {
       return taskQueue.getAvailableTypes();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // DOCUMENT CREATION
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('documents:getTemplates', async () => {
       return documentCreator.getTemplates();
@@ -218,12 +271,12 @@ class WorkflowControllerClass {
         title: 'Select output directory',
       });
 
-      return result.canceled ? null : result.filePaths[0];
+      return (result.canceled || result.filePaths.length === 0) ? null : result.filePaths[0];
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // EXTERNAL CONNECTORS
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('connectors:add', async (_, config: Omit<ConnectorConfig, 'id' | 'createdAt'>) => {
       return externalConnectors.addConnector(config);
@@ -288,9 +341,9 @@ class WorkflowControllerClass {
       return externalConnectors.getOperationLog();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // BROWSER BRIDGE
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('browser:startServer', async () => {
       return browserBridge.startServer();
@@ -327,7 +380,8 @@ class WorkflowControllerClass {
       return browserBridge.readPage();
     });
 
-    ipcMain.handle('browser:fillField', async (_, selector: string, value: string) => {
+    ipcMain.handle('browser:fillField', async (_, selector: string, sealed: any) => {
+      const value = IPCCrypto.open(sealed);
       return browserBridge.fillField(selector, value);
     });
 
@@ -351,9 +405,9 @@ class WorkflowControllerClass {
       return browserBridge.cancelAction(actionId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // WORKFLOW BUILDER HELPERS
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('workflow:createNew', async (_, name: string, description?: string) => {
       const builder = new WorkflowBuilder(name, description);

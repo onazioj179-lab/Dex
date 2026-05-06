@@ -1,19 +1,26 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Backend Observability System
 // Phase 28: Backend Architecture Refinement
 // Execution timelines, task durations, queue depth, resource usage
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
 import log from 'electron-log';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import { app } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type MetricType = 'counter' | 'gauge' | 'histogram' | 'timer';
 
@@ -79,9 +86,9 @@ export interface SubsystemMetrics {
   lastUpdated: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // OBSERVABILITY CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ObservabilityClass extends EventEmitter {
   // Metrics storage
@@ -121,15 +128,15 @@ class ObservabilityClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
-    // Collect snapshots every second
+    // Collect snapshots every 10 seconds (reduced from 1s to lower CPU usage)
     this.snapshotInterval = setInterval(() => {
       this.collectSnapshot();
-    }, 1000);
+    }, 10_000);
     
     log.info('[Observability] Started');
     this.emit('started');
@@ -148,9 +155,9 @@ class ObservabilityClass extends EventEmitter {
     this.emit('stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // METRICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Record a counter metric (always increments)
@@ -290,9 +297,9 @@ class ObservabilityClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TIMELINE EVENTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Start a timeline event
@@ -391,9 +398,9 @@ class ObservabilityClass extends EventEmitter {
     return events;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERFORMANCE SNAPSHOTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private collectSnapshot(): void {
     const now = Date.now();
@@ -488,9 +495,9 @@ class ObservabilityClass extends EventEmitter {
     return this.snapshots[this.snapshots.length - 1] ?? null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUBSYSTEM METRICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Register subsystem metrics
@@ -539,9 +546,9 @@ class ObservabilityClass extends EventEmitter {
     return Array.from(this.subsystems.values());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // REPORTING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Generate a performance report
@@ -590,9 +597,9 @@ class ObservabilityClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     ipcMain.handle('observability:getSnapshots', (_, options) => 
@@ -622,9 +629,9 @@ class ObservabilityClass extends EventEmitter {
     log.info('[Observability] IPC handlers registered');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private persistMetrics(): void {
     try {
@@ -639,7 +646,9 @@ class ObservabilityClass extends EventEmitter {
         }
       }
       
-      fs.writeFileSync(this.metricsPath, JSON.stringify(toSave, null, 2));
+      fsPromises.writeFile(this.metricsPath, JSON.stringify(toSave, null, 2)).catch(e => {
+        log.warn('[Observability] Failed to persist metrics:', e);
+      });
       log.debug('[Observability] Metrics persisted');
     } catch (e) {
       log.warn('[Observability] Failed to persist metrics:', e);
@@ -647,9 +656,9 @@ class ObservabilityClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const observability = new ObservabilityClass();
 export default observability;

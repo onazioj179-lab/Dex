@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Gallery Controller
 // Phase 67: Visual media browsing with virtualization
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, BrowserWindow, dialog } from 'electron';
 import * as fs from 'fs';
@@ -10,9 +16,9 @@ import { app } from 'electron';
 import { DataStore } from '../store/DataStore';
 import { Logger } from '../utils/Logger';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface GalleryItem {
   id: string;
@@ -44,9 +50,9 @@ interface ScanOptions {
   extensions?: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Gallery Controller
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class GalleryController {
   private dataStore: DataStore;
@@ -83,9 +89,9 @@ export class GalleryController {
     this.logger.info(`[Gallery] Initialized with ${this.items.length} items`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC Handlers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerHandlers(): void {
     // Get all gallery items
@@ -163,9 +169,9 @@ export class GalleryController {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Core Methods
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadGalleryData(): Promise<void> {
     try {
@@ -274,12 +280,27 @@ export class GalleryController {
           if (extensions.has(ext)) {
             const stats = await fs.promises.stat(fullPath);
             
+            // Get actual dimensions via native module
+            let width = 0;
+            let height = 0;
+            try {
+              const { getNativeModule } = require('../native');
+              const native = getNativeModule();
+              if (native) {
+                const meta = native.getImageMetadata(fullPath);
+                width = meta.width;
+                height = meta.height;
+              }
+            } catch {
+              // Native module unavailable — dimensions stay 0
+            }
+            
             items.push({
               id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               name: entry.name,
               path: fullPath,
-              width: 0, // Would need image processing to get actual dimensions
-              height: 0,
+              width,
+              height,
               size: stats.size,
               format: ext.substring(1).toUpperCase(),
               createdAt: stats.birthtime.getTime(),
@@ -392,9 +413,9 @@ export class GalleryController {
     return mimeTypes[format] || 'image/jpeg';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.saveGalleryData();

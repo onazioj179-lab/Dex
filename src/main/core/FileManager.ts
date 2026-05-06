@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Management Module
 // Phase 19: Controlled, permission-based file operations
 // Only touches folders explicitly selected by the user
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,9 +17,9 @@ import { Logger } from '../utils/Logger';
 
 const log = new Logger();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface FileInfo {
   name: string;
@@ -68,9 +74,9 @@ export interface ScopeConfig {
   label?: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FILE MANAGER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FileManagerClass {
   private allowedScopes: Map<string, ScopeConfig> = new Map();
@@ -81,9 +87,9 @@ class FileManagerClass {
     this.loadScopes();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCOPE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Add a folder to allowed scopes
@@ -176,9 +182,9 @@ class FileManagerClass {
     return true; // Default to read-only for safety
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE LISTING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * List files in a directory (must be in scope)
@@ -251,9 +257,9 @@ class FileManagerClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Rename a file
@@ -302,7 +308,7 @@ class FileManagerClass {
     try {
       fs.renameSync(normalizedOld, newPath);
       operation.success = true;
-      log.info(`[FileManager] Renamed: ${normalizedOld} → ${newPath}`);
+      log.info(`[FileManager] Renamed: ${normalizedOld} ${newPath}`);
     } catch (error) {
       operation.error = error instanceof Error ? error.message : 'Unknown error';
       log.error(`[FileManager] Rename failed:`, error);
@@ -361,7 +367,7 @@ class FileManagerClass {
     try {
       fs.renameSync(normalizedSource, targetPath);
       operation.success = true;
-      log.info(`[FileManager] Moved: ${normalizedSource} → ${targetPath}`);
+      log.info(`[FileManager] Moved: ${normalizedSource} ${targetPath}`);
     } catch (error) {
       operation.error = error instanceof Error ? error.message : 'Unknown error';
       log.error(`[FileManager] Move failed:`, error);
@@ -416,7 +422,7 @@ class FileManagerClass {
     try {
       fs.copyFileSync(normalizedSource, targetPath);
       operation.success = true;
-      log.info(`[FileManager] Copied: ${normalizedSource} → ${targetPath}`);
+      log.info(`[FileManager] Copied: ${normalizedSource} ${targetPath}`);
     } catch (error) {
       operation.error = error instanceof Error ? error.message : 'Unknown error';
       log.error(`[FileManager] Copy failed:`, error);
@@ -477,9 +483,9 @@ class FileManagerClass {
     return operation;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BATCH OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Preview batch rename
@@ -614,9 +620,9 @@ class FileManagerClass {
     return operations;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UNDO SUPPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Undo last operation
@@ -658,9 +664,9 @@ class FileManagerClass {
     log.info('[FileManager] Operation history cleared');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return `op_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;

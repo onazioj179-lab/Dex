@@ -1,0 +1,19 @@
+config BR2_PACKAGE_DEX
+	bool "dex"
+	depends on BR2_x86_64
+	depends on BR2_PACKAGE_XORG7
+	depends on BR2_PACKAGE_MESA3D
+	depends on BR2_PACKAGE_GTK3
+	depends on BR2_PACKAGE_NODEJS
+	help
+	  DEX desktop environment.
+	  Installs the pre-built DEX Electron application and configures
+	  the system to boot directly into DEX in kiosk mode.
+
+	  Provides: file management, media processing, creative tools,
+	  system monitoring, and the Nexus 3D knowledge graph.
+
+	  https://github.com/onazioj/dex
+
+comment "dex needs X86_64, Xorg, Mesa, GTK3, and Node.js"
+	depends on !BR2_x86_64 || !BR2_PACKAGE_XORG7 || !BR2_PACKAGE_MESA3D || !BR2_PACKAGE_GTK3 || !BR2_PACKAGE_NODEJS

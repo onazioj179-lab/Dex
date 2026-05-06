@@ -1,4 +1,10 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX Privacy Guard Module - Data Protection and Explainable AI
 // Local processing, permissions, and transparent reasoning
 // =============================================================================
@@ -116,6 +122,7 @@ class PrivacyGuardManager extends EventEmitter {
   private accessLog: DataAccessLog[] = [];
   private pendingApprovals: Map<string, ExplainableAction> = new Map();
   private encryptionKey: Buffer | null = null;
+  private auditCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     super();
@@ -136,7 +143,7 @@ class PrivacyGuardManager extends EventEmitter {
         permissions: [],
         accessLog: [],
       },
-    });
+    }) as unknown as Store;
 
     this.config = this.store.get('config') as PrivacyConfig;
     this.loadData();
@@ -493,7 +500,7 @@ class PrivacyGuardManager extends EventEmitter {
 
   private startAuditCleanup(): void {
     // Clean up old logs daily
-    setInterval(() => {
+    this.auditCleanupInterval = setInterval(() => {
       const cutoff = Date.now() - this.config.dataRetentionDays * 24 * 60 * 60 * 1000;
       const beforeCount = this.accessLog.length;
       this.accessLog = this.accessLog.filter(l => l.timestamp > cutoff);
@@ -929,7 +936,7 @@ class PrivacyGuardManager extends EventEmitter {
     try {
       // Derive key from password
       const salt = crypto.randomBytes(16);
-      this.encryptionKey = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+      this.encryptionKey = crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
 
       // Store salt (not the key)
       this.store.set('encryptionSalt', salt.toString('hex'));
@@ -950,7 +957,7 @@ class PrivacyGuardManager extends EventEmitter {
     try {
       // Verify password
       const salt = Buffer.from(this.store.get('encryptionSalt', '') as string, 'hex');
-      const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+      const key = crypto.pbkdf2Sync(password, salt, 310000, 32, 'sha256');
 
       if (!this.encryptionKey || !key.equals(this.encryptionKey)) {
         return { success: false, message: 'Invalid password' };
@@ -1014,6 +1021,11 @@ class PrivacyGuardManager extends EventEmitter {
   // ---------------------------------------------------------------------------
 
   shutdown(): void {
+    // Clear audit cleanup interval
+    if (this.auditCleanupInterval) {
+      clearInterval(this.auditCleanupInterval);
+      this.auditCleanupInterval = null;
+    }
     this.saveData();
     this.emit('shutdown');
   }

@@ -1,18 +1,25 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Error Classification & Recovery System
 // Phase 28: Backend Architecture Refinement
 // Classify errors, retry safely, rollback partial operations
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import log from 'electron-log';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import { app } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ErrorCategory = 
   | 'system'      // OS-level errors (disk, memory, permissions)
@@ -69,9 +76,9 @@ export interface RollbackOperation {
   createdAt: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ERROR CODES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const ErrorCode = {
   // System errors
@@ -110,9 +117,9 @@ export const ErrorCode = {
 
 type ErrorCodeKey = keyof typeof ErrorCode;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ERROR CLASSIFIER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ErrorClassifierClass extends EventEmitter {
   // Error history
@@ -153,9 +160,9 @@ class ErrorClassifierClass extends EventEmitter {
     this.registerDefaultHandlers();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ERROR CLASSIFICATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Classify an error
@@ -240,9 +247,9 @@ class ErrorClassifierClass extends EventEmitter {
     return { error: classified, recovery };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECOVERY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Attempt recovery for an error
@@ -368,9 +375,9 @@ class ErrorClassifierClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ROLLBACK MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Register a rollback operation
@@ -431,9 +438,9 @@ class ErrorClassifierClass extends EventEmitter {
     log.debug(`[ErrorClassifier] Committed operation: ${operationId}`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ERROR HISTORY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Get recent errors
@@ -476,9 +483,9 @@ class ErrorClassifierClass extends EventEmitter {
     log.info('[ErrorClassifier] Error history cleared');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATISTICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): {
     total: number;
@@ -510,9 +517,9 @@ class ErrorClassifierClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LOGGING & PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private logError(error: ClassifiedError): void {
     const logFn = {
@@ -534,16 +541,13 @@ class ErrorClassifierClass extends EventEmitter {
 
   private loadErrorHistory(): void {
     try {
-      if (fs.existsSync(this.errorLogPath)) {
-        const data = fs.readFileSync(this.errorLogPath, 'utf-8');
+      fsPromises.readFile(this.errorLogPath, 'utf-8').then(data => {
         const parsed = JSON.parse(data);
-        
-        // Only load recent errors (last 24 hours)
         const dayAgo = Date.now() - 86400000;
         this.errors = (parsed.errors ?? []).filter(
           (e: ClassifiedError) => e.timestamp >= dayAgo
         );
-      }
+      }).catch(() => { /* file doesn't exist yet */ });
     } catch (e) {
       log.warn('[ErrorClassifier] Failed to load error history:', e);
       this.errors = [];
@@ -552,18 +556,20 @@ class ErrorClassifierClass extends EventEmitter {
 
   private saveErrorHistory(): void {
     try {
-      fs.writeFileSync(
+      fsPromises.writeFile(
         this.errorLogPath,
         JSON.stringify({ errors: this.errors }, null, 2)
-      );
+      ).catch(e => {
+        log.warn('[ErrorClassifier] Failed to save error history:', e);
+      });
     } catch (e) {
       log.warn('[ErrorClassifier] Failed to save error history:', e);
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DEFAULT HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerDefaultHandlers(): void {
     // Memory pressure handler
@@ -607,9 +613,9 @@ class ErrorClassifierClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const errorClassifier = new ErrorClassifierClass();
 export default errorClassifier;

@@ -1,7 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// DEX - Data Store
-// Local-first data persistence using electron-store
-// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * ===========================================================================
+ * DEX -- Data Store
+ * ===========================================================================
+ *
+ * Local-first data persistence using electron-store.
+ *
+ * @author     Onazi Treasure OJ
+ * @copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+ * @license    MIT License
+ * ===========================================================================
+ */
 
 import Store from 'electron-store';
 import * as log from 'electron-log';
@@ -11,6 +19,11 @@ interface StoreSchema {
   actions: DexAction[];
   modes: DexMode[];
   rules: DexRule[];
+  notes: any[];
+  tasks: any[];
+  workflows: any[];
+  operations: any[];
+  timers: any[];
   permissions: DexPermissions;
   automations: any[];
   settings: {
@@ -25,6 +38,82 @@ interface StoreSchema {
     message: string;
     data?: any;
   }>;
+  sessions: Array<{
+    id: string;
+    startedAt: number;
+    endedAt?: number;
+    active: boolean;
+  }>;
+  activities: Array<{
+    id: string;
+    type: string;
+    title: string;
+    timestamp: number;
+    read: boolean;
+    data?: any;
+  }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    path?: string;
+    active: boolean;
+    createdAt: number;
+    updatedAt?: number;
+  }>;
+  automationQueue: Array<{
+    id: string;
+    action: string;
+    status: 'pending' | 'approved' | 'denied';
+    createdAt: number;
+    data?: any;
+  }>;
+  themeConfig: {
+    mode: string;
+    accentColor: string;
+    fontScale: number;
+    reducedMotion: boolean;
+    density: string;
+  };
+  tags: Array<{
+    id: string;
+    name: string;
+    color?: string;
+    createdAt: number;
+  }>;
+  focusSessions: Array<{
+    id: string;
+    startedAt: number;
+    endedAt?: number;
+    active: boolean;
+    mode?: string;
+  }>;
+  sessionNotes: Array<{
+    id: string;
+    sessionId: string;
+    content: string;
+    createdAt: number;
+    updatedAt?: number;
+  }>;
+  sessionTimers: Array<{
+    id: string;
+    label: string;
+    duration: number;
+    remaining: number;
+    status: 'idle' | 'running' | 'paused' | 'done';
+    createdAt: number;
+  }>;
+  events: Array<{
+    id: string;
+    type: string;
+    data?: any;
+    timestamp: number;
+  }>;
+  emergencyMode: boolean;
+  fileScopes: string[];
+  appliedSettings: Record<string, any>;
+  currentSession: any | null;
+  archivedSessions: any[];
 }
 
 function generateId(): string {
@@ -33,32 +122,69 @@ function generateId(): string {
 }
 
 export class DataStore {
+  private static storeInstance: Store<StoreSchema> | null = null;
+  private static sharedReadCache = new Map<string, { value: any; expires: number }>();
   private store: Store<StoreSchema>;
+  
+  // Item 151: Read coalescing — cache hot reads for 16ms (one frame) to avoid
+  // redundant disk reads when multiple controllers query the same key in a tick
+  private readCache = DataStore.sharedReadCache;
+  private static READ_CACHE_TTL_MS = 16;
 
   constructor() {
-    this.store = new Store<StoreSchema>({
-      name: 'dex-data',
-      defaults: {
-        actions: this.getDefaultActions(),
-        modes: this.getDefaultModes(),
-        rules: [],
-        automations: [],
-        permissions: {
-          openApps: true,
-          closeApps: false,
-          runCommands: false,
-          adjustVolume: true,
-          fileSystem: false,
-          network: false,
+    if (!DataStore.storeInstance) {
+      DataStore.storeInstance = new Store<StoreSchema>({
+        name: 'dex-data',
+        defaults: {
+          actions: this.getDefaultActions(),
+          modes: this.getDefaultModes(),
+          rules: [],
+          notes: [],
+          tasks: [],
+          workflows: [],
+          operations: [],
+          timers: [],
+          automations: [],
+          permissions: {
+            openApps: true,
+            closeApps: false,
+            runCommands: false,
+            adjustVolume: true,
+            fileSystem: false,
+            network: false,
+          },
+          settings: {
+            startOnBoot: false,
+            minimizeToTray: true,
+            theme: 'dark',
+          },
+          logs: [],
+          sessions: [],
+          activities: [],
+          projects: [],
+          automationQueue: [],
+          themeConfig: {
+            mode: 'dark',
+            accentColor: '#0a84ff',
+            fontScale: 1.0,
+            reducedMotion: false,
+            density: 'comfortable',
+          },
+          tags: [],
+          focusSessions: [],
+          sessionNotes: [],
+          sessionTimers: [],
+          events: [],
+          emergencyMode: false,
+          fileScopes: [],
+          appliedSettings: {},
+          currentSession: null,
+          archivedSessions: [],
         },
-        settings: {
-          startOnBoot: false,
-          minimizeToTray: true,
-          theme: 'dark',
-        },
-        logs: [],
-      },
-    });
+      });
+    }
+
+    this.store = DataStore.storeInstance;
   }
 
   async initialize(): Promise<void> {
@@ -66,9 +192,9 @@ export class DataStore {
     log.info('[DataStore] Initialized at:', this.store.path);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Actions
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   getActions(): DexAction[] {
     return this.store.get('actions');
   }
@@ -113,9 +239,9 @@ export class DataStore {
     this.store.set('actions', actions);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Modes
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   getModes(): DexMode[] {
     return this.store.get('modes');
   }
@@ -164,9 +290,9 @@ export class DataStore {
     this.store.set('modes', modes);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Rules
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   getRules(): DexRule[] {
     return this.store.get('rules');
   }
@@ -225,9 +351,9 @@ export class DataStore {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Permissions
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   getPermissions(): DexPermissions {
     return this.store.get('permissions');
   }
@@ -238,20 +364,30 @@ export class DataStore {
     this.store.set('permissions', permissions);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Generic Get/Set (for controllers)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   async get<T = any>(key: string): Promise<T | null> {
-    return (this.store as any).get(key) ?? null;
+    // Item 151: Coalesce reads within 16ms window
+    const now = Date.now();
+    const cached = this.readCache.get(key);
+    if (cached && cached.expires > now) {
+      return cached.value as T ?? null;
+    }
+    const value = this.store.get(key as keyof StoreSchema) as T ?? null;
+    this.readCache.set(key, { value, expires: now + DataStore.READ_CACHE_TTL_MS });
+    return value;
   }
 
   async set<T = any>(key: string, value: T): Promise<void> {
-    (this.store as any).set(key, value);
+    // Invalidate read cache on write
+    this.readCache.delete(key);
+    this.store.set(key as keyof StoreSchema, value as any);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Logs
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   getLogs(limit: number = 100): any[] {
     const logs = this.store.get('logs');
     return logs.slice(-limit);
@@ -277,9 +413,9 @@ export class DataStore {
     this.store.set('logs', []);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Default Data
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   private getDefaultActions(): DexAction[] {
     // Start fresh - let user create their first action
     return [];

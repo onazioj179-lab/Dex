@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — System Services Layer
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- System Services Layer
+ * ===========================================================================
  * 
  * OS-level services shared across all sub-apps.
  * Sub-apps consume services; they never reimplement core logic.
@@ -15,15 +21,15 @@
  * - SessionService: User session and authentication
  * - PermissionService: Runtime permission enforcement
  * - PowerService: Resource budgets and throttling
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPE DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Service health status */
 export type ServiceStatus = 'healthy' | 'degraded' | 'offline' | 'error';
@@ -126,9 +132,9 @@ export interface SystemEvent {
   severity: 'info' | 'warning' | 'error' | 'critical';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FILE SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface FileServiceState {
   status: ServiceStatus;
@@ -233,9 +239,9 @@ export const useFileService = create<FileServiceState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // NETWORK SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface NetworkServiceState {
   status: ServiceStatus;
@@ -390,9 +396,9 @@ export const useNetworkService = create<NetworkServiceState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MEDIA SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface MediaServiceState {
   status: ServiceStatus;
@@ -478,9 +484,9 @@ export const useMediaService = create<MediaServiceState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SEARCH SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SearchServiceState {
   status: ServiceStatus;
@@ -507,8 +513,17 @@ export const useSearchService = create<SearchServiceState>((set, get) => ({
     // Add to recent searches
     get().addRecentSearch(query);
     
-    // In a real implementation, this would query an index
-    // For now, return empty results - apps provide their own search
+    // Query the main process file search index via IPC
+    try {
+      const electron = (window as any).electron;
+      if (electron?.invoke) {
+        const results = await electron.invoke('search:query', query, filters);
+        if (Array.isArray(results)) return results;
+      }
+    } catch {
+      // IPC unavailable — fall through to empty results
+    }
+    
     return [];
   },
 
@@ -528,9 +543,9 @@ export const useSearchService = create<SearchServiceState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SESSION SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SessionServiceState {
   status: ServiceStatus;
@@ -601,9 +616,9 @@ export const useSessionService = create<SessionServiceState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERMISSION SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface PermissionServiceState {
   status: ServiceStatus;
@@ -766,9 +781,9 @@ export const usePermissionService = create<PermissionServiceState>()(
   )
 );
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // POWER SERVICE (Resource Budgets)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface PowerServiceState {
   status: ServiceStatus;
@@ -960,9 +975,9 @@ export const usePowerService = create<PowerServiceState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SYSTEM EVENTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SystemEventsState {
   events: SystemEvent[];
@@ -1045,9 +1060,9 @@ export const useSystemEvents = create<SystemEventsState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SYSTEM SERVICES AGGREGATE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface SystemServicesStatus {
   file: ServiceStatus;

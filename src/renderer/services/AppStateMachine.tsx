@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — App State Machine
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- App State Machine
+ * ===========================================================================
  * 
  * Real, deterministic state management for sub-apps.
  * Every state transition is explicit, logged, and reversible.
@@ -16,15 +22,15 @@
  * - Clear transition rules
  * - No implicit state changes
  * - All transitions logged
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { create } from 'zustand';
 import { useSystemEvents, useNetworkService } from './SystemServices';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STATE MACHINE TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** All possible app states */
 export type AppStateType =
@@ -98,9 +104,9 @@ const VALID_TRANSITIONS: Record<AppStateType, AppStateType[]> = {
   terminated: [], // Terminal state
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STATE MACHINE STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface AppStateMachineState {
   // Per-instance state machines
@@ -259,9 +265,9 @@ export const useAppStateMachine = create<AppStateMachineState>((set, get) => ({
     return VALID_TRANSITIONS[machine.state]?.includes(to) ?? false;
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Loading Helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   startLoading: (instanceId, operation) => {
     get().transition(instanceId, 'loading', {
@@ -302,9 +308,9 @@ export const useAppStateMachine = create<AppStateMachineState>((set, get) => ({
     });
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Error Helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setError: (instanceId, error) => {
     get().transition(instanceId, 'error', {
@@ -327,9 +333,9 @@ export const useAppStateMachine = create<AppStateMachineState>((set, get) => ({
     );
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Network Helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   checkOnlineStatus: (instanceId) => {
     const machine = get().machines.get(instanceId);
@@ -353,9 +359,9 @@ export const useAppStateMachine = create<AppStateMachineState>((set, get) => ({
     }
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // History
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getHistory: (instanceId, limit = 50) => {
     const machine = get().machines.get(instanceId);
@@ -363,9 +369,9 @@ export const useAppStateMachine = create<AppStateMachineState>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HOOKS FOR APPS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Hook for apps to manage their state machine
@@ -431,9 +437,9 @@ export const useNetworkAwareState = (instanceId: string) => {
 // Need React for the hook
 import React from 'react';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STATE-BASED UI COMPONENTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface StateRendererProps {
   instanceId: string;
@@ -511,9 +517,9 @@ export const StateRenderer: React.FC<StateRendererProps> = ({
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Default UI Components
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const DefaultLoadingUI: React.FC<{
   operation?: string;
@@ -544,7 +550,7 @@ const DefaultErrorUI: React.FC<{
     </svg>
     <h3 style={uiStyles.title}>{error?.message || 'Something went wrong'}</h3>
     {error?.retryable && onRetry && (
-      <button style={{ ...uiStyles.button, background: `${color}22`, border: `1px solid ${color}40`, color: color, backdropFilter: 'blur(8px)' }} onClick={onRetry}>
+      <button style={{ ...uiStyles.button, background: `${color}22`, border: `1px solid ${color}40`, color: color }} onClick={onRetry}>
         Try Again
       </button>
     )}

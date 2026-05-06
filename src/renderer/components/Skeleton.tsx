@@ -1,352 +1,343 @@
-/**
- * DEX Skeleton Components
- * Loading placeholders and skeleton screens
- */
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
+// DEX v3.6.0 - Skeleton Components
+// Phase C: Optimistic UI (Items 136-150)
+// Show something immediately - skeleton placeholders matching content layout
+// =============================================================================
 
-import React from 'react';
+import React, { CSSProperties, useMemo } from 'react';
 
-// ==================== TYPES ====================
+// ---------------------------------------------------------------------------
+// 136-140. Skeleton Base
+// ---------------------------------------------------------------------------
 
-interface SkeletonProps {
-  width?: number | string;
-  height?: number | string;
-  variant?: 'text' | 'circular' | 'rectangular' | 'rounded';
-  animation?: 'pulse' | 'wave' | 'none';
-  style?: React.CSSProperties;
+interface SkeletonBaseProps {
+  width?: string | number;
+  height?: string | number;
+  borderRadius?: string | number;
+  animate?: boolean;
+  style?: CSSProperties;
+  className?: string;
 }
+
+const shimmerKeyframes = `
+@keyframes dex-skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+`;
+
+// Inject shimmer styles once
+if (typeof document !== 'undefined' && !document.getElementById('dex-skeleton-styles')) {
+  const style = document.createElement('style');
+  style.id = 'dex-skeleton-styles';
+  style.textContent = shimmerKeyframes;
+  document.head.appendChild(style);
+}
+
+export const SkeletonBase: React.FC<SkeletonBaseProps> = ({
+  width = '100%',
+  height = 16,
+  borderRadius = 4,
+  animate = true,
+  style,
+  className,
+}) => {
+  const baseStyle: CSSProperties = useMemo(() => ({
+    width: typeof width === 'number' ? `${width}px` : width,
+    height: typeof height === 'number' ? `${height}px` : height,
+    borderRadius: typeof borderRadius === 'number' ? `${borderRadius}px` : borderRadius,
+    background: animate
+      ? 'linear-gradient(90deg, var(--color-bg-tertiary, #2a2a2a) 25%, var(--color-bg-secondary, #3a3a3a) 50%, var(--color-bg-tertiary, #2a2a2a) 75%)'
+      : 'var(--color-bg-tertiary, #2a2a2a)',
+    backgroundSize: animate ? '200% 100%' : undefined,
+    animation: animate ? 'dex-skeleton-shimmer 1.5s ease-in-out infinite' : undefined,
+    ...style,
+  }), [width, height, borderRadius, animate, style]);
+
+  return <div className={className} style={baseStyle} />;
+};
+
+// ---------------------------------------------------------------------------
+// 141-142. Text Skeleton
+// ---------------------------------------------------------------------------
 
 interface SkeletonTextProps {
   lines?: number;
   lineHeight?: number;
-  spacing?: number;
+  gap?: number;
   lastLineWidth?: string;
-  animation?: 'pulse' | 'wave' | 'none';
+  animate?: boolean;
 }
-
-interface SkeletonAvatarProps {
-  size?: number | 'sm' | 'md' | 'lg';
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-interface SkeletonCardProps {
-  hasImage?: boolean;
-  imageHeight?: number;
-  lines?: number;
-  hasAction?: boolean;
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-interface SkeletonListProps {
-  items?: number;
-  hasAvatar?: boolean;
-  lines?: number;
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-interface SkeletonTableProps {
-  rows?: number;
-  columns?: number;
-  hasHeader?: boolean;
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-// ==================== KEYFRAMES ====================
-
-const keyframes = `
-  @keyframes skeleton-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  
-  @keyframes skeleton-wave {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-  }
-`;
-
-// ==================== SKELETON ====================
-
-export const Skeleton: React.FC<SkeletonProps> = ({
-  width = '100%',
-  height = 20,
-  variant = 'text',
-  animation = 'pulse',
-  style,
-}) => {
-  const getVariantStyles = (): React.CSSProperties => {
-    switch (variant) {
-      case 'circular':
-        return {
-          borderRadius: '50%',
-          width: typeof width === 'number' ? width : height,
-          height: typeof height === 'number' ? height : width,
-        };
-      case 'rectangular':
-        return { borderRadius: 0 };
-      case 'rounded':
-        return { borderRadius: 8 };
-      case 'text':
-      default:
-        return { borderRadius: 4 };
-    }
-  };
-
-  const getAnimationStyles = (): React.CSSProperties => {
-    switch (animation) {
-      case 'pulse':
-        return { animation: 'skeleton-pulse 1.5s ease-in-out infinite' };
-      case 'wave':
-        return { position: 'relative', overflow: 'hidden' };
-      default:
-        return {};
-    }
-  };
-
-  const styles: React.CSSProperties = {
-    display: 'block',
-    background: 'var(--color-bg-tertiary)',
-    width,
-    height,
-    ...getVariantStyles(),
-    ...getAnimationStyles(),
-    ...style,
-  };
-
-  return (
-    <>
-      <style>{keyframes}</style>
-      <span style={styles}>
-        {animation === 'wave' && (
-          <span
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
-              animation: 'skeleton-wave 1.5s ease-in-out infinite',
-            }}
-          />
-        )}
-      </span>
-    </>
-  );
-};
-
-// ==================== SKELETON TEXT ====================
 
 export const SkeletonText: React.FC<SkeletonTextProps> = ({
   lines = 3,
-  lineHeight = 16,
-  spacing = 8,
+  lineHeight = 14,
+  gap = 8,
   lastLineWidth = '60%',
-  animation = 'pulse',
+  animate = true,
 }) => {
-  const styles: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing,
-  };
-
   return (
-    <div style={styles}>
-      {Array.from({ length: lines }).map((_, index) => (
-        <Skeleton
-          key={index}
+    <div style={{ display: 'flex', flexDirection: 'column', gap }}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <SkeletonBase
+          key={i}
           height={lineHeight}
-          width={index === lines - 1 ? lastLineWidth : '100%'}
-          animation={animation}
+          width={i === lines - 1 ? lastLineWidth : '100%'}
+          animate={animate}
         />
       ))}
     </div>
   );
 };
 
-// ==================== SKELETON AVATAR ====================
+// ---------------------------------------------------------------------------
+// 143. Image/Avatar Skeleton
+// ---------------------------------------------------------------------------
 
-export const SkeletonAvatar: React.FC<SkeletonAvatarProps> = ({
-  size = 'md',
-  animation = 'pulse',
+interface SkeletonImageProps {
+  width?: number;
+  height?: number;
+  circle?: boolean;
+  animate?: boolean;
+}
+
+export const SkeletonImage: React.FC<SkeletonImageProps> = ({
+  width = 100,
+  height = 100,
+  circle = false,
+  animate = true,
 }) => {
-  const sizeMap = {
-    sm: 32,
-    md: 40,
-    lg: 56,
-  };
-
-  const pixelSize = typeof size === 'number' ? size : sizeMap[size];
-
   return (
-    <Skeleton
-      variant="circular"
-      width={pixelSize}
-      height={pixelSize}
-      animation={animation}
+    <SkeletonBase
+      width={width}
+      height={height}
+      borderRadius={circle ? '50%' : 8}
+      animate={animate}
     />
   );
 };
 
-// ==================== SKELETON CARD ====================
+export const SkeletonAvatar: React.FC<{ size?: number; animate?: boolean }> = ({
+  size = 40,
+  animate = true,
+}) => <SkeletonImage width={size} height={size} circle animate={animate} />;
+
+// ---------------------------------------------------------------------------
+// 144. Icon Skeleton
+// ---------------------------------------------------------------------------
+
+export const SkeletonIcon: React.FC<{ size?: number; animate?: boolean }> = ({
+  size = 24,
+  animate = true,
+}) => (
+  <SkeletonBase
+    width={size}
+    height={size}
+    borderRadius={4}
+    animate={animate}
+  />
+);
+
+// ---------------------------------------------------------------------------
+// 145-146. Card Skeleton
+// ---------------------------------------------------------------------------
+
+interface SkeletonCardProps {
+  imageHeight?: number;
+  titleLines?: number;
+  descriptionLines?: number;
+  showImage?: boolean;
+  showAvatar?: boolean;
+  animate?: boolean;
+}
 
 export const SkeletonCard: React.FC<SkeletonCardProps> = ({
-  hasImage = true,
-  imageHeight = 160,
-  lines = 3,
-  hasAction = true,
-  animation = 'pulse',
+  imageHeight = 180,
+  titleLines = 1,
+  descriptionLines = 2,
+  showImage = true,
+  showAvatar = false,
+  animate = true,
 }) => {
-  const styles: Record<string, React.CSSProperties> = {
-    card: {
-      background: 'var(--color-bg-secondary)',
+  return (
+    <div style={{
+      background: 'var(--color-bg-secondary, #1a1a1a)',
       borderRadius: 12,
       overflow: 'hidden',
-      border: '1px solid var(--color-border)',
-    },
-    content: {
-      padding: 16,
-    },
-    title: {
-      marginBottom: 12,
-    },
-    actions: {
-      display: 'flex',
-      gap: 8,
-      marginTop: 16,
-    },
-  };
-
-  return (
-    <div style={styles.card}>
-      {hasImage && (
-        <Skeleton
+      padding: showImage ? 0 : 16,
+    }}>
+      {showImage && (
+        <SkeletonBase
+          width="100%"
           height={imageHeight}
-          variant="rectangular"
-          animation={animation}
+          borderRadius={0}
+          animate={animate}
         />
       )}
-      <div style={styles.content}>
-        <div style={styles.title}>
-          <Skeleton height={24} width="70%" animation={animation} />
-        </div>
-        <SkeletonText lines={lines} animation={animation} />
-        {hasAction && (
-          <div style={styles.actions}>
-            <Skeleton
-              height={36}
-              width={100}
-              variant="rounded"
-              animation={animation}
-            />
-            <Skeleton
-              height={36}
-              width={80}
-              variant="rounded"
-              animation={animation}
-            />
+      <div style={{ padding: 16 }}>
+        {showAvatar && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <SkeletonAvatar size={36} animate={animate} />
+            <SkeletonBase width={120} height={12} animate={animate} />
           </div>
         )}
+        <SkeletonText lines={titleLines} lineHeight={18} gap={4} animate={animate} />
+        <div style={{ marginTop: 12 }}>
+          <SkeletonText lines={descriptionLines} lineHeight={12} gap={6} animate={animate} />
+        </div>
       </div>
     </div>
   );
 };
 
-// ==================== SKELETON LIST ====================
+// ---------------------------------------------------------------------------
+// 147. List Item Skeleton
+// ---------------------------------------------------------------------------
 
-export const SkeletonList: React.FC<SkeletonListProps> = ({
-  items = 5,
-  hasAvatar = true,
-  lines = 2,
-  animation = 'pulse',
+interface SkeletonListItemProps {
+  showAvatar?: boolean;
+  avatarSize?: number;
+  titleWidth?: string;
+  subtitleWidth?: string;
+  showAction?: boolean;
+  animate?: boolean;
+}
+
+export const SkeletonListItem: React.FC<SkeletonListItemProps> = ({
+  showAvatar = true,
+  avatarSize = 40,
+  titleWidth = '70%',
+  subtitleWidth = '50%',
+  showAction = false,
+  animate = true,
 }) => {
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'flex',
-      flexDirection: 'column',
-    },
-    item: {
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: 12,
-      padding: '12px 0',
-      borderBottom: '1px solid var(--color-border)',
-    },
-    content: {
-      flex: 1,
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      {Array.from({ length: items }).map((_, index) => (
-        <div key={index} style={styles.item}>
-          {hasAvatar && <SkeletonAvatar animation={animation} />}
-          <div style={styles.content}>
-            <Skeleton
-              height={18}
-              width="40%"
-              animation={animation}
-              style={{ marginBottom: 8 }}
-            />
-            <SkeletonText
-              lines={lines}
-              lineHeight={14}
-              spacing={6}
-              animation={animation}
-            />
-          </div>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '12px 16px',
+    }}>
+      {showAvatar && <SkeletonAvatar size={avatarSize} animate={animate} />}
+      <div style={{ flex: 1 }}>
+        <SkeletonBase width={titleWidth} height={14} animate={animate} />
+        <div style={{ marginTop: 6 }}>
+          <SkeletonBase width={subtitleWidth} height={11} animate={animate} />
         </div>
+      </div>
+      {showAction && <SkeletonIcon size={20} animate={animate} />}
+    </div>
+  );
+};
+
+export const SkeletonList: React.FC<{ count?: number; animate?: boolean }> = ({
+  count = 5,
+  animate = true,
+}) => (
+  <div>
+    {Array.from({ length: count }).map((_, i) => (
+      <SkeletonListItem key={i} animate={animate} />
+    ))}
+  </div>
+);
+
+// ---------------------------------------------------------------------------
+// 148. Grid Skeleton
+// ---------------------------------------------------------------------------
+
+interface SkeletonGridProps {
+  columns?: number;
+  count?: number;
+  gap?: number;
+  itemHeight?: number;
+  animate?: boolean;
+}
+
+export const SkeletonGrid: React.FC<SkeletonGridProps> = ({
+  columns = 3,
+  count = 6,
+  gap = 16,
+  itemHeight = 120,
+  animate = true,
+}) => {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(${columns}, 1fr)`,
+      gap,
+    }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonBase
+          key={i}
+          height={itemHeight}
+          borderRadius={8}
+          animate={animate}
+        />
       ))}
     </div>
   );
 };
 
-// ==================== SKELETON TABLE ====================
+// ---------------------------------------------------------------------------
+// 149. Table Skeleton
+// ---------------------------------------------------------------------------
+
+interface SkeletonTableProps {
+  rows?: number;
+  columns?: number;
+  showHeader?: boolean;
+  animate?: boolean;
+}
 
 export const SkeletonTable: React.FC<SkeletonTableProps> = ({
   rows = 5,
   columns = 4,
-  hasHeader = true,
-  animation = 'pulse',
+  showHeader = true,
+  animate = true,
 }) => {
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      width: '100%',
-    },
-    row: {
-      display: 'grid',
-      gridTemplateColumns: `repeat(${columns}, 1fr)`,
-      gap: 16,
-      padding: '12px 16px',
-      borderBottom: '1px solid var(--color-border)',
-    },
-    headerRow: {
-      background: 'var(--color-bg-secondary)',
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      {hasHeader && (
-        <div style={{ ...styles.row, ...styles.headerRow }}>
-          {Array.from({ length: columns }).map((_, index) => (
-            <Skeleton
-              key={`header-${index}`}
-              height={16}
-              width={`${60 + Math.random() * 30}%`}
-              animation={animation}
-            />
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+    }}>
+      {showHeader && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columns}, 1fr)`,
+          gap: 12,
+          padding: '12px 16px',
+          background: 'var(--color-bg-secondary, #1a1a1a)',
+          borderRadius: '8px 8px 0 0',
+        }}>
+          {Array.from({ length: columns }).map((_, i) => (
+            <SkeletonBase key={i} height={12} animate={animate} />
           ))}
         </div>
       )}
       {Array.from({ length: rows }).map((_, rowIndex) => (
-        <div key={rowIndex} style={styles.row}>
+        <div
+          key={rowIndex}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            gap: 12,
+            padding: '12px 16px',
+            background: 'var(--color-bg-primary, #0a0a0a)',
+          }}
+        >
           {Array.from({ length: columns }).map((_, colIndex) => (
-            <Skeleton
-              key={`cell-${rowIndex}-${colIndex}`}
+            <SkeletonBase
+              key={colIndex}
               height={14}
-              width={`${40 + Math.random() * 50}%`}
-              animation={animation}
+              width={colIndex === 0 ? '80%' : '60%'}
+              animate={animate}
             />
           ))}
         </div>
@@ -355,236 +346,81 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
   );
 };
 
-// ==================== SKELETON PROFILE ====================
+// ---------------------------------------------------------------------------
+// 150. Composite Page Skeletons
+// ---------------------------------------------------------------------------
 
-interface SkeletonProfileProps {
-  showCover?: boolean;
-  showStats?: boolean;
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-export const SkeletonProfile: React.FC<SkeletonProfileProps> = ({
-  showCover = true,
-  showStats = true,
-  animation = 'pulse',
+export const SkeletonPage: React.FC<{ variant?: 'list' | 'grid' | 'detail'; animate?: boolean }> = ({
+  variant = 'list',
+  animate = true,
 }) => {
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      background: 'var(--color-bg-secondary)',
-      borderRadius: 12,
-      overflow: 'hidden',
-      border: '1px solid var(--color-border)',
-    },
-    cover: {
-      height: 120,
-    },
-    profile: {
-      padding: 16,
-      marginTop: -40,
-    },
-    avatar: {
-      border: '4px solid var(--color-bg-secondary)',
-      borderRadius: '50%',
-      marginBottom: 12,
-    },
-    info: {
-      marginTop: 12,
-    },
-    stats: {
-      display: 'flex',
-      gap: 24,
-      marginTop: 16,
-      paddingTop: 16,
-      borderTop: '1px solid var(--color-border)',
-    },
-    stat: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 4,
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      {showCover && (
-        <Skeleton
-          height={120}
-          variant="rectangular"
-          animation={animation}
-        />
-      )}
-      <div style={styles.profile}>
-        <div style={styles.avatar}>
-          <SkeletonAvatar size={80} animation={animation} />
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <SkeletonBase width={200} height={28} animate={animate} />
+        <div style={{ marginTop: 8 }}>
+          <SkeletonBase width={300} height={14} animate={animate} />
         </div>
-        <div style={styles.info}>
-          <Skeleton height={24} width="40%" animation={animation} />
-          <Skeleton
-            height={14}
-            width="25%"
-            animation={animation}
-            style={{ marginTop: 8 }}
-          />
-          <Skeleton
-            height={14}
-            width="60%"
-            animation={animation}
-            style={{ marginTop: 12 }}
-          />
-        </div>
-        {showStats && (
-          <div style={styles.stats}>
-            {[1, 2, 3].map(i => (
-              <div key={i} style={styles.stat}>
-                <Skeleton height={20} width={40} animation={animation} />
-                <Skeleton height={12} width={60} animation={animation} />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
-    </div>
-  );
-};
 
-// ==================== SKELETON ARTICLE ====================
-
-interface SkeletonArticleProps {
-  hasImage?: boolean;
-  paragraphs?: number;
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-export const SkeletonArticle: React.FC<SkeletonArticleProps> = ({
-  hasImage = true,
-  paragraphs = 3,
-  animation = 'pulse',
-}) => {
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      maxWidth: 720,
-    },
-    header: {
-      marginBottom: 24,
-    },
-    image: {
-      marginBottom: 24,
-    },
-    paragraph: {
-      marginBottom: 20,
-    },
-  };
-
-  return (
-    <article style={styles.container}>
-      <div style={styles.header}>
-        <Skeleton height={36} width="80%" animation={animation} />
-        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-          <SkeletonAvatar size="sm" animation={animation} />
+      {/* Content */}
+      {variant === 'list' && <SkeletonList count={8} animate={animate} />}
+      {variant === 'grid' && <SkeletonGrid columns={4} count={8} animate={animate} />}
+      {variant === 'detail' && (
+        <div style={{ display: 'flex', gap: 24 }}>
+          <SkeletonImage width={300} height={300} animate={animate} />
           <div style={{ flex: 1 }}>
-            <Skeleton height={14} width={120} animation={animation} />
-            <Skeleton
-              height={12}
-              width={80}
-              animation={animation}
-              style={{ marginTop: 4 }}
-            />
+            <SkeletonBase width="60%" height={32} animate={animate} />
+            <div style={{ marginTop: 16 }}>
+              <SkeletonText lines={5} animate={animate} />
+            </div>
           </div>
-        </div>
-      </div>
-
-      {hasImage && (
-        <div style={styles.image}>
-          <Skeleton height={400} variant="rounded" animation={animation} />
         </div>
       )}
-
-      {Array.from({ length: paragraphs }).map((_, index) => (
-        <div key={index} style={styles.paragraph}>
-          <SkeletonText
-            lines={4 + Math.floor(Math.random() * 3)}
-            animation={animation}
-          />
-        </div>
-      ))}
-    </article>
-  );
-};
-
-// ==================== SKELETON SIDEBAR ====================
-
-interface SkeletonSidebarProps {
-  sections?: number;
-  itemsPerSection?: number;
-  animation?: 'pulse' | 'wave' | 'none';
-}
-
-export const SkeletonSidebar: React.FC<SkeletonSidebarProps> = ({
-  sections = 3,
-  itemsPerSection = 4,
-  animation = 'pulse',
-}) => {
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      width: 240,
-      padding: 16,
-    },
-    header: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      marginBottom: 24,
-    },
-    section: {
-      marginBottom: 24,
-    },
-    sectionTitle: {
-      marginBottom: 12,
-    },
-    item: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      padding: '8px 0',
-    },
-  };
-
-  return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <Skeleton
-          variant="circular"
-          width={36}
-          height={36}
-          animation={animation}
-        />
-        <Skeleton height={18} width={120} animation={animation} />
-      </div>
-
-      {Array.from({ length: sections }).map((_, sectionIndex) => (
-        <div key={sectionIndex} style={styles.section}>
-          <div style={styles.sectionTitle}>
-            <Skeleton height={12} width={80} animation={animation} />
-          </div>
-          {Array.from({ length: itemsPerSection }).map((_, itemIndex) => (
-            <div key={itemIndex} style={styles.item}>
-              <Skeleton
-                variant="rounded"
-                width={20}
-                height={20}
-                animation={animation}
-              />
-              <Skeleton
-                height={14}
-                width={`${50 + Math.random() * 40}%`}
-                animation={animation}
-              />
-            </div>
-          ))}
-        </div>
-      ))}
     </div>
   );
 };
 
-export default Skeleton;
+// Files app skeleton
+export const SkeletonFilesGrid: React.FC<{ count?: number }> = ({ count = 12 }) => (
+  <div style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+    gap: 16,
+    padding: 16,
+  }}>
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <SkeletonBase width={64} height={64} borderRadius={8} />
+        <SkeletonBase width={80} height={12} />
+      </div>
+    ))}
+  </div>
+);
+
+// Browser tab skeleton
+export const SkeletonBrowserTab: React.FC = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' }}>
+    <SkeletonIcon size={16} />
+    <SkeletonBase width={100} height={12} />
+  </div>
+);
+
+// Notes skeleton
+export const SkeletonNote: React.FC = () => (
+  <div style={{ padding: 24 }}>
+    <SkeletonBase width="40%" height={24} style={{ marginBottom: 16 }} />
+    <SkeletonText lines={8} lineHeight={16} gap={12} />
+  </div>
+);
+
+// ---------------------------------------------------------------------------
+// Export all
+// ---------------------------------------------------------------------------
+
+export {
+  SkeletonBase as Skeleton,
+};
+
+export default SkeletonBase;

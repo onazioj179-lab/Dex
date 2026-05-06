@@ -1,1 +1,0 @@
-export { GovernancePanel } from './SystemHealth';

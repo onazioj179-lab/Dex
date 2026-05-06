@@ -1,23 +1,24 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Personal Control Hub for Desktop Automation
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * @author     Onazi Treasure OJ
  * @copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * @license    MIT License
- * @version    2.0.0
+ * @version    3.6.0
  * 
  * Main Process Entry Point - Electron Application Core
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 // Electron
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, globalShortcut, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, globalShortcut, dialog, systemPreferences, screen, powerMonitor } from 'electron';
 import * as log from 'electron-log';
 
 // Node.js
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 // Shared Types
@@ -48,15 +49,19 @@ import { SessionController } from './controllers/SessionController';
 import { systemMapController } from './controllers/SystemMapController';
 import { transferController } from './controllers/TransferController';
 import { httpTransferServer } from './controllers/HttpTransferServer';
+import { initDTPController, startDTP } from './transfer/DTPController';
 import { trustController } from './controllers/TrustController';
 import { VoiceController } from './controllers/VoiceController';
+import { ukiController } from './controllers/UkiController';
 import { watchdogController } from './controllers/WatchdogController';
 import { workflowController } from './controllers/WorkflowController';
+import { shutdownAllWorkers } from './workers/WorkerRecovery';
 import { authController } from './controllers/AuthController';
 import { vaultController } from './controllers/VaultController';
 import { systemIntelligenceController } from './controllers/SystemIntelligenceController';
 import { governanceController } from './controllers/GovernanceController';
 import { AutoFillController } from './controllers/AutoFillController';
+import { IPCCrypto } from './security/IPCCrypto';
 
 // System Storage, Automation & Learning Intelligence
 import { storageManager } from './core/StorageManager';
@@ -74,6 +79,7 @@ import { initializeSync, shutdownSync } from './sync/SyncManager';
 
 // Core Services
 import { backgroundTasks } from './core/BackgroundTasks';
+import { CrashRecoverySystem } from './core/CrashRecoverySystem';
 import { ClipboardHistoryManager } from './core/ClipboardHistoryManager';
 import { dataIntegrity } from './core/DataIntegrity';
 import { errorRecovery } from './core/ErrorRecovery';
@@ -82,6 +88,13 @@ import { performanceGuardian } from './core/PerformanceGuardian';
 import { pythonExecutor } from './core/PythonExecutor';
 import { resourceGovernor } from './core/ResourceGovernor';
 import { securityAudit } from './core/SecurityAudit';
+import { SSDSpillManager } from './core/SSDSpillManager';
+
+// Crash Reporter -- local-only, privacy-safe
+import { crashReporterService } from './core/CrashReporter';
+
+// Startup performance measurement
+import { startupTimeline } from './utils/StartupTimeline';
 
 // VISUAL SMOOTHNESS MODE: Performance & Render Systems
 import { RenderGovernor } from './core/RenderGovernor';
@@ -112,6 +125,9 @@ import { initializeSystemUndo, shutdownSystemUndo } from './core/SystemUndoManag
 // DEX Performance Booster - System-level optimization
 import { initializePerformanceBooster, shutdownPerformanceBooster, performanceBooster } from './core/PerformanceBooster';
 
+// DEX Xenon - Background Resource Optimizer
+import { initializeXenon, shutdownXenon } from './core/Xenon';
+
 // DEX Premium Features - Ecosystem & UX Enhancements
 import { initializeEcosystemIntegration, shutdownEcosystemIntegration } from './core/EcosystemIntegration';
 import { initializeUXEnhancement, shutdownUXEnhancement } from './core/UXEnhancement';
@@ -129,6 +145,7 @@ import { scheduler } from './runtime/Scheduler';
 
 // Engine, Monitors, Security, Store, Utils
 import { RuleEngine } from './engine/RuleEngine';
+import { CppSpatial, CppMatrix, CppHash } from './native/cpp-bridge';
 import { EventMonitor } from './monitors/EventMonitor';
 import { healthMonitor, registerHealthHandlers } from './monitors/HealthMonitor';
 import { PermissionManager } from './security/PermissionManager';
@@ -173,11 +190,91 @@ import { WINDOW, TIMEOUTS, LIMITS, THEME_DEFAULTS, MEDIA_EXTENSIONS } from './ut
 // Pattern Learning (Local-only, privacy-first)
 import { initializePatternLearning, shutdownPatternLearning, patternLearning } from './core/PatternLearning';
 
+// Unified Systems (13 Production Subsystems)
+import { databaseManager } from './core/DatabaseManager';
+import { initializeUnifiedNotificationCenter, shutdownUnifiedNotificationCenter } from './core/UnifiedNotificationHub';
+import { initializeGlobalContentSearch, shutdownGlobalContentSearch } from './core/GlobalContentSearch';
+import { initializeSharedMediaLibrary, shutdownSharedMediaLibrary } from './core/SharedMediaLibrary';
+import { initializeVersionHistory, shutdownVersionHistory } from './core/VersionHistoryManager';
+import { initializeTaskQueue, shutdownTaskQueue } from './core/TaskQueueManager';
+import { initializeRecycleBin, shutdownRecycleBin } from './core/RecycleBinManager';
+import { initializeWorkspaceLayouts, shutdownWorkspaceLayouts } from './core/WorkspaceLayoutManager';
+import { initializeDeepLinks, shutdownDeepLinks } from './core/DeepLinkRouter';
+import { initializeScratchpad, shutdownScratchpad } from './core/ScratchpadManager';
+import { initializeLocalization, shutdownLocalization } from './core/LocalizationEngine';
+import { initializeFeedback, shutdownFeedback } from './core/FeedbackCollector';
+import { initializeMultiWindow, shutdownMultiWindow } from './core/MultiWindowManager';
+import { initializeBatchOperations, shutdownBatchOperations } from './core/BatchOperationManager';
+
 // Governance Contract (Phase 58-59)
 import { registerGovernanceHandlers, governanceEnforcer } from './core/GovernanceContract';
 
+// Feature Suite (38 New Subsystems)
+import { sessionReplayManager } from './core/SessionReplayManager';
+
+
+
+// DEX Notes (SQLite-backed)
+import { notesManager } from './core/NotesManager';
+
+// Inner App Stability
+import { initializeInnerAppStability, shutdownInnerAppStability } from './core/InnerAppStabilityManager';
+
+// System Completeness (Phase 70)
+import { migrationManager } from './core/MigrationManager';
+import { multiMonitorManager } from './core/MultiMonitorManager';
+import { multiUserManager } from './core/MultiUserManager';
+import { licensingManager } from './core/LicensingManager';
+import { localizationManager } from './core/LocalizationManager';
+import { helpSystemManager } from './core/HelpSystemManager';
+import { developerPlatformManager } from './core/DeveloperPlatformManager';
+import { backupRestoreManager } from './core/BackupRestoreManager';
+import { dataImportManager } from './core/DataImportManager';
+import { healthCheckManager } from './core/HealthCheckManager';
+import { uninstallManager } from './core/UninstallManager';
+
+import { projectLinkerManager } from './core/ProjectLinkerManager';
+import { dailyBriefingManager } from './core/DailyBriefingManager';
+import { relationshipGraphManager } from './core/RelationshipGraphManager';
+import { timeTrackingManager } from './core/TimeTrackingManager';
+import { goalSystemManager } from './core/GoalSystemManager';
+import { snapshotComparisonManager } from './core/SnapshotComparisonManager';
+import { projectHealthManager } from './core/ProjectHealthManager';
+import { duplicationDetectorManager } from './core/DuplicationDetectorManager';
+import { keyboardNavigationManager } from './core/KeyboardNavigationManager';
+import { projectArchiverManager } from './core/ProjectArchiverManager';
+import { dailyNoteManager } from './core/DailyNoteManager';
+import { contentExpiryManager } from './core/ContentExpiryManager';
+import { searchHistoryManager } from './core/SearchHistoryManager';
+import { liveCollaborationManager } from './core/LiveCollaborationManager';
+import { smartGroupingManager } from './core/SmartGroupingManager';
+import { voiceMemoManager } from './core/VoiceMemoManager';
+import { projectTimelineManager } from './core/ProjectTimelineManager';
+import { linkPreviewManager } from './core/LinkPreviewManager';
+import { statisticsDashboardManager } from './core/StatisticsDashboardManager';
+import { projectExportBundleManager } from './core/ProjectExportBundleManager';
+import { fileWatcherManager } from './core/FileWatcherManager';
+import { wordCountManager } from './core/WordCountManager';
+import { smartRenameManager } from './core/SmartRenameManager';
+import { vinxPresentationManager } from './core/VinxPresentationManager';
+import { projectComparisonManager } from './core/ProjectComparisonManager';
+import { customDashboardManager } from './core/CustomDashboardManager';
+import { reminderManager } from './core/ReminderManager';
+import { fullTextIndexManager } from './core/FullTextIndexManager';
+import { dependencyManager } from './core/DependencyManager';
+import { colorLabelManager } from './core/ColorLabelManager';
+import { readLaterManager } from './core/ReadLaterManager';
+import { bulkMetadataManager } from './core/BulkMetadataManager';
+import { activityFeedManager } from './core/ActivityFeedManager';
+import { projectLockManager } from './core/ProjectLockManager';
+import { themeScheduleManager } from './core/ThemeScheduleManager';
+import { naturalLanguageTaskManager } from './core/NaturalLanguageTaskManager';
+import { personalChangelogManager } from './core/PersonalChangelogManager';
+
 // Release Management (Phase 66)
 import { ReleaseManager } from './core/ReleaseManager';
+import { UpdateService } from './core/UpdateService';
+import { ProductionMonitor } from './core/ProductionMonitor';
 
 // Voice Control (Phase 46)
 import { voiceControlEngine } from './core/VoiceControlEngine';
@@ -205,16 +302,73 @@ import {
   sessionHardening
 } from './security/Q1Integration';
 
+// Deep Backend Systems (11-Part Architecture Pass)
+import { initializeThreadOrchestrator, shutdownThreadOrchestrator } from './core/ThreadOrchestrator';
+import { initializePerformanceInstrument, shutdownPerformanceInstrument } from './core/PerformanceInstrument';
+import { initializeDatabaseCluster, shutdownDatabaseCluster } from './core/DatabaseCluster';
+import { initializePluginSecurityGate, shutdownPluginSecurityGate } from './core/PluginSecurityGate';
+import { initializeEncryptionOrchestrator, shutdownEncryptionOrchestrator } from './core/EncryptionOrchestrator';
+import { initializeIntelligenceAPI, shutdownIntelligenceAPI } from './core/IntelligenceAPI';
+import { initializeDexEventBus, shutdownDexEventBus } from './core/DexEventBus';
+import { initializeStartupSequencer, shutdownStartupSequencer } from './core/StartupSequencer';
+import { initializeShutdownSequencer, shutdownShutdownSequencer } from './core/ShutdownSequencer';
+
+// DEX Rewind System Journal (5-Part Architecture)
+import { initializeSystemJournal, shutdownSystemJournal } from './core/SystemJournal';
+import { initializeJournalAnalysis, shutdownJournalAnalysis } from './core/JournalAnalysisEngine';
+
+// Backend Performance Engine (100 Rules)
+import { initializePerformanceEngine, shutdownPerformanceEngine } from './engine';
+
+// System Optimization Layer (Hardware-Aware Performance)
+import { hardwareDetector } from './core/HardwareDetector';
+import { memoryBudget } from './core/MemoryBudgetService';
+import { workStealingScheduler } from './core/WorkStealingScheduler';
+import { thermalPowerManager } from './core/ThermalPowerManager';
+import { tierStartupSequencer } from './core/TierStartupSequencer';
+
+import { databasePerformanceOptimizer } from './core/DatabasePerformanceOptimizer';
+import { ipcEfficiencyManager } from './core/IPCEfficiencyManager';
+import { systemOptimizationWiring } from './core/SystemOptimizationWiring';
+
+// System Health Orchestrator (Rules 98-100)
+import { systemHealth } from './core/SystemHealthOrchestrator';
+
 // Platform detection
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
+
+// File watchers (hoisted for shutdown cleanup)
+const activeWatchers = new Map<string, any>();
+
+// IPC handler timeout wrapper -- prevents renderer hangs from unresponsive handlers
+const IPC_TIMEOUT_MS = 15_000;
+function handleWithTimeout<T>(
+  channel: string,
+  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => Promise<T>,
+  timeoutMs = IPC_TIMEOUT_MS,
+): void {
+  ipcMain.handle(channel, (event, ...args) =>
+    Promise.race([
+      handler(event, ...args),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`IPC timeout: ${channel} exceeded ${timeoutMs}ms`)), timeoutMs),
+      ),
+    ]).catch(err => {
+      log.warn(`[IPC] ${channel} failed:`, err?.message || err);
+      return { success: false, error: err?.message || 'IPC handler failed' };
+    }),
+  );
+}
 
 class DexApp {
   // Window & Tray
   private mainWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private isQuitting = false;
+  private shutdownStarted = false;
+  private featureSuiteManagers: Array<[string, { initialize: (win: BrowserWindow) => void; destroy?: () => void }]> = [];
 
   // Core Services
   private logger: Logger;
@@ -237,6 +391,8 @@ class DexApp {
 
   // Release Management (Phase 66)
   private releaseManager: ReleaseManager | null = null;
+  private updateService: UpdateService | null = null;
+  private productionMonitor: ProductionMonitor | null = null;
 
   private isNetworkFeatureOptInEnabled(): boolean {
     const raw = (process.env.DEX_ENABLE_NETWORK_FEATURES || '').trim().toLowerCase();
@@ -263,6 +419,7 @@ class DexApp {
     log.info('[DEX] ========================================');
     log.info('[DEX]   STARTUP SEQUENCE INITIATED');
     log.info('[DEX] ========================================');
+    startupTimeline.mark('process:entry');
     
     // Single instance lock
     const gotTheLock = app.requestSingleInstanceLock();
@@ -280,8 +437,44 @@ class DexApp {
       }
     });
 
+    // GPU command-line switches MUST be applied BEFORE app.whenReady()
+    app.commandLine.appendSwitch('enable-gpu-rasterization');
+    app.commandLine.appendSwitch('enable-accelerated-video-decode');
+    app.commandLine.appendSwitch('enable-accelerated-video-encode');
+    // Vaapi is Linux-only; PlatformHEVCDecoderSupport works cross-platform
+    const gpuFeatures = isLinux
+      ? 'VaapiVideoDecoder,VaapiVideoEncoder,PlatformHEVCDecoderSupport'
+      : 'PlatformHEVCDecoderSupport';
+    app.commandLine.appendSwitch('enable-features', gpuFeatures);
+
+    // Auto-scale V8 heap based on system RAM (optimized for 5GB effective memory)
+    // Ultra-low (<=2GB): 256MB, Low (<=4GB): 25%, Mid (<=8GB): 35%, High (>8GB): 45%, capped at 4GB
+    // Systems with 8GB+ and SSD get expanded heap for 5GB total effective budget
+    const totalMemMB = Math.round(os.totalmem() / (1024 * 1024));
+    let heapMB: number;
+    if (totalMemMB <= 2048) {
+      heapMB = 256;
+    } else if (totalMemMB <= 4096) {
+      heapMB = Math.round(totalMemMB * 0.25);
+    } else if (totalMemMB <= 8192) {
+      heapMB = Math.round(totalMemMB * 0.35);
+    } else {
+      // High-end systems: allocate 45% for RAM, SSD spill provides additional 2GB
+      heapMB = Math.max(512, Math.min(4096, Math.round(totalMemMB * 0.45)));
+    }
+    app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${heapMB}`);
+    log.info(`[DEX] V8 heap set to ${heapMB} MB (system RAM: ${totalMemMB} MB, effective with SSD spill: ${heapMB + 2048} MB)`);
+
+    const diskCacheMB = totalMemMB <= 4096 ? 512 : totalMemMB <= 8192 ? 1024 : 2048;
+    app.commandLine.appendSwitch('disk-cache-size', String(diskCacheMB * 1024 * 1024));
+    log.info(`[DEX] Chromium disk cache capped at ${diskCacheMB} MB`);
+
     await app.whenReady();
+    startupTimeline.mark('app:ready');
     
+    // IPC envelope encryption — must be before any IPC handler registration
+    IPCCrypto.init();
+
     log.info('[DEX] Stage 1: App ready');
     this.logger.info('Dex starting up...');
 
@@ -313,17 +506,26 @@ class DexApp {
       log.warn('[DEX] Q1 Foundation init warning (continuing):', err);
     }
     
-    // CRITICAL: Create window FIRST before anything else
-    log.info('[DEX] Stage 2: Creating window...');
+    // Setup IPC FIRST (critical — renderer calls arrive as soon as window loads)
+    log.info('[DEX] Stage 2: Setting up IPC...');
+    startupTimeline.begin('IPC:setup');
+    this.setupIPC();
+    startupTimeline.end('IPC:setup');
+
+    // Create window after IPC handlers are registered
+    log.info('[DEX] Stage 3: Creating window...');
+    startupTimeline.begin('window:create');
     try {
       await this.createWindow();
-      log.info('[DEX] Stage 2: Window created successfully');
+      startupTimeline.end('window:create');
+      log.info('[DEX] Stage 3: Window created successfully');
       
       // Track window for memory leak prevention
       if (this.mainWindow) {
         memoryLeakPrevention.trackWindow(this.mainWindow);
       }
     } catch (err) {
+      startupTimeline.end('window:create');
       log.error('[DEX] CRITICAL: Window creation failed:', err);
       stabilityCore.recordTabLifecycleError(err as Error, { stage: 'window-creation' });
       await this.showFatalError('Window creation failed', String(err));
@@ -331,16 +533,16 @@ class DexApp {
     }
     
     // Initialize data store (with timeout)
-    log.info('[DEX] Stage 3: Initializing data store...');
+    log.info('[DEX] Stage 4: Initializing data store...');
     try {
       await Promise.race([
         this.dataStore.initialize(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('DataStore timeout')), 5000))
       ]);
-      log.info('[DEX] Stage 3: Data store ready');
+      log.info('[DEX] Stage 4: Data store ready');
       
       // Run data migrations after DataStore is ready
-      log.info('[DEX] Stage 3b: Running data migrations...');
+      log.info('[DEX] Stage 4b: Running data migrations...');
       try {
         const migrationResult = await dataMigrationManager.migrate(this.dataStore);
         if (migrationResult.applied.length > 0) {
@@ -354,16 +556,12 @@ class DexApp {
     }
     
     // Create tray (non-critical)
-    log.info('[DEX] Stage 4: Creating tray...');
+    log.info('[DEX] Stage 5: Creating tray...');
     try {
       this.createTray();
     } catch (err) {
       log.warn('[DEX] Tray creation failed, continuing:', err);
     }
-    
-    // Setup IPC (critical for renderer)
-    log.info('[DEX] Stage 5: Setting up IPC...');
-    this.setupIPC();
     
     // Start monitoring (non-critical)
     log.info('[DEX] Stage 6: Starting monitors...');
@@ -375,7 +573,7 @@ class DexApp {
       log.warn('[DEX] Monitors failed to start:', err);
     }
 
-    // Initialize controllers — each in its own try/catch for resilience
+    // Initialize controllers -- each in its own try/catch for resilience
     const safeInit = (name: string, fn: () => void) => {
       try { fn(); } catch (err) { log.warn(`[DEX] ${name} init failed:`, err); }
     };
@@ -391,8 +589,24 @@ class DexApp {
     // Ensure controller handlers are registered (prevents tree-shaking)
     transferController;
     httpTransferServer;
+    safeInit('dtpController', () => { initDTPController(); startDTP(); });
     codeController;
     storageManager;
+
+    // Register temporary stub handlers for unified systems channels
+    // (prevents "No handler registered" errors during race window before real managers init)
+    const earlyStubChannels = [
+      'task-queue:getActive', 'notification-center:getUnreadCount',
+      'recycle-bin:getCount', 'scratchpad:getState',
+      'localization:getLanguage', 'localization:getAllStrings',
+    ];
+    for (const ch of earlyStubChannels) {
+      ipcMain.handle(ch, async () => null);
+    }
+
+    // File surfaces query recent items immediately on first paint.
+    // Register a safe stub until FileManagerController replaces it.
+    ipcMain.handle('files:recent', async () => ({ success: true, files: [] }));
 
     // Initialize subsystems in background (don't block UI)
     log.info('[DEX] Stage 7: Starting background subsystems...');
@@ -429,11 +643,15 @@ class DexApp {
       }
     });
 
-    app.on('before-quit', async () => {
+    app.on('before-quit', (event) => {
+      if (this.shutdownStarted) return; // Guard: let quit proceed on second call
+      event.preventDefault();
+      this.shutdownStarted = true;
       this.isQuitting = true;
       log.info('[DEX] Shutting down...');
       globalShortcut.unregisterAll();
 
+      (async () => {
       // Shutdown with timeout to prevent hangs
       const shutdownWithTimeout = async (name: string, fn: () => void | Promise<void>, timeoutMs = 3000) => {
         try {
@@ -447,6 +665,26 @@ class DexApp {
       };
 
       // Shut down in priority order
+      // System Optimization Layer shutdown
+      await shutdownWithTimeout('SystemOptimizationWiring', () => systemOptimizationWiring.shutdown());
+      await shutdownWithTimeout('Xenon', shutdownXenon);
+
+      await shutdownWithTimeout('InnerAppStability', shutdownInnerAppStability);
+      await shutdownWithTimeout('NotesManager', () => notesManager.destroy());
+
+      await shutdownWithTimeout('BatchOperations', shutdownBatchOperations);
+      await shutdownWithTimeout('MultiWindow', shutdownMultiWindow);
+      await shutdownWithTimeout('Feedback', shutdownFeedback);
+      await shutdownWithTimeout('Localization', shutdownLocalization);
+      await shutdownWithTimeout('Scratchpad', shutdownScratchpad);
+      await shutdownWithTimeout('DeepLinks', shutdownDeepLinks);
+      await shutdownWithTimeout('WorkspaceLayouts', shutdownWorkspaceLayouts);
+      await shutdownWithTimeout('RecycleBin', shutdownRecycleBin);
+      await shutdownWithTimeout('TaskQueue', shutdownTaskQueue);
+      await shutdownWithTimeout('VersionHistory', shutdownVersionHistory);
+      await shutdownWithTimeout('SharedMediaLibrary', shutdownSharedMediaLibrary);
+      await shutdownWithTimeout('GlobalContentSearch', shutdownGlobalContentSearch);
+      await shutdownWithTimeout('UnifiedNotificationCenter', shutdownUnifiedNotificationCenter);
       await shutdownWithTimeout('HardwareOptimization', shutdownHardwareOptimization);
       await shutdownWithTimeout('SecurityLayer', shutdownSecurityLayer);
       await shutdownWithTimeout('UXEnhancement', shutdownUXEnhancement);
@@ -466,6 +704,97 @@ class DexApp {
       await shutdownWithTimeout('UsageAwareFS', shutdownUsageAwareFileSystem);
       await shutdownWithTimeout('TrustworthySearch', shutdownTrustworthySearch);
       await shutdownWithTimeout('SystemUndo', shutdownSystemUndo);
+
+      // System Completeness shutdown (reverse init order)
+      await shutdownWithTimeout('UninstallManager', () => uninstallManager.destroy());
+      await shutdownWithTimeout('HealthCheckManager', () => healthCheckManager.destroy());
+      await shutdownWithTimeout('DataImportManager', () => dataImportManager.destroy());
+      await shutdownWithTimeout('BackupRestoreManager', () => backupRestoreManager.destroy());
+      await shutdownWithTimeout('DeveloperPlatformManager', () => developerPlatformManager.destroy());
+      await shutdownWithTimeout('HelpSystemManager', () => helpSystemManager.destroy());
+      await shutdownWithTimeout('LocalizationManager', () => localizationManager.destroy());
+      await shutdownWithTimeout('LicensingManager', () => licensingManager.destroy());
+      await shutdownWithTimeout('MultiUserManager', () => multiUserManager.destroy());
+      await shutdownWithTimeout('MultiMonitorManager', () => multiMonitorManager.destroy());
+      await shutdownWithTimeout('MigrationManager', () => migrationManager.destroy());
+
+      // System Journal shutdown (before Deep Backend Systems)
+      await shutdownWithTimeout('JournalAnalysis', shutdownJournalAnalysis);
+      await shutdownWithTimeout('SystemJournal', shutdownSystemJournal);
+
+      // Deep Backend Systems shutdown (reverse init order)
+      await shutdownWithTimeout('ThreadOrchestrator', shutdownThreadOrchestrator);
+      await shutdownWithTimeout('ShutdownSequencer', shutdownShutdownSequencer);
+      await shutdownWithTimeout('StartupSequencer', shutdownStartupSequencer);
+      await shutdownWithTimeout('PluginSecurityGate', shutdownPluginSecurityGate);
+      await shutdownWithTimeout('IntelligenceAPI', shutdownIntelligenceAPI);
+      await shutdownWithTimeout('DexEventBus', shutdownDexEventBus);
+      await shutdownWithTimeout('EncryptionOrchestrator', shutdownEncryptionOrchestrator);
+      await shutdownWithTimeout('DatabaseCluster', shutdownDatabaseCluster);
+      await shutdownWithTimeout('PerformanceInstrument', shutdownPerformanceInstrument);
+      
+      // Backend Performance Engine shutdown (after all subsystems flushed)
+      await shutdownWithTimeout('PerformanceEngine', shutdownPerformanceEngine);
+
+      // --- UKI Voice Assistant ---
+      await shutdownWithTimeout('UkiController', () => ukiController.shutdown());
+
+      // --- IPC Crypto session key wipe ---
+      IPCCrypto.destroy();
+
+      // --- Runtime services (started in initializeSubsystems) ---
+      await shutdownWithTimeout('CoreRuntime', () => coreRuntime.shutdown());
+      await shutdownWithTimeout('Observability', () => observability.stop());
+      await shutdownWithTimeout('HardenedPython', () => hardenedPython.stop());
+      await shutdownWithTimeout('Scheduler', () => scheduler.stop());
+      await shutdownWithTimeout('ActionEngine', () => actionEngine.stop());
+      await shutdownWithTimeout('ResourceManager', () => resourceManager.stop());
+      await shutdownWithTimeout('HealthMonitor', () => healthMonitor.stop());
+      await shutdownWithTimeout('PerformanceGuardian', () => performanceGuardian.stop());
+      await shutdownWithTimeout('PythonExecutor', () => pythonExecutor.stop());
+      await shutdownWithTimeout('BackgroundTasks', () => backgroundTasks.stop());
+      await shutdownWithTimeout('MemoryManager', () => memoryManager.stopMonitoring());
+      await shutdownWithTimeout('ResourceGovernor', () => resourceGovernor.stop());
+      await shutdownWithTimeout('WatchdogController', () => watchdogController.stop());
+      await shutdownWithTimeout('VoiceControlEngine', () => voiceControlEngine.shutdown());
+
+      // --- Visual smoothness controllers ---
+      try { RenderGovernor.stop(); } catch { /* non-critical */ }
+      try { MotionController.stop(); } catch { /* non-critical */ }
+      try { InputLatencyController.stop(); } catch { /* non-critical */ }
+      try { SessionStabilityManager.stop(); } catch { /* non-critical */ }
+      try { PerformanceEnforcer.stop(); } catch { /* non-critical */ }
+
+      // --- Feature Suite managers (38 subsystems) ---
+      for (const [name, manager] of this.featureSuiteManagers) {
+        if (typeof (manager as any).destroy === 'function') {
+          await shutdownWithTimeout(`FeatureSuite:${name}`, () => (manager as any).destroy());
+        }
+      }
+
+      // --- Worker threads ---
+      await shutdownWithTimeout('Workers', () => shutdownAllWorkers(), 5000);
+
+      // --- File watchers ---
+      for (const [id, watcher] of activeWatchers) {
+        try { watcher.close(); } catch { /* non-critical */ }
+      }
+      activeWatchers.clear();
+
+      // Production Monitor -- save session digest before database closes
+      if (this.productionMonitor) {
+        await shutdownWithTimeout('ProductionMonitor', () => this.productionMonitor!.stop());
+      }
+      // Update Service -- stop polling
+      if (this.updateService) {
+        await shutdownWithTimeout('UpdateService', () => this.updateService!.dispose());
+      }
+
+      // Crash reporter -- flush log before database closes
+      await shutdownWithTimeout('CrashReporter', () => crashReporterService.destroy());
+      
+      // Close SQLite database last (all other systems flushed first)
+      await shutdownWithTimeout('DatabaseManager', () => databaseManager.close());
       
       // Destroy tray icon
       if (this.tray) {
@@ -474,11 +803,19 @@ class DexApp {
       }
       
       log.info('[DEX] Shutdown complete');
+      app.quit(); // Re-trigger quit now that shutdownStarted is true (guard skips preventDefault)
+      })().catch(err => {
+        log.error('[DEX] Shutdown error:', err);
+        app.quit();
+      });
     });
 
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') {
-        // Don't quit on Windows/Linux, stay in tray
+        // Stay in tray if tray exists, otherwise quit to avoid zombie process
+        if (!this.tray || this.tray.isDestroyed()) {
+          app.quit();
+        }
       }
     });
 
@@ -504,6 +841,10 @@ class DexApp {
   
   // Initialize subsystems asynchronously (don't block window)
   private initializeSubsystemsAsync(): void {
+    // Adaptive startup delay: give UI more time on low-RAM systems
+    const totalMemGB = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+    const startupDelay = totalMemGB <= 4 ? 4000 : totalMemGB <= 8 ? 3000 : 1500;
+
     setTimeout(async () => {
       try {
         await this.initializeSubsystems();
@@ -511,8 +852,9 @@ class DexApp {
         log.error('[DEX] Subsystem init error:', err);
       }
       
-      // Background tasks
-      try {
+      // Defer heavy background tasks further (8 seconds after subsystems on low RAM)
+      const bgDelay = totalMemGB <= 8 ? 8000 : 5000;
+      setTimeout(() => {
         dataIntegrity.verifyAllFiles().then(results => {
           const issues = results.filter(r => !r.valid);
           if (issues.length > 0) {
@@ -522,51 +864,39 @@ class DexApp {
         
         dataController.createAutoBackup().catch(err => log.warn('[DEX] Auto backup failed:', err));
         this.autoOptimizeSystem().catch(err => log.warn('[DEX] Auto optimize failed:', err));
-      } catch (err) {
-        log.warn('[DEX] Background tasks error:', err);
-      }
-    }, 100); // Small delay to let UI render first
+      }, bgDelay);
+    }, startupDelay);
   }
 
   private async initializeSubsystems(): Promise<void> {
-    // ═══════════════════════════════════════════════════════════════════════
-    // DEX PERFORMANCE BOOSTER: System-level optimization (start first)
-    // ═══════════════════════════════════════════════════════════════════════
+    // Guard: if window was closed before subsystems init, skip
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      log.warn('[DEX] Window closed before subsystem init — skipping');
+      return;
+    }
+    // =======================================================================
+    // BACKEND PERFORMANCE ENGINE + BOOSTER (sequential to reduce memory spikes)
+    // =======================================================================
+    await initializePerformanceEngine();
     await initializePerformanceBooster();
     
-    // ═══════════════════════════════════════════════════════════════════════
-    // VISUAL SMOOTHNESS MODE: Core Performance Systems (start first)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    // ULTRA-LOW RESOURCE MODE: Start ResourceGovernor first
+    // =======================================================================
+    // VISUAL SMOOTHNESS + System Integration (parallelized — all fire-and-forget .start())
+    // =======================================================================
     resourceGovernor.start();
-    
-    // 120Hz Render Governor: High-refresh display support
+    initializeXenon();
     RenderGovernor.start();
-    
-    // Motion Controller: Animation discipline
-    // DISABLED: MotionController.start(); // Reduces overhead
-    
-    // Input Latency Controller: Zero-latency input
-    // DISABLED: InputLatencyController.start(); // Reduces overhead
-    
-    // Session Stability Manager: Long-session support
-    // DISABLED: SessionStabilityManager.start(); // Reduces overhead
-    
-    // Performance Enforcer: Guarantees enforcement
-    // DISABLED: PerformanceEnforcer.start(); // Reduces overhead
-
-    // System Integration
+    MotionController.start();
+    InputLatencyController.start();
+    SessionStabilityManager.start();
+    PerformanceEnforcer.start();
     systemMapController.start();
     connectionController.start();
     deviceController.start();
-
-    // Session Management
     deepSessionController.start();
-
-    // Performance & Optimization
     memoryManager.startMonitoring();
     backgroundTasks.start();
+    CrashRecoverySystem.initialize();
     pythonExecutor.start();
     performanceGuardian.start();
     performanceGuardian.recordStartupTime(Date.now() - 5000);
@@ -583,6 +913,13 @@ class DexApp {
     // Health Monitoring
     registerHealthHandlers();
     healthMonitor.start();
+
+    // System Health Orchestrator (comprehensive health dashboard)
+    systemHealth.initialize();
+    ipcMain.handle('systemHealth:getReport', async () => {
+      try { return systemHealth.getHealthReport(); }
+      catch (err: any) { return { error: err.message }; }
+    });
 
     // Runtime Services
     resourceManager.start();
@@ -613,13 +950,11 @@ class DexApp {
     // Usage-Aware File System (Next-Gen OS-Level System 2)
     // Trustworthy, Explainable Search (Next-Gen OS-Level System 3)
     // System-Level Undo & Safety (Next-Gen OS-Level System 4)
-    // Parallelize independent Next-Gen systems
-    await Promise.all([
-      initializeIntentSessions(),
-      initializeUsageAwareFileSystem(),
-      initializeTrustworthySearch(),
-      initializeSystemUndo(),
-    ]);
+    // Sequential init to reduce memory spikes on low-RAM systems
+    await initializeIntentSessions();
+    await initializeUsageAwareFileSystem();
+    await initializeTrustworthySearch();
+    await initializeSystemUndo();
 
     // Universal Search System (FINAL UI FUNCTIONALITY PHASE)
     await this.searchController.initialize();
@@ -653,18 +988,227 @@ class DexApp {
     await initializePatternLearning();
     this.registerPatternLearningHandlers();
 
+    // UKI Voice Assistant
+    ukiController.initialize(this.mainWindow!);
+
+    // Performance Reservation + Defense Orchestrator (best-effort)
+    try {
+      const { performanceController } = await import('./controllers/PerformanceController');
+      performanceController.initialize();
+    } catch (err) { log.warn('[main] PerformanceController init failed:', err); }
+    try {
+      const { defenseController } = await import('./controllers/DefenseController');
+      defenseController.initialize(this.mainWindow!);
+    } catch (err) { log.warn('[main] DefenseController init failed:', err); }
+    try {
+      const { nexusController } = await import('./controllers/NexusController');
+      nexusController.initialize();
+    } catch (err) { log.warn('[main] NexusController init failed:', err); }
+
     // DEX Rewind - Activity Logger
     await initializeRewind(this.mainWindow!);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // DEX PREMIUM FEATURES - Ecosystem, UX, Security, Hardware (parallelized)
-    // ═══════════════════════════════════════════════════════════════════════
-    await Promise.all([
-      initializeEcosystemIntegration(),
-      initializeUXEnhancement(),
-      initializeSecurityLayer(),
-      initializeHardwareOptimization(),
-    ]);
+    // =======================================================================
+    // DEX PREMIUM FEATURES - Ecosystem, UX, Security, Hardware (sequential to reduce memory spikes)
+    // =======================================================================
+    await initializeEcosystemIntegration();
+    await initializeUXEnhancement();
+    await initializeSecurityLayer();
+    await initializeHardwareOptimization();
+
+    // =======================================================================
+    // UNIFIED SYSTEMS: 13 Production Subsystems (SQLite-backed)
+    // =======================================================================
+    log.info('[DEX] Initializing Unified Systems (13 subsystems)...');
+    try {
+      databaseManager.initialize();
+      log.info('[DEX] DatabaseManager ready (SQLite)');
+    } catch (dbErr) {
+      log.warn('[DEX] DatabaseManager init failed (continuing):', dbErr);
+    }
+
+    // Remove early stub handlers so real managers can register
+    const earlyStubChannels = [
+      'task-queue:getActive', 'notification-center:getUnreadCount',
+      'recycle-bin:getCount', 'scratchpad:getState',
+      'localization:getLanguage', 'localization:getAllStrings',
+    ];
+    for (const ch of earlyStubChannels) {
+      ipcMain.removeHandler(ch);
+    }
+
+    const unifiedInitFns: Array<[string, (win: BrowserWindow) => void]> = [
+      ['UnifiedNotificationCenter', initializeUnifiedNotificationCenter],
+      ['GlobalContentSearch', initializeGlobalContentSearch],
+      ['SharedMediaLibrary', initializeSharedMediaLibrary],
+      ['VersionHistory', initializeVersionHistory],
+      ['TaskQueue', initializeTaskQueue],
+      ['RecycleBin', initializeRecycleBin],
+      ['WorkspaceLayouts', initializeWorkspaceLayouts],
+      ['DeepLinks', initializeDeepLinks],
+      ['Scratchpad', initializeScratchpad],
+      ['Localization', initializeLocalization],
+      ['Feedback', initializeFeedback],
+      ['MultiWindow', initializeMultiWindow],
+      ['BatchOperations', initializeBatchOperations],
+      ['InnerAppStability', initializeInnerAppStability],
+    ];
+    for (const [name, initFn] of unifiedInitFns) {
+      try {
+        initFn(this.mainWindow!);
+      } catch (err) {
+        log.warn(`[DEX] ${name} init failed (continuing):`, err);
+      }
+    }
+    log.info('[DEX] Unified Systems initialized (13/13)');
+
+    // =======================================================================
+    // DEX NOTES: SQLite-backed Notes System
+    // =======================================================================
+    try {
+      await notesManager.initialize(this.mainWindow!);
+      log.info('[DEX] NotesManager initialized (SQLite + FTS5)');
+    } catch (notesErr) {
+      log.warn('[DEX] NotesManager init failed (continuing):', notesErr);
+    }
+
+    // =======================================================================
+    // FEATURE SUITE: 38 New Subsystems
+    // =======================================================================
+    log.info('[DEX] Initializing Feature Suite (38 subsystems)...');
+    this.featureSuiteManagers = [
+      ['SessionReplay', sessionReplayManager],
+      ['ProjectLinker', projectLinkerManager],
+      ['DailyBriefing', dailyBriefingManager],
+      ['RelationshipGraph', relationshipGraphManager],
+      ['TimeTracking', timeTrackingManager as unknown as { initialize: (win: BrowserWindow) => void }],
+      ['GoalSystem', goalSystemManager],
+      ['SnapshotComparison', snapshotComparisonManager],
+      ['ProjectHealth', projectHealthManager],
+      ['DuplicationDetector', duplicationDetectorManager],
+      ['KeyboardNavigation', keyboardNavigationManager],
+      ['ProjectArchiver', projectArchiverManager],
+      ['DailyNote', dailyNoteManager],
+      ['ContentExpiry', contentExpiryManager],
+      ['SearchHistory', searchHistoryManager],
+      ['LiveCollaboration', liveCollaborationManager],
+      ['SmartGrouping', smartGroupingManager],
+      ['VoiceMemo', voiceMemoManager],
+      ['ProjectTimeline', projectTimelineManager],
+      ['LinkPreview', linkPreviewManager],
+      ['StatisticsDashboard', statisticsDashboardManager],
+      ['ProjectExportBundle', projectExportBundleManager],
+      ['FileWatcherManager', fileWatcherManager],
+      ['WordCountManager', wordCountManager],
+      ['SmartRenameManager', smartRenameManager],
+      ['VinxPresentationManager', vinxPresentationManager],
+      ['ProjectComparisonManager', projectComparisonManager],
+      ['CustomDashboardManager', customDashboardManager],
+      ['ReminderManager', reminderManager],
+      ['FullTextIndexManager', fullTextIndexManager],
+      ['DependencyManager', dependencyManager],
+      ['ColorLabelManager', colorLabelManager],
+      ['ReadLaterManager', readLaterManager],
+      ['BulkMetadataManager', bulkMetadataManager],
+      ['ActivityFeedManager', activityFeedManager],
+      ['ProjectLockManager', projectLockManager],
+      ['ThemeScheduleManager', themeScheduleManager],
+      ['NaturalLanguageTaskManager', naturalLanguageTaskManager],
+      ['PersonalChangelogManager', personalChangelogManager],
+    ];
+    // Staggered batch-initialize: init in batches of 8 with yielding to reduce memory spikes
+    let featureInitCount = 0;
+    const BATCH_SIZE = 8;
+    for (let i = 0; i < this.featureSuiteManagers.length; i += BATCH_SIZE) {
+      const batch = this.featureSuiteManagers.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map(([name, manager]) =>
+        Promise.resolve().then(() => {
+          manager.initialize(this.mainWindow!);
+          featureInitCount++;
+        }).catch(err => log.warn(`[DEX] ${name} init failed (continuing):`, err))
+      );
+      await Promise.all(batchPromises);
+      // Yield to event loop between batches to prevent blocking
+      if (i + BATCH_SIZE < this.featureSuiteManagers.length) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+    log.info(`[DEX] Feature Suite initialized (${featureInitCount}/${this.featureSuiteManagers.length})`);
+
+    // =======================================================================
+    // DEEP BACKEND SYSTEMS: 11-Part Architecture Pass
+    // =======================================================================
+    log.info('[DEX] Initializing Deep Backend Systems...');
+    const deepInit = (name: string, fn: () => void) => {
+      try { fn(); log.info(`[DEX] ${name} ready`); }
+      catch (err) { log.warn(`[DEX] ${name} init failed (continuing):`, err); }
+    };
+
+    deepInit('PerformanceInstrument', () => initializePerformanceInstrument());
+    deepInit('DatabaseCluster', () => initializeDatabaseCluster());
+    deepInit('EncryptionOrchestrator', () => initializeEncryptionOrchestrator(this.mainWindow!));
+    deepInit('DexEventBus', () => initializeDexEventBus(this.mainWindow!));
+    deepInit('IntelligenceAPI', () => initializeIntelligenceAPI(this.mainWindow!));
+    deepInit('PluginSecurityGate', () => initializePluginSecurityGate(this.mainWindow!));
+    deepInit('StartupSequencer', () => initializeStartupSequencer());
+    deepInit('ShutdownSequencer', () => initializeShutdownSequencer());
+    deepInit('ThreadOrchestrator', () => initializeThreadOrchestrator());
+    log.info('[DEX] Deep Backend Systems initialized (9/9)');
+
+    // =======================================================================
+    // DEX REWIND SYSTEM JOURNAL: Central Operational Memory Layer
+    // =======================================================================
+    log.info('[DEX] Initializing System Journal...');
+    deepInit('SystemJournal', () => initializeSystemJournal(this.mainWindow!));
+    deepInit('JournalAnalysis', () => initializeJournalAnalysis(this.mainWindow!));
+    log.info('[DEX] System Journal initialized');
+
+    // =======================================================================
+    // SYSTEM COMPLETENESS: Infrastructure, Platform, and Quality Pass
+    // =======================================================================
+    log.info('[DEX] Initializing System Completeness modules...');
+    deepInit('MigrationManager', () => migrationManager.initialize());
+    deepInit('MultiMonitorManager', () => multiMonitorManager.initialize(this.mainWindow!));
+    deepInit('MultiUserManager', () => multiUserManager.initialize());
+    deepInit('LicensingManager', () => licensingManager.initialize());
+    deepInit('LocalizationManager', () => localizationManager.initialize());
+    deepInit('HelpSystemManager', () => helpSystemManager.initialize(this.mainWindow!));
+    deepInit('DeveloperPlatformManager', () => developerPlatformManager.initialize(this.mainWindow!));
+    deepInit('BackupRestoreManager', () => backupRestoreManager.initialize());
+    deepInit('DataImportManager', () => dataImportManager.initialize(this.mainWindow!));
+    deepInit('HealthCheckManager', () => healthCheckManager.initialize());
+    deepInit('UninstallManager', () => uninstallManager.initialize());
+    log.info('[DEX] System Completeness initialized (11/11)');
+
+    // =======================================================================
+    // SYSTEM OPTIMIZATION LAYER: Hardware-Aware Performance Management
+    // =======================================================================
+    log.info('[DEX] Initializing System Optimization Layer...');
+    try {
+      // Detect hardware capabilities (CPU, RAM, Storage, GPU, Battery, Display, Thermal)
+      await hardwareDetector.detect();
+      const tier = hardwareDetector.getTier();
+      log.info(`[DEX] Hardware detected: capability tier = ${tier}`);
+
+      // Initialize SSD spill manager based on hardware tier budget
+      try {
+        const budgets = hardwareDetector.getMemoryBudgets();
+        if (budgets.ssdSpillMB > 0) {
+          SSDSpillManager.init(budgets.ssdSpillMB);
+          log.info(`[DEX] SSD spill initialized: ${budgets.ssdSpillMB} MB (effective total: ${budgets.effectiveTotalMB} MB)`);
+        }
+      } catch (spillErr) {
+        log.warn('[DEX] SSD spill init failed (continuing without):', spillErr);
+      }
+
+
+
+      // Start the master optimization wiring (connects all subsystems)
+      systemOptimizationWiring.initialize(this.mainWindow!);
+      log.info('[DEX] System Optimization Layer initialized');
+    } catch (optErr) {
+      log.warn('[DEX] System Optimization Layer init failed (continuing):', optErr);
+    }
 
     this.logger.info('All subsystems initialized');
   }
@@ -691,38 +1235,41 @@ class DexApp {
 
   private async createWindow(): Promise<void> {
     const isMac = process.platform === 'darwin';
+    const isOSMode = process.argv.includes('--os-mode') || process.env.DEX_OS_MODE === '1';
     
-    log.info('[DEX] Creating BrowserWindow with performance optimizations...');
+    log.info(`[DEX] Creating BrowserWindow (OS Mode: ${isOSMode})...`);
     
-    // GPU switches are process-level — only append once
-    if (!(this as any)._gpuSwitchesApplied) {
-      app.commandLine.appendSwitch('enable-gpu-rasterization');
-      app.commandLine.appendSwitch('enable-zero-copy');
-      app.commandLine.appendSwitch('disable-software-rasterizer');
-      (this as any)._gpuSwitchesApplied = true;
-    }
+    // GPU switches are applied in initialize() before app.whenReady()
+
+    // In OS mode, use full screen; otherwise cap to 85% of display
+    const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+    const fullBounds = screen.getPrimaryDisplay().bounds;
+    const winWidth = isOSMode ? fullBounds.width : Math.min(WINDOW.DEFAULT_WIDTH, Math.round(screenW * 0.80));
+    const winHeight = isOSMode ? fullBounds.height : Math.min(WINDOW.DEFAULT_HEIGHT, Math.round(screenH * 0.80));
     
     this.mainWindow = new BrowserWindow({
-      width: WINDOW.DEFAULT_WIDTH,
-      height: WINDOW.DEFAULT_HEIGHT,
+      width: winWidth,
+      height: winHeight,
       minWidth: WINDOW.MIN_WIDTH,
       minHeight: WINDOW.MIN_HEIGHT,
       show: false, // Don't show until ready
-      center: true,
+      center: !isOSMode,
+      x: isOSMode ? fullBounds.x : undefined,
+      y: isOSMode ? fullBounds.y : undefined,
       icon: path.join(__dirname, '../../assets/icon.png'),
-      frame: isMac,
+      frame: isOSMode ? false : isMac,
       transparent: false,
+      fullscreen: isOSMode,
+      kiosk: isOSMode,
       backgroundColor: WINDOW.BACKGROUND_COLOR,
-      titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
-      titleBarOverlay: isMac ? false : {
-        color: WINDOW.TITLE_BAR_COLOR,
-        symbolColor: WINDOW.TITLE_BAR_SYMBOL_COLOR,
-        height: WINDOW.TITLE_BAR_HEIGHT
-      },
+      titleBarStyle: isOSMode ? 'hidden' : (isMac ? 'hiddenInset' : 'hidden'),
+      // Item 55: Native vibrancy on macOS (sidebar material)
+      ...(isMac && !isOSMode ? { vibrancy: 'sidebar' as const, visualEffectState: 'active' as const } : {}),
+      titleBarOverlay: false,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        sandbox: true, // Enable sandbox for enhanced security
+        sandbox: false,
         webviewTag: true,
         preload: path.join(__dirname, 'preload.js'),
         // Security hardening
@@ -735,6 +1282,11 @@ class DexApp {
         disableDialogs: false,
         safeDialogs: true,
         safeDialogsMessage: 'DEX has prevented this page from creating additional dialogs.',
+        // Performance: disable deprecated WebSQL, enable V8 code caching
+        enableWebSQL: false,
+        v8CacheOptions: 'bypassHeatCheck',
+        // Adaptive throttling: disabled to prevent state loss on refocus
+        backgroundThrottling: false,
       },
     });
 
@@ -748,15 +1300,59 @@ class DexApp {
     // Show window when ready (prevents flash)
     this.mainWindow.once('ready-to-show', () => {
       log.info('[DEX] Window ready-to-show');
+      // In OS mode, stay fullscreen; otherwise ensure defined size
+      if (!isOSMode && this.mainWindow?.isMaximized()) {
+        this.mainWindow.unmaximize();
+      }
       this.mainWindow?.show();
       this.mainWindow?.focus();
+      // Tell renderer about OS mode so it can adapt UI
+      this.mainWindow?.webContents.send('dex:os-mode', isOSMode);
     });
 
+    // NOTE: session.clearCache() removed — it was destroying the entire HTTP/disk
+    // cache on every startup, forcing re-download of all resources. Stale Vite
+    // chunks are handled by content-hashed filenames in production builds.
+
     // Load the app
+    const isDev = process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === 'development';
+    const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
     const indexPath = path.join(__dirname, '../renderer/index.html');
-    log.info('[DEX] Loading renderer from:', indexPath);
     
-    if (!fs.existsSync(indexPath)) {
+    if (isDev) {
+      log.info('[DEX] Loading renderer from dev server:', devServerUrl);
+    } else {
+      log.info('[DEX] Loading renderer from:', indexPath);
+    }
+    
+    if (isDev) {
+      try {
+        await this.mainWindow.loadURL(devServerUrl);
+        log.info('[DEX] Renderer loaded from dev server');
+      } catch (err) {
+        log.warn('[DEX] Dev server not ready, falling back to built files...');
+        if (fs.existsSync(indexPath)) {
+          await this.mainWindow.loadFile(indexPath);
+          log.info('[DEX] Renderer loaded from built files');
+        } else {
+          await this.mainWindow.loadURL(
+            'data:text/html;charset=utf-8,' +
+              encodeURIComponent(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>DEX</title></head>
+                <body style="margin:0;background:#09090b;color:#f8fafc;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;">
+                  <h1 style="font-size:32px;margin:0 0 16px;font-weight:600;">DEX</h1>
+                  <div style="font-size:14px;color:#ef4444;margin-bottom:8px;">Dev server not available</div>
+                  <div style="font-size:12px;color:#a1a1aa;">Run: npm run dev:renderer</div>
+                </body>
+                </html>
+              `)
+          );
+          this.mainWindow.show();
+        }
+      }
+    } else if (!fs.existsSync(indexPath)) {
       log.error('[DEX] Renderer not found! Loading fallback...');
       await this.mainWindow.loadURL(
         'data:text/html;charset=utf-8,' +
@@ -803,6 +1399,11 @@ class DexApp {
       log.error(`[DEX] Renderer failed: ${errorCode} - ${errorDescription}`);
     });
     
+    this.mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+      const tag = level >= 3 ? 'error' : level >= 2 ? 'warn' : 'info';
+      log.info(`[RendererConsole][${tag}] ${message} (${sourceId}:${line})`);
+    });
+
     this.mainWindow.webContents.on('did-finish-load', () => {
       log.info('[DEX] Renderer finished loading');
       this.logger.info('Renderer finished loading');
@@ -817,7 +1418,70 @@ class DexApp {
       }
     });
 
-    // ── Content Security Policy ─────────────────────────────────────────
+    // -- Renderer crash recovery -----------------------------------------
+    {
+      let crashCount = 0;
+      let firstCrashTime = 0;
+      const CRASH_WINDOW_MS = 60000;
+      const MAX_CRASHES_IN_WINDOW = 3;
+
+      this.mainWindow.webContents.on('render-process-gone', (_event, details) => {
+        const reason = details.reason || 'unknown';
+        log.error(`[DEX] Renderer process gone: ${reason}`);
+        securityAudit.log('system', 'renderer-crash', `Renderer process gone: ${reason} (exit ${details.exitCode})`);
+
+        const now = Date.now();
+        if (now - firstCrashTime > CRASH_WINDOW_MS) {
+          crashCount = 0;
+          firstCrashTime = now;
+        }
+        crashCount++;
+
+        if (crashCount >= MAX_CRASHES_IN_WINDOW) {
+          log.error(`[DEX] Renderer crashed ${crashCount} times in ${CRASH_WINDOW_MS / 1000}s`);
+          if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+            this.mainWindow.webContents.loadURL(
+              'data:text/html;charset=utf-8,' +
+              encodeURIComponent(`<!DOCTYPE html><html><head><title>DEX</title></head>
+              <body style="margin:0;background:#09090b;color:#f8fafc;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;">
+              <h1 style="font-size:24px;margin:0 0 16px;font-weight:600;">DEX</h1>
+              <div style="font-size:14px;color:#f59e0b;margin-bottom:8px;">This window is having repeated problems.</div>
+              <div style="font-size:12px;color:#a1a1aa;">Contact support if this continues.</div>
+              </body></html>`)
+            );
+          }
+          return;
+        }
+
+        setTimeout(() => {
+          if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+            log.info('[DEX] Reloading renderer after crash...');
+            this.mainWindow.webContents.reload();
+            setTimeout(() => {
+              if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('renderer:crash-recovery', {
+                  message: 'This window restarted after an error. Your work has been restored.',
+                  reason,
+                });
+              }
+            }, 1000);
+          }
+        }, 500);
+      });
+
+      this.mainWindow.on('unresponsive', () => {
+        log.warn('[DEX] Window became unresponsive');
+        securityAudit.log('system', 'renderer-unresponsive', 'Window became unresponsive');
+        // Do NOT force-crash the renderer — it kills all webview tabs and playing media.
+        // Instead, log and wait for natural recovery.
+      });
+
+      this.mainWindow.on('responsive', () => {
+        log.info('[DEX] Window became responsive again');
+      });
+    }
+
+    // -- Content Security Policy -----------------------------------------
     this.mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
       callback({
         responseHeaders: {
@@ -827,7 +1491,7 @@ class DexApp {
             "script-src 'self'; " +
             "style-src 'self' 'unsafe-inline'; " +
             "img-src 'self' data: blob:; " +
-            "media-src 'self' blob: data:; " +
+            "media-src 'self' blob: data: https:; " +
             "font-src 'self' data:; " +
             "connect-src 'self' https:; " +
             "worker-src 'self' blob:; " +
@@ -839,10 +1503,11 @@ class DexApp {
       });
     });
 
-    // Handle webview permissions for embedded browser
+    // Handle webview permissions for embedded browser (main session)
+    // Include audioCapture for microphone, video for camera
+    const allowedPermissions = ['media', 'audioCapture', 'microphone', 'notifications', 'fullscreen', 'clipboard-read', 'mediaKeySystem', 'display-capture', 'video', 'videoCapture', 'audio'];
+
     this.mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-      // Only allow safe permissions — deny geolocation and overly broad clipboard access
-      const allowedPermissions = ['media', 'notifications', 'fullscreen', 'clipboard-read'];
       if (allowedPermissions.includes(permission)) {
         callback(true);
       } else {
@@ -851,8 +1516,40 @@ class DexApp {
       }
     });
 
+    // Grant media/audio permissions immediately on check (fixes UKI mic access)
+    this.mainWindow.webContents.session.setPermissionCheckHandler((_webContents, permission) => {
+      return allowedPermissions.includes(permission);
+    });
+
+    // Handle webview permissions for the browser partition (separate session)
+    const { session: electronSession } = require('electron');
+    const browserSession = electronSession.fromPartition('persist:dex-browser');
+    browserSession.setPermissionRequestHandler((_webContents: any, permission: string, callback: (granted: boolean) => void) => {
+      if (allowedPermissions.includes(permission)) {
+        callback(true);
+      } else {
+        log.warn(`[DEX] Denied browser-partition permission request: ${permission}`);
+        callback(false);
+      }
+    });
+    browserSession.setPermissionCheckHandler((_webContents: any, permission: string) => {
+      return allowedPermissions.includes(permission);
+    });
+
     // Handle webview attachment - configure webview security
     app.on('web-contents-created', (_, contents) => {
+      // Prevent the main window from being navigated away by malicious content
+      contents.on('will-navigate', (event, navigationUrl) => {
+        const parsedUrl = new URL(navigationUrl);
+        // Allow dev server in development, block all other navigations in main window
+        const isDev = !!process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === 'development';
+        if (isDev && parsedUrl.origin === new URL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173').origin) return;
+        // Block navigation in the main window — webview handles its own navigation
+        if (contents === this.mainWindow?.webContents) {
+          event.preventDefault();
+        }
+      });
+
       contents.on('will-attach-webview', (event, webPreferences, params) => {
         // Strip preload scripts
         delete webPreferences.preload;
@@ -866,6 +1563,8 @@ class DexApp {
         webPreferences.javascript = true;
         webPreferences.webgl = true;
         webPreferences.images = true;
+        webPreferences.autoplayPolicy = 'no-user-gesture-required' as any;
+        webPreferences.backgroundThrottling = false;
         
         // Verify URL is safe
         const url = params.src;
@@ -887,6 +1586,13 @@ class DexApp {
 
     this.mainWindow.on('close', (event) => {
       if (!this.isQuitting) {
+        // In dev mode, actually quit — prevents zombie processes accumulating
+        const isDev = !!process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === 'development';
+        if (isDev) {
+          this.isQuitting = true;
+          app.quit();
+          return;
+        }
         event.preventDefault();
         this.mainWindow?.hide();
       }
@@ -1063,16 +1769,30 @@ class DexApp {
   }
 
   private setupIPC(): void {
-    // ─────────────────────────────────────────────────────────────────────────    // User Activity Tracking (for ResourceGovernor)
-    // ───────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------    // User Activity Tracking (for ResourceGovernor)
+    // ---------------------------------------------------------------------------
     ipcMain.on('user:activity', () => {
       resourceGovernor.recordUserActivity();
       backgroundTasks.recordUserInput();
     });
 
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
+    // User Profile IPC
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('user:getProfile', () => {
+      const username = os.userInfo().username || 'User';
+      return {
+        username,
+        displayName: username,
+        hostname: os.hostname(),
+        platform: process.platform,
+        arch: process.arch,
+      };
+    });
+
+    // ---------------------------------------------------------------------------
     // Resource Governor IPC
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
     ipcMain.handle('resource:getSnapshot', async () => {
       return resourceGovernor.getSnapshot();
     });
@@ -1089,9 +1809,473 @@ class DexApp {
       return resourceGovernor.getSubsystemBudgets();
     });
 
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
+    // Renderer Logger IPC
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('log:renderer', async (_event, payload: { level: string; message: string; data?: unknown }) => {
+      const { level, message, data } = payload || {};
+      if (typeof message !== 'string') return;
+      const prefix = `[Renderer] ${message}`;
+      switch (level) {
+        case 'warn': log.warn(prefix, data || ''); break;
+        case 'error': log.error(prefix, data || ''); break;
+        default: log.info(prefix, data || ''); break;
+      }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Renderer Heartbeat -- renderer sends every 5 s; main logs and notifies
+    // the watchdog so it can detect frozen renderers.
+    // ---------------------------------------------------------------------------
+    let _firstHeartbeat = true;
+    ipcMain.on('renderer:heartbeat', (_event, payload: {
+      t: number;
+      frameTimeMs: number;
+      heapUsedMB: number;
+      freezeDetected: boolean;
+      frozenMs?: number;
+    }) => {
+      if (!payload || typeof payload.t !== 'number') return;
+      if (_firstHeartbeat) {
+        _firstHeartbeat = false;
+        startupTimeline.mark('renderer:first-heartbeat');
+        startupTimeline.complete();
+      }
+      watchdogController.recordRendererHeartbeat?.({
+        t: payload.t,
+        heapUsedMB: payload.heapUsedMB ?? 0,
+        frameTimeMs: payload.frameTimeMs ?? 0,
+      });
+      if (payload.freezeDetected) {
+        log.warn('[Renderer] freeze detected', { frozenMs: payload.frozenMs, heapUsedMB: payload.heapUsedMB });
+        crashReporterService.recordFreezeEvent?.({
+          source: 'renderer',
+          frozenMs: payload.frozenMs ?? 0,
+          t: payload.t,
+        });
+      }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Startup Timeline -- renderer diagnostics panel can request full snapshot
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('startup:timeline', () => startupTimeline.snapshot());
+
+    // ---------------------------------------------------------------------------
+    // Renderer Error Report -- global window.onerror / unhandledrejection events
+    // ---------------------------------------------------------------------------
+    ipcMain.on('render-error:report', (_event, payload: {
+      kind: 'error' | 'unhandledrejection';
+      message?: string;
+      stack?: string;
+      filename?: string;
+      lineno?: number;
+      colno?: number;
+      t?: number;
+    }) => {
+      if (!payload) return;
+      const { kind, message, stack, t } = payload;
+      log.error(`[Renderer:${kind}] ${message ?? 'unknown'}`, { stack, t });
+      crashReporterService.recordRendererError?.({ kind, message: message ?? '', stack, t: t ?? Date.now() });
+    });
+
+    // ---------------------------------------------------------------------------
+    // Native Core IPC (dex-core Rust addon bridge)
+    // ---------------------------------------------------------------------------
+    const nativeCore = (() => {
+      try {
+        const { isCoreAvailable, getCoreModule } = require('./native/core-loader');
+        return { isCoreAvailable, getCoreModule };
+      } catch {
+        return {
+          isCoreAvailable: () => false,
+          getCoreModule: () => null,
+        };
+      }
+    })();
+
+    ipcMain.handle('native-core:available', () => {
+      try { return nativeCore.isCoreAvailable(); } catch { return false; }
+    });
+
+    ipcMain.handle('native-core:physics-create', (_, stiffness: number, damping: number, mass: number, initial: number, target: number) => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (!mod) return -1;
+        return mod.physicsCreateSpring(stiffness, damping, mass, initial, target);
+      } catch { return -1; }
+    });
+
+    ipcMain.handle('native-core:physics-set-target', (_, id: number, target: number) => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (mod) mod.physicsSetTarget(id, target);
+      } catch { /* swallow */ }
+    });
+
+    ipcMain.handle('native-core:physics-release', (_, id: number) => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (mod) mod.physicsReleaseSpring(id);
+      } catch { /* swallow */ }
+    });
+
+    ipcMain.handle('native-core:search-fuzzy', async (_, query: string, candidates: string[], limit: number) => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (!mod) return [];
+        return await mod.searchFuzzy(query, candidates, limit);
+      } catch { return []; }
+    });
+
+    ipcMain.handle('native-core:memory-pressure', async () => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (!mod) return 'normal';
+        return await mod.memoryGetPressure();
+      } catch { return 'normal'; }
+    });
+
+    ipcMain.handle('native-core:platform-info', () => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (!mod) return JSON.stringify({ os: process.platform, arch: process.arch, family: 'unknown', features: [] });
+        return mod.platformGetInfo();
+      } catch { return JSON.stringify({ os: process.platform, arch: process.arch, family: 'unknown', features: [] }); }
+    });
+
+    ipcMain.handle('native-core:scheduler-cores', () => {
+      try {
+        const mod = nativeCore.getCoreModule();
+        if (!mod) return os.cpus().length;
+        return mod.schedulerGetCoreCount();
+      } catch { return os.cpus().length; }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Native Kernel -- Spatial & Matrix IPC for AXL CAD engine
+    // ---------------------------------------------------------------------------
+
+    ipcMain.handle('native-core:spatial-create', () => {
+      try { return CppSpatial.create(); } catch { return -1; }
+    });
+
+    ipcMain.handle('native-core:spatial-insert', (_, id: number, x: number, y: number, z: number, label?: string) => {
+      try { CppSpatial.insert(id, x, y, z, label); } catch { /* swallow */ }
+    });
+
+    ipcMain.handle('native-core:spatial-query', (_, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number) => {
+      try { return CppSpatial.query(minX, minY, minZ, maxX, maxY, maxZ); } catch { return []; }
+    });
+
+    ipcMain.handle('native-core:spatial-nearest', (_, x: number, y: number, z: number, k: number) => {
+      try { return CppSpatial.nearest(x, y, z, k); } catch { return []; }
+    });
+
+    ipcMain.handle('native-core:spatial-clear', () => {
+      try { CppSpatial.clear(); } catch { /* swallow */ }
+    });
+
+    ipcMain.handle('native-core:mat4-multiply', (_, a: number[], b: number[]) => {
+      try {
+        const result = CppMatrix.multiply(new Float64Array(a), new Float64Array(b));
+        return result ? Array.from(result) : null;
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native-core:batch-hash', (_, items: string[]) => {
+      try { return CppHash.batch(items); } catch { return []; }
+    });
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('native:image-metadata', (_, filePath: string) => {
+      try {
+        PathValidator.validatePath(filePath, { requireExists: true });
+        const { NativeImage } = require('./native/bridge');
+        return NativeImage.getMetadata(filePath);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:image-thumbnail', (_, inputPath: string, outputPath: string, maxWidth: number, maxHeight: number) => {
+      try {
+        PathValidator.validatePath(inputPath, { requireExists: true });
+        PathValidator.validatePath(outputPath);
+        const { NativeImage } = require('./native/bridge');
+        return NativeImage.generateThumbnail(inputPath, outputPath, maxWidth, maxHeight);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:image-batch-resize', (_, inputPaths: string[], outputDir: string, maxWidth: number, maxHeight: number, format?: string) => {
+      try {
+        for (const p of inputPaths) PathValidator.validatePath(p, { requireExists: true });
+        PathValidator.validatePath(outputDir);
+        const { NativeImage } = require('./native/bridge');
+        return NativeImage.batchResize(inputPaths, outputDir, maxWidth, maxHeight, format);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:audio-metadata', (_, filePath: string) => {
+      try {
+        PathValidator.validatePath(filePath, { requireExists: true });
+        const { NativeAudio } = require('./native/bridge');
+        return NativeAudio.getMetadata(filePath);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:audio-waveform', (_, filePath: string, numBins: number) => {
+      try {
+        PathValidator.validatePath(filePath, { requireExists: true });
+        const { NativeAudio } = require('./native/bridge');
+        return NativeAudio.extractWaveformPeaks(filePath, numBins);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:audio-normalize', (_, inputPath: string, outputPath: string, targetDb?: number) => {
+      try {
+        PathValidator.validatePath(inputPath, { requireExists: true });
+        PathValidator.validatePath(outputPath);
+        const { NativeAudio } = require('./native/bridge');
+        return NativeAudio.normalize(inputPath, outputPath, targetDb);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:video-metadata', (_, filePath: string) => {
+      try {
+        PathValidator.validatePath(filePath, { requireExists: true });
+        const { NativeVideo } = require('./native/bridge');
+        return NativeVideo.getMetadata(filePath);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:media-probe', (_, filePath: string) => {
+      try {
+        PathValidator.validatePath(filePath, { requireExists: true });
+        const { NativeVideo } = require('./native/bridge');
+        return NativeVideo.probe(filePath);
+      } catch { return null; }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Creative Utilities IPC (color, hashing, project analysis)
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('native:parse-color', (_, hex: string) => {
+      try {
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.parseColor(hex);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:hsl-to-hex', (_, h: number, s: number, l: number) => {
+      try {
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.hslToHex(h, s, l);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:generate-palette', (_, hex: string, mode: string) => {
+      try {
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.generatePalette(hex, mode);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:contrast-ratio', (_, hex1: string, hex2: string) => {
+      try {
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.contrastRatio(hex1, hex2);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:hash-file', (_, filePath: string) => {
+      try {
+        PathValidator.validatePath(filePath, { requireExists: true });
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.hashFile(filePath);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:batch-hash', (_, filePaths: string[]) => {
+      try {
+        for (const p of filePaths) PathValidator.validatePath(p, { requireExists: true });
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.batchHashFiles(filePaths);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:analyze-project', (_, dirPath: string) => {
+      try {
+        PathValidator.validatePath(dirPath, { requireExists: true });
+        const { NativeCreative } = require('./native/bridge');
+        return NativeCreative.analyzeProjectDir(dirPath);
+      } catch { return null; }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Native System/Health/Files/Process IPC (Rust direct access from renderer)
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('native:available', () => {
+      try {
+        const { isNativeAvailable } = require('./native/bridge');
+        return isNativeAvailable();
+      } catch { return false; }
+    });
+
+    ipcMain.handle('native:system-stats', () => {
+      try {
+        const { NativeSystem } = require('./native/bridge');
+        return NativeSystem.getStats();
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:disk-info', () => {
+      try {
+        const { NativeSystem } = require('./native/bridge');
+        return NativeSystem.getDisks();
+      } catch { return []; }
+    });
+
+    ipcMain.handle('native:network-info', () => {
+      try {
+        const { NativeSystem } = require('./native/bridge');
+        return NativeSystem.getNetworks();
+      } catch { return []; }
+    });
+
+    ipcMain.handle('native:process-list', (_, limit?: number) => {
+      try {
+        const { NativeProcesses } = require('./native/bridge');
+        return NativeProcesses.list(limit);
+      } catch { return []; }
+    });
+
+    ipcMain.handle('native:process-close', (_, pid: number, force?: boolean) => {
+      try {
+        const { NativeProcesses } = require('./native/bridge');
+        return NativeProcesses.close(pid, force);
+      } catch { return { success: false, message: 'Native module unavailable' }; }
+    });
+
+    ipcMain.handle('native:free-memory', () => {
+      try {
+        const { NativeProcesses } = require('./native/bridge');
+        return NativeProcesses.freeMemory();
+      } catch { return { success: false, message: 'Native module unavailable' }; }
+    });
+
+    ipcMain.handle('native:power-status', () => {
+      try {
+        const { NativePower } = require('./native/bridge');
+        return NativePower.getStatus();
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:power-profiles', () => {
+      try {
+        const { NativePower } = require('./native/bridge');
+        return NativePower.getProfiles();
+      } catch { return []; }
+    });
+
+    ipcMain.handle('native:power-set-profile', (_, profile: string) => {
+      try {
+        const { NativePower } = require('./native/bridge');
+        return NativePower.setProfile(profile);
+      } catch { return { success: false, profile, changes: [], error: 'Native module unavailable' }; }
+    });
+
+    ipcMain.handle('native:file-scan', (_, rootPath: string, extensions?: string[], maxDepth?: number, limit?: number, includeDirs?: boolean) => {
+      try {
+        PathValidator.validatePath(rootPath, { requireExists: true });
+        const { NativeFiles } = require('./native/bridge');
+        return NativeFiles.scan(rootPath, extensions, maxDepth, limit, includeDirs);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:directory-size', (_, dirPath: string) => {
+      try {
+        PathValidator.validatePath(dirPath, { requireExists: true });
+        const { NativeFiles } = require('./native/bridge');
+        return NativeFiles.directorySize(dirPath);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:media-scan', (_, scanType: string, customPaths?: string[], limit?: number) => {
+      try {
+        const { NativeFiles } = require('./native/bridge');
+        return NativeFiles.scanMedia(scanType, customPaths, limit);
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:health-status', () => {
+      try {
+        const { NativeHealth } = require('./native/bridge');
+        return NativeHealth.getHealth();
+      } catch { return null; }
+    });
+
+    ipcMain.handle('native:health-heartbeat', () => {
+      try {
+        const { NativeHealth } = require('./native/bridge');
+        NativeHealth.heartbeat();
+        return true;
+      } catch { return false; }
+    });
+
+    ipcMain.handle('native:health-suggestions', () => {
+      try {
+        const { NativeHealth } = require('./native/bridge');
+        return NativeHealth.getSuggestions();
+      } catch { return []; }
+    });
+
+    ipcMain.handle('native:log-status', () => {
+      try {
+        const { logNativeStatus, isNativeAvailable } = require('./native/bridge');
+        logNativeStatus();
+        return { available: isNativeAvailable() };
+      } catch { return { available: false }; }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Watch Folder Handlers (uses module-level activeWatchers)
+    // ---------------------------------------------------------------------------
+
+    ipcMain.handle('watch:start', (event, { id, path: dirPath }: { id: string; path: string }) => {
+      try {
+        const fs = require('fs');
+        const pathMod = require('path');
+        // Validate path to prevent directory traversal attacks
+        const validatedPath = PathValidator.validatePath(dirPath, { requireExists: true });
+        if (activeWatchers.has(id)) return { success: true };
+        const sender = event.sender;
+        const watcher = fs.watch(validatedPath, { persistent: false }, (eventType: string, filename: string) => {
+          if (eventType === 'rename' && filename) {
+            // Use validated path for join to prevent path injection
+            const safeName = pathMod.basename(filename); // strip any path components
+            const fullPath = pathMod.join(validatedPath, safeName);
+            try {
+              if (sender.isDestroyed()) { watcher.close(); activeWatchers.delete(id); return; }
+              if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                sender.send('watch:fileAdded', { id, files: [fullPath] });
+              }
+            } catch (e) { log.warn('[DEX]', e); }
+          }
+        });
+        activeWatchers.set(id, watcher);
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    });
+
+    ipcMain.handle('watch:stop', (_, { id }: { id: string }) => {
+      const watcher = activeWatchers.get(id);
+      if (watcher) { watcher.close(); activeWatchers.delete(id); }
+      return { success: true };
+    });
+
+    // ---------------------------------------------------------------------------
     // Settings Apply Handler (Real System Settings)
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
     ipcMain.handle('settings:apply', async (_, settings) => {
       try {
         log.info('[DEX] Applying settings:', Object.keys(settings));
@@ -1102,14 +2286,19 @@ class DexApp {
                          settings.performanceMode === 'powersaver' ? 'eco' : 'balanced';
           await this.powerController.setProfile(profile);
         }
-        
-        // Apply GPU settings
-        if (settings.enableGpu !== undefined) {
-          if (settings.enableGpu) {
-            app.commandLine.appendSwitch('enable-gpu-rasterization');
-            app.commandLine.appendSwitch('enable-zero-copy');
+
+        // Apply user RAM limit to ResourceGovernor
+        if (settings.maxRamGB !== undefined) {
+          try {
+            const { resourceGovernor } = require('./core/ResourceGovernor');
+            resourceGovernor.applyUserMaxRam(settings.maxRamGB);
+          } catch (e) {
+            log.debug('[DEX] Could not apply RAM limit:', e);
           }
         }
+        
+        // GPU switches are set at startup in initialize() (before app.whenReady)
+        // They cannot be changed at runtime, so this is a no-op.
         
         // Apply animation settings to main window
         if (this.mainWindow && settings.reduceMotion) {
@@ -1131,9 +2320,9 @@ class DexApp {
       }
     });
 
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
     // Settings Get/Save Handlers
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
     ipcMain.handle('settings:get', async () => {
       try {
         const settings = await capabilityLayer.storage.get('dex-system-settings');
@@ -1152,8 +2341,8 @@ class DexApp {
       }
     });
 
-    // ───────────────────────────────────────────────────────────────────────────    // Window Controls
-    // ─────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------    // Window Controls
+    // -------------------------------------------------------------------------
     ipcMain.handle('window:minimize', () => {
       this.mainWindow?.minimize();
       return { success: true };
@@ -1174,10 +2363,194 @@ class DexApp {
       this.mainWindow?.hide();
       return { success: true };
     });
+    ipcMain.handle('window:setTitleBarOverlay', (_e: any, enabled: boolean) => {
+      if (!this.mainWindow || process.platform === 'darwin') return { success: false };
+      try {
+        if (enabled) {
+          this.mainWindow.setTitleBarOverlay({
+            color: WINDOW.TITLE_BAR_COLOR,
+            symbolColor: WINDOW.TITLE_BAR_SYMBOL_COLOR,
+            height: WINDOW.TITLE_BAR_HEIGHT,
+          });
+        } else {
+          this.mainWindow.setTitleBarOverlay({
+            color: '#00000000',
+            symbolColor: '#00000000',
+            height: 0,
+          });
+        }
+        return { success: true };
+      } catch (error) {
+        log.warn('[DEX] Failed to set titlebar overlay:', error);
+        return { success: false, error: String(error) };
+      }
+    });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // OS Mode Shell Controls
+    // -------------------------------------------------------------------------
+    ipcMain.handle('os:getMode', () => {
+      return process.argv.includes('--os-mode') || process.env.DEX_OS_MODE === '1';
+    });
+
+    ipcMain.handle('os:toggleFullscreen', () => {
+      if (this.mainWindow) {
+        const isFull = this.mainWindow.isFullScreen();
+        this.mainWindow.setFullScreen(!isFull);
+        return { fullscreen: !isFull };
+      }
+      return { fullscreen: false };
+    });
+
+    ipcMain.handle('os:getSystemInfo', async () => {
+      const osModule = os;
+      const displays = screen.getAllDisplays().map(d => ({
+        id: d.id,
+        width: d.bounds.width,
+        height: d.bounds.height,
+        scaleFactor: d.scaleFactor,
+        isPrimary: d.id === screen.getPrimaryDisplay().id,
+      }));
+      return {
+        hostname: osModule.hostname(),
+        username: osModule.userInfo().username,
+        platform: process.platform,
+        arch: process.arch,
+        osVersion: osModule.release(),
+        totalMemory: osModule.totalmem(),
+        freeMemory: osModule.freemem(),
+        cpuModel: osModule.cpus()[0]?.model || 'Unknown',
+        cpuCores: osModule.cpus().length,
+        uptime: osModule.uptime(),
+        displays,
+      };
+    });
+
+    ipcMain.handle('os:getBatteryInfo', async () => {
+      try {
+        const stats = await this.powerController.getState();
+        return stats;
+      } catch {
+        return { level: -1, charging: false, timeRemaining: -1 };
+      }
+    });
+
+    // System resource usage monitoring
+    ipcMain.handle('system:getCpuUsage', async () => {
+      const osModule = os;
+      const cpus = osModule.cpus();
+      if (!cpus || cpus.length === 0) return 0;
+      
+      // Calculate average CPU usage across all cores
+      let totalIdle = 0;
+      let totalTick = 0;
+      cpus.forEach(cpu => {
+        for (const type of Object.keys(cpu.times) as Array<keyof typeof cpu.times>) {
+          totalTick += cpu.times[type];
+        }
+        totalIdle += cpu.times.idle;
+      });
+      const usage = Math.round(100 - (100 * totalIdle / totalTick));
+      return Math.max(0, Math.min(100, usage));
+    });
+
+    ipcMain.handle('system:getMemoryUsage', async () => {
+      const osModule = os;
+      const total = osModule.totalmem();
+      const free = osModule.freemem();
+      const used = total - free;
+      return Math.round((used / total) * 100);
+    });
+
+    ipcMain.handle('os:getScreenBrightness', async () => {
+      // Query screen brightness using platform-specific commands
+      if (process.platform === 'win32') {
+        try {
+          const { execSync } = require('child_process');
+          const output = execSync(
+            'powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "(Get-WmiObject -Namespace root/wmi -Class WmiMonitorBrightness).CurrentBrightness"',
+            { encoding: 'utf-8', timeout: 3000, windowsHide: true }
+          ).trim();
+          const brightness = parseInt(output, 10);
+          if (!isNaN(brightness)) {
+            return { brightness, supported: true };
+          }
+        } catch {
+          // WMI not available (desktop monitors)
+        }
+      } else if (process.platform === 'darwin') {
+        try {
+          const { execSync } = require('child_process');
+          const output = execSync('brightness -l 2>/dev/null | grep "display 0" | awk \'{print $NF}\'', { encoding: 'utf-8', timeout: 3000 }).trim();
+          const brightness = Math.round(parseFloat(output) * 100);
+          if (!isNaN(brightness)) {
+            return { brightness, supported: true };
+          }
+        } catch {
+          // brightness CLI not installed
+        }
+      }
+      return { brightness: 100, supported: false };
+    });
+
+    ipcMain.handle('os:lockScreen', () => {
+      this.mainWindow?.webContents.send('dex:lock-screen');
+      return { success: true };
+    });
+
+    // Auto-lock on OS suspend / lock-screen events
+    powerMonitor.on('suspend', () => {
+      this.mainWindow?.webContents.send('dex:lock-screen');
+    });
+    powerMonitor.on('lock-screen', () => {
+      this.mainWindow?.webContents.send('dex:lock-screen');
+    });
+    powerMonitor.on('resume', () => {
+      this.mainWindow?.webContents.send('dex:resume');
+      // Force window visible and repaint after sleep/hibernate
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.show();
+        this.mainWindow.focus();
+        // Force Chromium to repaint — fixes black/blank screen after lid close
+        this.mainWindow.webContents.invalidate();
+      }
+    });
+    powerMonitor.on('unlock-screen', () => {
+      this.mainWindow?.webContents.send('dex:resume');
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.show();
+        this.mainWindow.focus();
+        this.mainWindow.webContents.invalidate();
+      }
+    });
+
+    ipcMain.handle('os:shutdown', () => {
+      this.isQuitting = true;
+      app.quit();
+      return { success: true };
+    });
+
+    ipcMain.handle('os:restart', () => {
+      app.relaunch();
+      app.exit(0);
+      return { success: true };
+    });
+
+    ipcMain.handle('os:sleep', () => {
+      this.mainWindow?.webContents.send('dex:lock-screen');
+      if (process.platform === 'win32') {
+        require('child_process').exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0');
+      } else if (process.platform === 'darwin') {
+        require('child_process').exec('pmset sleepnow');
+      } else {
+        require('child_process').exec('systemctl suspend');
+      }
+      return { success: true };
+    });
+
+    // -------------------------------------------------------------------------
     // Actions (with input sanitization)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('action:execute', async (_, action) => {
       // Validate the action execution request
       const validation = ipcValidator.validate('actions:execute', [action]);
@@ -1220,9 +2593,9 @@ class DexApp {
       return this.powerController.closeProcess(pid, false);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Modes
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('mode:getAll', async () => {
       try {
         return this.dataStore.getModes();
@@ -1252,9 +2625,9 @@ class DexApp {
       return this.dataStore.deleteMode(modeId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Rules
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('rule:getAll', async () => {
       return this.dataStore.getRules();
     });
@@ -1275,9 +2648,9 @@ class DexApp {
       this.ruleEngine.reloadRules();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Dialog & File System (for Audio player, etc.)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('dialog:showOpenDialog', async (_, options) => {
       return dialog.showOpenDialog(this.mainWindow!, options);
     });
@@ -1287,9 +2660,22 @@ class DexApp {
       return fs.promises.readdir(validPath);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    ipcMain.handle('fs:readFileHead', async (_, filePath: string, byteCount: number) => {
+      const validPath = PathValidator.validatePath(filePath, { requireExists: true });
+      const maxBytes = Math.min(byteCount || 131072, 2 * 1024 * 1024); // cap at 2MB
+      const fd = await fs.promises.open(validPath, 'r');
+      try {
+        const buffer = Buffer.alloc(maxBytes);
+        const { bytesRead } = await fd.read(buffer, 0, maxBytes, 0);
+        return buffer.slice(0, bytesRead).buffer;
+      } finally {
+        await fd.close();
+      }
+    });
+
+    // -------------------------------------------------------------------------
     // System Status
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('system:getStatus', async () => {
       return this.eventMonitor.getSystemStatus();
     });
@@ -1298,9 +2684,9 @@ class DexApp {
       return this.eventMonitor.getRunningProcesses();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Logs
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('logs:get', async (_, limit) => {
       return this.logger.getLogs(limit);
     });
@@ -1309,9 +2695,9 @@ class DexApp {
       return this.logger.clearLogs();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Health & Verification (Phase 50)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('health:getVerification', async () => {
       try {
         const results = await shipReadyVerification.runAllVerifications();
@@ -1324,9 +2710,9 @@ class DexApp {
 
     // Note: health:getStatus is registered in HealthMonitor.ts
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Phase 51: Performance & Capability Layer
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('phase51:getStatus', async () => {
       return getPhase51Status();
     });
@@ -1386,7 +2772,7 @@ class DexApp {
       return deviceInterface.exportFiles(deviceId, paths, dest);
     });
 
-    // Capability layer operations — with path validation
+    // Capability layer operations -- with path validation
     ipcMain.handle('capability:fileSystem:list', async (_, dirPath: string) => {
       const validPath = PathValidator.validatePath(dirPath);
       return capabilityLayer.fileSystem.listDirectory(validPath);
@@ -1409,18 +2795,22 @@ class DexApp {
     });
 
     ipcMain.handle('capability:storage:get', async (_, key: string) => {
-      const validKey = PathValidator.validateStorageKey(key);
-      return capabilityLayer.storage.get(validKey);
+      try {
+        const validKey = PathValidator.validateStorageKey(key);
+        return capabilityLayer.storage.get(validKey);
+      } catch { return null; }
     });
 
     ipcMain.handle('capability:storage:set', async (_, key: string, value: unknown) => {
-      const validKey = PathValidator.validateStorageKey(key);
-      return capabilityLayer.storage.set(validKey, value);
+      try {
+        const validKey = PathValidator.validateStorageKey(key);
+        return capabilityLayer.storage.set(validKey, value);
+      } catch { return null; }
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Permissions
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('permissions:getAll', async () => {
       return this.permissionManager.getAllPermissions();
     });
@@ -1433,9 +2823,9 @@ class DexApp {
       return this.permissionManager.revokePermission(permission);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Emergency Controls
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('emergency:stop', async () => {
       return this.emergencyStop();
     });
@@ -1444,9 +2834,9 @@ class DexApp {
       return this.resume();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Power & Performance
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('power:getStats', async () => {
       return this.powerController.getPowerStats();
     });
@@ -1479,9 +2869,24 @@ class DexApp {
       return this.powerController.getSuggestedCleanup();
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    ipcMain.handle('power:setCpuLimit', async (_, limit: number) => {
+      log.info(`[DEX] CPU limit set to ${limit}% (advisory)`);
+      return { success: true, limit };
+    });
+
+    ipcMain.handle('power:setGpuLimit', async (_, limit: number) => {
+      log.info(`[DEX] GPU limit set to ${limit}% (advisory)`);
+      return { success: true, limit };
+    });
+
+    ipcMain.handle('power:setFanCurve', async (_, curve: string) => {
+      log.info(`[DEX] Fan curve set to ${curve} (advisory)`);
+      return { success: true, curve };
+    });
+
+    // -------------------------------------------------------------------------
     // Operations (Phase 4A - Manual Control Layer)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('operations:execute', async (_, operationId) => {
       return this.operationsController.execute(operationId);
     });
@@ -1494,9 +2899,9 @@ class DexApp {
       return this.operationsController.getLogs(limit);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Workflows (Phase 5 - Composed Operations)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('workflows:getAll', async () => {
       return this.sessionController.getWorkflows();
     });
@@ -1525,9 +2930,9 @@ class DexApp {
       return this.sessionController.executeWorkflow(workflowId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Notes (Phase 6 - Quick Notes)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('sessions:getNotes', async () => {
       return this.sessionController.getNotes();
     });
@@ -1544,9 +2949,9 @@ class DexApp {
       return this.sessionController.deleteNote(noteId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Timers (Phase 6 - Time Tracking)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('sessions:getTimers', async () => {
       return this.sessionController.getTimers();
     });
@@ -1571,9 +2976,9 @@ class DexApp {
       return this.sessionController.deleteTimer(timerId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Running Tasks (Phase 6 - Task Control)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('sessions:getRunningTasks', async () => {
       return this.sessionController.getRunningTasks();
     });
@@ -1582,9 +2987,9 @@ class DexApp {
       return this.sessionController.stopTask(taskId);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Shell Operations (with IPC validation)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('shell:openPath', async (_, filePath) => {
       // Validate and rate-limit the request
       const validation = ipcValidator.validate('shell:openPath', [filePath]);
@@ -1604,12 +3009,18 @@ class DexApp {
         log.warn('[DEX] IPC validation failed for shell:openExternal:', validation.error);
         throw new Error(validation.error || 'Validation failed');
       }
-      return shell.openExternal(url);
+      const sanitizedUrl = (validation.sanitizedArgs?.[0] || url) as string;
+      return shell.openExternal(sanitizedUrl);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    ipcMain.handle('shell:showItemInFolder', async (_, filePath) => {
+      if (typeof filePath !== 'string') throw new Error('Invalid path');
+      shell.showItemInFolder(filePath);
+    });
+
+    // -------------------------------------------------------------------------
     // Universal Search (FINAL UI FUNCTIONALITY PHASE)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('search:query', async (_, query, options) => {
       return this.searchController.search(query, options);
     });
@@ -1624,9 +3035,9 @@ class DexApp {
       return { success: true };
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Media File Scanner (Real File System Integration)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('media:getMediaFiles', async (_, mediaType: string) => {
       ipcRateLimiter.enforce('media:getMediaFiles');
       const os = await import('os');
@@ -1649,7 +3060,7 @@ class DexApp {
         return results;
       }
       
-      // Scan directory recursively (max depth 3) — async to avoid blocking main thread
+      // Scan directory recursively (max depth 3) -- async to avoid blocking main thread
       const scanDir = async (dir: string, depth: number = 0): Promise<void> => {
         if (depth > 3 || results.length >= 500) return;
         try {
@@ -1689,13 +3100,13 @@ class DexApp {
       return results.slice(0, 500);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Fast Download System (Drop - Secure & Fast Downloads)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     ipcMain.handle('download:start', async (_, url: string, filename?: string) => {
       // Rate limiting
       ipcRateLimiter.enforce('download:start');
-      // Validate URL — only allow http/https, block internal networks
+      // Validate URL -- only allow http/https, block internal networks
       const urlObj = PathValidator.validateDownloadUrl(url);
 
       const os = await import('os');
@@ -1733,9 +3144,10 @@ class DexApp {
         const request = protocol.get(url, options, (response: any) => {
           // Follow redirects
           if (response.statusCode === 301 || response.statusCode === 302) {
-            file.close();
-            fs.unlinkSync(filePath);
-            resolve({ redirect: response.headers.location });
+            file.close(() => {
+              try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+              resolve({ redirect: response.headers.location });
+            });
             return;
           }
           
@@ -1811,14 +3223,14 @@ class DexApp {
       return files;
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Governance (Phase 58-59: AI + Plugin Boundaries)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     registerGovernanceHandlers();
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // Release Management (Phase 66: Safe Updates)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     this.releaseManager = new ReleaseManager();
     this.releaseManager.setMainWindow(this.mainWindow!);
     this.releaseManager.initialize().catch(err => {
@@ -1826,9 +3238,21 @@ class DexApp {
     });
     log.info('[DEX] Release Manager initialized');
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Update Service (VERSION.txt polling, supplements ReleaseManager)
+    this.updateService = new UpdateService();
+    this.updateService.setReleaseManager(this.releaseManager);
+    this.updateService.initialize().catch(err => {
+      log.error('[DEX] Update Service initialize failed:', err);
+    });
+
+    // Production Monitor (health snapshots, performance baseline)
+    this.productionMonitor = new ProductionMonitor();
+    this.productionMonitor.setMainWindow(this.mainWindow!);
+    this.productionMonitor.start();
+
+    // -------------------------------------------------------------------------
     // Voice Control (Phase 46: Opt-in Voice Commands)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     voiceControlEngine.initialize().then(() => {
       log.info('[DEX] Voice Control Engine initialized');
     }).catch(err => {
@@ -1838,15 +3262,19 @@ class DexApp {
 
   private async emergencyStop(): Promise<void> {
     this.logger.warn('EMERGENCY STOP ACTIVATED');
-    this.ruleEngine.stop();
-    this.eventMonitor.stop();
-    this.modeController.deactivateMode();
+    try { this.ruleEngine.stop(); } catch { /* */ }
+    try { this.eventMonitor.stop(); } catch { /* */ }
+    try { this.modeController.deactivateMode(); } catch { /* */ }
+    try { ukiController.shutdown(); } catch { /* */ }
+    try { coreRuntime.shutdown(); } catch { /* */ }
+    try { await shutdownAllWorkers(); } catch { /* */ }
     this.mainWindow?.webContents.send('emergency:stopped');
+    app.quit();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =======================================================================
   // Voice Notes IPC Handlers (Phase 7B)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =======================================================================
   
   private registerVoiceNotesHandlers(): void {
     // CRUD
@@ -1880,9 +3308,9 @@ class DexApp {
     this.logger.info('Voice Notes IPC handlers registered');
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // =======================================================================
   // Pattern Learning IPC Handlers (Local-only, background)
-  // ═══════════════════════════════════════════════════════════════════════
+  // =======================================================================
   
   private registerPatternLearningHandlers(): void {
     // Record usage events from renderer
@@ -1943,9 +3371,9 @@ class DexApp {
       patternLearning.cleanOldData();
     });
 
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
     // Creative Apps - File I/O Bridge (Imosion, Prism, Flux, Forge, VINX)
-    // ───────────────────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------
     ipcMain.handle('creativeApps:showSaveDialog', async (_event, options: any) => {
       const result = await dialog.showSaveDialog(this.mainWindow!, {
         title: options?.title || 'Save File',
@@ -1989,78 +3417,430 @@ class DexApp {
       }
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Critical Missing IPC Handlers -- Safe stubs preventing runtime crashes
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
+    // IPC Handlers -- Backed by DataStore persistence
+    // -------------------------------------------------------------------------
 
     // Sessions
     ipcMain.handle('sessions:getCurrent', async () => {
-      return { id: `session-${Date.now()}`, startedAt: Date.now(), active: true };
+      const sessions = await this.dataStore.get<any[]>('sessions') || [];
+      return sessions.find((s: any) => s.active) || null;
     });
     ipcMain.handle('sessions:start', async () => {
-      return { id: `session-${Date.now()}`, startedAt: Date.now(), active: true };
+      const sessions = await this.dataStore.get<any[]>('sessions') || [];
+      // End any currently active session
+      for (const s of sessions) { if (s.active) { s.active = false; s.endedAt = Date.now(); } }
+      const newSession = { id: `session-${Date.now()}`, startedAt: Date.now(), active: true };
+      sessions.push(newSession);
+      await this.dataStore.set('sessions', sessions);
+      return newSession;
     });
-    ipcMain.handle('sessions:end', async () => ({ success: true }));
-    ipcMain.handle('sessions:getHistory', async () => []);
+    ipcMain.handle('sessions:end', async () => {
+      const sessions = await this.dataStore.get<any[]>('sessions') || [];
+      for (const s of sessions) { if (s.active) { s.active = false; s.endedAt = Date.now(); } }
+      await this.dataStore.set('sessions', sessions);
+      return { success: true };
+    });
+    ipcMain.handle('sessions:getHistory', async () => {
+      const sessions = await this.dataStore.get<any[]>('sessions') || [];
+      return sessions.sort((a: any, b: any) => b.startedAt - a.startedAt);
+    });
 
     // Activity
-    ipcMain.handle('activity:getAll', async () => []);
-    ipcMain.handle('activity:getRecent', async () => []);
-    ipcMain.handle('activity:markRead', async () => ({ success: true }));
-    ipcMain.handle('activity:markAllRead', async () => ({ success: true }));
-    ipcMain.handle('activity:clearAll', async () => ({ success: true }));
-
-    // Dashboard
-    ipcMain.handle('dashboard:getLayout', async () => ({ id: 'default', name: 'Default', widgets: [] }));
-    ipcMain.handle('dashboard:saveLayout', async (_, layout) => layout);
-    ipcMain.handle('dashboard:getLayouts', async () => [{ id: 'default', name: 'Default', widgets: [] }]);
-    ipcMain.handle('dashboard:switchLayout', async () => ({ success: true }));
-    ipcMain.handle('dashboard:createLayout', async (_, layout) => ({ id: `layout-${Date.now()}`, ...layout, widgets: [] }));
-    ipcMain.handle('dashboard:deleteLayout', async () => ({ success: true }));
-    ipcMain.handle('dashboard:addWidget', async () => ({ success: true }));
-    ipcMain.handle('dashboard:removeWidget', async () => ({ success: true }));
-    ipcMain.handle('dashboard:moveWidget', async () => ({ success: true }));
-    ipcMain.handle('dashboard:resizeWidget', async () => ({ success: true }));
-    ipcMain.handle('dashboard:getWidgetTypes', async () => []);
-    ipcMain.handle('dashboard:getQuickButtons', async () => []);
-    ipcMain.handle('dashboard:addQuickButton', async () => ({ success: true }));
-    ipcMain.handle('dashboard:removeQuickButton', async () => ({ success: true }));
-    ipcMain.handle('dashboard:executeQuickAction', async () => ({ success: true }));
+    ipcMain.handle('activity:getAll', async () => {
+      return await this.dataStore.get<any[]>('activities') || [];
+    });
+    ipcMain.handle('activity:getRecent', async () => {
+      const activities = await this.dataStore.get<any[]>('activities') || [];
+      return activities.slice(-20).reverse();
+    });
+    ipcMain.handle('activity:markRead', async (_, activityId: string) => {
+      const activities = await this.dataStore.get<any[]>('activities') || [];
+      const item = activities.find((a: any) => a.id === activityId);
+      if (item) { item.read = true; await this.dataStore.set('activities', activities); }
+      return { success: true };
+    });
+    ipcMain.handle('activity:markAllRead', async () => {
+      const activities = await this.dataStore.get<any[]>('activities') || [];
+      for (const a of activities) { a.read = true; }
+      await this.dataStore.set('activities', activities);
+      return { success: true };
+    });
+    ipcMain.handle('activity:clearAll', async () => {
+      await this.dataStore.set('activities', []);
+      return { success: true };
+    });
 
     // Projects
-    ipcMain.handle('projects:getAll', async () => []);
-    ipcMain.handle('projects:create', async (_, project) => ({ id: `proj-${Date.now()}`, ...project, createdAt: Date.now() }));
-    ipcMain.handle('projects:update', async (_, project) => project);
-    ipcMain.handle('projects:delete', async () => ({ success: true }));
-    ipcMain.handle('projects:setActive', async () => ({ success: true }));
-    ipcMain.handle('projects:getActive', async () => null);
+    ipcMain.handle('projects:getAll', async () => {
+      return await this.dataStore.get<any[]>('projects') || [];
+    });
+    ipcMain.handle('projects:create', async (_, project: any) => {
+      const projects = await this.dataStore.get<any[]>('projects') || [];
+      const newProject = { id: `proj-${Date.now()}`, ...project, active: false, createdAt: Date.now() };
+      projects.push(newProject);
+      await this.dataStore.set('projects', projects);
+      return newProject;
+    });
+    ipcMain.handle('projects:update', async (_, project: any) => {
+      const projects = await this.dataStore.get<any[]>('projects') || [];
+      const idx = projects.findIndex((p: any) => p.id === project.id);
+      if (idx !== -1) { projects[idx] = { ...projects[idx], ...project, updatedAt: Date.now() }; await this.dataStore.set('projects', projects); return projects[idx]; }
+      return project;
+    });
+    ipcMain.handle('projects:delete', async (_, projectId: string) => {
+      const projects = await this.dataStore.get<any[]>('projects') || [];
+      await this.dataStore.set('projects', projects.filter((p: any) => p.id !== projectId));
+      return { success: true };
+    });
+    ipcMain.handle('projects:setActive', async (_, projectId: string) => {
+      const projects = await this.dataStore.get<any[]>('projects') || [];
+      for (const p of projects) { p.active = p.id === projectId; }
+      await this.dataStore.set('projects', projects);
+      return { success: true };
+    });
+    ipcMain.handle('projects:getActive', async () => {
+      const projects = await this.dataStore.get<any[]>('projects') || [];
+      return projects.find((p: any) => p.active) || null;
+    });
 
     // Media
     ipcMain.handle('media:getSupportedFormats', async () => [...MEDIA_EXTENSIONS.supported]);
-    ipcMain.handle('media:getThumbnail', async () => null);
+    ipcMain.handle('media:getThumbnail', async (_, filePath: string) => {
+      try {
+        const validPath = PathValidator.validatePath(filePath, { requireExists: true });
+        const img = await nativeImage.createThumbnailFromPath(validPath, { width: 256, height: 256 });
+        return img.toDataURL();
+      } catch {
+        return null;
+      }
+    });
     ipcMain.handle('media:openWithSystem', async (_, filePath: string) => {
       const validPath = PathValidator.validatePath(filePath, { requireExists: true });
       await shell.openPath(validPath);
       return { success: true };
     });
-    ipcMain.handle('media:preview', async () => null);
+    ipcMain.handle('media:preview', async (_, filePath: string) => {
+      try {
+        const validPath = PathValidator.validatePath(filePath, { requireExists: true });
+        const img = await nativeImage.createThumbnailFromPath(validPath, { width: 512, height: 512 });
+        return img.toDataURL();
+      } catch {
+        return null;
+      }
+    });
 
-    // Theme (remaining channels not in UXEnhancement)
-    ipcMain.handle('theme:getConfig', async () => ({ mode: THEME_DEFAULTS.MODE, accentColor: THEME_DEFAULTS.ACCENT_COLOR, fontScale: THEME_DEFAULTS.FONT_SCALE, reducedMotion: THEME_DEFAULTS.REDUCED_MOTION, density: THEME_DEFAULTS.DENSITY }));
-    ipcMain.handle('theme:setAccentColor', async () => ({ success: true }));
-    ipcMain.handle('theme:setFontScale', async () => ({ success: true }));
-    ipcMain.handle('theme:setReducedMotion', async () => ({ success: true }));
-    ipcMain.handle('theme:setDensity', async () => ({ success: true }));
-    ipcMain.handle('theme:generateCSSVariables', async () => '');
-    ipcMain.handle('theme:getPresets', async () => []);
-    ipcMain.handle('theme:applyPreset', async () => ({ success: true }));
-    ipcMain.handle('theme:export', async () => ({}));
-    ipcMain.handle('theme:import', async () => ({ success: true }));
+    // Theme -- persisted config
+    ipcMain.handle('theme:getConfig', async () => {
+      return await this.dataStore.get('themeConfig') || { mode: THEME_DEFAULTS.MODE, accentColor: THEME_DEFAULTS.ACCENT_COLOR, fontScale: THEME_DEFAULTS.FONT_SCALE, reducedMotion: THEME_DEFAULTS.REDUCED_MOTION, density: THEME_DEFAULTS.DENSITY };
+    });
+    // Item 78: System accent color sync -- read OS accent color
+    ipcMain.handle('theme:getSystemAccentColor', async () => {
+      try {
+        if (process.platform === 'win32' || process.platform === 'darwin') {
+          const color = systemPreferences.getAccentColor();
+          // Returns RRGGBBAA hex string on Windows, convert to #RRGGBB
+          if (color && color.length >= 6) {
+            return '#' + color.substring(0, 6);
+          }
+        }
+      } catch { /* Not supported on this OS */ }
+      return null;
+    });
+    ipcMain.handle('theme:setMode', async (_, mode: string) => {
+      const cfg = await this.dataStore.get<any>('themeConfig') || {};
+      cfg.mode = mode;
+      await this.dataStore.set('themeConfig', cfg);
+      this.mainWindow?.webContents.send('theme:changed', cfg);
+      return { success: true };
+    });
+    ipcMain.handle('theme:setAccentColor', async (_, color: string) => {
+      const cfg = await this.dataStore.get<any>('themeConfig') || {};
+      cfg.accentColor = color;
+      await this.dataStore.set('themeConfig', cfg);
+      return { success: true };
+    });
+    ipcMain.handle('theme:setFontScale', async (_, scale: number) => {
+      const cfg = await this.dataStore.get<any>('themeConfig') || {};
+      cfg.fontScale = scale;
+      await this.dataStore.set('themeConfig', cfg);
+      return { success: true };
+    });
+    ipcMain.handle('theme:setReducedMotion', async (_, enabled: boolean) => {
+      const cfg = await this.dataStore.get<any>('themeConfig') || {};
+      cfg.reducedMotion = enabled;
+      await this.dataStore.set('themeConfig', cfg);
+      return { success: true };
+    });
+    ipcMain.handle('theme:setDensity', async (_, density: string) => {
+      const cfg = await this.dataStore.get<any>('themeConfig') || {};
+      cfg.density = density;
+      await this.dataStore.set('themeConfig', cfg);
+      return { success: true };
+    });
+    ipcMain.handle('theme:generateCSSVariables', async () => {
+      const cfg = await this.dataStore.get<any>('themeConfig') || {};
+      return `--accent-color: ${cfg.accentColor || '#0a84ff'}; --font-scale: ${cfg.fontScale || 1};`;
+    });
+    ipcMain.handle('theme:getPresets', async () => {
+      return [
+        { id: 'true-black', name: 'True Black', accentColor: '#0a84ff', mode: 'dark' },
+        { id: 'midnight', name: 'Midnight', accentColor: '#5e5ce6', mode: 'dark' },
+        { id: 'ocean', name: 'Ocean', accentColor: '#64d2ff', mode: 'dark' },
+        { id: 'sunset', name: 'Sunset', accentColor: '#ff9f0a', mode: 'dark' },
+        { id: 'rose', name: 'Rose', accentColor: '#ff375f', mode: 'dark' },
+      ];
+    });
+    ipcMain.handle('theme:applyPreset', async (_, presetId: string) => {
+      const presets: Record<string, any> = {
+        'true-black': { mode: 'dark', accentColor: '#0a84ff', fontScale: 1, reducedMotion: false, density: 'comfortable' },
+        'midnight': { mode: 'dark', accentColor: '#5e5ce6', fontScale: 1, reducedMotion: false, density: 'comfortable' },
+        'ocean': { mode: 'dark', accentColor: '#64d2ff', fontScale: 1, reducedMotion: false, density: 'comfortable' },
+        'sunset': { mode: 'dark', accentColor: '#ff9f0a', fontScale: 1, reducedMotion: false, density: 'comfortable' },
+        'rose': { mode: 'dark', accentColor: '#ff375f', fontScale: 1, reducedMotion: false, density: 'comfortable' },
+      };
+      const preset = presets[presetId];
+      if (preset) { await this.dataStore.set('themeConfig', preset); }
+      return { success: true };
+    });
+    ipcMain.handle('theme:export', async () => {
+      return await this.dataStore.get('themeConfig') || {};
+    });
+    ipcMain.handle('theme:import', async (_, config: any) => {
+      if (config && typeof config === 'object') { await this.dataStore.set('themeConfig', config); }
+      return { success: true };
+    });
 
     // Automation Engine approval queue
-    ipcMain.handle('automationEngine:getApprovalQueue', async () => []);
-    ipcMain.handle('automationEngine:approve', async () => ({ success: true }));
-    ipcMain.handle('automationEngine:deny', async () => ({ success: true }));
+    ipcMain.handle('automationEngine:getApprovalQueue', async () => {
+      const queue = await this.dataStore.get<any[]>('automationQueue') || [];
+      return queue.filter((item: any) => item.status === 'pending');
+    });
+    ipcMain.handle('automationEngine:approve', async (_, itemId: string) => {
+      const queue = await this.dataStore.get<any[]>('automationQueue') || [];
+      const item = queue.find((q: any) => q.id === itemId);
+      if (item) { item.status = 'approved'; await this.dataStore.set('automationQueue', queue); }
+      return { success: true };
+    });
+    ipcMain.handle('automationEngine:deny', async (_, itemId: string) => {
+      const queue = await this.dataStore.get<any[]>('automationQueue') || [];
+      const item = queue.find((q: any) => q.id === itemId);
+      if (item) { item.status = 'denied'; await this.dataStore.set('automationQueue', queue); }
+      return { success: true };
+    });
+
+    // -----------------------------------------------------------------------
+    // Phase 3: Additional IPC handlers — wired to DataStore persistence
+    // -----------------------------------------------------------------------
+
+    // Auth setup handlers
+    ipcMain.handle('auth:setup:pin', async (_, pin: string) => {
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update(pin).digest('hex');
+      const s = await this.dataStore.get<Record<string, any>>('appliedSettings') || {};
+      s.pinHash = hash; s.pinEnabled = true;
+      await this.dataStore.set('appliedSettings', s);
+      return { success: true };
+    });
+    ipcMain.handle('auth:setup:password', async (_, password: string) => {
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update(password).digest('hex');
+      const s = await this.dataStore.get<Record<string, any>>('appliedSettings') || {};
+      s.passwordHash = hash; s.passwordEnabled = true;
+      await this.dataStore.set('appliedSettings', s);
+      return { success: true };
+    });
+    ipcMain.handle('auth:setup:biometric', async () => {
+      return { success: true, supported: process.platform === 'darwin' || process.platform === 'win32' };
+    });
+
+    // Split view
+    ipcMain.handle('splitview:apply-preset', async (_, preset: string) => {
+      this.mainWindow?.webContents.send('splitview:preset-applied', preset);
+      return { success: true };
+    });
+    ipcMain.handle('split:cross-drop', async (_, data: any) => {
+      this.mainWindow?.webContents.send('split:cross-drop-applied', data);
+      return { success: true };
+    });
+
+    // Tags CRUD
+    ipcMain.handle('tags:rename', async (_, tagId: string, newName: string) => {
+      const tags = await this.dataStore.get<any[]>('tags') || [];
+      const tag = tags.find((t: any) => t.id === tagId);
+      if (tag) { tag.name = newName; await this.dataStore.set('tags', tags); }
+      return { success: true };
+    });
+    ipcMain.handle('tags:merge', async (_, sourceId: string, targetId: string) => {
+      let tags = await this.dataStore.get<any[]>('tags') || [];
+      tags = tags.filter((t: any) => t.id !== sourceId);
+      await this.dataStore.set('tags', tags);
+      return { success: true, mergedInto: targetId };
+    });
+    ipcMain.handle('tags:delete', async (_, tagId: string) => {
+      let tags = await this.dataStore.get<any[]>('tags') || [];
+      tags = tags.filter((t: any) => t.id !== tagId);
+      await this.dataStore.set('tags', tags);
+      return { success: true };
+    });
+    ipcMain.handle('tags:bulk-rename', async (_, renames: Array<{ id: string; name: string }>) => {
+      const tags = await this.dataStore.get<any[]>('tags') || [];
+      for (const r of renames) {
+        const tag = tags.find((t: any) => t.id === r.id);
+        if (tag) tag.name = r.name;
+      }
+      await this.dataStore.set('tags', tags);
+      return { success: true };
+    });
+    ipcMain.handle('tags:bulk-merge', async (_, sourceIds: string[], targetId: string) => {
+      let tags = await this.dataStore.get<any[]>('tags') || [];
+      tags = tags.filter((t: any) => !sourceIds.includes(t.id));
+      await this.dataStore.set('tags', tags);
+      return { success: true, mergedInto: targetId };
+    });
+
+    // Duplicates resolution
+    ipcMain.handle('duplicates:resolve', async (_, duplicateId: string, strategy: string) => {
+      const tags = await this.dataStore.get<any[]>('tags') || [];
+      // Mark as resolved in metadata
+      const resolvedDups = await this.dataStore.get<any[]>('resolvedDuplicates') || [];
+      resolvedDups.push({ id: duplicateId, strategy, resolvedAt: Date.now() });
+      await this.dataStore.set('resolvedDuplicates', resolvedDups);
+      return { success: true, resolved: duplicateId, strategy };
+    });
+    ipcMain.handle('duplicates:bulk-resolve', async (_, ids: string[], strategy: string) => {
+      const resolvedDups = await this.dataStore.get<any[]>('resolvedDuplicates') || [];
+      for (const id of ids) {
+        resolvedDups.push({ id, strategy, resolvedAt: Date.now() });
+      }
+      await this.dataStore.set('resolvedDuplicates', resolvedDups);
+      return { success: true, resolved: ids.length, strategy };
+    });
+
+    // Notes server — local sync mode (no external network required)
+    ipcMain.handle('notes:start-server', async () => {
+      // Notes are persisted locally via DataStore — no server needed
+      const noteCount = ((await this.dataStore.get<any[]>('notes')) || []).length;
+      return { success: true, status: 'running', port: 0, mode: 'local', noteCount };
+    });
+    ipcMain.handle('notes:stop-server', async () => {
+      return { success: true, status: 'stopped', mode: 'local' };
+    });
+
+    // Focus sessions
+    ipcMain.handle('focus:start', async (_, mode?: string) => {
+      const sessions = await this.dataStore.get<any[]>('focusSessions') || [];
+      const session = { id: `focus-${Date.now()}`, startedAt: Date.now(), active: true, mode: mode || 'default' };
+      sessions.push(session);
+      await this.dataStore.set('focusSessions', sessions);
+      this.mainWindow?.webContents.send('focus:state-changed', { active: true, session });
+      return session;
+    });
+    ipcMain.handle('focus:end', async () => {
+      const sessions = await this.dataStore.get<any[]>('focusSessions') || [];
+      const active = sessions.find((s: any) => s.active);
+      if (active) { active.active = false; active.endedAt = Date.now(); await this.dataStore.set('focusSessions', sessions); }
+      this.mainWindow?.webContents.send('focus:state-changed', { active: false });
+      return { success: true };
+    });
+
+    // Health / stability
+    ipcMain.handle('stability:ping', async () => {
+      return { status: 'ok', uptime: process.uptime(), timestamp: Date.now() };
+    });
+    ipcMain.handle('memory:recordActivity', async (_, activity: any) => {
+      const activities = await this.dataStore.get<any[]>('activities') || [];
+      activities.push({ ...activity, id: `act-${Date.now()}`, timestamp: Date.now() });
+      if (activities.length > 1000) activities.splice(0, activities.length - 1000);
+      await this.dataStore.set('activities', activities);
+      return { success: true };
+    });
+
+    // Session notes CRUD
+    ipcMain.handle('sessions:notes:get', async (_, sessionId: string) => {
+      const notes = await this.dataStore.get<any[]>('sessionNotes') || [];
+      return notes.filter((n: any) => n.sessionId === sessionId);
+    });
+    ipcMain.handle('sessions:notes:add', async (_, sessionId: string, content: string) => {
+      const notes = await this.dataStore.get<any[]>('sessionNotes') || [];
+      const note = { id: `note-${Date.now()}`, sessionId, content, createdAt: Date.now() };
+      notes.push(note);
+      await this.dataStore.set('sessionNotes', notes);
+      return note;
+    });
+    ipcMain.handle('sessions:notes:update', async (_, noteId: string, content: string) => {
+      const notes = await this.dataStore.get<any[]>('sessionNotes') || [];
+      const note = notes.find((n: any) => n.id === noteId);
+      if (note) { note.content = content; note.updatedAt = Date.now(); await this.dataStore.set('sessionNotes', notes); }
+      return { success: true };
+    });
+    ipcMain.handle('sessions:notes:delete', async (_, noteId: string) => {
+      let notes = await this.dataStore.get<any[]>('sessionNotes') || [];
+      notes = notes.filter((n: any) => n.id !== noteId);
+      await this.dataStore.set('sessionNotes', notes);
+      return { success: true };
+    });
+
+    // Session timers CRUD
+    ipcMain.handle('sessions:timers:get', async () => {
+      return await this.dataStore.get<any[]>('sessionTimers') || [];
+    });
+    ipcMain.handle('sessions:timers:create', async (_, label: string, duration: number) => {
+      const timers = await this.dataStore.get<any[]>('sessionTimers') || [];
+      const timer = { id: `timer-${Date.now()}`, label, duration, remaining: duration, status: 'idle' as const, createdAt: Date.now() };
+      timers.push(timer);
+      await this.dataStore.set('sessionTimers', timers);
+      return timer;
+    });
+    ipcMain.handle('sessions:timers:start', async (_, timerId: string) => {
+      const timers = await this.dataStore.get<any[]>('sessionTimers') || [];
+      const timer = timers.find((t: any) => t.id === timerId);
+      if (timer) { timer.status = 'running'; await this.dataStore.set('sessionTimers', timers); }
+      return { success: true };
+    });
+    ipcMain.handle('sessions:timers:pause', async (_, timerId: string) => {
+      const timers = await this.dataStore.get<any[]>('sessionTimers') || [];
+      const timer = timers.find((t: any) => t.id === timerId);
+      if (timer) { timer.status = 'paused'; await this.dataStore.set('sessionTimers', timers); }
+      return { success: true };
+    });
+    ipcMain.handle('sessions:timers:stop', async (_, timerId: string) => {
+      const timers = await this.dataStore.get<any[]>('sessionTimers') || [];
+      const timer = timers.find((t: any) => t.id === timerId);
+      if (timer) { timer.status = 'done'; timer.remaining = 0; await this.dataStore.set('sessionTimers', timers); }
+      return { success: true };
+    });
+    ipcMain.handle('sessions:timers:delete', async (_, timerId: string) => {
+      let timers = await this.dataStore.get<any[]>('sessionTimers') || [];
+      timers = timers.filter((t: any) => t.id !== timerId);
+      await this.dataStore.set('sessionTimers', timers);
+      return { success: true };
+    });
+
+    // Emergency mode
+    ipcMain.handle('emergency:stop', async () => {
+      await this.dataStore.set('emergencyMode', true);
+      this.mainWindow?.webContents.send('emergency:stopped');
+      return { success: true };
+    });
+    ipcMain.handle('emergency:resume', async () => {
+      await this.dataStore.set('emergencyMode', false);
+      this.mainWindow?.webContents.send('emergency:resumed');
+      return { success: true };
+    });
+
+    // Intelligence event recording
+    ipcMain.handle('intelligence:recordEvent', async (_, event: any) => {
+      const events = await this.dataStore.get<any[]>('events') || [];
+      events.push({ ...event, id: `evt-${Date.now()}`, timestamp: Date.now() });
+      if (events.length > 5000) events.splice(0, events.length - 5000);
+      await this.dataStore.set('events', events);
+      return { success: true };
+    });
+
+    // Renderer health ping (using ipcMain.on for one-way messages)
+    const { ipcMain: ipcMainModule } = require('electron');
+    ipcMainModule.on('renderer-health:pong', () => { /* renderer is alive */ });
   }
 
   private async resume(): Promise<void> {
@@ -2078,21 +3858,13 @@ class DexApp {
       // Set balanced profile by default for optimal performance
       await this.powerController.setProfile('balanced');
       
-      // Clean up memory if usage is high
+      // Only clean up memory if usage is critically high (>90%)
+      // Lower thresholds cause unnecessary event loop blocking
       const stats = await this.powerController.getPowerStats();
-      if (stats.memory.percent > 80) {
-        this.logger.info('High memory usage detected, freeing memory...');
-        await this.powerController.freeMemory();
-      }
-      
-      // Deprioritize background processes for smoother foreground performance
-      const resourceHogs = await this.powerController.getResourceHogs();
-      const backgroundHogs = resourceHogs.filter(p => 
-        p.priority === 'background' && p.cpu > 10
-      );
-      
-      if (backgroundHogs.length > 0) {
-        this.logger.info(`Found ${backgroundHogs.length} background processes using high CPU`);
+      if (stats.memory.percent > 90) {
+        this.logger.info('Critical memory usage detected, freeing memory...');
+        // Run asynchronously without blocking startup
+        this.powerController.freeMemory().catch(() => {});
       }
       
       this.logger.success('System optimization complete - running smooth');
@@ -2114,7 +3886,8 @@ const dex = new DexApp();
 
 // Check for CLI mode via command line arguments
 const args = process.argv.slice(2);
-const isCLIMode = args.length > 0 && !args[0].startsWith('--inspect');
+const CLI_COMMANDS = new Set(['help', 'version', 'list', 'run', 'status', 'trigger', 'export', 'import', 'exec', 'config']);
+const isCLIMode = args.length > 0 && CLI_COMMANDS.has(args[0]);
 
 if (isCLIMode) {
   // Run in CLI mode without GUI

@@ -1,0 +1,22 @@
+{
+  "name": "@dex/native-cpp",
+  "version": "3.6.0",
+  "description": "DEX C++ native addon -- bloom filter, spatial index, SIMD hashing, signal processing, matrix ops",
+  "main": "build/Release/dex_cpp.node",
+  "private": true,
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "build": "node-gyp rebuild",
+    "clean": "node-gyp clean"
+  },
+  "dependencies": {
+    "node-addon-api": "^7.1.0"
+  },
+  "devDependencies": {
+    "node-gyp": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "UNLICENSED"
+}

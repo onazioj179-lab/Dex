@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 32: Release Validation & Production Readiness
 // Pre-release checks and validation utilities
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { runSystemAudit, SystemAuditReport } from './systemAudit';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // RELEASE CHECKLIST
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface ChecklistItem {
   id: string;
@@ -28,9 +34,9 @@ export interface ReleaseChecklist {
   requiredTotal: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // STANDARD CHECKLIST ITEMS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const RELEASE_CHECKLIST_ITEMS: Omit<ChecklistItem, 'passed' | 'details'>[] = [
   // Build & Code Quality
@@ -230,9 +236,9 @@ const RELEASE_CHECKLIST_ITEMS: Omit<ChecklistItem, 'passed' | 'details'>[] = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // AUTOMATED CHECKS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Run automated validation checks
@@ -328,9 +334,9 @@ async function runAutomatedChecks(): Promise<Map<string, { passed: boolean; deta
   return results;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // RELEASE VALIDATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Generate release checklist with automated check results
@@ -364,6 +370,7 @@ export async function generateReleaseChecklist(version: string): Promise<Release
  * Print release checklist to console
  */
 export function printReleaseChecklist(checklist: ReleaseChecklist): void {
+  if (!import.meta.env.DEV) return;
   console.group(`Release Checklist v${checklist.version}`);
   console.log(`Timestamp: ${new Date(checklist.timestamp).toISOString()}`);
   console.log(`Status: ${checklist.passed ? 'READY' : 'NOT READY'}`);
@@ -393,9 +400,9 @@ export function printReleaseChecklist(checklist: ReleaseChecklist): void {
   console.groupEnd();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // RELEASE CANDIDATE BUILD
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface ReleaseCandidateInfo {
   version: string;
@@ -443,6 +450,7 @@ export async function generateReleaseCandidateInfo(
  * Print release candidate summary
  */
 export function printReleaseCandidateSummary(rc: ReleaseCandidateInfo): void {
+  if (!import.meta.env.DEV) return;
   console.group(`Release Candidate: v${rc.version} (build ${rc.buildNumber})`);
   console.log(`Environment: ${rc.environment}`);
   console.log(`Timestamp: ${new Date(rc.timestamp).toISOString()}`);
@@ -467,9 +475,9 @@ export function printReleaseCandidateSummary(rc: ReleaseCandidateInfo): void {
   console.groupEnd();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // QUICK VALIDATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Quick pre-release validation (for CI/CD)

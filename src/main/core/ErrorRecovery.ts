@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Error Recovery System
 // Phase 15: Deep Internal Micro-Optimization
 // Boundary checks, state consistency, and automatic recovery
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import log from 'electron-log';
 import { app, dialog, BrowserWindow } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -35,9 +41,9 @@ export interface RecoveryAction {
 type ErrorHandler = (error: DexError) => Promise<boolean>;
 type RecoveryStrategy = (error: DexError) => Promise<RecoveryAction | null>;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ERROR CODES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const ErrorCodes = {
   // System errors
@@ -72,9 +78,9 @@ export const ErrorCodes = {
   UNKNOWN: 'UNKNOWN',
 } as const;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ERROR RECOVERY SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ErrorRecoverySystemClass {
   private errors: DexError[] = [];
@@ -402,9 +408,9 @@ class ErrorRecoverySystemClass {
 // Singleton export
 export const errorRecovery = new ErrorRecoverySystemClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VALIDATION UTILITIES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export function validateNotNull<T>(value: T | null | undefined, name: string): T {
   if (value === null || value === undefined) {
@@ -473,9 +479,9 @@ export function validateArray<T>(value: any, name: string, options?: {
   return value;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SAFE EXECUTION WRAPPER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export async function safeExecute<T>(
   operation: () => Promise<T>,

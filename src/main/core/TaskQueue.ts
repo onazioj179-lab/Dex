@@ -1,17 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Task Queue System
 // Phase 19: Queued, not autonomous task automation
 // Tasks run only after explicit user start
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { Logger } from '../utils/Logger';
 import { EventEmitter } from 'events';
 
 const log = new Logger();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
 export type TaskPriority = 'low' | 'normal' | 'high';
@@ -64,9 +70,9 @@ export interface QueueStatus {
   currentTask: string | null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TASK QUEUE CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class TaskQueueClass extends EventEmitter {
   private queue: QueuedTask[] = [];
@@ -82,9 +88,9 @@ class TaskQueueClass extends EventEmitter {
     this.registerBuiltInExecutors();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXECUTOR REGISTRATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Register a task executor
@@ -101,9 +107,9 @@ class TaskQueueClass extends EventEmitter {
     return Array.from(this.executors.keys());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Add task to queue
@@ -235,9 +241,9 @@ class TaskQueueClass extends EventEmitter {
     return removed;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXECUTION CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Start queue execution
@@ -338,9 +344,9 @@ class TaskQueueClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE PROCESSING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async processQueue(): Promise<void> {
     while (this.isRunning && !this.isPaused) {
@@ -454,9 +460,9 @@ class TaskQueueClass extends EventEmitter {
     return firstPending === -1 ? this.queue.length : firstPending;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUILT-IN EXECUTORS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerBuiltInExecutors(): void {
     // Delay executor (for testing/debugging)
@@ -489,16 +495,31 @@ class TaskQueueClass extends EventEmitter {
       validate: (params) => typeof params.message === 'string',
     });
 
-    // Batch executor (runs multiple sub-operations)
+    // Batch executor (runs multiple sub-operations via their registered executors)
     this.registerExecutor({
       type: 'batch',
       execute: async (params, onProgress) => {
-        const operations = params.operations ?? [];
+        const operations: { type: string; params?: any }[] = params.operations ?? [];
         const results: any[] = [];
 
         for (let i = 0; i < operations.length; i++) {
-          // Execute operation (placeholder - actual ops would be implemented)
-          results.push({ index: i, op: operations[i] });
+          const op = operations[i];
+          const executor = this.executors.get(op.type);
+          if (!executor || op.type === 'batch') {
+            results.push({ index: i, type: op.type, error: 'Unknown or recursive task type' });
+          } else {
+            try {
+              const result = await executor.execute(op.params ?? {}, (p) => {
+                // Scale sub-task progress to overall batch progress
+                const baseProgress = (i / operations.length) * 100;
+                const subProgress = (p / 100) * (100 / operations.length);
+                onProgress(baseProgress + subProgress);
+              });
+              results.push({ index: i, type: op.type, result });
+            } catch (err: any) {
+              results.push({ index: i, type: op.type, error: err.message || 'Failed' });
+            }
+          }
           onProgress(((i + 1) / operations.length) * 100);
         }
 
@@ -511,9 +532,9 @@ class TaskQueueClass extends EventEmitter {
 // Singleton export
 export const taskQueue = new TaskQueueClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TASK CHAIN BUILDER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class TaskChainBuilder {
   private tasks: Omit<TaskDefinition, 'id' | 'createdAt'>[] = [];

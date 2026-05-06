@@ -1,18 +1,24 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 30: Animation Budget System
 // System-wide animation control with performance awareness
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const ANIMATION_CONFIG = {
   // Base durations (in ms) - these are modified by system state
-  micro: 50,      // Subtle feedback (hover, press)
-  fast: 100,      // Quick transitions (dropdown open)
-  normal: 150,    // Standard transitions (panel slide)
-  slow: 250,      // Emphasis transitions (modal)
+  micro: 20,      // Subtle feedback (hover, press)
+  fast: 50,       // Quick transitions (dropdown open)
+  normal: 80,     // Standard transitions (panel slide)
+  slow: 120,      // Emphasis transitions (modal)
   
   // Easing functions
   easing: {
@@ -30,9 +36,9 @@ export const ANIMATION_CONFIG = {
   minimumDuration: 16,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // ANIMATION STATE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface AnimationState {
   enabled: boolean;
@@ -50,9 +56,9 @@ const state: AnimationState = {
   frameTimeHistory: [],
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // INITIALIZATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 let initialized = false;
 let frameId: number | null = null;
@@ -79,16 +85,18 @@ export function initAnimationBudget(): () => void {
   
   mediaQuery.addEventListener('change', handleMotionChange);
   
-  // Monitor frame timing
+  // Monitor frame timing - sample periodically (every 500ms) instead of
+  // running a continuous rAF loop which wastes CPU when idle.
   let lastTime = performance.now();
+  let sampleTimer: ReturnType<typeof setTimeout> | null = null;
   
   const measureFrame = (time: number) => {
     const frameTime = time - lastTime;
     lastTime = time;
     
-    // Update frame time history (keep last 30 frames)
+    // Update frame time history (keep last 10 samples)
     state.frameTimeHistory.push(frameTime);
-    if (state.frameTimeHistory.length > 30) {
+    if (state.frameTimeHistory.length > 10) {
       state.frameTimeHistory.shift();
     }
     
@@ -96,11 +104,22 @@ export function initAnimationBudget(): () => void {
     
     // Update performance mode based on frame times
     updatePerformanceMode();
-    
-    frameId = requestAnimationFrame(measureFrame);
   };
   
-  frameId = requestAnimationFrame(measureFrame);
+  const scheduleSample = () => {
+    sampleTimer = setTimeout(() => {
+      frameId = requestAnimationFrame((time) => {
+        measureFrame(time);
+        scheduleSample();
+      });
+    }, 3000);
+  };
+  
+  // Kick off the first sample
+  frameId = requestAnimationFrame((time) => {
+    lastTime = time;
+    scheduleSample();
+  });
   
   // Cleanup function
   return () => {
@@ -108,6 +127,10 @@ export function initAnimationBudget(): () => void {
     if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
+    }
+    if (sampleTimer !== null) {
+      clearTimeout(sampleTimer);
+      sampleTimer = null;
     }
     initialized = false;
   };
@@ -141,9 +164,9 @@ function updatePerformanceMode(): void {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // API
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Check if animations are currently enabled
@@ -247,9 +270,9 @@ export function getAnimationStyle(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CSS VARIABLE GENERATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Generate CSS variables for animation system
@@ -391,9 +414,9 @@ export const animationClasses = `
 }
 `;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // REACT HOOKS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 import { useState, useEffect } from 'react';
 
@@ -413,12 +436,13 @@ export function useAnimationDuration(
     
     mediaQuery.addEventListener('change', update);
     
-    // Also update periodically to catch performance changes
-    const interval = setInterval(update, 1000);
+    // Check on perf-tier changes (no polling -- event-driven only)
+    const tierObs = new MutationObserver(() => setDuration(getAnimationDuration(type)));
+    tierObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-perf-tier'] });
     
     return () => {
       mediaQuery.removeEventListener('change', update);
-      clearInterval(interval);
+      tierObs.disconnect();
     };
   }, [type]);
   
@@ -437,11 +461,12 @@ export function useAnimationsEnabled(): boolean {
     const update = () => setEnabled(areAnimationsEnabled());
     
     mediaQuery.addEventListener('change', update);
-    const interval = setInterval(update, 1000);
+    const tierObs = new MutationObserver(update);
+    tierObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-perf-tier'] });
     
     return () => {
       mediaQuery.removeEventListener('change', update);
-      clearInterval(interval);
+      tierObs.disconnect();
     };
   }, []);
   
@@ -463,4 +488,148 @@ export function useTransition(
   const easing = getEasing('default');
   
   return props.map(prop => `${prop} ${d}ms ${easing}`).join(', ');
+}
+
+// -----------------------------------------------------------------------------
+// PERFORMANCE TIER DETECTION (Phase 10: Low-End PC Optimization)
+// -----------------------------------------------------------------------------
+
+export type PerformanceTier = 'low' | 'mid' | 'high' | 'ultra';
+
+interface HardwareProfile {
+  cores: number;
+  memory: number; // GB
+  gpu: string;
+  tier: PerformanceTier;
+}
+
+let cachedTier: PerformanceTier | null = null;
+let cachedProfile: HardwareProfile | null = null;
+
+/**
+ * Detect hardware capabilities and return a performance tier.
+ * Results are cached after first detection.
+ */
+export function detectPerformanceTier(): PerformanceTier {
+  if (cachedTier) return cachedTier;
+
+  const cores = navigator.hardwareConcurrency || 2;
+  const memory = (navigator as any).deviceMemory || 4; // GB, Chrome-only
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  let gpu = 'unknown';
+  if (gl) {
+    const dbg = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
+    if (dbg) gpu = (gl as WebGLRenderingContext).getParameter(dbg.UNMASKED_RENDERER_WEBGL) || 'unknown';
+  }
+
+  let score = 0;
+  // CPU score (0-3)
+  if (cores >= 8) score += 3;
+  else if (cores >= 4) score += 2;
+  else score += 1;
+  // Memory score (0-3)
+  if (memory >= 16) score += 3;
+  else if (memory >= 8) score += 2;
+  else score += 1;
+  // GPU score (0-3) - penalize integrated/software renderers
+  const gpuLower = gpu.toLowerCase();
+  if (gpuLower.includes('swiftshader') || gpuLower.includes('llvmpipe') || gpuLower.includes('software')) score += 0;
+  else if (gpuLower.includes('intel') || gpuLower.includes('integrated')) score += 1;
+  else score += 3;
+
+  const tier: PerformanceTier = score <= 3 ? 'low' : score <= 5 ? 'mid' : score <= 7 ? 'high' : 'ultra';
+
+  cachedProfile = { cores, memory, gpu, tier };
+  cachedTier = tier;
+
+  // Apply tier-based CSS class to document root
+  document.documentElement.dataset.perfTier = tier;
+
+  return tier;
+}
+
+/**
+ * Get the full hardware profile (call after detectPerformanceTier)
+ */
+export function getHardwareProfile(): HardwareProfile | null {
+  return cachedProfile;
+}
+
+/**
+ * Check if backdrop-filter should be used (disabled on low-end)
+ */
+export function shouldUseBackdropFilter(): boolean {
+  const tier = cachedTier || detectPerformanceTier();
+  return tier !== 'low';
+}
+
+/**
+ * Get recommended waveform downsampling factor
+ */
+export function getWaveformDownsample(): number {
+  const tier = cachedTier || detectPerformanceTier();
+  return tier === 'low' ? 4 : tier === 'mid' ? 2 : 1;
+}
+
+/**
+ * Get recommended UI update throttle (ms) during playback
+ */
+export function getPlaybackThrottle(): number {
+  const tier = cachedTier || detectPerformanceTier();
+  return tier === 'low' ? 66 : tier === 'mid' ? 33 : 16; // ~15fps, ~30fps, ~60fps
+}
+
+/**
+ * Hook to get current performance tier
+ */
+export function usePerformanceTier(): PerformanceTier {
+  const [tier] = useState(() => detectPerformanceTier());
+  return tier;
+}
+
+/**
+ * Schedule a non-critical callback via requestIdleCallback (falls back to setTimeout)
+ */
+export function scheduleIdle(cb: () => void, timeout = 2000): number {
+  if ('requestIdleCallback' in window) {
+    return (window as any).requestIdleCallback(cb, { timeout });
+  }
+  return setTimeout(cb, 100) as unknown as number;
+}
+
+/**
+ * Cancel a scheduled idle callback
+ */
+export function cancelIdle(id: number): void {
+  if ('cancelIdleCallback' in window) {
+    (window as any).cancelIdleCallback(id);
+  } else {
+    clearTimeout(id);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// MEMORY PRESSURE DETECTION
+// -----------------------------------------------------------------------------
+
+let memoryWarnTriggered = false;
+
+/**
+ * Check if memory usage is high and reduce caches if needed.
+ * Returns true if memory is under pressure.
+ */
+export function checkMemoryPressure(): boolean {
+  const perf = performance as any;
+  if (!perf.memory) return false;
+  const used = perf.memory.usedJSHeapSize;
+  const limit = perf.memory.jsHeapSizeLimit;
+  const ratio = used / limit;
+  if (ratio > 0.85 && !memoryWarnTriggered) {
+    memoryWarnTriggered = true;
+    console.warn(`[DEX] Memory pressure: ${(ratio * 100).toFixed(1)}% heap used (${(used / 1024 / 1024).toFixed(0)}MB / ${(limit / 1024 / 1024).toFixed(0)}MB)`);
+  } else if (ratio < 0.7) {
+    memoryWarnTriggered = false;
+  }
+  return ratio > 0.85;
 }

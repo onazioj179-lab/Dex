@@ -1,4 +1,10 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX Agent Core - Central AI Reasoning Engine
 // Coordinates NLP, memory, tools, and task execution
 // =============================================================================
@@ -136,7 +142,7 @@ class AgentCore extends EventEmitter {
           averageResponseTime: 0,
         },
       },
-    }) as Store<Record<string, unknown>>;
+    }) as unknown as Store<Record<string, unknown>>;
 
     this.contextStore = new Store({
       name: 'dex-agent-context',
@@ -145,7 +151,7 @@ class AgentCore extends EventEmitter {
         userPreferences: {},
         learnedPatterns: [],
       },
-    }) as Store<Record<string, unknown>>;
+    }) as unknown as Store<Record<string, unknown>>;
 
     this.config = this.store.get('config') as AgentConfig;
     this.stats = this.store.get('stats') as AgentStats;

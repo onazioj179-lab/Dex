@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Large File Reader
 // GB-scale files open safely with chunked reads
 // No freezes, no memory spikes
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
@@ -11,9 +17,9 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface ChunkRequest {
   filePath: string;
@@ -52,9 +58,9 @@ export interface LargeFileConfig {
   lineBufferSize: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DEFAULT CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_CONFIG: LargeFileConfig = {
   defaultChunkSize: 64 * 1024,      // 64KB default chunk
@@ -64,9 +70,9 @@ const DEFAULT_CONFIG: LargeFileConfig = {
   lineBufferSize: 4096              // Buffer for line reading
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LARGE FILE READER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class LargeFileReaderClass extends EventEmitter {
   private config: LargeFileConfig;
@@ -81,9 +87,9 @@ class LargeFileReaderClass extends EventEmitter {
     this.startSessionCleanup();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Open file session
@@ -138,9 +144,9 @@ class LargeFileReaderClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SESSION MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async openSession(filePath: string, chunkSize?: number): Promise<{ session?: FileSession; error?: string }> {
     try {
@@ -211,9 +217,9 @@ class LargeFileReaderClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CHUNK READING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async readNextChunk(sessionId: string): Promise<ChunkResult | { error: string }> {
     const session = this.sessions.get(sessionId);
@@ -282,9 +288,9 @@ class LargeFileReaderClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LINE-BASED READING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async readLines(sessionId: string, lineCount: number): Promise<{ lines: string[]; hasMore: boolean } | { error: string }> {
     const session = this.sessions.get(sessionId);
@@ -335,9 +341,9 @@ class LargeFileReaderClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SEEKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   seek(sessionId: string, position: number): { success: boolean; position?: number; error?: string } {
     const session = this.sessions.get(sessionId);
@@ -399,9 +405,9 @@ class LargeFileReaderClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE INFO
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getFileInfo(filePath: string): Promise<{
     size: number;
@@ -430,9 +436,9 @@ class LargeFileReaderClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SESSION INFO
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getSession(sessionId: string): FileSession | null {
     return this.sessions.get(sessionId) || null;
@@ -442,9 +448,9 @@ class LargeFileReaderClass extends EventEmitter {
     return Array.from(this.sessions.values());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STREAM READING (for very large files)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   createReadStream(filePath: string, start?: number, end?: number): fsSync.ReadStream {
     const options: { highWaterMark: number; start?: number; end?: number } = {
@@ -457,9 +463,9 @@ class LargeFileReaderClass extends EventEmitter {
     return fsSync.createReadStream(filePath, options);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -468,9 +474,9 @@ class LargeFileReaderClass extends EventEmitter {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startSessionCleanup(): void {
     this.cleanupInterval = setInterval(() => {
@@ -497,9 +503,9 @@ class LargeFileReaderClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const LargeFileReader = new LargeFileReaderClass();
 export default LargeFileReader;

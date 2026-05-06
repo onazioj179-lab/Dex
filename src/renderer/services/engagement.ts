@@ -1,6 +1,12 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Engagement System -- Achievements, Streaks & Tips
- * Now powered by the 500-achievement catalog. No emojis -- SVG icons only.
+ * Now powered by the 5000-achievement catalog. No emojis -- SVG icons only.
  */
 
 import {
@@ -39,7 +45,6 @@ export const TIPS: { id: string; text: string; icon: string }[] = [
   { id: 'tip-prism', text: 'PRISM Image Editor (Alt+R) handles layers, filters, and batch edits.', icon: 'image' },
   { id: 'tip-flux', text: 'FLUX Motion (Alt+F) creates animations and motion graphics.', icon: 'sparkles' },
   { id: 'tip-rewind', text: 'Rewind acts like a DVR for your computer -- replay your activity!', icon: 'rewind' },
-  { id: 'tip-games', text: 'Play brain games in the Games app to sharpen your mind.', icon: 'gamepad' },
   { id: 'tip-pin', text: 'Pin your favorite apps on the Home page for lightning-fast access.', icon: 'pin' },
   { id: 'tip-fullscreen', text: 'Press F11 to toggle fullscreen mode for a distraction-free workspace.', icon: 'maximize' },
   { id: 'tip-launchpad', text: 'Use the dock to launch any app -- just one click away.', icon: 'grid' },
@@ -51,7 +56,7 @@ export const TIPS: { id: string; text: string; icon: string }[] = [
   { id: 'tip-notes', text: 'Notes supports rich text -- bold, lists, and code blocks.', icon: 'file-text' },
   { id: 'tip-darkmode', text: 'DEX looks stunning in dark mode -- customize in Settings.', icon: 'moon' },
   { id: 'tip-streak', text: 'Use DEX daily to build your streak -- unlock special achievements!', icon: 'flame' },
-  { id: 'tip-achievements', text: 'Open the Trophies app to see your progress across 500 achievements!', icon: 'trophy' },
+  { id: 'tip-achievements', text: 'Open the Trophies app to see your progress across 5000 achievements!', icon: 'trophy' },
   { id: 'tip-kanban', text: 'Use Kanban boards to organize projects visually.', icon: 'columns' },
   { id: 'tip-rewind2', text: 'Rewind captures snapshots so you can jump back in time.', icon: 'clock' },
   { id: 'tip-shortcuts', text: 'Learn keyboard shortcuts to speed up your workflow dramatically.', icon: 'terminal' },
@@ -73,12 +78,12 @@ export function loadEngagement(): EngagementState {
         stats: { ...DEFAULT_STATS, ...parsed.stats, appUsageCounts: { ...parsed.stats?.appUsageCounts } },
       };
     }
-  } catch {}
+  } catch (e) { console.warn('[DEX]', e); }
   return { ...DEFAULT_STATE, stats: { ...DEFAULT_STATS } };
 }
 
 export function saveEngagement(state: EngagementState) {
-  try { localStorage.setItem(ENGAGEMENT_KEY, JSON.stringify(state)); } catch {}
+  try { localStorage.setItem(ENGAGEMENT_KEY, JSON.stringify(state)); } catch (e) { console.warn('[DEX]', e); }
 }
 
 // === Core Functions ===
@@ -136,7 +141,7 @@ export function incrementStat(
 ): EngagementState {
   const stats = { ...state.stats };
   if (typeof stats[key] === 'number') {
-    (stats as any)[key] = (stats[key] as number) + amount;
+    (stats[key] as number) += amount;
   }
   return { ...state, stats };
 }
@@ -166,17 +171,30 @@ export function checkAchievements(
     let passes = false;
     if (ach.id.startsWith('ach-count-')) {
       const idx = parseInt(ach.id.split('-').pop() || '0') - 1;
-      const thresholds = [15, 40, 75, 150, 250, 350, 425, 500];
-      passes = unlockedCount >= (thresholds[idx] || 999);
+      const thresholds = [15, 40, 75, 150, 250, 500, 1000, 1500, 2000, 3000, 4000, 5000];
+      passes = unlockedCount >= (thresholds[idx] || 99999);
     } else if (ach.id.startsWith('points-')) {
       const idx = parseInt(ach.id.split('-').pop() || '0') - 1;
-      const thresholds = [200, 500, 1000, 2500, 5000, 10000, 20000, 40000];
-      passes = pts >= (thresholds[idx] || 999999);
+      const thresholds = [200, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 200000, 500000];
+      passes = pts >= (thresholds[idx] || 9999999);
+    } else if (ach.id.startsWith('final-') && ach.id.includes('-unlock')) {
+      const num = parseInt(ach.id.replace('final-', '').replace('-unlock', '')) || 0;
+      passes = unlockedCount >= num;
+    } else if (ach.id.startsWith('final-') && ach.id.includes('-pts')) {
+      const label = ach.id.replace('final-', '').replace('-pts', '');
+      const ptMap: Record<string, number> = { '10k': 10000, '25k': 25000, '50k': 50000, '100k': 100000 };
+      passes = pts >= (ptMap[label] || 999999);
+    } else if (ach.id === 'final-all-categories') {
+      const cats = Object.keys(CATEGORY_META);
+      passes = cats.every(c => ACHIEVEMENTS.filter(a => a.category === c && unlocked.includes(a.id)).length >= 100);
     } else if (ach.id.startsWith('rank-')) {
       const rank = getUserRank(pts);
       const rankMap: Record<string, string> = {
         'rank-beginner': 'Beginner', 'rank-regular': 'Regular', 'rank-pro': 'Pro',
-        'rank-expert': 'Expert', 'rank-legend': 'Legend', 'rank-transcend': 'Transcendent',
+        'rank-expert': 'Expert', 'rank-legend': 'Legend', 'rank-champion': 'Champion',
+        'rank-transcend': 'Transcendent', 'rank-grandmaster': 'Grandmaster',
+        'rank-titan': 'Titan', 'rank-mythical': 'Mythical',
+        'rank-celestial': 'Celestial', 'rank-eternal': 'Eternal',
       };
       passes = rank.title === rankMap[ach.id] || false;
     } else {
@@ -211,13 +229,19 @@ export function getTotalPoints(unlocked: string[]): number {
 
 /** Get user rank based on points -- no emojis, icon names only */
 export function getUserRank(points: number): { title: string; icon: string; next: string; pointsNeeded: number; level: number } {
-  if (points >= 15000) return { title: 'Transcendent', icon: 'diamond',  next: 'Max rank!',    pointsNeeded: 0, level: 6 };
-  if (points >= 6000)  return { title: 'Legend',       icon: 'crown',    next: 'Transcendent', pointsNeeded: 15000 - points, level: 5 };
-  if (points >= 2500)  return { title: 'Expert',       icon: 'award',    next: 'Legend',        pointsNeeded: 6000 - points, level: 4 };
-  if (points >= 1000)  return { title: 'Pro',          icon: 'star',     next: 'Expert',        pointsNeeded: 2500 - points, level: 3 };
-  if (points >= 350)   return { title: 'Regular',      icon: 'shield',   next: 'Pro',           pointsNeeded: 1000 - points, level: 2 };
-  if (points >= 75)    return { title: 'Beginner',     icon: 'seedling', next: 'Regular',       pointsNeeded: 350 - points, level: 1 };
-  return { title: 'Newcomer', icon: 'hand-wave', next: 'Beginner', pointsNeeded: 75 - points, level: 0 };
+  if (points >= 500000) return { title: 'Eternal',       icon: 'infinity',  next: 'Max rank!',     pointsNeeded: 0, level: 12 };
+  if (points >= 250000) return { title: 'Celestial',     icon: 'sparkles',  next: 'Eternal',       pointsNeeded: 500000 - points, level: 11 };
+  if (points >= 100000) return { title: 'Mythical',      icon: 'flame',     next: 'Celestial',     pointsNeeded: 250000 - points, level: 10 };
+  if (points >= 50000)  return { title: 'Titan',         icon: 'mountain',  next: 'Mythical',      pointsNeeded: 100000 - points, level: 9 };
+  if (points >= 25000)  return { title: 'Grandmaster',   icon: 'trophy',    next: 'Titan',         pointsNeeded: 50000 - points, level: 8 };
+  if (points >= 15000)  return { title: 'Transcendent',  icon: 'diamond',   next: 'Grandmaster',   pointsNeeded: 25000 - points, level: 7 };
+  if (points >= 8000)   return { title: 'Champion',      icon: 'shield',    next: 'Transcendent',  pointsNeeded: 15000 - points, level: 6 };
+  if (points >= 4000)   return { title: 'Legend',         icon: 'crown',     next: 'Champion',      pointsNeeded: 8000 - points, level: 5 };
+  if (points >= 2000)   return { title: 'Expert',         icon: 'award',     next: 'Legend',         pointsNeeded: 4000 - points, level: 4 };
+  if (points >= 800)    return { title: 'Pro',            icon: 'star',      next: 'Expert',         pointsNeeded: 2000 - points, level: 3 };
+  if (points >= 250)    return { title: 'Regular',        icon: 'shield',    next: 'Pro',            pointsNeeded: 800 - points, level: 2 };
+  if (points >= 50)     return { title: 'Beginner',       icon: 'seedling',  next: 'Regular',        pointsNeeded: 250 - points, level: 1 };
+  return { title: 'Newcomer', icon: 'hand-wave', next: 'Beginner', pointsNeeded: 50 - points, level: 0 };
 }
 
 /** Get achievement stats summary */

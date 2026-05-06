@@ -1,9 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Secure Vault System
 // Secure vault folders with extra isolation
 // End-to-end encryption for all Dex-managed data
 // Tamper detection for critical files and configuration
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, safeStorage } from 'electron';
@@ -13,9 +19,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type VaultStatus = 'locked' | 'unlocked' | 'corrupted' | 'uninitialized';
 
@@ -58,9 +64,9 @@ export interface IntegrityCheck {
   checkedAt: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURE VAULT SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecureVaultSystemClass extends EventEmitter {
   private config: VaultConfig;
@@ -84,9 +90,9 @@ class SecureVaultSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     this.vaultsPath = path.join(app.getPath('userData'), 'vaults');
@@ -102,9 +108,9 @@ class SecureVaultSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Create vault
@@ -173,9 +179,9 @@ class SecureVaultSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VAULT MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createVault(name: string, password: string): Promise<Vault> {
     const vaultId = `vault-${++this.vaultIdCounter}-${Date.now()}`;
@@ -289,9 +295,9 @@ class SecureVaultSystemClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addFileToVault(vaultId: string, filePath: string): Promise<{ success: boolean; fileId?: string; error?: string }> {
     const unlocked = this.unlockedVaults.get(vaultId);
@@ -482,9 +488,9 @@ class SecureVaultSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ENCRYPTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async deriveKey(password: string, salt: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -542,9 +548,9 @@ class SecureVaultSystemClass extends EventEmitter {
     return this.decryptData(data, key);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INTEGRITY MONITORING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async registerForIntegrity(filePath: string): Promise<{ success: boolean; hash?: string }> {
     try {
@@ -609,9 +615,9 @@ class SecureVaultSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadVaultIndex(): Promise<void> {
     try {
@@ -665,9 +671,9 @@ class SecureVaultSystemClass extends EventEmitter {
     await fs.writeFile(hashesPath, JSON.stringify(hashes, null, 2));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   shutdown(): void {
     // Lock all vaults
@@ -677,9 +683,9 @@ class SecureVaultSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const SecureVaultSystem = new SecureVaultSystemClass();
 export default SecureVaultSystem;

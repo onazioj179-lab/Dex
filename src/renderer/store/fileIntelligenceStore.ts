@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Intelligence Store
 // Phase 38: Renderer-side state management for file intelligence
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface FileMetadata {
   id: string;
@@ -81,9 +87,12 @@ export type ViewMode = 'grid' | 'list' | 'groups';
 export type SortBy = 'name' | 'date' | 'size' | 'type';
 export type GroupBy = 'none' | 'type' | 'date' | 'category';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// Maximum number of file entries to keep in memory (LRU eviction)
+const MAX_FILE_CACHE_SIZE = 10_000;
+
+// -----------------------------------------------------------------------------
 // Store State
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface FileIntelligenceState {
   // Data
@@ -153,9 +162,9 @@ interface FileIntelligenceActions {
   getSortedFiles: () => FileMetadata[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Store Implementation
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const useFileIntelligenceStore = create<FileIntelligenceState & FileIntelligenceActions>((set, get) => ({
   // Initial State
@@ -182,10 +191,11 @@ export const useFileIntelligenceStore = create<FileIntelligenceState & FileIntel
   showHidden: false,
   
   // Data Actions
-  setFiles: (files) => set({ files }),
-  addFile: (file) => set((state) => ({ 
-    files: [...state.files.filter(f => f.id !== file.id), file] 
-  })),
+  setFiles: (files) => set({ files: files.slice(-MAX_FILE_CACHE_SIZE) }),
+  addFile: (file) => set((state) => {
+    const updated = [...state.files.filter(f => f.id !== file.id), file];
+    return { files: updated.length > MAX_FILE_CACHE_SIZE ? updated.slice(-MAX_FILE_CACHE_SIZE) : updated };
+  }),
   removeFile: (id) => set((state) => ({ 
     files: state.files.filter(f => f.id !== id) 
   })),
@@ -298,14 +308,15 @@ export const useFileIntelligenceStore = create<FileIntelligenceState & FileIntel
   },
 }));
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // API Hooks
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const useFileIntelligenceAPI = () => {
   const store = useFileIntelligenceStore();
   
   const authorizePath = async (path?: string) => {
+    if (!window.dex?.fileIntel) throw new Error('File Intelligence API not available');
     const result = await window.dex.fileIntel.authorizePath(path);
     if (result.success) {
       const paths = await window.dex.fileIntel.getAuthorizedPaths();
@@ -315,12 +326,14 @@ export const useFileIntelligenceAPI = () => {
   };
   
   const revokePath = async (path: string) => {
+    if (!window.dex?.fileIntel) return;
     await window.dex.fileIntel.revokePath(path);
     const paths = await window.dex.fileIntel.getAuthorizedPaths();
     store.setAuthorizedPaths(paths);
   };
   
   const scanDirectory = async (path: string, options?: { recursive?: boolean }) => {
+    if (!window.dex?.fileIntel) return { success: false, files: [] };
     store.setScanning(true);
     store.setScanProgress({ path, status: 'scanning' });
     
@@ -337,6 +350,7 @@ export const useFileIntelligenceAPI = () => {
   };
   
   const loadAllFiles = async () => {
+    if (!window.dex?.fileIntel) return;
     store.setLoading(true);
     try {
       const files = await window.dex.fileIntel.getAllFiles();
@@ -347,11 +361,13 @@ export const useFileIntelligenceAPI = () => {
   };
   
   const loadStatistics = async () => {
+    if (!window.dex?.fileIntel) return;
     const stats = await window.dex.fileIntel.getStatistics();
     store.setStatistics(stats);
   };
   
   const loadGroups = async (groupBy: GroupBy) => {
+    if (!window.dex?.fileIntel) return;
     let groups: FileGroup[] = [];
     
     switch (groupBy) {
@@ -369,19 +385,23 @@ export const useFileIntelligenceAPI = () => {
   };
   
   const loadSuggestions = async () => {
+    if (!window.dex?.fileIntel) return;
     const suggestions = await window.dex.fileIntel.getSuggestions();
     store.setSuggestions(suggestions);
   };
   
   const openFile = async (path: string) => {
+    if (!window.dex?.fileIntel) return;
     return await window.dex.fileIntel.openFile(path);
   };
   
   const revealInExplorer = async (path: string) => {
+    if (!window.dex?.fileIntel) return;
     return await window.dex.fileIntel.revealInExplorer(path);
   };
   
   const searchFiles = async (query: string) => {
+    if (!window.dex?.fileIntel) return [];
     const results = await window.dex.fileIntel.searchFiles(query);
     return results;
   };

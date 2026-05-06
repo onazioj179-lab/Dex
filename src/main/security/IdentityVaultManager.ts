@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - SYSTEM 9: Passwords & Identity as OS Features (NATIVE)
 // ===========================================================================
-// Dex should manage passwords, 2FA codes, and identity primitives NATIVELY—
+// Dex should manage passwords, 2FA codes, and identity primitives NATIVELY--
 // not as plugins or extensions. Encrypted vault. Local breach checking.
 // Form autofill. Clipboard safety. All inspectable, all user-controlled.
 // ===========================================================================

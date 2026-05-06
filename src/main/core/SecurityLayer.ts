@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX SECURITY LAYER
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Enterprise-grade security features:
  * - AppGuard: Verify app signatures before execution
@@ -11,14 +17,15 @@
  * - SecureBoot: Verify system integrity on startup
  */
 
+import log from 'electron-log';
 import { app, ipcMain, BrowserWindow, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface AppVerification {
   path: string;
@@ -73,9 +80,9 @@ interface IntegrityCheck {
   timestamp: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // APP GUARD - App Verification Before Execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AppGuardService {
   private verificationCache: Map<string, AppVerification> = new Map();
@@ -103,7 +110,7 @@ class AppGuardService {
       return cached;
     }
 
-    console.log(`[AppGuard] Verifying: ${appPath}`);
+    log.info(`[AppGuard] Verifying: ${appPath}`);
 
     const verification: AppVerification = {
       path: appPath,
@@ -184,13 +191,10 @@ class AppGuardService {
   }
 
   private async verifySignature(filePath: string): Promise<{ valid: boolean; publisher: string | null }> {
-    // In production, this would use Windows/macOS APIs to verify code signatures
-    // For now, simulate based on file location
-    const isInProgramFiles = filePath.includes('Program Files') || filePath.includes('Applications');
-    
+    // Native code-signing verification not available — report honestly
     return {
-      valid: isInProgramFiles,
-      publisher: isInProgramFiles ? 'Verified Publisher' : null,
+      valid: false,
+      publisher: null,
     };
   }
 
@@ -203,7 +207,7 @@ class AppGuardService {
     
     try {
       fs.renameSync(filePath, quarantinedPath);
-      console.log(`[AppGuard] Quarantined: ${fileName}`);
+      log.info(`[AppGuard] Quarantined: ${fileName}`);
       
       this.emitToRenderers('security:quarantined', {
         originalPath: filePath,
@@ -211,7 +215,7 @@ class AppGuardService {
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('[AppGuard] Quarantine failed:', error);
+      log.error('[AppGuard] Quarantine failed:', error);
     }
   }
 
@@ -224,9 +228,9 @@ class AppGuardService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // THREAT SHIELD - Real-time Malware Detection
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ThreatShieldService {
   private detections: ThreatDetection[] = [];
@@ -357,7 +361,7 @@ class ThreatShieldService {
       try {
         await this.scanDirectory(basePath, newDetections);
       } catch (error) {
-        console.error(`[ThreatShield] Scan error for ${basePath}:`, error);
+        log.error(`[ThreatShield] Scan error for ${basePath}:`, error);
       }
     }
 
@@ -415,9 +419,9 @@ class ThreatShieldService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VAULT ENCRYPT - Secure Data Encryption
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VaultEncryptService {
   private vaults: Map<string, EncryptedVault> = new Map();
@@ -440,7 +444,7 @@ class VaultEncryptService {
         });
       }
     } catch (error) {
-      console.warn('[VaultEncrypt] Failed to load vaults:', error);
+      log.warn('[VaultEncrypt] Failed to load vaults:', error);
     }
   }
 
@@ -452,7 +456,7 @@ class VaultEncryptService {
       }));
       fs.writeFileSync(this.configPath, JSON.stringify(vaultsArray, null, 2));
     } catch (error) {
-      console.error('[VaultEncrypt] Failed to save vaults:', error);
+      log.error('[VaultEncrypt] Failed to save vaults:', error);
     }
   }
 
@@ -488,7 +492,7 @@ class VaultEncryptService {
     this.vaultKeys.set(id, key);
     this.saveVaults();
 
-    console.log(`[VaultEncrypt] Created vault: ${name}`);
+    log.info(`[VaultEncrypt] Created vault: ${name}`);
     return vault;
   }
 
@@ -513,10 +517,10 @@ class VaultEncryptService {
       this.vaultKeys.set(vaultId, key);
       this.saveVaults();
 
-      console.log(`[VaultEncrypt] Unlocked vault: ${vault.name}`);
+      log.info(`[VaultEncrypt] Unlocked vault: ${vault.name}`);
       return true;
     } catch (error) {
-      console.error('[VaultEncrypt] Unlock failed:', error);
+      log.error('[VaultEncrypt] Unlock failed:', error);
       return false;
     }
   }
@@ -532,7 +536,7 @@ class VaultEncryptService {
     this.unlockedVaults.delete(vaultId);
     this.vaultKeys.delete(vaultId);
 
-    console.log(`[VaultEncrypt] Locked vault: ${vault.name}`);
+    log.info(`[VaultEncrypt] Locked vault: ${vault.name}`);
   }
 
   /**
@@ -559,11 +563,11 @@ class VaultEncryptService {
       const outputPath = path.join(vault.path, `${path.basename(filePath)}.enc`);
       
       fs.writeFileSync(outputPath, outputData);
-      console.log(`[VaultEncrypt] Encrypted: ${path.basename(filePath)}`);
+      log.info(`[VaultEncrypt] Encrypted: ${path.basename(filePath)}`);
       
       return outputPath;
     } catch (error) {
-      console.error('[VaultEncrypt] Encryption failed:', error);
+      log.error('[VaultEncrypt] Encryption failed:', error);
       return null;
     }
   }
@@ -592,10 +596,10 @@ class VaultEncryptService {
       const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
       fs.writeFileSync(outputPath, decrypted);
       
-      console.log(`[VaultEncrypt] Decrypted to: ${outputPath}`);
+      log.info(`[VaultEncrypt] Decrypted to: ${outputPath}`);
       return true;
     } catch (error) {
-      console.error('[VaultEncrypt] Decryption failed:', error);
+      log.error('[VaultEncrypt] Decryption failed:', error);
       return false;
     }
   }
@@ -618,7 +622,7 @@ class VaultEncryptService {
     try {
       fs.rmSync(vault.path, { recursive: true, force: true });
     } catch (err: any) {
-      console.error(`[VaultEncrypt] Failed to delete vault files at ${vault.path}:`, err.message);
+      log.error(`[VaultEncrypt] Failed to delete vault files at ${vault.path}:`, err.message);
     }
 
     this.vaults.delete(vaultId);
@@ -626,13 +630,13 @@ class VaultEncryptService {
     this.vaultKeys.delete(vaultId);
     this.saveVaults();
 
-    console.log(`[VaultEncrypt] Deleted vault: ${vault.name}`);
+    log.info(`[VaultEncrypt] Deleted vault: ${vault.name}`);
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURITY LAYER MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecurityLayerManager {
   public appGuard: AppGuardService;
@@ -652,12 +656,12 @@ class SecurityLayerManager {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log('[SecurityLayer] Initializing...');
+    log.info('[SecurityLayer] Initializing...');
 
     this.registerIPCHandlers();
 
     this.isInitialized = true;
-    console.log('[SecurityLayer] Initialized successfully');
+    log.info('[SecurityLayer] Initialized successfully');
   }
 
   private registerIPCHandlers(): void {
@@ -668,7 +672,7 @@ class SecurityLayerManager {
       } catch (e: any) {
         // Handler already registered - skip silently
         if (!e.message?.includes('second handler')) {
-          console.warn(`[SecurityLayer] Failed to register ${channel}:`, e.message);
+          log.warn(`[SecurityLayer] Failed to register ${channel}:`, e.message);
         }
       }
     };
@@ -710,7 +714,7 @@ class SecurityLayerManager {
    * Shutdown
    */
   shutdown(): void {
-    console.log('[SecurityLayer] Shutting down...');
+    log.info('[SecurityLayer] Shutting down...');
     
     // Lock all vaults on shutdown
     this.vaultEncrypt.getVaults().forEach(vault => {
@@ -723,9 +727,9 @@ class SecurityLayerManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const securityLayer = new SecurityLayerManager();
 

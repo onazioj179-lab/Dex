@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — Performance Monitor & Resource Budgets
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- Performance Monitor & Resource Budgets
+ * ===========================================================================
  * 
  * Performance discipline for all sub-apps.
  * Each app has CPU, memory, I/O budgets enforced by the system.
@@ -11,16 +17,16 @@
  * - Exceeding budget triggers throttling or suspension
  * - No polling - event-driven only
  * - Dex must scale with many sub-apps open
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { create } from 'zustand';
 import { useSystemEvents, usePowerService } from './SystemServices';
 import { useLifecycleManager } from './LifecycleManager';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Performance metrics snapshot */
 export interface PerformanceMetrics {
@@ -95,9 +101,9 @@ export interface PerformanceAlert {
   acknowledged: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERFORMANCE MONITOR STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface PerformanceMonitorState {
   // Global metrics
@@ -148,21 +154,38 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
   let frameCount = 0;
   let lastFrameTime = performance.now();
   let frameDropCount = 0;
+  let frameSampleTimer: NodeJS.Timeout | null = null;
+  let frameSampleRafId: number | null = null;
 
-  // Frame counter for FPS calculation
-  const countFrame = () => {
-    frameCount++;
-    const now = performance.now();
-    const delta = now - lastFrameTime;
-    
-    // Detect frame drops (> 50ms between frames = drop)
-    if (delta > 50) {
-      frameDropCount++;
-    }
-    
-    if (get().isMonitoring) {
-      requestAnimationFrame(countFrame);
-    }
+  // Intermittent frame sampling: run RAF for 500ms every 5s to measure FPS
+  // without consuming GPU continuously
+  const startFrameSampling = () => {
+    if (frameSampleTimer) return;
+    const doSample = () => {
+      frameCount = 0;
+      lastFrameTime = performance.now();
+      frameDropCount = 0;
+      let sampling = true;
+      const countFrame = () => {
+        frameCount++;
+        const now = performance.now();
+        const delta = now - lastFrameTime;
+        if (delta > 50) frameDropCount++;
+        if (sampling && get().isMonitoring) {
+          frameSampleRafId = requestAnimationFrame(countFrame);
+        }
+      };
+      frameSampleRafId = requestAnimationFrame(countFrame);
+      // Stop sampling after 500ms
+      setTimeout(() => { sampling = false; }, 500);
+    };
+    doSample();
+    frameSampleTimer = setInterval(doSample, 5000);
+  };
+
+  const stopFrameSampling = () => {
+    if (frameSampleTimer) { clearInterval(frameSampleTimer); frameSampleTimer = null; }
+    if (frameSampleRafId) { cancelAnimationFrame(frameSampleRafId); frameSampleRafId = null; }
   };
 
   return {
@@ -187,14 +210,14 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
       
       set({ isMonitoring: true });
       
-      // Start frame counting
-      requestAnimationFrame(countFrame);
+      // Start intermittent frame sampling (not continuous RAF)
+      startFrameSampling();
       
-      // Start periodic collection
+      // Start periodic collection (every 5s instead of 2s)
       monitoringInterval = setInterval(() => {
         get().collectMetrics();
         get().checkThresholds();
-      }, get().sampleInterval);
+      }, 5000);
       
       // Initial collection
       get().collectMetrics();
@@ -202,6 +225,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
 
     stopMonitoring: () => {
       set({ isMonitoring: false });
+      stopFrameSampling();
       
       if (monitoringInterval) {
         clearInterval(monitoringInterval);
@@ -259,7 +283,7 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
 
       set(state => ({
         currentMetrics: metrics,
-        metricsHistory: [...state.metricsHistory.slice(-59), metrics],
+        metricsHistory: [...state.metricsHistory.slice(-199), metrics],
         lastSampleAt: Date.now(),
       }));
     },
@@ -467,9 +491,9 @@ export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) 
   };
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HOOKS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Get current system metrics */
 export const useSystemMetrics = () => {
@@ -494,9 +518,9 @@ export const usePerformanceAlerts = () => {
   }));
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // RESOURCE BUDGET HOOK FOR APPS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /**
  * Hook for apps to report their resource usage
@@ -544,9 +568,9 @@ export const useResourceBudget = (instanceId: string, appId: string) => {
   };
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERFORMANCE PANEL COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import React from 'react';
 
@@ -568,9 +592,9 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({ compact = fa
   }
 
   const healthColor = {
-    healthy: '#34c759',
+    healthy: 'var(--color-success)',
     degraded: '#ff9500',
-    critical: '#ff3b30',
+    critical: 'var(--color-error)',
   }[health];
 
   if (compact) {
@@ -580,7 +604,7 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({ compact = fa
         <span style={panelStyles.text}>{metrics.fps} FPS</span>
         <span style={panelStyles.text}>{metrics.memoryMB}MB</span>
         {count > 0 && (
-          <span style={{ ...panelStyles.badge, background: '#ff3b30' }}>{count}</span>
+          <span style={{ ...panelStyles.badge, background: 'var(--color-error)' }}>{count}</span>
         )}
       </div>
     );
@@ -615,7 +639,7 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({ compact = fa
               key={alert.id} 
               style={{
                 ...panelStyles.alert,
-                borderColor: alert.severity === 'critical' ? '#ff3b30' : '#ff9500',
+                borderColor: alert.severity === 'critical' ? 'var(--color-error)' : '#ff9500',
               }}
             >
               {alert.message}

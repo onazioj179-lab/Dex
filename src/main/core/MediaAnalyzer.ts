@@ -1,17 +1,24 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Media Analyzer Service
 // Phase 38: Deep media understanding for images, video, and audio
 // Local analysis only, no uploads, incremental and cached
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app, nativeImage } from 'electron';
 import { EventEmitter } from 'events';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface ImageAnalysis {
   path: string;
@@ -76,9 +83,9 @@ export interface DocumentAnalysis {
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Media Analyzer Service
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class MediaAnalyzerService extends EventEmitter {
   private static instance: MediaAnalyzerService;
@@ -105,9 +112,9 @@ export class MediaAnalyzerService extends EventEmitter {
     return MediaAnalyzerService.instance;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Image Analysis
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async analyzeImage(filePath: string, generateThumbnail = true): Promise<ImageAnalysis | null> {
     // Check cache first
@@ -152,7 +159,7 @@ export class MediaAnalyzerService extends EventEmitter {
       
       return analysis;
     } catch (error) {
-      console.error(`[MediaAnalyzer] Error analyzing image ${filePath}:`, error);
+      log.error(`[MediaAnalyzer] Error analyzing image ${filePath}:`, error);
       return null;
     }
   }
@@ -186,7 +193,7 @@ export class MediaAnalyzerService extends EventEmitter {
       
       return dataUrl;
     } catch (error) {
-      console.error('[MediaAnalyzer] Error generating thumbnail:', error);
+      log.error('[MediaAnalyzer] Error generating thumbnail:', error);
       return undefined;
     }
   }
@@ -213,9 +220,9 @@ export class MediaAnalyzerService extends EventEmitter {
     return ['.png', '.gif', '.webp', '.svg', '.ico', '.psd'].includes(ext);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Video Analysis (Basic - without FFmpeg)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async analyzeVideo(filePath: string): Promise<VideoAnalysis | null> {
     // Check cache first
@@ -254,7 +261,7 @@ export class MediaAnalyzerService extends EventEmitter {
       
       return analysis;
     } catch (error) {
-      console.error(`[MediaAnalyzer] Error analyzing video ${filePath}:`, error);
+      log.error(`[MediaAnalyzer] Error analyzing video ${filePath}:`, error);
       return null;
     }
   }
@@ -289,9 +296,9 @@ export class MediaAnalyzerService extends EventEmitter {
     return Math.round((fileSize * 8) / bitrate);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Audio Analysis (Basic)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async analyzeAudio(filePath: string): Promise<AudioAnalysis | null> {
     // Check cache first
@@ -331,7 +338,7 @@ export class MediaAnalyzerService extends EventEmitter {
       
       return analysis;
     } catch (error) {
-      console.error(`[MediaAnalyzer] Error analyzing audio ${filePath}:`, error);
+      log.error(`[MediaAnalyzer] Error analyzing audio ${filePath}:`, error);
       return null;
     }
   }
@@ -404,9 +411,9 @@ export class MediaAnalyzerService extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Document Analysis (Basic)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async analyzeDocument(filePath: string): Promise<DocumentAnalysis | null> {
     // Check cache first
@@ -442,14 +449,14 @@ export class MediaAnalyzerService extends EventEmitter {
       
       return analysis;
     } catch (error) {
-      console.error(`[MediaAnalyzer] Error analyzing document ${filePath}:`, error);
+      log.error(`[MediaAnalyzer] Error analyzing document ${filePath}:`, error);
       return null;
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Batch Analysis
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /**
    * Queue files for background analysis
@@ -486,7 +493,7 @@ export class MediaAnalyzerService extends EventEmitter {
             break;
         }
       } catch (error) {
-        console.error(`[MediaAnalyzer] Error processing ${item.path}:`, error);
+        log.error(`[MediaAnalyzer] Error processing ${item.path}:`, error);
       }
       
       // Small delay to prevent overwhelming the system
@@ -497,9 +504,9 @@ export class MediaAnalyzerService extends EventEmitter {
     this.emit('queueComplete');
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Thumbnail Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async getThumbnail(filePath: string): Promise<string | null> {
     const thumbName = this.getThumbnailName(filePath);
@@ -531,9 +538,9 @@ export class MediaAnalyzerService extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cache Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   clearCache(): void {
     this.imageCache.clear();

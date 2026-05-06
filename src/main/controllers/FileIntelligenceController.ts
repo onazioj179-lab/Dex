@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Intelligence Controller
 // Phase 38: Bridge between main process and renderer for file operations
 // Secure, permission-based, user-approved actions only
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, dialog, shell, BrowserWindow } from 'electron';
 import * as path from 'path';
@@ -11,9 +17,9 @@ import { fileIntelligence, FileMetadata, OrganizationSuggestion } from '../core/
 import { mediaAnalyzer } from '../core/MediaAnalyzer';
 import { fileWatcher, FileChangeEvent } from '../core/FileWatcher';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // IPC Channel Names
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const CHANNELS = {
   // Authorization
@@ -61,9 +67,9 @@ const CHANNELS = {
   ANALYSIS_COMPLETE: 'file-intel:analysis-complete',
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Controller Class
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class FileIntelligenceController {
   private static instance: FileIntelligenceController;
@@ -85,9 +91,9 @@ export class FileIntelligenceController {
     this.mainWindow = window;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC Handlers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   private setupIpcHandlers(): void {
     // Authorization
@@ -270,9 +276,9 @@ export class FileIntelligenceController {
     });
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Event Forwarding (Main -> Renderer)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   private setupEventForwarding(): void {
     // Forward file watcher events to renderer
@@ -310,9 +316,9 @@ export class FileIntelligenceController {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Initialize Controller
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const fileIntelligenceController = FileIntelligenceController.getInstance();
 

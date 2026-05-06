@@ -1,17 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Context Quick Actions
 // Context-based quick actions (shown only when relevant)
 // Drag-anywhere action execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ContextType = 
   | 'file' | 'folder' | 'image' | 'video' | 'audio' | 'document' | 'code'
@@ -57,12 +63,12 @@ export interface ActionResult {
   undoId?: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DEFAULT QUICK ACTIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_ACTIONS: QuickAction[] = [
-  // ── File Actions ─────────────────────────────────────────────────────────
+  // -- File Actions ---------------------------------------------------------
   {
     id: 'open',
     name: 'Open',
@@ -158,7 +164,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     handler: 'quickaction:newFolder'
   },
 
-  // ── Organization ─────────────────────────────────────────────────────────
+  // -- Organization ---------------------------------------------------------
   {
     id: 'moveTo',
     name: 'Move to...',
@@ -197,7 +203,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     handler: 'quickaction:extract'
   },
 
-  // ── Image Actions ────────────────────────────────────────────────────────
+  // -- Image Actions --------------------------------------------------------
   {
     id: 'resizeImage',
     name: 'Resize Image',
@@ -229,7 +235,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     handler: 'quickaction:rotateImage'
   },
 
-  // ── Code Actions ─────────────────────────────────────────────────────────
+  // -- Code Actions ---------------------------------------------------------
   {
     id: 'openInEditor',
     name: 'Edit Code',
@@ -251,7 +257,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     handler: 'quickaction:formatCode'
   },
 
-  // ── Batch Actions ────────────────────────────────────────────────────────
+  // -- Batch Actions --------------------------------------------------------
   {
     id: 'batchRename',
     name: 'Batch Rename',
@@ -273,7 +279,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     handler: 'quickaction:batchOrganize'
   },
 
-  // ── Share Actions ────────────────────────────────────────────────────────
+  // -- Share Actions --------------------------------------------------------
   {
     id: 'copyPath',
     name: 'Copy Path',
@@ -293,7 +299,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     handler: 'quickaction:revealInExplorer'
   },
 
-  // ── Automation ───────────────────────────────────────────────────────────
+  // -- Automation -----------------------------------------------------------
   {
     id: 'createAction',
     name: 'Create Action',
@@ -314,9 +320,9 @@ const DEFAULT_ACTIONS: QuickAction[] = [
   }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONTEXT QUICK ACTIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ContextQuickActionsClass extends EventEmitter {
   private actions: Map<string, QuickAction> = new Map();
@@ -328,9 +334,9 @@ class ContextQuickActionsClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private loadDefaultActions(): void {
     for (const action of DEFAULT_ACTIONS) {
@@ -339,9 +345,9 @@ class ContextQuickActionsClass extends EventEmitter {
     log.info(`[QuickActions] Loaded ${this.actions.size} default actions`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Get actions for context
@@ -375,9 +381,9 @@ class ContextQuickActionsClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONTEXT MATCHING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getActionsForContext(context: ActionContext): QuickAction[] {
     const allActions = [...this.actions.values(), ...this.customActions.values()];
@@ -464,9 +470,9 @@ class ContextQuickActionsClass extends EventEmitter {
     ) || null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTION EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async executeAction(actionId: string, context: ActionContext): Promise<ActionResult> {
     const action = this.actions.get(actionId) || this.customActions.get(actionId);
@@ -491,9 +497,9 @@ class ContextQuickActionsClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CUSTOM ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   registerAction(action: QuickAction): { success: boolean; error?: string } {
     if (this.actions.has(action.id)) {
@@ -519,9 +525,9 @@ class ContextQuickActionsClass extends EventEmitter {
     return { success: removed };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONTEXT DETECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   detectContextType(items: ContextItem[]): ContextType {
     if (items.length === 0) return 'empty';
@@ -566,9 +572,9 @@ class ContextQuickActionsClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const ContextQuickActions = new ContextQuickActionsClass();
 export default ContextQuickActions;

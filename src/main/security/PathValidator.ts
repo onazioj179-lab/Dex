@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Path Validation & Sanitization
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Centralized path validation to prevent:
  * - Directory traversal attacks (../, ..\\)
@@ -52,22 +58,40 @@ export class PathValidator {
       throw new Error('Invalid path: contains null bytes');
     }
 
-    // Resolve to absolute path (handles ../ and symlinks)
+    // Resolve to absolute path (normalises ../ components)
     const resolved = path.resolve(inputPath);
 
-    // Check against blocked sensitive paths
-    for (const blocked of BLOCKED_PATHS) {
-      if (resolved.startsWith(blocked)) {
-        throw new Error('Access denied: sensitive directory');
+    // Helper: check the resolved/real path against block-list and home-dir boundary
+    const assertSafe = (p: string) => {
+      for (const blocked of BLOCKED_PATHS) {
+        if (p === blocked || p.startsWith(blocked + path.sep)) {
+          throw new Error('Access denied: sensitive directory');
+        }
+      }
+      if (!p.startsWith(HOME_DIR)) {
+        throw new Error('Access denied: path outside home directory');
+      }
+    };
+
+    assertSafe(resolved);
+
+    // If the path exists on disk, resolve symlinks and re-validate the real path.
+    // path.resolve() does NOT follow symlinks; a symlink inside HOME_DIR could
+    // point to ~/.ssh or / and silently pass the first check.
+    if (fs.existsSync(resolved)) {
+      try {
+        const real = fs.realpathSync(resolved);
+        if (real !== resolved) {
+          assertSafe(real);
+          return real; // return the fully-resolved canonical path
+        }
+      } catch (e: any) {
+        // Re-throw our own access-denied errors; swallow OS errors (race, perms)
+        if (typeof e?.message === 'string' && e.message.startsWith('Access denied')) throw e;
       }
     }
 
-    // Ensure path is within user's home directory
-    if (!resolved.startsWith(HOME_DIR)) {
-      throw new Error('Access denied: path outside home directory');
-    }
-
-    // Optionally verify the path exists
+    // Optionally verify the path exists (checked after symlink resolution)
     if (options?.requireExists && !fs.existsSync(resolved)) {
       throw new Error(`Path not found: ${resolved}`);
     }
@@ -116,7 +140,7 @@ export class PathValidator {
 
     // Only allow HTTP and HTTPS
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new Error(`Invalid URL protocol: ${parsed.protocol} — only http: and https: allowed`);
+      throw new Error(`Invalid URL protocol: ${parsed.protocol} -- only http: and https: allowed`);
     }
 
     // Block internal network addresses

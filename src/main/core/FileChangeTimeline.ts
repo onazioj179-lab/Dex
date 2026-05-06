@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Change Timeline
 // File change timeline with diff preview
 // Universal compare tool (file, folder, text, metadata)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain } from 'electron';
@@ -12,9 +18,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ChangeType = 'created' | 'modified' | 'deleted' | 'renamed' | 'moved';
 
@@ -94,9 +100,9 @@ export interface TimelineConfig {
   excludePatterns: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FILE CHANGE TIMELINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FileChangeTimelineClass extends EventEmitter {
   private config: TimelineConfig;
@@ -118,9 +124,9 @@ class FileChangeTimelineClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     this.versionsPath = path.join(app.getPath('userData'), 'file-versions');
@@ -134,9 +140,9 @@ class FileChangeTimelineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Record change
@@ -201,9 +207,9 @@ class FileChangeTimelineClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CHANGE TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async recordChange(filePath: string, type: ChangeType, oldPath?: string): Promise<FileChange> {
     const normalizedPath = path.normalize(filePath);
@@ -275,9 +281,9 @@ class FileChangeTimelineClass extends EventEmitter {
       .slice(0, limit);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VERSION MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createVersion(filePath: string): Promise<FileVersion | null> {
     const normalizedPath = path.normalize(filePath);
@@ -426,9 +432,9 @@ class FileChangeTimelineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // COMPARISON
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async compareFiles(leftPath: string, rightPath: string): Promise<DiffResult> {
     const leftContent = await this.readFileContent(leftPath);
@@ -598,9 +604,9 @@ class FileChangeTimelineClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async hashFile(filePath: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -685,9 +691,9 @@ class FileChangeTimelineClass extends EventEmitter {
     return `ver-${++this.changeIdCounter}-${Date.now()}`;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadIndex(): Promise<void> {
     try {
@@ -711,18 +717,18 @@ class FileChangeTimelineClass extends EventEmitter {
     await fs.writeFile(indexPath, JSON.stringify(data, null, 2));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   configure(config: Partial<TimelineConfig>): void {
     this.config = { ...this.config, ...config };
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const FileChangeTimeline = new FileChangeTimelineClass();
 export default FileChangeTimeline;

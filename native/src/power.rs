@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ═══════════════════════════════════════════════════════════════════════════
 // DEX Native — Power Profile Management
 // Replaces: dex_core.py PowerManager (powercfg, pmset, cpupower)
@@ -6,6 +12,13 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::process::Command;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+
+// Wake lock child process handle (macOS/Linux only)
+#[allow(dead_code)]
+static WAKE_LOCK_CHILD: Lazy<Mutex<Option<std::process::Child>>> =
+    Lazy::new(|| Mutex::new(None));
 
 // ─────────────────────────────────────────────────────────────────────────
 // Types
@@ -128,7 +141,7 @@ fn set_profile_os(profile: &str, changes: &mut Vec<String>) -> std::result::Resu
         changes.push(format!("CPU governor set to {}", gov));
         Ok(())
     } else {
-        Err(format!("{} (may need sudo)", String::from_utf8_lossy(&out.stderr).trim()))
+        Err(format!("{} (ensure cpupower is installed and run with sudo)", String::from_utf8_lossy(&out.stderr).trim()))
     }
 }
 
@@ -168,4 +181,107 @@ fn detect_profile() -> String {
         })
         .unwrap_or("balanced")
         .to_string()
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Wake Lock — Prevent system sleep during long operations
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Prevent the system from sleeping. Call release_wake_lock when done.
+#[napi]
+pub fn acquire_wake_lock(reason: String) -> Result<PowerResult> {
+    let mut changes = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        match Command::new("powershell")
+            .args(["-Command", "Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class SleepPrev { [DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f); }'; [SleepPrev]::SetThreadExecutionState(0x80000003)"])
+            .output()
+        {
+            Ok(_) => changes.push(format!("Wake lock acquired: {}", reason)),
+            Err(e) => return Ok(PowerResult {
+                success: false, profile: "wake-lock".into(), changes,
+                error: Some(format!("Failed: {}", e)),
+            }),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        match Command::new("caffeinate")
+            .args(["-dis", "-w", &std::process::id().to_string()])
+            .spawn()
+        {
+            Ok(child) => {
+                if let Ok(mut guard) = WAKE_LOCK_CHILD.lock() {
+                    *guard = Some(child);
+                }
+                changes.push(format!("caffeinate started: {}", reason));
+            }
+            Err(e) => return Ok(PowerResult {
+                success: false, profile: "wake-lock".into(), changes,
+                error: Some(format!("caffeinate failed: {}", e)),
+            }),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        match Command::new("systemd-inhibit")
+            .args(["--what=sleep:idle", &format!("--why={}", reason), "sleep", "infinity"])
+            .spawn()
+        {
+            Ok(child) => {
+                if let Ok(mut guard) = WAKE_LOCK_CHILD.lock() {
+                    *guard = Some(child);
+                }
+                changes.push(format!("systemd-inhibit started: {}", reason));
+            }
+            Err(e) => return Ok(PowerResult {
+                success: false, profile: "wake-lock".into(), changes,
+                error: Some(format!("systemd-inhibit failed: {}", e)),
+            }),
+        }
+    }
+
+    Ok(PowerResult { success: true, profile: "wake-lock".into(), changes, error: None })
+}
+
+/// Release wake lock (allow system to sleep again).
+#[napi]
+pub fn release_wake_lock() -> Result<PowerResult> {
+    let mut changes = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = Command::new("powershell")
+            .args(["-Command", "Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class SleepRel { [DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f); }'; [SleepRel]::SetThreadExecutionState(0x80000000)"])
+            .output();
+        changes.push("Wake lock released".into());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Kill stored child first, fall back to pkill
+        if let Ok(mut guard) = WAKE_LOCK_CHILD.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+            }
+        }
+        let _ = Command::new("pkill").args(["-f", "caffeinate"]).output();
+        changes.push("caffeinate stopped".into());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(mut guard) = WAKE_LOCK_CHILD.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+            }
+        }
+        let _ = Command::new("pkill").args(["-f", "systemd-inhibit"]).output();
+        changes.push("systemd-inhibit stopped".into());
+    }
+
+    Ok(PowerResult { success: true, profile: "wake-lock-released".into(), changes, error: None })
 }

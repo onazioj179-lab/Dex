@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Diagnostics Controller
 // Phase 11: Local logging, crash reports, performance metrics
 // No automatic uploads - user has full control
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, app, dialog, BrowserWindow, shell } from 'electron';
 import * as fs from 'fs/promises';
@@ -97,7 +103,7 @@ class DiagnosticsController {
 
       log.info('Diagnostics initialized');
     } catch (error) {
-      console.error('Failed to initialize diagnostics:', error);
+      log.error('Failed to initialize diagnostics:', error);
     }
   }
 
@@ -212,9 +218,9 @@ class DiagnosticsController {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // LOGGING
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   log(level: 'info' | 'warn' | 'error' | 'debug', category: string, message: string, data?: any): void {
     if (!this.preferences.loggingEnabled) return;
@@ -294,9 +300,9 @@ class DiagnosticsController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // CRASH REPORTS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async saveCrashReport(error: Error): Promise<void> {
     if (!this.preferences.crashReportingEnabled) return;
@@ -318,7 +324,7 @@ class DiagnosticsController {
       // Clean old crash reports (keep last 20)
       await this.cleanOldCrashReports(20);
     } catch (err) {
-      console.error('Failed to save crash report:', err);
+      log.error('Failed to save crash report:', err);
     }
   }
 
@@ -371,9 +377,9 @@ class DiagnosticsController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // PERFORMANCE METRICS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   startPerformanceMonitoring(): void {
     if (this.metricsInterval) return;
@@ -446,9 +452,9 @@ class DiagnosticsController {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // SYSTEM INFO
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async getSystemInfo(): Promise<Record<string, any>> {
     // For detailed hardware info (CPU brand, GPU, etc.) we still use systeminformation
@@ -514,9 +520,9 @@ class DiagnosticsController {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // EXPORT
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async exportDiagnostics(): Promise<{ success: boolean; path?: string }> {
     try {
@@ -543,7 +549,12 @@ class DiagnosticsController {
         crashReports: await this.getCrashReports()
       };
 
-      await fs.writeFile(filePath, JSON.stringify(diagnostics, null, 2), 'utf-8');
+      // Redact secrets before writing to disk
+      const redacted = JSON.stringify(diagnostics, null, 2)
+        .replace(/("(?:password|pin|secret|token|masterPassword|sessionToken|apiKey|masterKey|encryptedKey)":\s*)"[^"]*"/gi, '$1"[REDACTED]"')
+        .replace(/"(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*)"/g, '"[JWT_REDACTED]"');
+
+      await fs.writeFile(filePath, redacted, 'utf-8');
       return { success: true, path: filePath };
     } catch {
       return { success: false };

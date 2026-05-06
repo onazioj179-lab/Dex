@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - SYSTEM 12: Mental Model Consistency (UNIFIED)
 // ===========================================================================
@@ -241,7 +247,7 @@ class MentalModelManagerClass extends EventEmitter {
     this.registerSystem({
       id: 'learning',
       name: 'Local Learning',
-      description: 'Learns your patterns locally—never sent to cloud',
+      description: 'Learns your patterns locally--never sent to cloud',
       status: 'active',
       metrics: {
         patterns: { value: 0, label: 'Learned Patterns' },
@@ -361,7 +367,7 @@ class MentalModelManagerClass extends EventEmitter {
 
     this.addBehaviorRule({
       name: 'Learning stays local',
-      description: 'All learned patterns stay on your device—nothing is sent to any server',
+      description: 'All learned patterns stay on your device--nothing is sent to any server',
       condition: 'Always',
       behavior: 'Data stored locally only',
       userVisible: true,

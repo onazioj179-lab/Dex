@@ -1,15 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Silent Learning System
 // Phase 36: Invisible intelligence, local-only, resettable
 // Learns patterns without interrupting flow or changing UI unexpectedly
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { debouncedJsonStorage } from '../utils/debouncedStorage';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface UsagePattern {
   /** Page navigation frequency */
@@ -60,9 +67,9 @@ interface LearningActions {
   reset: () => void;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Initial State
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const initialPatterns: UsagePattern = {
   pageVisits: {},
@@ -81,9 +88,9 @@ const initialState: LearningState = {
   pageEnterTime: null,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Store
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const useLearningStore = create<LearningState & LearningActions>()(
   persist(
@@ -132,6 +139,8 @@ export const useLearningStore = create<LearningState & LearningActions>()(
         const state = get();
         if (!state.enabled || !state.currentPage || !state.pageEnterTime) return;
 
+        // Capture currentPage before setting to null to avoid stale closure
+        const page = state.currentPage;
         const timeSpent = Date.now() - state.pageEnterTime;
         set((s) => ({
           currentPage: null,
@@ -140,7 +149,7 @@ export const useLearningStore = create<LearningState & LearningActions>()(
             ...s.patterns,
             pageTime: {
               ...s.patterns.pageTime,
-              [s.currentPage!]: (s.patterns.pageTime[s.currentPage!] || 0) + timeSpent,
+              [page]: (s.patterns.pageTime[page] || 0) + timeSpent,
             },
           },
         }));
@@ -214,6 +223,7 @@ export const useLearningStore = create<LearningState & LearningActions>()(
     }),
     {
       name: 'dex-learning',
+      storage: debouncedJsonStorage,
       version: 1,
       partialize: (state) => ({
         enabled: state.enabled,
@@ -223,9 +233,9 @@ export const useLearningStore = create<LearningState & LearningActions>()(
   )
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Hooks for silent integration
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /** Hook to track page visits - call on navigation */
 export const usePageTracking = (page: string) => {

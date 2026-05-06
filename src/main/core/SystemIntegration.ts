@@ -1,9 +1,16 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Phase 51: Complete Integration Module
 // Unified exports for all Phase 51 capabilities
 // =============================================================================
 
 // Performance Optimization
+import log from 'electron-log';
 import {
   PERF_TARGETS as _PERF_TARGETS,
   stateOptimizer as _stateOptimizer,
@@ -122,7 +129,7 @@ export interface Phase51Status {
 let phase51Initialized = false;
 
 export async function initializePhase51(): Promise<Phase51Status> {
-  console.log('[Phase51] Initializing all subsystems...');
+  log.info('[Phase51] Initializing all subsystems...');
   
   const status: Phase51Status = {
     performance: { initialized: false, targetsActive: false },
@@ -135,31 +142,31 @@ export async function initializePhase51(): Promise<Phase51Status> {
   
   try {
     // 1. Performance Optimizer
-    console.log('[Phase51] Starting Performance Optimizer...');
+    log.info('[Phase51] Starting Performance Optimizer...');
     status.performance.initialized = true;
     status.performance.targetsActive = true;
     
     // 2. Capability Layer
-    console.log('[Phase51] Starting Capability Layer...');
+    log.info('[Phase51] Starting Capability Layer...');
     const caps = _capabilityLayer.getActiveCapabilities();
     status.capabilities.initialized = true;
     status.capabilities.activeCount = caps.length;
     
     // 3. Device Interface
-    console.log('[Phase51] Starting Device Interface...');
+    log.info('[Phase51] Starting Device Interface...');
     const devices = _deviceInterface.getDevices();
     status.devices.initialized = true;
     status.devices.connectedCount = devices.length;
     
     // 4. Plugin System
-    console.log('[Phase51] Loading Plugin System...');
+    log.info('[Phase51] Loading Plugin System...');
     await _pluginManager.loadInstalledPlugins();
     const plugins = _pluginManager.getActivePlugins();
     status.plugins.initialized = true;
     status.plugins.activeCount = plugins.length;
     
     // 5. Long-Term Stability
-    console.log('[Phase51] Starting Long-Term Stability Monitor...');
+    log.info('[Phase51] Starting Long-Term Stability Monitor...');
     const stabilityReport = _longTermStability.getStabilityReport();
     status.stability.initialized = true;
     status.stability.isStable = stabilityReport.isStable;
@@ -168,15 +175,15 @@ export async function initializePhase51(): Promise<Phase51Status> {
     status.ready = true;
     phase51Initialized = true;
     
-    console.log('[Phase51] All subsystems initialized successfully');
-    console.log(`  - Performance: Active`);
-    console.log(`  - Capabilities: ${status.capabilities.activeCount} active`);
-    console.log(`  - Devices: ${status.devices.connectedCount} connected`);
-    console.log(`  - Plugins: ${status.plugins.activeCount} active`);
-    console.log(`  - Stability: ${status.stability.isStable ? 'Stable' : 'Issues detected'}`);
+    log.info('[Phase51] All subsystems initialized successfully');
+    log.info(`  - Performance: Active`);
+    log.info(`  - Capabilities: ${status.capabilities.activeCount} active`);
+    log.info(`  - Devices: ${status.devices.connectedCount} connected`);
+    log.info(`  - Plugins: ${status.plugins.activeCount} active`);
+    log.info(`  - Stability: ${status.stability.isStable ? 'Stable' : 'Issues detected'}`);
     
   } catch (err) {
-    console.error('[Phase51] Initialization error:', err);
+    log.error('[Phase51] Initialization error:', err);
   }
   
   return status;
@@ -209,7 +216,7 @@ export function getPhase51Status(): Phase51Status {
 }
 
 export function shutdownPhase51(): void {
-  console.log('[Phase51] Shutting down all subsystems...');
+  log.info('[Phase51] Shutting down all subsystems...');
   
   try {
     // Shutdown in reverse order
@@ -218,9 +225,9 @@ export function shutdownPhase51(): void {
     _performanceOptimizer.shutdown();
     
     phase51Initialized = false;
-    console.log('[Phase51] All subsystems shut down');
+    log.info('[Phase51] All subsystems shut down');
   } catch (err) {
-    console.error('[Phase51] Shutdown error:', err);
+    log.error('[Phase51] Shutdown error:', err);
   }
 }
 

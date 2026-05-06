@@ -122,7 +122,7 @@ export const BUILTIN_SHORTCUTS: Omit<ShortcutRegistration, 'id'>[] = [
   { keys: 'Ctrl+Space', action: 'Toggle Spotlight Search', source: 'Spotlight', priority: 100, enabled: true },
   { keys: 'Ctrl+Shift+P', action: 'Toggle Command Palette', source: 'CommandPalette', priority: 100, enabled: true },
   { keys: 'Ctrl+Shift+V', action: 'Toggle Clipboard History', source: 'ClipboardHistory', priority: 100, enabled: true },
-  { keys: 'Ctrl+K', action: 'Toggle Unified Search', source: 'AppManager', priority: 90, enabled: true },
+  { keys: 'Ctrl+K', action: 'Toggle Command Palette', source: 'CommandPalette', priority: 100, enabled: true },
   { keys: 'Ctrl+Shift+Q', action: 'Close All Apps', source: 'AppManager', priority: 80, enabled: true },
   { keys: 'Alt+Left', action: 'Navigate Back', source: 'AppManager', priority: 80, enabled: true },
   { keys: 'Alt+Right', action: 'Navigate Forward', source: 'AppManager', priority: 80, enabled: true },

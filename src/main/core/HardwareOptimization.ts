@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX HARDWARE OPTIMIZATION
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Premium hardware-level optimizations:
  * - InstantWake: Near-instant system wake from sleep
@@ -11,14 +17,15 @@
  * - MemoryCompression: Active memory compression for efficiency
  */
 
+import log from 'electron-log';
 import { app, ipcMain, BrowserWindow, powerMonitor } from 'electron';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface PowerState {
   isOnBattery: boolean;
@@ -60,9 +67,9 @@ interface PerformanceMetrics {
 
 type PowerProfile = 'performance' | 'balanced' | 'power-saver' | 'ultra-saver';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // INSTANT WAKE SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class InstantWakeService {
   private wakeState: WakeState = {
@@ -93,11 +100,11 @@ class InstantWakeService {
 
     // Lock screen events
     powerMonitor.on('lock-screen', () => {
-      console.log('[InstantWake] Screen locked');
+      log.info('[InstantWake] Screen locked');
     });
 
     powerMonitor.on('unlock-screen', () => {
-      console.log('[InstantWake] Screen unlocked');
+      log.info('[InstantWake] Screen unlocked');
       this.quickRestoreUI();
     });
   }
@@ -106,7 +113,7 @@ class InstantWakeService {
    * Called before system suspends
    */
   private onSystemSuspend(): void {
-    console.log('[InstantWake] System suspending - capturing state...');
+    log.info('[InstantWake] System suspending - capturing state...');
     this.wakeState.lastSleepTime = Date.now();
 
     // Capture all window states
@@ -139,7 +146,7 @@ class InstantWakeService {
       ? wakeTime - this.wakeState.lastSleepTime 
       : 0;
 
-    console.log(`[InstantWake] System resumed after ${Math.round(sleepDuration / 1000)}s`);
+    log.info(`[InstantWake] System resumed after ${Math.round(sleepDuration / 1000)}s`);
     this.wakeState.lastWakeTime = wakeTime;
 
     // Instant restoration
@@ -204,7 +211,7 @@ class InstantWakeService {
     try {
       fs.writeFileSync(statePath, JSON.stringify(this.wakeState.preservedState, null, 2));
     } catch (error) {
-      console.warn('[InstantWake] Failed to save state:', error);
+      log.warn('[InstantWake] Failed to save state:', error);
     }
   }
 
@@ -219,7 +226,7 @@ class InstantWakeService {
         this.wakeState.preservedState = data;
       }
     } catch (error) {
-      console.warn('[InstantWake] Failed to load state:', error);
+      log.warn('[InstantWake] Failed to load state:', error);
     }
   }
 
@@ -228,7 +235,7 @@ class InstantWakeService {
    */
   setEnabled(enabled: boolean): void {
     this.wakeState.instantWakeEnabled = enabled;
-    console.log(`[InstantWake] ${enabled ? 'Enabled' : 'Disabled'}`);
+    log.info(`[InstantWake] ${enabled ? 'Enabled' : 'Disabled'}`);
   }
 
   getWakeState(): WakeState {
@@ -236,9 +243,9 @@ class InstantWakeService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SMART POWER SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SmartPowerService {
   private currentProfile: PowerProfile = 'balanced';
@@ -263,14 +270,14 @@ class SmartPowerService {
 
     // Monitor battery state changes
     powerMonitor.on('on-ac', () => {
-      console.log('[SmartPower] Connected to AC power');
+      log.info('[SmartPower] Connected to AC power');
       this.powerState.isOnBattery = false;
       this.powerState.isCharging = true;
       this.autoAdjustProfile();
     });
 
     powerMonitor.on('on-battery', () => {
-      console.log('[SmartPower] Running on battery');
+      log.info('[SmartPower] Running on battery');
       this.powerState.isOnBattery = true;
       this.powerState.isCharging = false;
       this.autoAdjustProfile();
@@ -343,7 +350,7 @@ class SmartPowerService {
   setProfile(profile: PowerProfile): void {
     if (this.currentProfile === profile) return;
 
-    console.log(`[SmartPower] Switching to ${profile} profile`);
+    log.info(`[SmartPower] Switching to ${profile} profile`);
     this.currentProfile = profile;
 
     // Apply profile settings
@@ -432,7 +439,7 @@ class SmartPowerService {
    */
   setAutoProfile(enabled: boolean): void {
     this.autoProfileEnabled = enabled;
-    console.log(`[SmartPower] Auto profile ${enabled ? 'enabled' : 'disabled'}`);
+    log.info(`[SmartPower] Auto profile ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -446,14 +453,14 @@ class SmartPowerService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MEMORY OPTIMIZATION SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class MemoryOptimizationService {
-  private memoryThreshold = 0.85; // 85% memory usage triggers optimization
+  private memoryThreshold = 0.92; // 92% memory usage triggers optimization (was 85%)
   private lastOptimization = 0;
-  private optimizationCooldown = 30000; // 30 second cooldown
+  private optimizationCooldown = 120000; // 2 minute cooldown (was 30s)
   private monitorInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -463,7 +470,7 @@ class MemoryOptimizationService {
   private startMonitoring(): void {
     this.monitorInterval = setInterval(() => {
       this.checkMemoryPressure();
-    }, 10000); // Check every 10 seconds
+    }, 60000); // Check every 60 seconds (was 10s)
   }
 
   /**
@@ -475,7 +482,7 @@ class MemoryOptimizationService {
     if (usage.percentUsed > this.memoryThreshold) {
       const now = Date.now();
       if (now - this.lastOptimization > this.optimizationCooldown) {
-        console.log(`[MemoryOpt] High memory usage: ${Math.round(usage.percentUsed * 100)}%`);
+        log.info(`[MemoryOpt] High memory usage: ${Math.round(usage.percentUsed * 100)}%`);
         this.optimize();
         this.lastOptimization = now;
       }
@@ -498,7 +505,7 @@ class MemoryOptimizationService {
    * Run optimization
    */
   optimize(): void {
-    console.log('[MemoryOpt] Running memory optimization...');
+    log.info('[MemoryOpt] Running memory optimization...');
 
     // Clear caches in all renderer processes
     BrowserWindow.getAllWindows().forEach(win => {
@@ -521,7 +528,7 @@ class MemoryOptimizationService {
     });
 
     const after = this.getMemoryUsage();
-    console.log(`[MemoryOpt] After optimization: ${Math.round(after.percentUsed * 100)}%`);
+    log.info(`[MemoryOpt] After optimization: ${Math.round(after.percentUsed * 100)}%`);
   }
 
   /**
@@ -604,7 +611,7 @@ class MemoryOptimizationService {
    */
   setThreshold(threshold: number): void {
     this.memoryThreshold = Math.max(0.5, Math.min(0.95, threshold));
-    console.log(`[MemoryOpt] Threshold set to ${Math.round(this.memoryThreshold * 100)}%`);
+    log.info(`[MemoryOpt] Threshold set to ${Math.round(this.memoryThreshold * 100)}%`);
   }
 
   /**
@@ -618,9 +625,9 @@ class MemoryOptimizationService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HARDWARE OPTIMIZATION MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class HardwareOptimizationManager {
   public instantWake: InstantWakeService;
@@ -640,7 +647,7 @@ class HardwareOptimizationManager {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log('[HardwareOpt] Initializing...');
+    log.info('[HardwareOpt] Initializing...');
 
     // Load saved state
     this.instantWake.loadStateFromDisk();
@@ -649,7 +656,7 @@ class HardwareOptimizationManager {
     this.registerIPCHandlers();
 
     this.isInitialized = true;
-    console.log('[HardwareOpt] Initialized successfully');
+    log.info('[HardwareOpt] Initialized successfully');
   }
 
   private registerIPCHandlers(): void {
@@ -706,16 +713,16 @@ class HardwareOptimizationManager {
    * Shutdown all services
    */
   shutdown(): void {
-    console.log('[HardwareOpt] Shutting down...');
+    log.info('[HardwareOpt] Shutting down...');
     this.smartPower.shutdown();
     this.memoryOpt.shutdown();
     this.isInitialized = false;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const hardwareOptimization = new HardwareOptimizationManager();
 

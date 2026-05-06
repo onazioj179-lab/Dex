@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Governance Controller
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * System-wide Governance & Trust Lock:
  * 1. Global automation controls (enable/disable all)
@@ -18,14 +24,15 @@
  * - Transparency over convenience
  */
 
+import log from 'electron-log';
 import { ipcMain, app, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface GovernanceStatus {
   // Global controls
@@ -109,9 +116,9 @@ export interface GovernanceConfig {
   auditRetentionDays: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Governance Controller
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class GovernanceController {
   private mainWindow: BrowserWindow | null = null;
@@ -199,9 +206,9 @@ class GovernanceController {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Initialization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async initialize(): Promise<void> {
     try {
@@ -241,14 +248,14 @@ class GovernanceController {
       // Initial health check
       await this.performHealthCheck();
       
-      console.log('[GovernanceController] Initialized:', {
+      if (!app.isPackaged) log.info('[GovernanceController] Initialized:', {
         systemEnabled: this.config.systemEnabled,
         automationEnabled: this.config.automationEnabled,
         learningEnabled: this.config.learningEnabled,
         auditEntries: this.auditLog.length,
       });
     } catch (err) {
-      console.error('[GovernanceController] Initialization error:', err);
+      log.error('[GovernanceController] Initialization error:', err);
     }
   }
 
@@ -256,9 +263,9 @@ class GovernanceController {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Global Controls
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async enableAll(): Promise<boolean> {
     this.config.systemEnabled = true;
@@ -302,9 +309,9 @@ class GovernanceController {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Status
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async getStatus(): Promise<GovernanceStatus> {
     const storageLimit = this.config.limits.find(l => l.id === 'storage');
@@ -329,9 +336,9 @@ class GovernanceController {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Automation Permissions
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async getAutomationPermissions(): Promise<AutomationPermission[]> {
     return Array.from(this.config.automationPermissions.values());
@@ -427,9 +434,9 @@ class GovernanceController {
       `Automation ${automationId} executed`, 'allowed');
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Learning Governance
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getLearningConfig(): LearningGovernance {
     return { ...this.config.learning };
@@ -478,9 +485,9 @@ class GovernanceController {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Limits
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getLimits(): SystemLimit[] {
     return this.config.limits.map(l => ({ ...l }));
@@ -541,9 +548,9 @@ class GovernanceController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Health Checks
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async performHealthCheck(): Promise<void> {
     let health: GovernanceStatus['systemHealth'] = 'healthy';
@@ -578,15 +585,15 @@ class GovernanceController {
     this.lastHealthCheck = Date.now();
     
     if (health !== 'healthy') {
-      console.warn('[GovernanceController] Health check issues:', issues);
+      log.warn('[GovernanceController] Health check issues:', issues);
     }
     
     this.emitStatusUpdate();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Audit Log
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private audit(
     category: TrustAuditEntry['category'],
@@ -644,9 +651,9 @@ class GovernanceController {
     this.saveAuditLog();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Trust Dashboard Data
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async getTrustDashboardData(): Promise<{
     status: GovernanceStatus;
@@ -664,9 +671,9 @@ class GovernanceController {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Emergency Controls
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async emergencyStop(): Promise<boolean> {
     // Immediately disable all automated features
@@ -684,14 +691,14 @@ class GovernanceController {
       this.mainWindow.webContents.send('governance:emergencyStop');
     }
     
-    console.warn('[GovernanceController] EMERGENCY STOP ACTIVATED');
+    log.warn('[GovernanceController] EMERGENCY STOP ACTIVATED');
     
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Persistence
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private saveConfig(): void {
     const toSave = {
@@ -706,9 +713,9 @@ class GovernanceController {
     fs.writeFileSync(this.auditFile, JSON.stringify(this.auditLog, null, 2));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Events
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private emitStatusUpdate(): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -724,9 +731,9 @@ class GovernanceController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Cleanup
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   destroy(): void {
     if (this.healthCheckInterval) {
@@ -734,9 +741,9 @@ class GovernanceController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     // Status (using govCtrl: prefix to avoid conflict with GovernanceContract)
@@ -786,9 +793,9 @@ class GovernanceController {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Export
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const governanceController = new GovernanceController();
 export default governanceController;

@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * UpdateStabilityMode.ts
  * System 6: Reliability, Stability, Final Lock
@@ -11,6 +17,7 @@
  * Ensures updates never break Dex or lose user data.
  */
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import { app, ipcMain, dialog } from 'electron';
 import * as path from 'path';
@@ -165,7 +172,7 @@ class UpdateStabilityMode extends EventEmitter {
     this.setupIPC();
 
     this.initialized = true;
-    console.log('[UpdateStability] Initialized, version:', this.state.currentVersion.version);
+    log.info('[UpdateStability] Initialized, version:', this.state.currentVersion.version);
   }
 
   /**
@@ -211,7 +218,7 @@ class UpdateStabilityMode extends EventEmitter {
     try {
       await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
-      console.error('[UpdateStability] Failed to save config:', error);
+      log.error('[UpdateStability] Failed to save config:', error);
     }
   }
 
@@ -242,7 +249,7 @@ class UpdateStabilityMode extends EventEmitter {
         lastCheck: this.state.lastCheck
       }, null, 2));
     } catch (error) {
-      console.error('[UpdateStability] Failed to save state:', error);
+      log.error('[UpdateStability] Failed to save state:', error);
     }
   }
 
@@ -302,18 +309,31 @@ class UpdateStabilityMode extends EventEmitter {
   }
 
   /**
-   * Setup IPC handlers
+   * Setup IPC handlers -- uses safe registration to avoid collisions
+   * with ReleaseManager which may already own some `update:*` channels.
    */
   private setupIPC(): void {
-    ipcMain.handle('update:getState', () => {
+    const safeHandle = (channel: string, handler: (...args: any[]) => any): void => {
+      try {
+        ipcMain.handle(channel, handler);
+      } catch (_e) {
+        // Channel already registered by ReleaseManager -- skip silently
+        log.info(`[UpdateStability] Skipping '${channel}' (already registered by ReleaseManager)`);
+      }
+    };
+
+    // Unique to UpdateStabilityMode -- always safe
+    safeHandle('update:getState', () => {
       return this.state;
     });
 
-    ipcMain.handle('update:getConfig', () => {
+    // May collide with ReleaseManager
+    safeHandle('update:getConfig', () => {
       return this.config;
     });
 
-    ipcMain.handle('update:setConfig', async (_event, newConfig: Partial<UpdateConfig>) => {
+    // Unique -- ReleaseManager uses 'update:updateConfig'
+    safeHandle('update:setConfig', async (_event: any, newConfig: Partial<UpdateConfig>) => {
       this.config = { ...this.config, ...newConfig };
       await this.saveConfig();
       
@@ -324,31 +344,35 @@ class UpdateStabilityMode extends EventEmitter {
       return { success: true };
     });
 
-    ipcMain.handle('update:check', async () => {
+    // May collide with ReleaseManager
+    safeHandle('update:check', async () => {
       return await this.checkForUpdates();
     });
 
-    ipcMain.handle('update:download', async () => {
+    safeHandle('update:download', async () => {
       return await this.downloadUpdate();
     });
 
-    ipcMain.handle('update:install', async () => {
+    safeHandle('update:install', async () => {
       return await this.installUpdate();
     });
 
-    ipcMain.handle('update:rollback', async () => {
+    safeHandle('update:rollback', async () => {
       return await this.performRollback();
     });
 
-    ipcMain.handle('update:createBackup', async () => {
+    // Unique to UpdateStabilityMode
+    safeHandle('update:createBackup', async () => {
       return await this.createPreUpdateBackup();
     });
 
-    ipcMain.handle('update:getHistory', () => {
+    // May collide with ReleaseManager
+    safeHandle('update:getHistory', () => {
       return this.state.history;
     });
 
-    ipcMain.handle('update:canRollback', () => {
+    // Unique to UpdateStabilityMode
+    safeHandle('update:canRollback', () => {
       return {
         canRollback: this.state.canRollback,
         rollbackVersion: this.state.rollbackVersion
@@ -392,7 +416,7 @@ class UpdateStabilityMode extends EventEmitter {
       await this.saveState();
       return { available: false };
     } catch (error) {
-      console.error('[UpdateStability] Check failed:', error);
+      log.error('[UpdateStability] Check failed:', error);
       this.setPhase('idle');
       return { available: false };
     }
@@ -402,8 +426,7 @@ class UpdateStabilityMode extends EventEmitter {
    * Fetch update manifest from server
    */
   private async fetchUpdateManifest(): Promise<UpdateManifest | null> {
-    // This would be implemented to fetch from actual update server
-    // For now, return null (no updates)
+    // No update server configured — return null (no updates available)
     return null;
   }
 
@@ -423,25 +446,9 @@ class UpdateStabilityMode extends EventEmitter {
     this.state.progress = 0;
 
     try {
-      // Simulate download progress
-      for (let i = 0; i <= 100; i += 10) {
-        this.state.progress = i;
-        this.emit('download-progress', i);
-        await this.delay(100);
-      }
-
-      this.setPhase('verifying');
-      
-      // Verify downloaded files
-      const verified = await this.verifyDownload();
-      
-      if (!verified) {
-        this.setPhase('failed');
-        return { success: false, error: 'Download verification failed' };
-      }
-
-      this.setPhase('idle');
-      this.emit('download-complete');
+      // No remote update server configured — cannot download updates
+      this.setPhase('failed');
+      return { success: false, error: 'Update server not configured' };
 
       if (this.config.autoInstall && !this.config.requireUserConfirmation) {
         setTimeout(() => this.installUpdate(), 1000);
@@ -449,7 +456,7 @@ class UpdateStabilityMode extends EventEmitter {
 
       return { success: true };
     } catch (error) {
-      console.error('[UpdateStability] Download failed:', error);
+      log.error('[UpdateStability] Download failed:', error);
       this.setPhase('failed');
       return { success: false, error: String(error) };
     }
@@ -459,8 +466,8 @@ class UpdateStabilityMode extends EventEmitter {
    * Verify downloaded update
    */
   private async verifyDownload(): Promise<boolean> {
-    // Would verify checksums of downloaded files
-    return true;
+    // No download to verify — update server not configured
+    return false;
   }
 
   /**
@@ -505,9 +512,9 @@ class UpdateStabilityMode extends EventEmitter {
       // Run migration steps
       for (let i = 0; i < (this.state.pendingUpdate.migrationSteps?.length || 0); i++) {
         const step = this.state.pendingUpdate.migrationSteps[i];
-        console.log(`[UpdateStability] Running migration step: ${step}`);
+        log.info(`[UpdateStability] Running migration step: ${step}`);
         this.state.progress = Math.floor((i / this.state.pendingUpdate.migrationSteps.length) * 100);
-        await this.delay(500); // Simulate step execution
+        await this.delay(200); // Allow UI to update between steps
       }
 
       // Complete installation
@@ -550,7 +557,7 @@ class UpdateStabilityMode extends EventEmitter {
 
       return { success: true };
     } catch (error) {
-      console.error('[UpdateStability] Installation failed:', error);
+      log.error('[UpdateStability] Installation failed:', error);
       
       // Record failure
       const historyEntry: UpdateHistory = {
@@ -568,7 +575,7 @@ class UpdateStabilityMode extends EventEmitter {
 
       // Attempt automatic rollback
       if (this.config.allowRollback && this.state.canRollback) {
-        console.log('[UpdateStability] Attempting automatic rollback');
+        log.info('[UpdateStability] Attempting automatic rollback');
         await this.performRollback();
       }
 
@@ -601,7 +608,7 @@ class UpdateStabilityMode extends EventEmitter {
    * Create pre-update backup
    */
   async createPreUpdateBackup(): Promise<{ success: boolean; manifest?: BackupManifest; error?: string }> {
-    console.log('[UpdateStability] Creating pre-update backup');
+    log.info('[UpdateStability] Creating pre-update backup');
 
     try {
       const backupId = `backup-${Date.now()}`;
@@ -678,12 +685,12 @@ class UpdateStabilityMode extends EventEmitter {
       // Cleanup old backups
       await this.cleanupOldBackups();
 
-      console.log('[UpdateStability] Backup created:', backupId);
+      log.info('[UpdateStability] Backup created:', backupId);
       this.emit('backup-created', manifest);
 
       return { success: true, manifest };
     } catch (error) {
-      console.error('[UpdateStability] Backup failed:', error);
+      log.error('[UpdateStability] Backup failed:', error);
       return { success: false, error: String(error) };
     }
   }
@@ -706,10 +713,10 @@ class UpdateStabilityMode extends EventEmitter {
       for (const dir of toDelete) {
         const dirPath = path.join(this.backupDir, dir);
         await fs.rm(dirPath, { recursive: true, force: true });
-        console.log('[UpdateStability] Deleted old backup:', dir);
+        log.info('[UpdateStability] Deleted old backup:', dir);
       }
     } catch (error) {
-      console.error('[UpdateStability] Cleanup failed:', error);
+      log.error('[UpdateStability] Cleanup failed:', error);
     }
   }
 
@@ -721,7 +728,7 @@ class UpdateStabilityMode extends EventEmitter {
       return { success: false, error: 'Rollback not available' };
     }
 
-    console.log('[UpdateStability] Performing rollback');
+    log.info('[UpdateStability] Performing rollback');
     this.setPhase('rolling-back');
 
     try {
@@ -746,7 +753,7 @@ class UpdateStabilityMode extends EventEmitter {
         }
 
         await fs.writeFile(destPath, content);
-        console.log('[UpdateStability] Restored:', file.path);
+        log.info('[UpdateStability] Restored:', file.path);
       }
 
       // Record rollback in history
@@ -784,7 +791,7 @@ class UpdateStabilityMode extends EventEmitter {
 
       return { success: true };
     } catch (error) {
-      console.error('[UpdateStability] Rollback failed:', error);
+      log.error('[UpdateStability] Rollback failed:', error);
       this.setPhase('failed');
       this.emit('rollback-failed', error);
       return { success: false, error: String(error) };
@@ -854,7 +861,7 @@ class UpdateStabilityMode extends EventEmitter {
    * Shutdown
    */
   async shutdown(): Promise<void> {
-    console.log('[UpdateStability] Shutting down');
+    log.info('[UpdateStability] Shutting down');
     this.stopAutoCheck();
     this.removeAllListeners();
   }

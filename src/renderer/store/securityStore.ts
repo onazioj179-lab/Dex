@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Security Store
 // Phase 39 & 40: Zustand store for security state management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface SecurityLayerConfig {
   osSandbox: boolean;
@@ -90,9 +96,9 @@ export interface ConnectivityState {
   vpn: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SecurityStore {
   // Security status
@@ -162,7 +168,7 @@ export const useSecurityStore = create<SecurityStore>((set, get) => ({
         layers: [
           { layer: 1, name: 'OS Sandbox', status: 'active', details: 'Electron sandbox enabled' },
           { layer: 2, name: 'Process Isolation', status: 'active', details: 'Context isolation active' },
-          { layer: 3, name: 'Encryption Layer', status: 'active', details: 'AES-256-GCM ready' },
+          { layer: 3, name: 'Data Protection', status: 'active', details: 'Encryption ready' },
           { layer: 4, name: 'Execution Control', status: 'active', details: 'Script validation enabled' },
           { layer: 5, name: 'Audit & Integrity', status: 'active', details: 'Logging active' },
         ],
@@ -200,7 +206,8 @@ export const useSecurityStore = create<SecurityStore>((set, get) => ({
     set({ isLoading: true });
     try {
       const status = await window.dex?.securityCore?.runSecurityCheck();
-      set({ status, isLoading: false });
+      if (status) set({ status, isLoading: false });
+      else set({ isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
@@ -210,7 +217,7 @@ export const useSecurityStore = create<SecurityStore>((set, get) => ({
     try {
       await window.dex?.securityCore?.updateConfig(updates);
       const config = await window.dex?.securityCore?.getConfig();
-      set({ config });
+      if (config) set({ config });
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -376,9 +383,9 @@ export const useSecurityStore = create<SecurityStore>((set, get) => ({
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GLOBAL TYPE DECLARATIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // The window.dex API is already declared in preload.ts
 // This file just imports the types needed for the store

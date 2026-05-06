@@ -1,0 +1,29 @@
+DEX - Personal Control Hub for Desktop Automation
+=================================================
+
+This file lists every individual or organization that has authored code,
+documentation, design, or assets in the DEX project.
+
+Format: Name <email> -- role -- since
+
+PRIMARY AUTHOR
+--------------
+Onazi Treasure OJ <onazi.treasure@outlook.com> -- Creator, Architect, Maintainer -- 2026
+
+DEX was designed, built, and is maintained solely by Onazi Treasure OJ. The
+entire architecture (renderer shell, main process, native modules, plugin
+platform, security model, design system) is the original work of the
+primary author.
+
+CONTRIBUTORS
+------------
+(none yet)
+
+ACKNOWLEDGEMENTS
+----------------
+DEX builds on the work of countless open-source authors. Their licenses are
+preserved in node_modules and aggregated in NOTICE.
+
+To be added to this list, see CONTRIBUTING.md.
+
+Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.

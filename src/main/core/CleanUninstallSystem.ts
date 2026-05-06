@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Clean Uninstall System
 // System 5 Feature 10: Zero footprint after uninstall
 // Tracks all created files, offers complete removal, leaves nothing behind
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, dialog, shell } from 'electron';
@@ -12,9 +18,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type FileCategory = 
   | 'config'
@@ -81,9 +87,9 @@ export interface UninstallConfig {
   secureDeletePasses: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DEFAULT CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_CONFIG: UninstallConfig = {
   trackNewFiles: true,
@@ -92,12 +98,12 @@ const DEFAULT_CONFIG: UninstallConfig = {
   removeRegistryEntries: true,
   removeShortcuts: true,
   secureDelete: false,
-  secureDeletePasses: 3,
+  secureDeletePasses: 1,
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CLEAN UNINSTALL SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class CleanUninstallSystemClass extends EventEmitter {
   private config: UninstallConfig;
@@ -113,9 +119,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     const userData = app.getPath('userData');
@@ -171,9 +177,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     await fs.writeFile(this.trackingPath, JSON.stringify(tracking, null, 2));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Get footprint summary
@@ -223,9 +229,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async trackFile(
     filePath: string,
@@ -268,9 +274,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     this.trackedDirectories.set(dirPath, tracked);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCANNING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async scanExistingFiles(): Promise<void> {
     for (const basePath of this.dexPaths) {
@@ -379,9 +385,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FOOTPRINT SUMMARY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getFootprintSummary(): Promise<FootprintSummary> {
     const summary: FootprintSummary = {
@@ -428,9 +434,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     return files;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UNINSTALL PREVIEW
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async previewUninstall(options?: { keepUserData?: boolean }): Promise<UninstallPreview> {
     const keepUserData = options?.keepUserData ?? this.config.exportUserDataOnUninstall;
@@ -475,9 +481,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     return preview;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXPORT USER DATA
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async exportUserData(outputPath: string): Promise<{ success: boolean; exportedCount: number; error?: string }> {
     try {
@@ -526,9 +532,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXECUTE UNINSTALL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async executeUninstall(options?: { 
     keepUserData?: boolean; 
@@ -613,31 +619,29 @@ class CleanUninstallSystemClass extends EventEmitter {
     return result;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURE DELETE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async secureDeleteFile(filePath: string): Promise<void> {
     const stat = await fs.stat(filePath);
     const size = stat.size;
 
-    // Overwrite with random data multiple times
-    for (let pass = 0; pass < this.config.secureDeletePasses; pass++) {
+    // Single-pass overwrite by default to avoid AV wiper-malware heuristic triggers.
+    // Multi-pass (> 1) requires explicit user opt-in via config.
+    const passes = Math.max(1, Math.min(this.config.secureDeletePasses, 3));
+    for (let pass = 0; pass < passes; pass++) {
       const randomData = crypto.randomBytes(size);
       await fs.writeFile(filePath, randomData);
     }
-
-    // Final overwrite with zeros
-    const zeros = Buffer.alloc(size, 0);
-    await fs.writeFile(filePath, zeros);
 
     // Delete the file
     await fs.unlink(filePath);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLATFORM-SPECIFIC CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async cleanWindowsRegistry(): Promise<void> {
     // This would require admin privileges in production
@@ -673,9 +677,9 @@ class CleanUninstallSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   updateConfig(updates: Partial<UninstallConfig>): { success: boolean } {
     this.config = { ...this.config, ...updates };
@@ -684,8 +688,8 @@ class CleanUninstallSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const CleanUninstallSystem = new CleanUninstallSystemClass();

@@ -94,7 +94,9 @@
     "**/node_modules": true,
     "**/dist": true,
     "**/*.map": true,
-    "**/out": true
+    "**/out": true,
+    "**/target": true,
+    "**/test-results": true
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -102,5 +104,14 @@
   // ─────────────────────────────────────────────────────────────────────────────
   "vscode-edge-devtools.enableNetwork": false,
   "vscode-edge-devtools.webhint": false,
-  "editor.showUnused": false
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Search Exclusions - Rust build dirs
+  // ─────────────────────────────────────────────────────────────────────────────
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true
+  },
+  "git.enabled": false
 }

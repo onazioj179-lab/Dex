@@ -1,11 +1,19 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // LOCK SCREEN - Full-Screen Authentication Overlay
 // Renders when the app is locked, blocking all interaction behind it.
 // Supports PIN (4/6 digit), password, and biometric authentication.
+// Animated gradient background that runs continuously behind the login.
 // =============================================================================
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
+import { sharedTick } from '../services/SharedTick';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -23,6 +31,24 @@ const SHAKE_DURATION = 520;
 const ERROR_DISPLAY_MS = 3000;
 
 // -----------------------------------------------------------------------------
+// Animated Background - runs as a login background effect
+// -----------------------------------------------------------------------------
+
+const AnimatedBackground: React.FC = React.memo(() => (
+  <>
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'linear-gradient(160deg, #000000 0%, #0a0a0a 30%, #111111 60%, #0a0a0a 100%)',
+    }} />
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'radial-gradient(ellipse at 50% 40%, var(--color-border-subtle) 0%, transparent 60%)',
+    }} />
+  </>
+));
+AnimatedBackground.displayName = 'AnimatedBackground';
+
+// -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
 
@@ -37,6 +63,9 @@ export const LockScreen: React.FC = () => {
     authenticateWithPassword,
     authenticateWithPin,
     authenticateWithBiometric,
+    authenticateWithRecovery,
+    idleWarning,
+    setIdleWarning,
     setError,
     config,
   } = useAuthStore();
@@ -47,6 +76,10 @@ export const LockScreen: React.FC = () => {
   const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [unlocking, setUnlocking] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [idleSeconds, setIdleSeconds] = useState(0);
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -71,6 +104,14 @@ export const LockScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [isLocked, isEnabled]);
 
+  // Pause/resume SharedTick while lock screen is visible
+  useEffect(() => {
+    if (isLocked && isEnabled) {
+      sharedTick.pause();
+      return () => { sharedTick.resume(); };
+    }
+  }, [isLocked, isEnabled]);
+
   // Cleanup timeouts
   useEffect(() => {
     return () => {
@@ -78,6 +119,14 @@ export const LockScreen: React.FC = () => {
       if (errorTimeout.current) clearTimeout(errorTimeout.current);
     };
   }, []);
+
+  // Fade-out transition when unlocking
+  useEffect(() => {
+    if (!isLocked && unlocking) {
+      const t = setTimeout(() => setUnlocking(false), 600);
+      return () => clearTimeout(t);
+    }
+  }, [isLocked, unlocking]);
 
   // Focus password input when it mounts
   useEffect(() => {
@@ -92,7 +141,52 @@ export const LockScreen: React.FC = () => {
     setPassword('');
     setLocalError('');
     setError(null);
+    setShowRecovery(false);
+    setRecoveryCode('');
   }, [isLocked, setError]);
+
+  // Listen for idle warning from main process
+  useEffect(() => {
+    const handler = (_event: any, data: { secondsUntilLock: number }) => {
+      setIdleWarning({ active: true, seconds: data.secondsUntilLock });
+      setIdleSeconds(data.secondsUntilLock);
+    };
+    // @ts-ignore - electron IPC
+    window.electron?.on?.('auth:idleWarning', handler);
+
+    let countdown: ReturnType<typeof setInterval>;
+    if (idleWarning?.active) {
+      countdown = setInterval(() => {
+        setIdleSeconds(prev => {
+          if (prev <= 1) {
+            setIdleWarning(null);
+            clearInterval(countdown);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      // @ts-ignore
+      window.electron?.removeListener?.('auth:idleWarning', handler);
+      if (countdown) clearInterval(countdown);
+    };
+  }, [idleWarning?.active, setIdleWarning]);
+
+  // Recovery code submission
+  const handleRecoverySubmit = useCallback(async () => {
+    if (!recoveryCode.trim()) return;
+    const ok = await authenticateWithRecovery(recoveryCode.trim());
+    if (!ok) {
+      triggerShake();
+      showLocalError('Invalid recovery code');
+    } else {
+      setShowRecovery(false);
+      setRecoveryCode('');
+    }
+  }, [recoveryCode, authenticateWithRecovery]);
 
   // Display error from store or local
   const displayError = localError || storeError || '';
@@ -124,7 +218,9 @@ export const LockScreen: React.FC = () => {
 
     if (next.length === pinLength) {
       const success = await authenticateWithPin(next);
-      if (!success) {
+      if (success) {
+        setUnlocking(true);
+      } else {
         triggerShake();
         showLocalError('Incorrect PIN');
         setTimeout(() => setPin(''), SHAKE_DURATION);
@@ -139,7 +235,9 @@ export const LockScreen: React.FC = () => {
     if (lockoutStatus.isLockedOut || isLoading || !password.trim()) return;
 
     const success = await authenticateWithPassword(password);
-    if (!success) {
+    if (success) {
+      setUnlocking(true);
+    } else {
       triggerShake();
       showLocalError('Incorrect password');
       setPassword('');
@@ -151,7 +249,9 @@ export const LockScreen: React.FC = () => {
   const handleBiometric = useCallback(async () => {
     if (lockoutStatus.isLockedOut || isLoading) return;
     const success = await authenticateWithBiometric();
-    if (!success) {
+    if (success) {
+      setUnlocking(true);
+    } else {
       triggerShake();
       showLocalError('Biometric authentication failed');
     }
@@ -181,8 +281,37 @@ export const LockScreen: React.FC = () => {
     }
   }, [isLocked, isEnabled, method, handleBiometric]);
 
-  // Don't render if not locked or auth not enabled
-  if (!isLocked || !isEnabled) return null;
+  // Always show lock screen on startup (as welcome screen if auth not enabled)
+  // When auth is not enabled, user can click/press any key to dismiss
+  const isWelcomeMode = !isEnabled;
+  const [dismissed, setDismissed] = useState(() => {
+    try { return !!sessionStorage.getItem('dex-lock-dismissed'); } catch { return false; }
+  });
+
+  // Dismiss welcome screen on click or keypress
+  const handleWelcomeDismiss = useCallback(() => {
+    if (!isWelcomeMode || dismissed) return;
+    setUnlocking(true);
+    setTimeout(() => {
+      try { sessionStorage.setItem('dex-lock-dismissed', '1'); } catch (e) { console.warn('[DEX]', e); }
+      setDismissed(true);
+    }, 500);
+  }, [isWelcomeMode, dismissed]);
+
+  // Listen for keypress to dismiss welcome screen
+  useEffect(() => {
+    if (!isWelcomeMode || dismissed) return;
+    const handler = (e: KeyboardEvent) => {
+      if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+      handleWelcomeDismiss();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isWelcomeMode, dismissed, handleWelcomeDismiss]);
+
+  // Don't render welcome/lock screen if auth is not enabled — go straight to desktop
+  if (isWelcomeMode) return null;
+  if (!isLocked && !unlocking) return null;
 
   // Format time
   const hours = currentTime.getHours();
@@ -200,12 +329,17 @@ export const LockScreen: React.FC = () => {
     : '';
 
   return (
-    <div style={styles.overlay} role="dialog" aria-label="Lock Screen" aria-modal="true">
+    <div style={{
+      ...styles.overlay,
+      opacity: unlocking ? 0 : 1,
+      transition: 'opacity 0.5s ease-out',
+      pointerEvents: unlocking ? 'none' : 'auto',
+    }} role="dialog" aria-label="Lock Screen" aria-modal="true">
       <style>{lockScreenCSS}</style>
 
-      <div style={styles.backdrop} />
+      <AnimatedBackground />
 
-      <div style={styles.content}>
+      <div style={styles.content} onClick={isWelcomeMode ? handleWelcomeDismiss : undefined}>
         {/* Clock */}
         <div style={styles.clockSection}>
           <div style={styles.time}>
@@ -215,8 +349,17 @@ export const LockScreen: React.FC = () => {
           <div style={styles.date}>{dateStr}</div>
         </div>
 
-        {/* Auth Section */}
-        <div
+        {/* Welcome mode: just show hint to continue */}
+        {isWelcomeMode && (
+          <div style={{ textAlign: 'center', animation: 'fadeInUp 1s ease-out 0.5s both' }}>
+            <div style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>
+              Click anywhere or press any key
+            </div>
+          </div>
+        )}
+
+        {/* Auth Section - only when auth is enabled */}
+        {!isWelcomeMode && <div
           style={styles.authSection}
           className={shake ? 'lock-shake' : ''}
         >
@@ -252,16 +395,18 @@ export const LockScreen: React.FC = () => {
                   if (digit === '') {
                     return <div key={i} style={styles.numpadSpacer} />;
                   }
+                  const isDisabled = lockoutStatus.isLockedOut || isLoading;
                   if (digit === 'del') {
                     return (
                       <button
                         key={i}
-                        style={styles.numpadKey}
+                        style={{...styles.numpadKey, opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}
                         className="lock-numpad-key"
                         onClick={() => handlePinDigit('del')}
-                        disabled={lockoutStatus.isLockedOut || isLoading}
+                        disabled={isDisabled}
                         aria-label="Delete last digit"
-                        tabIndex={0}
+                        aria-disabled={isDisabled}
+                        tabIndex={isDisabled ? -1 : 0}
                       >
                         <svg width="22" height="18" viewBox="0 0 22 18" fill="none">
                           <path
@@ -278,12 +423,13 @@ export const LockScreen: React.FC = () => {
                   return (
                     <button
                       key={i}
-                      style={styles.numpadKey}
+                      style={{...styles.numpadKey, opacity: isDisabled ? 0.4 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer'}}
                       className="lock-numpad-key"
                       onClick={() => handlePinDigit(digit)}
-                      disabled={lockoutStatus.isLockedOut || isLoading}
+                      disabled={isDisabled}
                       aria-label={`Digit ${digit}`}
-                      tabIndex={0}
+                      aria-disabled={isDisabled}
+                      tabIndex={isDisabled ? -1 : 0}
                     >
                       {digit}
                     </button>
@@ -374,6 +520,7 @@ export const LockScreen: React.FC = () => {
               style={styles.fallbackLink}
               className="lock-fallback-link"
               onClick={handleBiometric}
+              aria-label="Authenticate with biometrics"
               disabled={lockoutStatus.isLockedOut || isLoading}
             >
               Use Biometrics
@@ -382,7 +529,7 @@ export const LockScreen: React.FC = () => {
 
           {/* Error message */}
           {displayError && !lockoutStatus.isLockedOut && (
-            <div style={styles.errorMsg} role="alert">
+            <div style={styles.errorMsg} role="alert" aria-live="assertive">
               {displayError}
             </div>
           )}
@@ -393,8 +540,90 @@ export const LockScreen: React.FC = () => {
               {lockoutStatus.attemptsRemaining} attempt{lockoutStatus.attemptsRemaining !== 1 ? 's' : ''} remaining
             </div>
           )}
-        </div>
+
+          {/* Recovery code link */}
+          {(method.includes('pin') || method.includes('password')) && !showRecovery && (
+            <button
+              style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: '12px', cursor: 'pointer', marginTop: '12px', padding: '4px 8px' }}
+              onClick={() => setShowRecovery(true)}
+            >
+              Forgot PIN / Password?
+            </button>
+          )}
+
+          {/* Recovery code input */}
+          {showRecovery && (
+            <div style={{ marginTop: '16px', width: '100%', maxWidth: '280px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+                Enter a recovery code
+              </div>
+              <input
+                type="text"
+                value={recoveryCode}
+                onChange={e => setRecoveryCode(e.target.value.toUpperCase())}
+                placeholder="XXXX-XXXX"
+                style={{
+                  width: '100%', padding: '12px', background: 'var(--color-border-subtle)',
+                  border: '1px solid var(--color-border)', borderRadius: '10px',
+                  color: '#fff', fontSize: '16px', textAlign: 'center',
+                  fontFamily: 'monospace', letterSpacing: '2px',
+                  outline: 'none',
+                }}
+                onKeyDown={e => e.key === 'Enter' && handleRecoverySubmit()}
+              />
+              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleRecoverySubmit}
+                  disabled={isLoading || !recoveryCode.trim()}
+                  style={{
+                    padding: '8px 20px', borderRadius: '8px', border: 'none',
+                    background: 'rgba(74,158,255,0.3)', color: '#fff', fontSize: '13px',
+                    cursor: 'pointer', opacity: (!recoveryCode.trim() || isLoading) ? 0.5 : 1,
+                  }}
+                >
+                  Verify
+                </button>
+                <button
+                  onClick={() => { setShowRecovery(false); setRecoveryCode(''); }}
+                  style={{
+                    padding: '8px 20px', borderRadius: '8px', border: 'none',
+                    background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+                    fontSize: '13px', cursor: 'pointer',
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          )}
+        </div>}
       </div>
+
+      {/* Idle warning overlay — shown before screen locks */}
+      {!isLocked && idleWarning?.active && idleSeconds > 0 && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0,
+          zIndex: 'var(--z-max)', padding: '10px 20px',
+          background: 'linear-gradient(135deg, rgba(255,159,10,0.95), rgba(255,69,58,0.9))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+          fontSize: '13px', fontWeight: 600, color: '#fff',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+          </svg>
+          Screen will lock in {idleSeconds}s due to inactivity
+          <button
+            onClick={() => setIdleWarning(null)}
+            style={{
+              padding: '4px 14px', borderRadius: '6px', border: '1px solid var(--color-text-tertiary)',
+              background: 'var(--color-border)', color: '#fff', fontSize: '12px',
+              cursor: 'pointer', fontWeight: 600,
+            }}
+          >
+            Stay Active
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -407,16 +636,11 @@ const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'fixed',
     inset: 0,
-    zIndex: 999999,
+    zIndex: 'var(--z-max)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     userSelect: 'none',
-  },
-  backdrop: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(135deg, #0a0a0c 0%, #1a1a2e 40%, #16213e 70%, #0f3460 100%)',
   },
   content: {
     position: 'relative',
@@ -432,7 +656,7 @@ const styles: Record<string, React.CSSProperties> = {
   time: {
     fontSize: 72,
     fontWeight: 200,
-    color: '#ffffff',
+    color: 'var(--color-text-primary)',
     letterSpacing: -2,
     lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
@@ -440,14 +664,14 @@ const styles: Record<string, React.CSSProperties> = {
   ampm: {
     fontSize: 20,
     fontWeight: 400,
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--color-text-secondary)',
     marginLeft: 8,
     verticalAlign: 'super',
   },
   date: {
     fontSize: 17,
     fontWeight: 400,
-    color: 'rgba(255,255,255,0.55)',
+    color: 'var(--color-text-secondary)',
     marginTop: 8,
   },
   authSection: {
@@ -460,7 +684,7 @@ const styles: Record<string, React.CSSProperties> = {
   authLabel: {
     fontSize: 15,
     fontWeight: 500,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'var(--color-text-secondary)',
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -471,7 +695,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     background: 'rgba(255,159,10,0.12)',
     border: '1px solid rgba(255,159,10,0.25)',
-    color: '#ff9f0a',
+    color: 'var(--color-warning)',
     fontSize: 13,
     fontWeight: 500,
     marginBottom: 8,
@@ -495,14 +719,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: 14,
     height: 14,
     borderRadius: '50%',
-    border: '2px solid rgba(255,255,255,0.35)',
+    border: '2px solid var(--color-text-tertiary)',
     background: 'transparent',
     transition: 'all 0.2s ease',
   },
   pinDotFilled: {
     background: '#ffffff',
-    borderColor: '#ffffff',
-    boxShadow: '0 0 8px rgba(255,255,255,0.4)',
+    borderColor: 'var(--color-text-primary)',
+    boxShadow: '0 0 8px var(--color-text-tertiary)',
   },
   numpad: {
     display: 'grid',
@@ -514,9 +738,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: 72,
     height: 72,
     borderRadius: '50%',
-    border: '1px solid rgba(255,255,255,0.15)',
-    background: 'rgba(255,255,255,0.08)',
-    color: '#ffffff',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-border-subtle)',
+    color: 'var(--color-text-primary)',
     fontSize: 28,
     fontWeight: 300,
     display: 'flex',
@@ -547,9 +771,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     height: 48,
     borderRadius: 12,
-    border: '1px solid rgba(255,255,255,0.15)',
-    background: 'rgba(255,255,255,0.08)',
-    color: '#ffffff',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-border-subtle)',
+    color: 'var(--color-text-primary)',
     fontSize: 16,
     padding: '0 44px 0 16px',
     outline: 'none',
@@ -563,7 +787,7 @@ const styles: Record<string, React.CSSProperties> = {
     transform: 'translateY(-50%)',
     background: 'none',
     border: 'none',
-    color: 'rgba(255,255,255,0.45)',
+    color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
     padding: 6,
     display: 'flex',
@@ -575,8 +799,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: 44,
     borderRadius: 10,
     border: 'none',
-    background: '#0a84ff',
-    color: '#ffffff',
+    background: 'var(--color-accent)',
+    color: 'var(--color-text-primary)',
     fontSize: 15,
     fontWeight: 600,
     cursor: 'pointer',
@@ -602,7 +826,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
     background: 'none',
     border: 'none',
-    color: '#ffffff',
+    color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: 20,
     borderRadius: 20,
@@ -611,14 +835,14 @@ const styles: Record<string, React.CSSProperties> = {
   biometricLabel: {
     fontSize: 15,
     fontWeight: 500,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'var(--color-text-secondary)',
   },
 
   // Fallback / Error / Attempts
   fallbackLink: {
     background: 'none',
     border: 'none',
-    color: '#0a84ff',
+    color: 'var(--color-accent)',
     fontSize: 13,
     fontWeight: 500,
     cursor: 'pointer',
@@ -627,14 +851,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
   },
   errorMsg: {
-    color: '#ff453a',
+    color: 'var(--color-error)',
     fontSize: 13,
     fontWeight: 500,
     textAlign: 'center',
     marginTop: 4,
   },
   attemptsMsg: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--color-text-tertiary)',
     fontSize: 12,
     textAlign: 'center',
   },
@@ -652,6 +876,38 @@ const lockScreenCSS = `
     -webkit-app-region: no-drag;
   }
 
+  @keyframes lockGradientShift {
+    0% { background-position: 0% 50%; }
+    25% { background-position: 100% 50%; }
+    50% { background-position: 100% 0%; }
+    75% { background-position: 0% 100%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  @keyframes lockFloat0 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    33% { transform: translate(-40%, -60%) scale(1.1); }
+    66% { transform: translate(-60%, -40%) scale(0.9); }
+  }
+  @keyframes lockFloat1 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-55%, -45%) scale(1.15); }
+  }
+  @keyframes lockFloat2 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    40% { transform: translate(-45%, -55%) scale(1.08); }
+    80% { transform: translate(-55%, -48%) scale(0.95); }
+  }
+  @keyframes lockFloat3 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-48%, -55%) scale(1.12); }
+  }
+  @keyframes lockFloat4 {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    35% { transform: translate(-55%, -48%) scale(1.06); }
+    70% { transform: translate(-46%, -52%) scale(0.94); }
+  }
+
   @keyframes lock-shake {
     0%, 100% { transform: translateX(0); }
     15% { transform: translateX(-12px); }
@@ -667,11 +923,11 @@ const lockScreenCSS = `
   }
 
   .lock-numpad-key:hover:not(:disabled) {
-    background: rgba(255,255,255,0.15) !important;
+    background: var(--color-border) !important;
   }
 
   .lock-numpad-key:active:not(:disabled) {
-    background: rgba(255,255,255,0.25) !important;
+    background: var(--color-text-tertiary) !important;
     transform: scale(0.95);
   }
 
@@ -694,7 +950,7 @@ const lockScreenCSS = `
   }
 
   .lock-biometric-btn:hover:not(:disabled) {
-    background: rgba(255,255,255,0.06);
+    background: var(--color-bg-hover);
   }
 
   .lock-fallback-link:hover:not(:disabled) {
@@ -702,7 +958,12 @@ const lockScreenCSS = `
   }
 
   .lock-toggle-vis:hover {
-    color: rgba(255,255,255,0.7) !important;
+    color: var(--color-text-secondary) !important;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 `;
 

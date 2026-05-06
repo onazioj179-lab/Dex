@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - App Launcher & Switcher
 // OS-Level app discovery, launching, and switching
 // Recent apps, favorites, keyboard-driven, zero-latency
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, shell, BrowserWindow } from 'electron';
@@ -12,12 +18,13 @@ import * as path from 'path';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import log from 'electron-log';
+import { NativeProcesses, isNativeAvailable } from '../native/bridge';
 
 const execAsync = promisify(exec);
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type AppCategory = 
   | 'productivity'
@@ -26,7 +33,6 @@ export type AppCategory =
   | 'communication'
   | 'utilities'
   | 'system'
-  | 'games'
   | 'other';
 
 export interface InstalledApp {
@@ -74,9 +80,9 @@ export interface LauncherConfig {
   customPaths: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // APP LAUNCHER & SWITCHER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AppLauncherSwitcherClass extends EventEmitter {
   private apps: Map<string, InstalledApp> = new Map();
@@ -89,8 +95,8 @@ class AppLauncherSwitcherClass extends EventEmitter {
 
   // Platform-specific app paths
   private readonly WINDOWS_PATHS = [
-    'C:\\Program Files',
-    'C:\\Program Files (x86)',
+    process.env.ProgramFiles || 'C:\\Program Files',
+    process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
     path.join(process.env.LOCALAPPDATA || '', 'Programs'),
     path.join(process.env.APPDATA || '', 'Microsoft\\Windows\\Start Menu\\Programs'),
   ];
@@ -115,7 +121,6 @@ class AppLauncherSwitcherClass extends EventEmitter {
     communication: ['slack', 'discord', 'teams', 'zoom', 'mail', 'outlook', 'telegram', 'whatsapp'],
     utilities: ['calculator', 'notepad', 'settings', 'control', 'finder', 'explorer', 'file'],
     system: ['task manager', 'activity monitor', 'system', 'preferences', 'security'],
-    games: ['game', 'steam', 'epic', 'battle.net', 'riot'],
     other: [],
   };
 
@@ -131,9 +136,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -154,9 +159,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Get all apps
@@ -224,9 +229,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // APP DISCOVERY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async scanApps(): Promise<{ found: number; duration: number }> {
     if (this.isScanning) {
@@ -463,9 +468,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // APP LISTING & SEARCH
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getAllApps(): InstalledApp[] {
     return Array.from(this.apps.values())
@@ -558,9 +563,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
       .slice(0, this.config.maxSearchResults);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // APP LAUNCHING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async launchApp(appId: string, args?: string[]): Promise<AppLaunchResult> {
     const app = this.apps.get(appId);
@@ -637,9 +642,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     return { success: false, error: 'No matching app found' };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RUNNING APPS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getRunningApps(): Promise<RunningApp[]> {
     const platform = process.platform;
@@ -709,7 +714,7 @@ class AppLauncherSwitcherClass extends EventEmitter {
     try {
       if (platform === 'win32') {
         // Use PowerShell to bring window to front
-        await execAsync(`powershell -Command "(New-Object -ComObject WScript.Shell).AppActivate(${pid})"`);
+        await execAsync(`powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "(New-Object -ComObject WScript.Shell).AppActivate(${pid})"`);
       } else if (platform === 'darwin') {
         // Get app name from pid and activate
         const { stdout } = await execAsync(`ps -p ${pid} -o comm=`);
@@ -731,9 +736,20 @@ class AppLauncherSwitcherClass extends EventEmitter {
     const platform = process.platform;
 
     try {
+      // Use native module (AV-safe) when available
+      if (isNativeAvailable()) {
+        const result = NativeProcesses.close(pid, force);
+        if (result.success) {
+          return { success: true };
+        }
+        return { success: false, error: result.message };
+      }
+
+      // Fallback paths
       if (platform === 'win32') {
-        const forceFlag = force ? '/F' : '';
-        await execAsync(`taskkill /PID ${pid} ${forceFlag}`);
+        // Use PowerShell Stop-Process instead of taskkill for AV safety
+        const forceParam = force ? '-Force' : '';
+        await execAsync(`powershell -NoProfile -NonInteractive -Command "Stop-Process -Id ${pid} ${forceParam} -ErrorAction SilentlyContinue"`);
       } else {
         const signal = force ? 'SIGKILL' : 'SIGTERM';
         process.kill(pid, signal);
@@ -746,9 +762,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // APP MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setFavorite(appId: string, favorite: boolean): { success: boolean } {
     const app = this.apps.get(appId);
@@ -778,9 +794,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateAppId(name: string): string {
     return name
@@ -827,9 +843,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     return systemProcesses.includes(name.toLowerCase());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadApps(): Promise<void> {
     try {
@@ -874,9 +890,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.saveApps();
@@ -884,9 +900,9 @@ class AppLauncherSwitcherClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const AppLauncherSwitcher = new AppLauncherSwitcherClass();
 export default AppLauncherSwitcher;

@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Task & Reminder System
 // OS-Level task management with reminders, recurring tasks, and smart scheduling
 // Keyboard-first, minimal UI, integrates with system notifications
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, Notification, BrowserWindow } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type TaskPriority = 'urgent' | 'high' | 'normal' | 'low';
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled';
@@ -113,9 +119,9 @@ export interface TaskStats {
   avgCompletionTime: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TASK & REMINDER SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class TaskReminderSystemClass extends EventEmitter {
   private tasks: Map<string, Task> = new Map();
@@ -141,9 +147,9 @@ class TaskReminderSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -169,9 +175,9 @@ class TaskReminderSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Task CRUD
@@ -296,9 +302,9 @@ class TaskReminderSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TASK OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createTask(data: Partial<Task>): Promise<Task> {
     const now = Date.now();
@@ -386,7 +392,7 @@ class TaskReminderSystemClass extends EventEmitter {
 
     // Delete task file
     const taskPath = path.join(this.dataPath, `${id}.json`);
-    await fs.unlink(taskPath).catch(() => {});
+    await fs.unlink(taskPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     // Remove reminders
     for (const reminder of task.reminders) {
@@ -482,9 +488,9 @@ class TaskReminderSystemClass extends EventEmitter {
     return tasks;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUICK ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async completeTask(id: string): Promise<{ success: boolean }> {
     const task = this.tasks.get(id);
@@ -541,9 +547,9 @@ class TaskReminderSystemClass extends EventEmitter {
     return this.updateTask(id, { tags });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUBTASKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addSubtask(taskId: string, title: string): Promise<{ success: boolean; subtask?: Subtask }> {
     const task = this.tasks.get(taskId);
@@ -594,9 +600,9 @@ class TaskReminderSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // REMINDERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startReminderChecker(): void {
     // Check reminders every minute
@@ -706,9 +712,9 @@ class TaskReminderSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LISTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createList(name: string, options?: Partial<TaskList>): Promise<TaskList> {
     const id = name.toLowerCase().replace(/\s+/g, '-');
@@ -787,9 +793,9 @@ class TaskReminderSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECURRENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setRecurrence(taskId: string, rule?: RecurrenceRule): Promise<{ success: boolean }> {
     const task = this.tasks.get(taskId);
@@ -858,9 +864,9 @@ class TaskReminderSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SMART QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getTodayTasks(): Task[] {
     const now = new Date();
@@ -916,9 +922,9 @@ class TaskReminderSystemClass extends EventEmitter {
       .sort((a, b) => b.count - a.count);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BULK OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async bulkComplete(ids: string[]): Promise<{ success: number; failed: number }> {
     let success = 0;
@@ -946,9 +952,9 @@ class TaskReminderSystemClass extends EventEmitter {
     return { success, failed };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): TaskStats {
     const tasks = Array.from(this.tasks.values());
@@ -996,9 +1002,9 @@ class TaskReminderSystemClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setConfig(config: Partial<TasksConfig>): Promise<{ success: boolean }> {
     this.config = { ...this.config, ...config };
@@ -1012,9 +1018,9 @@ class TaskReminderSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadTasks(): Promise<void> {
     try {
@@ -1100,9 +1106,9 @@ class TaskReminderSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     if (this.reminderCheckInterval) {
@@ -1113,9 +1119,9 @@ class TaskReminderSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const TaskReminderSystem = new TaskReminderSystemClass();
 export default TaskReminderSystem;

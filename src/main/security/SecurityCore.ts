@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Security Core
 // Defensive system security core
 // Layered security architecture with defense in depth
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { app, safeStorage } from 'electron';
 import * as crypto from 'crypto';
@@ -12,9 +18,9 @@ import * as fs from 'fs';
 import Store from 'electron-store';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface SecurityConfig {
   layersEnabled: SecurityLayerConfig;
@@ -81,17 +87,17 @@ export interface IntegrityRecord {
   status: 'verified' | 'modified' | 'missing';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const SECURITY_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 const CONTEXT_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_THREATS_STORED = 100;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const securityStore = new Store<{
   config: SecurityConfig;
@@ -129,9 +135,9 @@ interface AuditEntry {
   success: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURITY CORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecurityCoreClass {
   private activeContexts: Map<string, SecureContext> = new Map();
@@ -139,9 +145,9 @@ class SecurityCoreClass {
   private isInitialized = false;
   private checkInterval: NodeJS.Timeout | null = null;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
@@ -187,9 +193,9 @@ class SecurityCoreClass {
     log.info('[SecurityCore] Security core shutdown');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LAYER 1: OS SANDBOX & PERMISSIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getOSSandboxStatus(): LayerStatus {
     const config = this.getConfig();
@@ -226,9 +232,9 @@ class SecurityCoreClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LAYER 2: PROCESS ISOLATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getProcessIsolationStatus(): LayerStatus {
     const config = this.getConfig();
@@ -252,9 +258,9 @@ class SecurityCoreClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LAYER 3: ENCRYPTION LAYER
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getEncryptionLayerStatus(): LayerStatus {
     const config = this.getConfig();
@@ -281,9 +287,9 @@ class SecurityCoreClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LAYER 4: EXECUTION CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getExecutionControlStatus(): LayerStatus {
     const config = this.getConfig();
@@ -373,9 +379,9 @@ class SecurityCoreClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LAYER 5: AUDIT & INTEGRITY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getAuditIntegrityStatus(): LayerStatus {
     const config = this.getConfig();
@@ -483,9 +489,9 @@ class SecurityCoreClass {
     securityStore.set('integrityRecords', records);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURITY STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async performSecurityCheck(): Promise<SecurityStatus> {
     const layers: LayerStatus[] = [
@@ -584,9 +590,9 @@ class SecurityCoreClass {
     return recommendations;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // THREAT MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordThreat(threat: SecurityThreat): void {
     const threats = securityStore.get('threats');
@@ -619,9 +625,9 @@ class SecurityCoreClass {
     return securityStore.get('threats');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // AUDIT LOGGING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private audit(action: string, category: string, details: string, success: boolean): void {
     const config = this.getConfig();
@@ -650,9 +656,9 @@ class SecurityCoreClass {
     return securityStore.get('auditLog').slice(0, limit);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): SecurityConfig {
     return securityStore.get('config');
@@ -674,9 +680,9 @@ class SecurityCoreClass {
     return config.layersEnabled;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MEMORY PROTECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   // Securely zero memory buffer
   zeroize(buffer: Buffer | Uint8Array): void {
@@ -696,9 +702,268 @@ class SecurityCoreClass {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// ITEMS 301-305: ADVANCED THREAT DETECTION
+// ===========================================================================
+
+export interface ThreatRule {
+  id: string;
+  name: string;
+  category: ThreatCategory;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  pattern: string;
+  action: ThreatAction;
+  enabled: boolean;
+}
+
+export type ThreatCategory = 
+  | 'injection' | 'xss' | 'path-traversal' | 'command-injection'
+  | 'resource-abuse' | 'data-exfiltration' | 'privilege-escalation';
+
+export type ThreatAction = 'log' | 'block' | 'quarantine' | 'alert';
+
+export const THREAT_RULES: ThreatRule[] = [
+  { id: 'rule-001', name: 'SQL Injection', category: 'injection', severity: 'critical', pattern: '(?:union\\s+select|;\\s*drop|--\\s*$)', action: 'block', enabled: true },
+  { id: 'rule-002', name: 'XSS Script', category: 'xss', severity: 'high', pattern: '<script[^>]*>|javascript:', action: 'block', enabled: true },
+  { id: 'rule-003', name: 'Path Traversal', category: 'path-traversal', severity: 'high', pattern: '\\.\\.\\/|\\.\\.\\\\', action: 'block', enabled: true },
+  { id: 'rule-004', name: 'Command Injection', category: 'command-injection', severity: 'critical', pattern: ';|\\||`|\\$\\(', action: 'block', enabled: true },
+  { id: 'rule-005', name: 'Resource Exhaustion', category: 'resource-abuse', severity: 'medium', pattern: '', action: 'log', enabled: true },
+];
+
+export function detectThreats(input: string, rules: ThreatRule[]): ThreatRule[] {
+  const matched: ThreatRule[] = [];
+  
+  for (const rule of rules) {
+    if (!rule.enabled || !rule.pattern) continue;
+    
+    try {
+      const regex = new RegExp(rule.pattern, 'i');
+      if (regex.test(input)) {
+        matched.push(rule);
+      }
+    } catch {
+      // Invalid regex, skip
+    }
+  }
+  
+  return matched;
+}
+
+// ===========================================================================
+// ITEMS 306-310: SECURITY MONITORING
+// ===========================================================================
+
+export interface SecurityEvent {
+  id: string;
+  timestamp: number;
+  type: SecurityEventType;
+  source: string;
+  details: Record<string, unknown>;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  handled: boolean;
+}
+
+export type SecurityEventType =
+  | 'login-attempt' | 'login-success' | 'login-failure'
+  | 'permission-denied' | 'resource-access' | 'config-change'
+  | 'threat-detected' | 'quarantine' | 'integrity-violation';
+
+export interface SecurityMetrics {
+  totalEvents: number;
+  eventsByType: Record<string, number>;
+  eventsBySeverity: Record<string, number>;
+  threatsBlocked: number;
+  lastEventTime: number;
+  uptimeSeconds: number;
+}
+
+export function createSecurityEvent(
+  type: SecurityEventType,
+  source: string,
+  details: Record<string, unknown>,
+  severity: SecurityEvent['severity'] = 'info'
+): SecurityEvent {
+  return {
+    id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: Date.now(),
+    type,
+    source,
+    details,
+    severity,
+    handled: false,
+  };
+}
+
+export function calculateMetrics(events: SecurityEvent[]): SecurityMetrics {
+  const metrics: SecurityMetrics = {
+    totalEvents: events.length,
+    eventsByType: {},
+    eventsBySeverity: {},
+    threatsBlocked: 0,
+    lastEventTime: 0,
+    uptimeSeconds: 0,
+  };
+  
+  for (const event of events) {
+    metrics.eventsByType[event.type] = (metrics.eventsByType[event.type] || 0) + 1;
+    metrics.eventsBySeverity[event.severity] = (metrics.eventsBySeverity[event.severity] || 0) + 1;
+    
+    if (event.type === 'threat-detected' || event.type === 'quarantine') {
+      metrics.threatsBlocked++;
+    }
+    
+    if (event.timestamp > metrics.lastEventTime) {
+      metrics.lastEventTime = event.timestamp;
+    }
+  }
+  
+  return metrics;
+}
+
+// ===========================================================================
+// ITEMS 311-315: DATA PROTECTION
+// ===========================================================================
+
+export interface DataProtectionPolicy {
+  id: string;
+  name: string;
+  dataTypes: DataType[];
+  rules: ProtectionRule[];
+  enabled: boolean;
+}
+
+export type DataType = 'pii' | 'financial' | 'health' | 'credentials' | 'intellectual-property';
+
+export interface ProtectionRule {
+  action: 'mask' | 'encrypt' | 'redact' | 'tokenize';
+  pattern: string;
+  replacement?: string;
+}
+
+export const DATA_PATTERNS: Record<DataType, string[]> = {
+  'pii': [
+    '\\b\\d{3}-\\d{2}-\\d{4}\\b', // SSN
+    '\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b', // Email
+    '\\b\\d{10,}\\b', // Phone
+  ],
+  'financial': [
+    '\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b', // Credit card
+    '\\b[A-Z]{2}\\d{2}[A-Z0-9]{11,30}\\b', // IBAN
+  ],
+  'health': [],
+  'credentials': [
+    '(?:password|passwd|pwd|secret|api[_-]?key|token)\\s*[:=]\\s*\\S+',
+  ],
+  'intellectual-property': [],
+};
+
+export function maskSensitiveData(text: string, dataTypes: DataType[]): string {
+  let result = text;
+  
+  for (const type of dataTypes) {
+    const patterns = DATA_PATTERNS[type] || [];
+    for (const pattern of patterns) {
+      try {
+        const regex = new RegExp(pattern, 'gi');
+        result = result.replace(regex, (match) => '*'.repeat(match.length));
+      } catch {
+        // Invalid regex
+      }
+    }
+  }
+  
+  return result;
+}
+
+// ===========================================================================
+// ITEMS 316-320: SECURITY COMPLIANCE
+// ===========================================================================
+
+export interface ComplianceCheck {
+  id: string;
+  standard: ComplianceStandard;
+  requirement: string;
+  status: 'pass' | 'fail' | 'warning' | 'not-applicable';
+  details: string;
+  remediation?: string;
+}
+
+export type ComplianceStandard = 'gdpr' | 'hipaa' | 'pci-dss' | 'soc2' | 'iso27001';
+
+export interface ComplianceReport {
+  generatedAt: number;
+  standard: ComplianceStandard;
+  overallScore: number;
+  checks: ComplianceCheck[];
+  passCount: number;
+  failCount: number;
+  warningCount: number;
+}
+
+export const COMPLIANCE_REQUIREMENTS: Record<ComplianceStandard, string[]> = {
+  'gdpr': [
+    'Data minimization',
+    'Purpose limitation',
+    'Storage limitation',
+    'Encryption at rest',
+    'Encryption in transit',
+    'Access controls',
+    'Audit logging',
+    'Right to erasure',
+  ],
+  'hipaa': [
+    'Access control',
+    'Audit controls',
+    'Integrity controls',
+    'Transmission security',
+    'Authentication',
+  ],
+  'pci-dss': [
+    'Firewall configuration',
+    'Secure passwords',
+    'Protect stored data',
+    'Encrypt transmission',
+    'Anti-virus software',
+    'Secure development',
+  ],
+  'soc2': [
+    'Security policies',
+    'Change management',
+    'Risk assessment',
+    'Monitoring',
+    'Incident response',
+  ],
+  'iso27001': [
+    'Information security policy',
+    'Asset management',
+    'Access control',
+    'Cryptography',
+    'Physical security',
+    'Operations security',
+  ],
+};
+
+export function generateComplianceReport(standard: ComplianceStandard, checks: ComplianceCheck[]): ComplianceReport {
+  const filtered = checks.filter(c => c.standard === standard);
+  const passCount = filtered.filter(c => c.status === 'pass').length;
+  const failCount = filtered.filter(c => c.status === 'fail').length;
+  const warningCount = filtered.filter(c => c.status === 'warning').length;
+  const applicable = filtered.filter(c => c.status !== 'not-applicable').length;
+  
+  return {
+    generatedAt: Date.now(),
+    standard,
+    overallScore: applicable > 0 ? Math.round((passCount / applicable) * 100) : 100,
+    checks: filtered,
+    passCount,
+    failCount,
+    warningCount,
+  };
+}
+
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const SecurityCore = new SecurityCoreClass();
 export default SecurityCore;

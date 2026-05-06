@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Release & Update Manager
 // Safe, non-disruptive update system
 // Phase 66: Production readiness
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -10,9 +16,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface UpdateConfig {
   autoCheck: boolean;
@@ -43,9 +49,9 @@ export interface UpdateStatus {
   updateInfo: UpdateInfo | null;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Constants
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const CONFIG_FILE = 'update-config.json';
 const BACKUP_DIR = 'backups';
@@ -62,9 +68,9 @@ const DEFAULT_CONFIG: UpdateConfig = {
   remindLaterUntil: 0,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Release Manager Class
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class ReleaseManager {
   private config: UpdateConfig;
@@ -98,9 +104,9 @@ export class ReleaseManager {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Configuration
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private loadConfig(): UpdateConfig {
     try {
@@ -131,9 +137,9 @@ export class ReleaseManager {
     return { ...this.config };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Auto Updater Setup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupAutoUpdater(): void {
     // Configure auto-updater
@@ -238,9 +244,9 @@ export class ReleaseManager {
     return this.config.skipVersion === version;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Update Operations
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async checkForUpdates(): Promise<UpdateStatus> {
     if (this.status.checking) {
@@ -255,6 +261,17 @@ export class ReleaseManager {
       this.status.error = 'Update server URL must use HTTPS';
       return this.getStatus();
     }
+
+    // Offline-aware: skip if no network connectivity
+    try {
+      const { net } = require('electron') as typeof import('electron');
+      if (typeof net.isOnline === 'function' && !net.isOnline()) {
+        log.info('[ReleaseManager] Offline — skipping update check');
+        this.status.checking = false;
+        this.status.error = null;
+        return this.getStatus();
+      }
+    } catch { /* net.isOnline not available on older Electron — proceed anyway */ }
 
     try {
       await autoUpdater.checkForUpdates();
@@ -360,9 +377,9 @@ export class ReleaseManager {
     return { ...this.status };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Backup & Recovery
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createBackup(): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -561,9 +578,9 @@ export class ReleaseManager {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC Setup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     ipcMain.handle('update:getConfig', () => this.getConfig());
@@ -626,9 +643,9 @@ export class ReleaseManager {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Lifecycle
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
@@ -654,16 +671,57 @@ export class ReleaseManager {
           targetVersion: string;
           backupPath?: string | null;
           timestamp: number;
+          crashCount?: number;
         };
-        this.notifyRenderer('update:installed', {
-          version: marker.targetVersion,
-          backupPath: marker.backupPath || null,
-          timestamp: marker.timestamp,
-        });
-        fs.unlinkSync(this.postUpdateMarkerPath);
+
+        const currentVersion = app.getVersion();
+        const updateSucceeded = currentVersion === marker.targetVersion;
+        const crashCount = marker.crashCount ?? 0;
+
+        if (updateSucceeded) {
+          // Update installed and app launched successfully — clean up
+          log.info(`[ReleaseManager] Post-update verification passed: running ${currentVersion}`);
+          this.notifyRenderer('update:installed', {
+            version: marker.targetVersion,
+            backupPath: marker.backupPath || null,
+            timestamp: marker.timestamp,
+          });
+          this.recordHistory('post-update-verified', { version: currentVersion });
+          fs.unlinkSync(this.postUpdateMarkerPath);
+        } else if (crashCount >= 2 && marker.backupPath) {
+          // Two failures after update — offer rollback
+          log.error(`[ReleaseManager] Post-update crash detected (${crashCount} failures). Offering rollback.`);
+          this.recordHistory('post-update-crash', { targetVersion: marker.targetVersion, crashCount });
+          const choice = await dialog.showMessageBox({
+            type: 'warning',
+            title: 'Update Problem Detected',
+            message: `DEX failed to start correctly after updating to ${marker.targetVersion}.`,
+            detail: 'Would you like to restore your previous configuration from backup?',
+            buttons: ['Restore Backup', 'Continue Anyway'],
+            defaultId: 0,
+            cancelId: 1,
+          });
+          if (choice.response === 0) {
+            await this.restoreFromBackup(marker.backupPath);
+            fs.unlinkSync(this.postUpdateMarkerPath);
+            app.relaunch();
+            app.exit(0);
+            return;
+          } else {
+            fs.unlinkSync(this.postUpdateMarkerPath);
+          }
+        } else {
+          // Increment crash counter so next failure triggers rollback offer
+          log.warn(`[ReleaseManager] Post-update marker found but version mismatch (expected ${marker.targetVersion}, got ${currentVersion}). Crash count: ${crashCount + 1}`);
+          fs.writeFileSync(this.postUpdateMarkerPath, JSON.stringify({
+            ...marker,
+            crashCount: crashCount + 1,
+          }, null, 2), 'utf-8');
+        }
       }
-    } catch {
-      // Ignore marker errors
+    } catch (err) {
+      log.warn('[ReleaseManager] Post-update verification error:', err);
+      try { fs.unlinkSync(this.postUpdateMarkerPath); } catch { /* ignore */ }
     }
 
     log.info('[ReleaseManager] Initialized');
@@ -671,7 +729,7 @@ export class ReleaseManager {
 
   private loadUpdateServerUrl(): string {
     const userConfigPath = path.join(app.getPath('userData'), UPDATE_SERVER_CONFIG_FILE);
-    // Update server URL — configure via userData config file when a real server is deployed.
+    // Update server URL -- configure via userData config file when a real server is deployed.
     // Left empty to prevent accidental connections to a non-existent endpoint.
     const fallback = '';
 
@@ -696,9 +754,9 @@ export class ReleaseManager {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Version Info
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export function getVersionInfo(): {
   version: string;
@@ -718,9 +776,9 @@ export function getVersionInfo(): {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Clean Uninstall Support
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export async function prepareCleanUninstall(): Promise<{
   dataLocation: string;

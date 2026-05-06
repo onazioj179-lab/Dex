@@ -1,16 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Encryption Controller
 // Phase 16: Data Encryption & Secure Creative Space
 // IPC handlers for encryption management in renderer
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain } from 'electron';
 import { encryptionService, EncryptionConfig } from '../core/EncryptionService';
 import log from 'electron-log';
+import { IPCCrypto } from '../security/IPCCrypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // IPC HANDLERS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class EncryptionControllerClass {
   constructor() {
@@ -34,8 +41,9 @@ class EncryptionControllerClass {
     });
 
     // Initialize with password
-    ipcMain.handle('encryption:initWithPassword', async (_, password: string) => {
+    ipcMain.handle('encryption:initWithPassword', async (_, sealed: any) => {
       try {
+        const password = IPCCrypto.open(sealed);
         const success = await encryptionService.initializeWithPassword(password);
         return { success };
       } catch (error: any) {
@@ -56,8 +64,9 @@ class EncryptionControllerClass {
     });
 
     // Unlock with password
-    ipcMain.handle('encryption:unlock', async (_, password: string) => {
+    ipcMain.handle('encryption:unlock', async (_, sealed: any) => {
       try {
+        const password = IPCCrypto.open(sealed);
         const success = await encryptionService.unlock(password);
         return { success };
       } catch (error: any) {

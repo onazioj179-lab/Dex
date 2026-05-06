@@ -1,9 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Batch Action Previewer
 // Rename, move, organize in batches
 // Preview results before running
 // Cancel anytime - safety first
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
@@ -11,9 +17,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type BatchActionType = 
   | 'rename'        // Rename files with pattern
@@ -76,9 +82,9 @@ export interface OrganizeOptions {
   customFolders?: Record<string, string[]>; // type -> extensions mapping
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BATCH ACTION PREVIEWER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class BatchActionPreviewerClass extends EventEmitter {
   private previews: Map<string, BatchPreview> = new Map();
@@ -91,9 +97,9 @@ class BatchActionPreviewerClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Preview rename batch
@@ -152,9 +158,9 @@ class BatchActionPreviewerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PREVIEW GENERATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async previewRename(files: string[], pattern: RenamePattern): Promise<BatchPreview> {
     const items: BatchItem[] = [];
@@ -455,9 +461,9 @@ class BatchActionPreviewerClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ITEM MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   updateItemAction(previewId: string, itemId: string, action: BatchItem['action']): { success: boolean } {
     const preview = this.previews.get(previewId);
@@ -480,9 +486,9 @@ class BatchActionPreviewerClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BATCH EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async executeBatch(previewId: string): Promise<BatchProgress> {
     const preview = this.previews.get(previewId);
@@ -587,9 +593,9 @@ class BatchActionPreviewerClass extends EventEmitter {
     return { success: this.previews.delete(previewId) };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return `batch-${++this.batchIdCounter}-${Date.now()}`;
@@ -605,9 +611,9 @@ class BatchActionPreviewerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const BatchActionPreviewer = new BatchActionPreviewerClass();
 export default BatchActionPreviewer;

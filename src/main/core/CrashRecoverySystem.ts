@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Silent Crash Recovery System
 // System 6 Feature 2: Silent Crash Recovery
 // Catches crashes silently, restores state, no data loss, no scary dialogs
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, dialog } from 'electron';
@@ -11,9 +17,9 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type CrashType = 
   | 'renderer-crash'
@@ -75,9 +81,9 @@ export interface RecoveryStats {
   crashesByType: Record<CrashType, number>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DEFAULT CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_CONFIG: RecoveryConfig = {
   enabled: true,
@@ -90,9 +96,9 @@ const DEFAULT_CONFIG: RecoveryConfig = {
   silentMode: true, // No scary error dialogs
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CRASH RECOVERY SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class CrashRecoverySystemClass extends EventEmitter {
   private config: RecoveryConfig;
@@ -111,9 +117,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     const dataPath = path.join(app.getPath('userData'), 'recovery');
@@ -185,9 +191,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Get crash history
@@ -244,9 +250,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CRASH HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupCrashHandlers(): void {
     // Renderer crashes
@@ -344,9 +350,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECOVERY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async attemptRecovery(crash: CrashEvent): Promise<void> {
     if (this.isRecovering) return;
@@ -449,7 +455,13 @@ class CrashRecoverySystemClass extends EventEmitter {
         window.setFullScreen(true);
       }
 
-      await window.loadURL(state.url);
+      // Security: Validate URL before loading -- only allow file: or app protocol
+      const recoveryUrl = state.url || '';
+      if (!recoveryUrl.startsWith('file://') && !recoveryUrl.startsWith('app://') && !recoveryUrl.startsWith('http://localhost') && !recoveryUrl.startsWith('https://')) {
+        log.warn('[CrashRecovery] Blocked suspicious URL:', recoveryUrl.substring(0, 100));
+        return null;
+      }
+      await window.loadURL(recoveryUrl);
       
       log.info('[CrashRecovery] Recreated window from saved state');
       return window;
@@ -459,9 +471,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startStateSaving(): void {
     this.saveInterval = setInterval(() => {
@@ -543,9 +555,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private showRecoveryNotification(crash: CrashEvent): void {
     const window = BrowserWindow.getFocusedWindow();
@@ -575,9 +587,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // GETTERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getCrashHistory(limit?: number): CrashEvent[] {
     return this.crashes.slice(-(limit || 20));
@@ -613,9 +625,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     return stats;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async updateConfig(updates: Partial<RecoveryConfig>): Promise<{ success: boolean }> {
     this.config = { ...this.config, ...updates };
@@ -634,9 +646,9 @@ class CrashRecoverySystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   shutdown(): void {
     if (this.saveInterval) {
@@ -648,8 +660,8 @@ class CrashRecoverySystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const CrashRecoverySystem = new CrashRecoverySystemClass();

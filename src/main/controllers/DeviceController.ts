@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Device Controller
 // Phase 12: Device Discovery & Management
 // Consent-based device pairing and session management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, BrowserWindow, dialog } from 'electron';
 import * as os from 'os';
@@ -11,9 +17,9 @@ import * as crypto from 'crypto';
 import Store from 'electron-store';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface Device {
   id: string;
@@ -57,9 +63,9 @@ export interface DeviceSession {
   metadata: Record<string, any>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const store = new Store<{
   devices: Device[];
@@ -79,9 +85,9 @@ const store = new Store<{
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class DeviceController {
   private discoverySocket: dgram.Socket | null = null;
@@ -259,9 +265,9 @@ class DeviceController {
     log.info('Device handlers registered');
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // DISCOVERY
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   startDiscovery(): void {
     if (this.discoverySocket) return;
@@ -286,7 +292,7 @@ class DeviceController {
       // Broadcast presence periodically
       this.broadcastInterval = setInterval(() => {
         this.broadcastPresence();
-      }, 5000);
+      }, 30000);
 
       // Initial broadcast
       this.broadcastPresence();
@@ -388,9 +394,9 @@ class DeviceController {
     log.info('New device discovered:', device.name, device.ip);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // MANUAL DEVICE ADD
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async addManualDevice(ip: string, port: number): Promise<{
     success: boolean;
@@ -512,9 +518,9 @@ class DeviceController {
         socket.destroy();
         
         // Connection refused means port is not listening
-        if ((err as any).code === 'ECONNREFUSED') {
+        if ((err as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
           reject(new Error('Connection refused - no service running on this port'));
-        } else if ((err as any).code === 'ETIMEDOUT' || (err as any).code === 'EHOSTUNREACH') {
+        } else if ((err as NodeJS.ErrnoException).code === 'ETIMEDOUT' || (err as NodeJS.ErrnoException).code === 'EHOSTUNREACH') {
           reject(new Error('Device unreachable'));
         } else {
           // Other errors - device exists but protocol mismatch
@@ -524,9 +530,9 @@ class DeviceController {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // PAIRING
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async initiatePairing(deviceId: string): Promise<{
     success: boolean;
@@ -610,9 +616,9 @@ class DeviceController {
     return { success: true };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // SESSIONS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   createSession(deviceId: string, type: DeviceSession['type']): DeviceSession {
     const session: DeviceSession = {
@@ -641,9 +647,9 @@ class DeviceController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // LIFECYCLE
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   start(): void {
     // Update this device IP

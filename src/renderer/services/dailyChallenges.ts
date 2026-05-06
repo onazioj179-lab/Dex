@@ -99,12 +99,12 @@ export function loadChallenges(): DailyChallengeState {
       // Otherwise generate new daily challenges
       return rollNewDay(state);
     }
-  } catch {}
+  } catch (e) { console.warn('[DEX]', e); }
   return createInitialState();
 }
 
 export function saveChallenges(state: DailyChallengeState): void {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { console.warn('[DEX]', e); }
 }
 
 function createInitialState(): DailyChallengeState {

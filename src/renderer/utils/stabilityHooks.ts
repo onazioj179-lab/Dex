@@ -1,8 +1,16 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - Renderer Stability Hooks
 // Phase 1: Client-side stability integration
 // Provides stability ping, activity tracking, and error boundaries
 // ===========================================================================
+
+import { useState, useEffect } from 'react';
 
 // ===========================================================================
 // TYPES
@@ -90,17 +98,18 @@ export function shutdownRendererStability(): void {
 function startPingInterval(): void {
   if (pingInterval) return;
 
-  // Send ping every 5 seconds
+  // Send async ping every 30 seconds (non-blocking)
   pingInterval = setInterval(() => {
     try {
-      const result = window.electron?.ipcRenderer?.sendSync?.('stability:ping');
-      if (!result?.pong) {
-        console.warn('[Stability] Ping failed - main process may be unresponsive');
-      }
+      window.electron?.ipcRenderer?.invoke?.('stability:ping').then((result: any) => {
+        if (!result?.pong) {
+          console.warn('[Stability] Ping failed - main process may be unresponsive');
+        }
+      }).catch((e: unknown) => { console.warn('[Stability] Ping IPC failed:', e); });
     } catch (error) {
       console.error('[Stability] Ping error:', error);
     }
-  }, 5000);
+  }, 30000);
 }
 
 // ===========================================================================
@@ -113,7 +122,7 @@ function setupActivityTracking(): void {
       window.electron?.ipcRenderer?.send?.('memory:recordActivity');
     } catch (e) {
       // Non-critical - IPC may not be available during startup/shutdown
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('[Stability] Activity tracking unavailable:', e);
       }
     }
@@ -382,11 +391,28 @@ export async function invalidateSearchCache(reason?: string): Promise<boolean> {
  * Usage: const { isStable, health, stats } = useStability();
  */
 export function useStability() {
-  // This would be implemented with React hooks
-  // For now, return a placeholder
-  return {
-    isStable: true,
-    health: 'good' as const,
-    stats: null as StabilityStats | null,
-  };
+  const [isStable, setIsStable] = useState(true);
+  const [health, setHealth] = useState<'excellent' | 'good' | 'degraded' | 'critical'>('good');
+  const [stats, setStats] = useState<StabilityStats | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      const [stableResult, statsResult] = await Promise.all([
+        isSystemStable(),
+        getStabilityStats(),
+      ]);
+      if (!mounted) return;
+      setIsStable(stableResult);
+      if (statsResult) {
+        setStats(statsResult);
+        setHealth(statsResult.currentHealth);
+      }
+    };
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  return { isStable, health, stats };
 }

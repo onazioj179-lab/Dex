@@ -1,10 +1,17 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 34: Black Box Log Engine
 // Immutable forensic log with checksum chain
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import type {
   BlackBoxEntry,
   LogCategory,
@@ -14,9 +21,9 @@ import type {
   ReplaySession,
 } from '../../shared/blackBoxTypes';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CHECKSUM GENERATION (Simple hash for integrity chain)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 function simpleHash(str: string): string {
   let hash = 0;
@@ -37,9 +44,9 @@ function generateId(): string {
   return `bb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // STORE INTERFACE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface BlackBoxStore {
   // State
@@ -105,9 +112,9 @@ interface BlackBoxStore {
   compact: (keepDays?: number) => number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // STORE IMPLEMENTATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const GENESIS_CHECKSUM = '00000000';
 
@@ -122,9 +129,9 @@ export const useBlackBox = create<BlackBoxStore>()(
       integrityVerified: true,
       lastVerification: null,
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Core logging
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       log: (category, action, severity = 'info', data, source) => {
         const state = get();
@@ -149,8 +156,15 @@ export const useBlackBox = create<BlackBoxStore>()(
         const checksum = generateChecksum(entry, state.lastChecksum);
         const fullEntry: BlackBoxEntry = { ...entry, checksum };
 
+        // Cap in-memory entries at 10,000 to prevent unbounded growth
+        const MAX_ENTRIES = 10000;
+        const currentEntries = state.entries;
+        const newEntries = currentEntries.length >= MAX_ENTRIES
+          ? [...currentEntries.slice(currentEntries.length - MAX_ENTRIES + 1), fullEntry]
+          : [...currentEntries, fullEntry];
+
         set({
-          entries: [...state.entries, fullEntry],
+          entries: newEntries,
           sequence,
           lastChecksum: checksum,
         });
@@ -158,9 +172,9 @@ export const useBlackBox = create<BlackBoxStore>()(
         return fullEntry;
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Category-specific logging
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       logAction: (action, data) => get().log('action', action, 'info', data),
       logWorkflow: (action, data) => get().log('workflow', action, 'info', data),
@@ -174,9 +188,9 @@ export const useBlackBox = create<BlackBoxStore>()(
       logMission: (action, data) => get().log('mission', action, 'info', data),
       logSecurity: (action, severity = 'warn', data) => get().log('security', action, severity, data),
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Queries
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       query: (params) => {
         let results = get().entries;
@@ -259,9 +273,9 @@ export const useBlackBox = create<BlackBoxStore>()(
         return get().entries.filter(e => e.timestamp >= start && e.timestamp <= end);
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Stats
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       getStats: () => {
         const entries = get().entries;
@@ -309,9 +323,9 @@ export const useBlackBox = create<BlackBoxStore>()(
         };
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Replay
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       startReplay: (entries, speed = 1) => {
         const startSequence = entries[0]?.sequence || 0;
@@ -357,9 +371,9 @@ export const useBlackBox = create<BlackBoxStore>()(
         }
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Integrity
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       verifyIntegrity: () => {
         const entries = get().entries;
@@ -406,9 +420,9 @@ export const useBlackBox = create<BlackBoxStore>()(
         });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Export
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       exportLog: (query) => {
         const entries = query ? get().query(query) : get().entries;
@@ -420,9 +434,9 @@ export const useBlackBox = create<BlackBoxStore>()(
         }, null, 2);
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Maintenance
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       compact: (keepDays = 30) => {
         const cutoff = Date.now() - (keepDays * 24 * 60 * 60 * 1000);
@@ -458,6 +472,7 @@ export const useBlackBox = create<BlackBoxStore>()(
     }),
     {
       name: 'dex-black-box',
+      storage: debouncedJsonStorage,
       partialize: (state) => ({
         entries: state.entries.slice(-10000), // Keep last 10,000 entries
         sequence: state.sequence,
@@ -469,9 +484,9 @@ export const useBlackBox = create<BlackBoxStore>()(
   )
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // GLOBAL BLACK BOX LOGGER (for use outside React)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const blackBox = {
   log: (...args: Parameters<BlackBoxStore['log']>) => useBlackBox.getState().log(...args),

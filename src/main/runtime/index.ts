@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Runtime Module Index
 // Phase 28: Backend Architecture Refinement
 // Exports all runtime components
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export { coreRuntime, type AppState, type ShutdownReason, type SessionInfo } from './CoreRuntime';
 export { actionEngine, type Action, type ActionResult, type ActionState } from './ActionEngine';

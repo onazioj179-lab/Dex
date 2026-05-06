@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Phase 51: Final Performance Optimizer
 // Maximum safe performance ceiling with zero waste
 // =============================================================================
 
+import log from 'electron-log';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as v8 from 'v8';
 
@@ -401,7 +408,7 @@ class IdleDetector {
       try {
         callback();
       } catch (err) {
-        console.error('[IdleDetector] Idle callback error:', err);
+        log.error('[IdleDetector] Idle callback error:', err);
       }
     }
   }
@@ -411,7 +418,7 @@ class IdleDetector {
       try {
         callback();
       } catch (err) {
-        console.error('[IdleDetector] Active callback error:', err);
+        log.error('[IdleDetector] Active callback error:', err);
       }
     }
   }
@@ -517,14 +524,14 @@ export class PerformanceOptimizer {
   private setupIdleOptimizations(): void {
     // When idle, release resources
     idleDetector.onIdle(() => {
-      console.log('[PerformanceOptimizer] Entering idle mode - releasing resources');
+      log.info('[PerformanceOptimizer] Entering idle mode - releasing resources');
       memoryOptimizer.releaseForIdle();
       stateOptimizer.reset();
     });
     
     // When active, prepare for work
     idleDetector.onActive(() => {
-      console.log('[PerformanceOptimizer] Exiting idle mode - preparing for activity');
+      log.info('[PerformanceOptimizer] Exiting idle mode - preparing for activity');
     });
   }
   
@@ -536,7 +543,7 @@ export class PerformanceOptimizer {
       // Check for memory issues
       const memStats = memoryOptimizer.getStats();
       if (memStats.driftPerHour > PERF_TARGETS.MEMORY_DRIFT_MAX_PER_HOUR * 2) {
-        console.warn('[PerformanceOptimizer] High memory drift detected:', memStats.driftPerHour, 'MB/hour');
+        log.warn('[PerformanceOptimizer] High memory drift detected:', memStats.driftPerHour, 'MB/hour');
         memoryOptimizer.requestGC(true);
       }
     }, 60000);

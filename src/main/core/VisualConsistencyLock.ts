@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Visual Consistency Lock
 // Phase 69: Final Visual Audit
 // Lock all visual behaviors - no future drift allowed
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, BrowserWindow } from 'electron';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES - LOCKED DESIGN TOKENS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface DesignToken {
   name: string;
@@ -46,12 +52,12 @@ export interface ConsistencyViolation {
   timestamp: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LOCKED DESIGN TOKENS - Phase 69 Final Values
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const LOCKED_TOKENS: DesignToken[] = [
-  // ── Colors ──────────────────────────────────────────────────────────────
+  // -- Colors --------------------------------------------------------------
   { name: '--bg-primary', value: '#0f0f0f', category: 'color', locked: true, description: 'Main background' },
   { name: '--bg-secondary', value: '#1a1a1a', category: 'color', locked: true, description: 'Card/panel background' },
   { name: '--bg-tertiary', value: '#252525', category: 'color', locked: true, description: 'Input/elevated background' },
@@ -66,7 +72,7 @@ const LOCKED_TOKENS: DesignToken[] = [
   { name: '--accent-warning', value: '#eab308', category: 'color', locked: true, description: 'Warning yellow' },
   { name: '--accent-error', value: '#ef4444', category: 'color', locked: true, description: 'Error red' },
 
-  // ── Spacing ─────────────────────────────────────────────────────────────
+  // -- Spacing -------------------------------------------------------------
   { name: '--space-xs', value: '4px', category: 'spacing', locked: true, description: 'Extra small spacing' },
   { name: '--space-sm', value: '8px', category: 'spacing', locked: true, description: 'Small spacing' },
   { name: '--space-md', value: '12px', category: 'spacing', locked: true, description: 'Medium spacing' },
@@ -74,7 +80,7 @@ const LOCKED_TOKENS: DesignToken[] = [
   { name: '--space-xl', value: '24px', category: 'spacing', locked: true, description: 'Extra large spacing' },
   { name: '--space-2xl', value: '32px', category: 'spacing', locked: true, description: '2X large spacing' },
 
-  // ── Typography ──────────────────────────────────────────────────────────
+  // -- Typography ----------------------------------------------------------
   { name: '--font-family', value: 'Inter, system-ui, sans-serif', category: 'typography', locked: true },
   { name: '--font-mono', value: 'JetBrains Mono, monospace', category: 'typography', locked: true },
   { name: '--font-size-xs', value: '11px', category: 'typography', locked: true },
@@ -90,20 +96,20 @@ const LOCKED_TOKENS: DesignToken[] = [
   { name: '--line-height-normal', value: '1.5', category: 'typography', locked: true },
   { name: '--line-height-relaxed', value: '1.75', category: 'typography', locked: true },
 
-  // ── Border Radius ───────────────────────────────────────────────────────
+  // -- Border Radius -------------------------------------------------------
   { name: '--radius-sm', value: '4px', category: 'radius', locked: true, description: 'Small radius' },
   { name: '--radius-md', value: '6px', category: 'radius', locked: true, description: 'Medium radius' },
   { name: '--radius-lg', value: '8px', category: 'radius', locked: true, description: 'Large radius' },
   { name: '--radius-xl', value: '12px', category: 'radius', locked: true, description: 'Extra large radius' },
   { name: '--radius-full', value: '9999px', category: 'radius', locked: true, description: 'Full/pill radius' },
 
-  // ── Shadows ─────────────────────────────────────────────────────────────
+  // -- Shadows -------------------------------------------------------------
   { name: '--shadow-sm', value: '0 1px 2px rgba(0,0,0,0.3)', category: 'shadow', locked: true },
   { name: '--shadow-md', value: '0 4px 6px rgba(0,0,0,0.4)', category: 'shadow', locked: true },
   { name: '--shadow-lg', value: '0 10px 15px rgba(0,0,0,0.5)', category: 'shadow', locked: true },
   { name: '--shadow-glow', value: '0 0 20px rgba(59,130,246,0.15)', category: 'shadow', locked: true },
 
-  // ── Animations ──────────────────────────────────────────────────────────
+  // -- Animations ----------------------------------------------------------
   { name: '--duration-fast', value: '100ms', category: 'animation', locked: true },
   { name: '--duration-normal', value: '200ms', category: 'animation', locked: true },
   { name: '--duration-slow', value: '300ms', category: 'animation', locked: true },
@@ -111,7 +117,7 @@ const LOCKED_TOKENS: DesignToken[] = [
   { name: '--ease-in', value: 'cubic-bezier(0.4, 0, 1, 1)', category: 'animation', locked: true },
   { name: '--ease-out', value: 'cubic-bezier(0, 0, 0.2, 1)', category: 'animation', locked: true },
 
-  // ── Z-Index ─────────────────────────────────────────────────────────────
+  // -- Z-Index -------------------------------------------------------------
   { name: '--z-dropdown', value: '100', category: 'z-index', locked: true },
   { name: '--z-sticky', value: '200', category: 'z-index', locked: true },
   { name: '--z-modal', value: '300', category: 'z-index', locked: true },
@@ -119,19 +125,19 @@ const LOCKED_TOKENS: DesignToken[] = [
   { name: '--z-tooltip', value: '500', category: 'z-index', locked: true },
   { name: '--z-toast', value: '600', category: 'z-index', locked: true },
 
-  // ── Breakpoints ─────────────────────────────────────────────────────────
+  // -- Breakpoints ---------------------------------------------------------
   { name: '--breakpoint-sm', value: '640px', category: 'breakpoint', locked: true },
   { name: '--breakpoint-md', value: '768px', category: 'breakpoint', locked: true },
   { name: '--breakpoint-lg', value: '1024px', category: 'breakpoint', locked: true },
   { name: '--breakpoint-xl', value: '1280px', category: 'breakpoint', locked: true }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LOCKED VISUAL RULES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const LOCKED_RULES: VisualRule[] = [
-  // ── Icon Rules ──────────────────────────────────────────────────────────
+  // -- Icon Rules ----------------------------------------------------------
   {
     id: 'icon-stroke',
     name: 'Icon Stroke Width',
@@ -154,7 +160,7 @@ const LOCKED_RULES: VisualRule[] = [
     enforced: true
   },
 
-  // ── Button Rules ────────────────────────────────────────────────────────
+  // -- Button Rules --------------------------------------------------------
   {
     id: 'button-height-sm',
     name: 'Small Button Height',
@@ -177,7 +183,7 @@ const LOCKED_RULES: VisualRule[] = [
     enforced: true
   },
 
-  // ── Input Rules ─────────────────────────────────────────────────────────
+  // -- Input Rules ---------------------------------------------------------
   {
     id: 'input-height',
     name: 'Input Height',
@@ -193,7 +199,7 @@ const LOCKED_RULES: VisualRule[] = [
     enforced: true
   },
 
-  // ── Card Rules ──────────────────────────────────────────────────────────
+  // -- Card Rules ----------------------------------------------------------
   {
     id: 'card-padding',
     name: 'Card Padding',
@@ -209,7 +215,7 @@ const LOCKED_RULES: VisualRule[] = [
     enforced: true
   },
 
-  // ── Sidebar Rules ───────────────────────────────────────────────────────
+  // -- Sidebar Rules -------------------------------------------------------
   {
     id: 'sidebar-width',
     name: 'Sidebar Width',
@@ -225,7 +231,7 @@ const LOCKED_RULES: VisualRule[] = [
     enforced: true
   },
 
-  // ── Animation Rules ─────────────────────────────────────────────────────
+  // -- Animation Rules -----------------------------------------------------
   {
     id: 'hover-transition',
     name: 'Hover Transition',
@@ -241,7 +247,7 @@ const LOCKED_RULES: VisualRule[] = [
     enforced: true
   },
 
-  // ── Text Rules ──────────────────────────────────────────────────────────
+  // -- Text Rules ----------------------------------------------------------
   {
     id: 'truncate-single',
     name: 'Single Line Truncation',
@@ -251,9 +257,9 @@ const LOCKED_RULES: VisualRule[] = [
   }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VISUAL CONSISTENCY LOCK CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VisualConsistencyLockClass {
   private tokens: Map<string, DesignToken> = new Map();
@@ -267,9 +273,9 @@ class VisualConsistencyLockClass {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private initializeTokens(): void {
     for (const token of LOCKED_TOKENS) {
@@ -327,9 +333,9 @@ class VisualConsistencyLockClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TOKEN ACCESS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getToken(name: string): DesignToken | null {
     return this.tokens.get(name) || null;
@@ -348,9 +354,9 @@ class VisualConsistencyLockClass {
     return token?.value || null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RULE ACCESS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getRule(id: string): VisualRule | null {
     return this.rules.get(id) || null;
@@ -360,9 +366,9 @@ class VisualConsistencyLockClass {
     return Array.from(this.rules.values());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VALIDATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   validateComponent(component: string, styles: Record<string, string>): { valid: boolean; violations: string[] } {
     if (!this.lockEnabled) {
@@ -423,9 +429,9 @@ class VisualConsistencyLockClass {
     return { valid: violations.length === 0, violations };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VIOLATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordViolation(violation: Omit<ConsistencyViolation, 'timestamp'>): void {
     const full: ConsistencyViolation = {
@@ -451,9 +457,9 @@ class VisualConsistencyLockClass {
     this.violations = [];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CSS GENERATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   generateCSS(): string {
     const lines: string[] = [
@@ -480,9 +486,9 @@ class VisualConsistencyLockClass {
     return lines.join('\n');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LOCK CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   enableLock(): void {
     this.lockEnabled = true;
@@ -498,9 +504,9 @@ class VisualConsistencyLockClass {
     return this.lockEnabled;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   exportTokensAsJSON(): string {
     const tokensByCategory: Record<string, Record<string, string>> = {};
@@ -562,9 +568,9 @@ class VisualConsistencyLockClass {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const VisualConsistencyLock = new VisualConsistencyLockClass();
 export default VisualConsistencyLock;

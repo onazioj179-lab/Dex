@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Gallery Editor (Light)
 // Non-destructive image editing: crop, rotate, flip, brightness/contrast
 // Preview before save, original always preserved, no heavy rendering
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, nativeImage } from 'electron';
@@ -11,9 +17,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type EditOperation = 
   | 'crop' | 'rotate' | 'flip' 
@@ -114,9 +120,9 @@ export interface MetadataUpdate {
   rating?: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GALLERY EDITOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class GalleryEditorClass extends EventEmitter {
   private activeEdit: EditState | null = null;
@@ -143,9 +149,9 @@ class GalleryEditorClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -163,9 +169,9 @@ class GalleryEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Session management
@@ -262,9 +268,9 @@ class GalleryEditorClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SESSION MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async openImage(imagePath: string): Promise<EditState | null> {
     const absolutePath = path.isAbsolute(imagePath) ? imagePath : path.resolve(imagePath);
@@ -329,14 +335,14 @@ class GalleryEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ROTATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   rotate(angle: RotationAngle): EditState | null {
     if (!this.activeEdit) return null;
     
-    this.addHistoryEntry('rotate', { transform: { ...this.activeEdit.transform } }, `Rotate ${angle}°`);
+    this.addHistoryEntry('rotate', { transform: { ...this.activeEdit.transform } }, `Rotate ${angle}`);
     this.activeEdit.transform.rotation = angle;
     this.markDirty();
     
@@ -362,9 +368,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.rotate(newRotation);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FLIP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   flip(direction: FlipDirection): EditState | null {
     if (!this.activeEdit) return null;
@@ -382,9 +388,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.activeEdit;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CROP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setCrop(region: CropRegion | null): EditState | null {
     if (!this.activeEdit) return null;
@@ -407,9 +413,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.setCrop(null);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ADJUSTMENTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setBrightness(value: number): EditState | null {
     if (!this.activeEdit) return null;
@@ -478,9 +484,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.activeEdit;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RESIZE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setResize(options: ResizeOptions | null): EditState | null {
     if (!this.activeEdit) return null;
@@ -493,9 +499,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.activeEdit;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PREVIEW
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getPreview(quality?: number): Promise<PreviewResult | null> {
     if (!this.activeEdit) return null;
@@ -589,9 +595,9 @@ class GalleryEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HISTORY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private addHistoryEntry(operation: EditOperation, previousState: Partial<EditState>, description: string): void {
     if (!this.activeEdit) return;
@@ -674,9 +680,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.activeEdit?.history || [];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RESET
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   reset(): EditState | null {
     if (!this.activeEdit) return null;
@@ -709,9 +715,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.activeEdit;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SAVE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async save(options?: SaveOptions): Promise<SaveResult | null> {
     if (!this.activeEdit) return null;
@@ -829,23 +835,21 @@ class GalleryEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // METADATA
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async updateMetadata(_updates: MetadataUpdate): Promise<boolean> {
     if (!this.activeEdit) return false;
     
-    // Note: Actual EXIF/metadata editing requires specialized libraries
-    // This is a placeholder for the interface
-    
-    log.info('[GalleryEditor] Metadata update requested (not implemented)');
-    return true;
+    // Metadata editing requires specialized EXIF library — not available
+    log.info('[GalleryEditor] Metadata update not available (requires EXIF library)');
+    return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async loadConfig(): Promise<void> {
     const configPath = path.join(this.dataPath, 'config.json');
@@ -871,9 +875,9 @@ class GalleryEditorClass extends EventEmitter {
     return this.config;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return crypto.randomBytes(8).toString('hex');
@@ -909,9 +913,9 @@ class GalleryEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     this.closeEditor();
@@ -920,9 +924,9 @@ class GalleryEditorClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const GalleryEditor = new GalleryEditorClass();
 export default GalleryEditor;

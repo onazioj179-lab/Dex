@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Performance Integration Hook
 // FINAL PERFORMANCE & VISUAL SMOOTHNESS MODE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Renderer-side integration with all performance systems
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { useEffect, useCallback, useRef, useState } from 'react';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface PerformanceState {
   isReady: boolean;
@@ -36,9 +42,9 @@ interface FrameMetrics {
   jank: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MAIN PERFORMANCE HOOK
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export function usePerformance() {
   const [state, setState] = useState<PerformanceState>({
@@ -65,9 +71,9 @@ export function usePerformance() {
   const lastInputTime = useRef(0);
   const inputIdleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     const init = async () => {
@@ -112,9 +118,9 @@ export function usePerformance() {
     };
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FRAME MONITORING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   const lastReportTime = useRef(0);
   const REPORT_INTERVAL = 2000; // Only report metrics once every 2 seconds
@@ -123,44 +129,52 @@ export function usePerformance() {
     if (isMonitoring.current) return;
     isMonitoring.current = true;
     
-    const measureFrame = (timestamp: number) => {
-      const frameTime = timestamp - lastFrameTime.current;
-      lastFrameTime.current = timestamp;
-      
-      // Only report meaningful frames AND throttle to once per second
-      if (frameTime > 0 && frameTime < 1000) {
-        // Only report jank or once per second for normal frames
-        const isJank = frameTime > 16.67 * 2;
-        const shouldReport = isJank || (timestamp - lastReportTime.current > REPORT_INTERVAL);
+    // Intermittent sampling: measure for 300ms every 4s, not continuously
+    let sampleInterval: ReturnType<typeof setInterval> | null = null;
+    
+    const runSample = () => {
+      let sampling = true;
+      const measureFrame = (timestamp: number) => {
+        const frameTime = timestamp - lastFrameTime.current;
+        lastFrameTime.current = timestamp;
+        
+        if (frameTime > 0 && frameTime < 1000) {
+          const isJank = frameTime > 16.67 * 2;
+          const shouldReport = isJank || (timestamp - lastReportTime.current > REPORT_INTERVAL);
 
-        if (shouldReport) {
-          lastReportTime.current = timestamp;
-          const metrics: FrameMetrics = {
-            timestamp,
-            frameTime,
-            paintTime: 0,
-            layoutTime: 0,
-            styleTime: 0,
-            inputLatency: lastInputTime.current ? timestamp - lastInputTime.current : 0,
-            jank: isJank,
-          };
-          
-          // Report to main process (throttled)
-          window.dex?.render?.reportFrameMetrics(metrics);
-          window.dex?.stability?.reportFrameTime(frameTime);
-          
-          // Report to enforcer
-          window.dex?.enforce?.reportMetrics({
-            frameTime,
-            isIdle: state.isIdle,
-          });
+          if (shouldReport) {
+            lastReportTime.current = timestamp;
+            const metrics: FrameMetrics = {
+              timestamp,
+              frameTime,
+              paintTime: 0,
+              layoutTime: 0,
+              styleTime: 0,
+              inputLatency: lastInputTime.current ? timestamp - lastInputTime.current : 0,
+              jank: isJank,
+            };
+            window.dex?.render?.reportFrameMetrics(metrics);
+            window.dex?.stability?.reportFrameTime(frameTime);
+            window.dex?.enforce?.reportMetrics({
+              frameTime,
+              isIdle: state.isIdle,
+            });
+          }
         }
-      }
-      
+        
+        if (sampling && isMonitoring.current) {
+          frameCallbackId.current = requestAnimationFrame(measureFrame);
+        }
+      };
       frameCallbackId.current = requestAnimationFrame(measureFrame);
+      setTimeout(() => { sampling = false; }, 300);
     };
     
-    frameCallbackId.current = requestAnimationFrame(measureFrame);
+    runSample();
+    sampleInterval = setInterval(runSample, 4000);
+    
+    // Store interval for cleanup
+    (startFrameMonitoring as any)._interval = sampleInterval;
   }, [state.isIdle]);
 
   const stopFrameMonitoring = useCallback(() => {
@@ -168,12 +182,14 @@ export function usePerformance() {
       cancelAnimationFrame(frameCallbackId.current);
       frameCallbackId.current = null;
     }
+    const interval = (startFrameMonitoring as any)?._interval;
+    if (interval) clearInterval(interval);
     isMonitoring.current = false;
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INPUT TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   const setupInputTracking = useCallback(() => {
     let lastMoveTime = 0;
@@ -265,9 +281,9 @@ export function usePerformance() {
     }
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ANIMATION HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   const requestAnimation = useCallback(async (
     type: 'fade' | 'slide' | 'scale-subtle' | 'focus-ring',
@@ -303,9 +319,9 @@ export function usePerformance() {
     window.dex?.resource?.reportRenderEnd();
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RENDER HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   const shouldRender = useCallback(async (): Promise<boolean> => {
     if (!window.dex?.resource) return true;
@@ -333,9 +349,9 @@ export function usePerformance() {
     });
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EVENT HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     if (!window.dex?.on) return;
@@ -381,9 +397,9 @@ export function usePerformance() {
     };
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RETURN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   return {
     // State
@@ -407,9 +423,9 @@ export function usePerformance() {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MOTION-SAFE ANIMATION HOOK
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export function useMotionSafeAnimation() {
   const { requestAnimation, animationStart, animationEnd, isMotionAllowed } = usePerformance();

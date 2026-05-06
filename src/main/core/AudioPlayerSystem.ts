@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Audio Player System
 // Apple Music-level feel audio player with hardware acceleration
 // No autoplay, keyboard-driven, minimal resource usage at idle
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, globalShortcut } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type PlaybackState = 'stopped' | 'playing' | 'paused' | 'loading';
 export type RepeatMode = 'off' | 'one' | 'all';
@@ -110,9 +116,9 @@ export interface PlayerStats {
   mostPlayed: AudioTrack[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // AUDIO PLAYER SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AudioPlayerSystemClass extends EventEmitter {
   private tracks: Map<string, AudioTrack> = new Map();
@@ -161,9 +167,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -185,9 +191,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Playback controls
@@ -364,9 +370,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLAYBACK CONTROLS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async play(trackId?: string): Promise<{ success: boolean }> {
     try {
@@ -508,9 +514,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     await this.next();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VOLUME CONTROLS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setVolume(volume: number): { success: boolean } {
     this.config.volume = Math.max(0, Math.min(1, volume));
@@ -537,9 +543,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return this.config.muted ? this.unmute() : this.mute();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getState(): {
     playbackState: PlaybackState;
@@ -562,9 +568,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return this.queue.tracks[this.queue.currentIndex];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getQueue(): { tracks: AudioTrack[]; currentIndex: number } {
     return {
@@ -659,9 +665,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLAYBACK MODES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setRepeatMode(mode: RepeatMode): { success: boolean } {
     this.config.repeatMode = mode;
@@ -694,9 +700,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIBRARY MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addTracks(paths: string[]): Promise<{ added: number; failed: number }> {
     let added = 0;
@@ -797,7 +803,7 @@ class AudioPlayerSystemClass extends EventEmitter {
 
     // Delete track file
     const trackPath = path.join(this.dataPath, 'library', `${trackId}.json`);
-    await fs.unlink(trackPath).catch(() => {});
+    await fs.unlink(trackPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     this.tracks.delete(trackId);
     this.emit('track:removed', trackId);
@@ -831,9 +837,9 @@ class AudioPlayerSystemClass extends EventEmitter {
       .slice(0, 50);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // METADATA
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async updateMetadata(trackId: string, metadata: Partial<AudioMetadata>): Promise<{ success: boolean }> {
     const track = this.tracks.get(trackId);
@@ -868,9 +874,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return { success: true, favorite: track.favorite };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLAYLISTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createPlaylist(name: string, trackIds?: string[]): Promise<Playlist> {
     const id = `playlist-${++this.idCounter}-${Date.now()}`;
@@ -917,7 +923,7 @@ class AudioPlayerSystemClass extends EventEmitter {
     if (!this.playlists.has(playlistId)) return { success: false };
 
     const playlistPath = path.join(this.dataPath, 'playlists', `${playlistId}.json`);
-    await fs.unlink(playlistPath).catch(() => {});
+    await fs.unlink(playlistPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     this.playlists.delete(playlistId);
     this.emit('playlist:deleted', playlistId);
@@ -1028,9 +1034,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EQUALIZER
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setEqPreset(presetId: string): { success: boolean } {
     if (!this.eqPresets.has(presetId)) return { success: false };
@@ -1068,9 +1074,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BROWSE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getArtists(): { name: string; trackCount: number; albumCount: number }[] {
     const artists = new Map<string, { tracks: Set<string>; albums: Set<string> }>();
@@ -1160,9 +1166,9 @@ class AudioPlayerSystemClass extends EventEmitter {
       .sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): PlayerStats {
     const tracks = Array.from(this.tracks.values());
@@ -1220,9 +1226,9 @@ class AudioPlayerSystemClass extends EventEmitter {
       .sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VISUALIZER
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getVisualizerData(): { frequencies: number[]; waveform: number[] } | null {
     // This would be fed by the audio context analyzer in the renderer
@@ -1230,9 +1236,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MEDIA KEYS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerMediaKeys(): void {
     try {
@@ -1264,9 +1270,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     globalShortcut.unregister('MediaStop');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setConfig(config: Partial<AudioConfig>): Promise<{ success: boolean }> {
     const oldMediaKeys = this.config.mediaKeysEnabled;
@@ -1288,9 +1294,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private notifyRenderer(channel: string, data: unknown): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -1298,9 +1304,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadLibrary(): Promise<void> {
     try {
@@ -1403,9 +1409,9 @@ class AudioPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     this.unregisterMediaKeys();
@@ -1413,9 +1419,9 @@ class AudioPlayerSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const AudioPlayerSystem = new AudioPlayerSystemClass();
 export default AudioPlayerSystem;

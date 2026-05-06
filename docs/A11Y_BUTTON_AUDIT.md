@@ -2,7 +2,7 @@
 
 **Generated**: Automated scan of all `<button>` elements missing `aria-label` or `title` attributes.  
 **Scope**: `src/renderer/pages/`, `src/renderer/DEXAPPLICATIONS/`, `src/renderer/components/`, `src/renderer/App.tsx`  
-**App.tsx**: 0 buttons found — no issues.
+**App.tsx**: 0 buttons found -- no issues.
 
 ---
 
@@ -21,7 +21,7 @@
 
 ---
 
-### Imosion.tsx — 73/92 missing
+### Imosion.tsx -- 73/92 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -101,7 +101,7 @@
 
 ---
 
-### VideoEditor.tsx — 73/87 missing
+### VideoEditor.tsx -- 73/87 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -181,13 +181,13 @@
 
 ---
 
-### Rewind.tsx — 68/74 missing
+### Rewind.tsx -- 68/74 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
 | L1093 | `aria-label="Toggle sidebar"` | Sidebar toggle |
-| L1116 | `aria-label="Previous date"` | Date nav ‹ |
-| L1120 | `aria-label="Next date"` | Date nav › |
+| L1116 | `aria-label="Previous date"` | Date nav |
+| L1120 | `aria-label="Next date"` | Date nav |
 | L1158 | `aria-label="Toggle section"` | Section toggle |
 | L1242 | `aria-label="Execute command"` | Palette command |
 | L1265 | `aria-label="Action"` | Dynamic action |
@@ -256,7 +256,7 @@
 
 ---
 
-### Settings.tsx (page) — 30/30 missing (100%)
+### Settings.tsx (page) -- 30/30 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -293,7 +293,7 @@
 
 ---
 
-### Calculator.tsx — 30/38 missing
+### Calculator.tsx -- 30/38 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -305,10 +305,10 @@
 | L267 | `aria-label="Tangent function"` | tan |
 | L268 | `aria-label="Natural logarithm"` | ln |
 | L269 | `aria-label="Logarithm base 10"` | log |
-| L271 | `aria-label="Square root"` | √ |
-| L272 | `aria-label="Square"` | x² |
-| L273 | `aria-label="Cube"` | x³ |
-| L274 | `aria-label="Pi constant"` | π |
+| L271 | `aria-label="Square root"` | |
+| L272 | `aria-label="Square"` | x|
+| L273 | `aria-label="Cube"` | x|
+| L274 | `aria-label="Pi constant"` | |
 | L275 | `aria-label="Euler's number"` | e |
 | L283 | `aria-label="Factorial"` | x! |
 | L285 | `aria-label="Digit 7"` | 7 |
@@ -330,7 +330,7 @@
 
 ---
 
-### Browser.tsx — 24/29 missing
+### Browser.tsx -- 24/29 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -361,7 +361,7 @@
 
 ---
 
-### Flux.tsx — 23/28 missing
+### Flux.tsx -- 23/28 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -391,7 +391,7 @@
 
 ---
 
-### Prism.tsx — 17/25 missing
+### Prism.tsx -- 17/25 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -415,7 +415,7 @@
 
 ---
 
-### KanbanApp.tsx — 16/18 missing
+### KanbanApp.tsx -- 16/18 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -438,7 +438,7 @@
 
 ---
 
-### Calendar.tsx (DEXAPP) — 12/12 missing (100%)
+### Calendar.tsx (DEXAPP) -- 12/12 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -448,16 +448,16 @@
 | L182 | `aria-label="Month view"` | Month |
 | L183 | `aria-label="Week view"` | Week |
 | L185 | `aria-label="Add event"` | Add event |
-| L243 | `aria-label="Delete event"` | Delete (×) |
+| L243 | `aria-label="Delete event"` | Delete () |
 | L255 | `aria-label="Toggle sidebar"` | Sidebar toggle |
-| L381 | `aria-label="Close event modal"` | Close (×) |
+| L381 | `aria-label="Close event modal"` | Close () |
 | L409 | `aria-label="Select event color"` | Event color |
 | L428 | `aria-label="Cancel event creation"` | Cancel |
 | L429 | `aria-label="Save event"` | Save Event |
 
 ---
 
-### Games.tsx — 9/9 missing (100%)
+### Games.tsx -- 9/9 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -467,13 +467,13 @@
 | L305 | `aria-label="Go back"` | Back |
 | L341 | `aria-label="Enter letter"` | Wordle key (Enter) |
 | L360 | `aria-label="Type letter"` | Wordle key (letter) |
-| L372 | `aria-label="Delete letter"` | Backspace (⌫) |
+| L372 | `aria-label="Delete letter"` | Backspace () |
 | L430 | `aria-label="Go back"` | Back |
 | L582 | `aria-label="Go back"` | Back |
 
 ---
 
-### Forge.tsx — 8/12 missing
+### Forge.tsx -- 8/12 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -488,7 +488,7 @@
 
 ---
 
-### Achievements.tsx — 7/7 missing (100%)
+### Achievements.tsx -- 7/7 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -502,7 +502,7 @@
 
 ---
 
-### PasswordGenerator.tsx (DEXAPP) — 4/7 missing
+### PasswordGenerator.tsx (DEXAPP) -- 4/7 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -517,7 +517,7 @@
 
 ---
 
-### Files.tsx — 14/15 missing
+### Files.tsx -- 14/15 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -538,7 +538,7 @@
 
 ---
 
-### Gallery.tsx — 9/11 missing
+### Gallery.tsx -- 9/11 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -554,7 +554,7 @@
 
 ---
 
-### Audio.tsx — 7/10 missing
+### Audio.tsx -- 7/10 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -568,7 +568,7 @@
 
 ---
 
-### Home.tsx — 7/7 missing (100%)
+### Home.tsx -- 7/7 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -582,7 +582,7 @@
 
 ---
 
-### Tasks.tsx — 6/6 missing (100%)
+### Tasks.tsx -- 6/6 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -595,7 +595,7 @@
 
 ---
 
-### Transfers.tsx — 5/6 missing
+### Transfers.tsx -- 5/6 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -607,7 +607,7 @@
 
 ---
 
-### Video.tsx — 4/7 missing
+### Video.tsx -- 4/7 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -618,7 +618,7 @@
 
 ---
 
-### Workflows.tsx — 4/8 missing
+### Workflows.tsx -- 4/8 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -629,7 +629,7 @@
 
 ---
 
-### Notes.tsx — 3/13 missing
+### Notes.tsx -- 3/13 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -639,7 +639,7 @@
 
 ---
 
-### Dashboard.tsx — 1/2 missing
+### Dashboard.tsx -- 1/2 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -647,7 +647,7 @@
 
 ---
 
-### Power.tsx — 1/3 missing
+### Power.tsx -- 1/3 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -659,7 +659,7 @@
 
 ---
 
-### MediaPlayer.tsx — 14/14 missing (100%)
+### MediaPlayer.tsx -- 14/14 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -674,11 +674,11 @@
 | L575 | `aria-label="Toggle shuffle"` | Shuffle |
 | L585 | `aria-label="Repeat mode"` | Repeat |
 | L727 | `aria-label="Action"` | Dynamic button |
-| L844 | `aria-label="Previous track"` | ⏮ |
+| L844 | `aria-label="Previous track"` | |
 | L846 | `aria-label="Toggle playback"` | Play/Pause |
-| L850 | `aria-label="Next track"` | ⏭ |
+| L850 | `aria-label="Next track"` | |
 
-### Pagination.tsx — 14/14 missing (100%)
+### Pagination.tsx -- 14/14 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -697,7 +697,7 @@
 | L623 | `aria-label="Page action"` | Page button |
 | L630 | `aria-label="Page action"` | Page button |
 
-### DatePicker.tsx — 12/12 missing (100%)
+### DatePicker.tsx -- 12/12 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -714,7 +714,7 @@
 | L925 | `aria-label="Select month"` | Month |
 | L937 | `aria-label="Select year"` | Year |
 
-### BackupManager.tsx — 10/10 missing (100%)
+### BackupManager.tsx -- 10/10 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -729,7 +729,7 @@
 | L300 | `aria-label="Export backup"` | Export |
 | L301 | `aria-label="Delete backup"` | Delete |
 
-### Comment.tsx — 10/10 missing (100%)
+### Comment.tsx -- 10/10 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -744,7 +744,7 @@
 | L563 | `aria-label="Delete comment"` | Delete |
 | L571 | `aria-label="Pin comment"` | Pin |
 
-### ConfirmDialog.tsx — 10/10 missing (100%)
+### ConfirmDialog.tsx -- 10/10 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -759,7 +759,7 @@
 | L729 | `aria-label="Confirm"` | Confirm |
 | L740 | `aria-label="Dismiss"` | Dismiss |
 
-### NumberInput.tsx — 8/8 missing (100%)
+### NumberInput.tsx -- 8/8 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -772,20 +772,20 @@
 | L649 | `aria-label="Decrement value"` | Decrease |
 | L657 | `aria-label="Increment value"` | Increase |
 
-### NotificationCenter.tsx — 8/8 missing (100%)
+### NotificationCenter.tsx -- 8/8 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
-| L182 | `aria-label="Close notifications"` | Close (×) |
+| L182 | `aria-label="Close notifications"` | Close () |
 | L187 | `aria-label="Show all notifications"` | All filter |
 | L191 | `aria-label="Show unread only"` | Unread filter |
 | L197 | `aria-label="Mark all as read"` | Mark all read |
 | L198 | `aria-label="Clear all notifications"` | Clear all |
 | L226 | `aria-label="Execute notification action"` | Action |
 | L232 | `aria-label="Dismiss notification"` | Clear |
-| L447 | `aria-label="Close toast"` | Close (×) |
+| L447 | `aria-label="Close toast"` | Close () |
 
-### ErrorHandling.tsx — 8/8 missing (100%)
+### ErrorHandling.tsx -- 8/8 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -798,7 +798,7 @@
 | L531 | `aria-label="Primary action"` | Action |
 | L543 | `aria-label="Secondary action"` | Action |
 
-### FilterSort.tsx — 8/8 missing (100%)
+### FilterSort.tsx -- 8/8 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -811,7 +811,7 @@
 | L451 | `aria-label="Apply filter preset"` | Preset apply |
 | L581 | `aria-label="Action"` | Action |
 
-### VoiceNotes.tsx — 8/11 missing
+### VoiceNotes.tsx -- 8/11 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -824,7 +824,7 @@
 | L287 | `aria-label="Edit voice note"` | Edit |
 | L288 | `aria-label="Delete voice note"` | Del |
 
-### FileManager.tsx — 8/9 missing
+### FileManager.tsx -- 8/9 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -837,7 +837,7 @@
 | L810 | `aria-label="Grid view"` | Grid view |
 | L824 | `aria-label="Tiles view"` | Tiles view |
 
-### Annotation.tsx — 7/7 missing (100%)
+### Annotation.tsx -- 7/7 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -849,7 +849,7 @@
 | L623 | `aria-label="Select color"` | Color select |
 | L752 | `aria-label="Action"` | Action |
 
-### NotificationSystem.tsx — 7/7 missing (100%)
+### NotificationSystem.tsx -- 7/7 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -861,7 +861,7 @@
 | L547 | `aria-label="Show all notifications"` | All filter |
 | L557 | `aria-label="Show unread only"` | Unread filter |
 
-### Timeline.tsx — 7/7 missing (100%)
+### Timeline.tsx -- 7/7 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -873,7 +873,7 @@
 | L450 | `aria-label="Toggle snap"` | Snap |
 | L457 | `aria-label="Toggle ripple edit"` | Ripple |
 
-### FocusMode.tsx — 7/7 missing (100%)
+### FocusMode.tsx -- 7/7 missing (100%)
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -885,7 +885,7 @@
 | L479 | `aria-label="Select ambient sound"` | Sound select |
 | L593 | `aria-label="Close focus mode"` | Close |
 
-### PomodoroTimer.tsx — 7/8 missing
+### PomodoroTimer.tsx -- 7/8 missing
 
 | Line | Suggested `aria-label` | Context |
 |---|---|---|
@@ -899,14 +899,14 @@
 
 ### Remaining Components (6 missing each)
 
-**Export.tsx** — 6/6: L292, L413, L422, L615, L634, L700  
-**EmptyState.tsx** — 6/6: L302, L315, L419, L424, L531, L657  
-**Modal.tsx** — 6/6: L192, L275, L372, L375, L477, L480  
-**RichTextEditor.tsx** — 6/6: L379, L396, L479, L480, L481, L482  
-**Button.tsx** — 6/7: L207, L242, L378, L388, L402, L458  
-**PasswordGenerator.tsx** (component) — 6/6: L169, L170, L210, L215, L233, L234  
-**SystemHealth.tsx** — 6/6: L171, L238, L245, L306, L332, L358  
-**ImageGallery.tsx** — 6/6: L373, L379, L393, L609, L615, L627  
+**Export.tsx** -- 6/6: L292, L413, L422, L615, L634, L700  
+**EmptyState.tsx** -- 6/6: L302, L315, L419, L424, L531, L657  
+**Modal.tsx** -- 6/6: L192, L275, L372, L375, L477, L480  
+**RichTextEditor.tsx** -- 6/6: L379, L396, L479, L480, L481, L482  
+**Button.tsx** -- 6/7: L207, L242, L378, L388, L402, L458  
+**PasswordGenerator.tsx** (component) -- 6/6: L169, L170, L210, L215, L233, L234  
+**SystemHealth.tsx** -- 6/6: L171, L238, L245, L306, L332, L358  
+**ImageGallery.tsx** -- 6/6: L373, L379, L393, L609, L615, L627  
 
 ### Components with 5 missing
 
@@ -961,10 +961,10 @@ For each button, add `aria-label` as follows:
 ```
 
 **Priority order for fixes:**
-1. Icon-only buttons (no text content) — **Critical** — screen readers have nothing to announce
-2. Buttons with only emoji/symbol content (×, ⌫, ⏮ etc.) — **High** 
-3. Dynamic/generic buttons with unclear context — **Medium**
-4. Text buttons (already have accessible name from content) — **Low** but good practice
+1. Icon-only buttons (no text content) -- **Critical** -- screen readers have nothing to announce
+2. Buttons with only emoji/symbol content (, , etc.) -- **High** 
+3. Dynamic/generic buttons with unclear context -- **Medium**
+4. Text buttons (already have accessible name from content) -- **Low** but good practice
 
 ---
 

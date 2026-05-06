@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX SVG Icon Library
  * Inline SVG icons replacing all emoji usage across the application.
@@ -15,7 +21,7 @@ interface IconProps {
 const defaultSize = 16;
 const defaultColor = 'currentColor';
 
-// ─── Helper ───────────────────────────────────────────────────────────────
+// --- Helper ---------------------------------------------------------------
 const icon = (name: string, path: React.ReactNode) =>
   memo(({ size = defaultSize, color = defaultColor, className, style }: IconProps) => (
     <svg
@@ -36,7 +42,7 @@ const icon = (name: string, path: React.ReactNode) =>
     </svg>
   ));
 
-// ─── Media Controls ───────────────────────────────────────────────────────
+// --- Media Controls -------------------------------------------------------
 export const PlayIcon = icon('PlayIcon',
   <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none" />
 );
@@ -62,7 +68,7 @@ export const StopIcon = icon('StopIcon',
 );
 StopIcon.displayName = 'StopIcon';
 
-// ─── System / Power ──────────────────────────────────────────────────────
+// --- System / Power ------------------------------------------------------
 export const BatteryIcon = icon('BatteryIcon',
   <><rect x="1" y="6" width="18" height="12" rx="2" ry="2" /><line x1="23" y1="13" x2="23" y2="11" /></>
 );
@@ -118,7 +124,7 @@ export const MuteIcon = icon('MuteIcon',
 );
 MuteIcon.displayName = 'MuteIcon';
 
-// ─── UI / Navigation ────────────────────────────────────────────────────
+// --- UI / Navigation ----------------------------------------------------
 export const BarChartIcon = icon('BarChartIcon',
   <><line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></>
 );
@@ -154,7 +160,7 @@ export const CleanupIcon = icon('CleanupIcon',
 );
 CleanupIcon.displayName = 'CleanupIcon';
 
-// ─── Actions / Quick Actions ─────────────────────────────────────────────
+// --- Actions / Quick Actions ---------------------------------------------
 export const PenIcon = icon('PenIcon',
   <><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></>
 );
@@ -220,7 +226,7 @@ export const CodeIcon = icon('CodeIcon',
 );
 CodeIcon.displayName = 'CodeIcon';
 
-// ─── Games ──────────────────────────────────────────────────────────────
+// --- Games --------------------------------------------------------------
 export const TrophyIcon = icon('TrophyIcon',
   <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></>
 );
@@ -261,7 +267,7 @@ export const CircleIcon = icon('CircleIcon',
 );
 CircleIcon.displayName = 'CircleIcon';
 
-// ─── Undo/Redo ──────────────────────────────────────────────────────────
+// --- Undo/Redo ----------------------------------------------------------
 export const UndoIcon = icon('UndoIcon',
   <><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>
 );
@@ -272,13 +278,13 @@ export const RedoIcon = icon('RedoIcon',
 );
 RedoIcon.displayName = 'RedoIcon';
 
-// ─── Weather ────────────────────────────────────────────────────────────
+// --- Weather ------------------------------------------------------------
 export const CloudSunIcon = icon('CloudSunIcon',
   <><path d="M12 2v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="M20 12h2" /><path d="m19.07 4.93-1.41 1.41" /><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128" /><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z" /></>
 );
 CloudSunIcon.displayName = 'CloudSunIcon';
 
-// ─── Tags ──────────────────────────────────────────────────────────────
+// --- Tags --------------------------------------------------------------
 export const StarIcon = icon('StarIcon',
   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
 );
@@ -304,7 +310,7 @@ export const EyeIcon = icon('EyeIcon',
 );
 EyeIcon.displayName = 'EyeIcon';
 
-// ─── Chevrons / Arrows ──────────────────────────────────────────────────
+// --- Chevrons / Arrows --------------------------------------------------
 export const ChevronRightIcon = icon('ChevronRightIcon',
   <polyline points="9 18 15 12 9 6" />
 );
@@ -325,19 +331,19 @@ export const ChevronUpIcon = icon('ChevronUpIcon',
 );
 ChevronUpIcon.displayName = 'ChevronUpIcon';
 
-// ─── YouTube / Link ─────────────────────────────────────────────────────
+// --- YouTube / Link -----------------------------------------------------
 export const YoutubeIcon = icon('YoutubeIcon',
   <><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19.13C5.12 19.56 12 19.56 12 19.56s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" /></>
 );
 YoutubeIcon.displayName = 'YoutubeIcon';
 
-// ─── Rewind ─────────────────────────────────────────────────────────────
+// --- Rewind -------------------------------------------------------------
 export const RewindIcon = icon('RewindIcon',
   <><polygon points="11 19 2 12 11 5 11 19" /><polygon points="22 19 13 12 22 5 22 19" /></>
 );
 RewindIcon.displayName = 'RewindIcon';
 
-// ─── Sad / Error ────────────────────────────────────────────────────────
+// --- Sad / Error --------------------------------------------------------
 export const FrownIcon = icon('FrownIcon',
   <><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></>
 );

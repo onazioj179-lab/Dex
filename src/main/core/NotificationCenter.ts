@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Notification & Activity Center
 // Quiet activity stream: file operations, errors, completed tasks
 // No popups by default, collapsible, read-only, clear timestamps
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, Notification as ElectronNotification } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type NotificationType = 
   | 'info' 
@@ -106,9 +112,9 @@ export interface NotificationStats {
   byPriority: Record<NotificationPriority, number>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // NOTIFICATION CENTER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class NotificationCenterClass extends EventEmitter {
   private notifications: Map<string, DexNotification> = new Map();
@@ -133,9 +139,9 @@ class NotificationCenterClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -151,12 +157,12 @@ class NotificationCenterClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
-    // ── Create Notifications ──────────────────────────────────────────────
+    // -- Create Notifications ----------------------------------------------
     ipcMain.handle('notifications:create', async (_event, data: {
       type: NotificationType;
       category?: NotificationCategory;
@@ -184,7 +190,7 @@ class NotificationCenterClass extends EventEmitter {
       return this.updateProgress(id, current, message);
     });
 
-    // ── Query Notifications ───────────────────────────────────────────────
+    // -- Query Notifications -----------------------------------------------
     ipcMain.handle('notifications:list', (_event, filter?: NotificationFilter) => {
       return this.list(filter);
     });
@@ -209,7 +215,7 @@ class NotificationCenterClass extends EventEmitter {
       return this.search(query);
     });
 
-    // ── Actions ───────────────────────────────────────────────────────────
+    // -- Actions -----------------------------------------------------------
     ipcMain.handle('notifications:markRead', async (_event, id: string) => {
       return this.markRead(id);
     });
@@ -238,7 +244,7 @@ class NotificationCenterClass extends EventEmitter {
       return this.executeAction(notificationId, actionId);
     });
 
-    // ── Stats & Config ────────────────────────────────────────────────────
+    // -- Stats & Config ----------------------------------------------------
     ipcMain.handle('notifications:stats', () => this.getStats());
     ipcMain.handle('notifications:config', () => this.config);
     ipcMain.handle('notifications:setConfig', async (_event, config: Partial<NotificationConfig>) => {
@@ -248,9 +254,9 @@ class NotificationCenterClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CREATE NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   create(data: {
     type: NotificationType;
@@ -369,9 +375,9 @@ class NotificationCenterClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHORTCUT METHODS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   info(title: string, message: string, category: NotificationCategory = 'general'): DexNotification {
     return this.create({ type: 'info', category, title, message });
@@ -397,9 +403,9 @@ class NotificationCenterClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERY METHODS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   get(id: string): DexNotification | null {
     return this.notifications.get(id) || null;
@@ -487,9 +493,9 @@ class NotificationCenterClass extends EventEmitter {
     return this.list({ search: query });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   markRead(id: string): { success: boolean } {
     const notification = this.notifications.get(id);
@@ -601,9 +607,9 @@ class NotificationCenterClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): NotificationStats {
     const stats: NotificationStats = {
@@ -627,9 +633,9 @@ class NotificationCenterClass extends EventEmitter {
     return stats;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SYSTEM NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private showSystemNotification(notification: DexNotification): void {
     if (!ElectronNotification.isSupported()) return;
@@ -652,9 +658,9 @@ class NotificationCenterClass extends EventEmitter {
     sysNotification.show();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private isQuietHours(): boolean {
     if (this.config.quietHoursStart === undefined || this.config.quietHoursEnd === undefined) {
@@ -719,9 +725,9 @@ class NotificationCenterClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadPersistentNotifications(): Promise<void> {
     try {
@@ -770,9 +776,9 @@ class NotificationCenterClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     if (this.expiryTimer) {
@@ -784,9 +790,9 @@ class NotificationCenterClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const NotificationCenter = new NotificationCenterClass();
 export default NotificationCenter;

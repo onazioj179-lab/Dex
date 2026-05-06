@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Transfer Controller
 // Phase 12: Data/File/Media Sharing - Explicit, Transparent Transfers
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, app, dialog, BrowserWindow } from 'electron';
 import * as fs from 'fs';
@@ -13,9 +19,9 @@ import Store from 'electron-store';
 import log from 'electron-log';
 import { systemMapController, ActiveTransfer, SystemHealth } from './SystemMapController';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface TransferRequest {
   type: 'file' | 'folder' | 'media' | 'session';
@@ -57,9 +63,9 @@ export interface TransferConfig {
   defaultPort: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const store = new Store<{
   transferConfig: TransferConfig;
@@ -80,9 +86,9 @@ const store = new Store<{
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class TransferController {
   private activeTransfers: Map<string, {
@@ -206,9 +212,9 @@ class TransferController {
     log.info('Transfer handlers registered');
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // LOCAL TRANSFERS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async initiateLocalTransfer(
     request: TransferRequest, 
@@ -365,9 +371,9 @@ class TransferController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // NETWORK TRANSFERS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async initiateSend(request: TransferRequest): Promise<{
     success: boolean;
@@ -375,28 +381,165 @@ class TransferController {
     error?: string;
   }> {
     try {
-      // For now, implement local network transfer via TCP
       if (request.channel !== 'wifi') {
         return { success: false, error: 'Only WiFi transfers are currently supported' };
       }
 
-      const stats = await fsp.stat(request.sourcePath);
-      if (stats.isDirectory()) {
-        return { success: false, error: 'Folder network transfer not yet implemented' };
-      }
-
-      // Check permissions
       if (!this.hasPermission('file', 'wifi', 'send', request.destinationDevice)) {
         return { success: false, error: 'Transfer permission required' };
       }
 
-      // Implement actual network transfer here
-      // This would connect to a receiving server on another device
-      
-      return { success: false, error: 'Network transfer pending implementation' };
+      const stats = await fsp.stat(request.sourcePath);
+      const isDirectory = stats.isDirectory();
+      const totalBytes = isDirectory
+        ? await this.calculateFolderSize(request.sourcePath)
+        : stats.size;
+
+      const config = store.get('transferConfig');
+      const [host, port] = (request.destinationDevice || `127.0.0.1:${config.defaultPort}`).split(':');
+      const targetPort = parseInt(port, 10) || config.defaultPort;
+
+      const transfer = systemMapController.addTransfer({
+        name: path.basename(request.sourcePath),
+        type: isDirectory ? 'folder' : 'file',
+        direction: 'send',
+        source: request.sourcePath,
+        destination: `${host}:${targetPort}`,
+        sizeBytes: totalBytes,
+        transferredBytes: 0,
+        status: 'active',
+        startedAt: Date.now()
+      });
+
+      this.activeTransfers.set(transfer.id, {
+        request,
+        paused: false,
+        bytesTransferred: 0,
+        totalBytes,
+        startTime: Date.now()
+      });
+
+      if (isDirectory) {
+        // Collect all files in directory for multi-file send
+        const files = await this.collectFiles(request.sourcePath, request.sourcePath);
+        await this.sendFilesOverNetwork(files, host, targetPort, transfer.id);
+      } else {
+        await this.sendFileOverNetwork(
+          request.sourcePath,
+          path.basename(request.sourcePath),
+          host,
+          targetPort,
+          transfer.id
+        );
+      }
+
+      systemMapController.completeTransfer(transfer.id, 'completed');
+      this.activeTransfers.delete(transfer.id);
+      return { success: true, transferId: transfer.id };
     } catch (error) {
+      log.error('Network send failed:', error);
       return { success: false, error: String(error) };
     }
+  }
+
+  private async collectFiles(dir: string, baseDir: string): Promise<{ abs: string; rel: string }[]> {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    const files: { abs: string; rel: string }[] = [];
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...await this.collectFiles(full, baseDir));
+      } else {
+        files.push({ abs: full, rel: path.relative(baseDir, full) });
+      }
+    }
+    return files;
+  }
+
+  private async sendFilesOverNetwork(
+    files: { abs: string; rel: string }[],
+    host: string,
+    port: number,
+    transferId: string
+  ): Promise<void> {
+    for (const file of files) {
+      const transfer = this.activeTransfers.get(transferId);
+      if (!transfer || transfer.paused) throw new Error('Transfer cancelled or paused');
+      await this.sendFileOverNetwork(file.abs, file.rel, host, port, transferId);
+    }
+  }
+
+  private sendFileOverNetwork(
+    filePath: string,
+    relativeName: string,
+    host: string,
+    port: number,
+    transferId: string
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const socket = net.createConnection({ host, port }, async () => {
+        try {
+          const stats = await fsp.stat(filePath);
+          const config = store.get('transferConfig');
+
+          // Protocol: 4 bytes header length (LE) + JSON header + raw file bytes
+          const header = JSON.stringify({
+            name: relativeName,
+            size: stats.size,
+            checksum: config.verifyIntegrity
+              ? await this.computeFileChecksum(filePath)
+              : undefined
+          });
+          const headerBuf = Buffer.from(header, 'utf-8');
+          const lenBuf = Buffer.alloc(4);
+          lenBuf.writeUInt32LE(headerBuf.length);
+          socket.write(lenBuf);
+          socket.write(headerBuf);
+
+          // Stream the file
+          const readStream = fs.createReadStream(filePath, { highWaterMark: config.chunkSize });
+          const transferState = this.activeTransfers.get(transferId);
+          if (transferState) transferState.socket = socket;
+
+          readStream.on('data', (chunk) => {
+            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            if (transferState) {
+              transferState.bytesTransferred += buf.length;
+              this.updateTransferProgress(transferId);
+            }
+          });
+
+          readStream.on('error', (err) => {
+            socket.destroy();
+            reject(err);
+          });
+
+          readStream.on('end', () => {
+            socket.end(() => resolve());
+          });
+
+          readStream.pipe(socket, { end: false });
+        } catch (err) {
+          socket.destroy();
+          reject(err);
+        }
+      });
+
+      socket.on('error', reject);
+      socket.setTimeout(30000, () => {
+        socket.destroy(new Error('Connection timed out'));
+      });
+    });
+  }
+
+  private computeFileChecksum(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', reject);
+    });
   }
 
   async startReceivingServer(port?: number): Promise<{
@@ -440,17 +583,126 @@ class TransferController {
   }
 
   private handleIncomingConnection(socket: net.Socket): void {
-    // Handle incoming file transfer
-    // This would implement the receive protocol
     log.info('Incoming transfer connection from:', socket.remoteAddress);
-    
-    // For security, require explicit acceptance
-    // This would emit an event to the UI for user approval
+
+    const config = store.get('transferConfig');
+    const receiveDir = path.join(app.getPath('downloads'), 'DEX Transfers');
+    let headerBuf = Buffer.alloc(0);
+    let header: { name: string; size: number; checksum?: string } | null = null;
+    let headerLen = -1;
+    let writeStream: fs.WriteStream | null = null;
+    let received = 0;
+
+    const transfer = systemMapController.addTransfer({
+      name: 'Incoming file',
+      type: 'file',
+      direction: 'receive',
+      source: socket.remoteAddress || 'unknown',
+      destination: receiveDir,
+      sizeBytes: 0,
+      transferredBytes: 0,
+      status: 'active',
+      startedAt: Date.now()
+    });
+
+    this.activeTransfers.set(transfer.id, {
+      request: { type: 'file', sourcePath: '', channel: 'wifi', direction: 'receive' },
+      socket,
+      paused: false,
+      bytesTransferred: 0,
+      totalBytes: 0,
+      startTime: Date.now()
+    });
+
+    socket.on('data', (chunk: Buffer) => {
+      if (!header) {
+        headerBuf = Buffer.concat([headerBuf, chunk]);
+        if (headerLen < 0 && headerBuf.length >= 4) {
+          headerLen = headerBuf.readUInt32LE(0);
+        }
+        if (headerLen > 0 && headerBuf.length >= 4 + headerLen) {
+          const headerStr = headerBuf.subarray(4, 4 + headerLen).toString('utf-8');
+          header = JSON.parse(headerStr);
+          const remaining = headerBuf.subarray(4 + headerLen);
+
+          // Sanitize filename to prevent path traversal
+          const safeName = path.basename(header!.name).replace(/[<>:"|?*]/g, '_');
+          const destDir = header!.name.includes('/')
+            ? path.join(receiveDir, path.dirname(header!.name.split('/').map((s: string) => s.replace(/[<>:"|?*]/g, '_')).join('/')))
+            : receiveDir;
+
+          fs.mkdirSync(destDir, { recursive: true });
+          const destPath = path.join(destDir, safeName);
+          writeStream = fs.createWriteStream(destPath);
+
+          const transferState = this.activeTransfers.get(transfer.id);
+          if (transferState) transferState.totalBytes = header!.size;
+          systemMapController.updateTransfer(transfer.id, { name: safeName, sizeBytes: header!.size });
+
+          if (remaining.length > 0) {
+            writeStream.write(remaining);
+            received += remaining.length;
+            if (transferState) {
+              transferState.bytesTransferred = received;
+              this.updateTransferProgress(transfer.id);
+            }
+          }
+        }
+      } else if (writeStream) {
+        writeStream.write(chunk);
+        received += chunk.length;
+        const transferState = this.activeTransfers.get(transfer.id);
+        if (transferState) {
+          transferState.bytesTransferred = received;
+          this.updateTransferProgress(transfer.id);
+        }
+      }
+    });
+
+    socket.on('end', async () => {
+      if (writeStream) writeStream.end();
+      // Verify integrity if checksum provided
+      if (header?.checksum && config.verifyIntegrity && writeStream) {
+        const safeName = path.basename(header.name).replace(/[<>:"|?*]/g, '_');
+        const destPath = path.join(receiveDir, safeName);
+        try {
+          const receivedChecksum = await this.computeFileChecksum(destPath);
+          if (receivedChecksum !== header.checksum) {
+            log.warn('Transfer checksum mismatch for', safeName);
+          }
+        } catch (e) {
+          log.warn('Could not verify transfer checksum:', e);
+        }
+      }
+      systemMapController.completeTransfer(transfer.id, 'completed');
+      this.activeTransfers.delete(transfer.id);
+      log.info('Transfer complete:', header?.name);
+
+      // Notify renderer
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('transfer:received', {
+          name: header?.name,
+          size: header?.size
+        });
+      }
+    });
+
+    socket.on('error', (err) => {
+      log.error('Incoming transfer error:', err);
+      if (writeStream) writeStream.end();
+      systemMapController.completeTransfer(transfer.id, 'failed');
+      this.activeTransfers.delete(transfer.id);
+    });
+
+    socket.setTimeout(60000, () => {
+      log.warn('Incoming transfer timed out');
+      socket.destroy();
+    });
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // TRANSFER CONTROL
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   pauseTransfer(transferId: string): { success: boolean; error?: string } {
     const transfer = this.activeTransfers.get(transferId);
@@ -556,9 +808,9 @@ class TransferController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // PERMISSIONS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   grantPermission(permission: Omit<TransferPermission, 'id' | 'grantedAt'>): TransferPermission {
     const newPermission: TransferPermission = {
@@ -615,9 +867,9 @@ class TransferController {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // UTILITIES
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async browseForFile(): Promise<{ path?: string; name?: string; size?: number }> {
     const window = BrowserWindow.getFocusedWindow();
@@ -720,9 +972,9 @@ class TransferController {
     return count;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // LIFECYCLE
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;

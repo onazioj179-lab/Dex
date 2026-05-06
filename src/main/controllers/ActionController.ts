@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Action Controller
 // Executes actions with permission checks
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { exec, spawn } from 'child_process';
 import { shell } from 'electron';
@@ -10,8 +16,28 @@ import { promisify } from 'util';
 import { DexAction, ActionType } from '../../shared/types';
 import { PermissionManager } from '../security/PermissionManager';
 import { Logger } from '../utils/Logger';
+import { NativeProcesses, isNativeAvailable } from '../native/bridge';
 
 const execAsync = promisify(exec);
+
+// Shell-dangerous characters that must never appear in unquoted targets.
+// This catches common injection vectors: ; & | ` $ ( ) { } < > \n
+const SHELL_METACHAR_RE = /[;&|`$(){}\n\r<>!\\]/;
+
+/** Reject targets containing shell metacharacters. */
+function assertSafeTarget(target: string, context: string): void {
+  if (!target || typeof target !== 'string') {
+    throw new Error(`[ActionController] ${context}: empty target`);
+  }
+  if (SHELL_METACHAR_RE.test(target)) {
+    throw new Error(`[ActionController] ${context}: target contains forbidden characters`);
+  }
+}
+
+// Action types that are permanently blocked from renderer invocation.
+// These give full shell/script execution and are only available via
+// internal automation pipelines with governance approval.
+const BLOCKED_ACTION_TYPES: ReadonlySet<string> = new Set(['run-command', 'run-script', 'custom']);
 
 export class ActionController {
   private permissionManager: PermissionManager;
@@ -26,6 +52,12 @@ export class ActionController {
     this.logger.info(`Executing action: ${action.name} (${action.type})`);
 
     try {
+      // Block dangerous action types from renderer
+      if (BLOCKED_ACTION_TYPES.has(action.type)) {
+        this.logger.warn(`Blocked action type: ${action.type}`);
+        return { success: false, message: `Action type ${action.type} is disabled for security` };
+      }
+
       // Check permissions first
       const hasPermission = await this.checkPermission(action.type);
       if (!hasPermission) {
@@ -83,11 +115,12 @@ export class ActionController {
     return this.permissionManager.hasPermission(permission as any);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Action Implementations
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async openApp(action: DexAction): Promise<{ success: boolean; message: string }> {
+    assertSafeTarget(action.target, 'openApp');
     const platform = process.platform;
     let command: string;
 
@@ -96,7 +129,7 @@ export class ActionController {
     } else if (platform === 'darwin') {
       command = `open -a "${action.target}"`;
     } else {
-      command = action.target;
+      command = `"${action.target}"`;
     }
 
     await execAsync(command);
@@ -105,12 +138,21 @@ export class ActionController {
   }
 
   private async closeApp(action: DexAction): Promise<{ success: boolean; message: string }> {
+    assertSafeTarget(action.target, 'closeApp');
     const platform = process.platform;
-    let command: string;
 
-    if (platform === 'win32') {
-      command = `taskkill /IM "${action.target}" /F`;
-    } else if (platform === 'darwin') {
+    // Use native module (AV-safe) on Windows when available
+    if (platform === 'win32' && isNativeAvailable()) {
+      const result = NativeProcesses.closeByName(action.target, true);
+      if (result.success) {
+        this.logger.success(`Closed app: ${action.target}`);
+      }
+      return result;
+    }
+
+    // Fallback for macOS/Linux or when native unavailable
+    let command: string;
+    if (platform === 'darwin') {
       command = `pkill -x "${action.target}"`;
     } else {
       command = `pkill "${action.target}"`;
@@ -131,15 +173,27 @@ export class ActionController {
 
   private async killProcess(action: DexAction): Promise<{ success: boolean; message: string }> {
     const platform = process.platform;
-    const pid = parseInt(action.target);
-    let command: string;
+    const pid = parseInt(action.target, 10);
 
-    if (isNaN(pid)) {
-      return await this.closeApp(action);
+    if (isNaN(pid) || pid <= 0 || String(pid) !== action.target.trim()) {
+      // Only allow exact numeric PIDs — no name-based kill from this path
+      return { success: false, message: 'kill-process requires a numeric PID' };
     }
 
+    // Use native module (AV-safe) when available
+    if (isNativeAvailable()) {
+      const result = NativeProcesses.close(pid, true);
+      if (result.success) {
+        this.logger.success(`Killed process: ${pid}`);
+      }
+      return result;
+    }
+
+    // Fallback for when native is unavailable
+    let command: string;
     if (platform === 'win32') {
-      command = `taskkill /PID ${pid} /F`;
+      // Use PowerShell Stop-Process instead of taskkill for AV safety
+      command = `powershell -NoProfile -NonInteractive -Command "Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue"`;
     } else {
       command = `kill -9 ${pid}`;
     }
@@ -150,41 +204,13 @@ export class ActionController {
   }
 
   private async runCommand(action: DexAction): Promise<{ success: boolean; message: string; data?: any }> {
-    const { stdout, stderr } = await execAsync(action.target);
-    this.logger.success(`Ran command: ${action.target}`);
-    return { 
-      success: true, 
-      message: 'Command executed',
-      data: { stdout, stderr }
-    };
+    // Blocked by BLOCKED_ACTION_TYPES above; this is a second safety net
+    return { success: false, message: 'run-command is disabled for security' };
   }
 
   private async runScript(action: DexAction): Promise<{ success: boolean; message: string; data?: any }> {
-    const ext = path.extname(action.target).toLowerCase();
-    const platform = process.platform;
-    let command: string;
-
-    if (ext === '.ps1' && platform === 'win32') {
-      command = `powershell -ExecutionPolicy Bypass -File "${action.target}"`;
-    } else if (ext === '.bat' || ext === '.cmd') {
-      command = `"${action.target}"`;
-    } else if (ext === '.sh') {
-      command = `bash "${action.target}"`;
-    } else if (ext === '.py') {
-      command = `python "${action.target}"`;
-    } else if (ext === '.js') {
-      command = `node "${action.target}"`;
-    } else {
-      command = `"${action.target}"`;
-    }
-
-    const { stdout, stderr } = await execAsync(command);
-    this.logger.success(`Ran script: ${action.target}`);
-    return {
-      success: true,
-      message: 'Script executed',
-      data: { stdout, stderr }
-    };
+    // Blocked by BLOCKED_ACTION_TYPES above; this is a second safety net
+    return { success: false, message: 'run-script is disabled for security' };
   }
 
   private async openFile(action: DexAction): Promise<{ success: boolean; message: string }> {
@@ -200,6 +226,14 @@ export class ActionController {
   }
 
   private async openUrl(action: DexAction): Promise<{ success: boolean; message: string }> {
+    try {
+      const parsed = new URL(action.target);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { success: false, message: `Blocked URL with protocol: ${parsed.protocol}` };
+      }
+    } catch {
+      return { success: false, message: `Invalid URL: ${action.target}` };
+    }
     await shell.openExternal(action.target);
     this.logger.success(`Opened URL: ${action.target}`);
     return { success: true, message: `Opened ${action.target}` };
@@ -207,20 +241,25 @@ export class ActionController {
 
   private async adjustVolume(action: DexAction): Promise<{ success: boolean; message: string }> {
     const platform = process.platform;
-    const target = action.target.toLowerCase();
+    const target = action.target.toLowerCase().trim();
     let command: string;
+
+    // Parse and clamp volume level for numeric targets
+    const parseLevel = (): number | null => {
+      const level = parseInt(target, 10);
+      if (isNaN(level)) return null;
+      return Math.max(0, Math.min(100, level));
+    };
 
     if (platform === 'win32') {
       if (target === 'mute') {
-        // Use PowerShell to mute on Windows
-        command = `powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"`;
+        command = `powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"`;
       } else if (target === 'unmute') {
-        command = `powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"`;
+        command = `powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"`;
       } else {
-        const level = parseInt(target);
-        if (!isNaN(level)) {
-          // Set volume level using nircmd or PowerShell
-          command = `powershell -Command "$wshShell = New-Object -ComObject WScript.Shell; 1..50 | ForEach-Object { $wshShell.SendKeys([char]174) }; 1..${Math.round(level / 2)} | ForEach-Object { $wshShell.SendKeys([char]175) }"`;
+        const level = parseLevel();
+        if (level !== null) {
+          command = `powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "$wshShell = New-Object -ComObject WScript.Shell; 1..50 | ForEach-Object { $wshShell.SendKeys([char]174) }; 1..${Math.round(level / 2)} | ForEach-Object { $wshShell.SendKeys([char]175) }"`;
         } else {
           return { success: false, message: 'Invalid volume level' };
         }
@@ -231,8 +270,8 @@ export class ActionController {
       } else if (target === 'unmute') {
         command = 'osascript -e "set volume output muted false"';
       } else {
-        const level = parseInt(target);
-        if (!isNaN(level)) {
+        const level = parseLevel();
+        if (level !== null) {
           command = `osascript -e "set volume output volume ${level}"`;
         } else {
           return { success: false, message: 'Invalid volume level' };
@@ -245,8 +284,8 @@ export class ActionController {
       } else if (target === 'unmute') {
         command = 'pactl set-sink-mute @DEFAULT_SINK@ 0';
       } else {
-        const level = parseInt(target);
-        if (!isNaN(level)) {
+        const level = parseLevel();
+        if (level !== null) {
           command = `pactl set-sink-volume @DEFAULT_SINK@ ${level}%`;
         } else {
           return { success: false, message: 'Invalid volume level' };

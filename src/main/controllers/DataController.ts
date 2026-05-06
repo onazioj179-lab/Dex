@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Data Controller
 // Phase 10/11: User data ownership - Export, Import, Reset, Backup
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, dialog, app, BrowserWindow, shell } from 'electron';
 import * as fs from 'fs/promises';
@@ -9,6 +15,7 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/Logger';
 import { DataStore } from '../store/DataStore';
+import { notesManager } from '../core/NotesManager';
 
 const logger = new Logger();
 const dataStoreInstance = new DataStore();
@@ -134,6 +141,13 @@ class DataController {
     logger.info('Data handlers registered');
   }
 
+  private async getExportableNotes(): Promise<any[]> {
+    if (notesManager.isReady()) {
+      return notesManager.exportAllNotes();
+    }
+    return await dataStoreInstance.get('notes') || [];
+  }
+
   async exportData(): Promise<{ success: boolean; path?: string; error?: string }> {
     try {
       const mainWindow = BrowserWindow.getFocusedWindow();
@@ -159,7 +173,7 @@ class DataController {
         exportedAt: new Date().toISOString(),
         appVersion: app.getVersion(),
         data: {
-          notes: await dataStoreInstance.get('notes') || [],
+          notes: await this.getExportableNotes(),
           tasks: await dataStoreInstance.get('tasks') || [],
           workflows: await dataStoreInstance.get('workflows') || [],
           operations: await dataStoreInstance.get('operations') || [],
@@ -301,7 +315,7 @@ class DataController {
     timers: number;
     totalSize: number;
   }> {
-    const notes = await dataStoreInstance.get('notes') || [];
+    const notes = await this.getExportableNotes();
     const tasks = await dataStoreInstance.get('tasks') || [];
     const workflows = await dataStoreInstance.get('workflows') || [];
     const operations = await dataStoreInstance.get('operations') || [];
@@ -369,9 +383,9 @@ class DataController {
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // FOLDER-BASED EXPORT (Human-Readable)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async exportToFolder(options?: Partial<FolderExportOptions>): Promise<{ success: boolean; path?: string; error?: string }> {
     try {
@@ -411,7 +425,7 @@ class DataController {
 
       // Export notes
       if (opts.includeNotes) {
-        const notes = await dataStoreInstance.get('notes') || [];
+        const notes = await this.getExportableNotes();
         await this.exportCollectionToFolder(exportDir, 'notes', notes, opts.format);
       }
 
@@ -588,7 +602,7 @@ This folder contains your exported Dex data.
 ## Importing Back to Dex
 
 1. Open Dex
-2. Go to Settings → Data → Import from Folder
+2. Go to Settings Data Import from Folder
 3. Select this folder
 
 ## Manual Editing
@@ -638,9 +652,9 @@ Exported on: ${new Date().toLocaleString()}
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // FOLDER-BASED IMPORT
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async importFromFolder(): Promise<{ success: boolean; imported?: string[]; error?: string }> {
     try {
@@ -715,9 +729,9 @@ Exported on: ${new Date().toLocaleString()}
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // AUTO BACKUP
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async createAutoBackup(): Promise<{ success: boolean; path?: string; error?: string }> {
     try {
@@ -731,7 +745,7 @@ Exported on: ${new Date().toLocaleString()}
         exportedAt: new Date().toISOString(),
         appVersion: app.getVersion(),
         data: {
-          notes: await dataStoreInstance.get('notes') || [],
+          notes: await this.getExportableNotes(),
           tasks: await dataStoreInstance.get('tasks') || [],
           workflows: await dataStoreInstance.get('workflows') || [],
           operations: await dataStoreInstance.get('operations') || [],

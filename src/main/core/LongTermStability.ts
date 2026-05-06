@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Long-Term Stability: Operation guarantees and health monitoring
 // Ensures stable operation for 168+ hours (1 week) continuous use
 // =============================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -342,7 +349,7 @@ export class LongTermStabilityManager extends EventEmitter {
           .filter((s: HealthSnapshot) => s.timestamp > cutoff);
       }
     } catch (err) {
-      console.error('[LongTermStability] Failed to load persisted data:', err);
+      log.error('[LongTermStability] Failed to load persisted data:', err);
     }
   }
   
@@ -355,7 +362,7 @@ export class LongTermStabilityManager extends EventEmitter {
       
       fs.writeFileSync(this.persistPath, JSON.stringify(data, null, 2));
     } catch (err) {
-      console.error('[LongTermStability] Failed to persist data:', err);
+      log.error('[LongTermStability] Failed to persist data:', err);
     }
   }
   
@@ -475,7 +482,7 @@ export class LongTermStabilityManager extends EventEmitter {
     
     // Check performance
     if (!this.performanceTracker.isPerformanceStable()) {
-      issues.push(`Performance variance: FPS ±${fpsVariance.toFixed(1)}`);
+      issues.push(`Performance variance: FPS ${fpsVariance.toFixed(1)}`);
       recommendations.push('Check for performance-heavy operations');
     }
     

@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Floating Media Controls
 // Context-aware, translucent pill-style overlay for active media
 // Auto-hides, never blocks content, adapts to audio vs video
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, screen } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type MediaContextType = 'audio' | 'video' | 'gallery' | 'none';
 export type ControlsPosition = 'bottom' | 'top' | 'left' | 'right' | 'floating';
@@ -100,9 +106,9 @@ export interface ControlsLayout {
   showArtwork: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FLOATING MEDIA CONTROLS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FloatingMediaControlsClass extends EventEmitter {
   private state: ControlsState;
@@ -193,9 +199,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -211,9 +217,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // State management
@@ -283,9 +289,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONTEXT MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setContext(context: MediaContextType): ControlsState {
     const previousContext = this.state.context;
@@ -312,9 +318,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     return this.state.context;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLAYBACK STATE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   updatePlayback(updates: Partial<MediaPlaybackState>): ControlsState {
     this.state.playback = { ...this.state.playback, ...updates };
@@ -352,9 +358,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     return this.state;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTION HANDLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async handleAction(action: ControlAction): Promise<{ success: boolean; action: string }> {
     this.onInteraction();
@@ -473,9 +479,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     return { success: true, action: action.type };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VISIBILITY MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   show(): void {
     if (this.state.context === 'none') return;
@@ -543,9 +549,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MOUSE INTERACTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   onMouseEnter(): void {
     this.isMouseOver = true;
@@ -569,9 +575,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     this.showTemporarily();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // POSITION & STATE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setPosition(position: ControlsPosition): ControlsState {
     this.state.position = position;
@@ -627,9 +633,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async loadConfig(): Promise<void> {
     try {
@@ -695,9 +701,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     return this.videoLayout;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RENDERER NOTIFICATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private notifyStateChange(): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -705,9 +711,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
@@ -720,9 +726,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     return (this.state.playback.currentTime / this.state.playback.duration) * 100;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEYBOARD SHORTCUTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   handleKeyPress(key: string, modifiers: { ctrl?: boolean; shift?: boolean; alt?: boolean }): boolean {
     if (this.state.context === 'none') return false;
@@ -786,9 +792,9 @@ class FloatingMediaControlsClass extends EventEmitter {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     this.clearTimers();
@@ -797,9 +803,9 @@ class FloatingMediaControlsClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const FloatingMediaControls = new FloatingMediaControlsClass();
 export default FloatingMediaControls;

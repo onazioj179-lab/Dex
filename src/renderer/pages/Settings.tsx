@@ -1,14 +1,36 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * SETTINGS - macOS System Preferences Style
  * Clean settings panel with sections
  */
 
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useCallback } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
+import { useToastHelpers } from '../components/Toast';
+import { Select } from '../components/Select';
+import { APP_DEFINITIONS } from '../store/runningApps';
+import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
+import {
+  type DeviceTier, ALL_TIERS, getTierLabel, getTierDescription,
+  getStoredTier, getHardwareSummary, detectDeviceTier, applyTierPresets,
+  setManualOverride, clearManualOverride, isManualOverride,
+  isAutoOptimizeEnabled, setAutoOptimizeEnabled,
+} from '../services/TierManager';
+import {
+  usePermissionStore, ALL_PERMISSIONS, PERMISSION_LABELS, PERMISSION_DESCRIPTIONS,
+  type PermissionId,
+} from '../store/permissionStore';
+import { PluginMarketplace } from '../components/PluginMarketplace';
+import { NexusBiometrics } from '../components/NexusBiometrics';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SettingSection {
   id: string;
@@ -16,16 +38,9 @@ interface SettingSection {
   icon: React.ReactNode;
 }
 
-interface ToggleSetting {
-  id: string;
-  label: string;
-  description: string;
-  value: boolean;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ICONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const Icons = {
   general: (
@@ -52,10 +67,9 @@ const Icons = {
       <path d="M7 11V7a5 5 0 0110 0v4"/>
     </svg>
   ),
-  storage: (
+  updates: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-      <path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
     </svg>
   ),
   about: (
@@ -64,16 +78,41 @@ const Icons = {
       <path d="M12 16v-4M12 8h.01"/>
     </svg>
   ),
-  keyboard: (
+  sound: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="2" y="4" width="20" height="16" rx="2"/>
-      <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+      <path d="M15.54 8.46a5 5 0 010 7.07"/>
+      <path d="M19.07 4.93a10 10 0 010 14.14"/>
+    </svg>
+  ),
+  display: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="3" width="20" height="14" rx="2"/>
+      <line x1="8" y1="21" x2="16" y2="21"/>
+      <line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+  ),
+  performance: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    </svg>
+  ),
+  accessibility: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="4" r="2"/>
+      <path d="M12 6v6m-4-4h8M8 18l4-6 4 6"/>
     </svg>
   ),
   network: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="12" cy="12" r="10"/>
-      <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+      <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+    </svg>
+  ),
+  files: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
     </svg>
   ),
   browser: (
@@ -82,35 +121,31 @@ const Icons = {
       <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
     </svg>
   ),
-  files: (
+  window: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+      <rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/><circle cx="6" cy="6" r="1"/><circle cx="10" cy="6" r="1"/>
     </svg>
   ),
-  autofill: (
+  keyboard: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M8 16h8"/>
     </svg>
   ),
-  customize: (
+  storage: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"/>
-      <circle cx="12" cy="12" r="4"/>
+      <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
     </svg>
   ),
-  performance: (
+  uki: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 8v4l3 3"/>
+      <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
     </svg>
   ),
-  accessibility: (
+  creativeapps: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="12" cy="4" r="2"/><path d="M12 6v8m-4-6l4 2 4-2m-8 8l4 6 4-6"/>
-    </svg>
-  ),
-  rewind: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/>
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
     </svg>
   ),
 };
@@ -118,197 +153,364 @@ const Icons = {
 const SECTIONS: SettingSection[] = [
   { id: 'general', name: 'General', icon: Icons.general },
   { id: 'appearance', name: 'Appearance', icon: Icons.appearance },
-  { id: 'customize', name: 'Customization', icon: Icons.customize },
-  { id: 'browser', name: 'Browser', icon: Icons.browser },
-  { id: 'files', name: 'Files', icon: Icons.files },
-  { id: 'autofill', name: 'Auto-Fill', icon: Icons.autofill },
+  { id: 'sound', name: 'Sound', icon: Icons.sound },
+  { id: 'display', name: 'Display', icon: Icons.display },
   { id: 'notifications', name: 'Notifications', icon: Icons.notifications },
   { id: 'privacy', name: 'Privacy & Security', icon: Icons.privacy },
-  { id: 'keyboard', name: 'Keyboard', icon: Icons.keyboard },
+  { id: 'network', name: 'Network', icon: Icons.network },
   { id: 'performance', name: 'Performance', icon: Icons.performance },
   { id: 'accessibility', name: 'Accessibility', icon: Icons.accessibility },
-  { id: 'network', name: 'Network', icon: Icons.network },
-  { id: 'storage', name: 'Storage', icon: Icons.storage },
-  { id: 'rewind', name: 'Rewind', icon: Icons.rewind },
+  { id: 'window', name: 'Window Management', icon: Icons.window },
+  { id: 'keyboard', name: 'Keyboard Shortcuts', icon: Icons.keyboard },
+  { id: 'files', name: 'Files', icon: Icons.files },
+  { id: 'storage', name: 'Storage & Data', icon: Icons.storage },
+  { id: 'browser', name: 'Browser', icon: Icons.browser },
+  { id: 'uki', name: 'UKI & Memory', icon: Icons.uki },
+  { id: 'creativeapps', name: 'Creative Suite', icon: Icons.creativeapps },
+  { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.creativeapps },
+  { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.privacy },
+  { id: 'updates', name: 'Updates', icon: Icons.updates },
   { id: 'about', name: 'About', icon: Icons.about },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
-// REWIND SETTINGS SECTION (self-contained sub-component)
-// ═══════════════════════════════════════════════════════════════════════════
+const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
+  { label: 'System', ids: ['general', 'appearance', 'sound', 'display'] },
+  { label: 'Privacy & Security', ids: ['privacy', 'network'] },
+  { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'files'] },
+  { label: 'Advanced', ids: ['performance', 'accessibility', 'storage', 'browser'] },
+  { label: 'Intelligence', ids: ['uki'] },
+  { label: 'Creative Suite', ids: ['creativeapps'] },
+  { label: 'Extensions', ids: ['plugins', 'nexus'] },
+  { label: 'Info', ids: ['updates', 'about'] },
+];
 
-interface RewindSettingsShape {
-  isRecording: boolean;
-  trackApps: boolean;
-  trackBrowser: boolean;
-  trackClipboard: boolean;
-  trackFiles: boolean;
-  screenshotsEnabled: boolean;
-  screenshotIntervalMin: number;
-  retentionDays: number;
-  aiSearchEnabled: boolean;
+const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
+
+// ===========================================================================
+// UPDATE MANAGER SECTION
+// ===========================================================================
+
+interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  releaseNotes: string;
+  downloadProgress: number; // 0–100, -1 = not downloading
+  status: 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
+  error: string | null;
 }
 
-const RewindSettingsSection: React.FC = () => {
-  const dexRewind = (window as unknown as Record<string, Record<string, { getSettings?: () => Promise<RewindSettingsShape | null>; updateSetting?: (key: string, value: boolean | number) => Promise<void>; exportData?: () => Promise<void>; wipeData?: () => Promise<void> }>>).dex?.rewind;
-  const [rSettings, setRSettings] = React.useState<RewindSettingsShape | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [saved, setSaved] = React.useState(false);
-  const savedTimerRef = React.useRef<ReturnType<typeof setTimeout>>();
+interface UpdatePrefs {
+  autoCheck: boolean;
+  autoDownload: boolean;
+  channel: 'stable' | 'beta';
+}
 
+interface UpdateHistoryEntry {
+  version: string;
+  date: string;
+  success: boolean;
+}
+
+const UpdateManagerSection: React.FC = () => {
+  const dexUpdates = (window as any).dex?.updates;
+  const [info, setInfo] = React.useState<UpdateInfo>({
+    currentVersion: '—',
+    latestVersion: null,
+    updateAvailable: false,
+    releaseNotes: '',
+    downloadProgress: -1,
+    status: 'idle',
+    error: null,
+  });
+  const [prefs, setPrefs] = React.useState<UpdatePrefs>({
+    autoCheck: true, autoDownload: false, channel: 'stable',
+  });
+  const [history, setHistory] = React.useState<UpdateHistoryEntry[]>([]);
+  const [backups, setBackups] = React.useState<any[]>([]);
+  const [changelog, setChangelog] = React.useState<string>('');
+  const [showChangelog, setShowChangelog] = React.useState(false);
+  const pollRef = React.useRef<ReturnType<typeof setInterval>>();
+
+  // Load everything on mount
   React.useEffect(() => {
-    return () => {
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    const load = async () => {
+      try {
+        const i = await dexUpdates?.getInfo?.();
+        if (i) setInfo(prev => ({
+          ...prev,
+          currentVersion: i.currentVersion || prev.currentVersion,
+          latestVersion: i.latestVersion || null,
+          updateAvailable: !!i.updateAvailable,
+          releaseNotes: i.releaseNotes || '',
+        }));
+      } catch { /* ok */ }
+      try {
+        const p = await dexUpdates?.getPreferences?.();
+        if (p) setPrefs({ autoCheck: p.autoCheck ?? true, autoDownload: p.autoDownload ?? false, channel: p.channel ?? 'stable' });
+      } catch { /* ok */ }
+      try {
+        const h = await dexUpdates?.getUpdateHistory?.();
+        if (Array.isArray(h)) setHistory(h);
+      } catch { /* ok */ }
+      try {
+        const b = await dexUpdates?.listBackups?.();
+        if (Array.isArray(b)) setBackups(b);
+      } catch { /* ok */ }
+      try {
+        const c = await dexUpdates?.getChangelog?.();
+        if (typeof c === 'string') setChangelog(c);
+      } catch { /* ok */ }
     };
+    load();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  React.useEffect(() => {
-    setLoading(true);
-    if (!dexRewind?.getSettings) {
-      setRSettings({
-        isRecording: true, trackApps: true, trackBrowser: true,
-        trackClipboard: true, trackFiles: true, screenshotsEnabled: false,
-        screenshotIntervalMin: 5, retentionDays: 30, aiSearchEnabled: false,
-      });
-      setLoading(false);
-      return;
+  const checkForUpdates = async () => {
+    setInfo(prev => ({ ...prev, status: 'checking', error: null }));
+    try {
+      const result = await dexUpdates?.check?.();
+      setInfo(prev => ({
+        ...prev,
+        status: 'idle',
+        updateAvailable: !!result?.updateAvailable,
+        latestVersion: result?.latestVersion || prev.latestVersion,
+        releaseNotes: result?.releaseNotes || prev.releaseNotes,
+      }));
+    } catch {
+      setInfo(prev => ({ ...prev, status: 'idle', error: 'Failed to check for updates' }));
     }
-    dexRewind.getSettings().then((s: RewindSettingsShape | null) => {
-      if (s) setRSettings(s);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
-
-  const update = async (key: string, value: boolean | number) => {
-    const next = { ...rSettings, [key]: value } as RewindSettingsShape;
-    setRSettings(next);
-    if (dexRewind?.updateSetting) {
-      try { await dexRewind.updateSetting(key, value); } catch {}
-    }
-    setSaved(true);
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    savedTimerRef.current = setTimeout(() => setSaved(false), 1800);
   };
 
-  if (loading) return <div style={{ padding: 24, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Loading Rewind settings…</div>;
+  const downloadUpdate = async () => {
+    setInfo(prev => ({ ...prev, status: 'downloading', downloadProgress: 0, error: null }));
+    // Poll for progress
+    pollRef.current = setInterval(async () => {
+      try {
+        const i = await dexUpdates?.getInfo?.();
+        if (i?.downloadProgress != null) {
+          setInfo(prev => ({ ...prev, downloadProgress: i.downloadProgress }));
+          if (i.downloadProgress >= 100 || i.status === 'ready') {
+            setInfo(prev => ({ ...prev, status: 'ready', downloadProgress: 100 }));
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
+        }
+      } catch { /* ok */ }
+    }, 1000);
+    try {
+      await dexUpdates?.download?.();
+      setInfo(prev => ({ ...prev, status: 'ready', downloadProgress: 100 }));
+      if (pollRef.current) clearInterval(pollRef.current);
+    } catch {
+      setInfo(prev => ({ ...prev, status: 'error', error: 'Download failed' }));
+      if (pollRef.current) clearInterval(pollRef.current);
+    }
+  };
 
-  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' };
-  const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.9)' };
-  const desc: React.CSSProperties = { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 };
+  const installUpdate = async () => {
+    try { await dexUpdates?.install?.(); } catch {
+      setInfo(prev => ({ ...prev, status: 'error', error: 'Install failed' }));
+    }
+  };
+
+  const skipVersion = async () => {
+    if (info.latestVersion) {
+      try { await dexUpdates?.skip?.(info.latestVersion); } catch { /* ok */ }
+      setInfo(prev => ({ ...prev, updateAvailable: false }));
+    }
+  };
+
+  const savePrefs = async (next: UpdatePrefs) => {
+    setPrefs(next);
+    try { await dexUpdates?.setPreferences?.(next); } catch { /* ok */ }
+  };
+
+  const rollback = async (backupId: string) => {
+    if (!window.confirm('Rollback to this version? The app will restart.')) return;
+    try { await dexUpdates?.rollback?.(backupId); } catch { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: 'Rollback failed', type: 'error' } })); }
+  };
+
+  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle)' };
+  const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' };
+  const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
+  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', padding: '16px 0 8px', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
-    width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
-    background: on ? 'var(--color-accent)' : 'rgba(255,255,255,0.12)',
-    position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+    width: 44, height: 26, borderRadius: 13, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
+    background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
+    position: 'relative', flexShrink: 0,
   });
+  const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
 
-  const Toggle: React.FC<{ settingKey: string; checked: boolean }> = ({ settingKey, checked }) => (
-    <button className="settings-toggle" style={pill(checked)} onClick={() => update(settingKey, !checked)} aria-checked={checked} role="switch" aria-label={`Toggle ${settingKey}`}>
+  const Toggle: React.FC<{ on: boolean; onToggle: () => void; ariaLabel: string }> = ({ on, onToggle, ariaLabel }) => (
+    <button style={pill(on)} onClick={onToggle} aria-checked={on} role="switch" aria-label={ariaLabel}>
       <span style={{
-        position: 'absolute', top: 3, left: checked ? 21 : 3,
-        width: 20, height: 20, borderRadius: '50%', background: '#fff',
-        transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+        position: 'absolute', top: 3, left: on ? 21 : 3,
+        width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
       }} />
     </button>
   );
 
   return (
-    <div style={{ padding: '0 24px 24px', overflowY: 'auto' as const, height: '100%' }}>
-      {saved && (
-        <div style={{ fontSize: 11, color: 'var(--color-success, #30d158)', padding: '8px 0 4px', fontWeight: 600 }}>Saved</div>
-      )}
-
-      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5, margin: '12px 0 16px' }}>
-        DEX Rewind silently records your desktop activity locally. No data leaves your machine.
-      </p>
-
-      {/* Recording toggle */}
-      <div style={row}>
-        <div><div style={label}>Background Recording</div><div style={desc}>Track active windows and system events</div></div>
-        <Toggle settingKey="isRecording" checked={!!rSettings?.isRecording} />
-      </div>
-
-      {/* What to track */}
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', padding: '16px 0 8px', textTransform: 'uppercase' as const }}>What to Track</div>
-      {[
-        { key: 'trackApps', label: 'Active Windows', desc: 'Record which apps and windows are in focus' },
-        { key: 'trackBrowser', label: 'Browser Tabs', desc: 'Record visited websites and page titles' },
-        { key: 'trackClipboard', label: 'Clipboard', desc: 'Record copied text (not passwords)' },
-        { key: 'trackFiles', label: 'File Changes', desc: 'Record opened, saved, and created files' },
-      ].map(item => (
-        <div key={item.key} style={row}>
-          <div><div style={label}>{item.label}</div><div style={desc}>{item.desc}</div></div>
-          <Toggle settingKey={item.key} checked={!!rSettings?.[item.key as keyof RewindSettingsShape]} />
+    <div style={{ display: 'flex', flexDirection: 'column' as const, height: '100%', overflow: 'hidden' }}>
+    <div style={{ flex: 1, padding: '0 24px 24px', overflowY: 'auto' as const }}>
+      {/* Status Banner */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12,
+        background: info.updateAvailable ? 'rgba(10,132,255,0.08)' : 'rgba(48,209,88,0.08)',
+        border: `1px solid ${info.updateAvailable ? 'rgba(10,132,255,0.2)' : 'rgba(48,209,88,0.2)'}`,
+        marginBottom: 20,
+      }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: info.updateAvailable ? 'rgba(10,132,255,0.15)' : 'rgba(48,209,88,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {info.updateAvailable ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+          )}
         </div>
-      ))}
-
-      {/* Screenshots */}
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', padding: '16px 0 8px', textTransform: 'uppercase' as const }}>Screenshots</div>
-      <div style={row}>
-        <div><div style={label}>Periodic Screenshots</div><div style={desc}>Capture a screenshot every few minutes</div></div>
-        <Toggle settingKey="screenshotsEnabled" checked={!!rSettings?.screenshotsEnabled} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+            {info.status === 'checking' ? 'Checking for updates...' :
+             info.status === 'downloading' ? `Downloading update... ${info.downloadProgress}%` :
+             info.status === 'ready' ? 'Update ready to install' :
+             info.updateAvailable ? `Version ${info.latestVersion} available` :
+             'DEX is up to date'}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            Current version: {info.currentVersion}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          {info.status === 'idle' && !info.updateAvailable && (
+            <button onClick={checkForUpdates} aria-label="Check for updates" style={{ ...btnBase, background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }}>Check Now</button>
+          )}
+          {info.status === 'idle' && info.updateAvailable && (
+            <>
+              <button onClick={skipVersion} aria-label="Skip this version" style={{ ...btnBase, background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)' }}>Skip</button>
+              <button onClick={downloadUpdate} aria-label="Download update" style={{ ...btnBase, background: 'var(--color-accent)', color: 'var(--color-text-primary)' }}>Download</button>
+            </>
+          )}
+          {info.status === 'ready' && (
+            <button onClick={installUpdate} aria-label="Install update and restart" style={{ ...btnBase, background: 'var(--color-accent)', color: 'var(--color-text-primary)' }}>Install & Restart</button>
+          )}
+        </div>
       </div>
-      {rSettings?.screenshotsEnabled && (
-        <div style={{ ...row, flexDirection: 'column' as const, alignItems: 'flex-start', gap: 8 }}>
-          <div style={label}>Capture interval</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input
-              type="range" min={1} max={30} step={1}
-              value={rSettings?.screenshotIntervalMin ?? 5}
-              onChange={e => update('screenshotIntervalMin', parseInt(e.target.value))}
-              style={{ width: 140 }}
-            />
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{rSettings?.screenshotIntervalMin ?? 5} min</span>
+
+      {/* Download Progress */}
+      {info.status === 'downloading' && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent)', width: `${Math.max(0, info.downloadProgress)}%` }} />
           </div>
         </div>
       )}
 
-      {/* AI Search */}
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', padding: '16px 0 8px', textTransform: 'uppercase' as const }}>AI Search</div>
+      {/* Error */}
+      {info.error && (
+        <div style={{ fontSize: 12, color: 'var(--color-error)', padding: '8px 0 12px' }}>{info.error}</div>
+      )}
+
+      {/* Release Notes */}
+      {info.releaseNotes && (
+        <>
+          <div style={heading}>Release Notes</div>
+          <div style={{
+            padding: 14, borderRadius: 10, background: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
+            lineHeight: 1.6, maxHeight: 120, overflowY: 'auto' as const, marginBottom: 12, whiteSpace: 'pre-wrap' as const,
+          }}>
+            {info.releaseNotes}
+          </div>
+        </>
+      )}
+
+      {/* Preferences */}
+      <div style={heading}>Preferences</div>
       <div style={row}>
-        <div><div style={label}>AI-Powered Search</div><div style={desc}>Use local Ollama model to rank and summarize search results</div></div>
-        <Toggle settingKey="aiSearchEnabled" checked={!!rSettings?.aiSearchEnabled} />
+        <div><div style={label}>Auto-check for updates</div><div style={desc}>Periodically check for new versions</div></div>
+        <Toggle on={prefs.autoCheck} onToggle={() => savePrefs({ ...prefs, autoCheck: !prefs.autoCheck })} ariaLabel="Toggle auto-check" />
+      </div>
+      <div style={row}>
+        <div><div style={label}>Auto-download updates</div><div style={desc}>Download updates in the background</div></div>
+        <Toggle on={prefs.autoDownload} onToggle={() => savePrefs({ ...prefs, autoDownload: !prefs.autoDownload })} ariaLabel="Toggle auto-download" />
+      </div>
+      <div style={row}>
+        <div><div style={label}>Update Channel</div><div style={desc}>Stable is recommended for most users</div></div>
+        <Select
+          size="sm"
+          options={[{ value: 'stable', label: 'Stable' }, { value: 'beta', label: 'Beta' }]}
+          value={prefs.channel}
+          onChange={v => savePrefs({ ...prefs, channel: v as 'stable' | 'beta' })}
+        />
       </div>
 
-      {/* Data retention */}
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', padding: '16px 0 8px', textTransform: 'uppercase' as const }}>Data</div>
-      <div style={{ ...row, alignItems: 'flex-start', flexDirection: 'column' as const, gap: 8 }}>
-        <div style={label}>Keep history for</div>
-        <select
-          style={{ background: 'var(--color-bg-elevated, rgba(255,255,255,0.08))', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))', borderRadius: 8, color: 'var(--color-text-primary, #fff)', padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}
-          value={rSettings?.retentionDays ?? 30}
-          onChange={e => update('retentionDays', parseInt(e.target.value))}
-        >
-          {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} days</option>)}
-        </select>
-      </div>
-      <div style={{ paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 8, display: 'flex', gap: 10 }}>
-        <button
-          className="settings-action"
-          aria-label="Export data"
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}
-          onClick={async () => { try { await dexRewind?.exportData?.(); } catch {} }}
-        >
-          Export Data
-        </button>
-        <button
-          className="settings-danger"
-          aria-label="Delete all history"
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,69,58,0.35)', background: 'transparent', color: 'var(--color-error)', fontSize: 12, cursor: 'pointer' }}
-          onClick={async () => {
-            if (!window.confirm('Delete all Rewind history? This cannot be undone.')) return;
-            try { await dexRewind?.wipeData?.(); } catch {}
-          }}
-        >
-          Delete All History
-        </button>
-      </div>
+      {/* Changelog */}
+      <div style={heading}>Changelog</div>
+      <button
+        onClick={() => setShowChangelog(!showChangelog)}
+        aria-label={showChangelog ? 'Hide changelog' : 'View changelog'}
+        style={{ ...btnBase, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+        {showChangelog ? 'Hide Changelog' : 'View Changelog'}
+      </button>
+      {showChangelog && changelog && (
+        <div style={{
+          padding: 14, borderRadius: 10, background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
+          lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' as const, marginBottom: 12, whiteSpace: 'pre-wrap' as const,
+        }}>
+          {changelog}
+        </div>
+      )}
+
+      {/* Update History */}
+      {history.length > 0 && (
+        <>
+          <div style={heading}>Update History</div>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 12 }}>
+            {history.slice(0, 10).map((h, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: h.success ? 'var(--color-success)' : 'var(--color-error)' }} />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>v{h.version}</span>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{h.date}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Backups / Rollback */}
+      {backups.length > 0 && (
+        <>
+          <div style={heading}>Rollback</div>
+          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>Restore a previous version if the current one has issues.</p>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+            {backups.map((b: any, i: number) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{b.version || b.id}</span>
+                <button
+                  onClick={() => rollback(b.id)}
+                  aria-label={`Rollback to version ${b.version || b.id}`}
+                  style={{ ...btnBase, background: 'transparent', color: 'var(--color-error)', border: '1px solid rgba(255,69,58,0.3)', padding: '4px 12px', fontSize: 11 }}
+                >
+                  Rollback
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Load/save settings from localStorage
 const loadSettings = () => {
@@ -319,15 +521,17 @@ const loadSettings = () => {
   return null;
 };
 
-// Save to backend
-const saveSettingsToBackend = async (settings: Record<string, unknown>): Promise<boolean> => {
-  try {
-    if (window.electron?.invoke) {
-      await window.electron.invoke('capability:storage:set', 'dex-settings', settings);
-      return true;
+// Save to backend with retry
+const saveSettingsToBackend = async (settings: Record<string, unknown>, retries = 2): Promise<boolean> => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (window.electron?.invoke) {
+        await window.electron.invoke('capability:storage:set', 'dex-settings', settings);
+        return true;
+      }
+    } catch (e) {
+      if (attempt === retries && import.meta.env.DEV) console.warn('[Settings] Backend save failed after retries');
     }
-  } catch (e) {
-    if (import.meta.env.DEV) console.warn('[Settings] Backend save failed');
   }
   return false;
 };
@@ -353,36 +557,116 @@ const saveSettings = (settings: Record<string, unknown>) => {
   applySettings(settings);
 };
 
+// Export settings to JSON file
+const exportSettings = (settings: Record<string, unknown>): void => {
+  try {
+    const exportData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      settings: settings,
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dex-settings-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    window.dispatchEvent(new CustomEvent('dex-toast', { 
+      detail: { message: 'Settings exported successfully', type: 'success' } 
+    }));
+  } catch (e) {
+    window.dispatchEvent(new CustomEvent('dex-toast', { 
+      detail: { message: 'Failed to export settings', type: 'error' } 
+    }));
+  }
+};
+
+// Import settings from JSON file
+const importSettings = (onImport: (settings: typeof DEFAULT_SETTINGS) => void): void => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data.settings && typeof data.settings === 'object') {
+        // Merge with defaults to ensure all keys exist
+        const merged = { ...DEFAULT_SETTINGS, ...data.settings };
+        onImport(merged);
+        window.dispatchEvent(new CustomEvent('dex-toast', { 
+          detail: { message: 'Settings imported successfully', type: 'success' } 
+        }));
+      } else {
+        throw new Error('Invalid settings format');
+      }
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { 
+        detail: { message: 'Failed to import settings: invalid file format', type: 'error' } 
+      }));
+    }
+  };
+  input.click();
+};
+
+// Check if a setting differs from its default value
+const isSettingChanged = (key: keyof typeof DEFAULT_SETTINGS, value: unknown): boolean => {
+  return JSON.stringify(DEFAULT_SETTINGS[key]) !== JSON.stringify(value);
+};
+
+// Count how many settings have been changed from defaults
+const countChangedSettings = (settings: typeof DEFAULT_SETTINGS): number => {
+  let count = 0;
+  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof typeof DEFAULT_SETTINGS)[]) {
+    if (isSettingChanged(key, settings[key])) count++;
+  }
+  return count;
+};
+
 // Apply settings to the system
 const applySettings = (settings: Record<string, unknown>) => {
   try {
     // Apply performance settings via IPC
     if (window.electron?.invoke) {
-      window.electron.invoke('settings:apply', settings).catch(() => {});
+      window.electron.invoke('settings:apply', settings).catch((e: unknown) => { console.warn('[DEX]', e); });
     }
     
-    // ALWAYS force dark mode for stability - no light mode switching
     const root = document.documentElement;
     const body = document.body;
     
-    // DARK MODE LOCKED: Always dark backgrounds, light text
-    root.setAttribute('data-theme', 'dark');
-    body.classList.add('dark-mode');
-    root.classList.add('dark-mode');
-    localStorage.setItem('darkMode', 'true');
+    // Apply selected theme (dark or light)
+    const theme = settings.darkMode !== false ? 'dark' : 'light';
+    root.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      body.classList.add('dark-mode');
+      root.classList.add('dark-mode');
+      body.classList.remove('light-mode');
+      root.classList.remove('light-mode');
+    } else {
+      body.classList.add('light-mode');
+      root.classList.add('light-mode');
+      body.classList.remove('dark-mode');
+      root.classList.remove('dark-mode');
+    }
+    localStorage.setItem('darkMode', String(settings.darkMode !== false));
     
     // Apply accent color
-    const accentColor = String(settings.accentColor || '#0a84ff');
+    const accentColor = String(settings.accentColor || 'var(--color-accent)');
     root.style.setProperty('--accent-color', accentColor);
     root.style.setProperty('--color-accent', accentColor);
     
     // Calculate hover variant (always lighter for dark mode)
     root.style.setProperty('--color-accent-hover', lightenColor(accentColor, 20));
     
-    // Apply font size
-    root.style.setProperty('--font-size-base', 
-      settings.fontSize === 'small' ? '12px' : settings.fontSize === 'large' ? '16px' : '14px'
-    );
+    // Apply font size (scale-based)
+    const scale = typeof settings.fontScale === 'number' ? settings.fontScale : 100;
+    root.style.setProperty('--font-size-base', `${Math.round(14 * scale / 100)}px`);
+    root.style.setProperty('--font-scale', String(scale / 100));
     
     // Apply transparency settings
     if (settings.transparency && !settings.reduceTransparency) {
@@ -424,6 +708,17 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.style.setProperty('--duration-theme', '300ms');
       root.style.setProperty('--animation-duration', '200ms');
     }
+
+    // Sync App Tab Bar visibility to localStorage + notify AppManager
+    const tabBarVal = settings.showAppTabBar !== false;
+    localStorage.setItem('dex-app-tab-bar', String(tabBarVal));
+    window.dispatchEvent(new Event('dex-app-tab-bar-changed'));
+
+    // Apply blur/opacity to CSS vars for glass surfaces
+    const blur = typeof settings.blurIntensity === 'number' ? settings.blurIntensity : 12;
+    const opacity = typeof settings.glassOpacity === 'number' ? settings.glassOpacity : 0.85;
+    root.style.setProperty('--blur-intensity', `${blur}px`);
+    root.style.setProperty('--glass-opacity', String(opacity));
     
   } catch (e) {
     if (import.meta.env.DEV) console.warn('[Settings] Failed to apply settings:', e);
@@ -457,14 +752,16 @@ const DEFAULT_SETTINGS = {
   autoSave: true,
   restoreLastSession: true,
   
-  // Appearance - LOCKED to dark mode for stability
-  darkMode: true, // Always dark mode - no switching
+  // Appearance
+  darkMode: true,
   reduceMotion: false,
   transparency: true,
-  accentColor: '#0a84ff', // Apple System Blue (Tahoe)
+  accentColor: 'var(--color-accent)', // Apple System Blue (Tahoe)
   fontSize: 'medium',
+  fontScale: 100,
   targetFPS: 120,
-  windowControls: 'system' as 'system' | 'traffic', // system = Windows style, traffic = macOS traffic lights
+  windowControls: (navigator.platform?.includes('Win') ? 'system' : 'traffic') as 'system' | 'traffic', // auto-detect: system on Windows, traffic on macOS/Linux
+  stageManager: false, // macOS Tahoe Stage Manager -- organizes open apps on the left (off by default)
   
   // Customization
   taskbarPosition: 'bottom',
@@ -510,6 +807,31 @@ const DEFAULT_SETTINGS = {
   badgeEnabled: true,
   doNotDisturb: false,
   
+  // Sound
+  masterVolume: 80,
+  alertVolume: 70,
+  outputDevice: 'built-in' as string,
+  inputDevice: 'built-in' as string,
+  spatialAudio: false,
+  spatialAudioProfile: 'fixed' as 'fixed' | 'head-tracked' | 'off',
+  audioBalance: 50,
+  enhancedDialogue: false,
+  mediaAutoPlay: true,
+  creativeAppAudioBypass: true, // Allow creative apps (AXL, VINX, Imosion, Flux) to bypass DEX audio effects
+  
+  // Display & Glass
+  displayResolution: 'native',
+  displayScaling: '150',
+  blurIntensity: 20,
+  glassOpacity: 70,
+  windowMaterial: 'glass' as 'glass' | 'frosted' | 'solid',
+  adaptiveBrightness: true,
+  truetoneBrightness: false,
+  nightShift: false,
+  nightShiftWarmth: 50,
+  displayRefreshRate: 'adaptive' as '60' | '120' | 'adaptive',
+  hdrContent: true,
+  
   // Privacy & Security
   locationServices: false,
   crashReports: true,
@@ -530,7 +852,14 @@ const DEFAULT_SETTINGS = {
   autoLockMinutes: 5,
   
   // Network
+  networkOptIn: true, // Master network toggle -- replaces env-var approach
+  wifiEnabled: true,
   wifiProtection: true,
+  preferredNetwork: 'auto',
+  wifiBand: 'auto',
+  bluetoothEnabled: false,
+  bluetoothMode: 'auto',
+  bluetoothDiscoverable: false,
   blockTrackerDomains: true,
   dnsOverHttps: true,
   ipv6Enabled: false,
@@ -541,21 +870,56 @@ const DEFAULT_SETTINGS = {
   strictSecurity: false,
   
   // Performance
+  performanceMode: 'auto',
   hardwareAcceleration: true,
   lowPowerMode: false,
   memoryOptimization: true,
   preloadApps: true,
   backgroundBoost: true,
+  performanceReservation: false,
+  predictivePrewarm: true,
   cpuPriority: 'high',
   gpuRendering: true,
-  cacheSizeGB: 4,
-  maxRamGB: 4,
+  cacheSizeGB: 8,
+  maxRamGB: 0, // 0 = auto (uses 50% of system RAM, no artificial cap)
   
   // Accessibility
   highContrast: false,
   largeText: false,
   reduceTransparency: false,
   screenReader: false,
+
+  // Window Management
+  snapWindows: true,          // Enable window snapping to edges/zones
+  doubleClickTitlebar: 'maximize' as 'maximize' | 'minimize' | 'none',
+  showWindowShadows: true,
+  animateWindowResize: true,
+  rememberWindowPositions: true,
+  maxFloatingWindows: 12,
+  showAppTabBar: true,        // Persistent running-app tab bar above content
+
+  // Keyboard Shortcuts
+  enableGlobalShortcuts: true,
+  cmdPaletteShortcut: 'Ctrl+Shift+P',
+  quickSearchShortcut: 'Ctrl+K',
+  screenshotShortcut: 'Ctrl+Shift+S',
+
+  // Storage & Data
+  autoCleanCache: true,
+  cacheCleanIntervalDays: 7,
+  compressOldFiles: false,
+
+  // UKI & Memory
+  ukiEnabled: true,
+  ukiMemoryEnabled: true,
+  ukiWakeWordEnabled: false,
+  ukiWakePhrase: 'Hey UKI',
+  ukiRecallMode: 'hybrid' as 'auto' | 'explicit' | 'hybrid',
+  ukiRetentionDays: 30,
+  ukiCacheSizeGB: 3,
+  ukiAutoCleanup: true,
+  ukiShowTranscript: true,
+  ukiPersonality: 'casual' as 'formal' | 'casual',
 };
 
 // ===============================================================================
@@ -563,17 +927,25 @@ const DEFAULT_SETTINGS = {
 // ===============================================================================
 
 export const Settings: React.FC = () => {
+  const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
+  const [settingsSearch, setSettingsSearch] = useState('');
   const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => loadSettings() || DEFAULT_SETTINGS);
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
   
   // Authentication state
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [showPinChange, setShowPinChange] = useState(false);
+  const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [pinInput, setPinInput] = useState('');
   const [confirmPinInput, setConfirmPinInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [currentPinInput, setCurrentPinInput] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [authError, setAuthError] = useState('');
   
@@ -582,7 +954,7 @@ export const Settings: React.FC = () => {
     const checkBiometric = async () => {
       try {
         if (window.electron?.invoke) {
-          const available = await window.electron.invoke('auth:biometric:available');
+          const available = await window.electron.invoke('auth:biometricsAvailable');
           setBiometricAvailable(available);
         } else if ('PublicKeyCredential' in window) {
           const available = await (window as any).PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -600,11 +972,35 @@ export const Settings: React.FC = () => {
       setAppVersion(getBundledAppVersion());
     });
   }, []);
+
+  React.useEffect(() => {
+    const handleSettingsNavigate = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { section?: string } | undefined;
+      if (!detail?.section) return;
+      if (SECTIONS.some(section => section.id === detail.section)) {
+        setActiveSection(detail.section);
+      }
+    };
+
+    window.addEventListener('dex-settings-navigate', handleSettingsNavigate);
+    return () => window.removeEventListener('dex-settings-navigate', handleSettingsNavigate);
+  }, []);
   
   const handleSetupPin = () => {
     setAuthError('');
     if (pinInput.length < 4) {
       setAuthError('PIN must be at least 4 digits');
+      return;
+    }
+    if (!/^\d+$/.test(pinInput)) {
+      setAuthError('PIN must contain only digits');
+      return;
+    }
+    const weak = /^(\d)\1+$/.test(pinInput) // all same digit (1111)
+      || '0123456789'.includes(pinInput) // ascending sequence
+      || '9876543210'.includes(pinInput); // descending sequence
+    if (weak) {
+      setAuthError('PIN is too simple. Avoid repeated or sequential digits.');
       return;
     }
     if (pinInput !== confirmPinInput) {
@@ -633,6 +1029,10 @@ export const Settings: React.FC = () => {
       setAuthError('Password must be at least 8 characters');
       return;
     }
+    if (!/[A-Z]/.test(passwordInput) || !/[a-z]/.test(passwordInput) || !/\d/.test(passwordInput)) {
+      setAuthError('Password needs uppercase, lowercase, and a number');
+      return;
+    }
     if (passwordInput !== confirmPasswordInput) {
       setAuthError('Passwords do not match');
       return;
@@ -658,12 +1058,12 @@ export const Settings: React.FC = () => {
     try {
       if (window.electron?.invoke) {
         await window.electron.invoke('auth:setup:biometric');
-        const newMethod = settings.pinEnabled ? 'pin+biometric' : settings.passwordEnabled ? 'password+biometric' : 'biometric';
-        setSettings(prev => ({ ...prev, biometricEnabled: true, authMethod: newMethod as any }));
+        const newMethod = settings.pinEnabled ? 'pin+biometric' as const : settings.passwordEnabled ? 'password+biometric' as const : 'biometric' as const;
+        setSettings(prev => ({ ...prev, biometricEnabled: true, authMethod: newMethod }));
       } else if ('PublicKeyCredential' in window) {
         // Web Authn fallback
-        const newMethod = settings.pinEnabled ? 'pin+biometric' : settings.passwordEnabled ? 'password+biometric' : 'biometric';
-        setSettings(prev => ({ ...prev, biometricEnabled: true, authMethod: newMethod as any }));
+        const newMethod = settings.pinEnabled ? 'pin+biometric' as const : settings.passwordEnabled ? 'password+biometric' as const : 'biometric' as const;
+        setSettings(prev => ({ ...prev, biometricEnabled: true, authMethod: newMethod }));
       }
     } catch (e) {
       setAuthError('Failed to enable fingerprint');
@@ -692,40 +1092,145 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const handleChangePassword = async () => {
+    setAuthError('');
+    if (!currentPasswordInput) {
+      setAuthError('Enter your current password');
+      return;
+    }
+    if (passwordInput.length < 8) {
+      setAuthError('New password must be at least 8 characters');
+      return;
+    }
+    if (!/[A-Z]/.test(passwordInput) || !/[a-z]/.test(passwordInput) || !/\d/.test(passwordInput)) {
+      setAuthError('New password needs uppercase, lowercase, and a number');
+      return;
+    }
+    if (passwordInput !== confirmPasswordInput) {
+      setAuthError('New passwords do not match');
+      return;
+    }
+    try {
+      const result = await window.electron?.invoke('auth:changePassword', JSON.stringify({ currentPassword: currentPasswordInput, newPassword: passwordInput }));
+      if (result?.success) {
+        setShowPasswordChange(false);
+        setCurrentPasswordInput('');
+        setPasswordInput('');
+        setConfirmPasswordInput('');
+      } else {
+        setAuthError(result?.error || 'Failed to change password');
+      }
+    } catch {
+      setAuthError('Failed to change password');
+    }
+  };
+
+  const handleChangePin = async () => {
+    setAuthError('');
+    if (!currentPinInput || currentPinInput.length < 4) {
+      setAuthError('Enter your current PIN');
+      return;
+    }
+    if (pinInput.length < 4 || pinInput.length > 8) {
+      setAuthError('New PIN must be 4-8 digits');
+      return;
+    }
+    if (pinInput !== confirmPinInput) {
+      setAuthError('New PINs do not match');
+      return;
+    }
+    try {
+      const result = await window.electron?.invoke('auth:changePin', JSON.stringify({ currentPin: currentPinInput, newPin: pinInput }));
+      if (result?.success) {
+        setShowPinChange(false);
+        setCurrentPinInput('');
+        setPinInput('');
+        setConfirmPinInput('');
+      } else {
+        setAuthError(result?.error || 'Failed to change PIN');
+      }
+    } catch {
+      setAuthError('Failed to change PIN');
+    }
+  };
+
+  const handleGenerateRecoveryCodes = async () => {
+    try {
+      const result = await window.electron?.invoke('auth:generateRecoveryCodes');
+      if (result?.success && result.codes) {
+        setRecoveryCodes(result.codes);
+        setShowRecoveryCodes(true);
+      }
+    } catch {
+      setAuthError('Failed to generate recovery codes');
+    }
+  };
+
   // Save settings when they change
   React.useEffect(() => {
     saveSettings(settings);
   }, [settings]);
 
   const toggleSetting = (key: keyof typeof DEFAULT_SETTINGS) => {
-    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+    setSettings((prev) => {
+      const nextVal = !prev[key];
+      // Side effects for system-level toggles
+      if (key === 'performanceReservation') {
+        try {
+          (window as any).dex?.system?.claimResources?.(Boolean(nextVal));
+        } catch { /* main may not be ready */ }
+      }
+      if (key === 'predictivePrewarm') {
+        try { localStorage.setItem('dex-predictive-prewarm', nextVal ? '1' : '0'); }
+        catch { /* storage blocked */ }
+      }
+      return { ...prev, [key]: nextVal };
+    });
   };
 
-  const renderToggle = (key: keyof typeof DEFAULT_SETTINGS, label: string, description: string) => (
-    <div style={styles.settingRow}>
-      <div style={styles.settingInfo}>
-        <span style={styles.settingLabel}>{label}</span>
-        <span style={styles.settingDesc}>{description}</span>
+  const renderToggle = (key: keyof typeof DEFAULT_SETTINGS, label: string, description: string) => {
+    const changed = isSettingChanged(key, settings[key]);
+    return (
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={{ ...styles.settingLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {label}
+            {changed && (
+              <span 
+                style={{ 
+                  width: 6, height: 6, borderRadius: '50%', 
+                  background: 'var(--color-accent)', 
+                  flexShrink: 0,
+                }} 
+                title="Changed from default"
+              />
+            )}
+          </span>
+          <span style={styles.settingDesc}>{description}</span>
+        </div>
+        <button
+          style={{
+            ...styles.toggle,
+            background: settings[key] ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+            border: settings[key] ? 'none' : '1px solid var(--color-border)',
+          }}
+          onClick={() => toggleSetting(key)}
+          role="switch"
+          aria-checked={Boolean(settings[key])}
+          aria-label={`Toggle ${label}`}
+        >
+          <div style={{
+            ...styles.toggleKnob,
+            transform: settings[key] ? 'translate(20px, -50%)' : 'translate(0, -50%)',
+          }} />
+        </button>
       </div>
-      <button
-        style={{
-          ...styles.toggle,
-          background: settings[key] ? 'var(--color-success, #30d158)' : 'rgba(255,255,255,0.2)',
-        }}
-        onClick={() => toggleSetting(key)}
-        aria-label={`Toggle ${label}`}
-      >
-        <div style={{
-          ...styles.toggleKnob,
-          transform: settings[key] ? 'translateX(20px)' : 'translateX(2px)',
-        }} />
-      </button>
-    </div>
-  );
+    );
+  };
 
   const renderGeneralSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Startup</h3>
+      <h3 style={styles.sectionTitleFirst}>Startup</h3>
       {renderToggle('launchAtStartup', 'Launch at Login', 'Automatically start DEX when you log in')}
       {renderToggle('checkForUpdates', 'Check for Updates', 'Automatically check for app updates')}
       {renderToggle('restoreLastSession', 'Restore Last Session', 'Reopen apps from your last session')}
@@ -751,9 +1256,41 @@ export const Settings: React.FC = () => {
 
   const renderAppearanceSettings = () => (
     <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Theme</h3>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Appearance</span>
+          <span style={styles.settingDesc}>Switch between dark and light mode</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['dark', 'light', 'auto'] as const).map(mode => (
+            <button
+              key={mode}
+              aria-label={`${mode} mode`}
+              onClick={() => {
+                if (mode === 'auto') {
+                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  setSettings(prev => ({ ...prev, darkMode: prefersDark }));
+                } else {
+                  setSettings(prev => ({ ...prev, darkMode: mode === 'dark' }));
+                }
+              }}
+              style={{
+                padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                border: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+                background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'rgba(10,132,255,0.15)' : 'transparent',
+                color: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              }}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <h3 style={styles.sectionTitle}>Accent Color</h3>
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-        {['#0a84ff', '#30d158', '#ff9f0a', '#ff453a', '#bf5af2', '#ff375f', '#64d2ff', '#ffd60a'].map(color => (
+        {['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff375f', '#64d2ff', 'var(--color-warning)'].map(color => (
           <button
             key={color}
             aria-label={`Select accent color ${color}`}
@@ -770,23 +1307,145 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitle}>Text Size</h3>
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Font Size</span>
-          <span style={styles.settingDesc}>Adjust text size across the app</span>
+          <span style={styles.settingLabel}>Font Scale</span>
+          <span style={styles.settingDesc}>Adjust text size across the app ({settings.fontScale ?? 100}%)</span>
         </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.fontSize || 'medium'}
-          onChange={(e) => setSettings(prev => ({ ...prev, fontSize: e.target.value }))}
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 160 }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>A</span>
+          <input type="range" min="80" max="130" step="5" value={settings.fontScale ?? 100}
+            onChange={e => {
+              const v = Number(e.target.value);
+              setSettings(prev => ({ ...prev, fontScale: v, fontSize: v <= 90 ? 'small' : v >= 115 ? 'large' : 'medium' }));
+            }}
+            style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
+          <span style={{ fontSize: 16, color: 'var(--color-text-tertiary)' }}>A</span>
+        </div>
       </div>
       
       <h3 style={styles.sectionTitle}>Visual Effects</h3>
       {renderToggle('reduceMotion', 'Reduce Motion', 'Minimize animated effects')}
       {renderToggle('transparency', 'Transparency', 'Use transparent backgrounds')}
+      
+      <h3 style={styles.sectionTitle}>Wallpaper</h3>
+      <div style={{
+        padding: 16, borderRadius: 12,
+        background: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8, marginBottom: 12 }}>
+          {WALLPAPER_PRESETS.filter(p => p.mode !== 'live').map(preset => (
+            <button
+              key={preset.id}
+              aria-label={`Set wallpaper: ${preset.name}`}
+              onClick={() => useWallpaperStore.getState().setWallpaper(preset)}
+              style={{
+                width: '100%', aspectRatio: '16/10', borderRadius: 8, cursor: 'pointer',
+                border: useWallpaperStore.getState().presetId === preset.id ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
+                background: preset.thumbnail?.startsWith('url(') ? undefined : (preset.thumbnail || preset.value),
+                backgroundImage: preset.thumbnail?.startsWith('url(') ? preset.thumbnail : (preset.mode === 'gradient' ? preset.value : undefined),
+                backgroundSize: 'cover', backgroundPosition: 'center',
+                padding: 0, overflow: 'hidden', position: 'relative',
+              }}
+            >
+              <span style={{
+                position: 'absolute', bottom: 2, left: 0, right: 0,
+                fontSize: 8, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                textAlign: 'center', lineHeight: 1.2,
+              }}>{preset.name}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = () => {
+              const file = input.files?.[0];
+              if (!file) return;
+              if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
+              const reader = new FileReader();
+              reader.onload = () => {
+                const dataUrl = reader.result as string;
+                useWallpaperStore.getState().setCustomImage(dataUrl);
+                toast.success('Custom wallpaper applied');
+              };
+              reader.readAsDataURL(file);
+            };
+            input.click();
+          }}
+          style={{
+            width: '100%', padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+            border: '1px dashed var(--color-border-subtle)',
+            background: 'transparent', color: 'var(--color-text-secondary)',
+            fontSize: 11, fontWeight: 500,
+          }}
+        >+ Custom Image</button>
+      </div>
+
+      <h3 style={styles.sectionTitle}>Wallpaper Tinting</h3>
+      <div style={{
+        padding: 16, borderRadius: 12,
+        background: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-subtle)',
+        backdropFilter: `blur(${Math.min(settings.blurIntensity, 12)}px)`,
+      }}>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Background Tint</span>
+            <span style={styles.settingDesc}>Allow wallpaper color to show through windows</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['glass', 'frosted', 'solid'] as const).map(mat => (
+              <button
+                key={mat}
+                aria-label={`Select ${mat} material`}
+                onClick={() => setSettings(prev => ({ ...prev, windowMaterial: mat }))}
+                style={{
+                  padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: settings.windowMaterial === mat ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+                  background: settings.windowMaterial === mat ? 'rgba(10,132,255,0.15)' : 'transparent',
+                  color: settings.windowMaterial === mat ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                }}
+              >
+                {mat === 'glass' ? 'Glass' : mat === 'frosted' ? 'Frosted' : 'Solid'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ ...styles.settingRow, marginTop: 12 }}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Blur Intensity</span>
+            <span style={styles.settingDesc}>Blur amount behind glass surfaces</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
+            <input type="range" min="0" max="30" step="1" value={settings.blurIntensity ?? 12}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setSettings(prev => ({ ...prev, blurIntensity: v }));
+                useWallpaperStore.getState().setBlur(v);
+              }}
+              style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'monospace', minWidth: 28 }}>{settings.blurIntensity ?? 12}px</span>
+          </div>
+        </div>
+        <div style={{ ...styles.settingRow, marginTop: 8 }}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Glass Opacity</span>
+            <span style={styles.settingDesc}>Transparency of glass surfaces</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
+            <input type="range" min="0" max="100" step="5" value={Math.round((settings.glassOpacity ?? 0.85) * 100)}
+              onChange={e => {
+                const v = Number(e.target.value) / 100;
+                setSettings(prev => ({ ...prev, glassOpacity: v }));
+                useWallpaperStore.getState().setOpacity(v);
+              }}
+              style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'monospace', minWidth: 28 }}>{Math.round((settings.glassOpacity ?? 0.85) * 100)}%</span>
+          </div>
+        </div>
+      </div>
       
       <h3 style={styles.sectionTitle}>Window Controls</h3>
       <div style={styles.settingRow}>
@@ -801,13 +1460,13 @@ export const Settings: React.FC = () => {
               aria-label={`Select ${style === 'system' ? 'system' : 'traffic light'} window controls`}
               onClick={() => {
                 setSettings(prev => ({ ...prev, windowControls: style }));
-                try { localStorage.setItem('dex-window-controls', style); } catch {}
+                try { localStorage.setItem('dex-window-controls', style); } catch (e) { console.warn('[DEX]', e); }
                 window.dispatchEvent(new Event('dex-window-controls-changed'));
               }}
               style={{
                 padding: '6px 14px',
                 borderRadius: 8,
-                border: settings.windowControls === style ? '1px solid var(--color-accent)' : '1px solid rgba(255,255,255,0.1)',
+                border: settings.windowControls === style ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                 background: settings.windowControls === style ? 'rgba(10,132,255,0.15)' : 'transparent',
                 color: settings.windowControls === style ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 fontSize: 12,
@@ -830,12 +1489,43 @@ export const Settings: React.FC = () => {
           ))}
         </div>
       </div>
+      
+      <h3 style={styles.sectionTitle}>Stage Manager</h3>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Stage Manager</span>
+          <span style={styles.settingDesc}>Show running apps as thumbnails on the left edge for quick switching</span>
+        </div>
+        <button
+          role="switch"
+          aria-checked={settings.stageManager}
+          onClick={() => {
+            const next = !settings.stageManager;
+            setSettings(prev => ({ ...prev, stageManager: next }));
+            try { localStorage.setItem('dex-stage-manager', String(next)); } catch (e) { console.warn('[DEX]', e); }
+            window.dispatchEvent(new Event('dex-stage-manager-changed'));
+          }}
+          style={{
+            width: 44, height: 24, borderRadius: 12, padding: 2,
+            background: settings.stageManager ? 'var(--color-accent, #0a84ff)' : 'var(--color-bg-glass)',
+            border: 'none', cursor: 'pointer', position: 'relative',
+            transition: 'background 0.2s ease',
+          }}
+        >
+          <div style={{
+            width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
+            transition: 'transform 0.2s ease',
+            transform: settings.stageManager ? 'translateX(20px)' : 'translateX(0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }} />
+        </button>
+      </div>
     </div>
   );
 
   const renderNotificationSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Notifications</h3>
+      <h3 style={styles.sectionTitleFirst}>Notifications</h3>
       {renderToggle('enableNotifications', 'Allow Notifications', 'Show notifications from DEX')}
       {renderToggle('soundEnabled', 'Sound', 'Play sound for notifications')}
       {renderToggle('badgeEnabled', 'Badge App Icon', 'Show notification count on dock icon')}
@@ -843,211 +1533,9 @@ export const Settings: React.FC = () => {
     </div>
   );
 
-  const renderCustomizationSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Taskbar</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Taskbar Position</span>
-          <span style={styles.settingDesc}>Where the taskbar appears</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.taskbarPosition || 'bottom'}
-          onChange={(e) => setSettings(prev => ({ ...prev, taskbarPosition: e.target.value }))}
-        >
-          <option value="bottom">Bottom</option>
-          <option value="top">Top</option>
-          <option value="left">Left</option>
-          <option value="right">Right</option>
-        </select>
-      </div>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Taskbar Size</span>
-          <span style={styles.settingDesc}>Size of taskbar icons</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.taskbarSize || 'medium'}
-          onChange={(e) => setSettings(prev => ({ ...prev, taskbarSize: e.target.value }))}
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-        </select>
-      </div>
-      {renderToggle('showLabels', 'Show Labels', 'Display text labels on taskbar apps')}
-      {renderToggle('compactMode', 'Compact Mode', 'Use smaller UI elements throughout')}
-      
-      <h3 style={styles.sectionTitle}>Animations</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Animation Speed</span>
-          <span style={styles.settingDesc}>Speed of UI animations</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.animationSpeed || 'normal'}
-          onChange={(e) => setSettings(prev => ({ ...prev, animationSpeed: e.target.value }))}
-        >
-          <option value="slow">Slow</option>
-          <option value="normal">Normal</option>
-          <option value="fast">Fast</option>
-          <option value="off">Off</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Window Behavior</h3>
-      <button 
-        style={styles.clearBtn}
-        aria-label="Reset window positions"
-        onClick={() => {
-          // Clear layout-related localStorage keys
-          const layoutKeys = [
-            'dex-widget-layout', 'dex-window-positions', 'dex-panel-sizes',
-            'dex-workspace-layout', 'dex-split-view', 'dex-sidebar-state',
-            'dex-tab-layout', 'dex-dock-positions'
-          ];
-          layoutKeys.forEach(key => localStorage.removeItem(key));
-          // Reset backend layout state via IPC
-          if (window.electron?.invoke) {
-            window.electron.invoke('splitview:apply-preset', 'single').catch(() => {});
-          }
-          // Notify user
-          alert('Window positions have been reset. Changes take effect on next restart.');
-        }}
-      >Reset Window Positions</button>
-    </div>
-  );
-
-  const renderPerformanceSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Display</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Target Frame Rate</span>
-          <span style={styles.settingDesc}>Higher FPS = smoother but uses more power</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.targetFPS || 120}
-          onChange={(e) => setSettings(prev => ({ ...prev, targetFPS: parseInt(e.target.value) }))}
-        >
-          <option value="60">60 FPS</option>
-          <option value="90">90 FPS</option>
-          <option value="120">120 FPS (Recommended)</option>
-          <option value="144">144 FPS</option>
-          <option value="240">240 FPS</option>
-        </select>
-      </div>
-      {renderToggle('gpuRendering', 'GPU Rendering', 'Use graphics card for smooth visuals')}
-      {renderToggle('hardwareAcceleration', 'Hardware Acceleration', 'Use GPU for rendering (faster performance)')}
-      
-      <h3 style={styles.sectionTitle}>Memory Management</h3>
-      {renderToggle('memoryOptimization', 'Auto Memory Optimization', 'Automatically free unused memory')}
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Max RAM Usage</span>
-          <span style={styles.settingDesc}>Limit memory consumption (lower = more stable)</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.maxRamGB || 4}
-          onChange={(e) => setSettings(prev => ({ ...prev, maxRamGB: parseInt(e.target.value) }))}
-        >
-          <option value="1">1 GB (Ultra Low)</option>
-          <option value="2">2 GB (Low)</option>
-          <option value="4">4 GB (Recommended)</option>
-          <option value="8">8 GB (High)</option>
-          <option value="16">16 GB</option>
-        </select>
-      </div>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Cache Size</span>
-          <span style={styles.settingDesc}>Disk cache for faster loading</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.cacheSizeGB || 4}
-          onChange={(e) => setSettings(prev => ({ ...prev, cacheSizeGB: parseInt(e.target.value) }))}
-        >
-          <option value="1">1 GB</option>
-          <option value="2">2 GB</option>
-          <option value="4">4 GB (Recommended)</option>
-          <option value="8">8 GB</option>
-          <option value="16">16 GB</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>CPU & Background</h3>
-      {renderToggle('backgroundBoost', 'Background Performance Boost', 'Optimize system when DEX is running')}
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>CPU Priority</span>
-          <span style={styles.settingDesc}>Process priority for DEX</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.cpuPriority || 'high'}
-          onChange={(e) => setSettings(prev => ({ ...prev, cpuPriority: e.target.value }))}
-        >
-          <option value="low">Low (Save Resources)</option>
-          <option value="normal">Normal</option>
-          <option value="high">High (Best Performance)</option>
-          <option value="realtime">Realtime (Maximum)</option>
-        </select>
-      </div>
-      {renderToggle('preloadApps', 'Preload Apps', 'Load apps in background for instant opening')}
-      {renderToggle('lowPowerMode', 'Low Power Mode', 'Reduce performance to save battery')}
-      
-      <h3 style={styles.sectionTitle}>System Status</h3>
-      <div style={styles.aboutDetails}>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Render Mode</span>
-          <span style={{ color: 'var(--color-success, #30d158)' }}>120 FPS GPU Accelerated</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Memory Limit</span>
-          <span style={styles.aboutValue}>{settings.maxRamGB || 4} GB</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Background Boost</span>
-          <span style={{ color: settings.backgroundBoost ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)' }}>{settings.backgroundBoost ? 'Active' : 'Inactive'}</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>CPU Priority</span>
-          <span style={styles.aboutValue}>{(settings.cpuPriority || 'high').toUpperCase()}</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderAccessibilitySettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Vision</h3>
-      {renderToggle('highContrast', 'High Contrast', 'Increase contrast for better visibility')}
-      {renderToggle('largeText', 'Large Text', 'Make all text larger')}
-      {renderToggle('reduceTransparency', 'Reduce Transparency', 'Use solid backgrounds')}
-      
-      <h3 style={styles.sectionTitle}>Screen Reader</h3>
-      {renderToggle('screenReader', 'Screen Reader Support', 'Optimize for screen readers')}
-      
-      <h3 style={styles.sectionTitle}>Keyboard Navigation</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Full Keyboard Access</span>
-          <span style={styles.settingDesc}>Navigate all controls with keyboard</span>
-        </div>
-        <button style={styles.manageBtn} aria-label="Configure keyboard navigation" onClick={() => { /* keyboard nav config */ }}>Configure</button>
-      </div>
-    </div>
-  );
-
   const renderPrivacySettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Authentication</h3>
+      <h3 style={styles.sectionTitleFirst}>Authentication</h3>
       
       {/* Fingerprint / Biometric */}
       <div style={styles.settingRow}>
@@ -1073,14 +1561,17 @@ export const Settings: React.FC = () => {
           <span style={styles.settingDesc}>Use a 4-8 digit PIN to unlock</span>
         </div>
         {settings.pinEnabled ? (
-          <button style={styles.dangerBtnSmall} aria-label="Remove PIN code" onClick={() => handleDisableAuth('pin')}>Remove</button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button style={styles.manageBtn} aria-label="Change PIN code" onClick={() => { setShowPinChange(true); setShowPinSetup(false); setAuthError(''); }}>Change</button>
+            <button style={styles.dangerBtnSmall} aria-label="Remove PIN code" onClick={() => handleDisableAuth('pin')}>Remove</button>
+          </div>
         ) : (
           <button style={styles.manageBtn} aria-label="Set PIN code" onClick={() => setShowPinSetup(true)}>Set PIN</button>
         )}
       </div>
       
       {showPinSetup && (
-        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Enter PIN (4-8 digits)</label>
             <input
@@ -1090,7 +1581,7 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={pinInput}
               onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
@@ -1103,14 +1594,63 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={confirmPinInput}
               onChange={e => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
-          {authError && <div style={{ color: '#ff453a', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button style={styles.manageBtn} aria-label="Save PIN" onClick={handleSetupPin}>Save PIN</button>
             <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel PIN setup" onClick={() => { setShowPinSetup(false); setPinInput(''); setConfirmPinInput(''); setAuthError(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      
+      {showPinChange && (
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Current PIN</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={8}
+              value={currentPinInput}
+              onChange={e => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              placeholder="****"
+            />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>New PIN (4-8 digits)</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={8}
+              value={pinInput}
+              onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              placeholder="****"
+            />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm New PIN</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={8}
+              value={confirmPinInput}
+              onChange={e => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              placeholder="****"
+            />
+          </div>
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button style={styles.manageBtn} aria-label="Save new PIN" onClick={handleChangePin}>Change PIN</button>
+            <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel PIN change" onClick={() => { setShowPinChange(false); setCurrentPinInput(''); setPinInput(''); setConfirmPinInput(''); setAuthError(''); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1122,21 +1662,24 @@ export const Settings: React.FC = () => {
           <span style={styles.settingDesc}>Use a password to unlock</span>
         </div>
         {settings.passwordEnabled ? (
-          <button style={styles.dangerBtnSmall} aria-label="Remove password" onClick={() => handleDisableAuth('password')}>Remove</button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button style={styles.manageBtn} aria-label="Change password" onClick={() => { setShowPasswordChange(true); setShowPasswordSetup(false); setAuthError(''); }}>Change</button>
+            <button style={styles.dangerBtnSmall} aria-label="Remove password" onClick={() => handleDisableAuth('password')}>Remove</button>
+          </div>
         ) : (
           <button style={styles.manageBtn} aria-label="Set password" onClick={() => setShowPasswordSetup(true)}>Set Password</button>
         )}
       </div>
       
       {showPasswordSetup && (
-        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Enter Password (min 8 characters)</label>
             <input
               type="password"
               value={passwordInput}
               onChange={e => setPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="Enter password"
             />
           </div>
@@ -1146,14 +1689,54 @@ export const Settings: React.FC = () => {
               type="password"
               value={confirmPasswordInput}
               onChange={e => setConfirmPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="Confirm password"
             />
           </div>
-          {authError && <div style={{ color: '#ff453a', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button style={styles.manageBtn} aria-label="Save password" onClick={handleSetupPassword}>Save Password</button>
             <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel password setup" onClick={() => { setShowPasswordSetup(false); setPasswordInput(''); setConfirmPasswordInput(''); setAuthError(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      
+      {showPasswordChange && (
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Current Password</label>
+            <input
+              type="password"
+              value={currentPasswordInput}
+              onChange={e => setCurrentPasswordInput(e.target.value)}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              placeholder="Current password"
+            />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>New Password (min 8 characters)</label>
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={e => setPasswordInput(e.target.value)}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              placeholder="New password"
+            />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm New Password</label>
+            <input
+              type="password"
+              value={confirmPasswordInput}
+              onChange={e => setConfirmPasswordInput(e.target.value)}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              placeholder="Confirm new password"
+            />
+          </div>
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button style={styles.manageBtn} aria-label="Save new password" onClick={handleChangePassword}>Change Password</button>
+            <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel password change" onClick={() => { setShowPasswordChange(false); setCurrentPasswordInput(''); setPasswordInput(''); setConfirmPasswordInput(''); setAuthError(''); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1164,18 +1747,12 @@ export const Settings: React.FC = () => {
           <span style={styles.settingLabel}>Auto-Lock Timer</span>
           <span style={styles.settingDesc}>Lock DEX after inactivity</span>
         </div>
-        <select
-          style={styles.selectInput}
-          value={settings.autoLockMinutes}
-          onChange={e => setSettings(prev => ({ ...prev, autoLockMinutes: Number(e.target.value) }))}
-        >
-          <option value={0}>Never</option>
-          <option value={1}>1 minute</option>
-          <option value={5}>5 minutes</option>
-          <option value={15}>15 minutes</option>
-          <option value={30}>30 minutes</option>
-          <option value={60}>1 hour</option>
-        </select>
+        <Select
+          size="sm"
+          options={[{ value: '0', label: 'Never' }, { value: '1', label: '1 minute' }, { value: '5', label: '5 minutes' }, { value: '15', label: '15 minutes' }, { value: '30', label: '30 minutes' }, { value: '60', label: '1 hour' }]}
+          value={String(settings.autoLockMinutes)}
+          onChange={v => setSettings(prev => ({ ...prev, autoLockMinutes: Number(v) }))}
+        />
       </div>
       
       {renderToggle('requireAuthOnWake', 'Require on Wake', 'Ask for authentication when computer wakes from sleep')}
@@ -1183,7 +1760,7 @@ export const Settings: React.FC = () => {
       {/* Current Auth Status */}
       {(settings.pinEnabled || settings.passwordEnabled || settings.biometricEnabled) && (
         <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#30d158', fontSize: '13px', fontWeight: 500 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success)', fontSize: '13px', fontWeight: 500 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9,12 11,14 15,10"/></svg>
             Protected with: {[
               settings.biometricEnabled && 'Fingerprint',
@@ -1191,6 +1768,31 @@ export const Settings: React.FC = () => {
               settings.passwordEnabled && 'Password'
             ].filter(Boolean).join(' + ')}
           </div>
+        </div>
+      )}
+      
+      {/* Recovery Codes */}
+      {(settings.pinEnabled || settings.passwordEnabled) && (
+        <div style={{ marginTop: '12px' }}>
+          <div style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>Recovery Codes</span>
+              <span style={styles.settingDesc}>Generate backup codes in case you forget your PIN or password</span>
+            </div>
+            <button style={styles.manageBtn} aria-label="Generate recovery codes" onClick={handleGenerateRecoveryCodes}>Generate</button>
+          </div>
+          {showRecoveryCodes && recoveryCodes.length > 0 && (
+            <div style={{ padding: '16px', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '8px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'monospace', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                {recoveryCodes.map((code, i) => (
+                  <div key={i} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', textAlign: 'center' }}>{code}</div>
+                ))}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>Each code can only be used once. Store them securely.</div>
+              <button style={{ ...styles.manageBtn, marginTop: '10px' }} aria-label="Close recovery codes" onClick={() => setShowRecoveryCodes(false)}>Done</button>
+            </div>
+          )}
         </div>
       )}
       
@@ -1205,7 +1807,7 @@ export const Settings: React.FC = () => {
       {renderToggle('sandboxApps', 'Sandbox Applications', 'Run apps in isolated environment for safety')}
       
       <h3 style={styles.sectionTitle}>Data Protection</h3>
-      {renderToggle('encryptData', 'Encrypt All Data', 'AES-256 encryption for stored data')}
+      {renderToggle('encryptData', 'Protect Stored Data', 'Keep saved data protected on this device')}
       {renderToggle('vpnProtection', 'VPN Protection', 'Route traffic through secure tunnel')}
       
       <h3 style={styles.sectionTitle}>Security Status</h3>
@@ -1219,8 +1821,8 @@ export const Settings: React.FC = () => {
           <span style={{ color: settings.antiHacker ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)' }}>{settings.antiHacker ? 'Protected' : 'Vulnerable'}</span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Encryption</span>
-          <span style={{ color: settings.encryptData ? 'var(--color-success, #30d158)' : 'var(--color-warning, #ff9f0a)' }}>{settings.encryptData ? 'AES-256' : 'None'}</span>
+          <span style={styles.aboutLabel}>Stored Data</span>
+          <span style={{ color: settings.encryptData ? 'var(--color-success, #30d158)' : 'var(--color-warning, #ff9f0a)' }}>{settings.encryptData ? 'Protected' : 'Standard'}</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Threats Blocked</span>
@@ -1228,6 +1830,99 @@ export const Settings: React.FC = () => {
         </div>
       </div>
       
+      <h3 style={styles.sectionTitle}>UKI Memory Privacy</h3>
+      <div style={styles.aboutDetails}>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Memory Recording</span>
+          <span style={{ color: settings.ukiMemoryEnabled ? 'var(--color-warning, #ff9f0a)' : 'var(--color-success, #30d158)' }}>
+            {settings.ukiMemoryEnabled ? 'Recording' : 'Off'}
+          </span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Storage</span>
+          <span style={styles.aboutValue}>Stored on this device only</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Auto Cleanup</span>
+          <span style={styles.aboutValue}>{settings.ukiAutoCleanup ? `Every ${settings.ukiRetentionDays || 30} days` : 'Manual'}</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+        UKI memories are stored locally and never transmitted. Manage in <button style={{ background: 'none', border: 'none', color: 'var(--color-accent, #4A9EFF)', cursor: 'pointer', fontSize: 11, padding: 0 }} onClick={() => setActiveSection('uki')}>UKI &amp; Memory</button>
+      </div>
+
+      <h3 style={styles.sectionTitle}>Permission Controls</h3>
+      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+        All permissions are OFF by default. Unused permissions auto-disable after the configured timeout.
+      </div>
+      {(() => {
+        const { permissions, setPermission, setAutoDisableMinutes } = usePermissionStore.getState();
+        return ALL_PERMISSIONS.map(id => {
+          const entry = permissions[id];
+          return (
+            <div key={id} style={{ ...styles.settingRow, flexWrap: 'wrap' }}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>{PERMISSION_LABELS[id]}</span>
+                <span style={styles.settingDesc}>{PERMISSION_DESCRIPTIONS[id]}</span>
+                {entry.enabled && entry.lastUsedAt && (
+                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                    Last used: {new Date(entry.lastUsedAt).toLocaleTimeString()} &middot; Auto-off: {entry.autoDisableMinutes} min
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {entry.enabled && (
+                  <select
+                    value={entry.autoDisableMinutes}
+                    onChange={e => setAutoDisableMinutes(id, Number(e.target.value))}
+                    style={{
+                      background: 'var(--color-bg-surface)',
+                      border: '1px solid var(--color-border-subtle)',
+                      borderRadius: 6, color: 'var(--color-text-secondary)',
+                      fontSize: 11, padding: '4px 6px', cursor: 'pointer',
+                    }}
+                    aria-label={`Auto-disable timeout for ${PERMISSION_LABELS[id]}`}
+                  >
+                    <option value={5}>5 min</option>
+                    <option value={15}>15 min</option>
+                    <option value={30}>30 min</option>
+                    <option value={60}>1 hour</option>
+                    <option value={1440}>Never</option>
+                  </select>
+                )}
+                <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={entry.enabled}
+                    onChange={e => setPermission(id, e.target.checked)}
+                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                    aria-label={`Toggle ${PERMISSION_LABELS[id]} permission`}
+                  />
+                  <span style={{
+                    position: 'absolute', inset: 0, borderRadius: 12,
+                    background: entry.enabled ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)',
+                    transition: 'background 0.2s ease',
+                  }}>
+                    <span style={{
+                      position: 'absolute', left: entry.enabled ? 20 : 2, top: 2, width: 20, height: 20,
+                      borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    }} />
+                  </span>
+                </label>
+              </div>
+            </div>
+          );
+        });
+      })()}
+      <button
+        style={{ ...styles.dangerBtnSmall, marginTop: 8, marginBottom: 16 }}
+        onClick={() => usePermissionStore.getState().revokeAll()}
+        aria-label="Revoke all permissions"
+      >
+        Revoke All Permissions
+      </button>
+
       <h3 style={styles.sectionTitle}>Danger Zone</h3>
       <button 
         style={styles.dangerBtn}
@@ -1243,243 +1938,15 @@ export const Settings: React.FC = () => {
     </div>
   );
 
-  const renderStorageSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Storage Status</h3>
-      <div style={styles.aboutDetails}>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Auto Management</span>
-          <span style={{ color: '#30d158' }}>Active</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Compression</span>
-          <span style={{ color: '#30d158' }}>Active</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Optimization</span>
-          <span style={{ color: '#30d158' }}>Active</span>
-        </div>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Current Usage</h3>
-      <div style={styles.storageBar}>
-        <div style={{...styles.storageUsed, width: '35%', background: '#0a84ff'}} />
-        <div style={{...styles.storageUsed, width: '15%', background: '#30d158'}} />
-        <div style={{...styles.storageUsed, width: '10%', background: '#ff9f0a'}} />
-      </div>
-      <div style={styles.storageLabels}>
-        <div style={styles.storageLabel}>
-          <span style={{...styles.storageDot, background: '#0a84ff'}} />
-          <span>Documents</span>
-        </div>
-        <div style={styles.storageLabel}>
-          <span style={{...styles.storageDot, background: '#30d158'}} />
-          <span>Cache</span>
-        </div>
-        <div style={styles.storageLabel}>
-          <span style={{...styles.storageDot, background: '#ff9f0a'}} />
-          <span>Other</span>
-        </div>
-      </div>
-      
-      <button 
-        style={styles.clearBtn}
-        aria-label="Clear cache"
-        onClick={() => {
-          localStorage.removeItem('dex-gallery-media');
-          localStorage.removeItem('dex-gallery-favorites');
-          /* Cache cleared successfully */
-        }}
-      >Clear Cache</button>
-    </div>
-  );
-
-  const renderBrowserSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Privacy & Security</h3>
-      {renderToggle('blockTrackers', 'Block Trackers', 'Silently block all known tracking scripts and pixels')}
-      {renderToggle('blockAds', 'Block Ads', 'Block advertisements and ad networks')}
-      {renderToggle('forceHttps', 'Force HTTPS', 'Automatically upgrade HTTP connections to HTTPS')}
-      {renderToggle('fingerprintProtection', 'Fingerprint Protection', 'Prevent websites from identifying your browser')}
-      {renderToggle('doNotTrack', 'Do Not Track', 'Send Do Not Track header to websites')}
-      {renderToggle('blockThirdPartyCookies', 'Block Third-Party Cookies', 'Block cookies from other domains')}
-      
-      <h3 style={styles.sectionTitle}>Advanced Security</h3>
-      {renderToggle('enableTorMode', 'Enhanced Privacy Mode', 'Maximum privacy with Tor-like fingerprint resistance')}
-      {renderToggle('clearOnExit', 'Clear Data on Exit', 'Automatically clear browsing data when closing')}
-      {renderToggle('strictSecurity', 'Strict Security Mode', 'Block all potentially risky content (may break some sites)')}
-      
-      <h3 style={styles.sectionTitle}>Site Compatibility</h3>
-      {renderToggle('allowJavaScript', 'Allow JavaScript', 'Enable JavaScript for interactive websites')}
-      {renderToggle('allowWebGL', 'Allow WebGL', 'Enable WebGL for 3D graphics and games')}
-      
-      <h3 style={styles.sectionTitle}>Auto-Clear History</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Clear History After</span>
-          <span style={styles.settingDesc}>Automatically delete browsing history</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.historyAutoClearDays || 7}
-          onChange={(e) => setSettings(prev => ({ ...prev, historyAutoClearDays: parseInt(e.target.value) }))}
-        >
-          <option value="1">1 Day</option>
-          <option value="3">3 Days</option>
-          <option value="7">7 Days (Default)</option>
-          <option value="14">14 Days</option>
-          <option value="30">30 Days</option>
-          <option value="0">Never</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Download Speed</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Parallel Connections</span>
-          <span style={styles.settingDesc}>More connections = faster downloads</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.parallelDownloads || 8}
-          onChange={(e) => setSettings(prev => ({ ...prev, parallelDownloads: parseInt(e.target.value) }))}
-        >
-          <option value="1">1 (Basic)</option>
-          <option value="4">4</option>
-          <option value="8">8 (Recommended)</option>
-          <option value="16">16 (Fast)</option>
-          <option value="32">32 (Maximum Speed)</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Search Engine</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Default Search Engine</span>
-          <span style={styles.settingDesc}>Used when searching from address bar</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.defaultSearchEngine || 'duckduckgo'}
-          onChange={(e) => setSettings(prev => ({ ...prev, defaultSearchEngine: e.target.value }))}
-        >
-          <option value="duckduckgo">DuckDuckGo (Private)</option>
-          <option value="startpage">Startpage</option>
-          <option value="brave">Brave Search</option>
-          <option value="google">Google</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Protection Status</h3>
-      <div style={styles.aboutDetails}>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Trackers Blocked</span>
-          <span style={styles.aboutValue}>Enabled</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Ads Blocked</span>
-          <span style={styles.aboutValue}>Enabled</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>HTTPS Upgrades</span>
-          <span style={styles.aboutValue}>Auto-upgrade active</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Download Speed</span>
-          <span style={styles.aboutValue}>{settings.parallelDownloads || 8}x parallel</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderFilesSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Display</h3>
-      {renderToggle('showHiddenFiles', 'Show Hidden Files', 'Display files that start with a dot')}
-      
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Default View</span>
-          <span style={styles.settingDesc}>How files are displayed</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.defaultView || 'list'}
-          onChange={(e) => setSettings(prev => ({ ...prev, defaultView: e.target.value }))}
-        >
-          <option value="list">List</option>
-          <option value="grid">Grid</option>
-          <option value="columns">Columns</option>
-        </select>
-      </div>
-      
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Sort By</span>
-          <span style={styles.settingDesc}>Default sorting for files</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.sortBy || 'name'}
-          onChange={(e) => setSettings(prev => ({ ...prev, sortBy: e.target.value }))}
-        >
-          <option value="name">Name</option>
-          <option value="date">Date Modified</option>
-          <option value="size">Size</option>
-          <option value="type">Type</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Behavior</h3>
-      {renderToggle('confirmDelete', 'Confirm Before Deleting', 'Ask for confirmation when deleting files')}
-      {renderToggle('indexFolders', 'Index Folders for Search', 'Allow fast file searching across folders')}
-      {renderToggle('watchForChanges', 'Watch for Changes', 'Automatically refresh when files change')}
-      
-      <h3 style={styles.sectionTitle}>Indexed Locations</h3>
-      <button 
-        style={styles.addFolderBtn}
-        aria-label="Add folder to index"
-        onClick={async () => {
-          if (window.electron?.invoke) {
-            await window.electron.invoke('files:addScopeWithDialog');
-          }
-        }}
-      >+ Add Folder to Index</button>
-    </div>
-  );
-
-  const renderAutoFillSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Auto-Fill</h3>
-      {renderToggle('enableAutoFill', 'Enable Auto-Fill', 'Automatically fill in forms and fields')}
-      {renderToggle('autoFillForms', 'Auto-Fill Forms', 'Automatically fill web forms')}
-      {renderToggle('smartSuggestions', 'Smart Suggestions', 'Show intelligent suggestions based on context')}
-      
-      <h3 style={styles.sectionTitle}>Save Information</h3>
-      {renderToggle('savePasswords', 'Save Passwords', 'Offer to save passwords when you sign in')}
-      {renderToggle('saveAddresses', 'Save Addresses', 'Save and fill shipping and billing addresses')}
-      {renderToggle('saveCreditCards', 'Save Payment Methods', 'Save credit cards for faster checkout')}
-      
-      <h3 style={styles.sectionTitle}>Saved Data</h3>
-      <div style={styles.savedDataRow}>
-        <span>Saved Passwords</span>
-        <button style={styles.manageBtn} aria-label="Manage saved passwords" onClick={() => setActiveSection('security')}>Manage</button>
-      </div>
-      <div style={styles.savedDataRow}>
-        <span>Saved Addresses</span>
-        <button style={styles.manageBtn} aria-label="Manage saved addresses" onClick={() => { /* open address manager */ }}>Manage</button>
-      </div>
-      <div style={styles.savedDataRow}>
-        <span>Saved Payment Methods</span>
-        <button style={styles.manageBtn} aria-label="Manage saved payment methods" onClick={() => { /* open payment manager */ }}>Manage</button>
-      </div>
-    </div>
-  );
-
   const renderAboutSettings = () => (
     <div style={styles.settingsContent}>
-      <div style={styles.aboutHeader}>
-        <div style={styles.appIcon}>DEX</div>
+      <div style={{ ...styles.aboutHeader, marginTop: 12 }}>
+        <div style={styles.appIcon}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="4" />
+            <path d="M8 12h8M12 8v8" />
+          </svg>
+        </div>
         <div style={styles.appInfo}>
           <span style={styles.appName}>DEX</span>
           <span style={styles.appVersion}>Version {appVersion}</span>
@@ -1487,22 +1954,57 @@ export const Settings: React.FC = () => {
       </div>
       
       {/* Creator Watermark */}
-      <div style={{ padding: '16px', background: 'var(--color-accent-muted)', borderRadius: '12px', marginBottom: '20px', border: '1px solid var(--color-border-subtle)' }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '4px' }}>Created by Onazi Treasure OJ</div>
-        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Copyright 2026 All Rights Reserved</div>
+      <div style={{
+        padding: '20px', borderRadius: '14px', marginBottom: '20px',
+        background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
+        border: '1px solid rgba(74,158,255,0.15)',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: -8, right: -8, width: 64, height: 64, borderRadius: '50%', background: 'rgba(74,158,255,0.04)', pointerEvents: 'none' }} />
+        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-accent)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
+          Created by Onazi Treasure OJ
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
+          Personal Control Hub for Desktop Automation
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <span>&copy; 2026 Onazi Treasure OJ</span>
+          <span>MIT License</span>
+          <span>All Rights Reserved</span>
+        </div>
       </div>
       
       <div style={styles.aboutDetails}>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Build</span>
-          <span style={styles.aboutValue}>2026.03.01</span>
+          <span style={styles.aboutValue}>2026.03.12</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Platform</span>
+          <span style={styles.aboutValue}>{navigator.platform || 'Unknown'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Engine</span>
+          <span style={styles.aboutValue}>Electron + React 18</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Display</span>
+          <span style={styles.aboutValue}>{screen.width}×{screen.height} @ {Math.round(window.devicePixelRatio * 100)}%</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Memory</span>
+          <span style={styles.aboutValue}>{(navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : `${navigator.hardwareConcurrency || '?'} cores`}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>License</span>
+          <span style={styles.aboutValue}>MIT</span>
         </div>
       </div>
       
       <div style={styles.aboutLinks}>
-        <button style={styles.linkBtn} aria-label="Open DEX website" onClick={() => window.open('https://dex.app', '_blank', 'noopener,noreferrer')}>Website</button>
-        <button style={styles.linkBtn} aria-label="Open documentation" onClick={() => window.open('https://docs.dex.app', '_blank', 'noopener,noreferrer')}>Documentation</button>
-        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => window.open('https://github.com/dex-app/dex/issues', '_blank', 'noopener,noreferrer')}>Report Issue</button>
+        <button style={styles.linkBtn} aria-label="Open DEX website" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', 'https://dex.app') || window.open('https://dex.app', '_blank', 'noopener,noreferrer')}>Website</button>
+        <button style={styles.linkBtn} aria-label="Open documentation" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', 'https://docs.dex.app') || window.open('https://docs.dex.app', '_blank', 'noopener,noreferrer')}>Documentation</button>
+        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', 'https://github.com/dex-app/dex/issues') || window.open('https://github.com/dex-app/dex/issues', '_blank', 'noopener,noreferrer')}>Report Issue</button>
       </div>
 
       {/* Diagnostic Share */}
@@ -1531,7 +2033,7 @@ export const Settings: React.FC = () => {
             const diag: string[] = [];
             diag.push('=== DEX Diagnostic Report ===');
             diag.push('Version: ' + appVersion);
-            diag.push('Build: 2026.03.01');
+            diag.push('Build: 2026.03.09');
             diag.push('Platform: ' + navigator.platform);
             diag.push('User Agent: ' + navigator.userAgent);
             diag.push('Language: ' + navigator.language);
@@ -1552,13 +2054,13 @@ export const Settings: React.FC = () => {
                 diag.push('Current Streak: ' + (parsed.stats?.currentStreak || 0));
                 diag.push('Achievements: ' + (parsed.unlockedAchievements?.length || 0));
               }
-            } catch {}
+            } catch (e) { console.warn('[DEX]', e); }
             try {
               const keys = Object.keys(localStorage).filter(k => k.startsWith('dex-'));
               diag.push('');
               diag.push('=== Storage Keys ===');
               keys.forEach(k => diag.push(k + ': ' + ((localStorage.getItem(k) || '').length) + ' bytes'));
-            } catch {}
+            } catch (e) { console.warn('[DEX]', e); }
 
             const body = encodeURIComponent(diag.join('\n'));
             const subject = encodeURIComponent('DEX Diagnostic Report - v' + appVersion);
@@ -1575,142 +2077,902 @@ export const Settings: React.FC = () => {
     </div>
   );
 
-  const renderKeyboardSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Keyboard Shortcuts</h3>
-      <div style={styles.shortcutList}>
-        {[
-          { action: 'Quick Actions', shortcut: 'Ctrl + Space' },
-          { action: 'Search', shortcut: 'Ctrl + K' },
-          { action: 'Home', shortcut: 'Ctrl + 1' },
-          { action: 'Files', shortcut: 'Ctrl + 2' },
-          { action: 'Notes', shortcut: 'Ctrl + 3' },
-          { action: 'Tasks', shortcut: 'Ctrl + 4' },
-          { action: 'Browser', shortcut: 'Ctrl + 5' },
-          { action: 'Gallery', shortcut: 'Ctrl + 6' },
-          { action: 'Music', shortcut: 'Ctrl + 7' },
-          { action: 'Video', shortcut: 'Ctrl + 8' },
-          { action: 'Workflows', shortcut: 'Ctrl + 9' },
-          { action: 'Settings', shortcut: 'Ctrl + 0' },
-          { action: 'Calculator', shortcut: 'Alt + C' },
-          { action: 'Calendar', shortcut: 'Alt + A' },
-          { action: 'Password', shortcut: 'Alt + P' },
-          { action: 'VINX Editor', shortcut: 'Alt + V' },
-          { action: 'Imosion', shortcut: 'Alt + I' },
-          { action: 'PRISM', shortcut: 'Alt + R' },
-          { action: 'FLUX', shortcut: 'Alt + F' },
-          { action: 'FORGE', shortcut: 'Alt + G' },
-          { action: 'STAGE', shortcut: 'Alt + S' },
-        ].map(item => (
-          <div key={item.action} style={styles.shortcutRow}>
-            <span>{item.action}</span>
-            <span style={styles.shortcutKey}>{item.shortcut}</span>
-          </div>
-        ))}
+  // =========================================================================
+  // SLIDER HELPER
+  // =========================================================================
+  const renderSlider = (
+    key: keyof typeof DEFAULT_SETTINGS,
+    label: string,
+    description: string,
+    min: number,
+    max: number,
+    unit: string = '',
+    step: number = 1,
+  ) => (
+    <div style={styles.settingRow}>
+      <div style={styles.settingInfo}>
+        <span style={styles.settingLabel}>{label}</span>
+        <span style={styles.settingDesc}>{description}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={settings[key] as number}
+          onChange={e => setSettings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+          style={{ width: 120, accentColor: 'var(--color-accent, #0a84ff)' }}
+          aria-label={label}
+        />
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>
+          {settings[key]}{unit}
+        </span>
       </div>
     </div>
   );
 
+  // =========================================================================
+  // SELECT HELPER
+  // =========================================================================
+  const renderSelect = (
+    key: keyof typeof DEFAULT_SETTINGS,
+    label: string,
+    description: string,
+    options: { value: string; label: string }[],
+  ) => (
+    <div style={styles.settingRow}>
+      <div style={styles.settingInfo}>
+        <span style={styles.settingLabel}>{label}</span>
+        <span style={styles.settingDesc}>{description}</span>
+      </div>
+      <select
+        className="settings-select"
+        value={String(settings[key])}
+        onChange={e => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
+        aria-label={label}
+        style={{
+          padding: '6px 12px', borderRadius: 8, fontSize: 12,
+          border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
+          color: 'var(--color-text-primary)', outline: 'none', cursor: 'pointer',
+        }}
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+
+  // =========================================================================
+  // SOUND SETTINGS
+  // =========================================================================
+  const renderSoundSettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Output</h3>
+      {renderSlider('masterVolume', 'Master Volume', 'System-wide volume level', 0, 100, '%')}
+      {renderSlider('alertVolume', 'Alert Volume', 'Volume for system alerts and notifications', 0, 100, '%')}
+      {renderSlider('audioBalance', 'Balance', 'Left/Right audio balance', 0, 100, '', 1)}
+      {renderSelect('outputDevice', 'Output Device', 'Sound output device', [
+        { value: 'built-in', label: 'Built-in Speakers' },
+        { value: 'headphones', label: 'Headphones' },
+        { value: 'bluetooth', label: 'Bluetooth Audio' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Input</h3>
+      {renderSelect('inputDevice', 'Input Device', 'Sound input device', [
+        { value: 'built-in', label: 'Built-in Microphone' },
+        { value: 'external', label: 'External Microphone' },
+        { value: 'bluetooth', label: 'Bluetooth Microphone' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Spatial Audio</h3>
+      {renderToggle('spatialAudio', 'Spatial Audio', 'Enable immersive 3D audio experience')}
+      {renderSelect('spatialAudioProfile', 'Profile', 'Spatial audio tracking mode', [
+        { value: 'fixed', label: 'Fixed' },
+        { value: 'head-tracked', label: 'Head Tracked' },
+        { value: 'off', label: 'Off' },
+      ])}
+      {renderToggle('enhancedDialogue', 'Enhanced Dialogue', 'Boost voice clarity in media')}
+
+      <h3 style={styles.sectionTitle}>Creative Apps</h3>
+      {renderToggle('creativeAppAudioBypass', 'Bypass Audio Effects', 'AXL, VINX, Imosion, and Flux get raw unprocessed audio')}
+
+      <h3 style={styles.sectionTitle}>Media</h3>
+      {renderToggle('mediaAutoPlay', 'Auto-Play Media', 'Automatically play media in apps')}
+    </div>
+  );
+
+  // =========================================================================
+  // DISPLAY SETTINGS
+  // =========================================================================
+  const renderDisplaySettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Resolution & Scaling</h3>
+      {renderSelect('displayResolution', 'Resolution', 'Display resolution', [
+        { value: 'native', label: 'Native (Recommended)' },
+        { value: '3840x2160', label: '3840 × 2160 (4K)' },
+        { value: '2560x1440', label: '2560 × 1440 (QHD)' },
+        { value: '1920x1080', label: '1920 × 1080 (Full HD)' },
+        { value: '1366x768', label: '1366 × 768' },
+      ])}
+      {renderSelect('displayScaling', 'UI Scaling', 'Scale interface elements', [
+        { value: '100', label: '100%' },
+        { value: '125', label: '125%' },
+        { value: '150', label: '150% (Recommended)' },
+        { value: '175', label: '175%' },
+        { value: '200', label: '200%' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Glass & Material</h3>
+      {renderSlider('blurIntensity', 'Blur Intensity', 'Background blur strength for glass effects', 0, 40, 'px')}
+      {renderSlider('glassOpacity', 'Glass Opacity', 'Transparency level of glass surfaces', 0, 100, '%')}
+
+      <h3 style={styles.sectionTitle}>Brightness</h3>
+      {renderToggle('adaptiveBrightness', 'Adaptive Brightness', 'Automatically adjust brightness based on ambient light')}
+      {renderToggle('truetoneBrightness', 'True Tone', 'Adjust display warmth to match ambient lighting')}
+
+      <h3 style={styles.sectionTitle}>Night Shift</h3>
+      {renderToggle('nightShift', 'Night Shift', 'Reduce blue light in the evening for better sleep')}
+      {renderSlider('nightShiftWarmth', 'Warmth', 'Color temperature adjustment for Night Shift', 0, 100, '%')}
+
+      <h3 style={styles.sectionTitle}>Advanced</h3>
+      {renderSelect('displayRefreshRate', 'Refresh Rate', 'Display update frequency', [
+        { value: '60', label: '60 Hz' },
+        { value: '120', label: '120 Hz' },
+        { value: 'adaptive', label: 'Adaptive (ProMotion)' },
+      ])}
+      {renderToggle('hdrContent', 'HDR Content', 'Enable High Dynamic Range when available')}
+    </div>
+  );
+
+  // =========================================================================
+  // PERFORMANCE SETTINGS
+  // =========================================================================
+  const renderPerformanceSettings = () => (
+    <div style={styles.settingsContent}>
+      {/* ---- Device Performance Tier ---- */}
+      <h3 style={styles.sectionTitleFirst}>Device Performance Tier</h3>
+      {(() => {
+        const currentTier = getStoredTier() || 'mid';
+        const hw = getHardwareSummary();
+        const manual = isManualOverride();
+        const autoOpt = isAutoOptimizeEnabled();
+        return (
+          <>
+            <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              {hw.cores} cores &middot; {hw.memoryGB.toFixed(1)} GB RAM &middot; {hw.gpuRenderer.slice(0, 48)}
+              {hw.weakGPU ? ' (weak GPU)' : ''}
+            </div>
+            {/* 5-segment tier selector */}
+            <div style={{ display: 'flex', gap: 2, marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
+              {ALL_TIERS.map((tier) => {
+                const active = tier === currentTier;
+                return (
+                  <button
+                    key={tier}
+                    onClick={() => {
+                      setManualOverride(tier);
+                      applyTierPresets(tier);
+                      window.location.reload();
+                    }}
+                    style={{
+                      flex: 1, padding: '8px 4px', border: 'none', cursor: 'pointer',
+                      background: active ? 'var(--color-accent, #007AFF)' : 'var(--color-bg-secondary)',
+                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      fontSize: 11, fontWeight: active ? 700 : 500, transition: 'all 0.2s ease',
+                    }}
+                    title={getTierDescription(tier)}
+                    aria-pressed={active}
+                  >
+                    {getTierLabel(tier)}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+              {getTierDescription(currentTier)}
+              {manual ? ' (manual override)' : ' (auto-detected)'}
+            </div>
+            {manual && (
+              <button
+                onClick={() => {
+                  clearManualOverride();
+                  const detected = detectDeviceTier();
+                  applyTierPresets(detected);
+                  window.location.reload();
+                }}
+                style={{
+                  background: 'none', border: '1px solid var(--color-border-subtle)',
+                  color: 'var(--color-text-secondary)', borderRadius: 8, padding: '6px 14px',
+                  cursor: 'pointer', fontSize: 12, marginBottom: 12,
+                }}
+              >
+                Reset to Auto-Detect
+              </button>
+            )}
+            {/* Auto-optimize toggle */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '0.5px solid var(--color-border-subtle)' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Daily Auto-Optimize</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Re-detect hardware and optimize settings each day</div>
+              </div>
+              <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={autoOpt}
+                  onChange={(e) => setAutoOptimizeEnabled(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                />
+                <span style={{
+                  position: 'absolute', inset: 0, borderRadius: 12,
+                  background: autoOpt ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)',
+                  transition: 'background 0.2s ease',
+                }}>
+                  <span style={{
+                    position: 'absolute', left: autoOpt ? 20 : 2, top: 2, width: 20, height: 20,
+                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  }} />
+                </span>
+              </label>
+            </div>
+          </>
+        );
+      })()}
+
+      <h3 style={styles.sectionTitle}>Graphics</h3>
+      {renderToggle('hardwareAcceleration', 'Hardware Acceleration', 'Use GPU for rendering and compositing')}
+      {renderToggle('gpuRendering', 'GPU Rendering', 'Offload UI rendering to the graphics card')}
+
+      <h3 style={styles.sectionTitle}>Power</h3>
+      {renderSelect('performanceMode', 'Performance Mode', 'System-wide performance tier', [
+        { value: 'auto', label: 'Auto (detect hardware)' },
+        { value: 'low', label: 'Low (battery/old hardware)' },
+        { value: 'balanced', label: 'Balanced' },
+        { value: 'performance', label: 'High Performance' },
+      ])}
+      {renderToggle('lowPowerMode', 'Low Power Mode', 'Reduce animations and background activity to save battery')}
+      {renderSelect('cpuPriority', 'CPU Priority', 'Process priority for DEX', [
+        { value: 'low', label: 'Low' },
+        { value: 'normal', label: 'Normal' },
+        { value: 'high', label: 'High' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Memory</h3>
+      {renderToggle('memoryOptimization', 'Memory Optimization', 'Automatically free unused memory')}
+      {renderSlider('cacheSizeGB', 'Cache Size', 'Maximum disk cache for app data', 1, 32, ' GB')}
+      {renderSlider('maxRamGB', 'RAM Limit', 'Maximum RAM usage (0 = auto)', 0, 32, ' GB')}
+
+      <h3 style={styles.sectionTitle}>Startup</h3>
+      {renderToggle('preloadApps', 'Preload Apps', 'Pre-load frequently used apps for faster launch')}
+      {renderToggle('backgroundBoost', 'Background Boost', 'Allow background apps to use extra resources when idle')}
+
+      <h3 style={styles.sectionTitle}>Resource Reservation</h3>
+      {renderToggle(
+        'performanceReservation',
+        'Performance Mode',
+        'Reserve CPU/GPU for the foreground app by lowering the priority of background processes (revertible).',
+      )}
+      {renderToggle(
+        'predictivePrewarm',
+        'Predictive Pre-warm',
+        'Use your recent app-switching history to pre-warm the next likely app while the device is idle.',
+      )}
+    </div>
+  );
+
+  // =========================================================================
+  // ACCESSIBILITY SETTINGS
+  // =========================================================================
+  const renderAccessibilitySettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Vision</h3>
+      {renderToggle('highContrast', 'Increase Contrast', 'Enhance visual distinction between UI elements')}
+      {renderToggle('largeText', 'Larger Text', 'Use larger text size throughout the interface')}
+      {renderToggle('reduceTransparency', 'Reduce Transparency', 'Use solid backgrounds instead of translucent surfaces')}
+
+      <h3 style={styles.sectionTitle}>Screen Reader</h3>
+      {renderToggle('screenReader', 'Screen Reader', 'Enable screen reader support and ARIA announcements')}
+
+      <h3 style={styles.sectionTitle}>Motion</h3>
+      {renderToggle('reduceMotion', 'Reduce Motion', 'Minimize animations and motion effects')}
+    </div>
+  );
+
+  // =========================================================================
+  // NETWORK SETTINGS
+  // =========================================================================
   const renderNetworkSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitle}>Network Status</h3>
-      <div style={styles.networkStatus}>
-        <div style={{...styles.statusDot, background: '#30d158'}} />
-        <span>Connected - Protected</span>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>WiFi Protection</h3>
-      {renderToggle('wifiProtection', 'WiFi Security Monitor', 'Detect and block WiFi attacks and rogue networks')}
-      {renderToggle('networkMonitor', 'Network Activity Monitor', 'Track all incoming and outgoing connections')}
-      
-      <h3 style={styles.sectionTitle}>DNS & Privacy</h3>
+      <h3 style={styles.sectionTitleFirst}>Wi-Fi</h3>
+      {renderToggle('wifiEnabled', 'Wi-Fi', 'Connect to wireless networks')}
+      {renderSelect('preferredNetwork', 'Preferred Network', 'Default network to connect to', [
+        { value: 'auto', label: 'Auto (strongest signal)' },
+        { value: 'home', label: 'Home Network' },
+        { value: 'office', label: 'Office Network' },
+        { value: 'mobile', label: 'Mobile Hotspot' },
+      ])}
+      {renderSelect('wifiBand', 'Frequency Band', 'Preferred Wi-Fi frequency', [
+        { value: 'auto', label: 'Auto' },
+        { value: '2.4ghz', label: '2.4 GHz (longer range)' },
+        { value: '5ghz', label: '5 GHz (faster speed)' },
+        { value: '6ghz', label: '6 GHz (Wi-Fi 6E)' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Bluetooth</h3>
+      {renderToggle('bluetoothEnabled', 'Bluetooth', 'Enable Bluetooth connectivity')}
+      {renderSelect('bluetoothMode', 'Bluetooth Mode', 'Bluetooth power/range mode', [
+        { value: 'auto', label: 'Auto' },
+        { value: 'low-energy', label: 'Low Energy (BLE)' },
+        { value: 'classic', label: 'Classic (higher range)' },
+      ])}
+      {renderToggle('bluetoothDiscoverable', 'Discoverable', 'Allow other devices to find this computer')}
+
+      <h3 style={styles.sectionTitle}>Connection</h3>
+      {renderToggle('networkOptIn', 'Network Access', 'Allow DEX to access the internet')}
+      {renderToggle('ipv6Enabled', 'IPv6', 'Enable IPv6 networking')}
+      {renderToggle('networkMonitor', 'Network Monitor', 'Track real-time network activity')}
+
+      <h3 style={styles.sectionTitle}>DNS & Security</h3>
       {renderToggle('dnsOverHttps', 'DNS over HTTPS', 'Encrypt DNS queries for privacy')}
-      {renderToggle('blockTrackerDomains', 'Block Tracker Domains', 'Block known tracking and ad domains at DNS level')}
-      {renderToggle('ipv6Enabled', 'IPv6 Support', 'Enable IPv6 network connections')}
-      
-      <h3 style={styles.sectionTitle}>Bandwidth & Speed</h3>
-      {renderToggle('bandwidthOptimization', 'Bandwidth Optimization', 'Optimize network usage for faster downloads')}
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Max Download Speed</span>
-          <span style={styles.settingDesc}>Limit download bandwidth</span>
+      {renderToggle('wifiProtection', 'Wi-Fi Protection', 'Warn about insecure Wi-Fi networks')}
+      {renderToggle('blockTrackerDomains', 'Block Tracker Domains', 'Block known tracking and advertising domains')}
+      {renderToggle('strictSecurity', 'Strict Security', 'Enforce strict TLS and certificate validation')}
+
+      <h3 style={styles.sectionTitle}>Bandwidth</h3>
+      {renderToggle('bandwidthOptimization', 'Bandwidth Optimization', 'Optimize network usage for better performance')}
+
+      <h3 style={styles.sectionTitle}>Content</h3>
+      {renderToggle('allowWebGL', 'Allow WebGL', 'Enable GPU-accelerated graphics in web content')}
+      {renderToggle('allowJavaScript', 'Allow JavaScript', 'Enable JavaScript execution in web content')}
+    </div>
+  );
+
+  // =========================================================================
+  // FILES SETTINGS
+  // =========================================================================
+  const renderFilesSettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>File Browsing</h3>
+      {renderToggle('showHiddenFiles', 'Show Hidden Files', 'Display hidden files and folders')}
+      {renderToggle('confirmDelete', 'Confirm Delete', 'Ask for confirmation before deleting files')}
+      {renderSelect('defaultView', 'Default View', 'Default file view mode', [
+        { value: 'list', label: 'List' },
+        { value: 'grid', label: 'Grid' },
+        { value: 'column', label: 'Column' },
+      ])}
+      {renderSelect('sortBy', 'Sort By', 'Default file sort order', [
+        { value: 'name', label: 'Name' },
+        { value: 'date', label: 'Date Modified' },
+        { value: 'size', label: 'Size' },
+        { value: 'type', label: 'Type' },
+      ])}
+      {renderSelect('thumbnailSize', 'Thumbnail Size', 'Size of file thumbnails in grid view', [
+        { value: 'small', label: 'Small' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'large', label: 'Large' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Indexing</h3>
+      {renderToggle('indexFolders', 'Index Folders', 'Index folder contents for faster search')}
+      {renderToggle('watchForChanges', 'Watch for Changes', 'Automatically detect file changes on disk')}
+
+      <h3 style={styles.sectionTitle}>Storage</h3>
+      {renderSlider('maxStorageGB', 'Max Storage', 'Maximum storage DEX can use for cache and data', 1, 100000, ' GB', 100)}
+    </div>
+  );
+
+  // =========================================================================
+  // BROWSER SETTINGS
+  // =========================================================================
+  const renderBrowserSettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Privacy</h3>
+      {renderToggle('blockTrackers', 'Block Trackers', 'Block cross-site trackers and fingerprinting')}
+      {renderToggle('blockAds', 'Block Ads', 'Block advertisements and popups')}
+      {renderToggle('fingerprintProtection', 'Fingerprint Protection', 'Prevent browser fingerprint tracking')}
+      {renderToggle('doNotTrack', 'Do Not Track', 'Send Do Not Track header with requests')}
+      {renderToggle('blockThirdPartyCookies', 'Block Third-Party Cookies', 'Prevent cross-site cookie tracking')}
+
+      <h3 style={styles.sectionTitle}>Security</h3>
+      {renderToggle('forceHttps', 'Force HTTPS', 'Automatically upgrade connections to HTTPS')}
+      {renderToggle('clearOnExit', 'Clear on Exit', 'Clear browsing data when DEX closes')}
+      {renderToggle('enableTorMode', 'Tor Mode', 'Route traffic through the Tor network for privacy')}
+
+      <h3 style={styles.sectionTitle}>Search & Downloads</h3>
+      {renderSelect('defaultSearchEngine', 'Search Engine', 'Default search engine for the browser', [
+        { value: 'duckduckgo', label: 'DuckDuckGo' },
+        { value: 'google', label: 'Google' },
+        { value: 'bing', label: 'Bing' },
+        { value: 'brave', label: 'Brave Search' },
+      ])}
+      {renderSelect('maxDownloadSpeed', 'Download Speed Limit', 'Maximum download speed', [
+        { value: 'unlimited', label: 'Unlimited' },
+        { value: '10', label: '10 MB/s' },
+        { value: '50', label: '50 MB/s' },
+        { value: '100', label: '100 MB/s' },
+      ])}
+      {renderSlider('parallelDownloads', 'Parallel Downloads', 'Maximum simultaneous download connections', 1, 16, '')}
+    </div>
+  );
+
+  // ===========================================================================
+  // WINDOW MANAGEMENT SETTINGS
+  // ===========================================================================
+  const renderWindowSettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Snapping & Layout</h3>
+      {renderToggle('snapWindows', 'Snap Windows', 'Snap windows to screen edges and zones when dragging')}
+      {renderToggle('animateWindowResize', 'Animate Resizing', 'Smooth animation when resizing or snapping windows')}
+      {renderToggle('rememberWindowPositions', 'Remember Positions', 'Restore window positions when reopening apps')}
+      {renderToggle('showWindowShadows', 'Window Shadows', 'Show drop shadows behind floating windows')}
+      {renderToggle('stageManager', 'Stage Manager', 'Organize open apps on the side for quick switching')}
+      {renderToggle('showAppTabBar', 'App Tab Bar', 'Show running app tabs above the content area')}
+
+      <h3 style={styles.sectionTitle}>Title Bar</h3>
+      {renderSelect('doubleClickTitlebar', 'Double-Click Title Bar', 'Action when double-clicking a window title bar', [
+        { value: 'maximize', label: 'Maximize' },
+        { value: 'minimize', label: 'Minimize' },
+        { value: 'none', label: 'Do Nothing' },
+      ])}
+      {renderSelect('windowControls', 'Window Button Style', 'Choose the style of window control buttons', [
+        { value: 'system', label: 'System Default' },
+        { value: 'traffic', label: 'macOS Traffic Lights' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Limits</h3>
+      {renderSlider('maxFloatingWindows', 'Max Floating Windows', 'Maximum number of floating windows allowed at once', 1, 20, '')}
+    </div>
+  );
+
+  // ===========================================================================
+  // KEYBOARD SHORTCUTS SETTINGS
+  // ===========================================================================
+  const renderKeyboardSettings = () => {
+    const shortcuts = [
+      { key: 'cmdPaletteShortcut' as const, label: 'Command Palette', desc: 'Open the command palette' },
+      { key: 'quickSearchShortcut' as const, label: 'Quick Search', desc: 'Focus the search bar' },
+      { key: 'screenshotShortcut' as const, label: 'Screenshot', desc: 'Capture a screenshot' },
+    ];
+
+    return (
+      <div style={styles.settingsContent}>
+        <h3 style={styles.sectionTitleFirst}>Global Shortcuts</h3>
+        {renderToggle('enableGlobalShortcuts', 'Enable Global Shortcuts', 'Allow keyboard shortcuts throughout the app')}
+
+        <h3 style={styles.sectionTitle}>Shortcut Bindings</h3>
+        {shortcuts.map(sc => (
+          <div key={sc.key} style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>{sc.label}</span>
+              <span style={styles.settingDesc}>{sc.desc}</span>
+            </div>
+            <div style={{
+              padding: '4px 12px', borderRadius: 6,
+              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+              fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
+              fontFamily: 'monospace', letterSpacing: '0.02em',
+            }}>
+              {settings[sc.key]}
+            </div>
+          </div>
+        ))}
+        <div style={{ ...styles.settingDesc, marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
+          Keyboard shortcut customization is available in the Command Palette (Ctrl+Shift+P → "Keyboard Shortcuts").
         </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.maxDownloadSpeed || 'unlimited'}
-          onChange={(e) => setSettings(prev => ({ ...prev, maxDownloadSpeed: e.target.value }))}
-        >
-          <option value="1">1 MB/s</option>
-          <option value="5">5 MB/s</option>
-          <option value="10">10 MB/s</option>
-          <option value="50">50 MB/s</option>
-          <option value="100">100 MB/s</option>
-          <option value="unlimited">Unlimited (Max Speed)</option>
-        </select>
       </div>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Parallel Downloads</span>
-          <span style={styles.settingDesc}>Simultaneous download connections</span>
-        </div>
-        <select 
-          style={styles.selectInput}
-          value={settings.parallelDownloads || 8}
-          onChange={(e) => setSettings(prev => ({ ...prev, parallelDownloads: parseInt(e.target.value) }))}
-        >
-          <option value="1">1 (Slow)</option>
-          <option value="4">4</option>
-          <option value="8">8 (Recommended)</option>
-          <option value="16">16 (Fast)</option>
-          <option value="32">32 (Maximum)</option>
-        </select>
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Proxy Settings</h3>
-      <div style={styles.inputGroup}>
-        <label style={styles.inputLabel}>Proxy URL</label>
-        <input type="text" placeholder="http://proxy:8080" style={styles.input} />
-      </div>
-      
-      <h3 style={styles.sectionTitle}>Network Protection Status</h3>
+    );
+  };
+
+  // ===========================================================================
+  // STORAGE & DATA SETTINGS
+  // ===========================================================================
+  const renderStorageSettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>Cache</h3>
+      {renderSlider('cacheSizeGB', 'Cache Size', 'Maximum disk space for application cache', 1, 32, ' GB')}
+      {renderToggle('autoCleanCache', 'Auto-Clean Cache', 'Automatically clear old cache files periodically')}
+      {renderSlider('cacheCleanIntervalDays', 'Clean Interval', 'Days between automatic cache cleanups', 1, 30, ' days')}
+
+      <h3 style={styles.sectionTitle}>Data Management</h3>
+      {renderToggle('compressOldFiles', 'Compress Old Files', 'Automatically compress files that haven\'t been accessed recently')}
+      {renderSlider('maxStorageGB', 'Storage Limit', 'Maximum storage DEX can use for local data', 10, 100000, ' GB')}
+      {renderToggle('encryptData', 'Protect Stored Data', 'Keep saved data protected on this device')}
+
+      <h3 style={styles.sectionTitle}>Clear Data</h3>
+      <button
+        style={styles.dangerBtn}
+        onClick={() => {
+          if (confirm('Clear all cached data? This may slow down apps temporarily.')) {
+            try {
+              localStorage.removeItem('dex-cache');
+              toast.success('Cache cleared successfully');
+            } catch {
+              toast.error('Failed to clear cache');
+            }
+          }
+        }}
+      >Clear Cache</button>
+
+      <h3 style={styles.sectionTitle}>UKI Memory Archive</h3>
       <div style={styles.aboutDetails}>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>WiFi Security</span>
-          <span style={{ color: settings.wifiProtection ? '#30d158' : '#ff453a' }}>{settings.wifiProtection ? 'Protected' : 'Unprotected'}</span>
+          <span style={styles.aboutLabel}>Archive Status</span>
+          <span style={{ color: settings.ukiMemoryEnabled ? 'var(--color-success, #30d158)' : 'var(--color-text-secondary)' }}>
+            {settings.ukiMemoryEnabled ? 'Active' : 'Disabled'}
+          </span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>DNS Encryption</span>
-          <span style={{ color: settings.dnsOverHttps ? '#30d158' : '#ff9f0a' }}>{settings.dnsOverHttps ? 'Active' : 'Plain'}</span>
+          <span style={styles.aboutLabel}>Retention</span>
+          <span style={styles.aboutValue}>{settings.ukiRetentionDays || 30} days</span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Trackers Blocked</span>
-          <span style={styles.aboutValue}>Blocklist active</span>
+          <span style={styles.aboutLabel}>Size Limit</span>
+          <span style={styles.aboutValue}>{settings.ukiCacheSizeGB || 3} GB</span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Current Speed</span>
-          <span style={styles.aboutValue}>{settings.maxDownloadSpeed === 'unlimited' ? 'Max' : settings.maxDownloadSpeed + ' MB/s'}</span>
+          <span style={styles.aboutLabel}>Protection</span>
+          <span style={{ color: 'var(--color-success, #30d158)' }}>Enabled</span>
         </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+        Manage memory settings in <button style={{ background: 'none', border: 'none', color: 'var(--color-accent, #4A9EFF)', cursor: 'pointer', fontSize: 11, padding: 0 }} onClick={() => setActiveSection('uki')}>UKI &amp; Memory</button>
       </div>
     </div>
   );
+
+  // ===========================================================================
+  // UKI & MEMORY SETTINGS
+  // ===========================================================================
+  const renderUkiSettings = () => (
+    <div style={styles.settingsContent}>
+      <h3 style={styles.sectionTitleFirst}>UKI Voice Assistant</h3>
+      {renderToggle('ukiEnabled', 'Enable UKI', 'Activate the UKI voice assistant')}
+      {renderToggle('ukiShowTranscript', 'Show Transcript', 'Display speech transcription bubble during conversations')}
+      {renderSelect('ukiPersonality', 'Personality', 'UKI\'s conversational style', [
+        { value: 'casual', label: 'Casual' },
+        { value: 'formal', label: 'Formal' },
+      ])}
+
+      <h3 style={styles.sectionTitle}>Wake Word</h3>
+      {renderToggle('ukiWakeWordEnabled', 'Wake Word Detection', 'Activate UKI by saying the wake phrase')}
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Wake Phrase</span>
+          <span style={styles.settingDesc}>The phrase to activate UKI hands-free</span>
+        </div>
+        <div style={{
+          padding: '4px 12px', borderRadius: 6,
+          background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+          fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
+          fontFamily: 'monospace',
+        }}>
+          {settings.ukiWakePhrase}
+        </div>
+      </div>
+
+      <h3 style={styles.sectionTitle}>Memory & Context</h3>
+      {renderToggle('ukiMemoryEnabled', 'Memory Recording', 'Allow UKI to remember conversations and learn from interactions')}
+      {renderSelect('ukiRecallMode', 'Recall Mode', 'How UKI uses stored memories during conversations', [
+        { value: 'hybrid', label: 'Hybrid — Auto-inject recent, ask for older' },
+        { value: 'auto', label: 'Auto — Always use available memory' },
+        { value: 'explicit', label: 'Explicit — Only recall when asked' },
+      ])}
+      {renderSlider('ukiRetentionDays', 'Retention Period', 'How long to keep memory records before cleanup', 1, 365, ' days')}
+      {renderSlider('ukiCacheSizeGB', 'Archive Size Limit', 'Maximum disk space for the memory archive', 1, 32, ' GB')}
+      {renderToggle('ukiAutoCleanup', 'Auto Cleanup', 'Automatically remove expired memory records')}
+
+      <h3 style={styles.sectionTitle}>Memory Management</h3>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          style={{ ...styles.secondaryBtn, flex: 1 }}
+          onClick={async () => {
+            try {
+              const dex = (window as any).dex;
+              if (dex?.uki?.memoryCleanup) {
+                const removed = await dex.uki.memoryCleanup();
+                toast.success(`Cleaned up ${removed} expired records`);
+              } else {
+                toast.info('Memory cleanup not available — native engine required');
+              }
+            } catch {
+              toast.error('Cleanup failed');
+            }
+          }}
+        >Run Cleanup</button>
+        <button
+          style={{ ...styles.dangerBtn, flex: 1 }}
+          onClick={async () => {
+            if (!confirm('Clear all UKI memory? This cannot be undone.')) return;
+            try {
+              const dex = (window as any).dex;
+              if (dex?.uki?.memoryClear) {
+                await dex.uki.memoryClear();
+                toast.success('All UKI memory cleared');
+              } else {
+                toast.info('Memory clear not available — native engine required');
+              }
+            } catch {
+              toast.error('Failed to clear memory');
+            }
+          }}
+        >Clear All Memory</button>
+      </div>
+    </div>
+  );
+
+  // ===========================================================================
+  // CREATIVE SUITE — PER-APP PROFILES
+  // ===========================================================================
+  const CREATIVE_APP_IDS = ['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl'] as const;
+  const [selectedCreativeApp, setSelectedCreativeApp] = useState<string | null>(null);
+  const [creativeAppSettings, setCreativeAppSettings] = useState<Record<string, Record<string, unknown>>>(() => {
+    try {
+      const raw = localStorage.getItem('dex-creative-app-settings');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
+  // Persist per-app settings
+  React.useEffect(() => {
+    try { localStorage.setItem('dex-creative-app-settings', JSON.stringify(creativeAppSettings)); } catch { /* ignore */ }
+  }, [creativeAppSettings]);
+
+  const getAppSetting = (appId: string, key: string, fallback: unknown) => {
+    return creativeAppSettings[appId]?.[key] ?? fallback;
+  };
+  const setAppSetting = (appId: string, key: string, value: unknown) => {
+    setCreativeAppSettings(prev => ({ ...prev, [appId]: { ...prev[appId], [key]: value } }));
+  };
+
+  const renderCreativeAppsSettings = () => {
+    const detail = selectedCreativeApp ? APP_DEFINITIONS[selectedCreativeApp] : null;
+
+    return (
+      <div style={styles.settingsContent}>
+        <h3 style={styles.sectionTitleFirst}>DEX Creative Suite</h3>
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.5 }}>
+          Manage individual creative applications. Each app has its own version, settings profile, and performance controls.
+        </p>
+
+        {/* App Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+          {CREATIVE_APP_IDS.map(id => {
+            const app = APP_DEFINITIONS[id];
+            if (!app) return null;
+            const isSelected = selectedCreativeApp === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setSelectedCreativeApp(isSelected ? null : id)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  padding: '14px 8px', borderRadius: 12, cursor: 'pointer',
+                  background: isSelected ? `${app.color}22` : 'var(--color-bg-surface)',
+                  border: isSelected ? `1.5px solid ${app.color}` : '1.5px solid var(--color-border-subtle)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: `linear-gradient(135deg, ${app.color}44, ${app.color}22)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 700, color: app.color,
+                }}>
+                  {app.name.charAt(0)}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: isSelected ? app.color : 'var(--color-text-primary)' }}>
+                  {app.name}
+                </span>
+                <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
+                  v{app.version || '—'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Detail Panel */}
+        {detail && selectedCreativeApp && (
+          <div style={{
+            background: 'var(--color-bg-surface)', borderRadius: 12,
+            border: `1px solid ${detail.color}33`, padding: 20,
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14,
+                background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, fontWeight: 700, color: detail.color,
+              }}>
+                {detail.name.charAt(0)}
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {detail.name}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                  {detail.description || 'Creative application'}
+                </div>
+              </div>
+            </div>
+
+            {/* Version Info */}
+            <h3 style={styles.sectionTitle}>App Info</h3>
+            <div style={styles.aboutDetails}>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>Version</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 12, color: detail.color }}>{detail.version || '—'}</span>
+              </div>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>Build Date</span>
+                <span style={styles.aboutValue}>{detail.buildDate || '—'}</span>
+              </div>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>Shortcut</span>
+                <span style={{
+                  fontFamily: 'monospace', fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                  background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
+                }}>{detail.shortcut || '—'}</span>
+              </div>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>Status</span>
+                <span style={{ color: 'var(--color-success, #30d158)', fontSize: 12 }}>Active</span>
+              </div>
+            </div>
+
+            {/* Performance Controls */}
+            <h3 style={styles.sectionTitle}>Performance</h3>
+            <div style={styles.settingRow}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>Quality Mode</span>
+                <span style={styles.settingDesc}>Balance rendering quality vs performance</span>
+              </div>
+              <select
+                value={getAppSetting(selectedCreativeApp, 'qualityMode', 'balanced') as string}
+                onChange={e => setAppSetting(selectedCreativeApp, 'qualityMode', e.target.value)}
+                style={{
+                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+                  borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
+                  outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="performance">Performance</option>
+                <option value="balanced">Balanced</option>
+                <option value="quality">Quality</option>
+              </select>
+            </div>
+            <div style={styles.settingRow}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>GPU Acceleration</span>
+                <span style={styles.settingDesc}>Use hardware acceleration for rendering</span>
+              </div>
+              <button
+                style={{
+                  ...styles.toggle,
+                  background: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'var(--color-success, #30d158)' : 'var(--color-bg-glass)',
+                  border: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'none' : '1px solid var(--color-border)',
+                }}
+                onClick={() => setAppSetting(selectedCreativeApp, 'gpuAcceleration', !getAppSetting(selectedCreativeApp, 'gpuAcceleration', true))}
+              >
+                <div style={{ ...styles.toggleKnob, transform: getAppSetting(selectedCreativeApp, 'gpuAcceleration', true) ? 'translate(20px, -50%)' : 'translate(0, -50%)' }} />
+              </button>
+            </div>
+            <div style={styles.settingRow}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>Auto-Save Interval</span>
+                <span style={styles.settingDesc}>How often work is automatically saved</span>
+              </div>
+              <select
+                value={getAppSetting(selectedCreativeApp, 'autoSaveInterval', '30') as string}
+                onChange={e => setAppSetting(selectedCreativeApp, 'autoSaveInterval', e.target.value)}
+                style={{
+                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+                  borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
+                  outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="10">Every 10 seconds</option>
+                <option value="30">Every 30 seconds</option>
+                <option value="60">Every 60 seconds</option>
+                <option value="120">Every 2 minutes</option>
+                <option value="off">Disabled</option>
+              </select>
+            </div>
+
+            {/* Cache & Data */}
+            <h3 style={styles.sectionTitle}>Cache & Data</h3>
+            <div style={styles.settingRow}>
+              <div style={styles.settingInfo}>
+                <span style={styles.settingLabel}>Cache Limit</span>
+                <span style={styles.settingDesc}>Maximum cache size for this app</span>
+              </div>
+              <select
+                value={getAppSetting(selectedCreativeApp, 'cacheLimit', '2') as string}
+                onChange={e => setAppSetting(selectedCreativeApp, 'cacheLimit', e.target.value)}
+                style={{
+                  background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
+                  borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
+                  outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="0.5">500 MB</option>
+                <option value="1">1 GB</option>
+                <option value="2">2 GB</option>
+                <option value="4">4 GB</option>
+                <option value="8">8 GB</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                style={{ ...styles.secondaryBtn, flex: 1 }}
+                onClick={() => {
+                  setCreativeAppSettings(prev => {
+                    const updated = { ...prev };
+                    delete updated[selectedCreativeApp];
+                    return updated;
+                  });
+                  toast.success(`${detail.name} settings reset to defaults`);
+                }}
+              >Reset to Defaults</button>
+              <button
+                style={{ ...styles.secondaryBtn, flex: 1, color: 'var(--color-warning, #FFD60A)' }}
+                onClick={() => toast.success(`${detail.name} cache cleared`)}
+              >Clear Cache</button>
+            </div>
+          </div>
+        )}
+
+        {/* Suite Overview */}
+        {!selectedCreativeApp && (
+          <>
+            <h3 style={styles.sectionTitle}>Suite Overview</h3>
+            <div style={styles.aboutDetails}>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>Suite Version</span>
+                <span style={styles.aboutValue}>1.0.0</span>
+              </div>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>Apps Installed</span>
+                <span style={styles.aboutValue}>{CREATIVE_APP_IDS.length}</span>
+              </div>
+              <div style={styles.aboutRow}>
+                <span style={styles.aboutLabel}>License</span>
+                <span style={{ color: 'var(--color-success, #30d158)' }}>Included with DEX</span>
+              </div>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
+              Select an app above to view its version, configure performance, and manage per-app settings.
+              Each creative app can be independently updated in future releases.
+            </p>
+          </>
+        )}
+      </div>
+    );
+  };
 
   const renderContent = () => {
     switch (activeSection) {
       case 'general': return renderGeneralSettings();
       case 'appearance': return renderAppearanceSettings();
-      case 'customize': return renderCustomizationSettings();
-      case 'browser': return renderBrowserSettings();
-      case 'files': return renderFilesSettings();
-      case 'autofill': return renderAutoFillSettings();
+      case 'sound': return renderSoundSettings();
+      case 'display': return renderDisplaySettings();
       case 'notifications': return renderNotificationSettings();
       case 'privacy': return renderPrivacySettings();
-      case 'storage': return renderStorageSettings();
-      case 'about': return renderAboutSettings();
-      case 'rewind': return <RewindSettingsSection />;
-      case 'keyboard': return renderKeyboardSettings();
       case 'network': return renderNetworkSettings();
       case 'performance': return renderPerformanceSettings();
       case 'accessibility': return renderAccessibilitySettings();
+      case 'window': return renderWindowSettings();
+      case 'keyboard': return renderKeyboardSettings();
+      case 'files': return renderFilesSettings();
+      case 'storage': return renderStorageSettings();
+      case 'browser': return renderBrowserSettings();
+      case 'uki': return renderUkiSettings();
+      case 'creativeapps': return renderCreativeAppsSettings();
+      case 'plugins': return <PluginMarketplace />;
+      case 'nexus': return <NexusBiometrics />;
+      case 'updates': return <UpdateManagerSection />;
+      case 'about': return renderAboutSettings();
       default: return renderGeneralSettings();
     }
   };
@@ -1718,38 +2980,153 @@ export const Settings: React.FC = () => {
   return (
     <div style={styles.container}>
       <style>{`
-        .settings-nav:hover { background: rgba(255,255,255,0.06) !important; }
-        .settings-btn:hover { filter: brightness(1.15); }
-        .settings-btn:active { transform: scale(0.98); }
-        .settings-toggle:hover { filter: brightness(1.1); }
-        .settings-select:hover { border-color: rgba(255,255,255,0.18) !important; }
-        .settings-action:hover { background: rgba(255,255,255,0.06) !important; }
-        .settings-danger:hover { background: rgba(255,69,58,0.12) !important; }
+        .settings-nav:hover { background: var(--pg-row-hover) !important; color: var(--color-text-primary) !important; }
+        .settings-nav:active { transform: scale(0.98); }
+        .settings-nav[data-active="true"]::before {
+          content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
+          width: 2px; background: var(--color-accent); border-radius: 2px;
+          box-shadow: 0 0 6px rgba(74,158,255,0.55);
+        }
+        .settings-btn:hover { background: var(--color-bg-hover) !important; }
+        .settings-btn:active { transform: scale(0.97); }
+        .settings-toggle:hover { background: var(--color-bg-hover) !important; }
+        .settings-select:hover { border-color: var(--color-border-strong) !important; }
+        .settings-action:hover { background: var(--color-bg-hover) !important; }
+        .settings-danger:hover { background: rgba(255,69,58,0.18) !important; }
         .settings-color:hover { transform: scale(1.15); }
+        .settings-content::-webkit-scrollbar { width: 6px; }
+        .settings-content::-webkit-scrollbar-track { background: transparent; }
+        .settings-content::-webkit-scrollbar-thumb { background: var(--pg-border-strong); border-radius: 3px; }
+        .settings-content::-webkit-scrollbar-thumb:hover { background: var(--pg-border-active); }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
           <span style={styles.sidebarTitle}>Settings</span>
         </div>
+
+        <div style={{ padding: '0 12px 8px' }}>
+          <input
+            type="text"
+            placeholder="Search settings..."
+            value={settingsSearch}
+            onChange={e => setSettingsSearch(e.target.value)}
+            style={{
+              width: '100%', padding: '6px 10px', fontSize: 12,
+              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+              borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none',
+              boxSizing: 'border-box' as const,
+            }}
+          />
+        </div>
+
+        {/* Import/Export buttons */}
+        <div style={{ padding: '0 12px 8px', display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => importSettings(setSettings)}
+            aria-label="Import settings from file"
+            style={{
+              flex: 1, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 500,
+              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+              color: 'var(--color-text-secondary)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Import
+          </button>
+          <button
+            onClick={() => exportSettings(settings)}
+            aria-label="Export settings to file"
+            style={{
+              flex: 1, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 500,
+              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+              color: 'var(--color-text-secondary)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export
+          </button>
+        </div>
+
+        {/* Changed settings count */}
+        {countChangedSettings(settings) > 0 && (
+          <div style={{ 
+            padding: '6px 12px', margin: '0 12px 8px', borderRadius: 6,
+            background: 'rgba(10,132,255,0.1)', border: '1px solid rgba(10,132,255,0.2)',
+            fontSize: 10, color: 'var(--color-accent)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)' }} />
+            {countChangedSettings(settings)} setting{countChangedSettings(settings) !== 1 ? 's' : ''} changed from default
+          </div>
+        )}
         
         <div style={styles.sectionList}>
-          {SECTIONS.map(section => (
-            <button
-              key={section.id}
-              className="settings-nav"
-              aria-label={`Navigate to ${section.name} settings`}
-              style={{
-                ...styles.sectionItem,
-                background: activeSection === section.id ? 'rgba(10, 132, 255, 0.2)' : 'transparent',
-                color: activeSection === section.id ? 'var(--color-accent, #0a84ff)' : 'var(--color-text-primary, rgba(255,255,255,0.85))',
-              }}
-              onClick={() => setActiveSection(section.id)}
-            >
-              <span style={styles.sectionIcon}>{section.icon}</span>
-              <span>{section.name}</span>
-            </button>
-          ))}
+          {(() => {
+            const q = settingsSearch.toLowerCase();
+            if (q) {
+              const filtered = SECTIONS.filter(s => s.name.toLowerCase().includes(q));
+              return filtered.map(section => (
+                <button
+                  key={section.id}
+                  className="settings-nav"
+                  data-active={activeSection === section.id ? 'true' : undefined}
+                  aria-current={activeSection === section.id ? 'page' : undefined}
+                  aria-label={`Navigate to ${section.name} settings`}
+                  style={{
+                    ...styles.sectionItem,
+                    background: activeSection === section.id ? 'var(--pg-row-active)' : 'transparent',
+                    color: activeSection === section.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                    boxShadow: activeSection === section.id ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
+                    fontWeight: activeSection === section.id ? 600 : 500,
+                  }}
+                  onClick={() => setActiveSection(section.id)}
+                >
+                  <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-accent)' : 'currentColor' }}>{section.icon}</span>
+                  <span>{section.name}</span>
+                </button>
+              ));
+            }
+            return SECTION_CATEGORIES.map(cat => {
+              const items = cat.ids.map(id => sectionMap.get(id)).filter(Boolean) as SettingSection[];
+              if (items.length === 0) return null;
+              return (
+                <React.Fragment key={cat.label}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.8px', padding: '12px 14px 4px' }}>{cat.label}</div>
+                  {items.map(section => (
+                    <button
+                      key={section.id}
+                      className="settings-nav"
+                      data-active={activeSection === section.id ? 'true' : undefined}
+                      aria-current={activeSection === section.id ? 'page' : undefined}
+                      aria-label={`Navigate to ${section.name} settings`}
+                      style={{
+                        ...styles.sectionItem,
+                        background: activeSection === section.id ? 'var(--pg-row-active)' : 'transparent',
+                        color: activeSection === section.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                        boxShadow: activeSection === section.id ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
+                        fontWeight: activeSection === section.id ? 600 : 500,
+                      }}
+                      onClick={() => setActiveSection(section.id)}
+                    >
+                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-accent)' : 'currentColor' }}>{section.icon}</span>
+                      <span>{section.name}</span>
+                    </button>
+                  ))}
+                </React.Fragment>
+              );
+            });
+          })()}
         </div>
       </div>
 
@@ -1766,17 +3143,20 @@ export const Settings: React.FC = () => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STYLES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
+    width: '100%',
     height: '100%',
     display: 'flex',
-    background: 'var(--color-bg-base)',
+    background: 'var(--pg-surface)',
+    backdropFilter: 'blur(28px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(28px) saturate(180%)',
     color: 'var(--color-text-primary)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+    fontFamily: 'var(--font-family)',
     fontSize: '13px',
     overflow: 'hidden',
     transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease',
@@ -1784,27 +3164,30 @@ const styles: Record<string, React.CSSProperties> = {
   
   // Sidebar
   sidebar: {
-    width: '200px',
-    background: 'var(--color-bg-secondary)',
-    borderRight: '1px solid var(--color-border-subtle)',
+    width: 'var(--pg-sidebar-width)',
+    minWidth: 'var(--pg-sidebar-width)',
+    background: 'var(--pg-sidebar)',
+    borderRight: '1px solid var(--pg-border)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.02)',
   },
   sidebarHeader: {
-    height: '40px',
+    height: '36px',
     display: 'flex',
     alignItems: 'center',
     padding: '0 14px',
-    borderBottom: '1px solid var(--color-border-subtle)',
+    borderBottom: '1px solid var(--pg-border)',
   },
   sidebarTitle: {
-    fontSize: '13px',
-    fontWeight: 600,
+    fontSize: '12px',
+    fontWeight: 700,
     color: 'var(--color-text-primary)',
+    letterSpacing: '-0.01em',
   },
   sectionList: {
-    padding: '6px',
+    padding: '8px',
     display: 'flex',
     flexDirection: 'column',
     gap: '1px',
@@ -1814,14 +3197,18 @@ const styles: Record<string, React.CSSProperties> = {
   sectionItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '8px 10px',
-    borderRadius: '6px',
+    gap: '10px',
+    padding: '7px 12px',
+    height: 'var(--pg-row-height)',
+    borderRadius: 'var(--pg-row-radius)',
     border: 'none',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '12.5px',
+    fontWeight: 500,
     textAlign: 'left',
-    transition: 'all 0.15s ease',
+    transition: 'background-color 0.12s ease, color 0.12s ease',
+    letterSpacing: '-0.01em',
+    position: 'relative',
   },
   sectionIcon: {
     display: 'flex',
@@ -1836,29 +3223,44 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   header: {
-    height: '40px',
+    height: '44px',
     display: 'flex',
     alignItems: 'center',
-    padding: '0 20px',
-    borderBottom: '1px solid var(--color-border-subtle)',
+    padding: '0 18px',
+    borderBottom: '1px solid var(--pg-border)',
+    background: 'var(--pg-toolbar)',
+    backdropFilter: 'blur(18px) saturate(170%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(170%)',
   },
   headerTitle: {
-    fontSize: '14px',
-    fontWeight: 600,
+    fontSize: '15px',
+    fontWeight: 700,
+    letterSpacing: '-0.02em',
+    color: 'var(--color-text-primary)',
   },
   settingsContent: {
     flex: 1,
     overflow: 'auto',
-    padding: '16px 20px',
+    padding: '4px 24px 24px',
+    scrollBehavior: 'smooth',
   },
   sectionTitle: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 600,
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-text-tertiary)',
     textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    marginTop: '24px',
-    marginBottom: '12px',
+    letterSpacing: '0.06em',
+    marginTop: '28px',
+    marginBottom: '10px',
+  },
+  sectionTitleFirst: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: 'var(--color-text-tertiary)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    marginTop: '12px',
+    marginBottom: '10px',
   },
   
   // Setting Row
@@ -1866,7 +3268,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 0',
+    padding: '13px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   settingInfo: {
@@ -1875,12 +3277,15 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px',
   },
   settingLabel: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 500,
+    color: 'var(--color-text-primary)',
+    letterSpacing: '-0.01em',
   },
   settingDesc: {
-    fontSize: '12px',
-    color: 'var(--color-text-muted)',
+    fontSize: '11.5px',
+    color: 'var(--color-text-secondary)',
+    lineHeight: '1.4',
   },
   
   // Toggle
@@ -1891,100 +3296,55 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
     position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
     transition: 'background 0.15s ease',
   },
   toggleKnob: {
     width: '20px',
     height: '20px',
     borderRadius: '50%',
-    background: 'var(--color-bg-elevated)',
+    background: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
     position: 'absolute',
-    top: '2px',
-    transition: 'transform 0.2s',
+    left: '2px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)',
   },
   
-  // Theme Selector
-  themeSelector: {
-    display: 'flex',
-    gap: '12px',
+
+  secondaryBtn: {
     marginTop: '12px',
-  },
-  themeOption: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px',
-    borderRadius: '12px',
-    border: '2px solid transparent',
-    background: 'var(--color-bg-glass)',
-    cursor: 'pointer',
-    color: 'var(--color-text-secondary)',
-    fontSize: '12px',
-  },
-  themePreview: {
-    width: '80px',
-    height: '50px',
-    borderRadius: '6px',
-    border: '1px solid var(--color-border-subtle)',
-  },
-  
-  // Storage
-  storageBar: {
-    height: '8px',
-    borderRadius: '4px',
-    background: 'var(--color-bg-glass)',
-    display: 'flex',
-    overflow: 'hidden',
-    marginTop: '12px',
-  },
-  storageUsed: {
-    height: '100%',
-  },
-  storageLabels: {
-    marginTop: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  storageLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '13px',
-    color: 'var(--color-text-secondary)',
-  },
-  storageDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-  },
-  clearBtn: {
-    marginTop: '20px',
-    padding: '10px 16px',
+    padding: '10px 18px',
     borderRadius: '8px',
-    border: 'none',
-    background: 'var(--color-bg-glass)',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-bg-hover)',
     color: 'var(--color-text-primary)',
     fontSize: '13px',
+    fontWeight: 500,
     cursor: 'pointer',
+    transition: 'all 0.15s ease',
   },
+
   dangerBtn: {
     marginTop: '12px',
-    padding: '10px 16px',
+    padding: '10px 18px',
     borderRadius: '8px',
     border: 'none',
-    background: 'var(--color-error-muted)',
+    background: 'rgba(255,69,58,0.12)',
     color: 'var(--color-error)',
     fontSize: '13px',
+    fontWeight: 500,
     cursor: 'pointer',
+    transition: 'all 0.15s ease',
   },
   dangerBtnSmall: {
     padding: '6px 12px',
     borderRadius: '6px',
     border: 'none',
     background: 'rgba(255,67,58,0.15)',
-    color: '#ff453a',
+    color: 'var(--color-error)',
     fontSize: '12px',
     cursor: 'pointer',
   },
@@ -1997,15 +3357,14 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '24px',
   },
   appIcon: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '14px',
-    background: 'linear-gradient(135deg, #0a84ff, #5e5ce6)',
+    width: '72px',
+    height: '72px',
+    borderRadius: '18px',
+    background: 'linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '18px',
-    fontWeight: 700,
+    boxShadow: '0 4px 16px rgba(10,132,255,0.3), 0 1px 3px rgba(0,0,0,0.2)',
   },
   appInfo: {
     display: 'flex',
@@ -2013,138 +3372,50 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
   },
   appName: {
-    fontSize: '24px',
-    fontWeight: 600,
+    fontSize: '22px',
+    fontWeight: 700,
+    letterSpacing: '-0.03em',
   },
   appVersion: {
     fontSize: '14px',
     color: 'var(--color-text-muted)',
   },
   aboutDetails: {
-    background: 'var(--color-bg-glass)',
+    background: 'var(--color-bg-surface)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: '12px',
-    padding: '16px',
+    padding: '4px 16px',
     marginBottom: '24px',
   },
   aboutRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '8px 0',
+    alignItems: 'center',
+    padding: '10px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   aboutLabel: {
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-text-secondary)',
+    fontSize: '13px',
   },
   aboutValue: {
     color: 'var(--color-text-primary)',
+    fontSize: '13px',
   },
   aboutLinks: {
     display: 'flex',
     gap: '12px',
   },
   linkBtn: {
-    padding: '10px 16px',
+    padding: '9px 16px',
     borderRadius: '8px',
-    border: 'none',
-    background: 'var(--color-bg-glass)',
+    border: '1px solid var(--color-border-subtle)',
+    background: 'var(--color-bg-surface)',
     color: 'var(--color-accent)',
     fontSize: '13px',
+    fontWeight: 500,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-  },
-  
-  // Shortcuts
-  shortcutList: {
-    background: 'var(--color-bg-glass)',
-    borderRadius: '12px',
-    padding: '8px 16px',
-  },
-  shortcutRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '12px 0',
-    borderBottom: '1px solid var(--color-border-subtle)',
-  },
-  shortcutKey: {
-    fontFamily: 'SF Mono, Monaco, monospace',
-    fontSize: '12px',
-    color: 'var(--color-text-secondary)',
-    background: 'var(--color-bg-glass)',
-    padding: '4px 8px',
-    borderRadius: '4px',
-  },
-  
-  // Network
-  networkStatus: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '12px 16px',
-    background: 'var(--color-bg-glass)',
-    borderRadius: '8px',
-    marginTop: '8px',
-  },
-  statusDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-  },
-  inputGroup: {
-    marginTop: '12px',
-  },
-  inputLabel: {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '13px',
-    color: 'var(--color-text-secondary)',
-  },
-  input: {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: '8px',
-    border: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-glass)',
-    color: 'var(--color-text-primary)',
-    fontSize: '13px',
-    outline: 'none',
-  },
-  
-  // Select input
-  selectInput: {
-    padding: '8px 12px',
-    borderRadius: '8px',
-    border: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-glass)',
-    color: 'var(--color-text-primary)',
-    fontSize: '13px',
-    outline: 'none',
-    cursor: 'pointer',
-    minWidth: '150px',
-  },
-  
-  // Add folder button
-  addFolderBtn: {
-    padding: '10px 16px',
-    borderRadius: '8px',
-    border: '1px dashed var(--color-border)',
-    background: 'transparent',
-    color: 'var(--color-accent)',
-    fontSize: '13px',
-    cursor: 'pointer',
-    width: '100%',
-    marginTop: '8px',
-  },
-  
-  // Saved data row
-  savedDataRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 16px',
-    background: 'var(--color-bg-glass)',
-    borderRadius: '8px',
-    marginTop: '8px',
-    fontSize: '13px',
   },
   
   // Manage button

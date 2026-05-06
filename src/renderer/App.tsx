@@ -1,11 +1,11 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — OS-Grade Application Framework
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- OS-Grade Application Framework
+ * ===========================================================================
  * 
  * @author     Onazi Treasure OJ
  * @copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * @version    2.0.0
+ * @version    3.6.0
  * 
  * DEX now operates as a TRUE APPLICATION HOST SYSTEM:
  * - Native-grade sub-apps with real lifecycle
@@ -14,22 +14,38 @@
  * - Fault isolation - one app crash cannot crash DEX
  * - Performance discipline with resource budgets
  * - System integrity monitoring
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useMemo, lazy, Suspense } from 'react';
 import packageJson from '../../package.json';
-import { AppManager } from './components/AppManager';
-import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
-import { SystemFeatures, useSessionAutoSave } from './components/SystemFeatures';
-import { CommandPalette, useCommandPalette } from './components/CommandPalette';
-import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
-import { LockScreen } from './components/LockScreen';
 import { useAuthStore } from './store/useAuthStore';
+import { useWallpaperStore } from './store/wallpaperStore';
 import { AppErrorBoundary } from './services/ErrorBoundary';
+import ToastProvider from './components/Toast';
+import {
+  BatchActionBar,
+  FeedbackPanel,
+  GlobalSearchOverlay,
+  ScratchpadOverlay,
+  TaskQueueStrip,
+  UnifiedSystemsProvider,
+} from './components/UnifiedSystems';
+import { initializeTier } from './services/TierManager';
+import { startPermissionAutoDisable, stopPermissionAutoDisable } from './store/permissionStore';
 import { 
   initAppSubsystemIPC 
 } from './store/appSubsystem';
+import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
+import { CommandPalette, useCommandPalette } from './components/CommandPalette';
+import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
+import { SystemFeatures, useSessionAutoSave } from './components/SystemFeatures';
+import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
+
+// Progressive loading (item 153): Shell + nav immediate, overlays deferred
+const AppManager = lazy(() => import('./components/AppManager').then(m => ({ default: m.AppManager })));
+const LockScreen = lazy(() => import('./components/LockScreen').then(m => ({ default: m.LockScreen })));
+const KeyboardShortcuts = lazy(() => import('./components/KeyboardShortcuts'));
 
 // Services - OS-Grade System Layer
 import {
@@ -38,34 +54,40 @@ import {
   useSessionService,
   useSystemEvents,
 } from './services';
+import { initXenonListener } from './store/xenonStore';
+import { sharedTick } from './services/SharedTick';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// Motion system -- spring physics, reduce-motion, scrollbar styles
+import { initMotionController } from './utils/MotionController';
+
+// UI Polish -- panel animations, slider hover, focus-visible
+import { GLOBAL_POLISH_CSS } from './utils/uiPolish';
+
+// UI Polish System -- dropdowns, menus, overlays, button responsiveness, black screen prevention
+import { initUIPolishSystem, screenGuard } from './services/UIPolishSystem';
+
+// Screen Guard System -- comprehensive black screen prevention
+import { initScreenGuardSystems } from './services/ScreenGuardSystem';
+
+// Shortcut conflict detection
+import { initializeBuiltinShortcuts } from './utils/shortcutConflictDetector';
+
+// ===========================================================================
 // THEME INITIALIZATION
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const initializeTheme = () => {
+  // Respect saved preference, default to dark
+  const savedDarkMode = localStorage.getItem('darkMode');
+  const isDark = savedDarkMode === null ? true : savedDarkMode !== 'false';
+  const theme = isDark ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  document.body.classList.toggle('dark-mode', isDark);
+  document.body.classList.toggle('light-mode', !isDark);
+  document.documentElement.classList.toggle('dark-mode', isDark);
+  document.documentElement.classList.toggle('light-mode', !isDark);
   try {
-    const savedDarkMode = localStorage.getItem('darkMode');
     const savedSettings = localStorage.getItem('dex-settings');
-    
-    let isDark = true; // Default to dark mode
-    
-    if (savedDarkMode !== null) {
-      isDark = savedDarkMode === 'true';
-    } else if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      isDark = settings.darkMode ?? true;
-    }
-    
-    if (isDark) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      document.body.classList.add('dark-mode');
-    } else {
-      document.documentElement.setAttribute('data-theme', 'light');
-      document.body.classList.remove('dark-mode');
-    }
-    
-    // Apply saved accent color
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
       if (settings.accentColor) {
@@ -73,162 +95,386 @@ const initializeTheme = () => {
         document.documentElement.style.setProperty('--accent-color', settings.accentColor);
       }
     }
-  } catch (e) {
-    // Default to dark mode on error
-    document.documentElement.setAttribute('data-theme', 'dark');
-    document.body.classList.add('dark-mode');
+  } catch (_) {
+    // accent color load failed -- defaults are fine
   }
 };
 
-// Initialize theme immediately
-initializeTheme();
+// Theme is initialized in the main useEffect to avoid double calls
+// initializeTheme() removed from module scope (was duplicate)
 
-// ═══════════════════════════════════════════════════════════════════════════
+// Item 78: Sync system accent color from OS (async, non-blocking)
+(async () => {
+  try {
+    const hasUserAccent = localStorage.getItem('dex-accent-color');
+    if (hasUserAccent) return; // User has manually set accent -- respect it
+    const api = (window as any).electronAPI;
+    const osColor = await api?.theme?.getSystemAccentColor?.();
+    if (osColor && /^#[0-9a-f]{6}$/i.test(osColor)) {
+      document.documentElement.style.setProperty('--color-accent', osColor);
+      document.documentElement.style.setProperty('--accent-color', osColor);
+    }
+  } catch {
+    // OS accent detection unavailable
+  }
+})();
+
+// Item 139: DNS prefetch for common resources loaded during session
+if (typeof document !== 'undefined') {
+  const prefetchOrigins = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
+  for (const origin of prefetchOrigins) {
+    const link = document.createElement('link');
+    link.rel = 'dns-prefetch';
+    link.href = origin;
+    document.head.appendChild(link);
+  }
+}
+
+// Startup budget enforcement (item 152): track first paint + interactive milestones
+const STARTUP_MARK = performance.now();
+
+// Detect device perf tier immediately at module load so first paint respects it
+// 5-tier system: lowest | low | mid | high | ultra — managed by TierManager
+(() => {
+  const tier = initializeTier();
+  const screenH = Math.min(window.screen.height, window.screen.width);
+  // Also store screen class for responsive layouts
+  if (screenH <= 480) document.documentElement.setAttribute('data-screen-class', 'small');
+  else if (screenH <= 768) document.documentElement.setAttribute('data-screen-class', 'medium');
+  console.debug(`[DEX] Device tier: ${tier}`);
+})();
+
+// Permission auto-disable timer is started in App component useEffect with cleanup
+if (typeof PerformanceObserver !== 'undefined') {
+  try {
+    const paintObs = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        const ms = Math.round(entry.startTime);
+        if (entry.name === 'first-contentful-paint') {
+          console.debug(`[DEX] First Contentful Paint: ${ms}ms${ms > 2000 ? ' [!] OVER BUDGET (2s)' : ''}`);
+        }
+      }
+      paintObs.disconnect();
+    });
+    paintObs.observe({ type: 'paint', buffered: true });
+  } catch {
+    // PerformanceObserver not supported
+  }
+}
+
+// ===========================================================================
+// FIRST-LAUNCH DATA SEEDING
+// ===========================================================================
+// First-launch data initialisation (no demo content — fresh start for users)
+// ===========================================================================
+
+const seedFirstLaunchData = () => {
+  if (localStorage.getItem('dex-data-seeded')) return;
+  localStorage.setItem('dex-data-seeded', '1');
+
+  // Seed empty collections so pages initialise cleanly
+  if (!localStorage.getItem('dex-tasks')) {
+    localStorage.setItem('dex-tasks', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('dex-notes')) {
+    localStorage.setItem('dex-notes', JSON.stringify([]));
+  }
+};
+
+// Run seed on load
+seedFirstLaunchData();
+
+// ===========================================================================
 // MAIN APP COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const App: React.FC = () => {
-  // Check if user needs onboarding
-  const { needsOnboarding, markOnboardingComplete } = useOnboardingCheck();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
   // Command Palette (Ctrl+K)
   const commandPalette = useCommandPalette();
   
   // Clipboard History (Ctrl+Shift+V)
   const clipboardHistory = useClipboardHistory();
+  
+  // Picture-in-Picture video state
+  const pipState = usePiPState();
+
+  // First-run onboarding
+  const { needsOnboarding, markOnboardingComplete } = useOnboardingCheck();
+
+  // Wallpaper state for global layer
+  const wpMode = useWallpaperStore(s => s.mode);
+  const wpValue = useWallpaperStore(s => s.value);
+  const wpBlur = useWallpaperStore(s => s.blur);
+  const wallpaperBg = useMemo((): React.CSSProperties => {
+    if (wpMode === 'image') return { backgroundImage: `url("${wpValue}")`, backgroundSize: 'cover', backgroundPosition: 'center' };
+    if (wpMode === 'gradient') return { backgroundImage: wpValue };
+    if (wpMode === 'live') return { background: 'var(--color-bg-base)' };
+    return { backgroundColor: wpValue };
+  }, [wpMode, wpValue]);
 
   // Enable session auto-save
   useSessionAutoSave();
 
   // Initialize authentication system
   const authInitialize = useAuthStore(s => s.initialize);
+  const authLock = useAuthStore(s => s.lock);
+  const authIsEnabled = useAuthStore(s => s.isEnabled);
+  const authIsLocked = useAuthStore(s => s.isLocked);
   useEffect(() => {
     authInitialize();
   }, [authInitialize]);
 
-  // Show onboarding on first launch
+  // Permission auto-disable timer - revokes unused permissions after 15 min
   useEffect(() => {
-    if (needsOnboarding) {
-      // Small delay to ensure app is fully loaded
-      const timer = setTimeout(() => setShowOnboarding(true), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [needsOnboarding]);
+    startPermissionAutoDisable();
+    return () => stopPermissionAutoDisable();
+  }, []);
 
-  const handleOnboardingComplete = useCallback(() => {
-    markOnboardingComplete();
-    setShowOnboarding(false);
-  }, [markOnboardingComplete]);
+  // Auto-lock on inactivity
+  useEffect(() => {
+    if (!authIsEnabled || authIsLocked) return;
+    let raw = 5;
+    try {
+      const saved = localStorage.getItem('dex-settings');
+      if (saved) { raw = JSON.parse(saved).autoLockMinutes ?? 5; }
+    } catch { /* defaults */ }
+    const minutes = Number(raw);
+    if (!minutes || minutes <= 0) return;
+    const ms = minutes * 60_000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const handleOnboardingSkip = useCallback(() => {
-    markOnboardingComplete();
-    setShowOnboarding(false);
-  }, [markOnboardingComplete]);
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { authLock(); }, ms);
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const;
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
+    reset();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [authIsEnabled, authIsLocked, authLock]);
+
+  // Item 140: Unified memory pressure detection — downgrades perf tier and sets memory-pressure attribute
+  useEffect(() => {
+    let stopped = false;
+    const initialTier = document.documentElement.getAttribute('data-perf-tier') || 'high';
+    const tierRank: Record<string, number> = { low: 0, mid: 1, high: 2, ultra: 3 };
+
+    const check = async () => {
+      if (stopped) return;
+      try {
+        let usedMB = 0;
+        if (typeof (performance as any).measureUserAgentSpecificMemory === 'function') {
+          const info = await (performance as any).measureUserAgentSpecificMemory();
+          usedMB = info.bytes / (1024 * 1024);
+        } else if ((performance as any).memory) {
+          usedMB = (performance as any).memory.usedJSHeapSize / (1024 * 1024);
+        }
+        // Memory pressure attribute for CSS hiding of decorative elements
+        // Higher thresholds - modern apps easily use 500MB+
+        const pressure = usedMB > 1200 ? 'high' : usedMB > 800 ? 'moderate' : '';
+        if (pressure) {
+          document.documentElement.setAttribute('data-memory-pressure', pressure);
+        } else {
+          document.documentElement.removeAttribute('data-memory-pressure');
+        }
+        // Only downgrade if memory is EXTREMELY high (1GB+)
+        const memTier = usedMB > 1500 ? 'low' : usedMB > 1000 ? 'mid' : 'high';
+        const effectiveTier = (tierRank[memTier] ?? 3) < (tierRank[initialTier] ?? 3) ? memTier : initialTier;
+        document.documentElement.setAttribute('data-perf-tier', effectiveTier);
+      } catch { /* not supported */ }
+    };
+
+    const startup = setTimeout(() => {
+      check();
+      sharedTick.subscribe('app-mem-pressure', check, 60_000);
+    }, 8000);
+
+    return () => { stopped = true; clearTimeout(startup); sharedTick.unsubscribe('app-mem-pressure'); document.documentElement.removeAttribute('data-memory-pressure'); };
+  }, []);
 
   // Initialize IPC bridge and system services on mount
-  // Sanitize inline hardcoded colors so theme switching doesn't leave white-on-white or black-on-black
+  // Item 141: Sanitize inline hardcoded colors so theme switching works correctly
   useEffect(() => {
+    const HARDCODED_COLORS = new Set([
+      'rgb(255,255,255)', '#fff', '#ffffff', 'white',
+      'rgb(0,0,0)', '#000', '#000000', 'black',
+    ]);
+
     const sanitizeInlineColors = () => {
       try {
         const rootStyles = getComputedStyle(document.documentElement);
         const primary = (rootStyles.getPropertyValue('--color-text-primary') || 'var(--color-text-primary)').trim();
-        // Find elements with inline style color set to literal white/black and replace with CSS variable
-        document.querySelectorAll('[style]').forEach(el => {
+        // Limit scope to main content area instead of entire document
+        const scope = document.getElementById('dex-main-content') || document.body;
+        // Only scan top-level children to avoid deep DOM walks
+        const els = scope.querySelectorAll(':scope > [style*="color"], :scope > * > [style*="color"]');
+        els.forEach(el => {
           try {
             const html = el as HTMLElement;
-            const s = html.style;
-            if (!s) return;
-            const c = (s.color || '').toString().trim().toLowerCase();
-            if (!c) return;
-            // Normalize common hardcoded values
-            const normalized = c.replace(/\s+/g, '');
-            if (normalized === 'rgb(255,255,255)' || normalized === '#fff' || normalized === '#ffffff' || normalized === 'white' || normalized === 'rgb(0,0,0)' || normalized === '#000' || normalized === '#000000' || normalized === 'black') {
-              s.color = primary;
+            const c = (html.style.color || '').trim().toLowerCase().replace(/\s+/g, '');
+            if (c && HARDCODED_COLORS.has(c)) {
+              html.style.color = primary;
             }
-          } catch (e) {
+          } catch {
             // ignore per-element failures
           }
         });
-      } catch (e) {
+      } catch {
         // do nothing on error
       }
     };
 
-    // Run once on mount
-    sanitizeInlineColors();
+    // Only sanitize on theme change, not on mount (CSS vars handle it now)
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Observe theme changes on <html data-theme="..."> and re-sanitize
     const obs = new MutationObserver(muts => {
       for (const m of muts) {
-        if (m.type === 'attributes' && (m as MutationRecord).attributeName === 'data-theme') {
-          sanitizeInlineColors();
+        if (m.type === 'attributes' && m.attributeName === 'data-theme') {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(sanitizeInlineColors, 500);
           break;
         }
       }
     });
     obs.observe(document.documentElement, { attributes: true });
-    return () => obs.disconnect();
+    return () => { obs.disconnect(); if (debounceTimer) clearTimeout(debounceTimer); };
   }, []);
   useEffect(() => {
     // Re-apply theme on mount (in case it wasn't applied)
     initializeTheme();
     
+    // === CRITICAL PATH (must run immediately) ===
+    // Initialize motion system (spring physics, reduce-motion, scrollbar styles)
+    initMotionController();
+    
+    // Initialize UI polish system (dropdowns, menus, button responsiveness, black screen prevention)
+    initUIPolishSystem();
+    
+    // Initialize comprehensive screen guard (prevents black screen after sleep/wake)
+    initScreenGuardSystems();
+    
     // Initialize legacy app subsystem
     initAppSubsystemIPC();
+
+    // Initialize Xenon push-model listener (replaces renderer polling for system metrics)
+    const cleanupXenon = initXenonListener();
     
     // Start user session
     useSessionService.getState().startSession();
-    
-    // Start performance monitoring
-    usePerformanceMonitor.getState().startMonitoring();
-    
-    // Start integrity monitoring
-    useIntegrityMonitor.getState().startMonitoring();
-    
-    // Emit startup event
-    useSystemEvents.getState().emit({
-      type: 'service_status',
-      data: { message: 'DEX System initialized', version: packageJson.version },
-      severity: 'info',
-    });
+
+    // === DEFERRED: non-critical init via requestIdleCallback (item 144) ===
+    const idleInit = () => {
+      // Initialize shortcut conflict detection
+      initializeBuiltinShortcuts();
+      
+      // Start performance monitoring
+      usePerformanceMonitor.getState().startMonitoring();
+      
+      // Start integrity monitoring
+      useIntegrityMonitor.getState().startMonitoring();
+      
+      // Item 142: Detect device capabilities — REMOVED (module-level IIFE already sets
+      // data-perf-tier with full WebGL/GPU/screen checks; this deferred version
+      // was overwriting ultra-low → low and high → mid incorrectly)
+
+      // Item 143: Report startup completion time
+      const startupDuration = Math.round(performance.now() - STARTUP_MARK);
+      console.debug(`[DEX] Startup complete: ${startupDuration}ms`);
+
+      // Emit startup event
+      useSystemEvents.getState().emit({
+        type: 'service_status',
+        data: { message: 'DEX System initialized', version: packageJson.version, startupMs: startupDuration },
+        severity: 'info',
+      });
+    };
+
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(idleInit, { timeout: 3000 });
+    } else {
+      setTimeout(idleInit, 200);
+    }
 
     // Cleanup on unmount
     return () => {
+      cleanupXenon();
       usePerformanceMonitor.getState().stopMonitoring();
       useIntegrityMonitor.getState().stopMonitoring();
       useSessionService.getState().endSession();
     };
   }, []);
 
-  // Handle app launch events
-  const handleAppLaunch = useCallback((_appId: string) => {
-    // App launch tracked via SystemEvents
-  }, []);
-
   return (
     <AppErrorBoundary instanceId="root" appId="dex-root" appName="DEX" appColor="var(--color-accent, #0a84ff)">
+    <ToastProvider>
+    <UnifiedSystemsProvider>
     <div style={rootStyles.container}>
-      <style>{globalStyles}</style>
+      <style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
       
+      {/* Window drag region for frameless window (Windows) */}
+      <div className="dex-window-titlebar" aria-hidden="true" />
+      
+      {/* Skip to content link for keyboard/screen reader users */}
+      <a className="skip-to-content" href="#dex-main-content">
+        Skip to content
+      </a>
+      
+      {/* First-run onboarding wizard */}
+      {needsOnboarding && (
+        <Suspense fallback={null}>
+          <OnboardingWizard onComplete={markOnboardingComplete} onSkip={markOnboardingComplete} />
+        </Suspense>
+      )}
+
       {/* Lock Screen - blocks all interaction when locked */}
-      <LockScreen />
+      <AppErrorBoundary instanceId="lockscreen" appId="lockscreen" appName="Lock Screen" appColor="#ff453a">
+      <Suspense fallback={null}>
+        <LockScreen />
+      </Suspense>
+      </AppErrorBoundary>
 
       {/* System Features (Quick Launcher, Notifications, etc.) */}
-      <SystemFeatures />
+      <AppErrorBoundary instanceId="sysfeatures" appId="sysfeatures" appName="System Features" appColor="#30d158">
+      <Suspense fallback={null}>
+        <SystemFeatures />
+      </Suspense>
+      </AppErrorBoundary>
+      
+      {/* Unified Systems Overlays — deferred (item 153) */}
+      <AppErrorBoundary instanceId="unified-overlays" appId="unified-overlays" appName="Unified Systems" appColor="#5e5ce6">
+      <Suspense fallback={null}>
+        <GlobalSearchOverlay />
+        <ScratchpadOverlay />
+        <FeedbackPanel />
+        <TaskQueueStrip />
+        <BatchActionBar />
+        <KeyboardShortcuts />
+      </Suspense>
+      </AppErrorBoundary>
       
       {/* Command Palette - Ctrl+K */}
-      <CommandPalette 
-        isOpen={commandPalette.isOpen} 
-        onClose={commandPalette.close} 
-      />
+      <AppErrorBoundary instanceId="cmdpalette" appId="cmdpalette" appName="Command Palette" appColor="#ff9f0a">
+      <Suspense fallback={null}>
+        <CommandPalette 
+          isOpen={commandPalette.isOpen} 
+          onClose={commandPalette.close} 
+        />
+      </Suspense>
+      </AppErrorBoundary>
       
       {/* Clipboard History - Ctrl+Shift+V */}
-      <ClipboardHistory
-        isOpen={clipboardHistory.isOpen}
-        onClose={clipboardHistory.close}
-        onSelect={(content: string) => {
-          // Paste selected clipboard content into active element
+      <AppErrorBoundary instanceId="clipboard" appId="clipboard" appName="Clipboard History" appColor="#64d2ff">
+      <Suspense fallback={null}>
+        <ClipboardHistory
+          isOpen={clipboardHistory.isOpen}
+          onClose={clipboardHistory.close}
+          onSelect={(content: string) => {
+            // Paste selected clipboard content into active element
           const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
           if (el && ('value' in el)) {
             const start = el.selectionStart ?? el.value.length;
@@ -239,19 +485,37 @@ export const App: React.FC = () => {
           }
         }}
       />
-      
-      {/* Onboarding Wizard for first-time users */}
-      {showOnboarding && (
-        <OnboardingWizard 
-          onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingSkip}
+      </Suspense>
+      </AppErrorBoundary>
+
+      {/* Picture-in-Picture Video Player */}
+      {pipState && (
+        <PictureInPicture
+          src={pipState.src}
+          poster={pipState.poster}
+          title={pipState.title}
+          onClose={closePiP}
         />
       )}
       
-      <AppManager 
-        onAppLaunch={handleAppLaunch}
-      />
+      {/* Global wallpaper layer -- sits behind everything, reacts to wallpaper store */}
+      <div aria-hidden="true" style={{
+        position: 'fixed', inset: 0, zIndex: -2,
+        ...wallpaperBg,
+        filter: wpBlur > 0 ? `blur(${wpBlur}px)` : undefined,
+        transform: wpBlur > 0 ? 'scale(1.05)' : undefined,
+        transition: 'background 0.5s ease, filter 0.4s ease',
+        willChange: wpBlur > 0 ? 'transform, filter' : 'auto',
+      }} />
+
+      <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <Suspense fallback={null}>
+          <AppManager />
+        </Suspense>
+      </div>
     </div>
+    </UnifiedSystemsProvider>
+    </ToastProvider>
     </AppErrorBoundary>
   );
 };
@@ -261,7 +525,9 @@ const rootStyles: Record<string, React.CSSProperties> = {
     height: '100vh',
     width: '100vw',
     overflow: 'hidden',
-    background: 'var(--color-bg-base)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    background: 'transparent',
     fontFamily: 'var(--font-family, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif)',
     transition: 'background-color 0.3s ease, color 0.3s ease',
   },
@@ -279,6 +545,22 @@ const globalStyles = `
     transition: 
       background-color var(--duration-theme, 0.3s) var(--ease-default, ease),
       color var(--duration-theme, 0.3s) var(--ease-default, ease);
+  }
+`;
+
+// Titlebar drag region for frameless Windows
+// NOTE: pointer-events: none so it doesn't block window controls
+// The -webkit-app-region: drag still works for window dragging
+const titlebarStyles = `
+  .dex-window-titlebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    -webkit-app-region: drag;
+    z-index: 50;
+    pointer-events: none;
   }
 `;
 

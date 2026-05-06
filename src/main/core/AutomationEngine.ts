@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Automation Engine
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Real, end-to-end automation system for:
  * - File triggers (manual or approved events)
@@ -17,14 +23,15 @@
  * - Full undo/rollback where possible
  */
 
+import log from 'electron-log';
 import { ipcMain, app, BrowserWindow, shell, Notification } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type TriggerType = 
   | 'manual'              // User-initiated
@@ -131,9 +138,9 @@ export interface AutomationEngineConfig {
   autoApproveManual: boolean;      // Auto-approve manual triggers
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Automation Engine
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AutomationEngine {
   private mainWindow: BrowserWindow | null = null;
@@ -165,9 +172,9 @@ class AutomationEngine {
     this.registerIPCHandlers();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Initialization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async initialize(): Promise<void> {
     try {
@@ -204,12 +211,12 @@ class AutomationEngine {
         this.startFileWatchers();
       }
       
-      console.log('[AutomationEngine] Initialized:', {
+      log.info('[AutomationEngine] Initialized:', {
         automations: this.automations.size,
         enabled: this.config.enabled,
       });
     } catch (err) {
-      console.error('[AutomationEngine] Initialization error:', err);
+      log.error('[AutomationEngine] Initialization error:', err);
     }
   }
 
@@ -217,9 +224,9 @@ class AutomationEngine {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Automation CRUD
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async createAutomation(data: Partial<Automation>): Promise<Automation> {
     const automation: Automation = {
@@ -304,9 +311,9 @@ class AutomationEngine {
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Execution Preview
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async previewExecution(
     automationId: string,
@@ -414,9 +421,9 @@ class AutomationEngine {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Execution
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async execute(
     automationId: string,
@@ -708,19 +715,19 @@ class AutomationEngine {
     return { output: { ...input, archivedTo: destPath } };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Undo
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async undoExecution(logId: string): Promise<boolean> {
-    const log = this.executionLogs.find(l => l.id === logId);
-    if (!log || !log.canUndo || !log.undoData?.stack) {
+    const entry = this.executionLogs.find(l => l.id === logId);
+    if (!entry || !entry.canUndo || !entry.undoData?.stack) {
       return false;
     }
     
     try {
       // Execute undo operations in reverse order
-      const stack = [...log.undoData.stack].reverse();
+      const stack = [...entry.undoData.stack].reverse();
       
       for (const op of stack) {
         switch (op.type) {
@@ -733,19 +740,19 @@ class AutomationEngine {
         }
       }
       
-      log.canUndo = false;
+      entry.canUndo = false;
       await this.saveLogs();
       
       return true;
     } catch (err) {
-      console.error('[AutomationEngine] Undo error:', err);
+      log.error('[AutomationEngine] Undo error:', err);
       return false;
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // File Watchers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private startFileWatchers(): void {
     for (const automation of this.automations.values()) {
@@ -780,7 +787,7 @@ class AutomationEngine {
       
       this.fileWatchers.set(automation.id, watcher);
     } catch (err) {
-      console.error('[AutomationEngine] Watch error:', err);
+      log.error('[AutomationEngine] Watch error:', err);
     }
   }
 
@@ -813,9 +820,9 @@ class AutomationEngine {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Helpers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private updateStepStatus(
     log: ExecutionLog,
@@ -873,9 +880,9 @@ class AutomationEngine {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Configuration
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getConfig(): AutomationEngineConfig {
     return { ...this.config };
@@ -901,9 +908,9 @@ class AutomationEngine {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Logs
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getExecutionLogs(automationId?: string, limit?: number): ExecutionLog[] {
     let logs = this.executionLogs;
@@ -940,9 +947,9 @@ class AutomationEngine {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers (uses 'automationEngine:' prefix to avoid conflict with AutomationController)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     ipcMain.handle('automationEngine:getConfig', () => this.getConfig());
@@ -967,9 +974,9 @@ class AutomationEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Export
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const automationEngine = new AutomationEngine();
 export default automationEngine;

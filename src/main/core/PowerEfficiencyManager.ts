@@ -1,15 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Power Efficiency Manager
 // Phase 42: Battery preservation and power-aware optimization
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import { powerMonitor, app } from 'electron';
 import Store from 'electron-store';
 import * as os from 'os';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type PowerState = 'ac' | 'battery' | 'unknown';
 export type EfficiencyMode = 'normal' | 'battery-saver' | 'aggressive-saver' | 'performance';
@@ -49,9 +56,9 @@ export interface PowerEvent {
   details: Record<string, unknown>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EFFICIENCY PRESETS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const EFFICIENCY_PRESETS: Record<EfficiencyMode, ResourceLimits> = {
   performance: {
@@ -92,9 +99,9 @@ const EFFICIENCY_PRESETS: Record<EfficiencyMode, ResourceLimits> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const powerStore = new Store<{
   config: EfficiencyConfig;
@@ -130,9 +137,9 @@ const powerStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // POWER EFFICIENCY MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PowerEfficiencyManager {
   private static instance: PowerEfficiencyManager;
@@ -151,9 +158,9 @@ class PowerEfficiencyManager {
     return PowerEfficiencyManager.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -170,7 +177,7 @@ class PowerEfficiencyManager {
     }, 5 * 60 * 1000);
 
     this.initialized = true;
-    console.log('[PowerEfficiencyManager] Initialized');
+    log.info('[PowerEfficiencyManager] Initialized');
   }
 
   private setupPowerMonitoring(): void {
@@ -184,11 +191,11 @@ class PowerEfficiencyManager {
     });
 
     powerMonitor.on('suspend', () => {
-      console.log('[PowerEfficiencyManager] System suspending');
+      log.info('[PowerEfficiencyManager] System suspending');
     });
 
     powerMonitor.on('resume', () => {
-      console.log('[PowerEfficiencyManager] System resumed');
+      log.info('[PowerEfficiencyManager] System resumed');
       this.updatePowerState();
     });
 
@@ -204,9 +211,9 @@ class PowerEfficiencyManager {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // POWER STATE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async updatePowerState(): Promise<void> {
     const status = await this.getPowerStatus();
@@ -264,9 +271,9 @@ class PowerEfficiencyManager {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // POWER SOURCE CHANGES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private onPowerSourceChange(newState: PowerState): void {
     const config = powerStore.get('config');
@@ -279,7 +286,7 @@ class PowerEfficiencyManager {
       details: { previousState, newState },
     });
 
-    console.log(`[PowerEfficiencyManager] Power source: ${newState}`);
+    log.info(`[PowerEfficiencyManager] Power source: ${newState}`);
 
     // Auto-switch mode on battery
     if (config.autoSwitchOnBattery) {
@@ -304,7 +311,7 @@ class PowerEfficiencyManager {
     stats.batteryDrainEvents++;
     powerStore.set('statistics', stats);
 
-    console.log(`[PowerEfficiencyManager] Low battery: ${level}%`);
+    log.info(`[PowerEfficiencyManager] Low battery: ${level}%`);
 
     // Switch to aggressive saver
     if (config.autoSwitchOnBattery && level < 10) {
@@ -312,9 +319,9 @@ class PowerEfficiencyManager {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MODE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getMode(): EfficiencyMode {
     return powerStore.get('config').mode;
@@ -341,7 +348,7 @@ class PowerEfficiencyManager {
     // Notify listeners
     this.notifyLimitsChange(limits);
 
-    console.log(`[PowerEfficiencyManager] Mode set to: ${mode}`);
+    log.info(`[PowerEfficiencyManager] Mode set to: ${mode}`);
     return limits;
   }
 
@@ -349,9 +356,9 @@ class PowerEfficiencyManager {
     return powerStore.get('currentLimits');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): EfficiencyConfig {
     return powerStore.get('config');
@@ -370,9 +377,9 @@ class PowerEfficiencyManager {
     return updated;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RESOURCE CHECKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   shouldAllowBackgroundTask(): boolean {
     const limits = powerStore.get('currentLimits');
@@ -398,9 +405,9 @@ class PowerEfficiencyManager {
     return this.currentPowerState === 'battery';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // YIELD REQUEST
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Request Dex to yield resources immediately
@@ -418,12 +425,12 @@ class PowerEfficiencyManager {
       global.gc();
     }
 
-    console.log('[PowerEfficiencyManager] Resources yielded');
+    log.info('[PowerEfficiencyManager] Resources yielded');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EVENT RECORDING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private recordEvent(event: PowerEvent): void {
     const events = powerStore.get('events');
@@ -441,9 +448,9 @@ class PowerEfficiencyManager {
     return powerStore.get('events').slice(-limit);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LISTENERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   onLimitsChange(callback: (limits: ResourceLimits) => void): () => void {
     this.stateChangeListeners.add(callback);
@@ -454,9 +461,9 @@ class PowerEfficiencyManager {
     this.stateChangeListeners.forEach(cb => cb(limits));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATISTICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatistics(): typeof powerStore.store['statistics'] {
     return powerStore.get('statistics');
@@ -471,9 +478,9 @@ class PowerEfficiencyManager {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatus(): {
     powerState: PowerState;
@@ -490,9 +497,9 @@ class PowerEfficiencyManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const powerEfficiencyManager = PowerEfficiencyManager.getInstance();
 export default powerEfficiencyManager;

@@ -1,13 +1,20 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 23: Onboarding & First-Run Experience
 // Ambient, non-intrusive discovery system
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { debouncedJsonStorage } from '../utils/debouncedStorage';
 
 // Features that can show one-time hints
-type DiscoverableFeature = 
+export type DiscoverableFeature = 
   | 'notes-create'
   | 'workflow-run'
   | 'search-used'
@@ -82,14 +89,15 @@ export const useOnboarding = create<OnboardingState>()(
     }),
     {
       name: 'dex-onboarding',
+      storage: debouncedJsonStorage,
       version: 1,
     }
   )
 );
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HINT CONTENT - One line, calm, helpful
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const hintContent: Record<DiscoverableFeature, string> = {
   'notes-create': 'Notes are saved locally and sync-ready',
@@ -102,9 +110,9 @@ export const hintContent: Record<DiscoverableFeature, string> = {
   'settings-theme': 'Your preferences are stored locally',
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EMPTY STATE CONTENT - Purpose + one action
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const emptyStateContent = {
   notes: {
@@ -144,9 +152,9 @@ export const emptyStateContent = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TRUST INDICATORS - Subtle, honest
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const trustIndicators = {
   localOnly: 'Stored locally only',

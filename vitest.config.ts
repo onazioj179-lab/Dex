@@ -1,7 +1,7 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX VITEST CONFIGURATION
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Modern test framework configuration for:
  * - Unit tests (main process & renderer)
@@ -37,9 +37,6 @@ export default defineConfig({
       'dist',
       'release',
       'tests/e2e/**', // E2E tests use Playwright
-      'tests/e2e-integration.test.ts', // Legacy test file
-      'tests/component.test.ts', // Legacy test file  
-      'tests/ui-integration.test.ts', // Legacy test file
     ],
     
     // Coverage configuration

@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Network Hygiene Monitor
 // Defensive network hygiene - outbound-only, encrypted channels
 // No plain-text traffic, certificate validation, activity pausing
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { net, app } from 'electron';
 import * as https from 'https';
@@ -11,9 +17,9 @@ import * as dns from 'dns';
 import Store from 'electron-store';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface NetworkConfig {
   enabled: boolean;
@@ -74,16 +80,16 @@ export interface ConnectivityDetail {
   ssid?: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const MAX_LOG_ENTRIES = 500;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const networkStore = new Store<{
   config: NetworkConfig;
@@ -106,7 +112,7 @@ const networkStore = new Store<{
         'electronjs.org',
       ],
       blockedDomains: [],
-      maxConcurrentConnections: 10,
+      maxConcurrentConnections: 200,
       connectionTimeout: DEFAULT_TIMEOUT,
       logAllConnections: false,
     },
@@ -132,9 +138,9 @@ interface NetworkStatistics {
   lastReset: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // NETWORK HYGIENE MONITOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class NetworkHygieneMonitorClass {
   private activeConnections: Map<string, ConnectionAttempt> = new Map();
@@ -149,9 +155,9 @@ class NetworkHygieneMonitorClass {
     blockedAttempts: 0,
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     log.info('[NetworkHygiene] Initializing network hygiene monitor...');
@@ -177,9 +183,9 @@ class NetworkHygieneMonitorClass {
     log.info('[NetworkHygiene] Network hygiene monitor shutdown');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONNECTION VALIDATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   // Check if a connection should be allowed
   async validateConnection(
@@ -218,7 +224,12 @@ class NetworkHygieneMonitorClass {
       }
     }
 
-    // Check concurrent connection limit
+    // Check concurrent connection limit (TTL-sweep stale entries first)
+    const now = Date.now();
+    const timeout = config.connectionTimeout || DEFAULT_TIMEOUT;
+    for (const [cid, conn] of this.activeConnections) {
+      if (now - conn.timestamp > timeout) this.activeConnections.delete(cid);
+    }
     if (this.activeConnections.size >= config.maxConcurrentConnections) {
       return { allowed: false, reason: 'Connection limit reached' };
     }
@@ -330,9 +341,9 @@ class NetworkHygieneMonitorClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DOMAIN MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private isDomainBlocked(domain: string): boolean {
     const config = this.getConfig();
@@ -374,9 +385,9 @@ class NetworkHygieneMonitorClass {
     networkStore.set('config', config);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NETWORK STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async updateNetworkStatus(): Promise<NetworkStatus> {
     try {
@@ -406,8 +417,8 @@ class NetworkHygieneMonitorClass {
   }
 
   private detectConnectionType(): 'wifi' | 'ethernet' | 'cellular' | 'unknown' {
-    // Basic detection - would need native module for accurate detection
-    // For now, return unknown
+    // Accurate detection requires native modules — infer from online state
+    if (net.isOnline()) return 'ethernet'; // Assume wired on desktop unless native detection available
     return 'unknown';
   }
 
@@ -440,9 +451,9 @@ class NetworkHygieneMonitorClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PAUSE / RESUME
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   pause(): void {
     this.isPaused = true;
@@ -458,9 +469,9 @@ class NetworkHygieneMonitorClass {
     return this.isPaused;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DNS VALIDATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async resolveDomain(domain: string): Promise<string[] | null> {
     return new Promise((resolve) => {
@@ -475,9 +486,9 @@ class NetworkHygieneMonitorClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURE REQUEST HELPER
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async secureRequest(
     url: string,
@@ -521,9 +532,9 @@ class NetworkHygieneMonitorClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LOGGING & STATISTICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private logConnection(
     id: string,
@@ -604,9 +615,9 @@ class NetworkHygieneMonitorClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): NetworkConfig {
     return networkStore.get('config');
@@ -620,9 +631,9 @@ class NetworkHygieneMonitorClass {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const NetworkHygieneMonitor = new NetworkHygieneMonitorClass();
 export default NetworkHygieneMonitor;

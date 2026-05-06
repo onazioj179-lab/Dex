@@ -1,17 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// DEX Native — TypeScript Loader
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
+// DEX Native -- TypeScript Loader
 // Loads the Rust NAPI-RS native module and provides a typed interface.
 // Falls back to JS implementations if the native module isn't available.
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import * as path from 'path';
 import * as os from 'os';
 import type { DexNativeModule } from './types';
 import log from 'electron-log';
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Module Loading
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 let nativeModule: DexNativeModule | null = null;
 let loadAttempted = false;
@@ -43,7 +49,7 @@ function loadNativeModule(): DexNativeModule | null {
   // NAPI-RS generates: dex-native.<platform>.node
   // With GNU toolchain on Windows: dex-native.win32-x64-gnu.node
   const candidates = [
-    // Dev build (in native/ directory) — GNU toolchain (default on Windows without MSVC)
+    // Dev build (in native/ directory) -- GNU toolchain (default on Windows without MSVC)
     path.join(__dirname, '..', '..', '..', 'native', `dex-native.${platform}-${arch}-gnu.node`),
     // Dev build - MSVC toolchain
     path.join(__dirname, '..', '..', '..', 'native', `dex-native.${platformStr}-${archStr}-msvc.node`),
@@ -69,13 +75,13 @@ function loadNativeModule(): DexNativeModule | null {
     }
   }
 
-  log.warn('[Native] Rust native module not found — using JS fallback');
+  log.warn('[Native] Rust native module not found -- using JS fallback');
   return null;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Public API
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Check if the native Rust module is available.
@@ -102,9 +108,9 @@ export function requireNative(): DexNativeModule {
   return mod;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Re-export types
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 export type {
   SystemStats,
@@ -120,5 +126,15 @@ export type {
   DirectorySize,
   HealthStatus,
   Suggestion,
+  ColorInfo,
+  BatchHashResult,
+  ProjectStats,
+  KernelSchedulerStats,
+  KernelMemoryStats,
+  KernelIOStats,
+  KernelIPCStats,
+  KernelCPUStats,
+  KernelStartupStats,
+  KernelPerfStats,
   DexNativeModule,
 } from './types';

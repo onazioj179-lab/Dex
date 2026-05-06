@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vm from 'vm';
@@ -66,7 +72,7 @@ class RewindPluginManager {
 
   shutdown(): void {
     for (const plugin of this.plugins.values()) {
-      try { plugin.hooks.onUnload?.(); } catch {}
+      try { plugin.hooks.onUnload?.(); } catch (e) { log.warn('[DEX]', e); }
     }
     this.plugins.clear();
   }
@@ -96,7 +102,7 @@ class RewindPluginManager {
   }
 
   openPluginsFolder(): void {
-    shell.openPath(this.pluginsDir).catch(() => {});
+    shell.openPath(this.pluginsDir).catch((e: unknown) => { log.warn('[DEX]', e); });
   }
 
   setEnabled(id: string, enabled: boolean): boolean {
@@ -107,7 +113,7 @@ class RewindPluginManager {
     if (existing) {
       existing.enabled = enabled;
       if (!enabled) {
-        try { existing.hooks.onUnload?.(); } catch {}
+        try { existing.hooks.onUnload?.(); } catch (e) { log.warn('[DEX]', e); }
       } else {
         try {
           existing.hooks.onLoad?.(this.buildApi(id, existing));
@@ -183,28 +189,28 @@ class RewindPluginManager {
   emitActivity(event: any): void {
     for (const plugin of this.plugins.values()) {
       if (!plugin.enabled) continue;
-      try { plugin.hooks.onActivityEvent?.(event); } catch {}
+      try { plugin.hooks.onActivityEvent?.(event); } catch (e) { log.warn('[DEX]', e); }
     }
   }
 
   emitFocusStart(session: any): void {
     for (const plugin of this.plugins.values()) {
       if (!plugin.enabled) continue;
-      try { plugin.hooks.onFocusSessionStart?.(session); } catch {}
+      try { plugin.hooks.onFocusSessionStart?.(session); } catch (e) { log.warn('[DEX]', e); }
     }
   }
 
   emitFocusEnd(session: any): void {
     for (const plugin of this.plugins.values()) {
       if (!plugin.enabled) continue;
-      try { plugin.hooks.onFocusSessionEnd?.(session); } catch {}
+      try { plugin.hooks.onFocusSessionEnd?.(session); } catch (e) { log.warn('[DEX]', e); }
     }
   }
 
   emitSummary(summary: any): void {
     for (const plugin of this.plugins.values()) {
       if (!plugin.enabled) continue;
-      try { plugin.hooks.onSummaryGenerated?.(summary); } catch {}
+      try { plugin.hooks.onSummaryGenerated?.(summary); } catch (e) { log.warn('[DEX]', e); }
     }
   }
 
@@ -329,7 +335,7 @@ class RewindPluginManager {
     try {
       fs.writeFileSync(this.settingsFile, JSON.stringify(this.enabledState, null, 2), 'utf-8');
       fs.writeFileSync(this.dataFile, JSON.stringify(this.pluginData, null, 2), 'utf-8');
-    } catch {}
+    } catch (err) { log.warn('[RewindPluginManager] Failed to save state:', err); }
   }
 
   private ensureFolders(): void {

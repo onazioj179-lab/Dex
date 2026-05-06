@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Performance Utilities
 // Phase 10: Final performance hardening utilities
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { useRef, useMemo, useEffect, DependencyList } from 'react';
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // DEBOUNCE & THROTTLE
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Debounce a function - only call after a delay since last invocation
@@ -51,9 +57,9 @@ export function throttle<T extends (...args: any[]) => any>(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // REACT HOOKS FOR PERFORMANCE
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Debounced callback hook
@@ -116,9 +122,9 @@ export function usePrevious<T>(value: T): T | undefined {
   return ref.current;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // MEMOIZATION
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Simple memoization with size limit
@@ -154,9 +160,9 @@ export function memoize<T extends (...args: any[]) => any>(
   }) as T;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // RENDER OPTIMIZATION
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Shallow comparison for React.memo
@@ -203,9 +209,9 @@ export function deepEqual(a: any, b: any): boolean {
   return false;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // ASYNC UTILITIES
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Run expensive work in idle time
@@ -234,9 +240,9 @@ export async function batchAsync<T>(
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // DOM OPTIMIZATION
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 /**
  * Batch DOM reads/writes to avoid layout thrashing
@@ -275,4 +281,399 @@ function scheduleFrame() {
 }
 
 // Import useState for useDebouncedValue
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+
+// -------------------------------------------------------------------------
+// RAF THROTTLE - Smooth 60fps updates
+// -------------------------------------------------------------------------
+
+/**
+ * Throttle a callback to fire at most once per animation frame.
+ * Ideal for mousemove, scroll, resize handlers.
+ */
+export function rafThrottle<T extends (...args: any[]) => void>(fn: T): T & { cancel: () => void } {
+  let frameId: number | null = null;
+  let lastArgs: Parameters<T> | null = null;
+
+  const throttled = ((...args: Parameters<T>) => {
+    lastArgs = args;
+    if (frameId === null) {
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        if (lastArgs) fn(...lastArgs);
+      });
+    }
+  }) as T & { cancel: () => void };
+
+  throttled.cancel = () => {
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+  };
+
+  return throttled;
+}
+
+/**
+ * Hook that returns a RAF-throttled callback.
+ */
+export function useRAFThrottle<T extends (...args: any[]) => void>(callback: T): T {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
+  const throttledRef = useRef<ReturnType<typeof rafThrottle<T>> | null>(null);
+
+  if (!throttledRef.current) {
+    throttledRef.current = rafThrottle((...args: Parameters<T>) => {
+      callbackRef.current(...args);
+    }) as ReturnType<typeof rafThrottle<T>>;
+  }
+
+  useEffect(() => {
+    return () => throttledRef.current?.cancel();
+  }, []);
+
+  return throttledRef.current as T;
+}
+
+// -------------------------------------------------------------------------
+// VIRTUALIZATION HELPERS
+// -------------------------------------------------------------------------
+
+export interface VirtualRange {
+  start: number;
+  end: number;
+  offsetTop: number;
+  totalHeight: number;
+}
+
+/**
+ * Calculate which items are visible in a virtual scroll container.
+ */
+export function calculateVirtualRange(
+  totalItems: number,
+  itemHeight: number,
+  containerHeight: number,
+  scrollTop: number,
+  overscan = 3
+): VirtualRange {
+  const visibleStart = Math.floor(scrollTop / itemHeight);
+  const visibleCount = Math.ceil(containerHeight / itemHeight);
+  
+  const start = Math.max(0, visibleStart - overscan);
+  const end = Math.min(totalItems, visibleStart + visibleCount + overscan);
+  
+  return {
+    start,
+    end,
+    offsetTop: start * itemHeight,
+    totalHeight: totalItems * itemHeight,
+  };
+}
+
+/**
+ * Hook for virtual scrolling with fixed item height.
+ */
+export function useVirtualScroll(
+  totalItems: number,
+  itemHeight: number,
+  containerRef: React.RefObject<HTMLElement>,
+  overscan = 3
+): VirtualRange {
+  const [range, setRange] = useState<VirtualRange>({
+    start: 0,
+    end: Math.min(totalItems, 20),
+    offsetTop: 0,
+    totalHeight: totalItems * itemHeight,
+  });
+
+  const updateRange = useRAFThrottle(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const newRange = calculateVirtualRange(
+      totalItems,
+      itemHeight,
+      container.clientHeight,
+      container.scrollTop,
+      overscan
+    );
+
+    setRange(prev => {
+      if (prev.start === newRange.start && prev.end === newRange.end) {
+        return prev;
+      }
+      return newRange;
+    });
+  });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.addEventListener('scroll', updateRange, { passive: true });
+    window.addEventListener('resize', updateRange, { passive: true });
+    updateRange();
+
+    return () => {
+      container.removeEventListener('scroll', updateRange);
+      window.removeEventListener('resize', updateRange);
+    };
+  }, [totalItems, itemHeight, overscan]);
+
+  return range;
+}
+
+// -------------------------------------------------------------------------
+// RAF LOOP - Managed animation loop with cleanup
+// -------------------------------------------------------------------------
+
+export interface RAFLoop {
+  start: () => void;
+  stop: () => void;
+  isRunning: () => boolean;
+}
+
+/**
+ * Create a managed requestAnimationFrame loop.
+ */
+export function createRAFLoop(
+  callback: (deltaTime: number, elapsed: number) => void
+): RAFLoop {
+  let frameId: number | null = null;
+  let lastTime = 0;
+  let startTime = 0;
+  let running = false;
+
+  const tick = (time: number) => {
+    if (!running) return;
+    
+    if (lastTime === 0) {
+      lastTime = time;
+      startTime = time;
+    }
+    
+    const deltaTime = time - lastTime;
+    const elapsed = time - startTime;
+    lastTime = time;
+    
+    callback(deltaTime, elapsed);
+    
+    frameId = requestAnimationFrame(tick);
+  };
+
+  return {
+    start() {
+      if (running) return;
+      running = true;
+      lastTime = 0;
+      frameId = requestAnimationFrame(tick);
+    },
+    stop() {
+      running = false;
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+    },
+    isRunning() {
+      return running;
+    },
+  };
+}
+
+/**
+ * Hook that creates a stable RAF loop.
+ */
+export function useRAFLoop(
+  callback: (deltaTime: number, elapsed: number) => void,
+  enabled = true
+): void {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const loop = createRAFLoop((dt, elapsed) => {
+      callbackRef.current(dt, elapsed);
+    });
+
+    loop.start();
+    return () => loop.stop();
+  }, [enabled]);
+}
+
+// -------------------------------------------------------------------------
+// CLEANUP REGISTRY - Track and clean up subscriptions
+// -------------------------------------------------------------------------
+
+export type CleanupFn = () => void;
+
+export class CleanupRegistry {
+  private cleanups: CleanupFn[] = [];
+
+  add(cleanup: CleanupFn): void {
+    this.cleanups.push(cleanup);
+  }
+
+  cleanup(): void {
+    for (const fn of this.cleanups) {
+      try { fn(); } catch (e) { console.warn('[CleanupRegistry] Error:', e); }
+    }
+    this.cleanups = [];
+  }
+}
+
+/**
+ * Hook that tracks cleanup functions and runs them on unmount.
+ */
+export function useCleanup(): (cleanup: CleanupFn) => void {
+  const registryRef = useRef<CleanupRegistry | null>(null);
+
+  if (!registryRef.current) {
+    registryRef.current = new CleanupRegistry();
+  }
+
+  useEffect(() => {
+    return () => registryRef.current?.cleanup();
+  }, []);
+
+  return useCallback((cleanup: CleanupFn) => {
+    registryRef.current?.add(cleanup);
+  }, []);
+}
+
+// -------------------------------------------------------------------------
+// DOUBLE BUFFER - Prevent flicker in canvas operations
+// -------------------------------------------------------------------------
+
+/**
+ * Create a double-buffered canvas for flicker-free rendering.
+ */
+export function createDoubleBuffer(width: number, height: number): {
+  front: HTMLCanvasElement;
+  back: HTMLCanvasElement;
+  backCtx: CanvasRenderingContext2D;
+  swap: () => void;
+  resize: (w: number, h: number) => void;
+} {
+  const front = document.createElement('canvas');
+  const back = document.createElement('canvas');
+  
+  front.width = width;
+  front.height = height;
+  back.width = width;
+  back.height = height;
+  
+  const frontCtx = front.getContext('2d')!;
+  const backCtx = back.getContext('2d')!;
+  
+  return {
+    front,
+    back,
+    backCtx,
+    swap() {
+      frontCtx.clearRect(0, 0, width, height);
+      frontCtx.drawImage(back, 0, 0);
+    },
+    resize(w: number, h: number) {
+      front.width = w;
+      front.height = h;
+      back.width = w;
+      back.height = h;
+    },
+  };
+}
+
+// -------------------------------------------------------------------------
+// INTERSECTION OBSERVER POOL - Reuse observers
+// -------------------------------------------------------------------------
+
+type IntersectionCallback = (entry: IntersectionObserverEntry) => void;
+
+const observerPool = new Map<string, {
+  observer: IntersectionObserver;
+  callbacks: Map<Element, IntersectionCallback>;
+}>();
+
+/**
+ * Get or create a shared IntersectionObserver for given options.
+ */
+export function observeIntersection(
+  element: Element,
+  callback: IntersectionCallback,
+  options: IntersectionObserverInit = {}
+): () => void {
+  const key = JSON.stringify(options);
+  
+  let poolEntry = observerPool.get(key);
+  
+  if (!poolEntry) {
+    const callbacks = new Map<Element, IntersectionCallback>();
+    
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const cb = callbacks.get(entry.target);
+        if (cb) cb(entry);
+      }
+    }, options);
+    
+    poolEntry = { observer, callbacks };
+    observerPool.set(key, poolEntry);
+  }
+  
+  poolEntry.callbacks.set(element, callback);
+  poolEntry.observer.observe(element);
+  
+  return () => {
+    poolEntry!.callbacks.delete(element);
+    poolEntry!.observer.unobserve(element);
+    
+    if (poolEntry!.callbacks.size === 0) {
+      poolEntry!.observer.disconnect();
+      observerPool.delete(key);
+    }
+  };
+}
+
+/**
+ * Hook for intersection observation with automatic cleanup.
+ */
+export function useIntersection(
+  ref: React.RefObject<Element>,
+  callback: IntersectionCallback,
+  options?: IntersectionObserverInit
+): void {
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    return observeIntersection(element, callback, options);
+  }, [ref, callback, options]);
+}
+
+// -------------------------------------------------------------------------
+// PERFORMANCE MARKS - Simple profiling helpers
+// -------------------------------------------------------------------------
+
+const perfMarks = new Map<string, number>();
+
+export function perfStart(label: string): void {
+  perfMarks.set(label, performance.now());
+}
+
+export function perfEnd(label: string): number {
+  const start = perfMarks.get(label);
+  if (start === undefined) return 0;
+  
+  const duration = performance.now() - start;
+  perfMarks.delete(label);
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.debug(`[Perf] ${label}: ${duration.toFixed(2)}ms`);
+  }
+  
+  return duration;
+}

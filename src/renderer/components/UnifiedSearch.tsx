@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * UNIFIED SEARCH - Global Search Component
  * Searches across files, notes, tasks, and system
@@ -135,8 +141,8 @@ export const UnifiedSearch: React.FC<UnifiedSearchProps> = ({ isOpen, onClose, o
 
     try {
       // Search via backend IPC
-      if (window.electron?.invoke) {
-        const backendResults = await window.electron?.invoke?.('search:query', searchQuery, {
+      if (window.dex?.invoke) {
+        const backendResults = await window.dex?.invoke?.('search:query', searchQuery, {
           limit: 20,
           scopes: { dex: true, computer: false }
         });
@@ -225,7 +231,6 @@ export const UnifiedSearch: React.FC<UnifiedSearchProps> = ({ isOpen, onClose, o
         { id: 'calendar', title: 'Calendar', subtitle: 'Events and scheduling' },
         { id: 'passwordgenerator', title: 'Passwords', subtitle: 'Password generator and vault' },
         { id: 'rewind', title: 'Rewind', subtitle: 'Activity journal and timeline' },
-        { id: 'games', title: 'Games', subtitle: 'Game center and arcade' },
         { id: 'kanban', title: 'Kanban', subtitle: 'Project boards and cards' },
         { id: 'achievements', title: 'Achievements', subtitle: 'Trophies and milestones' },
         { id: 'videoeditor', title: 'Video Editor', subtitle: 'Cut, trim and edit videos' },
@@ -300,7 +305,7 @@ export const UnifiedSearch: React.FC<UnifiedSearchProps> = ({ isOpen, onClose, o
     if (result.action?.type === 'navigate' && onNavigate) {
       onNavigate(result.action.target);
     } else if (result.action?.type === 'open' && result.path) {
-      window.electron?.invoke?.('shell:openPath', result.path);
+      window.dex?.shell?.openPath?.(result.path);
     }
     onClose();
   }, [onNavigate, onClose]);
@@ -318,8 +323,8 @@ export const UnifiedSearch: React.FC<UnifiedSearchProps> = ({ isOpen, onClose, o
   if (!isOpen) return null;
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+    <div style={styles.overlay} onMouseDown={onClose}>
+      <div style={styles.modal} onMouseDown={e => e.stopPropagation()}>
         {/* Search Input */}
         <div style={styles.inputContainer}>
           <span style={styles.searchIcon}>{Icons.search}</span>
@@ -348,7 +353,7 @@ export const UnifiedSearch: React.FC<UnifiedSearchProps> = ({ isOpen, onClose, o
                 key={result.id}
                 style={{
                   ...styles.resultItem,
-                  background: index === selectedIndex ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  background: index === selectedIndex ? 'var(--color-border-subtle)' : 'transparent',
                 }}
                 onClick={() => executeResult(result)}
                 onMouseEnter={() => setSelectedIndex(index)}
@@ -406,13 +411,12 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0,0,0,0.6)',
-    backdropFilter: 'blur(4px)',
+    background: 'rgba(0,0,0,0.80)',
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'center',
     paddingTop: '15vh',
-    zIndex: 10000,
+    zIndex: 'var(--z-overlay)' as any,
   },
   modal: {
     width: '100%',
@@ -422,7 +426,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border-default)',
     boxShadow: 'var(--shadow-float)',
     overflow: 'hidden',
-    backdropFilter: 'blur(20px)',
   },
   inputContainer: {
     display: 'flex',
@@ -520,14 +523,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--color-text-tertiary)',
   },
   shortcutKey: {
     padding: '2px 6px',
-    background: 'rgba(255,255,255,0.08)',
+    background: 'var(--color-border-subtle)',
     borderRadius: 4,
     fontSize: 10,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--color-text-secondary)',
   },
 };
 

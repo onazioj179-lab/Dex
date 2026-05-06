@@ -1,3 +1,10 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
@@ -38,9 +45,9 @@ class RewindLogger {
     const line = `${timestamp} | ${level.toUpperCase()} | ${module} | ${message}\n`;
 
     if (process.env.NODE_ENV !== 'production') {
-      if (level === 'error') console.error(line.trim());
-      else if (level === 'warn') console.warn(line.trim());
-      else console.log(line.trim());
+      if (level === 'error') log.error(line.trim());
+      else if (level === 'warn') log.warn(line.trim());
+      else log.info(line.trim());
     }
 
     if (process.env.NODE_ENV === 'production' && !['warn', 'error'].includes(level)) {
@@ -48,7 +55,7 @@ class RewindLogger {
     }
 
     const file = this.filePathFor(new Date());
-    fs.promises.appendFile(file, line, 'utf-8').catch(() => {});
+    fs.promises.appendFile(file, line, 'utf-8').catch((e: unknown) => { log.warn('[DEX]', e); });
   }
 
   private filePathFor(date: Date): string {

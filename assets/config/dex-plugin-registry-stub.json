@@ -1,0 +1,4 @@
+{
+  "_comment": "Local stub registry for the DEX plugin marketplace. Real entries appended by plugins:publish are stored in userData/plugin-registry.json.",
+  "entries": []
+}

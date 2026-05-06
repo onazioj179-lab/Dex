@@ -1,9 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX Scripting Engine - JavaScript/TypeScript DSL for Custom Automation
 // Sandboxed execution with full Dex API access
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-import { ipcMain, BrowserWindow, app, Notification } from 'electron';
+import { ipcMain, BrowserWindow, app, Notification, powerMonitor } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vm from 'vm';
@@ -12,9 +18,9 @@ import * as https from 'https';
 import * as log from 'electron-log';
 import Store from 'electron-store';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface Script {
   id: string;
@@ -117,9 +123,9 @@ interface ScriptResult {
   logs: string[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Scripting Engine
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class ScriptingEngine {
   private store: Store;
@@ -202,8 +208,15 @@ class ScriptingEngine {
       // System APIs
       system: {
         getBattery: async () => {
-          // Simplified battery check
-          return { level: 100, charging: true };
+          try {
+            const si = require('systeminformation');
+            const battery = await si.battery();
+            return { level: battery.percent ?? 100, charging: battery.isCharging ?? true };
+          } catch {
+            // systeminformation unavailable, try powerMonitor
+            const onBattery = powerMonitor.isOnBatteryPower();
+            return { level: onBattery ? 50 : 100, charging: !onBattery };
+          }
         },
         getMemory: async () => {
           const mem = process.memoryUsage();
@@ -226,6 +239,24 @@ class ScriptingEngine {
         getPlatform: () => process.platform,
         getUptime: () => process.uptime(),
         runCommand: async (command: string) => {
+          // Whitelist of safe commands to reduce AV false positives
+          const ALLOWED_COMMANDS = [
+            'echo', 'date', 'whoami', 'hostname', 'dir', 'ls', 'pwd',
+            'cat', 'type', 'wmic path Win32_Battery',
+            'systeminfo', 'ipconfig', 'ifconfig', 'uname',
+            'node --version', 'npm --version', 'python --version',
+          ];
+          const cmdLower = command.trim().toLowerCase();
+          const isAllowed = ALLOWED_COMMANDS.some(allowed =>
+            cmdLower === allowed || cmdLower.startsWith(allowed + ' ')
+          );
+          if (!isAllowed) {
+            return {
+              stdout: '',
+              stderr: `Command not allowed. Permitted commands: ${ALLOWED_COMMANDS.join(', ')}`,
+              code: 1,
+            };
+          }
           return new Promise((resolve) => {
             const { exec } = require('child_process');
             exec(command, { timeout: 30000 }, (error: Error | null, stdout: string, stderr: string) => {
@@ -247,8 +278,12 @@ class ScriptingEngine {
           return workflows.map(w => ({ id: w.id, name: w.name }));
         },
         run: async (id: string) => {
-          ipcMain.emit('script:run-workflow', null, { workflowId: id });
-          return { success: true };
+          try {
+            const result = await ipcMain.emit('workflow:execute', null, id);
+            return { success: true };
+          } catch (err: any) {
+            return { success: false, error: err.message };
+          }
         },
         get: async (id: string) => {
           const workflowStore = new Store({ name: 'dex-workflows' });
@@ -265,8 +300,12 @@ class ScriptingEngine {
           return operations.map(o => ({ id: o.id, name: o.name }));
         },
         run: async (id: string) => {
-          ipcMain.emit('script:run-operation', null, { operationId: id });
-          return { success: true };
+          try {
+            const result = await ipcMain.emit('operation:execute', null, id);
+            return { success: true };
+          } catch (err: any) {
+            return { success: false, error: err.message };
+          }
         },
       },
 
@@ -321,7 +360,7 @@ class ScriptingEngine {
       log: (message: string) => {
         const logEntry = `[${new Date().toISOString()}] ${message}`;
         logs.push(logEntry);
-        console.log(`[Script] ${logEntry}`);
+        log.info(`[Script] ${logEntry}`);
       },
     };
 
@@ -594,9 +633,9 @@ await notify(\`Run count: \${count}\`);
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Exports
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const scriptingEngine = new ScriptingEngine();
 

@@ -1,0 +1,98 @@
+{
+  "bundleId": "com.onazioj.dex",
+  "appStoreId": "XXXXXXXXXX",
+  "teamId": "XXXXXXXXXX",
+  "appleId": "developer@example.com",
+  "appName": "DEX",
+  "subtitle": "Desktop Automation Hub",
+  "primaryCategory": "PRODUCTIVITY",
+  "secondaryCategory": "UTILITIES",
+  "contentRating": "4+",
+  "description": {
+    "brief": "Personal Control Hub for Desktop Automation",
+    "full": "DEX is a powerful desktop automation and productivity suite that puts you in complete control of your digital workflow.\n\nWith professional-grade creative tools, system management, and automation capabilities, DEX helps you work smarter and faster.\n\nPRISM IMAGE EDITOR\n- Non-destructive editing with layers\n- Advanced filters and adjustments\n- RAW file support\n- Batch processing\n\nVINX VIDEO EDITOR\n- Multi-track timeline\n- Video effects and transitions\n- Color grading\n- Export to any format\n\nIMOSION AUDIO\n- DAW-style interface\n- Virtual instruments\n- Audio effects\n- Podcast production\n\nFLUX ANIMATION\n- Motion graphics\n- Keyframe animation\n- Vector and raster support\n\nAXL CAD\n- 2D drafting\n- 3D modeling\n- Engineering tools\n\nPLUS\n- Notes with rich formatting\n- Built-in browser\n- Advanced file manager\n- System monitoring\n- Workflow automation\n\nAll data stored locally. Your privacy is protected."
+  },
+  "keywords": "automation,productivity,workflow,image editor,video editor,audio,creative,utilities,system tools",
+  "supportUrl": "https://dex-app.com/support",
+  "marketingUrl": "https://dex-app.com",
+  "privacyPolicyUrl": "https://dex-app.com/privacy",
+  "screenshots": {
+    "mac": [
+      {
+        "size": "1280x800",
+        "path": "store/screenshots/mac/dashboard.png"
+      },
+      {
+        "size": "1280x800",
+        "path": "store/screenshots/mac/prism.png"
+      },
+      {
+        "size": "1280x800",
+        "path": "store/screenshots/mac/vinx.png"
+      },
+      {
+        "size": "1280x800",
+        "path": "store/screenshots/mac/automation.png"
+      },
+      {
+        "size": "1280x800",
+        "path": "store/screenshots/mac/system.png"
+      }
+    ]
+  },
+  "previewVideos": [],
+  "pricing": {
+    "model": "free"
+  },
+  "inAppPurchases": [],
+  "localizations": [
+    {
+      "locale": "en-US",
+      "name": "DEX",
+      "subtitle": "Desktop Automation Hub",
+      "keywords": "automation,productivity,workflow,image editor,video editor"
+    },
+    {
+      "locale": "de-DE",
+      "name": "DEX",
+      "subtitle": "Desktop-Automatisierungs-Hub",
+      "keywords": "automatisierung,produktivitat,workflow,bildbearbeitung,videobearbeitung"
+    },
+    {
+      "locale": "fr-FR",
+      "name": "DEX",
+      "subtitle": "Hub d'automatisation de bureau",
+      "keywords": "automatisation,productivite,workflow,editeur image,editeur video"
+    },
+    {
+      "locale": "ja-JP",
+      "name": "DEX",
+      "subtitle": "Desktop Automation Hub",
+      "keywords": "automation,productivity,workflow"
+    }
+  ],
+  "ageRatingDeclaration": {
+    "violenceCartoon": "NONE",
+    "violenceRealistic": "NONE",
+    "violenceRealisticProlonged": "NONE",
+    "gambling": false,
+    "contests": false,
+    "unrestrictedWebAccess": true
+  },
+  "appPrivacy": {
+    "dataCollection": "not_collected",
+    "privacyTypes": []
+  },
+  "buildSettings": {
+    "minimumMacOSVersion": "10.15",
+    "targetArchitectures": ["x86_64", "arm64"],
+    "hardened": true,
+    "sandbox": true,
+    "entitlements": {
+      "com.apple.security.app-sandbox": true,
+      "com.apple.security.files.user-selected.read-write": true,
+      "com.apple.security.network.client": true,
+      "com.apple.security.automation.apple-events": true
+    }
+  }
+}

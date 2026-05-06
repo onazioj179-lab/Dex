@@ -1,15 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Voice Control Engine
 // Phase 46: Opt-in voice control with permission-based execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, BrowserWindow, systemPreferences } from 'electron';
 import { EventEmitter } from 'events';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ActivationMethod = 'push-to-talk' | 'keyboard-shortcut' | 'wake-word';
 export type VoiceState = 'disabled' | 'idle' | 'listening' | 'processing' | 'executing';
@@ -59,9 +66,9 @@ export interface MicrophoneStatus {
   deviceName: string | null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_CONFIG: VoiceControlConfig = {
   enabled: false, // OFF by default
@@ -77,9 +84,9 @@ const DEFAULT_CONFIG: VoiceControlConfig = {
   maxListeningDurationMs: 60000, // Max 60s listening session
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const voiceStore = new Store<{
   config: VoiceControlConfig;
@@ -98,9 +105,9 @@ const voiceStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VOICE CONTROL ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VoiceControlEngine extends EventEmitter {
   private static instance: VoiceControlEngine;
@@ -123,9 +130,9 @@ class VoiceControlEngine extends EventEmitter {
     return VoiceControlEngine.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -139,7 +146,7 @@ class VoiceControlEngine extends EventEmitter {
     }
 
     this.initialized = true;
-    console.log('[VoiceControl] Initialized (disabled by default)');
+    log.info('[VoiceControl] Initialized (disabled by default)');
   }
 
   private setupIPC(): void {
@@ -185,9 +192,9 @@ class VoiceControlEngine extends EventEmitter {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ENABLE/DISABLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async enable(): Promise<boolean> {
     const config = voiceStore.get('config');
@@ -210,7 +217,7 @@ class VoiceControlEngine extends EventEmitter {
 
     await this.initializeEngine();
     
-    console.log('[VoiceControl] Enabled');
+    log.info('[VoiceControl] Enabled');
     return true;
   }
 
@@ -228,7 +235,7 @@ class VoiceControlEngine extends EventEmitter {
     this.recognitionEngine = null;
     this.microphoneStream = null;
 
-    console.log('[VoiceControl] Disabled');
+    log.info('[VoiceControl] Disabled');
     return true;
   }
 
@@ -236,15 +243,15 @@ class VoiceControlEngine extends EventEmitter {
     return voiceStore.get('config').enabled;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LISTENING CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async startListening(): Promise<boolean> {
     const config = voiceStore.get('config');
     
     if (!config.enabled) {
-      console.log('[VoiceControl] Cannot start - voice control disabled');
+      log.info('[VoiceControl] Cannot start - voice control disabled');
       return false;
     }
 
@@ -272,7 +279,7 @@ class VoiceControlEngine extends EventEmitter {
     // Set up timeouts
     this.setupTimeouts(config);
 
-    console.log('[VoiceControl] Started listening');
+    log.info('[VoiceControl] Started listening');
     return true;
   }
 
@@ -294,7 +301,7 @@ class VoiceControlEngine extends EventEmitter {
     this.notifyStateChange();
     this.notifyMicrophoneActive(false);
 
-    console.log('[VoiceControl] Stopped listening');
+    log.info('[VoiceControl] Stopped listening');
     return true;
   }
 
@@ -306,14 +313,14 @@ class VoiceControlEngine extends EventEmitter {
     }
 
     await this.stopListening();
-    console.log('[VoiceControl] Command cancelled');
+    log.info('[VoiceControl] Command cancelled');
     return true;
   }
 
   private setupTimeouts(config: VoiceControlConfig): void {
     // Max listening duration
     this.listeningTimeout = setTimeout(() => {
-      console.log('[VoiceControl] Max listening duration reached');
+      log.info('[VoiceControl] Max listening duration reached');
       this.stopListening();
     }, config.maxListeningDurationMs);
 
@@ -327,7 +334,7 @@ class VoiceControlEngine extends EventEmitter {
     }
     
     this.silenceTimeout = setTimeout(() => {
-      console.log('[VoiceControl] Silence timeout - stopping');
+      log.info('[VoiceControl] Silence timeout - stopping');
       this.stopListening();
     }, config.autoDisableAfterMs);
   }
@@ -343,9 +350,9 @@ class VoiceControlEngine extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TRANSCRIPT HANDLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async processTranscript(transcript: string): Promise<void> {
     if (!this.currentSession) return;
@@ -387,9 +394,9 @@ class VoiceControlEngine extends EventEmitter {
     await this.stopListening();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MICROPHONE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getMicrophoneStatus(): Promise<MicrophoneStatus> {
     let permissionGranted = false;
@@ -421,9 +428,9 @@ class VoiceControlEngine extends EventEmitter {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATE & NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getState(): VoiceState {
     return this.state;
@@ -460,9 +467,9 @@ class VoiceControlEngine extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LOGGING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private logCommand(session: VoiceSession): void {
     if (!session.transcript) return;
@@ -527,9 +534,9 @@ class VoiceControlEngine extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): VoiceControlConfig {
     return voiceStore.get('config');
@@ -562,9 +569,9 @@ class VoiceControlEngine extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const voiceControlEngine = VoiceControlEngine.getInstance();
 export default voiceControlEngine;

@@ -1,16 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Failure Path Finalization
 // Phase 69: Graceful Failures
 // Every error has a clear message, recovery path, and never crashes
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow, dialog, app } from 'electron';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ErrorSeverity = 'info' | 'warning' | 'error' | 'critical';
 export type RecoveryStrategy = 'retry' | 'fallback' | 'ignore' | 'restart' | 'report' | 'manual';
@@ -55,12 +61,12 @@ export interface RecoveryResult {
   result?: unknown;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ERROR DEFINITIONS - COMPREHENSIVE CATALOG
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const ERROR_CATALOG: ErrorDefinition[] = [
-  // ── File System Errors ──────────────────────────────────────────────────
+  // -- File System Errors --------------------------------------------------
   {
     code: 'FS_NOT_FOUND',
     severity: 'warning',
@@ -123,7 +129,7 @@ const ERROR_CATALOG: ErrorDefinition[] = [
     fallback: 'Save to temp location'
   },
 
-  // ── Network Errors ──────────────────────────────────────────────────────
+  // -- Network Errors ------------------------------------------------------
   {
     code: 'NET_OFFLINE',
     severity: 'warning',
@@ -155,7 +161,7 @@ const ERROR_CATALOG: ErrorDefinition[] = [
     retryDelay: 3000
   },
 
-  // ── Action Errors ───────────────────────────────────────────────────────
+  // -- Action Errors -------------------------------------------------------
   {
     code: 'ACTION_NOT_FOUND',
     severity: 'warning',
@@ -187,7 +193,7 @@ const ERROR_CATALOG: ErrorDefinition[] = [
     retryDelay: 500
   },
 
-  // ── Media Errors ────────────────────────────────────────────────────────
+  // -- Media Errors --------------------------------------------------------
   {
     code: 'MEDIA_UNSUPPORTED_FORMAT',
     severity: 'warning',
@@ -219,7 +225,7 @@ const ERROR_CATALOG: ErrorDefinition[] = [
     retryDelay: 0
   },
 
-  // ── System Errors ───────────────────────────────────────────────────────
+  // -- System Errors -------------------------------------------------------
   {
     code: 'SYS_OUT_OF_MEMORY',
     severity: 'critical',
@@ -251,7 +257,7 @@ const ERROR_CATALOG: ErrorDefinition[] = [
     retryDelay: 1000
   },
 
-  // ── Database/Store Errors ───────────────────────────────────────────────
+  // -- Database/Store Errors -----------------------------------------------
   {
     code: 'DB_CONNECTION_FAILED',
     severity: 'error',
@@ -275,7 +281,7 @@ const ERROR_CATALOG: ErrorDefinition[] = [
     fallback: 'Restore from backup'
   },
 
-  // ── Generic Errors ──────────────────────────────────────────────────────
+  // -- Generic Errors ------------------------------------------------------
   {
     code: 'UNKNOWN',
     severity: 'error',
@@ -288,9 +294,9 @@ const ERROR_CATALOG: ErrorDefinition[] = [
   }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FAILURE PATH HANDLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FailurePathHandlerClass extends EventEmitter {
   private errorCatalog: Map<string, ErrorDefinition> = new Map();
@@ -305,9 +311,9 @@ class FailurePathHandlerClass extends EventEmitter {
     this.setupGlobalHandlers();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private initializeErrorCatalog(): void {
     for (const error of ERROR_CATALOG) {
@@ -372,9 +378,9 @@ class FailurePathHandlerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FAILURE HANDLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async handleFailure(code: string, context: FailureContext): Promise<FailureRecord> {
     const definition = this.errorCatalog.get(code) || this.errorCatalog.get('UNKNOWN')!;
@@ -435,9 +441,9 @@ class FailurePathHandlerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECOVERY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async autoRecover(record: FailureRecord, definition: ErrorDefinition): Promise<RecoveryResult> {
     const primaryStrategy = definition.recoveryStrategies[0];
@@ -526,9 +532,9 @@ class FailurePathHandlerClass extends EventEmitter {
     this.recoveryHandlers.set(code, handler);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // USER NOTIFICATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private notifyUser(record: FailureRecord): void {
     const window = BrowserWindow.getFocusedWindow();
@@ -559,9 +565,9 @@ class FailurePathHandlerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // REPORTING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async reportError(failureId: string): Promise<{ success: boolean }> {
     const record = this.failureHistory.find(f => f.id === failureId);
@@ -579,9 +585,9 @@ class FailurePathHandlerClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA ACCESS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getErrorInfo(code: string): ErrorDefinition | null {
     return this.errorCatalog.get(code) || null;
@@ -611,9 +617,9 @@ class FailurePathHandlerClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -646,9 +652,9 @@ class FailurePathHandlerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const FailurePathHandler = new FailurePathHandlerClass();
 export default FailurePathHandler;

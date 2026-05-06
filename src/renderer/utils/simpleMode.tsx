@@ -1,14 +1,20 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Simple Mode Manager
 // Zero-config default state with progressive disclosure
 // Phase 64: Trust and zero-friction adoption
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { useState, useEffect, useCallback } from 'react';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface SimpleModeConfig {
   enabled: boolean;
@@ -18,7 +24,7 @@ export interface SimpleModeConfig {
 
 export interface FeatureVisibility {
   // Core (always visible)
-  dashboard: boolean;
+  home: boolean;
   notes: boolean;
   tasks: boolean;
   search: boolean;
@@ -42,9 +48,9 @@ export interface FeatureVisibility {
   power: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Constants
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const STORAGE_KEY = 'dex:simpleMode';
 
@@ -72,9 +78,9 @@ const ADVANCED_FEATURES: string[] = [
   'voice',
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Simple Mode Hook
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export function useSimpleMode() {
   const [config, setConfig] = useState<SimpleModeConfig>(DEFAULT_CONFIG);
@@ -140,7 +146,7 @@ export function useSimpleMode() {
   // Check if feature is visible
   const isFeatureVisible = useCallback((feature: string): boolean => {
     // Always visible features
-    if (['dashboard', 'notes', 'tasks', 'search', 'settings'].includes(feature)) {
+    if (['home', 'notes', 'tasks', 'search', 'settings'].includes(feature)) {
       return true;
     }
 
@@ -164,7 +170,7 @@ export function useSimpleMode() {
 
   // Get feature visibility map
   const featureVisibility: FeatureVisibility = {
-    dashboard: true,
+    home: true,
     notes: true,
     tasks: true,
     search: true,
@@ -198,9 +204,9 @@ export function useSimpleMode() {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Simple Mode Context (for app-wide access)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 import React, { createContext, useContext } from 'react';
 
@@ -235,9 +241,9 @@ export const useSimpleModeContext = (): SimpleModeContextValue => {
   return context;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Utility Functions
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const getDefaultConfig = (): SimpleModeConfig => DEFAULT_CONFIG;
 

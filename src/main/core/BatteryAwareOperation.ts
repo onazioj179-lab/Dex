@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * BatteryAwareOperation.ts
  * System 6: Reliability, Stability, Final Lock
@@ -14,6 +20,8 @@ import { EventEmitter } from 'events';
 import { app, ipcMain, powerMonitor } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import log from 'electron-log';
+import { NativePower, isNativeAvailable } from '../native/bridge';
 
 // ============================================================================
 // Types
@@ -113,13 +121,24 @@ const PROFILE_RESTRICTIONS: Record<PowerProfile, ProfileRestrictions> = {
     allowIndexing: true,
     allowAgentOperations: true,
     allowNotifications: true,
+    pollingIntervalMultiplier: 1,
+    cpuThrottlePercent: 100,
+    reducedAnimations: false,
+    pauseNonEssentialTimers: false,
+    disablePreloading: false
+  },
+  conservative: {
+    allowBackgroundSync: true,
+    allowIndexing: true,
+    allowAgentOperations: true,
+    allowNotifications: true,
     pollingIntervalMultiplier: 1.5,
     cpuThrottlePercent: 80,
     reducedAnimations: false,
     pauseNonEssentialTimers: false,
     disablePreloading: false
   },
-  conservative: {
+  minimal: {
     allowBackgroundSync: true,
     allowIndexing: false,
     allowAgentOperations: true,
@@ -127,27 +146,16 @@ const PROFILE_RESTRICTIONS: Record<PowerProfile, ProfileRestrictions> = {
     pollingIntervalMultiplier: 2,
     cpuThrottlePercent: 60,
     reducedAnimations: true,
-    pauseNonEssentialTimers: true,
-    disablePreloading: true
-  },
-  minimal: {
-    allowBackgroundSync: false,
-    allowIndexing: false,
-    allowAgentOperations: false,
-    allowNotifications: true,
-    pollingIntervalMultiplier: 5,
-    cpuThrottlePercent: 40,
-    reducedAnimations: true,
-    pauseNonEssentialTimers: true,
-    disablePreloading: true
+    pauseNonEssentialTimers: false,
+    disablePreloading: false
   },
   emergency: {
     allowBackgroundSync: false,
     allowIndexing: false,
-    allowAgentOperations: false,
-    allowNotifications: false,
-    pollingIntervalMultiplier: 10,
-    cpuThrottlePercent: 20,
+    allowAgentOperations: true,
+    allowNotifications: true,
+    pollingIntervalMultiplier: 3,
+    cpuThrottlePercent: 40,
     reducedAnimations: true,
     pauseNonEssentialTimers: true,
     disablePreloading: true
@@ -199,7 +207,7 @@ class BatteryAwareOperation extends EventEmitter {
     this.setupIPC();
 
     this.initialized = true;
-    console.log('[BatteryAware] Initialized with profile:', this.state.currentProfile);
+    log.info('[BatteryAware] Initialized with profile:', this.state.currentProfile);
   }
 
   /**
@@ -222,7 +230,7 @@ class BatteryAwareOperation extends EventEmitter {
     try {
       await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
-      console.error('[BatteryAware] Failed to save config:', error);
+      log.error('[BatteryAware] Failed to save config:', error);
     }
   }
 
@@ -256,13 +264,9 @@ class BatteryAwareOperation extends EventEmitter {
   }
 
   /**
-   * Estimate battery level (platform-specific implementation would go here)
+   * Get battery level using platform-specific system queries.
    */
   private async estimateBatteryLevel(): Promise<number> {
-    // This is a placeholder - real implementation would query system
-    // On Windows: wmic path Win32_Battery get EstimatedChargeRemaining
-    // On macOS: pmset -g batt
-    // On Linux: /sys/class/power_supply/BAT0/capacity
     
     try {
       if (process.platform === 'win32') {
@@ -283,8 +287,21 @@ class BatteryAwareOperation extends EventEmitter {
    * Get battery level on Windows
    */
   private async getWindowsBatteryLevel(): Promise<number> {
-    // Would use child_process to run wmic or PowerShell
-    // For now, return 100 (full) as safe default
+    // Use native module first (AV-safe, no shell spawning)
+    if (isNativeAvailable()) {
+      const status = NativePower.getStatus();
+      if (status?.batteryPercent != null) {
+        return status.batteryPercent;
+      }
+    }
+    
+    // Fallback to PowerShell (safer than wmic for AV)
+    const { execSync } = require('child_process');
+    try {
+      const output = execSync('powershell -NoProfile -NonInteractive -Command "(Get-WmiObject Win32_Battery).EstimatedChargeRemaining"', { encoding: 'utf-8', timeout: 5000 });
+      const level = parseInt(output.trim(), 10);
+      if (!isNaN(level)) return level;
+    } catch { /* no battery or command failed */ }
     return 100;
   }
 
@@ -292,7 +309,12 @@ class BatteryAwareOperation extends EventEmitter {
    * Get battery level on macOS
    */
   private async getMacBatteryLevel(): Promise<number> {
-    // Would parse pmset -g batt output
+    const { execSync } = require('child_process');
+    try {
+      const output = execSync('pmset -g batt', { encoding: 'utf-8', timeout: 5000 });
+      const match = output.match(/(\d+)%/);
+      if (match) return parseInt(match[1], 10);
+    } catch { /* no battery or command failed */ }
     return 100;
   }
 
@@ -375,7 +397,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle power source change
    */
   private async handlePowerSourceChange(source: PowerSource): Promise<void> {
-    console.log('[BatteryAware] Power source changed to:', source);
+    log.info('[BatteryAware] Power source changed to:', source);
     
     this.state.currentStatus.powerSource = source;
     this.state.currentStatus.charging = source === 'ac';
@@ -408,7 +430,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle system suspend
    */
   private handleSystemSuspend(): void {
-    console.log('[BatteryAware] System suspending');
+    log.info('[BatteryAware] System suspending');
     this.stopPeriodicCheck();
     this.emit('system-suspend');
   }
@@ -417,7 +439,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle system resume
    */
   private async handleSystemResume(): Promise<void> {
-    console.log('[BatteryAware] System resuming');
+    log.info('[BatteryAware] System resuming');
     await this.detectInitialState();
     this.startPeriodicCheck();
     this.emit('system-resume');
@@ -427,7 +449,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle system shutdown
    */
   private handleSystemShutdown(): void {
-    console.log('[BatteryAware] System shutting down');
+    log.info('[BatteryAware] System shutting down');
     this.emit('system-shutdown');
   }
 
@@ -435,7 +457,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle screen lock
    */
   private handleScreenLock(): void {
-    console.log('[BatteryAware] Screen locked - reducing activity');
+    log.debug('[BatteryAware] Screen locked - reducing activity');
     this.emit('screen-lock');
   }
 
@@ -443,7 +465,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle screen unlock
    */
   private handleScreenUnlock(): void {
-    console.log('[BatteryAware] Screen unlocked - resuming normal activity');
+    log.debug('[BatteryAware] Screen unlocked - resuming normal activity');
     this.emit('screen-unlock');
   }
 
@@ -481,7 +503,7 @@ class BatteryAwareOperation extends EventEmitter {
     // Check for significant changes
     const levelDrop = previousStatus.level - newStatus.level;
     if (levelDrop >= 5) {
-      console.log(`[BatteryAware] Battery dropped ${levelDrop}% (now ${newStatus.level}%)`);
+      log.info(`[BatteryAware] Battery dropped ${levelDrop}% (now ${newStatus.level}%)`);
     }
 
     // Check for low battery warnings
@@ -536,7 +558,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Handle critical battery situation
    */
   private async handleCriticalBattery(): Promise<void> {
-    console.log('[BatteryAware] CRITICAL BATTERY - taking action');
+    log.warn('[BatteryAware] CRITICAL BATTERY - taking action');
 
     switch (this.config.criticalBatteryAction) {
       case 'warn':
@@ -586,7 +608,7 @@ class BatteryAwareOperation extends EventEmitter {
         data: { from: oldProfile, to: newProfile }
       });
 
-      console.log(`[BatteryAware] Profile changed: ${oldProfile} -> ${newProfile}`);
+      log.info(`[BatteryAware] Profile changed: ${oldProfile} -> ${newProfile}`);
       this.emit('profile-change', { from: oldProfile, to: newProfile, restrictions: this.getRestrictions() });
     }
   }
@@ -773,7 +795,7 @@ class BatteryAwareOperation extends EventEmitter {
 
     // Check if background operations are allowed
     if (!this.isOperationAllowed('allowBackgroundSync')) {
-      console.log('[BatteryAware] Background operation blocked due to power profile');
+      log.debug('[BatteryAware] Background operation blocked due to power profile');
       return null;
     }
 
@@ -790,7 +812,7 @@ class BatteryAwareOperation extends EventEmitter {
    * Shutdown battery monitoring
    */
   async shutdown(): Promise<void> {
-    console.log('[BatteryAware] Shutting down');
+    log.info('[BatteryAware] Shutting down');
     this.stopPeriodicCheck();
     this.removeAllListeners();
   }

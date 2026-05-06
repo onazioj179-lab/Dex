@@ -1,8 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Startup Manager
 // Reliable, timeout-protected, recoverable startup sequence
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import { BrowserWindow, app, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -126,7 +133,7 @@ class StartupManager {
       await this.progressWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
       this.progressWindow.show();
     } catch (err) {
-      console.error('[Startup] Failed to show progress UI:', err);
+      log.error('[Startup] Failed to show progress UI:', err);
     }
   }
 
@@ -134,7 +141,7 @@ class StartupManager {
     if (this.progressWindow && !this.progressWindow.isDestroyed()) {
       this.progressWindow.webContents.executeJavaScript(
         `document.getElementById('status').textContent = '${stage}';`
-      ).catch(() => {});
+      ).catch((e: unknown) => { log.warn('[DEX]', e); });
     }
   }
 
@@ -167,10 +174,10 @@ class StartupManager {
     this.startTime = Date.now();
     this.aborted = false;
     
-    console.log('========================================');
-    console.log('  DEX STARTUP SEQUENCE');
-    console.log(`  Safe Mode: ${safeMode.isSafeModeEnabled() ? 'ENABLED' : 'disabled'}`);
-    console.log('========================================');
+    log.info('========================================');
+    log.info('  DEX STARTUP SEQUENCE');
+    log.info(`  Safe Mode: ${safeMode.isSafeModeEnabled() ? 'ENABLED' : 'disabled'}`);
+    log.info('========================================');
     
     safeMode.markStartupBegin();
     
@@ -192,7 +199,7 @@ class StartupManager {
 
       // Check total timeout
       if (Date.now() - this.startTime > this.config.totalTimeout) {
-        console.error('[Startup] Total timeout exceeded!');
+        log.error('[Startup] Total timeout exceeded!');
         safeMode.enableSafeMode('Total startup timeout');
         this.closeProgressUI();
         return { success: false, failedStage: stage.name, error: 'Total startup timeout' };
@@ -209,18 +216,18 @@ class StartupManager {
         safeMode.failStage(stage.name, errorMsg);
 
         if (stage.required) {
-          console.error(`[Startup] Required stage '${stage.name}' failed:`, errorMsg);
+          log.error(`[Startup] Required stage '${stage.name}' failed:`, errorMsg);
           this.closeProgressUI();
           return { success: false, failedStage: stage.name, error: errorMsg };
         } else {
-          console.warn(`[Startup] Optional stage '${stage.name}' failed, continuing:`, errorMsg);
+          log.warn(`[Startup] Optional stage '${stage.name}' failed, continuing:`, errorMsg);
         }
       }
     }
 
     // Success!
     const totalTime = Date.now() - this.startTime;
-    console.log(`[Startup] Complete in ${totalTime}ms`);
+    log.info(`[Startup] Complete in ${totalTime}ms`);
     safeMode.markStartupSuccess();
     this.closeProgressUI();
     

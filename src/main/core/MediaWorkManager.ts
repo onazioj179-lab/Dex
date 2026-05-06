@@ -1,9 +1,15 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - SYSTEM 10: Media as Work (PIPELINES)
 // ===========================================================================
 // Screenshots, recordings, transcripts, and media pipelines should be
 // first-class work artifacts. Tied to intents. Searchable. Referenceable.
-// Media isn't separate—it's part of the work record.
+// Media isn't separate--it's part of the work record.
 // ===========================================================================
 
 import { EventEmitter } from 'events';

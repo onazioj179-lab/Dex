@@ -1,8 +1,16 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 14: Deep Work Utilities
 // Memory management and performance stability for extended sessions
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Philosophy: Stability over speed, invisible optimization
+
+import { sharedTick } from '../services/SharedTick';
 
 /**
  * Memory management utilities for long-running sessions
@@ -65,7 +73,7 @@ export class MemoryManager {
    */
   private startMonitoring(): void {
     // Check memory every 60 seconds
-    this.gcScheduleId = setInterval(() => {
+    sharedTick.subscribe('deep-work-mem', () => {
       this.checkMemoryPressure();
     }, 60000);
   }
@@ -107,10 +115,7 @@ export class MemoryManager {
    * Cleanup and destroy the manager
    */
   destroy(): void {
-    if (this.gcScheduleId) {
-      clearInterval(this.gcScheduleId);
-      this.gcScheduleId = null;
-    }
+    sharedTick.unsubscribe('deep-work-mem');
     this.cleanupCallbacks.clear();
     MemoryManager.instance = null;
   }
@@ -174,7 +179,7 @@ export class IdleDetector {
   }
   
   private startChecking(): void {
-    this.checkInterval = setInterval(() => {
+    sharedTick.subscribe('idle-detector', () => {
       const duration = Date.now() - this.lastActivity;
       const nowIdle = duration >= this.idleThreshold;
       
@@ -196,10 +201,7 @@ export class IdleDetector {
   }
   
   destroy(): void {
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
-    }
+    sharedTick.unsubscribe('idle-detector');
     this.idleCallbacks.clear();
   }
 }

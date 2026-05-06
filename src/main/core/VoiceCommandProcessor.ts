@@ -1,16 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Voice Command Processor
 // Phase 46: Parse and execute voice commands safely
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, BrowserWindow, shell } from 'electron';
 import { voiceControlEngine } from './VoiceControlEngine';
 import { voiceScopeManager, VoiceScope } from './VoiceScopeManager';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type CommandCategory = 
   | 'navigation'
@@ -53,12 +60,12 @@ export interface CommandPattern {
   extractor: (match: RegExpMatchArray) => Record<string, unknown>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // COMMAND PATTERNS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const COMMAND_PATTERNS: CommandPattern[] = [
-  // ─── Navigation Commands ────────────────────────────────────────────────
+  // --- Navigation Commands ------------------------------------------------
   {
     pattern: /^(go to|open|show|navigate to)\s+(notes?|actions?|workflows?|settings?|dashboard|files?|transfers?|scheduler|power|search)$/i,
     category: 'navigation',
@@ -84,7 +91,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: () => ({}),
   },
 
-  // ─── Search Commands ────────────────────────────────────────────────────
+  // --- Search Commands ----------------------------------------------------
   {
     pattern: /^(search|find|look for)\s+(.+)$/i,
     category: 'search',
@@ -110,7 +117,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: (match) => ({ type: match[2] }),
   },
 
-  // ─── Action Commands ────────────────────────────────────────────────────
+  // --- Action Commands ----------------------------------------------------
   {
     pattern: /^(start|run|execute)\s+workflow\s+(.+)$/i,
     category: 'action',
@@ -152,7 +159,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: (match) => ({ operation: match[1], destination: match[4] }),
   },
 
-  // ─── Media Commands ─────────────────────────────────────────────────────
+  // --- Media Commands -----------------------------------------------------
   {
     pattern: /^(play|start)\s+(this|the)?\s*(video|audio|music|media)?$/i,
     category: 'media',
@@ -202,7 +209,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: (match) => ({ direction: match[1], amount: match[3] ? parseInt(match[3]) : 10 }),
   },
 
-  // ─── Transfer Commands ──────────────────────────────────────────────────
+  // --- Transfer Commands --------------------------------------------------
   {
     pattern: /^send\s+(this|these|selected)\s+(files?|documents?)\s+to\s+(.+)$/i,
     category: 'transfer',
@@ -220,7 +227,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: (match) => ({ destination: match[2] }),
   },
 
-  // ─── App Control Commands ───────────────────────────────────────────────
+  // --- App Control Commands -----------------------------------------------
   {
     pattern: /^(open|launch|start)\s+(.+)\s+(app|application)$/i,
     category: 'app-control',
@@ -246,7 +253,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: (match) => ({ action: match[1] }),
   },
 
-  // ─── System Commands (Limited) ──────────────────────────────────────────
+  // --- System Commands (Limited) ------------------------------------------
   {
     pattern: /^(create|new)\s+(document|file|folder)\s+(named|called)?\s*(.+)$/i,
     category: 'system',
@@ -264,7 +271,7 @@ const COMMAND_PATTERNS: CommandPattern[] = [
     extractor: (match) => ({ path: match[2] }),
   },
 
-  // ─── Dex Control Commands ───────────────────────────────────────────────
+  // --- Dex Control Commands -----------------------------------------------
   {
     pattern: /^(close|hide)\s+(this\s+)?(panel|tab|window)$/i,
     category: 'navigation',
@@ -291,9 +298,9 @@ const COMMAND_PATTERNS: CommandPattern[] = [
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // COMMAND PROCESSOR STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const processorStore = new Store<{
   pendingConfirmation: ParsedCommand | null;
@@ -306,9 +313,9 @@ const processorStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VOICE COMMAND PROCESSOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VoiceCommandProcessor {
   private static instance: VoiceCommandProcessor;
@@ -324,9 +331,9 @@ class VoiceCommandProcessor {
     return VoiceCommandProcessor.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -336,7 +343,7 @@ class VoiceCommandProcessor {
     this.setupVoiceEngineListener();
 
     this.initialized = true;
-    console.log('[VoiceCommandProcessor] Initialized');
+    log.info('[VoiceCommandProcessor] Initialized');
   }
 
   private setupIPC(): void {
@@ -411,9 +418,9 @@ class VoiceCommandProcessor {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // COMMAND PARSING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   parseCommand(transcript: string): ParsedCommand | null {
     const normalized = transcript.trim().toLowerCase();
@@ -441,9 +448,9 @@ class VoiceCommandProcessor {
     return null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // COMMAND EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async executeCommand(command: ParsedCommand): Promise<CommandResult> {
     const executorKey = `${command.category}:${command.intent}`;
@@ -478,9 +485,9 @@ class VoiceCommandProcessor {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIRMATION HANDLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getPendingCommand(): ParsedCommand | null {
     return processorStore.get('pendingConfirmation');
@@ -519,9 +526,9 @@ class VoiceCommandProcessor {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DEFAULT EXECUTORS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerDefaultExecutors(): void {
     // Navigation executors
@@ -693,9 +700,9 @@ class VoiceCommandProcessor {
     this.executors.set(`${category}:${intent}`, executor);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private sendToRenderer(channel: string, data: unknown): void {
     const windows = BrowserWindow.getAllWindows();
@@ -720,9 +727,9 @@ class VoiceCommandProcessor {
     this.sendToRenderer('voice:commandResult', result);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getAvailablePatterns(): Array<{ category: string; intent: string; example: string }> {
     return COMMAND_PATTERNS.map(p => ({
@@ -733,9 +740,9 @@ class VoiceCommandProcessor {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const voiceCommandProcessor = VoiceCommandProcessor.getInstance();
 export default voiceCommandProcessor;

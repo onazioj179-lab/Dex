@@ -1,22 +1,28 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Performance Enforcer
 // FINAL PERFORMANCE & VISUAL SMOOTHNESS MODE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Measurement & Guarantees: Continuous enforcement of performance targets
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Any change that:
 // - Increases baseline usage
 // - Introduces jitter
 // - Breaks smoothness
 // IS REJECTED.
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import log from 'electron-log';
 import { ipcMain, BrowserWindow, app } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERFORMANCE GUARANTEES - NON-NEGOTIABLE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const GUARANTEES = {
   // Memory (hard ceilings)
@@ -46,9 +52,9 @@ export const GUARANTEES = {
   SESSION_STABILITY_HOURS: 24,         // Must maintain for 24+ hours
 } as const;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type GuaranteeStatus = 'passing' | 'warning' | 'failing';
 export type EnforcementAction = 'none' | 'throttle' | 'reduce-motion' | 'emergency';
@@ -79,9 +85,9 @@ export interface PerformanceBaseline {
   timestamp: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERFORMANCE ENFORCER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PerformanceEnforcerClass {
   private isRunning = false;
@@ -113,9 +119,9 @@ class PerformanceEnforcerClass {
 
   constructor() {}
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
     if (this.isRunning) return;
@@ -123,7 +129,7 @@ class PerformanceEnforcerClass {
     this.startTime = Date.now();
     
     log.info(' [PerformanceEnforcer] Starting - Guarantees enforcement mode');
-    log.info(` [PerformanceEnforcer] Targets: ≤${GUARANTEES.MAX_MEMORY_MB}MB RAM, ≤${GUARANTEES.TARGET_FRAME_TIME_MS}ms frames`);
+    log.info(` [PerformanceEnforcer] Targets: ${GUARANTEES.MAX_MEMORY_MB}MB RAM, ${GUARANTEES.TARGET_FRAME_TIME_MS}ms frames`);
     
     this.setupIPCHandlers();
     this.startEnforcement();
@@ -150,9 +156,9 @@ class PerformanceEnforcerClass {
     log.info(' [PerformanceEnforcer] Stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPCHandlers(): void {
     // Receive metrics from renderer
@@ -188,9 +194,9 @@ class PerformanceEnforcerClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // METRICS RECORDING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private recordFrameTime(frameTime: number): void {
     this.currentFrameTime = frameTime;
@@ -213,9 +219,9 @@ class PerformanceEnforcerClass {
     this.currentCpuPercent = cpuPercent;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BASELINE ESTABLISHMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private establishBaseline(): void {
     if (this.baselineEstablished) return;
@@ -232,9 +238,9 @@ class PerformanceEnforcerClass {
     log.info(` [PerformanceEnforcer] Baseline established: ${this.baseline.memoryMB}MB, ${this.baseline.avgFrameTime.toFixed(1)}ms frames`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ENFORCEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startEnforcement(): void {
     // Check guarantees every 30 seconds
@@ -301,9 +307,9 @@ class PerformanceEnforcerClass {
     this.executeAction(this.currentAction);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INDIVIDUAL CHECKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private checkMemory(): GuaranteeCheck {
     const current = this.currentMemoryMB;
@@ -438,9 +444,9 @@ class PerformanceEnforcerClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTION DETERMINATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private determineAction(status: GuaranteeStatus, failingChecks: GuaranteeCheck[]): EnforcementAction {
     if (status === 'passing') return 'none';
@@ -474,9 +480,9 @@ class PerformanceEnforcerClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // API
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getSnapshot(): EnforcementSnapshot {
     const failingCount = this.lastCheck.filter(c => c.status === 'failing').length;
@@ -522,9 +528,9 @@ class PerformanceEnforcerClass {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const PerformanceEnforcer = new PerformanceEnforcerClass();
 export default PerformanceEnforcer;

@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - Stability Core
 // Phase 1: Immediate Patch Cycle - Runtime and Crash Fixes
@@ -177,6 +183,8 @@ class StabilityCoreClass extends EventEmitter {
     const originalHandle = ipcMain.handle.bind(ipcMain);
     
     ipcMain.handle = (channel: string, listener: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any) => {
+      // Safely remove any existing handler to prevent "second handler" errors
+      try { ipcMain.removeHandler(channel); } catch (_) { /* no prior handler */ }
       return originalHandle(channel, async (event, ...args) => {
         try {
           return await Promise.race([
@@ -605,4 +613,17 @@ export function registerStabilityHandlers(): void {
   ipcMain.handle('stability:getStats', () => stabilityCore.getStats());
   ipcMain.handle('stability:getRecentEvents', (_, count?: number) => stabilityCore.getRecentEvents(count));
   ipcMain.handle('stability:isStable', () => stabilityCore.isStable());
+  ipcMain.handle('stability:reportError', (_, data: { type?: string; message?: string; stack?: string; timestamp?: number; source?: string }) => {
+    if (!data || typeof data !== 'object') return;
+    stabilityCore.emit('stability-event', {
+      id: `se-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: data.timestamp || Date.now(),
+      type: (data.type || 'renderer-error') as any,
+      severity: 'medium' as any,
+      message: data.message || 'Unknown renderer error',
+      stack: data.stack,
+      context: { source: data.source || 'renderer' },
+      recovered: false,
+    });
+  });
 }

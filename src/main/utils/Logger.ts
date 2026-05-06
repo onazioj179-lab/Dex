@@ -1,9 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Logger
 // Activity and decision logging
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import * as log from 'electron-log';
 
 interface LogEntry {
@@ -25,7 +31,9 @@ export class Logger {
   constructor() {
     // Configure electron-log
     log.transports.file.level = 'info';
-    log.transports.console.level = 'debug';
+    // Disable console output in production; enable in development
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+    log.transports.console.level = isDev ? 'debug' : false;
   }
 
   private addLog(level: LogEntry['level'], message: string, data?: any): void {

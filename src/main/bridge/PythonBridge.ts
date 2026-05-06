@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Python Bridge
 // Communicates with Python backend for deep system control
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
@@ -33,9 +39,9 @@ export class PythonBridge {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Lifecycle
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async start(): Promise<boolean> {
     if (this.process) {
@@ -124,9 +130,9 @@ export class PythonBridge {
     return this.ready;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Communication
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private handleOutput(line: string): void {
     try {
@@ -185,26 +191,26 @@ export class PythonBridge {
   // Simpler synchronous-style send (reads one line response)
   async call(cmd: string, args: Record<string, any> = {}): Promise<any> {
     if (!this.process || !this.ready) {
-      // Return fallback for non-critical commands
+      // Return accurate status for health checks
       if (cmd === 'health') {
-        return { healthy: true, uptime: 0, errorCount: 0, memoryMB: 0 };
+        return { healthy: false, uptime: 0, errorCount: 0, memoryMB: 0, reason: 'Python backend not running' };
       }
       throw new Error('Python backend not ready');
     }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        if (rl) rl.close();
         reject(new Error('Request timeout'));
       }, 30000);
+
+      let rl: readline.Interface | null = null;
 
       const handler = (line: string) => {
         try {
           const response = JSON.parse(line);
           clearTimeout(timeout);
-          if (this.process?.stdout) {
-            const rl = readline.createInterface({ input: this.process.stdout });
-            rl.removeAllListeners('line');
-          }
+          if (rl) rl.close();
           resolve(response);
         } catch {
           // Not valid JSON yet, wait for next line
@@ -213,7 +219,7 @@ export class PythonBridge {
       };
 
       if (this.process?.stdout) {
-        const rl = readline.createInterface({ input: this.process.stdout });
+        rl = readline.createInterface({ input: this.process.stdout });
         rl.once('line', handler);
       }
 
@@ -222,9 +228,9 @@ export class PythonBridge {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getPythonScriptPath(): string {
     // In development
@@ -247,9 +253,9 @@ export class PythonBridge {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONVENIENCE API
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class DexPythonAPI {
   private bridge: PythonBridge;

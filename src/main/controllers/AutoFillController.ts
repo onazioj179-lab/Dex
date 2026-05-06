@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Auto-Fill Controller
 // Smart background auto-fill service
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, BrowserWindow, safeStorage } from 'electron';
 import Store from 'electron-store';
@@ -10,9 +16,9 @@ import crypto from 'crypto';
 
 const log = new Logger();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SavedPassword {
   id: string;
@@ -63,9 +69,9 @@ interface FormFieldSuggestion {
   confidence: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const autoFillStore = new Store<{
   passwords: SavedPassword[];
@@ -92,9 +98,9 @@ const autoFillStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ENCRYPTION HELPERS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 function encryptData(data: string): string {
   try {
@@ -103,7 +109,7 @@ function encryptData(data: string): string {
       return encrypted.toString('base64');
     }
   } catch (err: any) {
-    console.warn('[AutoFill] Encryption failed, using basic obfuscation:', err.message);
+    log.warn('[AutoFill] Encryption failed, using basic obfuscation:', err.message);
   }
   // Fallback to basic obfuscation
   return Buffer.from(data).toString('base64');
@@ -116,15 +122,15 @@ function decryptData(encryptedData: string): string {
       return safeStorage.decryptString(buffer);
     }
   } catch (err: any) {
-    console.warn('[AutoFill] Decryption failed, attempting base64 fallback:', err.message);
+    log.warn('[AutoFill] Decryption failed, attempting base64 fallback:', err.message);
   }
   // Fallback
   return Buffer.from(encryptedData, 'base64').toString('utf-8');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONTROLLER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AutoFillControllerClass {
   private initialized = false;
@@ -134,9 +140,9 @@ class AutoFillControllerClass {
 
     log.info('[AutoFill] Initializing background auto-fill service...');
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // SETTINGS
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:getSettings', async () => {
       return autoFillStore.get('settings');
@@ -148,11 +154,14 @@ class AutoFillControllerClass {
       return autoFillStore.get('settings');
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // PASSWORDS
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:savePassword', async (_, domain: string, username: string, password: string) => {
+      if (!domain || typeof domain !== 'string' || domain.length > 2048) return null;
+      if (!username || typeof username !== 'string' || username.length > 512) return null;
+      if (!password || typeof password !== 'string' || password.length > 10000) return null;
       const settings = autoFillStore.get('settings');
       if (!settings.savePasswords) return null;
 
@@ -182,7 +191,7 @@ class AutoFillControllerClass {
 
     ipcMain.handle('autofill:getPasswords', async (_, domain?: string) => {
       const passwords = autoFillStore.get('passwords');
-      const filtered = domain 
+      const filtered = domain && domain.length > 0
         ? passwords.filter(p => p.domain.includes(domain))
         : passwords;
       
@@ -217,9 +226,9 @@ class AutoFillControllerClass {
       return true;
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // ADDRESSES
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:saveAddress', async (_, address: Omit<SavedAddress, 'id' | 'createdAt'>) => {
       const settings = autoFillStore.get('settings');
@@ -247,9 +256,9 @@ class AutoFillControllerClass {
       return true;
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // CARDS (Extra secure)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:saveCard', async (_, cardData: { 
       label: string;
@@ -300,9 +309,9 @@ class AutoFillControllerClass {
       return true;
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // SMART SUGGESTIONS
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:getSuggestions', async (_, context: {
       domain: string;
@@ -402,9 +411,9 @@ class AutoFillControllerClass {
       autoFillStore.set('formHistory', formHistory);
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // AUTO-FILL TRIGGER (Background)
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:autoFillForm', async (_, domain: string) => {
       const settings = autoFillStore.get('settings');
@@ -424,9 +433,9 @@ class AutoFillControllerClass {
       return null;
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
     // CLEAR ALL DATA
-    // ─────────────────────────────────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     ipcMain.handle('autofill:clearAll', async () => {
       autoFillStore.set('passwords', []);
@@ -451,9 +460,9 @@ class AutoFillControllerClass {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const AutoFillController = new AutoFillControllerClass();
 export default AutoFillController;

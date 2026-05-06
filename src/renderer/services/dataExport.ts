@@ -294,14 +294,14 @@ function convertToCSV(data: Record<string, any>): string {
 
 export function clearAllData(): void {
   DATA_SECTIONS.forEach(section => {
-    try { localStorage.removeItem(section.storageKey); } catch {}
+    try { localStorage.removeItem(section.storageKey); } catch (e) { console.warn('[DEX]', e); }
   });
 }
 
 export function clearSection(key: string): void {
   const section = DATA_SECTIONS.find(s => s.key === key);
   if (section) {
-    try { localStorage.removeItem(section.storageKey); } catch {}
+    try { localStorage.removeItem(section.storageKey); } catch (e) { console.warn('[DEX]', e); }
   }
 }
 

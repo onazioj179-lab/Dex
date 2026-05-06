@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Clipboard History Manager
 // OS-Level clipboard history with search, pinning, and smart organization
 // Zero background polling - event-driven only
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, clipboard, nativeImage, BrowserWindow } from 'electron';
@@ -11,9 +17,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ClipboardItemType = 'text' | 'image' | 'html' | 'rtf' | 'files';
 
@@ -70,9 +76,9 @@ export interface ClipboardStats {
   recentTags: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CLIPBOARD HISTORY MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ClipboardHistoryManagerClass extends EventEmitter {
   private config: ClipboardConfig;
@@ -110,9 +116,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -138,9 +144,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Get history
@@ -216,20 +222,19 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MONITORING (Event-driven, not polling)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startMonitoring(): void {
     if (this.checkInterval) return;
     
-    // We use a minimal interval check since Electron doesn't have clipboard events
-    // But we only capture on actual changes (hash comparison)
+    // Clipboard check — 3s is sufficient since we hash-compare for actual changes
     this.checkInterval = setInterval(() => {
       if (!this.isPaused && this.config.enabled) {
         this.checkClipboard();
       }
-    }, 1000); // Check every second, but only act on changes
+    }, 3000);
 
     // Initial capture
     this.captureClipboard();
@@ -275,9 +280,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CAPTURE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async captureClipboard(): Promise<ClipboardItem | null> {
     if (!this.config.enabled || this.isPaused) return null;
@@ -313,7 +318,7 @@ class ClipboardHistoryManagerClass extends EventEmitter {
         await fs.writeFile(imagePath, buffer);
         
         content = imagePath;
-        preview = `Image (${size.width}×${size.height})`;
+        preview = `Image (${size.width}${size.height})`;
 
         const item = this.createItem(type, content, preview);
         item.imagePath = imagePath;
@@ -402,7 +407,7 @@ class ClipboardHistoryManagerClass extends EventEmitter {
       if (removeIndex > -1) {
         const removed = this.history.splice(removeIndex, 1)[0];
         if (removed.imagePath) {
-          fs.unlink(removed.imagePath).catch(() => {});
+          fs.unlink(removed.imagePath).catch((e: unknown) => { log.warn('[DEX]', e); });
         }
       } else {
         break;
@@ -416,9 +421,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     return item;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HISTORY OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getHistory(filter?: ClipboardFilter): ClipboardItem[] {
     let items = [...this.history];
@@ -560,7 +565,7 @@ class ClipboardHistoryManagerClass extends EventEmitter {
       
       // Delete associated image
       if (item.imagePath) {
-        await fs.unlink(item.imagePath).catch(() => {});
+        await fs.unlink(item.imagePath).catch((e: unknown) => { log.warn('[DEX]', e); });
       }
       
       this.history.splice(index, 1);
@@ -579,7 +584,7 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     // Delete images
     for (const item of toRemove) {
       if (item.imagePath) {
-        await fs.unlink(item.imagePath).catch(() => {});
+        await fs.unlink(item.imagePath).catch((e: unknown) => { log.warn('[DEX]', e); });
       }
     }
 
@@ -591,9 +596,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     return { success: true, removed };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SEARCH
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   search(query: string): ClipboardItem[] {
     if (!query.trim()) return this.history.slice(0, 50);
@@ -634,9 +639,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
       .map(({ item }) => item);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): ClipboardStats {
     const byType: Record<ClipboardItemType, number> = {
@@ -672,9 +677,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setConfig(config: Partial<ClipboardConfig>): Promise<{ success: boolean }> {
     const wasEnabled = this.config.enabled;
@@ -703,9 +708,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     this.emit('monitoring:resumed');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private hashContent(content: string): string {
     return crypto.createHash('md5').update(content).digest('hex');
@@ -768,7 +773,7 @@ class ClipboardHistoryManagerClass extends EventEmitter {
       try {
         JSON.parse(text);
         return 'json';
-      } catch {}
+      } catch (e) { log.warn('[DEX]', e); }
     }
 
     return undefined;
@@ -780,9 +785,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadHistory(): Promise<void> {
     try {
@@ -840,7 +845,7 @@ class ClipboardHistoryManagerClass extends EventEmitter {
 
     for (const item of toRemove) {
       if (item.imagePath) {
-        await fs.unlink(item.imagePath).catch(() => {});
+        await fs.unlink(item.imagePath).catch((e: unknown) => { log.warn('[DEX]', e); });
       }
     }
 
@@ -854,9 +859,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     this.stopMonitoring();
@@ -865,9 +870,9 @@ class ClipboardHistoryManagerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const ClipboardHistoryManager = new ClipboardHistoryManagerClass();
 export default ClipboardHistoryManager;

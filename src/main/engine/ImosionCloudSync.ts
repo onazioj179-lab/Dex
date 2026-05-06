@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * IMOSION CLOUD SYNC - Project Collaboration & Cloud Storage
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Handles:
  * - Cloud sync for projects and presets
@@ -14,10 +20,11 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES & INTERFACES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface CloudUser {
   id: string;
@@ -102,9 +109,9 @@ export interface ChangeOperation {
   userId: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // OFFLINE CACHE MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class OfflineCacheManager {
   private cacheDir: string;
@@ -129,7 +136,7 @@ class OfflineCacheManager {
         this.pendingChanges = new Map(Object.entries(data));
       }
     } catch (error) {
-      console.error('[OfflineCacheManager] Failed to init cache:', error);
+      log.error('[OfflineCacheManager] Failed to init cache:', error);
     }
   }
   
@@ -153,7 +160,7 @@ class OfflineCacheManager {
         return { metadata: data.metadata, data: data.data };
       }
     } catch (error) {
-      console.error('[OfflineCacheManager] Failed to get cached project:', error);
+      log.error('[OfflineCacheManager] Failed to get cached project:', error);
     }
     
     return null;
@@ -190,14 +197,14 @@ class OfflineCacheManager {
         }
       }
     } catch (error) {
-      console.error('[OfflineCacheManager] Failed to clear cache:', error);
+      log.error('[OfflineCacheManager] Failed to clear cache:', error);
     }
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONFLICT RESOLVER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ConflictResolver {
   /**
@@ -275,9 +282,9 @@ class ConflictResolver {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MAIN CLOUD SYNC CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class ImosionCloudSync extends EventEmitter {
   private currentUser: CloudUser | null = null;
@@ -291,6 +298,7 @@ export class ImosionCloudSync extends EventEmitter {
   private autoSyncEnabled = true;
   private autoSyncInterval = 30000; // 30 seconds
   private syncTimer: NodeJS.Timeout | null = null;
+  private networkCheckTimer: NodeJS.Timeout | null = null;
   
   constructor() {
     super();
@@ -300,15 +308,15 @@ export class ImosionCloudSync extends EventEmitter {
     
     this.startNetworkMonitoring();
     
-    console.log('[ImosionCloudSync] Initialized');
+    log.info('[ImosionCloudSync] Initialized');
   }
   
   private startNetworkMonitoring(): void {
-    // Simulate network status (in real implementation, use native APIs)
-    setInterval(() => {
+    // Use Electron’s built-in online/offline events + infrequent fallback poll
+    const { net } = require('electron');
+    this.networkCheckTimer = setInterval(() => {
       const wasOnline = this.isOnline;
-      // For simulation, stay online
-      this.isOnline = true;
+      this.isOnline = net.isOnline();
       
       if (!wasOnline && this.isOnline) {
         this.emit('online');
@@ -316,26 +324,26 @@ export class ImosionCloudSync extends EventEmitter {
       } else if (wasOnline && !this.isOnline) {
         this.emit('offline');
       }
-    }, 5000);
+    }, 60000);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Authentication
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async login(email: string, password: string): Promise<CloudUser> {
-    // Simulated login - real implementation would call auth API
+    // Cloud API not yet configured — return local-only profile
+    log.info('[ImosionCloudSync] Cloud API not configured, using local-only profile');
     const user: CloudUser = {
-      id: `user_${Date.now()}`,
+      id: `local_${Date.now()}`,
       email,
       displayName: email.split('@')[0],
-      plan: 'pro',
+      plan: 'free',
       storageUsed: 0,
-      storageLimit: 10 * 1024 * 1024 * 1024 // 10 GB
+      storageLimit: 0
     };
     
     this.currentUser = user;
-    this.startAutoSync();
     this.emit('loggedIn', user);
     
     return user;
@@ -356,9 +364,9 @@ export class ImosionCloudSync extends EventEmitter {
     return this.currentUser !== null;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Project Sync
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async uploadProject(projectData: any, metadata: Partial<CloudProject>): Promise<CloudProject> {
     if (!this.currentUser) {
@@ -413,14 +421,14 @@ export class ImosionCloudSync extends EventEmitter {
       throw new Error('Offline and project not cached');
     }
     
-    // Simulated download - real implementation would call API
+    // Cloud API not yet configured — can only serve cached projects
     const cached = await this.offlineCache.getCachedProject(projectId);
     if (cached) {
       this.emit('projectDownloaded', cached.metadata);
       return cached;
     }
     
-    throw new Error('Project not found');
+    throw new Error('Cloud sync not configured — project not available locally');
   }
   
   async syncProject(projectId: string, localData: any): Promise<SyncStatus> {
@@ -499,18 +507,18 @@ export class ImosionCloudSync extends EventEmitter {
   }
   
   private async syncPendingChanges(): Promise<void> {
-    // Sync pending changes - in real implementation would iterate over pending projects
-    // For now, this is a placeholder that would be connected to actual sync logic
-    console.log('[ImosionCloudSync] Checking for pending changes to sync');
+    // Cloud API not yet configured -- skip sync attempts silently
+    if (!this.isOnline) return;
+    // When cloud endpoints are connected, iterate over pending project changes here
   }
   
   getSyncStatus(projectId: string): SyncStatus | undefined {
     return this.syncStatus.get(projectId);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Collaboration
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async startCollaborationSession(projectId: string): Promise<CollaborationSession> {
     if (!this.currentUser) {
@@ -613,9 +621,9 @@ export class ImosionCloudSync extends EventEmitter {
     return colors[Math.floor(Math.random() * colors.length)];
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Project Sharing
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async shareProject(projectId: string, email: string, role: 'editor' | 'viewer'): Promise<Collaborator> {
     if (!this.currentUser) {
@@ -643,9 +651,9 @@ export class ImosionCloudSync extends EventEmitter {
     this.emit('collaboratorRoleChanged', { projectId, userId, role });
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Preset Sharing
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async uploadPreset(preset: Partial<CloudPreset>, data: Uint8Array): Promise<CloudPreset> {
     if (!this.currentUser) {
@@ -670,7 +678,7 @@ export class ImosionCloudSync extends EventEmitter {
   }
   
   async searchPresets(query: string, pluginId?: string): Promise<CloudPreset[]> {
-    // Simulated search - real implementation would call API
+    // Cloud preset search not available — no API configured
     return [];
   }
   
@@ -678,9 +686,9 @@ export class ImosionCloudSync extends EventEmitter {
     throw new Error('Preset not found');
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Auto Sync
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   startAutoSync(): void {
     if (!this.autoSyncEnabled || this.syncTimer) return;
@@ -706,9 +714,9 @@ export class ImosionCloudSync extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Status
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   isNetworkOnline(): boolean {
     return this.isOnline;
@@ -726,12 +734,13 @@ export class ImosionCloudSync extends EventEmitter {
     };
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async dispose(): Promise<void> {
     this.stopAutoSync();
+    if (this.networkCheckTimer) clearInterval(this.networkCheckTimer);
     
     // Leave all active sessions
     for (const sessionId of this.activeSessions.keys()) {
@@ -739,7 +748,7 @@ export class ImosionCloudSync extends EventEmitter {
     }
     
     this.removeAllListeners();
-    console.log('[ImosionCloudSync] Disposed');
+    log.info('[ImosionCloudSync] Disposed');
   }
 }
 

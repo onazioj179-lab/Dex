@@ -4,12 +4,12 @@ Short reference for project organization + app features.
 
 ## Project Organization
 
-- `src/main/` — Electron main process (IPC, system control, updates)
-- `src/renderer/` — React UI (pages, components, styles, store)
-- `src/shared/` — shared types and validation
-- `src/python/` — Python backend helpers
-- `tests/` — unit, integration, and e2e tests
-- `assets/` — installer and platform assets
+- `src/main/` -- Electron main process (IPC, system control, updates)
+- `src/renderer/` -- React UI (pages, components, styles, store)
+- `src/shared/` -- shared types and validation
+- `src/python/` -- Python backend helpers
+- `tests/` -- unit, integration, and e2e tests
+- `assets/` -- installer and platform assets
 
 ## Main App Features
 

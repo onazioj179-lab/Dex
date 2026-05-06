@@ -1,0 +1,24 @@
+# ===========================================================================
+# DEX OS -- Filesystem Mount Table Template
+# ===========================================================================
+# Template used by the installer to generate /etc/fstab on the target disk.
+# Variables are replaced by install.sh during installation:
+#   {{ROOT_PARTITION}}  -> e.g. /dev/sda2
+#   {{EFI_PARTITION}}   -> e.g. /dev/sda1
+#   {{SWAP_PARTITION}}  -> e.g. /dev/sda3
+#   {{ROOT_UUID}}       -> UUID of root partition
+#   {{EFI_UUID}}        -> UUID of EFI partition
+#   {{SWAP_UUID}}       -> UUID of swap partition
+# ===========================================================================
+
+# <file system>                           <mount point>  <type>  <options>                          <dump> <pass>
+UUID={{ROOT_UUID}}                         /              ext4    defaults,noatime,discard           0      1
+UUID={{EFI_UUID}}                          /boot/efi      vfat    defaults,umask=0077                0      2
+UUID={{SWAP_UUID}}                         none           swap    sw                                 0      0
+
+# Temporary filesystems
+tmpfs                                      /tmp           tmpfs   defaults,noatime,nosuid,size=2G    0      0
+tmpfs                                      /run           tmpfs   defaults,noatime,nosuid,mode=0755  0      0
+
+# Shared memory for Chromium/Electron
+tmpfs                                      /dev/shm       tmpfs   defaults,noexec,nosuid,size=50%    0      0

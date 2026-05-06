@@ -1,0 +1,5 @@
+# ===========================================================================
+# DEX OS -- Buildroot External Tree Configuration
+# ===========================================================================
+name: DEX_OS
+desc: DEX desktop environment OS image

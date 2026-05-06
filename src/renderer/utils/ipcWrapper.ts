@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 30: Async IPC Wrapper
 // Non-blocking IPC communication with timeouts, retries, and cancellation
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { coalesceRequest, LRUCache, scheduleIdleWork } from './performance';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface IPCConfig {
   /** Default timeout for IPC calls (ms) */
@@ -30,9 +36,9 @@ const DEFAULT_CONFIG: IPCConfig = {
   cacheTTL: 30000, // 30 seconds
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // TYPES
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface IPCCallOptions {
   /** Timeout for this specific call (ms) */
@@ -63,9 +69,9 @@ interface CachedResponse<T> {
   ttl: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CACHE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const responseCache = new LRUCache<string, CachedResponse<unknown>>(200);
 
@@ -94,9 +100,9 @@ function setCachedResponse<T>(key: string, data: T, ttl: number): void {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // TIMEOUT PROMISE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -136,9 +142,9 @@ function withTimeout<T>(
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // RETRY LOGIC
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -175,9 +181,9 @@ async function withRetry<T>(
   throw lastError || new Error('Unknown error');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // IPC WRAPPER CLASS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class IPCWrapper {
   private config: IPCConfig;
@@ -367,15 +373,15 @@ class IPCWrapper {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // SINGLETON INSTANCE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const ipc = new IPCWrapper();
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CONVENIENCE FUNCTIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Make a cached IPC call
@@ -422,9 +428,9 @@ export function sendAsync(channel: string, args: unknown[] = []): void {
   ipc.send(channel, args);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // REACT HOOK
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
@@ -571,4 +577,163 @@ export function useLazyIPC<T, Args extends unknown[] = unknown[]>(
     execute,
     { data, loading, error, refetch, isCached }
   ];
+}
+
+// ---------------------------------------------------------------------------
+// BATCH IPC — group multiple calls into a single frame for reduced overhead
+// ---------------------------------------------------------------------------
+
+interface BatchedCall {
+  channel: string;
+  args: unknown[];
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+}
+
+let batchQueue: BatchedCall[] = [];
+let batchScheduled = false;
+
+function flushBatch() {
+  const calls = batchQueue.splice(0);
+  batchScheduled = false;
+  // Execute all queued calls concurrently
+  Promise.allSettled(
+    calls.map(async (call) => {
+      try {
+        const result = await ipc.call(call.channel, call.args);
+        if (result.success) call.resolve(result.data);
+        else call.reject(new Error(result.error || 'IPC batch call failed'));
+      } catch (e) {
+        call.reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    })
+  );
+}
+
+/**
+ * Queue an IPC call to be batched with other calls in the same frame.
+ * Reduces IPC overhead by coalescing multiple calls into a single microtask.
+ */
+export function batchIPCCall<T>(channel: string, ...args: unknown[]): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    batchQueue.push({ channel, args, resolve: resolve as (v: unknown) => void, reject });
+    if (!batchScheduled) {
+      batchScheduled = true;
+      // Use queueMicrotask for same-frame batching
+      queueMicrotask(flushBatch);
+    }
+  });
+}
+
+/**
+ * Execute multiple IPC calls in parallel and return all results.
+ * More efficient than sequential calls for independent data fetches.
+ */
+export async function parallelIPC<T extends unknown[]>(
+  ...calls: { channel: string; args?: unknown[] }[]
+): Promise<IPCResult<unknown>[]> {
+  return Promise.all(
+    calls.map(c => ipc.call(c.channel, c.args || []))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ERROR NOTIFICATION INTEGRATION
+// ---------------------------------------------------------------------------
+
+type ErrorNotifyFn = (message: string, details?: string) => void;
+let errorNotifier: ErrorNotifyFn | null = null;
+
+/**
+ * Set the error notification function (e.g., toast system)
+ */
+export function setIPCErrorNotifier(notifier: ErrorNotifyFn): void {
+  errorNotifier = notifier;
+}
+
+/**
+ * IPC call with automatic error notification
+ */
+export async function callWithNotify<T>(
+  channel: string,
+  args: unknown[] = [],
+  options: IPCCallOptions & { errorMessage?: string } = {}
+): Promise<T | null> {
+  const result = await ipc.call<T>(channel, args, options);
+  
+  if (!result.success) {
+    const message = options.errorMessage || `Failed to ${channel.split('.').pop()}`;
+    errorNotifier?.(message, result.error);
+    return null;
+  }
+  
+  return result.data!;
+}
+
+/**
+ * IPC call that throws on error (for use with try/catch)
+ */
+export async function callOrThrow<T>(
+  channel: string,
+  args: unknown[] = [],
+  options: IPCCallOptions = {}
+): Promise<T> {
+  const result = await ipc.call<T>(channel, args, options);
+  
+  if (!result.success) {
+    throw new Error(result.error || `IPC call to ${channel} failed`);
+  }
+  
+  return result.data!;
+}
+
+// ---------------------------------------------------------------------------
+// IPC ERROR CODES
+// ---------------------------------------------------------------------------
+
+export const IPC_ERROR_CODES = {
+  TIMEOUT: 'IPC_TIMEOUT',
+  ABORTED: 'IPC_ABORTED',
+  NOT_FOUND: 'IPC_NOT_FOUND',
+  INVALID_ARGS: 'IPC_INVALID_ARGS',
+  PERMISSION_DENIED: 'IPC_PERMISSION_DENIED',
+  RATE_LIMITED: 'IPC_RATE_LIMITED',
+  INTERNAL: 'IPC_INTERNAL',
+} as const;
+
+export type IPCErrorCode = typeof IPC_ERROR_CODES[keyof typeof IPC_ERROR_CODES];
+
+/**
+ * Parse IPC error message to get error code
+ */
+export function parseIPCError(error: string): IPCErrorCode {
+  if (error.includes('timed out')) return IPC_ERROR_CODES.TIMEOUT;
+  if (error.includes('aborted')) return IPC_ERROR_CODES.ABORTED;
+  if (error.includes('not found') || error.includes('Invalid channel')) return IPC_ERROR_CODES.NOT_FOUND;
+  if (error.includes('Invalid') || error.includes('missing')) return IPC_ERROR_CODES.INVALID_ARGS;
+  if (error.includes('permission') || error.includes('denied')) return IPC_ERROR_CODES.PERMISSION_DENIED;
+  if (error.includes('rate limit')) return IPC_ERROR_CODES.RATE_LIMITED;
+  return IPC_ERROR_CODES.INTERNAL;
+}
+
+/**
+ * Get user-friendly error message
+ */
+export function getIPCErrorMessage(code: IPCErrorCode): string {
+  switch (code) {
+    case IPC_ERROR_CODES.TIMEOUT:
+      return 'The operation took too long. Please try again.';
+    case IPC_ERROR_CODES.ABORTED:
+      return 'The operation was cancelled.';
+    case IPC_ERROR_CODES.NOT_FOUND:
+      return 'The requested feature is not available.';
+    case IPC_ERROR_CODES.INVALID_ARGS:
+      return 'Invalid request. Please check your input.';
+    case IPC_ERROR_CODES.PERMISSION_DENIED:
+      return 'You don\'t have permission to perform this action.';
+    case IPC_ERROR_CODES.RATE_LIMITED:
+      return 'Too many requests. Please wait a moment.';
+    default:
+      return 'An unexpected error occurred. Please try again.';
+  }
 }

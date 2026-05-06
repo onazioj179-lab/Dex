@@ -1,547 +1,426 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * DEX Resizable Panel Component
- * Resizable panels and split views
+ * ResizablePanel - Flexible panel with drag-to-resize
+ * 
+ * Features:
+ * - Drag handles on any edge
+ * - Min/max constraints
+ * - Double-click to reset
+ * - Size persistence in localStorage
+ * - Snap-to-grid option
+ * - Visual resize affordances
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from 'react';
+import { colors, radius } from '../styles/tokens';
 
-// ==================== TYPES ====================
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-interface ResizablePanelProps {
+export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+export interface ResizablePanelProps {
   children: React.ReactNode;
-  direction?: 'horizontal' | 'vertical';
-  minSize?: number;
-  maxSize?: number;
-  defaultSize?: number | string;
-  onResize?: (size: number) => void;
-  onResizeEnd?: (size: number) => void;
-  collapsible?: boolean;
-  collapsed?: boolean;
-  onCollapse?: (collapsed: boolean) => void;
-  handlePosition?: 'start' | 'end';
+  /** Initial width */
+  initialWidth?: number;
+  /** Initial height */
+  initialHeight?: number;
+  /** Minimum width */
+  minWidth?: number;
+  /** Minimum height */
+  minHeight?: number;
+  /** Maximum width */
+  maxWidth?: number;
+  /** Maximum height */
+  maxHeight?: number;
+  /** Which edges can be resized */
+  resizeDirections?: ResizeDirection[];
+  /** Key for localStorage persistence */
+  storageKey?: string;
+  /** Snap to grid size (pixels) */
+  snapToGrid?: number;
+  /** Called when resize starts */
+  onResizeStart?: () => void;
+  /** Called during resize */
+  onResize?: (width: number, height: number) => void;
+  /** Called when resize ends */
+  onResizeEnd?: (width: number, height: number) => void;
+  /** Default width for reset */
+  defaultWidth?: number;
+  /** Default height for reset */
+  defaultHeight?: number;
+  /** Custom class name */
+  className?: string;
+  /** Custom styles */
+  style?: React.CSSProperties;
 }
 
-interface ResizableGroupProps {
-  children: React.ReactNode;
-  direction?: 'horizontal' | 'vertical';
-  sizes?: number[];
-  minSizes?: number[];
-  onSizesChange?: (sizes: number[]) => void;
-  handleSize?: number;
-}
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-interface SplitPaneProps {
-  left: React.ReactNode;
-  right: React.ReactNode;
-  defaultLeftSize?: number | string;
-  minLeftSize?: number;
-  minRightSize?: number;
-  onResize?: (leftSize: number) => void;
-  allowCollapse?: boolean;
-  collapseThreshold?: number;
-}
+const HANDLE_SIZE = 6;
+const HANDLE_HITAREA = 12;
 
-// ==================== RESIZABLE PANEL ====================
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export const ResizablePanel: React.FC<ResizablePanelProps> = ({
   children,
-  direction = 'horizontal',
-  minSize = 100,
-  maxSize,
-  defaultSize = 300,
+  initialWidth,
+  initialHeight,
+  minWidth = 100,
+  minHeight = 100,
+  maxWidth = Infinity,
+  maxHeight = Infinity,
+  resizeDirections = ['e', 's', 'se'],
+  storageKey,
+  snapToGrid,
+  onResizeStart,
   onResize,
   onResizeEnd,
-  collapsible = false,
-  collapsed: controlledCollapsed,
-  onCollapse,
-  handlePosition = 'end',
+  defaultWidth,
+  defaultHeight,
+  className,
+  style,
 }) => {
-  const [size, setSize] = useState<number>(
-    typeof defaultSize === 'number' ? defaultSize : 300
-  );
+  // Load initial size from storage
+  const getStoredSize = useCallback(() => {
+    if (!storageKey) return null;
+    try {
+      const stored = localStorage.getItem(`dex-resize-${storageKey}`);
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // Ignore
+    }
+    return null;
+  }, [storageKey]);
+
+  const storedSize = useMemo(() => getStoredSize(), [getStoredSize]);
+
+  const [size, setSize] = useState({
+    width: storedSize?.width ?? initialWidth ?? 300,
+    height: storedSize?.height ?? initialHeight ?? 200,
+  });
+
   const [isResizing, setIsResizing] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(controlledCollapsed ?? false);
+  const [activeDirection, setActiveDirection] = useState<ResizeDirection | null>(null);
+  const startPos = useRef({ x: 0, y: 0 });
+  const startSize = useRef({ width: 0, height: 0 });
   const panelRef = useRef<HTMLDivElement>(null);
-  const startPos = useRef<number>(0);
-  const startSize = useRef<number>(0);
 
-  const isHorizontal = direction === 'horizontal';
-
-  useEffect(() => {
-    if (controlledCollapsed !== undefined) {
-      setIsCollapsed(controlledCollapsed);
+  // Save to storage
+  const saveSize = useCallback((width: number, height: number) => {
+    if (storageKey) {
+      try {
+        localStorage.setItem(`dex-resize-${storageKey}`, JSON.stringify({ width, height }));
+      } catch {
+        // Ignore
+      }
     }
-  }, [controlledCollapsed]);
+  }, [storageKey]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Snap value to grid
+  const snap = useCallback((value: number): number => {
+    if (!snapToGrid) return value;
+    return Math.round(value / snapToGrid) * snapToGrid;
+  }, [snapToGrid]);
+
+  // Clamp value within bounds
+  const clamp = useCallback((value: number, min: number, max: number): number => {
+    return Math.max(min, Math.min(max, value));
+  }, []);
+
+  // Handle resize start
+  const handleResizeStart = useCallback((
+    e: React.MouseEvent | React.TouchEvent,
+    direction: ResizeDirection
+  ) => {
     e.preventDefault();
-    startPos.current = isHorizontal ? e.clientX : e.clientY;
-    startSize.current = size;
+    e.stopPropagation();
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    startPos.current = { x: clientX, y: clientY };
+    startSize.current = { ...size };
+    setActiveDirection(direction);
     setIsResizing(true);
-  };
+    onResizeStart?.();
+  }, [size, onResizeStart]);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-
-    const currentPos = isHorizontal ? e.clientX : e.clientY;
-    const delta = handlePosition === 'end'
-      ? currentPos - startPos.current
-      : startPos.current - currentPos;
-
-    let newSize = startSize.current + delta;
-    newSize = Math.max(minSize, newSize);
-    if (maxSize) newSize = Math.min(maxSize, newSize);
-
-    setSize(newSize);
-    onResize?.(newSize);
-  }, [isResizing, isHorizontal, handlePosition, minSize, maxSize, onResize]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-    onResizeEnd?.(size);
-  }, [size, onResizeEnd]);
-
+  // Handle resize move
   useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
-      document.body.style.userSelect = 'none';
-    }
+    if (!isResizing || !activeDirection) return;
+
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+      const deltaX = clientX - startPos.current.x;
+      const deltaY = clientY - startPos.current.y;
+
+      let newWidth = startSize.current.width;
+      let newHeight = startSize.current.height;
+
+      // Calculate new size based on direction
+      if (activeDirection.includes('e')) {
+        newWidth = startSize.current.width + deltaX;
+      }
+      if (activeDirection.includes('w')) {
+        newWidth = startSize.current.width - deltaX;
+      }
+      if (activeDirection.includes('s')) {
+        newHeight = startSize.current.height + deltaY;
+      }
+      if (activeDirection.includes('n')) {
+        newHeight = startSize.current.height - deltaY;
+      }
+
+      // Snap and clamp
+      newWidth = clamp(snap(newWidth), minWidth, maxWidth);
+      newHeight = clamp(snap(newHeight), minHeight, maxHeight);
+
+      setSize({ width: newWidth, height: newHeight });
+      onResize?.(newWidth, newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setActiveDirection(null);
+      saveSize(size.width, size.height);
+      onResizeEnd?.(size.width, size.height);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleMouseMove);
+    document.addEventListener('touchend', handleMouseUp);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('touchend', handleMouseUp);
     };
-  }, [isResizing, handleMouseMove, handleMouseUp, isHorizontal]);
+  }, [isResizing, activeDirection, clamp, snap, minWidth, maxWidth, minHeight, maxHeight, onResize, onResizeEnd, saveSize, size.width, size.height]);
 
-  const toggleCollapse = () => {
-    const newCollapsed = !isCollapsed;
-    setIsCollapsed(newCollapsed);
-    onCollapse?.(newCollapsed);
+  // Double-click to reset
+  const handleDoubleClick = useCallback(() => {
+    const newWidth = defaultWidth ?? initialWidth ?? 300;
+    const newHeight = defaultHeight ?? initialHeight ?? 200;
+    setSize({ width: newWidth, height: newHeight });
+    saveSize(newWidth, newHeight);
+    onResizeEnd?.(newWidth, newHeight);
+  }, [defaultWidth, defaultHeight, initialWidth, initialHeight, saveSize, onResizeEnd]);
+
+  // Get cursor for direction
+  const getCursor = (direction: ResizeDirection): string => {
+    const cursors: Record<ResizeDirection, string> = {
+      n: 'ns-resize',
+      s: 'ns-resize',
+      e: 'ew-resize',
+      w: 'ew-resize',
+      ne: 'nesw-resize',
+      sw: 'nesw-resize',
+      nw: 'nwse-resize',
+      se: 'nwse-resize',
+    };
+    return cursors[direction];
   };
 
-  const displaySize = isCollapsed ? 0 : size;
+  // Render handle
+  const renderHandle = (direction: ResizeDirection) => {
+    if (!resizeDirections.includes(direction)) return null;
 
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'flex',
-      flexDirection: isHorizontal ? 'row' : 'column',
-      position: 'relative',
-    },
-    panel: {
-      [isHorizontal ? 'width' : 'height']: displaySize,
-      flexShrink: 0,
-      overflow: 'hidden',
-      transition: isResizing ? 'none' : 'width 0.2s, height 0.2s',
-    },
-    handle: {
-      position: 'relative',
-      [isHorizontal ? 'width' : 'height']: 6,
-      background: 'var(--color-border)',
-      cursor: isHorizontal ? 'col-resize' : 'row-resize',
-      flexShrink: 0,
-      transition: 'background 0.15s',
-    },
-    handleActive: {
-      background: 'var(--color-accent)',
-    },
-    handleHover: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+    const isCorner = direction.length === 2;
+    const isHorizontal = direction === 'e' || direction === 'w';
+    const isVertical = direction === 'n' || direction === 's';
+
+    const handleStyle: React.CSSProperties = {
       position: 'absolute',
-      [isHorizontal ? 'top' : 'left']: '50%',
-      transform: isHorizontal ? 'translateY(-50%)' : 'translateX(-50%)',
-      [isHorizontal ? 'left' : 'top']: 0,
-      [isHorizontal ? 'right' : 'bottom']: 0,
-      height: isHorizontal ? 40 : 6,
-      width: isHorizontal ? 6 : 40,
-    },
-    collapseButton: {
-      position: 'absolute',
-      [isHorizontal ? 'top' : 'left']: '50%',
-      [isHorizontal ? 'left' : 'top']: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: 20,
-      height: 20,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--color-bg-secondary)',
-      border: '1px solid var(--color-border)',
-      borderRadius: '50%',
-      cursor: 'pointer',
-      fontSize: 10,
-      color: 'var(--color-text-muted)',
-      zIndex: 1,
-    },
-    content: {
-      flex: 1,
-      overflow: 'auto',
-    },
+      background: isResizing && activeDirection === direction
+        ? colors.accent.default
+        : 'transparent',
+      transition: 'background 0.1s ease',
+      zIndex: 10,
+    };
+
+    // Position handles
+    if (direction === 'n') {
+      Object.assign(handleStyle, {
+        top: -HANDLE_HITAREA / 2,
+        left: HANDLE_HITAREA,
+        right: HANDLE_HITAREA,
+        height: HANDLE_HITAREA,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 's') {
+      Object.assign(handleStyle, {
+        bottom: -HANDLE_HITAREA / 2,
+        left: HANDLE_HITAREA,
+        right: HANDLE_HITAREA,
+        height: HANDLE_HITAREA,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 'e') {
+      Object.assign(handleStyle, {
+        right: -HANDLE_HITAREA / 2,
+        top: HANDLE_HITAREA,
+        bottom: HANDLE_HITAREA,
+        width: HANDLE_HITAREA,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 'w') {
+      Object.assign(handleStyle, {
+        left: -HANDLE_HITAREA / 2,
+        top: HANDLE_HITAREA,
+        bottom: HANDLE_HITAREA,
+        width: HANDLE_HITAREA,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 'ne') {
+      Object.assign(handleStyle, {
+        top: -HANDLE_HITAREA / 2,
+        right: -HANDLE_HITAREA / 2,
+        width: HANDLE_HITAREA * 2,
+        height: HANDLE_HITAREA * 2,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 'nw') {
+      Object.assign(handleStyle, {
+        top: -HANDLE_HITAREA / 2,
+        left: -HANDLE_HITAREA / 2,
+        width: HANDLE_HITAREA * 2,
+        height: HANDLE_HITAREA * 2,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 'se') {
+      Object.assign(handleStyle, {
+        bottom: -HANDLE_HITAREA / 2,
+        right: -HANDLE_HITAREA / 2,
+        width: HANDLE_HITAREA * 2,
+        height: HANDLE_HITAREA * 2,
+        cursor: getCursor(direction),
+      });
+    } else if (direction === 'sw') {
+      Object.assign(handleStyle, {
+        bottom: -HANDLE_HITAREA / 2,
+        left: -HANDLE_HITAREA / 2,
+        width: HANDLE_HITAREA * 2,
+        height: HANDLE_HITAREA * 2,
+        cursor: getCursor(direction),
+      });
+    }
+
+    return (
+      <div
+        key={direction}
+        style={handleStyle}
+        onMouseDown={(e) => handleResizeStart(e, direction)}
+        onTouchStart={(e) => handleResizeStart(e, direction)}
+        onDoubleClick={handleDoubleClick}
+      >
+        {/* Visual indicator for corner handles */}
+        {isCorner && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: direction.includes('s') ? 2 : 'auto',
+              top: direction.includes('n') ? 2 : 'auto',
+              right: direction.includes('e') ? 2 : 'auto',
+              left: direction.includes('w') ? 2 : 'auto',
+              width: HANDLE_SIZE,
+              height: HANDLE_SIZE,
+              borderRadius: 1,
+              background: colors.text.tertiary,
+              opacity: isResizing && activeDirection === direction ? 1 : 0.5,
+              transition: 'opacity 0.1s ease',
+            }}
+          />
+        )}
+      </div>
+    );
   };
 
-  const renderHandle = () => (
+  return (
     <div
+      ref={panelRef}
+      className={className}
       style={{
-        ...styles.handle,
-        ...(isResizing ? styles.handleActive : {}),
+        position: 'relative',
+        width: size.width,
+        height: size.height,
+        ...style,
       }}
-      onMouseDown={handleMouseDown}
     >
-      {collapsible && (
-        <button style={styles.collapseButton} onClick={toggleCollapse}>
-          {isCollapsed ? (isHorizontal ? 'arrow-right' : 'arrow-down') : (isHorizontal ? 'arrow-left' : 'arrow-up')}
-        </button>
+      {children}
+
+      {/* Resize handles */}
+      {(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as ResizeDirection[]).map(renderHandle)}
+
+      {/* Resize overlay (prevents content interaction during resize) */}
+      {isResizing && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 5,
+            cursor: activeDirection ? getCursor(activeDirection) : 'default',
+          }}
+        />
       )}
     </div>
   );
-
-  return (
-    <div style={styles.container}>
-      {handlePosition === 'start' && renderHandle()}
-      <div ref={panelRef} style={styles.panel}>
-        {children}
-      </div>
-      {handlePosition === 'end' && renderHandle()}
-    </div>
-  );
 };
 
-// ==================== RESIZABLE GROUP ====================
+// ---------------------------------------------------------------------------
+// Hook for programmatic resize control
+// ---------------------------------------------------------------------------
 
-export const ResizableGroup: React.FC<ResizableGroupProps> = ({
-  children,
-  direction = 'horizontal',
-  sizes: controlledSizes,
-  minSizes = [],
-  onSizesChange,
-  handleSize = 6,
-}) => {
-  const childArray = React.Children.toArray(children);
-  const defaultSizes = childArray.map(() => 100 / childArray.length);
-  const [sizes, setSizes] = useState<number[]>(controlledSizes || defaultSizes);
-  const [resizingIndex, setResizingIndex] = useState<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const startPos = useRef<number>(0);
-  const startSizes = useRef<number[]>([]);
-
-  const isHorizontal = direction === 'horizontal';
+export const useResizablePanel = (storageKey?: string) => {
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    if (controlledSizes) {
-      setSizes(controlledSizes);
-    }
-  }, [controlledSizes]);
-
-  const handleMouseDown = (index: number) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    startPos.current = isHorizontal ? e.clientX : e.clientY;
-    startSizes.current = [...sizes];
-    setResizingIndex(index);
-  };
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (resizingIndex === null || !containerRef.current) return;
-
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const containerSize = isHorizontal ? containerRect.width : containerRect.height;
-    const currentPos = isHorizontal ? e.clientX : e.clientY;
-    const delta = currentPos - startPos.current;
-    const deltaPercent = (delta / containerSize) * 100;
-
-    const newSizes = [...startSizes.current];
-    const minSize = minSizes[resizingIndex] || 10;
-    const nextMinSize = minSizes[resizingIndex + 1] || 10;
-
-    // Adjust sizes
-    let leftNewSize = newSizes[resizingIndex] + deltaPercent;
-    let rightNewSize = newSizes[resizingIndex + 1] - deltaPercent;
-
-    // Apply minimum constraints
-    if (leftNewSize < minSize) {
-      leftNewSize = minSize;
-      rightNewSize = newSizes[resizingIndex + 1] + (newSizes[resizingIndex] - minSize);
-    }
-    if (rightNewSize < nextMinSize) {
-      rightNewSize = nextMinSize;
-      leftNewSize = newSizes[resizingIndex] + (newSizes[resizingIndex + 1] - nextMinSize);
-    }
-
-    newSizes[resizingIndex] = leftNewSize;
-    newSizes[resizingIndex + 1] = rightNewSize;
-
-    setSizes(newSizes);
-    onSizesChange?.(newSizes);
-  }, [resizingIndex, isHorizontal, minSizes, onSizesChange]);
-
-  const handleMouseUp = useCallback(() => {
-    setResizingIndex(null);
-  }, []);
-
-  useEffect(() => {
-    if (resizingIndex !== null) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
-      document.body.style.userSelect = 'none';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [resizingIndex, handleMouseMove, handleMouseUp, isHorizontal]);
-
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'flex',
-      flexDirection: isHorizontal ? 'row' : 'column',
-      height: '100%',
-      width: '100%',
-    },
-    panel: {
-      overflow: 'auto',
-    },
-    handle: {
-      [isHorizontal ? 'width' : 'height']: handleSize,
-      background: 'var(--color-border)',
-      cursor: isHorizontal ? 'col-resize' : 'row-resize',
-      flexShrink: 0,
-      transition: 'background 0.15s',
-    },
-    handleActive: {
-      background: 'var(--color-accent)',
-    },
-  };
-
-  return (
-    <div ref={containerRef} style={styles.container}>
-      {childArray.map((child, index) => (
-        <React.Fragment key={index}>
-          <div
-            style={{
-              ...styles.panel,
-              [isHorizontal ? 'width' : 'height']: `${sizes[index]}%`,
-            }}
-          >
-            {child}
-          </div>
-          {index < childArray.length - 1 && (
-            <div
-              style={{
-                ...styles.handle,
-                ...(resizingIndex === index ? styles.handleActive : {}),
-              }}
-              onMouseDown={handleMouseDown(index)}
-            />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-};
-
-// ==================== SPLIT PANE ====================
-
-export const SplitPane: React.FC<SplitPaneProps> = ({
-  left,
-  right,
-  defaultLeftSize = '50%',
-  minLeftSize = 100,
-  minRightSize = 100,
-  onResize,
-  allowCollapse = false,
-  collapseThreshold = 50,
-}) => {
-  const [leftSize, setLeftSize] = useState<number | string>(defaultLeftSize);
-  const [isResizing, setIsResizing] = useState(false);
-  const [collapsed, setCollapsed] = useState<'left' | 'right' | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const startPos = useRef<number>(0);
-  const startSize = useRef<number>(0);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    startPos.current = e.clientX;
-    startSize.current = typeof leftSize === 'number' 
-      ? leftSize 
-      : (parseFloat(leftSize) / 100) * rect.width;
-    setIsResizing(true);
-  };
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing || !containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const delta = e.clientX - startPos.current;
-    let newSize = startSize.current + delta;
-
-    // Apply constraints
-    newSize = Math.max(minLeftSize, newSize);
-    newSize = Math.min(rect.width - minRightSize - 6, newSize);
-
-    // Check for collapse
-    if (allowCollapse) {
-      if (newSize < collapseThreshold) {
-        setCollapsed('left');
-        newSize = 0;
-      } else if (rect.width - newSize < collapseThreshold) {
-        setCollapsed('right');
-        newSize = rect.width - 6;
-      } else {
-        setCollapsed(null);
+    if (!storageKey) return;
+    try {
+      const stored = localStorage.getItem(`dex-resize-${storageKey}`);
+      if (stored) {
+        setSize(JSON.parse(stored));
       }
+    } catch {
+      // Ignore
     }
+  }, [storageKey]);
 
-    setLeftSize(newSize);
-    onResize?.(newSize);
-  }, [isResizing, minLeftSize, minRightSize, allowCollapse, collapseThreshold, onResize]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+  const updateSize = useCallback((width: number, height: number) => {
+    setSize({ width, height });
+    if (storageKey) {
+      localStorage.setItem(`dex-resize-${storageKey}`, JSON.stringify({ width, height }));
     }
+  }, [storageKey]);
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, handleMouseMove, handleMouseUp]);
+  const resetSize = useCallback(() => {
+    if (storageKey) {
+      localStorage.removeItem(`dex-resize-${storageKey}`);
+    }
+    setSize({ width: 0, height: 0 });
+  }, [storageKey]);
 
-  const getLeftWidth = () => {
-    if (collapsed === 'left') return 0;
-    if (collapsed === 'right') return 'calc(100% - 6px)';
-    return typeof leftSize === 'number' ? leftSize : leftSize;
-  };
-
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'flex',
-      height: '100%',
-      width: '100%',
-      overflow: 'hidden',
-    },
-    left: {
-      width: getLeftWidth(),
-      flexShrink: 0,
-      overflow: 'auto',
-      transition: isResizing ? 'none' : 'width 0.2s',
-    },
-    handle: {
-      width: 6,
-      background: 'var(--color-border)',
-      cursor: 'col-resize',
-      flexShrink: 0,
-      position: 'relative',
-      transition: 'background 0.15s',
-    },
-    handleActive: {
-      background: 'var(--color-accent)',
-    },
-    right: {
-      flex: 1,
-      overflow: 'auto',
-      minWidth: 0,
-    },
-  };
-
-  return (
-    <div ref={containerRef} style={styles.container}>
-      <div style={styles.left}>{left}</div>
-      <div
-        style={{
-          ...styles.handle,
-          ...(isResizing ? styles.handleActive : {}),
-        }}
-        onMouseDown={handleMouseDown}
-      />
-      <div style={styles.right}>{right}</div>
-    </div>
-  );
-};
-
-// ==================== USE RESIZABLE HOOK ====================
-
-export const useResizable = (
-  options: {
-    direction?: 'horizontal' | 'vertical';
-    minSize?: number;
-    maxSize?: number;
-    defaultSize?: number;
-  } = {}
-) => {
-  const {
-    direction = 'horizontal',
-    minSize = 100,
-    maxSize,
-    defaultSize = 300,
-  } = options;
-
-  const [size, setSize] = useState(defaultSize);
-  const [isResizing, setIsResizing] = useState(false);
-  const startPos = useRef(0);
-  const startSize = useRef(0);
-
-  const isHorizontal = direction === 'horizontal';
-
-  const startResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    startPos.current = isHorizontal ? e.clientX : e.clientY;
-    startSize.current = size;
-    setIsResizing(true);
-  };
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMove = (e: MouseEvent) => {
-      const currentPos = isHorizontal ? e.clientX : e.clientY;
-      const delta = currentPos - startPos.current;
-      let newSize = startSize.current + delta;
-      newSize = Math.max(minSize, newSize);
-      if (maxSize) newSize = Math.min(maxSize, newSize);
-      setSize(newSize);
-    };
-
-    const handleUp = () => setIsResizing(false);
-
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
-    document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
-    document.body.style.userSelect = 'none';
-
-    return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, isHorizontal, minSize, maxSize]);
-
-  return {
-    size,
-    isResizing,
-    startResize,
-    setSize,
-  };
+  return { size, updateSize, resetSize };
 };
 
 export default ResizablePanel;

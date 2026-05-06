@@ -1,17 +1,24 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Voice Command Controller
 // Phase 46: Central voice command control orchestration
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-import { globalShortcut, BrowserWindow, ipcMain } from 'electron';
+import log from 'electron-log';
+import { globalShortcut, BrowserWindow, ipcMain, app } from 'electron';
 import { voiceControlEngine } from '../core/VoiceControlEngine';
 import { voiceCommandProcessor } from '../core/VoiceCommandProcessor';
 import { voiceScopeManager } from '../core/VoiceScopeManager';
 import { voiceFeedbackSystem } from '../core/VoiceFeedbackSystem';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VOICE COMMAND CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VoiceCommandController {
   private static instance: VoiceCommandController;
@@ -27,9 +34,9 @@ class VoiceCommandController {
     return VoiceCommandController.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -53,7 +60,7 @@ class VoiceCommandController {
     }
 
     this.initialized = true;
-    console.log('[VoiceCommandController] Initialized');
+    if (!app.isPackaged) log.info('[VoiceCommandController] Initialized');
   }
 
   private setupIPC(): void {
@@ -77,9 +84,9 @@ class VoiceCommandController {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEYBOARD SHORTCUT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerShortcut(shortcut: string): void {
     if (this.shortcutRegistered) {
@@ -93,12 +100,12 @@ class VoiceCommandController {
 
       if (success) {
         this.shortcutRegistered = true;
-        console.log(`[VoiceCommandController] Shortcut registered: ${shortcut}`);
+        if (!app.isPackaged) log.info(`[VoiceCommandController] Shortcut registered: ${shortcut}`);
       } else {
-        console.warn(`[VoiceCommandController] Failed to register shortcut: ${shortcut}`);
+        log.warn(`[VoiceCommandController] Failed to register shortcut: ${shortcut}`);
       }
     } catch (error) {
-      console.error('[VoiceCommandController] Shortcut registration error:', error);
+      log.error('[VoiceCommandController] Shortcut registration error:', error);
     }
   }
 
@@ -109,9 +116,9 @@ class VoiceCommandController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LISTENING CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async toggleListening(): Promise<boolean> {
     const state = voiceControlEngine.getState();
@@ -125,9 +132,9 @@ class VoiceCommandController {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIG UPDATES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async onConfigUpdated(): Promise<void> {
     const config = voiceControlEngine.getConfig();
@@ -139,9 +146,9 @@ class VoiceCommandController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     this.unregisterShortcut();
@@ -149,9 +156,9 @@ class VoiceCommandController {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getFullStatus(): {
     enabled: boolean;
@@ -182,9 +189,9 @@ class VoiceCommandController {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const voiceCommandController = VoiceCommandController.getInstance();
 export default voiceCommandController;

@@ -168,7 +168,7 @@ export function initializeI18n(): void {
     if (saved && saved in LOCALES) {
       currentLocale = saved as Locale;
     }
-  } catch {}
+  } catch (e) { console.warn('[DEX]', e); }
   // Set document direction for RTL
   if (typeof document !== 'undefined') {
     document.documentElement.dir = LOCALES[currentLocale].direction;
@@ -183,7 +183,7 @@ export function getLocale(): Locale {
 export function setLocale(locale: Locale): void {
   if (!(locale in LOCALES)) return;
   currentLocale = locale;
-  try { localStorage.setItem(STORAGE_KEY, locale); } catch {}
+  try { localStorage.setItem(STORAGE_KEY, locale); } catch (e) { console.warn('[DEX]', e); }
   if (typeof document !== 'undefined') {
     document.documentElement.dir = LOCALES[locale].direction;
     document.documentElement.lang = locale;

@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Instant File Preview System
 // View files without opening external apps
 // Text, code, images, audio, video - no full file load, no lag
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow, nativeImage } from 'electron';
@@ -11,9 +17,9 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type PreviewType = 
   | 'text'
@@ -60,9 +66,9 @@ export interface PreviewConfig {
   enableSyntaxDetection: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FILE TYPE MAPPINGS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const EXTENSION_MAP: Record<string, { type: PreviewType; mime: string; language?: string }> = {
   // Text
@@ -160,9 +166,9 @@ const EXTENSION_MAP: Record<string, { type: PreviewType; mime: string; language?
   '.pdf': { type: 'pdf', mime: 'application/pdf' }
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DEFAULT CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_CONFIG: PreviewConfig = {
   maxTextSize: 512 * 1024,      // 512KB for text preview
@@ -172,9 +178,9 @@ const DEFAULT_CONFIG: PreviewConfig = {
   enableSyntaxDetection: true
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // INSTANT FILE PREVIEW
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class InstantFilePreviewClass extends EventEmitter {
   private config: PreviewConfig;
@@ -188,9 +194,9 @@ class InstantFilePreviewClass extends EventEmitter {
     this.startCacheCleanup();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Get file preview
@@ -226,9 +232,9 @@ class InstantFilePreviewClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MAIN PREVIEW
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getPreview(filePath: string): Promise<PreviewResult> {
     // Check cache
@@ -310,9 +316,9 @@ class InstantFilePreviewClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TEXT PREVIEW
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async generateTextPreview(result: PreviewResult, fileSize: number): Promise<void> {
     const bytesToRead = Math.min(fileSize, this.config.maxTextSize);
@@ -362,9 +368,9 @@ class InstantFilePreviewClass extends EventEmitter {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IMAGE PREVIEW
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async generateImagePreview(result: PreviewResult, fileSize: number): Promise<void> {
     if (fileSize > this.config.maxImageSize) {
@@ -406,9 +412,9 @@ class InstantFilePreviewClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MEDIA PREVIEW
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async generateMediaPreview(result: PreviewResult): Promise<void> {
     // For audio/video, we just provide the file URL for the renderer to handle
@@ -416,9 +422,9 @@ class InstantFilePreviewClass extends EventEmitter {
     result.content = result.type === 'audio' ? 'Audio file' : 'Video file';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // THUMBNAIL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getThumbnail(filePath: string, size?: number): Promise<{ dataUrl?: string; error?: string }> {
     const thumbnailSize = size || this.config.thumbnailSize;
@@ -449,9 +455,9 @@ class InstantFilePreviewClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getFileType(filePath: string): { type: PreviewType; mime: string; language?: string } {
     const ext = path.extname(filePath).toLowerCase();
@@ -475,9 +481,9 @@ class InstantFilePreviewClass extends EventEmitter {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CACHE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private cacheCleanupInterval: NodeJS.Timeout | null = null;
 
@@ -501,9 +507,9 @@ class InstantFilePreviewClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const InstantFilePreview = new InstantFilePreviewClass();
 export default InstantFilePreview;

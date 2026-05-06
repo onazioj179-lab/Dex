@@ -1,5 +1,11 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * LIVE ACTIVITY — Real-time activity feed for Home screen
+ * LIVE ACTIVITY -- Real-time activity feed for Home screen
  * Apps dispatch events; Home renders inline cards that auto-dismiss on complete.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -14,11 +20,11 @@ export interface LiveActivity {
   progress: number;
   app: string;
   startedAt: number;
-  /** Set when complete — triggers fade-out after 3s */
+  /** Set when complete -- triggers fade-out after 3s */
   completedAt?: number;
 }
 
-// ── Dispatch helpers — call from any app ─────────────────────────────────
+// -- Dispatch helpers -- call from any app ---------------------------------
 export function dispatchActivity(act: Omit<LiveActivity, 'startedAt'>) {
   window.dispatchEvent(new CustomEvent('dex-activity-start', { detail: { ...act, startedAt: Date.now() } }));
 }
@@ -31,7 +37,7 @@ export function completeActivity(id: string) {
   window.dispatchEvent(new CustomEvent('dex-activity-complete', { detail: { id } }));
 }
 
-// ── Hook — consumed by Home ──────────────────────────────────────────────
+// -- Hook -- consumed by Home ----------------------------------------------
 export function useLiveActivity() {
   const [activities, setActivities] = useState<Map<string, LiveActivity>>(new Map());
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());

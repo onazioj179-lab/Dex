@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Unified Media Timeline
 // Central media management with timeline view, cross-type organization
 // Links audio, video, images, recordings in one navigable timeline
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type MediaType = 'audio' | 'video' | 'image' | 'recording' | 'document';
 export type TimelineView = 'day' | 'week' | 'month' | 'year' | 'all';
@@ -122,9 +128,9 @@ export interface TimelineConfig {
   excludePatterns: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // UNIFIED MEDIA TIMELINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class UnifiedMediaTimelineClass extends EventEmitter {
   private items: Map<string, MediaItem> = new Map();
@@ -157,9 +163,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -178,9 +184,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Timeline queries
@@ -348,9 +354,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TIMELINE QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getTimelineRange(start: number, end: number): TimelineRange {
     const items = Array.from(this.items.values())
@@ -440,9 +446,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return summary;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ITEM OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addItem(filePath: string, metadata?: Partial<MediaItem>): Promise<MediaItem | null> {
     try {
@@ -548,11 +554,11 @@ class UnifiedMediaTimelineClass extends EventEmitter {
 
     // Delete item file
     const itemPath = path.join(this.dataPath, 'items', `${id}.json`);
-    await fs.unlink(itemPath).catch(() => {});
+    await fs.unlink(itemPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     // Delete thumbnail
     const thumbPath = path.join(this.dataPath, 'thumbnails', `${id}.jpg`);
-    await fs.unlink(thumbPath).catch(() => {});
+    await fs.unlink(thumbPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     this.items.delete(id);
     this.emit('item:removed', id);
@@ -684,9 +690,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LINKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async linkItems(id1: string, id2: string): Promise<{ success: boolean }> {
     const item1 = this.items.get(id1);
@@ -731,9 +737,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
       .filter((i): i is MediaItem => i !== undefined);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // COLLECTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createCollection(name: string, itemIds?: string[]): Promise<MediaCollection> {
     const id = `collection-${++this.idCounter}-${Date.now()}`;
@@ -800,7 +806,7 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     }
 
     const collectionPath = path.join(this.dataPath, 'collections', `${id}.json`);
-    await fs.unlink(collectionPath).catch(() => {});
+    await fs.unlink(collectionPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     this.collections.delete(id);
     this.emit('collection:deleted', id);
@@ -920,9 +926,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SEARCH
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   search(query: string, filter?: MediaFilter): MediaItem[] {
     return this.getItems({ ...filter, search: query });
@@ -937,9 +943,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IMPORT/SCAN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async scanFolder(folderPath: string, recursive = true): Promise<{ added: number; failed: number }> {
     const files: string[] = [];
@@ -989,9 +995,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return { added: 0 };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // THUMBNAILS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async generateThumbnail(id: string): Promise<{ success: boolean; path?: string }> {
     const item = this.items.get(id);
@@ -1025,9 +1031,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): MediaStats {
     const items = Array.from(this.items.values());
@@ -1106,9 +1112,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
       .sort((a, b) => b.count - a.count);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTIVITY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getRecentActivity(limit = 20): MediaItem[] {
     return Array.from(this.items.values())
@@ -1128,9 +1134,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // WATCH FOLDERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addWatchFolder(folderPath: string): Promise<{ success: boolean }> {
     if (this.config.watchFolders.includes(folderPath)) {
@@ -1156,9 +1162,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async exportTimeline(filter?: MediaFilter, format: 'json' | 'csv' = 'json'): Promise<string> {
     const items = this.getItems(filter);
@@ -1182,9 +1188,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return JSON.stringify(items, null, 2);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setConfig(config: Partial<TimelineConfig>): Promise<{ success: boolean }> {
     this.config = { ...this.config, ...config };
@@ -1192,9 +1198,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private detectMediaType(ext: string): MediaType | null {
     for (const [type, extensions] of Object.entries(this.typeExtensions)) {
@@ -1211,9 +1217,9 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadItems(): Promise<void> {
     try {
@@ -1314,18 +1320,18 @@ class UnifiedMediaTimelineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.saveConfig();
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const UnifiedMediaTimeline = new UnifiedMediaTimelineClass();
 export default UnifiedMediaTimeline;

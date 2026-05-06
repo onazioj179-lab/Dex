@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Usage Learning Engine
 // Phase 42: Local-only usage pattern learning for self-optimization
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import { app, powerMonitor } from 'electron';
 import Store from 'electron-store';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface UsagePattern {
   // Time patterns (24 buckets for hours)
@@ -65,9 +72,9 @@ export interface PredictionResult {
   confidence: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const learningStore = new Store<{
   config: LearningConfig;
@@ -103,9 +110,9 @@ const learningStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // USAGE LEARNING ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class UsageLearningEngine {
   private static instance: UsageLearningEngine;
@@ -125,16 +132,16 @@ class UsageLearningEngine {
     return UsageLearningEngine.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     const config = learningStore.get('config');
     if (!config.enabled) {
-      console.log('[UsageLearningEngine] Learning disabled');
+      log.info('[UsageLearningEngine] Learning disabled');
       return;
     }
 
@@ -156,7 +163,7 @@ class UsageLearningEngine {
     this.cleanOldData();
 
     this.initialized = true;
-    console.log('[UsageLearningEngine] Initialized');
+    log.info('[UsageLearningEngine] Initialized');
   }
 
   private setupSystemListeners(): void {
@@ -204,9 +211,9 @@ class UsageLearningEngine {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EVENT RECORDING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordActivity(): void {
     const config = learningStore.get('config');
@@ -283,9 +290,9 @@ class UsageLearningEngine {
     learningStore.set('events', events);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IDLE HANDLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private onIdleStart(): void {
     if (this.isIdle) return;
@@ -293,7 +300,7 @@ class UsageLearningEngine {
     this.isIdle = true;
     this.recordEvent({ type: 'idle_start', timestamp: Date.now() });
     
-    console.log('[UsageLearningEngine] User idle');
+    log.info('[UsageLearningEngine] User idle');
   }
 
   private onIdleEnd(): void {
@@ -302,7 +309,7 @@ class UsageLearningEngine {
     this.isIdle = false;
     this.recordEvent({ type: 'idle_end', timestamp: Date.now() });
     
-    console.log('[UsageLearningEngine] User active');
+    log.info('[UsageLearningEngine] User active');
   }
 
   private onSystemSuspend(): void {
@@ -314,9 +321,9 @@ class UsageLearningEngine {
     this.recordActivity();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PATTERN ANALYSIS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private analyzePatterns(): void {
     const config = learningStore.get('config');
@@ -369,12 +376,12 @@ class UsageLearningEngine {
     learningStore.set('patterns', patterns);
     learningStore.set('lastAnalysis', Date.now());
 
-    console.log('[UsageLearningEngine] Patterns analyzed');
+    log.info('[UsageLearningEngine] Patterns analyzed');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PREDICTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   predict(): PredictionResult {
     const config = learningStore.get('config');
@@ -420,9 +427,9 @@ class UsageLearningEngine {
     return result;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FEATURE RANKINGS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getMostUsedFeatures(limit: number = 10): FeatureUsageData[] {
     const patterns = learningStore.get('patterns');
@@ -438,9 +445,9 @@ class UsageLearningEngine {
       .slice(0, limit);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): LearningConfig {
     return learningStore.get('config');
@@ -457,9 +464,9 @@ class UsageLearningEngine {
     return learningStore.get('patterns');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private cleanOldData(): void {
     const config = learningStore.get('config');
@@ -491,9 +498,9 @@ class UsageLearningEngine {
     learningStore.set('lastAnalysis', 0);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatus(): {
     enabled: boolean;
@@ -515,9 +522,9 @@ class UsageLearningEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const usageLearningEngine = UsageLearningEngine.getInstance();
 export default usageLearningEngine;

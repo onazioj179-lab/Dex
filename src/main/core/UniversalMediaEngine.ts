@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Universal Media Engine
 // Single unified engine for audio, video, and image rendering
 // Hardware acceleration, streaming, graceful degradation
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, nativeImage } from 'electron';
@@ -11,9 +17,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type MediaEngineType = 'audio' | 'video' | 'image';
 export type EngineState = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'error';
@@ -108,9 +114,9 @@ export interface FormatSupport {
   hardwareAccelerated: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FORMAT DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const AUDIO_FORMATS: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -162,9 +168,9 @@ const IMAGE_FORMATS: Record<string, string> = {
 // Stream threshold: files larger than this are streamed
 const STREAM_THRESHOLD = 50 * 1024 * 1024; // 50MB
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // UNIVERSAL MEDIA ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class UniversalMediaEngineClass extends EventEmitter {
   private sources: Map<string, MediaSource> = new Map();
@@ -212,9 +218,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -233,9 +239,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Source management
@@ -293,9 +299,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SOURCE LOADING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async loadSource(filePath: string, options?: PlaybackOptions): Promise<MediaSource | null> {
     const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
@@ -438,9 +444,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STREAMING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createStream(filePath: string): Promise<MediaSource | null> {
     const source = await this.loadSource(filePath);
@@ -525,9 +531,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IMAGE RENDERING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async renderImage(request: RenderRequest): Promise<RenderResult | null> {
     const source = this.sources.get(request.sourceId);
@@ -636,9 +642,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FORMAT DETECTION & SUPPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   canPlayFile(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
@@ -706,9 +712,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     return hwFormats.includes(extension);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CAPABILITIES DETECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async detectCapabilities(): Promise<void> {
     // Check for hardware acceleration
@@ -726,9 +732,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     log.info('[MediaEngine] Capabilities detected:', this.capabilities);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS & MONITORING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): EngineStats {
     return {
@@ -756,9 +762,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     this.frameCount = 0;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async loadConfig(): Promise<void> {
     const configPath = path.join(this.dataPath, 'config.json');
@@ -788,9 +794,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     return { ...this.config };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return crypto.randomBytes(8).toString('hex');
@@ -813,9 +819,9 @@ class UniversalMediaEngineClass extends EventEmitter {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.unloadAll();
@@ -832,9 +838,9 @@ class UniversalMediaEngineClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const UniversalMediaEngine = new UniversalMediaEngineClass();
 export default UniversalMediaEngine;

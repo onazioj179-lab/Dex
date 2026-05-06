@@ -1,8 +1,11 @@
-# DEX Desktop App — Comprehensive Codebase Audit Report
+# DEX Desktop App -- Historical Codebase Audit Report
+
+> **Note:** This audit was conducted on an earlier version (v1.3.0). DEX is now at v3.6.0.  
+> Kept for historical reference only. Many issues listed here have been resolved.
 
 **Date:** March 2, 2026  
-**Version:** 1.3.0 (package.json) — partial references to 1.2.3 remain  
-**Stack:** Electron 28 + React 18 + TypeScript 5 + Vite 5 + Zustand 4 + Tailwind 3
+**Version audited:** 1.3.0  
+**Current version:** 3.6.0
 
 ---
 
@@ -36,21 +39,21 @@
 ## 1. ARCHITECTURE OVERVIEW
 
 ### Main Process (`src/main/`)
-- **main.ts** — 1,970 lines. Application core, BrowserWindow, 100+ IPC handlers, controller/service init.
-- **preload.ts** — 3,232 lines. Context bridge - exposes `window.electron`/`window.dex` API surface.
-- **42 Controllers** (`src/main/controllers/`) — Action, Automation, Auth, AutoFill, Code, Connection, Data, DataExport, DeepSession, Device, Diagnostics, Encryption, FeatureFlags, FileIntelligence, FileManager, Gallery, Governance, Hotkey, HttpTransfer, Ideas, Learning, Media, Mode, Operations, Plugin, Power, Scheduler, Search, Security, Session, SystemIntelligence, SystemMap, Timeline, Transfer, Trust, Update, Vault, VoiceCommand, Voice, Watchdog, Workflow.
-- **150+ Core modules** (`src/main/core/`) — Storage, Automation, Performance, Rewind, Security, AI, Clipboard, Patterns, UX, etc.
-- **14 Security modules** (`src/main/security/`) — Auth Hardening, Data Migration, Identity Vault, IPC Validator, Network Hygiene, Permissions, Q1 Integration, Secure Keys, Secure Transfer, Security Continuum, Security Core, Session Hardening, Vault Hardening.
-- **Runtime** (`src/main/runtime/`) — ActionEngine, CoreRuntime, ErrorClassifier, HardenedPython, Observability, ResourceManager, Scheduler.
-- **Monitors** — EventMonitor, HealthMonitor.
+- **main.ts** -- 1,970 lines. Application core, BrowserWindow, 100+ IPC handlers, controller/service init.
+- **preload.ts** -- 3,232 lines. Context bridge - exposes `window.electron`/`window.dex` API surface.
+- **42 Controllers** (`src/main/controllers/`) -- Action, Automation, Auth, AutoFill, Code, Connection, Data, DataExport, DeepSession, Device, Diagnostics, Encryption, FeatureFlags, FileIntelligence, FileManager, Gallery, Governance, Hotkey, HttpTransfer, Ideas, Learning, Media, Mode, Operations, Plugin, Power, Scheduler, Search, Security, Session, SystemIntelligence, SystemMap, Timeline, Transfer, Trust, Update, Vault, VoiceCommand, Voice, Watchdog, Workflow.
+- **150+ Core modules** (`src/main/core/`) -- Storage, Automation, Performance, Rewind, Security, AI, Clipboard, Patterns, UX, etc.
+- **14 Security modules** (`src/main/security/`) -- Auth Hardening, Data Migration, Identity Vault, IPC Validator, Network Hygiene, Permissions, Q1 Integration, Secure Keys, Secure Transfer, Security Continuum, Security Core, Session Hardening, Vault Hardening.
+- **Runtime** (`src/main/runtime/`) -- ActionEngine, CoreRuntime, ErrorClassifier, HardenedPython, Observability, ResourceManager, Scheduler.
+- **Monitors** -- EventMonitor, HealthMonitor.
 - **Additional:** `src/main/agent/`, `src/main/ai/`, `src/main/analytics/`, `src/main/api/`, `src/main/automation/`, `src/main/bridge/`, `src/main/cli/`, `src/main/engine/`, `src/main/scripting/`, `src/main/sync/`, `src/main/utils/`.
 
 ### Renderer Process (`src/renderer/`)
-- **App.tsx** — 781 lines. Root component with ErrorBoundary, theme init, AppManager, Spotlight, CommandPalette, ClipboardHistory, SystemFeatures.
-- **AppManager.tsx** — 667 lines. macOS-style dock, Launchpad overlay, keep-alive multi-app rendering, per-app ErrorBoundary.
+- **App.tsx** -- 781 lines. Root component with ErrorBoundary, theme init, AppManager, Spotlight, CommandPalette, ClipboardHistory, SystemFeatures.
+- **AppManager.tsx** -- 667 lines. macOS-style dock, Launchpad overlay, keep-alive multi-app rendering, per-app ErrorBoundary.
 - **13 Pages** (`src/renderer/pages/`): Home, Files, Browser, Settings (2,027 lines), Transfers, Dashboard, Notes, Tasks, Power, Workflows, Gallery, Audio, Video.
 - **19 DEX Applications** (`src/renderer/DEXAPPLICATIONS/`): VideoEditor, Imosion, Prism, Flux, Forge, Calculator, Calendar, PasswordGenerator, Rewind, Games + feature files (FluxFeatures, ForgeFeatures, ImosionEngine/Features, PrismEngine/Features, VideoEditorFeatures, features-index, RewindViewErrorBoundary).
-- **130+ Components** (`src/renderer/components/`) — Full list includes UI primitives (Button, Input, Modal, Toast, etc.), system features (Spotlight, CommandPalette, ClipboardHistory, HelpPanel), advanced components (Kanban, RichTextEditor, DataTable, VirtualList, DragDrop), and per-feature components (AIHub, Equalizer, MediaPlayer, Annotation, etc.).
+- **130+ Components** (`src/renderer/components/`) -- Full list includes UI primitives (Button, Input, Modal, Toast, etc.), system features (Spotlight, CommandPalette, ClipboardHistory, HelpPanel), advanced components (Kanban, RichTextEditor, DataTable, VirtualList, DragDrop), and per-feature components (AIHub, Equalizer, MediaPlayer, Annotation, etc.).
 - **11 Services** (`src/renderer/services/`): AppStateMachine, engagement, ErrorBoundary, helpContent, index, IntegrityMonitor, LifecycleManager, PerformanceMonitor, SystemServices, undoManager, usePatternLearning.
 - **19 Stores** (`src/renderer/store/`): appSubsystem, blackBoxStore, explainableSearchStore, fileIntelligenceStore, fileUsageStore, intentSessionStore, learningStore, mediaStore, missionStore, overrideStore, runningApps, securityStore, systemUndoStore, useAuthStore, useNavigationHistory, useOnboarding, useStore, useUndoRedo, useVaultStore.
 - **26 Utils** (`src/renderer/utils/`): accessibility, accessibilityHooks, accessibilityIndex, animationBudget, crashRecovery, DeepWorkUtils, FileValidation, hardeningIndex, index, ipcWrapper, KeyboardManager, keyboardNavigation, performance, performanceHooks, performanceIndex, PerformanceManager, PerformanceUtils, q1FoundationHooks, releaseValidation, renderOptimization, simpleMode, stabilityHooks, systemAudit, UndoRedoManager, useKeyboardShortcuts, usePerformance.
@@ -119,11 +122,11 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 | **Spotlight** | `src/renderer/components/Spotlight.tsx` | 720 | Ctrl+Space | App.tsx |
 | **UnifiedSearch** | `src/renderer/components/UnifiedSearch.tsx` | ? | Ctrl+K | AppManager.tsx |
 | **GlobalSearch** | `src/renderer/components/GlobalSearch.tsx` | 407 | F3/Ctrl+F | SystemFeatures.tsx |
-| **AdvancedSearch** | `src/renderer/components/AdvancedSearch.tsx` | 717 | — | (exports GlobalSearch) |
-| **SearchSystem** | `src/renderer/components/SearchSystem.tsx` | ? | — | Unknown |
+| **AdvancedSearch** | `src/renderer/components/AdvancedSearch.tsx` | 717 | -- | (exports GlobalSearch) |
+| **SearchSystem** | `src/renderer/components/SearchSystem.tsx` | ? | -- | Unknown |
 
 **Issues:**
-- `Spotlight` (Ctrl+Space) and `UnifiedSearch` (Ctrl+K) are **both mounted simultaneously** — Spotlight in App.tsx, UnifiedSearch in AppManager.tsx.
+- `Spotlight` (Ctrl+Space) and `UnifiedSearch` (Ctrl+K) are **both mounted simultaneously** -- Spotlight in App.tsx, UnifiedSearch in AppManager.tsx.
 - `GlobalSearch` is exported from AdvancedSearch.tsx AND exists as a standalone `GlobalSearch.tsx`.
 - `SearchSystem.tsx` adds yet another search component.
 - Users face 2+ search UIs that do similar things.
@@ -136,11 +139,11 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 
 | Location | Type | Scope |
 |----------|------|-------|
-| `src/renderer/App.tsx` L471-550 | `AppErrorBoundary` class | **Top-level** — wraps entire app |
-| `src/renderer/components/AppManager.tsx` L127-163 | `AppErrorBoundary` class | **Per-app** — wraps each rendered app |
-| `src/renderer/services/ErrorBoundary.tsx` L97+ | `AppErrorBoundary` (exported) + `ProcessIsolation` | **Service-level** — used in AppRenderer |
+| `src/renderer/App.tsx` L471-550 | `AppErrorBoundary` class | **Top-level** -- wraps entire app |
+| `src/renderer/components/AppManager.tsx` L127-163 | `AppErrorBoundary` class | **Per-app** -- wraps each rendered app |
+| `src/renderer/services/ErrorBoundary.tsx` L97+ | `AppErrorBoundary` (exported) + `ProcessIsolation` | **Service-level** -- used in AppRenderer |
 | `src/renderer/DEXAPPLICATIONS/RewindViewErrorBoundary.tsx` | Rewind-specific | **Per-feature** |
-| `src/renderer/utils/stabilityHooks.ts` L59 | Global error listeners | **Window-level** — uncaught errors |
+| `src/renderer/utils/stabilityHooks.ts` L59 | Global error listeners | **Window-level** -- uncaught errors |
 
 **Issues:**
 - **Three separate `AppErrorBoundary` classes** with identical names but different implementations:
@@ -158,8 +161,8 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 
 | File | What |
 |------|------|
-| `src/renderer/services/PerformanceMonitor.tsx` | Zustand store: `usePerformanceMonitor` — system metrics, 10s polling, per-app metrics, health scoring |
-| `src/renderer/utils/usePerformance.ts` | Hook: `usePerformance()` — FPS tracking, input latency, animation budgets, throttle levels |
+| `src/renderer/services/PerformanceMonitor.tsx` | Zustand store: `usePerformanceMonitor` -- system metrics, 10s polling, per-app metrics, health scoring |
+| `src/renderer/utils/usePerformance.ts` | Hook: `usePerformance()` -- FPS tracking, input latency, animation budgets, throttle levels |
 | `src/renderer/utils/PerformanceManager.ts` | Class: `PerformanceStateMachine` + `usePerformanceState()` hook |
 | `src/renderer/utils/performance.ts` | Utility performance functions |
 | `src/renderer/utils/performanceHooks.ts` | Performance-related hooks |
@@ -180,8 +183,8 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 
 | Location | Mechanism | Interval |
 |----------|-----------|----------|
-| `src/renderer/components/SystemFeatures.tsx` L324-370 | `useSessionAutoSave()` — saves running apps & active instance to localStorage | 30s + visibilitychange + beforeunload |
-| `src/main/security/SessionHardening.ts` L760-768 | `startAutoSave()` — captures session snapshot | 30s (configurable) |
+| `src/renderer/components/SystemFeatures.tsx` L324-370 | `useSessionAutoSave()` -- saves running apps & active instance to localStorage | 30s + visibilitychange + beforeunload |
+| `src/main/security/SessionHardening.ts` L760-768 | `startAutoSave()` -- captures session snapshot | 30s (configurable) |
 | `src/renderer/DEXAPPLICATIONS/VideoEditor.tsx` L1063-1065 | VideoEditor project auto-save | 60s |
 
 **Status:** Auto-save is implemented at session level (renderer) and session hardening level (main). Individual apps like VideoEditor have their own auto-save. Notes, Tasks, and other apps save to localStorage on change (implicit).
@@ -303,7 +306,7 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 - **Update:** `update:listBackups`, `update:restore`, `update:rollback`
 - **Network:** `network:addPolicy`, `network:removePolicy`, `network:testDomain`
 
-**AI Hub:** **DISABLED** — `src/main/main.ts` L161-162: `// AI Integration (Phase 56-57) - DISABLED` with commented import.
+**AI Hub:** **DISABLED** -- `src/main/main.ts` L161-162: `// AI Integration (Phase 56-57) - DISABLED` with commented import.
 
 ---
 
@@ -372,7 +375,7 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 
 **Issues:**
 - Most inline-style components (Spotlight, AppManager, Home) **lack `aria-*` attributes, `role` attributes, and proper `tabIndex` usage**.
-- Spotlight has only `tabIndex={-1}` on filter buttons — no `aria-label` on the search input, no `role="listbox"` on results.
+- Spotlight has only `tabIndex={-1}` on filter buttons -- no `aria-label` on the search input, no `role="listbox"` on results.
 - Dock buttons have no `aria-label`.
 - The a11y infrastructure exists in utils but is **not integrated** into the main UI components.
 
@@ -417,11 +420,11 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 
 - **18 Achievements** across 5 categories (explorer, creator, power, social, streak)
 - **20 Tips** of the day
-- **Rank system:** Newcomer → Beginner → Regular → Pro → Expert → Legend
+- **Rank system:** Newcomer Beginner Regular Pro Expert Legend
 - **Points:** 10-250 per achievement
 - **Streaks:** Daily usage tracking
 - **Persistence:** localStorage (`dex-engagement-state`)
-- **Integration:** Used in Home.tsx — shows rank badge, streak counter, tip of day, achievement grid, progress bar.
+- **Integration:** Used in Home.tsx -- shows rank badge, streak counter, tip of day, achievement grid, progress bar.
 
 **Status:** Fully functional and integrated.
 
@@ -436,7 +439,7 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 | `src/main/security/VaultHardening.ts` | L364 | `This is a placeholder - in production, use Have I Been Pwned k-anonymity API` |
 | `src/main/security/VaultHardening.ts` | L382 | `breachCount: 1000000,  // Placeholder` |
 
-**Note:** No `TODO`, `FIXME`, or `HACK` comments found — only `PLACEHOLDER` instances. The codebase appears to have been cleaned of TODO markers.
+**Note:** No `TODO`, `FIXME`, or `HACK` comments found -- only `PLACEHOLDER` instances. The codebase appears to have been cleaned of TODO markers.
 
 ---
 
@@ -445,7 +448,7 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 ### .bak Files
 | File | Action |
 |------|--------|
-| `src/renderer/components/AppManager.tsx.bak` | **DELETE** — stale backup of AppManager |
+| `src/renderer/components/AppManager.tsx.bak` | **DELETE** -- stale backup of AppManager |
 
 ### Duplicate/Redundant Components
 | Group | Files | Action |
@@ -463,12 +466,12 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 | File | Line | Value | Should Be |
 |------|------|-------|-----------|
 | `src/renderer/pages/Settings.tsx` | L1431 | `Version 1.2.3` | `Version 1.3.0` (or dynamic) |
-| `src/renderer/App.tsx` | L8 | `v1.3.0` (banner comment) | ✅ Correct |
-| `src/main/main.ts` | L9 | `@version 1.3.0` | ✅ Correct |
-| `src/main/preload.ts` | L10 | `@version 1.3.0` | ✅ Correct |
-| `package.json` | L3 | `"version": "1.3.0"` | ✅ Correct |
+| `src/renderer/App.tsx` | L8 | `v1.3.0` (banner comment) | Correct |
+| `src/main/main.ts` | L9 | `@version 1.3.0` | Correct |
+| `src/main/preload.ts` | L10 | `@version 1.3.0` | Correct |
+| `package.json` | L3 | `"version": "1.3.0"` | Correct |
 
-**Action Required:** Fix Settings.tsx L1431 — still shows `1.2.3`.
+**Action Required:** Fix Settings.tsx L1431 -- still shows `1.2.3`.
 
 ---
 
@@ -477,20 +480,20 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 ### Unguarded console.log (should be removed or guarded)
 | File | Lines | Count | Notes |
 |------|-------|-------|-------|
-| `src/renderer/utils/systemAudit.ts` | L550-575 | 10 | Audit report printing — OK if debug tool only |
-| `src/renderer/utils/releaseValidation.ts` | L368-465 | 15+ | Release report printing — OK if debug tool only |
-| `src/renderer/DEXAPPLICATIONS/VideoEditor.tsx` | L2313 | 1 | `console.log('Using alternate audio method...')` — **REMOVE** |
+| `src/renderer/utils/systemAudit.ts` | L550-575 | 10 | Audit report printing -- OK if debug tool only |
+| `src/renderer/utils/releaseValidation.ts` | L368-465 | 15+ | Release report printing -- OK if debug tool only |
+| `src/renderer/DEXAPPLICATIONS/VideoEditor.tsx` | L2313 | 1 | `console.log('Using alternate audio method...')` -- **REMOVE** |
 
 ### DEV-guarded console.log (safe)
 | File | Lines | Notes |
 |------|-------|-------|
-| `src/renderer/utils/stabilityHooks.ts` | L66, L192, L203 | `import.meta.env.DEV` guarded ✅ |
+| `src/renderer/utils/stabilityHooks.ts` | L66, L192, L203 | `import.meta.env.DEV` guarded |
 
 ### console.warn / console.error (acceptable for production)
 | File | Count | Notes |
 |------|-------|-------|
-| `src/renderer/utils/stabilityHooks.ts` | 5 | Error reporting — appropriate |
-| `src/renderer/utils/usePerformance.ts` | 1 | Init error — appropriate |
+| `src/renderer/utils/stabilityHooks.ts` | 5 | Error reporting -- appropriate |
+| `src/renderer/utils/usePerformance.ts` | 1 | Init error -- appropriate |
 
 ---
 
@@ -498,7 +501,7 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 
 | File | Line | Import |
 |------|------|--------|
-| `src/main/main.ts` | L162 | `// import { initializeAIHub, shutdownAIHub } from './ai';` — AI Hub disabled |
+| `src/main/main.ts` | L162 | `// import { initializeAIHub, shutdownAIHub } from './ai';` -- AI Hub disabled |
 
 **Only 1 genuine commented-out import found.** Other matches were false positives (comment-style section headers containing the word "import").
 
@@ -507,21 +510,21 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 ## 22. MISSING FUNCTIONALITY & GAPS
 
 ### Critical Gaps
-1. **No app icon assets** — All icons are inline SVGs. No actual icon files (.png/.svg/.ico) in assets/ for the app or individual sub-apps.
-2. **AI Hub disabled** — Phase 56-57 AI integration is commented out.
-3. **Light mode broken** — CSS supports it, Settings blocks it. Inconsistent state.
-4. **No localization/i18n** — All strings are hardcoded English.
-5. **No external data sync** — SyncManager exists but no cloud backend configured.
+1. **No app icon assets** -- All icons are inline SVGs. No actual icon files (.png/.svg/.ico) in assets/ for the app or individual sub-apps.
+2. **AI Hub disabled** -- Phase 56-57 AI integration is commented out.
+3. **Light mode broken** -- CSS supports it, Settings blocks it. Inconsistent state.
+4. **No localization/i18n** -- All strings are hardcoded English.
+5. **No external data sync** -- SyncManager exists but no cloud backend configured.
 
 ### Architecture Gaps
-6. **AppManager + App.tsx dual rendering** — Both files lazy-load all 23 apps independently. App.tsx has `AppRenderer` with `AppInstance`, AppManager.tsx has its own `renderKeepAlive`. Only AppManager's keep-alive approach is actually rendering.
-7. **runningApps store vs appSubsystem store** — Two separate stores track running apps: `runningApps.ts` (simpler, Zustand) and `appSubsystem.ts` (more complex, OS-grade). Both are imported and used.
-8. **Home.tsx ALL_APPS only has 9 apps** — The pinning menu only shows 9 creative/core apps, missing 14 others.
+6. **AppManager + App.tsx dual rendering** -- Both files lazy-load all 23 apps independently. App.tsx has `AppRenderer` with `AppInstance`, AppManager.tsx has its own `renderKeepAlive`. Only AppManager's keep-alive approach is actually rendering.
+7. **runningApps store vs appSubsystem store** -- Two separate stores track running apps: `runningApps.ts` (simpler, Zustand) and `appSubsystem.ts` (more complex, OS-grade). Both are imported and used.
+8. **Home.tsx ALL_APPS only has 9 apps** -- The pinning menu only shows 9 creative/core apps, missing 14 others.
 
 ### UI/UX Gaps
-9. **No loading skeleton** — `AppLoadingFallback` exists but no skeleton screens for data loading.
+9. **No loading skeleton** -- `AppLoadingFallback` exists but no skeleton screens for data loading.
 10. **No drag-and-drop for dock customization.**
-11. **No window snapping** — No split-view window management.
+11. **No window snapping** -- No split-view window management.
 12. **No right-click context menus** on most elements (only Launchpad has one for closing apps).
 
 ---
@@ -531,7 +534,7 @@ AuthHardening, DataMigration, IdentityVaultManager, index, IPCValidator, Network
 ### Immediate Fixes (P0)
 | # | Action | File(s) |
 |---|--------|---------|
-| 1 | Fix version string `1.2.3` → `1.3.0` | Settings.tsx L1431 |
+| 1 | Fix version string `1.2.3` `1.3.0` | Settings.tsx L1431 |
 | 2 | Delete `.bak` file | AppManager.tsx.bak |
 | 3 | Remove production `console.log` | VideoEditor.tsx L2313 |
 | 4 | Remove AI Hub commented import (decide: re-enable or clean up) | main.ts L162 |

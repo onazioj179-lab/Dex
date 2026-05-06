@@ -1,8 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Safe Mode Manager
 // Ensures app ALWAYS opens, even when things go wrong
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
@@ -67,7 +74,7 @@ class SafeModeManager {
         return JSON.parse(data);
       }
     } catch (err) {
-      console.error('[SafeMode] Failed to load state:', err);
+      log.error('[SafeMode] Failed to load state:', err);
     }
     
     return {
@@ -87,7 +94,7 @@ class SafeModeManager {
       }
       fs.writeFileSync(this.stateFile, JSON.stringify(this.state, null, 2));
     } catch (err) {
-      console.error('[SafeMode] Failed to save state:', err);
+      log.error('[SafeMode] Failed to save state:', err);
     }
   }
 
@@ -111,14 +118,14 @@ class SafeModeManager {
   }
 
   enableSafeMode(reason: string): void {
-    console.log(`[SafeMode] ENABLED: ${reason}`);
+    log.info(`[SafeMode] ENABLED: ${reason}`);
     this.state.enabled = true;
     this.state.reason = reason;
     this.saveState();
   }
 
   disableSafeMode(): void {
-    console.log('[SafeMode] Disabled');
+    log.info('[SafeMode] Disabled');
     this.state.enabled = false;
     this.state.reason = '';
     this.state.crashCount = 0;
@@ -140,7 +147,7 @@ class SafeModeManager {
     
     // Start overall timeout
     this.startupTimer = setTimeout(() => {
-      console.error('[SafeMode] Startup timeout exceeded!');
+      log.error('[SafeMode] Startup timeout exceeded!');
       this.enableSafeMode('Startup timeout');
     }, this.startupTimeout);
   }
@@ -157,12 +164,12 @@ class SafeModeManager {
     this.state.lastSuccessfulBoot = Date.now();
     this.saveState();
     
-    console.log('[SafeMode] Startup successful!');
+    log.info('[SafeMode] Startup successful!');
   }
 
   // Stage tracking
   beginStage(name: string): void {
-    console.log(`[Startup] BEGIN: ${name}`);
+    log.info(`[Startup] BEGIN: ${name}`);
     this.stages.set(name, {
       name,
       status: 'running',
@@ -176,7 +183,7 @@ class SafeModeManager {
       stage.status = 'success';
       stage.endTime = Date.now();
       const duration = stage.endTime - (stage.startTime || 0);
-      console.log(`[Startup] COMPLETE: ${name} (${duration}ms)`);
+      log.info(`[Startup] COMPLETE: ${name} (${duration}ms)`);
     }
   }
 
@@ -186,12 +193,12 @@ class SafeModeManager {
       stage.status = 'failed';
       stage.endTime = Date.now();
       stage.error = error;
-      console.error(`[Startup] FAILED: ${name} - ${error}`);
+      log.error(`[Startup] FAILED: ${name} - ${error}`);
     }
   }
 
   skipStage(name: string, reason: string): void {
-    console.log(`[Startup] SKIPPED: ${name} - ${reason}`);
+    log.info(`[Startup] SKIPPED: ${name} - ${reason}`);
     this.stages.set(name, {
       name,
       status: 'skipped',
@@ -246,7 +253,7 @@ class SafeModeManager {
     };
     this.saveState();
     this.stages.clear();
-    console.log('[SafeMode] State reset');
+    log.info('[SafeMode] State reset');
   }
 }
 

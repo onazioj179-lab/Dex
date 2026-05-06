@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * MaintenanceModeLock.ts
  * System 6: Reliability, Stability, Final Lock
@@ -15,6 +21,7 @@
  * "Make Dex run for days/weeks/years without degradation"
  */
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import { app, ipcMain } from 'electron';
 import * as path from 'path';
@@ -207,8 +214,8 @@ class MaintenanceModeLock extends EventEmitter {
     this.setupIPC();
 
     this.initialized = true;
-    console.log('[MaintenanceLock] Initialized at level:', this.state.level);
-    console.log('[MaintenanceLock] System age:', this.state.systemAge, 'days');
+    log.info('[MaintenanceLock] Initialized at level:', this.state.level);
+    log.info('[MaintenanceLock] System age:', this.state.systemAge, 'days');
   }
 
   /**
@@ -230,7 +237,7 @@ class MaintenanceModeLock extends EventEmitter {
     try {
       await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
-      console.error('[MaintenanceLock] Failed to save config:', error);
+      log.error('[MaintenanceLock] Failed to save config:', error);
     }
   }
 
@@ -262,7 +269,7 @@ class MaintenanceModeLock extends EventEmitter {
     try {
       await fs.writeFile(this.statePath, JSON.stringify(this.state, null, 2));
     } catch (error) {
-      console.error('[MaintenanceLock] Failed to save state:', error);
+      log.error('[MaintenanceLock] Failed to save state:', error);
     }
   }
 
@@ -386,7 +393,7 @@ class MaintenanceModeLock extends EventEmitter {
    * Perform auto-healing operations
    */
   private async performAutoHeal(): Promise<void> {
-    console.log('[MaintenanceLock] Performing auto-heal');
+    log.info('[MaintenanceLock] Performing auto-heal');
     
     // Request garbage collection if available
     if (global.gc) {
@@ -422,12 +429,12 @@ class MaintenanceModeLock extends EventEmitter {
         // Enter maintenance window
         this.state.activeMaintenanceWindow = window.id;
         this.emit('maintenance-window-enter', window);
-        console.log(`[MaintenanceLock] Entered maintenance window: ${window.name}`);
+        log.info(`[MaintenanceLock] Entered maintenance window: ${window.name}`);
       } else if (!inWindow && this.state.activeMaintenanceWindow === window.id) {
         // Exit maintenance window
         this.state.activeMaintenanceWindow = null;
         this.emit('maintenance-window-exit', window);
-        console.log(`[MaintenanceLock] Exited maintenance window: ${window.name}`);
+        log.info(`[MaintenanceLock] Exited maintenance window: ${window.name}`);
       }
     }
   }
@@ -524,7 +531,7 @@ class MaintenanceModeLock extends EventEmitter {
     this.recordChange('system', `Entered maintenance mode: ${reason}`, previousLevel, 'maintenance');
     await this.saveState();
 
-    console.log(`[MaintenanceLock] Entered maintenance mode: ${reason}`);
+    log.info(`[MaintenanceLock] Entered maintenance mode: ${reason}`);
     this.emit('level-change', { from: previousLevel, to: 'maintenance', reason });
 
     return { success: true };
@@ -550,7 +557,7 @@ class MaintenanceModeLock extends EventEmitter {
     this.recordChange('system', 'Exited maintenance mode', previousLevel, 'normal');
     await this.saveState();
 
-    console.log('[MaintenanceLock] Exited maintenance mode');
+    log.info('[MaintenanceLock] Exited maintenance mode');
     this.emit('level-change', { from: previousLevel, to: 'normal', reason: 'Manual exit' });
 
     return { success: true };
@@ -568,7 +575,7 @@ class MaintenanceModeLock extends EventEmitter {
     this.recordChange('system', `System frozen: ${reason}`, previousLevel, 'frozen');
     await this.saveState();
 
-    console.log(`[MaintenanceLock] System frozen: ${reason}`);
+    log.info(`[MaintenanceLock] System frozen: ${reason}`);
     this.emit('level-change', { from: previousLevel, to: 'frozen', reason });
 
     return { success: true };
@@ -587,7 +594,7 @@ class MaintenanceModeLock extends EventEmitter {
     this.recordChange('system', `EMERGENCY: ${reason}`, previousLevel, 'emergency');
     await this.saveState();
 
-    console.log(`[MaintenanceLock] EMERGENCY MODE: ${reason}`);
+    log.info(`[MaintenanceLock] EMERGENCY MODE: ${reason}`);
     this.emit('level-change', { from: previousLevel, to: 'emergency', reason });
     this.emit('emergency', reason);
 
@@ -809,7 +816,7 @@ class MaintenanceModeLock extends EventEmitter {
    * Shutdown
    */
   async shutdown(): Promise<void> {
-    console.log('[MaintenanceLock] Shutting down');
+    log.info('[MaintenanceLock] Shutting down');
     
     if (this.checkInterval) {
       clearInterval(this.checkInterval);

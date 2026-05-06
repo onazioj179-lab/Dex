@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — App Lifecycle Manager
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- App Lifecycle Manager
+ * ===========================================================================
  * 
  * System-governed lifecycle management for all sub-apps.
  * Apps do not manage their own lifecycle - the system controls:
@@ -15,16 +21,16 @@
  * - Suspended apps keep state only
  * - Resume is instant
  * - Termination is clean and explicit
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { usePowerService, useSystemEvents } from './SystemServices';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPE DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Detailed app lifecycle state */
 export type LifecycleState = 
@@ -106,9 +112,9 @@ export interface LifecycleTransition {
 /** Memory pressure levels */
 export type MemoryPressure = 'normal' | 'moderate' | 'critical';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LIFECYCLE MANAGER STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface LifecycleManagerState {
   // Process registry
@@ -126,9 +132,9 @@ interface LifecycleManagerState {
   // Transition history
   transitions: LifecycleTransition[];
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Process Lifecycle Actions
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /** Create a new app process */
   createProcess: (appId: string, initialRoute?: string) => AppProcess;
@@ -154,9 +160,9 @@ interface LifecycleManagerState {
   /** Handle crash recovery */
   handleCrash: (instanceId: string, error: AppProcess['lastError']) => void;
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // State Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /** Update functional state */
   setFunctionalState: (instanceId: string, state: FunctionalState) => void;
@@ -170,9 +176,9 @@ interface LifecycleManagerState {
   /** Clear preserved state */
   clearPreservedState: (instanceId: string) => void;
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Navigation
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /** Navigate within app */
   navigate: (instanceId: string, route: string) => void;
@@ -189,9 +195,9 @@ interface LifecycleManagerState {
   /** Can go forward? */
   canGoForward: (instanceId: string) => boolean;
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Window Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /** Update window bounds */
   updateWindowBounds: (instanceId: string, bounds: AppProcess['windowBounds']) => void;
@@ -202,9 +208,9 @@ interface LifecycleManagerState {
   /** Set maximized state */
   setMaximized: (instanceId: string, maximized: boolean) => void;
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Memory Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /** Set memory pressure level */
   setMemoryPressure: (level: MemoryPressure) => void;
@@ -212,9 +218,9 @@ interface LifecycleManagerState {
   /** Handle memory pressure (suspend least recently used) */
   handleMemoryPressure: () => void;
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Queries
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /** Get process by instance ID */
   getProcess: (instanceId: string) => AppProcess | undefined;
@@ -245,9 +251,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
       maxProcesses: 20,
       transitions: [],
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Process Lifecycle
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       createProcess: (appId, initialRoute = '/') => {
         const now = Date.now();
@@ -328,9 +334,6 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
         // Allocate resources
         const budget = usePowerService.getState().allocateBudget(process.appId, instanceId);
         process.resourceBudgetId = budget.instanceId;
-
-        // Simulate launch time (real apps would have actual initialization)
-        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Complete launch
         const launchDuration = Date.now() - now;
@@ -671,9 +674,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
         }
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // State Management
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       setFunctionalState: (instanceId, functionalState) => {
         set(state => {
@@ -687,18 +690,22 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
       },
 
       preserveState: (instanceId, appState) => {
-        set(state => {
-          const process = state.processes.get(instanceId);
-          if (!process) return state;
+        try {
+          set(state => {
+            const process = state.processes.get(instanceId);
+            if (!process) return state;
 
-          const newProcesses = new Map(state.processes);
-          newProcesses.set(instanceId, {
-            ...process,
-            preservedState: { ...process.preservedState, ...appState },
-            stateVersion: process.stateVersion + 1,
+            const newProcesses = new Map(state.processes);
+            newProcesses.set(instanceId, {
+              ...process,
+              preservedState: { ...process.preservedState, ...appState },
+              stateVersion: process.stateVersion + 1,
+            });
+            return { processes: newProcesses };
           });
-          return { processes: newProcesses };
-        });
+        } catch (err) {
+          console.error(`[LifecycleManager] preserveState failed for ${instanceId}:`, err);
+        }
       },
 
       restoreState: (instanceId) => {
@@ -721,9 +728,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
         });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Navigation
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       navigate: (instanceId, route) => {
         set(state => {
@@ -798,9 +805,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
           : false;
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Window Management
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       updateWindowBounds: (instanceId, bounds) => {
         set(state => {
@@ -839,9 +846,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
         });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Memory Management
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       setMemoryPressure: (level) => {
         set({ memoryPressure: level });
@@ -867,9 +874,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
         });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Queries
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       getProcess: (instanceId) => {
         return get().processes.get(instanceId);
@@ -916,9 +923,9 @@ export const useLifecycleManager = create<LifecycleManagerState>()(
   )
 );
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONVENIENCE HOOKS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Get the current foreground process */
 export const useForegroundProcess = () => {

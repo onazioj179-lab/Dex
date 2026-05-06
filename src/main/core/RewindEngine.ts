@@ -1,7 +1,7 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX Rewind Engine - Silent Background Activity Logger
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  *
  * Phase 1: Active windows, clipboard, file events, browser tabs.
  * Phase 2: Screenshots, AI search (Ollama), daily summaries, tray sync.
@@ -16,7 +16,7 @@ import { app, ipcMain, clipboard, BrowserWindow, desktopCapturer, shell, dialog 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as log from 'electron-log';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import Store from 'electron-store';
 
 // Phase 4 imports
@@ -28,9 +28,9 @@ import { rewindAnalyticsEngine } from './RewindAnalyticsEngine';
 import { rewindPluginManager } from './RewindPluginManager';
 import { rewindLogger } from './RewindLogger';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface RewindEntry {
   id: string;
@@ -86,9 +86,9 @@ interface SummaryStore {
   summaries: DailySummaryRecord[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // REWIND ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class RewindEngine {
   private settings: Store<RewindSettings>;
@@ -135,7 +135,7 @@ class RewindEngine {
         trackApps: true,
         trackBrowser: true,
         pollIntervalMs: 5000,
-        // Phase 2 defaults — opt-in only
+        // Phase 2 defaults -- opt-in only
         screenshotsEnabled: false,
         screenshotIntervalMin: 5,
         aiSearchEnabled: false,
@@ -151,9 +151,9 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow;
@@ -233,9 +233,9 @@ class RewindEngine {
     log.info('[RewindEngine] Shutdown complete');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // START / STOP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private start(): void {
     if (this.isRunning) return;
@@ -269,9 +269,9 @@ class RewindEngine {
     log.info('[RewindEngine] Recording stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // POLLING LOOP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async poll(): Promise<void> {
     if (!this.settings.get('isRecording')) return;
@@ -289,37 +289,50 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTIVE WINDOW (PowerShell on Windows)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
+
+  private _psScriptPath: string | null = null;
+
+  private getPsScriptPath(): string {
+    if (this._psScriptPath && fs.existsSync(this._psScriptPath)) return this._psScriptPath;
+    const tmpDir = app.getPath('temp');
+    const scriptPath = path.join(tmpDir, 'dex-rewind-poll.ps1');
+    const script = [
+      'Add-Type @"',
+      '  using System;',
+      '  using System.Runtime.InteropServices;',
+      '  public class Win32 {',
+      '    [DllImport("user32.dll")]',
+      '    public static extern IntPtr GetForegroundWindow();',
+      '    [DllImport("user32.dll", SetLastError=true)]',
+      '    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);',
+      '    [DllImport("user32.dll")]',
+      '    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);',
+      '  }',
+      '"@',
+      '$h = [Win32]::GetForegroundWindow()',
+      '$sb = New-Object System.Text.StringBuilder 256',
+      '[Win32]::GetWindowText($h, $sb, 256) | Out-Null',
+      '$pid2 = 0',
+      '[Win32]::GetWindowThreadProcessId($h, [ref]$pid2) | Out-Null',
+      '$proc = Get-Process -Id $pid2 -ErrorAction SilentlyContinue',
+      '"$($sb.ToString())|$($proc.ProcessName)"',
+    ].join('\r\n');
+    fs.writeFileSync(scriptPath, script, 'utf-8');
+    this._psScriptPath = scriptPath;
+    return scriptPath;
+  }
 
   private pollActiveWindow(): Promise<void> {
     return new Promise((resolve) => {
       if (process.platform !== 'win32') { resolve(); return; }
 
-      const ps = `
-        Add-Type @"
-          using System;
-          using System.Runtime.InteropServices;
-          public class Win32 {
-            [DllImport("user32.dll")]
-            public static extern IntPtr GetForegroundWindow();
-            [DllImport("user32.dll", SetLastError=true)]
-            public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
-            [DllImport("user32.dll")]
-            public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-          }
-"@
-        $h = [Win32]::GetForegroundWindow()
-        $sb = New-Object System.Text.StringBuilder 256
-        [Win32]::GetWindowText($h, $sb, 256) | Out-Null
-        $pid2 = 0
-        [Win32]::GetWindowThreadProcessId($h, [ref]$pid2) | Out-Null
-        $proc = Get-Process -Id $pid2 -ErrorAction SilentlyContinue
-        "$($sb.ToString())|$($proc.ProcessName)"
-      `.trim();
+      const scriptPath = this.getPsScriptPath();
 
-      exec(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, { timeout: 3000 }, (err, stdout) => {
+      // Execute from file to avoid here-string parsing issues
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], { timeout: 4000 }, (err, stdout) => {
         if (err) { this.markComponentError('windowTracker', err); resolve(); return; }
 
         const line = (stdout || '').trim();
@@ -358,9 +371,9 @@ class RewindEngine {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLIPBOARD
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private pollClipboard(): void {
     try {
@@ -392,9 +405,9 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE WATCHERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startFileWatchers(): void {
     const dirs = [
@@ -432,9 +445,9 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DEX INTERNAL EVENTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   logDexEvent(appName: string, action: string, details?: Record<string, any>): void {
     if (!this.settings.get('isRecording')) return;
@@ -451,9 +464,9 @@ class RewindEngine {
     this.writeEntry(entry);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // PHASE 2: SCREENSHOT MEMORY
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private startScreenshotTimer(): void {
     if (this.screenshotTimer) { clearInterval(this.screenshotTimer); }
@@ -510,7 +523,7 @@ class RewindEngine {
       const entry: RewindEntry = {
         id: record.id,
         type: 'screenshot',
-        content: `Screenshot captured — ${this.lastActiveApp}`,
+        content: `Screenshot captured -- ${this.lastActiveApp}`,
         appName: this.lastActiveApp,
         timestamp: ts,
         metadata: { filepath, screenshotId: record.id },
@@ -624,9 +637,9 @@ class RewindEngine {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // PHASE 2: SMART DAILY SUMMARY
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private startSummaryScheduler(): void {
     // Check once per minute if it's 6pm and we haven't generated today's summary
@@ -765,9 +778,9 @@ class RewindEngine {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // PHASE 2: LOCAL AI SEARCH (Ollama)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async checkOllamaAvailability(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -928,9 +941,9 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STORAGE — Date-Sharded JSON
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
+  // STORAGE -- Date-Sharded JSON
+  // -------------------------------------------------------------------------
 
   private getDateFile(ts?: number): string {
     const d = ts ? new Date(ts) : new Date();
@@ -972,9 +985,9 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TIMELINE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getTimeline(dateStr?: string, filterType?: string): RewindEntry[] {
     const d = dateStr || this.todayStr();
@@ -989,9 +1002,9 @@ class RewindEngine {
     return entries.sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SEARCH — Keyword fallback (used when AI not available)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
+  // SEARCH -- Keyword fallback (used when AI not available)
+  // -------------------------------------------------------------------------
 
   search(query: string, daysBack = 7): RewindEntry[] {
     if (!query.trim()) return [];
@@ -1036,9 +1049,9 @@ class RewindEngine {
     return results.sort((a, b) => b.timestamp - a.timestamp).slice(0, 200);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private pruneOldData(): void {
     try {
@@ -1116,7 +1129,7 @@ class RewindEngine {
         try {
           const data: RewindDayData = JSON.parse(fs.readFileSync(fp, 'utf-8'));
           totalEntries += data.entries.length;
-        } catch (_) {}
+        } catch (e) { log.warn('[RewindEngine] Data file parse error:', e); }
       }
 
       return {
@@ -1131,12 +1144,12 @@ class RewindEngine {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerIPC(): void {
-    // ── Phase 1 handlers ──
+    // -- Phase 1 handlers --
     ipcMain.handle('rewind:getTimeline', (_e, dateStr?: string, filterType?: string) => {
       return this.getTimeline(dateStr, filterType);
     });
@@ -1232,7 +1245,7 @@ class RewindEngine {
       return { date: d, totalEntries: data.entries.length, byType, topApps, hours: hourCounts };
     });
 
-    // ── Phase 2 handlers ──
+    // -- Phase 2 handlers --
 
     // Screenshots
     ipcMain.handle('rewind:getScreenshots', (_e, dateStr?: string) => {
@@ -1248,7 +1261,7 @@ class RewindEngine {
     });
 
     ipcMain.handle('rewind:openScreenshotsFolder', () => {
-      try { shell.openPath(this.screenshotsBaseDir); } catch (_) {}
+      try { shell.openPath(this.screenshotsBaseDir); } catch (e) { log.warn('[RewindEngine] openPath failed:', e); }
       return true;
     });
 
@@ -1274,7 +1287,7 @@ class RewindEngine {
       const summary = this.getDailySummary(dateStr);
       if (!summary) return null;
       const stats = JSON.parse(summary.statsJson);
-      let text = `DEX Rewind Daily Summary — ${summary.date}\n${'='.repeat(50)}\n\n`;
+      let text = `DEX Rewind Daily Summary -- ${summary.date}\n${'='.repeat(50)}\n\n`;
       if (summary.aiSummary) { text += `${summary.aiSummary}\n\n`; }
       text += `Total Active Time: ${stats.totalActiveMinutes} minutes\n`;
       text += `Total Events: ${stats.totalEntries}\n`;
@@ -1313,7 +1326,7 @@ class RewindEngine {
       return app.getVersion();
     });
 
-    // ── Phase 4: Learning Engine ──
+    // -- Phase 4: Learning Engine --
 
     ipcMain.handle('rewind:getLearningStatus', () => {
       return rewindLearningEngine.getStatus();
@@ -1344,7 +1357,7 @@ class RewindEngine {
       return true;
     });
 
-    // ── Phase 4: Security Layer ──
+    // -- Phase 4: Security Layer --
 
     ipcMain.handle('rewind:getSecurityStatus', () => {
       return rewindSecurityLayer.getStatus();
@@ -1366,7 +1379,7 @@ class RewindEngine {
       return rewindSecurityLayer.unlockSession();
     });
 
-    // ── Phase 4: DEX Bridge ──
+    // -- Phase 4: DEX Bridge --
 
     ipcMain.handle('rewind:getBridgeStatus', () => {
       return rewindDexBridge.getStatus();
@@ -1376,7 +1389,7 @@ class RewindEngine {
       return rewindDexBridge.isDndActive();
     });
 
-    // ── Phase 4: Combined Backend Status ──
+    // -- Phase 4: Combined Backend Status --
 
     ipcMain.handle('rewind:getBackendStatus', () => {
       const storageInfo = this.getStorageInfo();
@@ -1410,16 +1423,16 @@ class RewindEngine {
     });
 
     ipcMain.handle('rewind:openLogsFolder', () => {
-      shell.openPath(rewindLogger.openFolderPath()).catch(() => {});
+      shell.openPath(rewindLogger.openFolderPath()).catch((e: unknown) => { log.warn('[DEX]', e); });
       return true;
     });
 
-    // ── Phase 5: Crash Recovery ──
+    // -- Phase 5: Crash Recovery --
     ipcMain.handle('rewind:getCrashRecoveryStatus', () => rewindPhase5Manager.getCrashRecoveryStatus());
     ipcMain.handle('rewind:restoreCrashedSession', () => rewindPhase5Manager.restoreFromCrashSnapshot());
     ipcMain.handle('rewind:dismissCrashRecovery', () => { rewindPhase5Manager.dismissCrashRecovery(); return true; });
 
-    // ── Phase 5: Focus session snapshot ──
+    // -- Phase 5: Focus session snapshot --
     ipcMain.handle('rewind:setFocusSessionState', (_e, state: Record<string, any> | null) => {
       this.activeFocusSession = state;
       return true;
@@ -1453,7 +1466,7 @@ class RewindEngine {
       return this.getFocusSessions();
     });
 
-    // ── Phase 7: Plugins ──
+    // -- Phase 7: Plugins --
     ipcMain.handle('rewind:getPlugins', () => rewindPluginManager.getPlugins());
     ipcMain.handle('rewind:setPluginEnabled', (_e, id: string, enabled: boolean) => rewindPluginManager.setEnabled(id, enabled));
     ipcMain.handle('rewind:reloadPlugins', () => { rewindPluginManager.reloadAll(); return rewindPluginManager.getPlugins(); });
@@ -1463,7 +1476,7 @@ class RewindEngine {
       return rewindPluginManager.runPluginCommand(pluginId, name, payload);
     });
 
-    // ── Phase 6: Analytics ──
+    // -- Phase 6: Analytics --
     ipcMain.handle('rewind:getAnalyticsSnapshot', () => {
       return rewindAnalyticsEngine.getSnapshot();
     });
@@ -1473,7 +1486,7 @@ class RewindEngine {
       return rewindAnalyticsEngine.getSnapshot();
     });
 
-    // ── Phase 5: Backups ──
+    // -- Phase 5: Backups --
     ipcMain.handle('rewind:getBackupSettings', () => rewindPhase5Manager.getBackupSettings());
     ipcMain.handle('rewind:setBackupSchedule', (_e, schedule: 'daily' | '3days' | 'weekly') => {
       rewindPhase5Manager.setBackupSchedule(schedule);
@@ -1504,13 +1517,13 @@ class RewindEngine {
       return restored;
     });
 
-    // ── Phase 5: Workspace Profiles ──
+    // -- Phase 5: Workspace Profiles --
     ipcMain.handle('rewind:getWorkspaceProfiles', () => rewindPhase5Manager.getProfiles());
     ipcMain.handle('rewind:getActiveWorkspaceProfile', () => rewindPhase5Manager.getActiveProfile());
     ipcMain.handle('rewind:saveWorkspaceProfile', (_e, profile: any) => rewindPhase5Manager.saveProfile(profile));
     ipcMain.handle('rewind:deleteWorkspaceProfile', (_e, profileId: string) => rewindPhase5Manager.deleteProfile(profileId));
 
-    // ── Phase 5: First-run onboarding ──
+    // -- Phase 5: First-run onboarding --
     ipcMain.handle('rewind:getOnboardingState', () => ({ completed: rewindPhase5Manager.isOnboardingCompleted() }));
     ipcMain.handle('rewind:skipOnboarding', () => { rewindPhase5Manager.skipOnboarding(); return true; });
     ipcMain.handle('rewind:completeOnboarding', (_e, payload: {
@@ -1524,9 +1537,9 @@ class RewindEngine {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private todayStr(): string {
     return this.formatDateStr(new Date());
@@ -1632,7 +1645,7 @@ class RewindEngine {
       if (rssMb > 300) {
         log.warn(`[RewindEngine] Memory high: ${rssMb.toFixed(1)}MB`);
         if (typeof (global as any).gc === 'function') {
-          try { (global as any).gc(); } catch (_) {}
+          try { (global as any).gc(); } catch (e) { log.warn('[RewindEngine] GC invocation failed:', e); }
         }
       }
       if (rssMb > 500) {
@@ -1681,7 +1694,7 @@ class RewindEngine {
 
   private restartWorker(component: 'windowTracker' | 'clipboardMonitor' | 'fileWatcher' | 'browserReader' | 'poll-loop', reason: string): void {
     if (component === 'fileWatcher') {
-      this.fileWatchers.forEach(w => { try { w.close(); } catch (_) {} });
+      this.fileWatchers.forEach(w => { try { w.close(); } catch (e) { log.warn('[RewindEngine] Watcher close failed:', e); } });
       this.fileWatchers = [];
       this.startFileWatchers();
     } else {
@@ -1742,9 +1755,9 @@ class RewindEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MODULE EXPORTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const rewindEngine = new RewindEngine();
 

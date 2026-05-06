@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Notes System
 // OS-Level notes with text, voice, media support
 // Markdown, rich text, quick capture, tagging, search
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow } from 'electron';
@@ -12,9 +18,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type NoteType = 'text' | 'markdown' | 'richtext' | 'voice' | 'checklist';
 export type NoteStatus = 'active' | 'archived' | 'trashed';
@@ -114,9 +120,9 @@ export interface NotesStats {
   recentTags: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // NOTES SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class NotesSystemClass extends EventEmitter {
   private notes: Map<string, Note> = new Map();
@@ -144,9 +150,9 @@ class NotesSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -169,9 +175,9 @@ class NotesSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Notes CRUD
@@ -291,9 +297,9 @@ class NotesSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NOTE OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createNote(data: Partial<Note>): Promise<Note> {
     const now = Date.now();
@@ -392,12 +398,12 @@ class NotesSystemClass extends EventEmitter {
     if (permanent || note.status === 'trashed') {
       // Delete attachments
       for (const attachment of note.attachments) {
-        await fs.unlink(attachment.path).catch(() => {});
+        await fs.unlink(attachment.path).catch((e: unknown) => { log.warn('[DEX]', e); });
       }
 
       // Delete note file
       const notePath = path.join(this.dataPath, `${id}.json`);
-      await fs.unlink(notePath).catch(() => {});
+      await fs.unlink(notePath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
       // Delete versions
       this.versions.delete(id);
@@ -498,9 +504,9 @@ class NotesSystemClass extends EventEmitter {
     return notes;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUICK ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async quickCapture(content: string, type?: NoteType): Promise<Note> {
     // Auto-detect type
@@ -585,9 +591,9 @@ class NotesSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TAGS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setTags(id: string, tags: string[]): Promise<{ success: boolean }> {
     const note = this.notes.get(id);
@@ -617,9 +623,9 @@ class NotesSystemClass extends EventEmitter {
       .sort((a, b) => b.count - a.count);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FOLDERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createFolder(name: string, parentId?: string): Promise<NoteFolder> {
     const id = `folder-${++this.idCounter}-${Date.now()}`;
@@ -689,9 +695,9 @@ class NotesSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ATTACHMENTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addAttachment(noteId: string, filePath: string): Promise<{ success: boolean; attachment?: NoteAttachment }> {
     const note = this.notes.get(noteId);
@@ -738,7 +744,7 @@ class NotesSystemClass extends EventEmitter {
     if (index === -1) return { success: false };
 
     const attachment = note.attachments[index];
-    await fs.unlink(attachment.path).catch(() => {});
+    await fs.unlink(attachment.path).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     note.attachments.splice(index, 1);
     note.updatedAt = Date.now();
@@ -759,9 +765,9 @@ class NotesSystemClass extends EventEmitter {
     return 'file';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CHECKLIST
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async toggleChecklistItem(noteId: string, itemId: string): Promise<{ success: boolean }> {
     const note = this.notes.get(noteId);
@@ -797,9 +803,9 @@ class NotesSystemClass extends EventEmitter {
     return items;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SEARCH
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   searchNotes(query: string): Note[] {
     if (!query.trim()) return this.listNotes({ limit: 50 });
@@ -839,9 +845,9 @@ class NotesSystemClass extends EventEmitter {
     return results;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VERSIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async saveVersion(note: Note): Promise<void> {
     if (!this.config.enableVersionHistory) return;
@@ -895,9 +901,9 @@ class NotesSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): NotesStats {
     const notes = Array.from(this.notes.values());
@@ -937,9 +943,9 @@ class NotesSystemClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async exportNote(noteId: string, format: string): Promise<{ success: boolean; content?: string }> {
     const note = this.notes.get(noteId);
@@ -997,9 +1003,9 @@ class NotesSystemClass extends EventEmitter {
     return { success: true, path: exportDir };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private countWords(text: string): number {
     return text.trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -1011,9 +1017,9 @@ class NotesSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadNotes(): Promise<void> {
     try {
@@ -1099,9 +1105,9 @@ class NotesSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     // Clear auto-save timers
@@ -1114,9 +1120,9 @@ class NotesSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const NotesSystem = new NotesSystemClass();
 export default NotesSystem;

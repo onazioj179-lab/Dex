@@ -1,14 +1,20 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Memory Manager
 // Phase 15: Deep Internal Micro-Optimization
 // Enforces stable memory usage with bounded caches and automatic cleanup
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BOUNDED CACHE - LRU with TTL support
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface CacheOptions {
   maxSize: number;           // Maximum number of entries
@@ -167,9 +173,9 @@ export class BoundedCache<T> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // WEAK REFERENCE CACHE - For large objects that can be GC'd
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class WeakCache<T extends object> {
   private cache = new Map<string, WeakRef<T>>();
@@ -210,9 +216,9 @@ export class WeakCache<T extends object> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MEMORY MONITOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface MemoryStats {
   heapUsedMB: number;
@@ -238,9 +244,9 @@ class MemoryManagerClass {
 
   constructor() {
     this.options = {
-      checkIntervalMs: 120000, // Check every 2 minutes - reduced monitoring overhead
-      highPressureThresholdMB: 512,  // Relaxed: trigger cleanup at 512MB
-      criticalPressureThresholdMB: 1024, // Relaxed: emergency at 1GB
+      checkIntervalMs: 30000, // Check every 30s - faster reaction for low-RAM systems
+      highPressureThresholdMB: 350,  // Tighter: trigger cleanup at 350MB
+      criticalPressureThresholdMB: 600, // Tighter: emergency at 600MB for 6GB target
       onPressureChange: () => {},
     };
   }
@@ -392,9 +398,9 @@ class MemoryManagerClass {
 // Singleton instance
 export const memoryManager = new MemoryManagerClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BUFFER POOL - Reuse buffers to reduce allocations
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class BufferPool {
   private pool: Buffer[] = [];

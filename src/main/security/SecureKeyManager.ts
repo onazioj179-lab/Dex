@@ -1,17 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Secure Key Manager
 // Local-first encryption key management
 // Keys never leave the device, OS keychain integration
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { safeStorage } from 'electron';
 import * as crypto from 'crypto';
 import Store from 'electron-store';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface KeyInfo {
   id: string;
@@ -60,18 +66,18 @@ interface StoredKeyMetadata {
   checksumBase64: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const KEY_LENGTH = 32; // 256 bits
 const SALT_LENGTH = 32;
-const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_ITERATIONS = 310000; // OWASP 2023 minimum for PBKDF2-SHA256
 const KEY_CHECKSUM_LENGTH = 8;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const keyStore = new Store<{
   keys: Record<string, StoredKeyMetadata>;
@@ -82,18 +88,18 @@ const keyStore = new Store<{
   defaults: {
     keys: {},
     rotationPolicy: {
-      enabled: false,
+      enabled: true,
       intervalDays: 90,
       lastRotation: 0,
-      autoRotate: false,
+      autoRotate: true,
     },
     derivationParams: {},
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // KEY MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecureKeyManagerClass {
   // In-memory key cache (cleared on lock)
@@ -101,9 +107,9 @@ class SecureKeyManagerClass {
   private isLocked = true;
   private masterKey: Buffer | null = null;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<boolean> {
     log.info('[KeyManager] Initializing...');
@@ -120,7 +126,35 @@ class SecureKeyManagerClass {
       log.info('[KeyManager] Auto-unlocked with system key');
     }
 
+    // Auto-rotate keys if policy requires and manager is unlocked
+    if (!this.isLocked) {
+      await this.checkAutoRotation();
+    }
+
     return true;
+  }
+
+  private async checkAutoRotation(): Promise<void> {
+    const policy = keyStore.get('rotationPolicy');
+    if (!policy.enabled || !policy.autoRotate) return;
+
+    const now = Date.now();
+    const intervalMs = policy.intervalDays * 24 * 60 * 60 * 1000;
+    if (policy.lastRotation > 0 && (now - policy.lastRotation) < intervalMs) return;
+
+    log.info('[KeyManager] Auto-rotation policy triggered');
+    const keys = keyStore.get('keys');
+    const activeKeys = Object.entries(keys).filter(([, meta]) => !meta.rotatedAt);
+
+    for (const [keyId] of activeKeys) {
+      try {
+        await this.rotateKey(keyId);
+      } catch (err) {
+        log.warn(`[KeyManager] Auto-rotation failed for key ${keyId}:`, err);
+      }
+    }
+
+    this.updateRotationPolicy({ lastRotation: now });
   }
 
   private async tryAutoUnlock(): Promise<boolean> {
@@ -154,9 +188,9 @@ class SecureKeyManagerClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEY GENERATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   // Generate a new key
   async generateKey(
@@ -299,9 +333,9 @@ class SecureKeyManagerClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEY RETRIEVAL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async getKey(keyId: string): Promise<Buffer | null> {
     if (this.isLocked) {
@@ -361,9 +395,9 @@ class SecureKeyManagerClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEY ROTATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async rotateKey(keyId: string): Promise<KeyInfo | null> {
     const keys = keyStore.get('keys');
@@ -406,9 +440,9 @@ class SecureKeyManagerClass {
     return updated;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEY DELETION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async deleteKey(keyId: string): Promise<boolean> {
     try {
@@ -440,9 +474,9 @@ class SecureKeyManagerClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LOCK / UNLOCK
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async unlock(password: string): Promise<boolean> {
     try {
@@ -517,9 +551,9 @@ class SecureKeyManagerClass {
     return !this.isLocked;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEY INFO
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   listKeys(): KeyInfo[] {
     const keys = keyStore.get('keys');
@@ -552,9 +586,9 @@ class SecureKeyManagerClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // OS KEYCHAIN HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private storeInKeychain(key: string, value: string): boolean {
     try {
@@ -599,9 +633,9 @@ class SecureKeyManagerClass {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const SecureKeyManager = new SecureKeyManagerClass();
 export default SecureKeyManager;

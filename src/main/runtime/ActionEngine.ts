@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Action Engine
 // Phase 28: Backend Architecture Refinement
 // Step-by-step execution with cancellation, pause, and deterministic ordering
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ActionState = 'idle' | 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
@@ -83,9 +89,9 @@ export interface QueueStatus {
   currentAction: string | null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ACTION ENGINE CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ActionEngineClass extends EventEmitter {
   // Queue management
@@ -107,7 +113,7 @@ class ActionEngineClass extends EventEmitter {
     defaultTimeout: 60000,      // 1 minute
     maxRetries: 2,
     retryDelayMs: 1000,
-    processIntervalMs: 500,     // Queue check interval (increased from 50ms for idle efficiency)
+    processIntervalMs: 2000,    // Queue check interval (increased from 500ms for idle efficiency)
   };
 
   // Processing
@@ -119,16 +125,17 @@ class ActionEngineClass extends EventEmitter {
     this.setMaxListeners(50);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
     if (this.processInterval) return;
     
+    // 5s minimum — actions are event-driven, queue check is fallback
     this.processInterval = setInterval(() => {
       this.processQueue();
-    }, this.config.processIntervalMs);
+    }, Math.max(this.config.processIntervalMs, 5000));
     
     log.info('[ActionEngine] Started');
   }
@@ -151,9 +158,9 @@ class ActionEngineClass extends EventEmitter {
     log.info('[ActionEngine] Stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXECUTOR REGISTRATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   registerExecutor(executor: ActionExecutor): void {
     this.executors.set(executor.type, executor);
@@ -164,9 +171,9 @@ class ActionEngineClass extends EventEmitter {
     return Array.from(this.executors.keys());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Add action to queue
@@ -264,9 +271,9 @@ class ActionEngineClass extends EventEmitter {
     this.emit('queueCleared');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PAUSE & RESUME
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   pause(): void {
     if (this.engineState === 'paused') return;
@@ -293,9 +300,9 @@ class ActionEngineClass extends EventEmitter {
     this.emit('resumed');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE PROCESSING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async processQueue(): Promise<void> {
     // Skip if already processing or paused
@@ -428,9 +435,9 @@ class ActionEngineClass extends EventEmitter {
     return this.createResult(queuedAction, false, undefined, lastError);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private findInsertIndex(priority: Action['priority']): number {
     const priorityOrder = { critical: 0, high: 1, normal: 2, low: 3 };
@@ -490,9 +497,9 @@ class ActionEngineClass extends EventEmitter {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatus(): QueueStatus {
     return {
@@ -519,9 +526,9 @@ class ActionEngineClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const actionEngine = new ActionEngineClass();
 export default actionEngine;

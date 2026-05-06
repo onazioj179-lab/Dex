@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - Authentication Hardening Layer
 // Q1 Foundation & Trust: Finalize authentication (biometric, PIN, password)
@@ -8,6 +14,7 @@ import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow, safeStorage, systemPreferences, app } from 'electron';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
@@ -183,10 +190,10 @@ class AuthHardeningClass extends EventEmitter {
   private async loadConfig(): Promise<void> {
     try {
       const configPath = path.join(this.dataPath, 'auth-hardening-config.json');
-      if (fs.existsSync(configPath)) {
-        const data = fs.readFileSync(configPath, 'utf-8');
+      try {
+        const data = await fsPromises.readFile(configPath, 'utf-8');
         this.config = { ...DEFAULT_SECURITY_CONFIG, ...JSON.parse(data) };
-      }
+      } catch { /* file doesn't exist yet, use defaults */ }
     } catch (error) {
       log.error('[AuthHardening] Failed to load config:', error);
     }
@@ -195,7 +202,7 @@ class AuthHardeningClass extends EventEmitter {
   private async saveConfig(): Promise<void> {
     try {
       const configPath = path.join(this.dataPath, 'auth-hardening-config.json');
-      fs.writeFileSync(configPath, JSON.stringify(this.config, null, 2));
+      await fsPromises.writeFile(configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
       log.error('[AuthHardening] Failed to save config:', error);
     }
@@ -204,14 +211,15 @@ class AuthHardeningClass extends EventEmitter {
   private async loadAuditLog(): Promise<void> {
     try {
       const auditPath = path.join(this.dataPath, 'auth-audit.json');
-      if (fs.existsSync(auditPath) && safeStorage.isEncryptionAvailable()) {
-        const encrypted = fs.readFileSync(auditPath);
-        const decrypted = safeStorage.decryptString(encrypted);
-        this.auditLog = JSON.parse(decrypted);
-        // Keep only last 1000 entries
-        if (this.auditLog.length > 1000) {
-          this.auditLog = this.auditLog.slice(-1000);
-        }
+      if (safeStorage.isEncryptionAvailable()) {
+        try {
+          const encrypted = await fsPromises.readFile(auditPath);
+          const decrypted = safeStorage.decryptString(encrypted);
+          this.auditLog = JSON.parse(decrypted);
+          if (this.auditLog.length > 1000) {
+            this.auditLog = this.auditLog.slice(-1000);
+          }
+        } catch { /* file doesn't exist yet */ }
       }
     } catch (error) {
       log.warn('[AuthHardening] Failed to load audit log:', error);
@@ -227,7 +235,7 @@ class AuthHardeningClass extends EventEmitter {
       }
       const auditPath = path.join(this.dataPath, 'auth-audit.json');
       const encrypted = safeStorage.encryptString(JSON.stringify(this.auditLog));
-      fs.writeFileSync(auditPath, encrypted);
+      await fsPromises.writeFile(auditPath, encrypted);
     } catch (error) {
       log.error('[AuthHardening] Failed to save audit log:', error);
     }
@@ -613,7 +621,7 @@ class AuthHardeningClass extends EventEmitter {
     }
 
     // Save async
-    this.saveAuditLog().catch(() => {});
+    this.saveAuditLog().catch((e: unknown) => { log.warn('[DEX]', e); });
   }
 
   /**

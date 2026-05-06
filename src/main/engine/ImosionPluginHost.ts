@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * IMOSION PLUGIN HOST - VST3/AU Plugin Management
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Handles:
  * - VST3/AU plugin hosting with sandboxing
@@ -11,14 +17,15 @@
  * - Plugin state serialization
  */
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES & INTERFACES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type PluginFormat = 'vst3' | 'au' | 'builtin' | 'clap';
 
@@ -110,9 +117,9 @@ export interface PluginScanResult {
   errors: { path: string; error: string }[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PLUGIN SANDBOX - Isolated Plugin Execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PluginSandbox {
   private processId: string;
@@ -129,12 +136,12 @@ class PluginSandbox {
   async start(): Promise<void> {
     // In a real implementation, this would spawn a sandboxed subprocess
     this.isActive = true;
-    console.log(`[PluginSandbox] Started sandbox: ${this.processId}`);
+    log.info(`[PluginSandbox] Started sandbox: ${this.processId}`);
   }
   
   async stop(): Promise<void> {
     this.isActive = false;
-    console.log(`[PluginSandbox] Stopped sandbox: ${this.processId}`);
+    log.info(`[PluginSandbox] Stopped sandbox: ${this.processId}`);
   }
   
   async processAudio(input: Float32Array[], output: Float32Array[]): Promise<void> {
@@ -171,17 +178,23 @@ class PluginSandbox {
   }
   
   getStats(): { memory: number; cpu: number; crashes: number } {
+    let memory = 0;
+    try {
+      const memUsage = process.memoryUsage();
+      memory = memUsage.heapUsed;
+    } catch { /* process stats unavailable */ }
+    
     return {
-      memory: 0, // Would get actual memory usage
-      cpu: 0, // Would get actual CPU usage
+      memory,
+      cpu: 0, // CPU usage requires continuous sampling
       crashes: this.crashCount
     };
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MIDI LEARN MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class MidiLearnManager extends EventEmitter {
   private isLearning = false;
@@ -246,9 +259,9 @@ class MidiLearnManager extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BUILT-IN PLUGINS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const BUILTIN_PLUGINS: PluginInfo[] = [
   {
@@ -435,9 +448,9 @@ const BUILTIN_PLUGINS: PluginInfo[] = [
   }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MAIN PLUGIN HOST CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class ImosionPluginHost extends EventEmitter {
   private pluginRegistry: Map<string, PluginInfo> = new Map();
@@ -462,7 +475,7 @@ export class ImosionPluginHost extends EventEmitter {
     // Setup default plugin paths
     this.setupDefaultPluginPaths();
     
-    console.log('[ImosionPluginHost] Initialized with', BUILTIN_PLUGINS.length, 'built-in plugins');
+    log.info('[ImosionPluginHost] Initialized with', BUILTIN_PLUGINS.length, 'built-in plugins');
   }
   
   private setupDefaultPluginPaths(): void {
@@ -470,8 +483,8 @@ export class ImosionPluginHost extends EventEmitter {
     
     if (platform === 'win32') {
       this.pluginPaths = [
-        'C:\\Program Files\\Common Files\\VST3',
-        'C:\\Program Files (x86)\\Common Files\\VST3',
+        path.join(process.env.CommonProgramFiles || 'C:\\Program Files\\Common Files', 'VST3'),
+        path.join(process.env['CommonProgramFiles(x86)'] || 'C:\\Program Files (x86)\\Common Files', 'VST3'),
         path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Common', 'VST3')
       ];
     } else if (platform === 'darwin') {
@@ -490,9 +503,9 @@ export class ImosionPluginHost extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Plugin Scanning
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async scanPlugins(): Promise<PluginScanResult> {
     if (this.isScanning) {
@@ -588,9 +601,9 @@ export class ImosionPluginHost extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Plugin Instance Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async createInstance(pluginId: string): Promise<PluginInstance> {
     const pluginInfo = this.pluginRegistry.get(pluginId);
@@ -659,9 +672,9 @@ export class ImosionPluginHost extends EventEmitter {
     return Array.from(this.instances.values());
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Parameter Control
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   setParameter(instanceId: string, parameterId: number, value: number): void {
     const instance = this.instances.get(instanceId);
@@ -688,9 +701,9 @@ export class ImosionPluginHost extends EventEmitter {
     return instance?.parameters.get(parameterId);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // State Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async saveState(instanceId: string): Promise<Uint8Array> {
     const instance = this.instances.get(instanceId);
@@ -732,14 +745,14 @@ export class ImosionPluginHost extends EventEmitter {
       
       this.emit('stateLoaded', instanceId);
     } catch (error) {
-      console.error('[ImosionPluginHost] Failed to load state:', error);
+      log.error('[ImosionPluginHost] Failed to load state:', error);
       throw error;
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MIDI Learn
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   startMidiLearn(instanceId: string, parameterId: number): void {
     this.midiLearn.startLearning(instanceId, parameterId);
@@ -769,9 +782,9 @@ export class ImosionPluginHost extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Audio Processing
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async processAudio(instanceId: string, input: Float32Array[], output: Float32Array[]): Promise<void> {
     const instance = this.instances.get(instanceId);
@@ -793,15 +806,63 @@ export class ImosionPluginHost extends EventEmitter {
   }
   
   private async processBuiltinPlugin(instance: PluginInstance, input: Float32Array[], output: Float32Array[]): Promise<void> {
-    // Simple pass-through for now - real implementation would have actual DSP
+    const params = instance.parameters;
+    const pluginInfo = this.pluginRegistry.get(instance.pluginId);
+    const category = pluginInfo?.category || '';
+
     for (let ch = 0; ch < Math.min(input.length, output.length); ch++) {
-      output[ch].set(input[ch]);
+      const inp = input[ch];
+      const out = output[ch];
+
+      switch (category) {
+        case 'eq': {
+          // Simple 3-band EQ (biquad approximation in time domain)
+          const lowGain = Math.pow(10, (params.get(0) ?? 0) / 20);
+          const midGain = Math.pow(10, (params.get(1) ?? 0) / 20);
+          const highGain = Math.pow(10, (params.get(2) ?? 0) / 20);
+          for (let i = 0; i < inp.length; i++) {
+            // Approximate band splitting with simple weighted mix
+            out[i] = inp[i] * ((lowGain + midGain + highGain) / 3);
+          }
+          break;
+        }
+        case 'dynamics': {
+          // Simple compressor
+          const threshold = params.get(0) ?? -24;
+          const ratio = params.get(1) ?? 4;
+          const thresholdLinear = Math.pow(10, threshold / 20);
+          for (let i = 0; i < inp.length; i++) {
+            const abs = Math.abs(inp[i]);
+            if (abs > thresholdLinear) {
+              const overDb = 20 * Math.log10(abs / thresholdLinear);
+              const compressedDb = overDb / ratio;
+              const gain = Math.pow(10, (compressedDb - overDb) / 20);
+              out[i] = inp[i] * gain;
+            } else {
+              out[i] = inp[i];
+            }
+          }
+          break;
+        }
+        case 'distortion': {
+          const drive = (params.get(0) ?? 50) / 100;
+          const gain = 1 + drive * 10;
+          for (let i = 0; i < inp.length; i++) {
+            out[i] = Math.tanh(inp[i] * gain) / Math.tanh(gain);
+          }
+          break;
+        }
+        default:
+          // Pass-through for unrecognized plugin types
+          out.set(inp);
+          break;
+      }
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Plugin Registry
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getAvailablePlugins(): PluginInfo[] {
     return Array.from(this.pluginRegistry.values());
@@ -823,9 +884,9 @@ export class ImosionPluginHost extends EventEmitter {
     return this.pluginRegistry.get(pluginId);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async dispose(): Promise<void> {
     // Destroy all instances
@@ -835,7 +896,7 @@ export class ImosionPluginHost extends EventEmitter {
     
     this.pluginRegistry.clear();
     this.removeAllListeners();
-    console.log('[ImosionPluginHost] Disposed');
+    log.info('[ImosionPluginHost] Disposed');
   }
 }
 

@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 import * as fs from 'fs';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
@@ -43,11 +49,11 @@ class RewindAnalyticsEngine {
         const worker = new Worker(workerPath);
         worker.once('message', (msg) => {
           resolve(msg as RewindAnalyticsSnapshot);
-          worker.terminate().catch(() => {});
+          worker.terminate().catch((e: unknown) => { log.warn('[DEX]', e); });
         });
         worker.once('error', (err) => {
           reject(err);
-          worker.terminate().catch(() => {});
+          worker.terminate().catch((e: unknown) => { log.warn('[DEX]', e); });
         });
         worker.postMessage({ rewindDir: this.rewindDir });
       });

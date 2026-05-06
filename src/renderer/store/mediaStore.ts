@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Global Media State Store
 // Tracks media playback state across all media pages (Audio, Video, Gallery)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { create } from 'zustand';
 
@@ -69,3 +75,9 @@ export const useMediaStore = create<MediaState>((set) => ({
     duration: 0,
   }),
 }));
+
+// Selector-based subscriptions (item 146)
+export const useMediaPlaying = () => useMediaStore(s => s.isPlaying);
+export const useMediaProgress = () => useMediaStore(s => ({ currentTime: s.currentTime, duration: s.duration }));
+export const useMediaVolume = () => useMediaStore(s => ({ volume: s.volume, muted: s.muted }));
+export const useCurrentMediaInfo = () => useMediaStore(s => ({ id: s.currentMediaId, title: s.currentMediaTitle, type: s.currentMediaType }));

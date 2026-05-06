@@ -1,18 +1,25 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Intelligence Core
 // Phase 38: Deep File Intelligence, Media Understanding
 // Local-first, permission-based, secure file analysis
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { EventEmitter } from 'events';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface FileMetadata {
   id: string;
@@ -109,9 +116,9 @@ export interface OrganizationSuggestion {
   applied: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // File Type Detection
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const FILE_TYPE_MAP: Record<string, FileType> = {
   // Documents
@@ -202,9 +209,9 @@ const CLUTTER_PATTERNS = [
   /^\.idea$/,                // JetBrains settings
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // File Intelligence Service
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class FileIntelligenceService extends EventEmitter {
   private static instance: FileIntelligenceService;
@@ -235,9 +242,9 @@ export class FileIntelligenceService extends EventEmitter {
     return FileIntelligenceService.instance;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Security: Path Authorization
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /**
    * Authorize a path for file intelligence operations
@@ -260,7 +267,7 @@ export class FileIntelligenceService extends EventEmitter {
     
     for (const dir of forbidden) {
       if (normalized.toLowerCase().startsWith(dir.toLowerCase())) {
-        console.warn(`[FileIntelligence] Blocked access to system directory: ${dirPath}`);
+        log.warn(`[FileIntelligence] Blocked access to system directory: ${dirPath}`);
         return false;
       }
     }
@@ -291,16 +298,16 @@ export class FileIntelligenceService extends EventEmitter {
     return Array.from(this.allowedPaths);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // File Analysis
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /**
    * Analyze a single file and extract metadata
    */
   async analyzeFile(filePath: string, deep = false): Promise<FileMetadata | null> {
     if (!this.isPathAuthorized(filePath)) {
-      console.warn(`[FileIntelligence] Unauthorized path: ${filePath}`);
+      log.warn(`[FileIntelligence] Unauthorized path: ${filePath}`);
       return null;
     }
     
@@ -339,7 +346,7 @@ export class FileIntelligenceService extends EventEmitter {
       
       return metadata;
     } catch (error) {
-      console.error(`[FileIntelligence] Error analyzing ${filePath}:`, error);
+      log.error(`[FileIntelligence] Error analyzing ${filePath}:`, error);
       return null;
     }
   }
@@ -354,7 +361,7 @@ export class FileIntelligenceService extends EventEmitter {
     const { recursive = true, maxFiles = 10000 } = options;
     
     if (!this.isPathAuthorized(dirPath)) {
-      console.warn(`[FileIntelligence] Unauthorized path: ${dirPath}`);
+      log.warn(`[FileIntelligence] Unauthorized path: ${dirPath}`);
       return [];
     }
     
@@ -409,9 +416,9 @@ export class FileIntelligenceService extends EventEmitter {
     return results;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // File Grouping & Organization
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   /**
    * Group files by type
@@ -592,9 +599,9 @@ export class FileIntelligenceService extends EventEmitter {
     return suggestions;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Query & Retrieval
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getFile(id: string): FileMetadata | undefined {
     return this.fileIndex.get(id);
@@ -648,9 +655,9 @@ export class FileIntelligenceService extends EventEmitter {
       .slice(0, limit);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Statistics
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getStatistics() {
     const files = Array.from(this.fileIndex.values());
@@ -686,9 +693,9 @@ export class FileIntelligenceService extends EventEmitter {
     };
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Helper Methods
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   private generateFileId(filePath: string): string {
     return crypto.createHash('md5').update(filePath).digest('hex').slice(0, 16);
@@ -763,9 +770,9 @@ export class FileIntelligenceService extends EventEmitter {
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Persistence
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   private ensureCacheDir(): void {
     if (!fs.existsSync(this.cacheDir)) {
@@ -801,10 +808,10 @@ export class FileIntelligenceService extends EventEmitter {
           this.allowedPaths.add(p);
         }
         
-        console.log(`[FileIntelligence] Loaded ${this.fileIndex.size} files from index`);
+        log.info(`[FileIntelligence] Loaded ${this.fileIndex.size} files from index`);
       }
     } catch (error) {
-      console.error('[FileIntelligence] Error loading index:', error);
+      log.error('[FileIntelligence] Error loading index:', error);
     }
   }
   
@@ -824,7 +831,7 @@ export class FileIntelligenceService extends EventEmitter {
         'utf-8'
       );
     } catch (error) {
-      console.error('[FileIntelligence] Error saving index:', error);
+      log.error('[FileIntelligence] Error saving index:', error);
     }
   }
   
@@ -842,7 +849,7 @@ export class FileIntelligenceService extends EventEmitter {
         await fs.promises.unlink(this.indexPath);
       }
     } catch (error) {
-      console.error('[FileIntelligence] Error clearing cache:', error);
+      log.error('[FileIntelligence] Error clearing cache:', error);
     }
     
     this.emit('cacheCleared');

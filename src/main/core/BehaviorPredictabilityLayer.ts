@@ -1,17 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Behavior Predictability Layer
 // Phase 69: Deterministic Behavior
 // Same input = same result, always. No surprises.
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
 import log from 'electron-log';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface BehaviorContract {
   id: string;
@@ -56,12 +62,12 @@ export interface DeterminismViolation {
   timestamp: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LOCKED BEHAVIOR CONTRACTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
-  // ── Search Behavior ─────────────────────────────────────────────────────
+  // -- Search Behavior -----------------------------------------------------
   {
     id: 'search-files',
     name: 'File Search',
@@ -88,7 +94,7 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
     locked: true
   },
 
-  // ── Navigation Behavior ─────────────────────────────────────────────────
+  // -- Navigation Behavior -------------------------------------------------
   {
     id: 'navigate-page',
     name: 'Page Navigation',
@@ -114,7 +120,7 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
     locked: true
   },
 
-  // ── File Operations ─────────────────────────────────────────────────────
+  // -- File Operations -----------------------------------------------------
   {
     id: 'file-create',
     name: 'File Creation',
@@ -142,7 +148,7 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
     locked: true
   },
 
-  // ── Action Execution ────────────────────────────────────────────────────
+  // -- Action Execution ----------------------------------------------------
   {
     id: 'action-execute',
     name: 'Action Execution',
@@ -169,7 +175,7 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
     locked: true
   },
 
-  // ── Keyboard Shortcuts ──────────────────────────────────────────────────
+  // -- Keyboard Shortcuts --------------------------------------------------
   {
     id: 'keyboard-shortcut',
     name: 'Keyboard Shortcuts',
@@ -195,7 +201,7 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
     locked: true
   },
 
-  // ── Drag and Drop ───────────────────────────────────────────────────────
+  // -- Drag and Drop -------------------------------------------------------
   {
     id: 'drag-drop',
     name: 'Drag and Drop',
@@ -222,7 +228,7 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
     locked: true
   },
 
-  // ── Settings Changes ────────────────────────────────────────────────────
+  // -- Settings Changes ----------------------------------------------------
   {
     id: 'setting-change',
     name: 'Settings Changes',
@@ -250,9 +256,9 @@ const BEHAVIOR_CONTRACTS: BehaviorContract[] = [
   }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BEHAVIOR PREDICTABILITY LAYER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class BehaviorPredictabilityLayerClass extends EventEmitter {
   private contracts: Map<string, BehaviorContract> = new Map();
@@ -266,9 +272,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private initializeContracts(): void {
     for (const contract of BEHAVIOR_CONTRACTS) {
@@ -314,9 +320,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONTRACT ACCESS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getContract(id: string): BehaviorContract | null {
     return this.contracts.get(id) || null;
@@ -333,9 +339,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     return contract.expectedOutputs.find(o => o.condition === condition) || null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXECUTION TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordExecution(execution: Omit<BehaviorExecution, 'inputHash' | 'outputHash' | 'deterministic'>): BehaviorExecution {
     const inputHash = this.hashValue(execution.input);
@@ -397,9 +403,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VIOLATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private recordViolation(violation: DeterminismViolation): void {
     this.violations.push(violation);
@@ -432,17 +438,17 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HISTORY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getExecutionHistory(contractId: string): BehaviorExecution[] {
     return [...(this.executionHistory.get(contractId) || [])];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // WRAPPED EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Execute a function and verify its determinism
@@ -501,9 +507,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private hashValue(value: unknown): string {
     const serialized = this.deterministicStringify(value);
@@ -532,9 +538,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
     return '{' + pairs.join(',') + '}';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MODE CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   enableDeterministicMode(): void {
     this.deterministicMode = true;
@@ -551,9 +557,9 @@ class BehaviorPredictabilityLayerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const BehaviorPredictabilityLayer = new BehaviorPredictabilityLayerClass();
 export default BehaviorPredictabilityLayer;

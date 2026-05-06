@@ -1,16 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX CLI - Command Line Interface for Headless Automation
 // Run workflows, operations, and actions from terminal
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { app, ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import Store from 'electron-store';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface CLICommand {
   name: string;
@@ -63,9 +69,9 @@ interface ActionDefinition {
   config: Record<string, unknown>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CLI Manager
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class DexCLI {
   private commands: Map<string, CLICommand> = new Map();
@@ -451,12 +457,12 @@ Run 'dex help <command>' for detailed information about a command.
 
     const output = `
 Dex Status
-──────────────────────────────────
+----------------------------------
 Version:    ${status.version}
 Platform:   ${status.platform}
 Uptime:     ${Math.floor(status.uptime / 60)}m ${Math.floor(status.uptime % 60)}s
 Memory:     ${Math.round(status.memory.heapUsed / 1024 / 1024)}MB / ${Math.round(status.memory.heapTotal / 1024 / 1024)}MB
-──────────────────────────────────
+----------------------------------
 `;
 
     return { success: true, output, data: status, exitCode: 0 };
@@ -514,7 +520,11 @@ Memory:     ${Math.round(status.memory.heapUsed / 1024 / 1024)}MB / ${Math.round
     }
 
     const fullPath = path.isAbsolute(outputPath) ? outputPath : path.join(process.cwd(), outputPath);
-    fs.writeFileSync(fullPath, JSON.stringify(data, null, 2));
+    try {
+      fs.writeFileSync(fullPath, JSON.stringify(data, null, 2));
+    } catch (err) {
+      return { success: false, output: `Failed to write file: ${err instanceof Error ? err.message : String(err)}`, exitCode: 1 };
+    }
 
     return {
       success: true,
@@ -536,7 +546,12 @@ Memory:     ${Math.round(status.memory.heapUsed / 1024 / 1024)}MB / ${Math.round
     }
 
     const shouldMerge = options.merge || options.m;
-    const data = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+    let data: any;
+    try {
+      data = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+    } catch (err) {
+      return { success: false, output: `Failed to read/parse file: ${err instanceof Error ? err.message : String(err)}`, exitCode: 1 };
+    }
 
     const workflowStore = new Store({ name: 'dex-workflows' });
     const operationStore = new Store({ name: 'dex-operations' });
@@ -634,9 +649,9 @@ Memory:     ${Math.round(status.memory.heapUsed / 1024 / 1024)}MB / ${Math.round
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Exports
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const dexCLI = new DexCLI();
 
@@ -654,6 +669,6 @@ export async function runCLIMode(args?: string[]): Promise<number> {
   dexCLI.setHeadless(true);
   const argv = args ? ['node', 'dex', ...args] : process.argv;
   const result = await dexCLI.execute(argv);
-  console.log(result.output);
+  process.stdout.write(result.output + '\n');
   return result.exitCode;
 }

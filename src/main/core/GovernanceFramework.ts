@@ -1,16 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Governance Framework
 // Phase 45: Permission governance, compliance, data lifecycle
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface PermissionDefinition {
   id: string;
@@ -54,9 +61,9 @@ export interface GovernanceConfig {
   enforceRetentionPolicies: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERMISSION REGISTRY (SINGLE SOURCE OF TRUTH)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const PERMISSION_REGISTRY: PermissionDefinition[] = [
   // System permissions
@@ -158,9 +165,9 @@ export const PERMISSION_REGISTRY: PermissionDefinition[] = [
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DATA RETENTION POLICIES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const DEFAULT_RETENTION_POLICIES: DataRetentionPolicy[] = [
   {
@@ -207,9 +214,9 @@ export const DEFAULT_RETENTION_POLICIES: DataRetentionPolicy[] = [
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const governanceStore = new Store<{
   config: GovernanceConfig;
@@ -245,9 +252,9 @@ const governanceStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GOVERNANCE FRAMEWORK
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class GovernanceFramework {
   private static instance: GovernanceFramework;
@@ -262,9 +269,9 @@ class GovernanceFramework {
     return GovernanceFramework.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -279,7 +286,7 @@ class GovernanceFramework {
     }
 
     this.initialized = true;
-    console.log('[GovernanceFramework] Initialized');
+    log.info('[GovernanceFramework] Initialized');
   }
 
   private setupIPC(): void {
@@ -306,9 +313,9 @@ class GovernanceFramework {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERMISSION MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private syncPermissionRegistry(): void {
     const grants = governanceStore.get('grants');
@@ -394,9 +401,9 @@ class GovernanceFramework {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA RETENTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getRetentionPolicies(): DataRetentionPolicy[] {
     return governanceStore.get('retentionPolicies');
@@ -421,22 +428,60 @@ class GovernanceFramework {
   async runRetentionEnforcement(): Promise<number> {
     const policies = governanceStore.get('retentionPolicies');
     let itemsDeleted = 0;
+    const userDataPath = app.getPath('userData');
+
+    // Map data types to their file system locations
+    const dataTypeLocations: Record<string, string> = {
+      'logs.application': path.join(userDataPath, 'logs'),
+      'logs.audit': path.join(userDataPath, 'logs', 'audit'),
+      'patterns.usage': path.join(userDataPath, 'patterns'),
+      'cache.temporary': path.join(userDataPath, 'cache'),
+    };
 
     for (const policy of policies) {
       if (policy.retentionDays < 0) continue; // -1 means forever
 
       const cutoffDate = Date.now() - (policy.retentionDays * 24 * 60 * 60 * 1000);
-      // Implementation would delete items older than cutoffDate
-      // This is a placeholder for the actual deletion logic
+      const targetDir = dataTypeLocations[policy.dataType];
+      if (!targetDir || !fs.existsSync(targetDir)) continue;
+
+      try {
+        const entries = fs.readdirSync(targetDir);
+        for (const entry of entries) {
+          const entryPath = path.join(targetDir, entry);
+          try {
+            const stats = fs.statSync(entryPath);
+            if (stats.mtimeMs < cutoffDate) {
+              if (stats.isFile()) {
+                if (policy.deletionMethod === 'secure') {
+                  // Overwrite before delete
+                  const buf = Buffer.alloc(stats.size, 0);
+                  fs.writeFileSync(entryPath, buf);
+                }
+                fs.unlinkSync(entryPath);
+                itemsDeleted++;
+              } else if (stats.isDirectory()) {
+                fs.rmSync(entryPath, { recursive: true, force: true });
+                itemsDeleted++;
+              }
+            }
+          } catch {
+            // Skip files that are locked or permission-denied
+          }
+        }
+      } catch {
+        // Directory read error - skip this policy
+      }
     }
 
     governanceStore.set('lastRetentionRun', Date.now());
+    this.logAuditEvent('retention.enforced', undefined, `Retention enforcement completed: ${itemsDeleted} items deleted`);
     return itemsDeleted;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // COMPLIANCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getComplianceStatus(): ComplianceStatus {
     return {
@@ -448,9 +493,9 @@ class GovernanceFramework {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA LOCATIONS & EXPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getDataLocations(): { type: string; path: string; description: string }[] {
     const userDataPath = app.getPath('userData');
@@ -518,9 +563,9 @@ class GovernanceFramework {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // AUDIT LOG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private logAuditEvent(action: string, permissionId?: string, details: string = ''): void {
     const config = governanceStore.get('config');
@@ -551,9 +596,9 @@ class GovernanceFramework {
     return governanceStore.get('auditLog').slice(-limit);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): GovernanceConfig {
     return governanceStore.get('config');
@@ -567,9 +612,9 @@ class GovernanceFramework {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const governanceFramework = GovernanceFramework.getInstance();
 export default governanceFramework;

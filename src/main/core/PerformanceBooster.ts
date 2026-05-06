@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX PERFORMANCE BOOSTER
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * System-level performance optimization for DEX
  * - Intelligent resource management
@@ -13,12 +19,13 @@
  * Target: 2GB RAM systems, low CPU/GPU usage
  */
 
+import log from 'electron-log';
 import { app, powerMonitor, ipcMain } from 'electron';
 import * as os from 'os';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface SystemMetrics {
   cpuUsage: number;
@@ -39,9 +46,9 @@ interface PerformanceMode {
   animationFPS: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERFORMANCE MODES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const PERFORMANCE_MODES: Record<string, PerformanceMode> = {
   'power-saver': {
@@ -70,9 +77,9 @@ const PERFORMANCE_MODES: Record<string, PerformanceMode> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERFORMANCE BOOSTER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PerformanceBooster {
   private currentMode: PerformanceMode = PERFORMANCE_MODES['balanced'];
@@ -93,7 +100,7 @@ class PerformanceBooster {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log('[PerformanceBooster] Initializing DEX Performance Optimization...');
+    log.info('[PerformanceBooster] Initializing DEX Performance Optimization...');
 
     // Detect system capabilities and set optimal mode
     await this.detectOptimalMode();
@@ -114,7 +121,7 @@ class PerformanceBooster {
     this.applyElectronOptimizations();
 
     this.isInitialized = true;
-    console.log(`[PerformanceBooster] Initialized in ${this.currentMode.name} mode`);
+    log.info(`[PerformanceBooster] Initialized in ${this.currentMode.name} mode`);
   }
 
   /**
@@ -132,8 +139,8 @@ class PerformanceBooster {
       this.currentMode = PERFORMANCE_MODES['performance'];
     }
 
-    console.log(`[PerformanceBooster] System: ${totalMemGB.toFixed(1)}GB RAM, ${cpuCores} cores`);
-    console.log(`[PerformanceBooster] Selected mode: ${this.currentMode.name}`);
+    log.info(`[PerformanceBooster] System: ${totalMemGB.toFixed(1)}GB RAM, ${cpuCores} cores`);
+    log.info(`[PerformanceBooster] Selected mode: ${this.currentMode.name}`);
   }
 
   /**
@@ -151,38 +158,24 @@ class PerformanceBooster {
   }
 
   /**
-   * Perform garbage collection
+   * Perform garbage collection only when memory pressure is high
    */
   private performGarbageCollection(): void {
     try {
-      // V8 garbage collection (if exposed)
-      if (global.gc) {
+      // Check memory pressure first - only GC when needed
+      const freeMemory = os.freemem();
+      const totalMemory = os.totalmem();
+      const usageRatio = 1 - (freeMemory / totalMemory);
+
+      if (usageRatio >= this.lowMemoryThreshold && global.gc) {
         global.gc();
-        console.log('[PerformanceBooster] GC completed');
+        log.info('[PerformanceBooster] GC completed (memory at ' + Math.round(usageRatio * 100) + '%)');
       }
 
-      // Clear module cache for unused modules
-      this.clearUnusedModuleCache();
-
-      // Check memory pressure
+      // Check memory pressure thresholds
       this.checkMemoryPressure();
     } catch (error) {
-      console.warn('[PerformanceBooster] GC error:', error);
-    }
-  }
-
-  /**
-   * Clear unused module cache
-   */
-  private clearUnusedModuleCache(): void {
-    // Only clear temporary/cached data, not core modules
-    const keysToRemove: string[] = [];
-    for (const key of Object.keys(require.cache)) {
-      if (key.includes('node_modules') && 
-          !key.includes('electron') && 
-          !key.includes('@electron')) {
-        // Mark for potential cleanup (don't actually delete core deps)
-      }
+      log.warn('[PerformanceBooster] GC error:', error);
     }
   }
 
@@ -195,10 +188,10 @@ class PerformanceBooster {
     const usageRatio = 1 - (freeMemory / totalMemory);
 
     if (usageRatio >= this.criticalMemoryThreshold) {
-      console.warn('[PerformanceBooster] CRITICAL memory pressure - forcing cleanup');
+      log.warn('[PerformanceBooster] CRITICAL memory pressure - forcing cleanup');
       this.aggressiveCleanup();
     } else if (usageRatio >= this.lowMemoryThreshold) {
-      console.log('[PerformanceBooster] High memory pressure - optimizing');
+      log.info('[PerformanceBooster] High memory pressure - optimizing');
       this.moderateCleanup();
     }
   }
@@ -289,22 +282,22 @@ class PerformanceBooster {
    */
   private registerPowerHandlers(): void {
     powerMonitor.on('on-ac', () => {
-      console.log('[PerformanceBooster] On AC power - switching to balanced mode');
+      log.info('[PerformanceBooster] On AC power - switching to balanced mode');
       this.setMode('balanced');
     });
 
     powerMonitor.on('on-battery', () => {
-      console.log('[PerformanceBooster] On battery - switching to power-saver mode');
+      log.info('[PerformanceBooster] On battery - switching to power-saver mode');
       this.setMode('power-saver');
     });
 
     powerMonitor.on('suspend', () => {
-      console.log('[PerformanceBooster] System suspending - pausing optimizations');
+      log.info('[PerformanceBooster] System suspending - pausing optimizations');
       this.pause();
     });
 
     powerMonitor.on('resume', () => {
-      console.log('[PerformanceBooster] System resumed - resuming optimizations');
+      log.info('[PerformanceBooster] System resumed - resuming optimizations');
       this.resume();
     });
   }
@@ -348,14 +341,14 @@ class PerformanceBooster {
   setMode(modeName: string): void {
     const mode = PERFORMANCE_MODES[modeName];
     if (!mode) {
-      console.warn(`[PerformanceBooster] Unknown mode: ${modeName}`);
+      log.warn(`[PerformanceBooster] Unknown mode: ${modeName}`);
       return;
     }
 
     this.currentMode = mode;
     this.startGCScheduler(); // Restart with new interval
     this.emitOptimizationEvent('mode-changed');
-    console.log(`[PerformanceBooster] Mode changed to: ${modeName}`);
+    log.info(`[PerformanceBooster] Mode changed to: ${modeName}`);
   }
 
   /**
@@ -393,15 +386,15 @@ class PerformanceBooster {
    * Shutdown the performance booster
    */
   shutdown(): void {
-    console.log('[PerformanceBooster] Shutting down...');
+    log.info('[PerformanceBooster] Shutting down...');
     this.pause();
     this.isInitialized = false;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const performanceBooster = new PerformanceBooster();
 

@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Operations Controller
 // Phase 4A: Manual Control & Operations Layer
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Every operation is:
 // - User-triggered only (no background tasks)
 // - Explicit and visible
 // - Logged for transparency
 // - Safe and reversible where possible
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -16,6 +22,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DataStore } from '../store/DataStore';
 import { Logger } from '../utils/Logger';
+import { NativeProcesses, isNativeAvailable } from '../native/bridge';
 
 const execAsync = promisify(exec);
 
@@ -61,9 +68,9 @@ export class OperationsController {
     this.loadLogs();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Execute Operation (Main Entry Point)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   async execute(operationId: string): Promise<OperationResult> {
     this.logger.info(`[EXEC] Executing operation: ${operationId}`);
 
@@ -119,9 +126,9 @@ export class OperationsController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Undo Operation
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   async undo(logId: string): Promise<OperationResult> {
     const undoState = this.undoStates.get(logId);
     
@@ -138,14 +145,23 @@ export class OperationsController {
       let result: OperationResult;
 
       switch (undoState.operationId) {
+        case 'close-background-apps':
+          result = await this.undoCloseBackgroundApps(undoState.data);
+          break;
         case 'performance-prep':
           result = await this.undoPerformancePrep(undoState.data);
+          break;
+        case 'return-balanced':
+          result = await this.undoReturnToBalanced(undoState.data);
           break;
         case 'reduce-visual-load':
           result = await this.undoReduceVisualLoad(undoState.data);
           break;
         case 'minimize-distractions':
           result = await this.undoMinimizeDistractions(undoState.data);
+          break;
+        case 'reset-dex-state':
+          result = await this.undoResetDexState(undoState.data);
           break;
         default:
           result = { success: false, message: '[WARNING] Undo not implemented for this operation' };
@@ -164,9 +180,9 @@ export class OperationsController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Get Operation Logs
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   getLogs(limit: number = 20): OperationLog[] {
     // Clean up expired undo states
     const now = Date.now();
@@ -181,9 +197,9 @@ export class OperationsController {
     return this.operationLogs.slice(0, limit);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // CLEANUP OPERATIONS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async cleanMemory(): Promise<OperationResult> {
     const beforeFree = os.freemem();
@@ -194,7 +210,7 @@ export class OperationsController {
         // and clear the standby list (requires admin for full effect)
         try {
           // Clear working sets - this is safe and doesn't require admin
-          await execAsync('powershell -Command "[System.GC]::Collect()"');
+          await execAsync('powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "[System.GC]::Collect()"');
         } catch {
           // Ignore if PowerShell command fails
         }
@@ -223,9 +239,9 @@ export class OperationsController {
       return {
         success: true,
         message: freedMB > 0 
-          ? ` Freed approximately ${freedMB} MB of memory`
+          ? `Freed approximately ${freedMB} MB of memory`
           : '[OK] Memory cleanup completed. System may release more memory over time.',
-        details: ` Before: ${this.formatBytes(beforeFree)} free → After: ${this.formatBytes(afterFree)} free`,
+        details: `Before: ${this.formatBytes(beforeFree)} free After: ${this.formatBytes(afterFree)} free`,
       };
     } catch (error: any) {
       return {
@@ -283,9 +299,9 @@ export class OperationsController {
       return {
         success: true,
         message: filesDeleted > 0
-          ? ` Deleted ${filesDeleted} temporary files, freed ${this.formatBytes(bytesFreed)}`
+          ? `Deleted ${filesDeleted} temporary files, freed ${this.formatBytes(bytesFreed)}`
           : '[OK] No temporary files needed cleanup',
-        details: ` Scanned ${tempDirs.length} temp directories`,
+        details: `Scanned ${tempDirs.length} temp directories`,
       };
     } catch (error: any) {
       return {
@@ -309,22 +325,24 @@ export class OperationsController {
 
     try {
       if (this.platform === 'win32') {
-        const { stdout } = await execAsync('tasklist /FO CSV');
-        const lines = stdout.split('\n').slice(1);
-        
-        for (const line of lines) {
-          const match = line.match(/"([^"]+)"/);
-          if (!match) continue;
-          
-          const processName = match[1];
-          
-          if (safeToClose.some(safe => processName.toLowerCase() === safe.toLowerCase())) {
-            try {
-              await execAsync(`taskkill /IM "${processName}" /F`);
+        // Use native module (AV-safe) when available
+        if (isNativeAvailable()) {
+          for (const appName of safeToClose) {
+            const result = NativeProcesses.closeByName(`${appName}.exe`, true);
+            if (result.success && !result.message.includes('No process found')) {
               closedCount++;
-              closedApps.push(processName);
+              closedApps.push(appName);
+            }
+          }
+        } else {
+          // Fallback to PowerShell (safer than taskkill for AV)
+          for (const appName of safeToClose) {
+            try {
+              await execAsync(`powershell -NoProfile -NonInteractive -Command "Stop-Process -Name '${appName}' -Force -ErrorAction SilentlyContinue"`);
+              closedCount++;
+              closedApps.push(appName);
             } catch {
-              // Process may have exited or permission denied
+              // Process may not be running
             }
           }
         }
@@ -345,9 +363,11 @@ export class OperationsController {
       return {
         success: true,
         message: closedCount > 0
-          ? ` Closed ${closedCount} background apps`
+          ? `Closed ${closedCount} background apps`
           : '[OK] No background apps to close',
-        details: closedApps.length > 0 ? ` Closed: ${closedApps.join(', ')}` : undefined,
+        details: closedApps.length > 0 ? `Closed: ${closedApps.join(', ')}` : undefined,
+        canUndo: closedApps.length > 0,
+        undoData: closedApps.length > 0 ? { closedApps } : undefined,
       };
     } catch (error: any) {
       return {
@@ -358,9 +378,42 @@ export class OperationsController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  private async undoCloseBackgroundApps(previousState: any): Promise<OperationResult> {
+    const apps: string[] = previousState.closedApps || [];
+    let relaunched = 0;
+
+    try {
+      for (const app of apps) {
+        try {
+          if (this.platform === 'win32') {
+            await execAsync(`start "" "${app}"`);
+          } else if (this.platform === 'darwin') {
+            await execAsync(`open -a "${app}"`);
+          }
+          relaunched++;
+        } catch {
+          // App may have been uninstalled or moved
+        }
+      }
+
+      return {
+        success: true,
+        message: relaunched > 0
+          ? `Relaunched ${relaunched} apps`
+          : '[WARNING] Could not relaunch any apps',
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: '[ERROR] Failed to relaunch apps',
+        details: error.message,
+      };
+    }
+  }
+
+  // ===========================================================================
   // PERFORMANCE OPERATIONS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async performancePrep(): Promise<OperationResult> {
     const previousState: any = {};
@@ -380,7 +433,8 @@ export class OperationsController {
 
         // Set process priority to high for current process
         try {
-          await execAsync(`wmic process where name="electron.exe" CALL setpriority "high priority"`);
+          // Use PowerShell instead of wmic for AV safety
+          await execAsync('powershell -NoProfile -NonInteractive -Command "Get-Process -Name electron | ForEach-Object { $_.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High }"');
         } catch {
           // Ignore
         }
@@ -397,8 +451,8 @@ export class OperationsController {
       // Store undo state
       return {
         success: true,
-        message: ' System prepared for high performance tasks',
-        details: ' CPU priority elevated, power plan optimized',
+        message: 'System prepared for high performance tasks',
+        details: 'CPU priority elevated, power plan optimized',
         canUndo: true,
         undoData: previousState,
       };
@@ -419,7 +473,7 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' Performance settings restored to previous state',
+        message: 'Performance settings restored to previous state',
       };
     } catch (error: any) {
       return {
@@ -431,21 +485,52 @@ export class OperationsController {
   }
 
   private async returnToBalanced(): Promise<OperationResult> {
+    const previousState: any = {};
+
     try {
       if (this.platform === 'win32') {
+        // Store current power plan before switching
+        try {
+          const { stdout: currentPlan } = await execAsync('powercfg /getactivescheme');
+          previousState.powerPlan = currentPlan.match(/GUID: ([a-f0-9-]+)/i)?.[1];
+        } catch {
+          // Ignore
+        }
+
         // Balanced power plan GUID
         await execAsync('powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e');
       }
 
       return {
         success: true,
-        message: ' Power profile set to Balanced',
-        details: ' System is now running in balanced mode',
+        message: 'Power profile set to Balanced',
+        details: 'System is now running in balanced mode',
+        canUndo: !!previousState.powerPlan,
+        undoData: previousState.powerPlan ? previousState : undefined,
       };
     } catch (error: any) {
       return {
         success: false,
         message: '[ERROR] Failed to set balanced profile',
+        details: error.message,
+      };
+    }
+  }
+
+  private async undoReturnToBalanced(previousState: any): Promise<OperationResult> {
+    try {
+      if (this.platform === 'win32' && previousState.powerPlan) {
+        await execAsync(`powercfg /setactive ${previousState.powerPlan}`);
+      }
+
+      return {
+        success: true,
+        message: 'Power plan restored to previous setting',
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: '[ERROR] Failed to restore power plan',
         details: error.message,
       };
     }
@@ -483,8 +568,8 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' Visual effects reduced for better performance',
-        details: ' Animations and transparency minimized. May require app restart to take full effect.',
+        message: 'Visual effects reduced for better performance',
+        details: 'Animations and transparency minimized. May require app restart to take full effect.',
         canUndo: true,
         undoData: previousState,
       };
@@ -507,7 +592,7 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' Visual effects restored',
+        message: 'Visual effects restored',
       };
     } catch (error: any) {
       return {
@@ -518,9 +603,9 @@ export class OperationsController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // WORKSPACE OPERATIONS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async freeWorkspace(): Promise<OperationResult> {
     // Apps to keep open (protected list)
@@ -534,15 +619,22 @@ export class OperationsController {
 
     try {
       if (this.platform === 'win32') {
-        const { stdout } = await execAsync('tasklist /FO CSV /FI "STATUS eq Running"');
-        const lines = stdout.split('\n').slice(1);
-        
         const appsToConsider = ['notepad.exe', 'mspaint.exe', 'wordpad.exe', 'calc.exe'];
         
-        for (const app of appsToConsider) {
-          if (lines.some(line => line.toLowerCase().includes(app.toLowerCase()))) {
+        // Use native module (AV-safe) when available
+        if (isNativeAvailable()) {
+          for (const app of appsToConsider) {
+            const result = NativeProcesses.closeByName(app, false);
+            if (result.success && !result.message.includes('No process found')) {
+              closedCount++;
+            }
+          }
+        } else {
+          // Fallback to PowerShell
+          for (const app of appsToConsider) {
+            const appName = app.replace('.exe', '');
             try {
-              await execAsync(`taskkill /IM "${app}"`);
+              await execAsync(`powershell -NoProfile -NonInteractive -Command "Stop-Process -Name '${appName}' -ErrorAction SilentlyContinue"`);
               closedCount++;
             } catch {
               // Ignore
@@ -561,9 +653,9 @@ export class OperationsController {
       return {
         success: true,
         message: closedCount > 0 
-          ? ` Freed workspace by closing ${closedCount} non-essential apps`
+          ? `Freed workspace by closing ${closedCount} non-essential apps`
           : '[OK] Workspace is already clean',
-        details: ' Protected apps (browsers, editors, terminals) were preserved',
+        details: 'Protected apps (browsers, editors, terminals) were preserved',
       };
     } catch (error: any) {
       return {
@@ -581,7 +673,7 @@ export class OperationsController {
       if (this.platform === 'win32') {
         // Minimize all windows except the active one
         try {
-          await execAsync('powershell -Command "(New-Object -ComObject Shell.Application).MinimizeAll()"');
+          await execAsync('powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "(New-Object -ComObject Shell.Application).MinimizeAll()"');
           previousState.minimizedAll = true;
         } catch {
           // Ignore
@@ -598,8 +690,8 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' Distractions minimized',
-        details: ' Other windows have been minimized. Focus on your current task!',
+        message: 'Distractions minimized',
+        details: 'Other windows have been minimized. Focus on your current task!',
         canUndo: true,
         undoData: previousState,
       };
@@ -616,7 +708,7 @@ export class OperationsController {
     try {
       if (this.platform === 'win32' && previousState.minimizedAll) {
         // Restore windows - note: this won't perfectly restore the previous state
-        await execAsync('powershell -Command "(New-Object -ComObject Shell.Application).UndoMinimizeAll()"');
+        await execAsync('powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "(New-Object -ComObject Shell.Application).UndoMinimizeAll()"');
       } else if (this.platform === 'darwin' && previousState.hidOthers) {
         // Show all apps
         await execAsync(`osascript -e 'tell application "System Events" to set visible of every process to true'`);
@@ -624,7 +716,7 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' Windows restored',
+        message: 'Windows restored',
       };
     } catch (error: any) {
       return {
@@ -635,12 +727,20 @@ export class OperationsController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // SYSTEM OPERATIONS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async resetDexState(): Promise<OperationResult> {
+    const previousState: any = {};
+
     try {
+      // Snapshot current state for undo
+      previousState.activeMode = await this.dataStore.get('activeMode');
+      previousState.tempBoostActive = await this.dataStore.get('tempBoostActive');
+      previousState.tempBoostEndTime = await this.dataStore.get('tempBoostEndTime');
+      previousState.logCount = this.operationLogs.length;
+
       // Clear any active modes
       await this.dataStore.set('activeMode', null);
       
@@ -656,13 +756,40 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' Dex state has been reset to defaults',
+        message: 'Dex state has been reset to defaults',
         details: '[OK] All temporary settings cleared, modes deactivated',
+        canUndo: true,
+        undoData: previousState,
       };
     } catch (error: any) {
       return {
         success: false,
         message: '[ERROR] Failed to reset Dex state',
+        details: error.message,
+      };
+    }
+  }
+
+  private async undoResetDexState(previousState: any): Promise<OperationResult> {
+    try {
+      if (previousState.activeMode !== undefined) {
+        await this.dataStore.set('activeMode', previousState.activeMode);
+      }
+      if (previousState.tempBoostActive !== undefined) {
+        await this.dataStore.set('tempBoostActive', previousState.tempBoostActive);
+      }
+      if (previousState.tempBoostEndTime !== undefined) {
+        await this.dataStore.set('tempBoostEndTime', previousState.tempBoostEndTime);
+      }
+
+      return {
+        success: true,
+        message: 'Dex state restored to previous settings',
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: '[ERROR] Failed to restore Dex state',
         details: error.message,
       };
     }
@@ -689,34 +816,34 @@ export class OperationsController {
 
       return {
         success: true,
-        message: ' DNS cache flushed successfully',
+        message: 'DNS cache flushed successfully',
         details: '[OK] Network name resolution cache has been cleared',
       };
     } catch (error: any) {
       return {
         success: true, // DNS flush is often partially successful even with errors
-        message: ' DNS cache flush attempted',
+        message: 'DNS cache flush attempted',
         details: '[WARNING] Some operations may require administrator privileges',
       };
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // UTILITY METHODS
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private logOperation(operationId: string, result: OperationResult): void {
     const operationNames: Record<string, string> = {
-      'clean-memory': ' Clean Memory',
-      'clear-temp-files': ' Clear Temp Files',
-      'close-background-apps': ' Close Background Apps',
-      'performance-prep': ' Performance Prep',
-      'return-balanced': ' Return to Balanced',
-      'reduce-visual-load': ' Reduce Visual Load',
-      'free-workspace': ' Free Workspace',
-      'minimize-distractions': ' Minimize Distractions',
-      'reset-dex-state': ' Reset Dex State',
-      'flush-dns-cache': ' Flush DNS Cache',
+      'clean-memory': 'Clean Memory',
+      'clear-temp-files': 'Clear Temp Files',
+      'close-background-apps': 'Close Background Apps',
+      'performance-prep': 'Performance Prep',
+      'return-balanced': 'Return to Balanced',
+      'reduce-visual-load': 'Reduce Visual Load',
+      'free-workspace': 'Free Workspace',
+      'minimize-distractions': 'Minimize Distractions',
+      'reset-dex-state': 'Reset Dex State',
+      'flush-dns-cache': 'Flush DNS Cache',
     };
 
     const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -766,7 +893,7 @@ export class OperationsController {
       const saved = await this.dataStore.get('operationLogs');
       if (Array.isArray(saved)) {
         // Filter out old logs (older than 24 hours)
-        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        const cutoff = Date.now() - 24 * 66 * 60 * 1000;
         this.operationLogs = saved.filter((log: OperationLog) => log.timestamp > cutoff);
         // Mark all as non-undoable since undo states don't persist
         this.operationLogs.forEach(log => log.canUndo = false);

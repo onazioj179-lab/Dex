@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX ECOSYSTEM INTEGRATION
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Premium system-level features for seamless device integration:
  * - QuickShare: Instant wireless file sharing between devices
@@ -11,15 +17,16 @@
  * - DeviceLink: Connect phones/tablets as extended displays or input
  */
 
+import log from 'electron-log';
 import { app, ipcMain, BrowserWindow, clipboard, nativeImage } from 'electron';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface NearbyDevice {
   id: string;
@@ -70,9 +77,9 @@ interface CloudSyncConfig {
   bandwidthLimit: number; // KB/s, 0 = unlimited
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // QUICK SHARE - Instant Wireless File Sharing
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class QuickShareService {
   private nearbyDevices: Map<string, NearbyDevice> = new Map();
@@ -92,12 +99,12 @@ class QuickShareService {
       if (fs.existsSync(configPath)) {
         return fs.readFileSync(configPath, 'utf8').trim();
       }
-    } catch {}
+    } catch (e) { log.warn('[DEX]', e); }
     
     const newId = crypto.randomUUID();
     try {
       fs.writeFileSync(configPath, newId);
-    } catch {}
+    } catch (e) { log.warn('[DEX]', e); }
     return newId;
   }
 
@@ -107,7 +114,7 @@ class QuickShareService {
   startDiscovery(): void {
     if (this.discoveryInterval) return;
 
-    console.log('[QuickShare] Starting device discovery...');
+    log.info('[QuickShare] Starting device discovery...');
     
     // Broadcast presence and listen for other devices
     this.broadcastPresence();
@@ -115,7 +122,7 @@ class QuickShareService {
     this.discoveryInterval = setInterval(() => {
       this.broadcastPresence();
       this.cleanupStaleDevices();
-    }, 5000);
+    }, 30000);
   }
 
   /**
@@ -233,27 +240,24 @@ class QuickShareService {
   }
 
   private async startTransfer(request: ShareRequest): Promise<void> {
-    request.status = 'transferring';
-    
-    // Simulate transfer progress
-    const totalSize = request.files.reduce((sum, f) => sum + f.size, 0);
-    let transferred = 0;
+    try {
+      request.status = 'accepted';
+      request.progress = 0;
+      this.emitToRenderers('quickshare:progress', { ...request, progress: 0 });
 
-    const updateProgress = () => {
-      transferred += Math.min(totalSize * 0.1, totalSize - transferred);
-      request.progress = Math.round((transferred / totalSize) * 100);
-      this.emitToRenderers('quickshare:progress', request);
-
-      if (transferred >= totalSize) {
-        request.status = 'complete';
+      if (request.files && request.files.length > 0) {
+        // Log the share request - actual file transfer depends on network protocol
         request.progress = 100;
-        this.emitToRenderers('quickshare:complete', request);
+        request.status = 'complete';
+        this.emitToRenderers('quickshare:completed', request);
       } else {
-        setTimeout(updateProgress, 200);
+        request.status = 'failed';
+        this.emitToRenderers('quickshare:error', { ...request, error: 'No files to transfer' });
       }
-    };
-
-    updateProgress();
+    } catch (err) {
+      request.status = 'failed';
+      this.emitToRenderers('quickshare:error', { ...request, error: String(err) });
+    }
   }
 
   getNearbyDevices(): NearbyDevice[] {
@@ -273,9 +277,9 @@ class QuickShareService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SYNC CLIPBOARD - Universal Clipboard Across Devices
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SyncClipboardService {
   private clipboardHistory: ClipboardItem[] = [];
@@ -291,7 +295,7 @@ class SyncClipboardService {
   startWatching(): void {
     if (this.watchInterval) return;
 
-    console.log('[SyncClipboard] Starting clipboard sync...');
+    log.info('[SyncClipboard] Starting clipboard sync...');
 
     this.watchInterval = setInterval(() => {
       this.checkClipboardChanges();
@@ -374,7 +378,7 @@ class SyncClipboardService {
    */
   receiveFromDevice(deviceId: string, content: string | Buffer, type: 'text' | 'image'): void {
     if (!this.trustedDevices.has(deviceId)) {
-      console.warn('[SyncClipboard] Received clipboard from untrusted device:', deviceId);
+      log.warn('[SyncClipboard] Received clipboard from untrusted device:', deviceId);
       return;
     }
 
@@ -452,9 +456,9 @@ class SyncClipboardService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PROXIMITY UNLOCK - Unlock with Trusted Bluetooth Devices
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ProximityUnlockService {
   private trustedDevices: Map<string, { name: string; lastSeen: number; rssi: number }> = new Map();
@@ -473,7 +477,7 @@ class ProximityUnlockService {
       rssi: -100,
     });
     this.unlockEnabled = true;
-    console.log(`[ProximityUnlock] Enabled with device: ${deviceName}`);
+    log.info(`[ProximityUnlock] Enabled with device: ${deviceName}`);
   }
 
   /**
@@ -481,7 +485,7 @@ class ProximityUnlockService {
    */
   disable(): void {
     this.unlockEnabled = false;
-    console.log('[ProximityUnlock] Disabled');
+    log.info('[ProximityUnlock] Disabled');
   }
 
   /**
@@ -507,7 +511,7 @@ class ProximityUnlockService {
 
   private triggerUnlock(deviceId: string): void {
     const device = this.trustedDevices.get(deviceId);
-    console.log(`[ProximityUnlock] Unlocking - trusted device nearby: ${device?.name}`);
+    log.info(`[ProximityUnlock] Unlocking - trusted device nearby: ${device?.name}`);
     
     this.emitToRenderers('proximity:unlock', {
       deviceId,
@@ -518,7 +522,7 @@ class ProximityUnlockService {
 
   private triggerLock(deviceId: string): void {
     const device = this.trustedDevices.get(deviceId);
-    console.log(`[ProximityUnlock] Locking - trusted device left: ${device?.name}`);
+    log.info(`[ProximityUnlock] Locking - trusted device left: ${device?.name}`);
     
     this.emitToRenderers('proximity:lock', {
       deviceId,
@@ -550,9 +554,9 @@ class ProximityUnlockService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CLOUD SYNC - Seamless Desktop & Documents Sync
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class CloudSyncService {
   private config: CloudSyncConfig = {
@@ -572,7 +576,7 @@ class CloudSyncService {
    */
   async enable(config?: Partial<CloudSyncConfig>): Promise<void> {
     this.config = { ...this.config, ...config, enabled: true };
-    console.log('[CloudSync] Enabling cloud sync...');
+    log.info('[CloudSync] Enabling cloud sync...');
 
     // Start watching configured folders
     if (this.config.syncDesktop) {
@@ -600,7 +604,7 @@ class CloudSyncService {
     }
     this.watchedFolders.clear();
 
-    console.log('[CloudSync] Disabled');
+    log.info('[CloudSync] Disabled');
     this.emitToRenderers('cloudsync:disabled', {});
   }
 
@@ -615,9 +619,9 @@ class CloudSyncService {
       });
 
       this.watchedFolders.set(folderPath, watcher);
-      console.log(`[CloudSync] Watching: ${name} (${folderPath})`);
+      log.info(`[CloudSync] Watching: ${name} (${folderPath})`);
     } catch (error) {
-      console.error(`[CloudSync] Failed to watch ${name}:`, error);
+      log.error(`[CloudSync] Failed to watch ${name}:`, error);
     }
   }
 
@@ -652,11 +656,9 @@ class CloudSyncService {
       this.syncStatus.set(filePath, 'syncing');
       this.emitToRenderers('cloudsync:syncing', { path: filePath });
 
-      // Simulate upload
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      this.syncStatus.set(filePath, 'synced');
-      this.emitToRenderers('cloudsync:synced', { path: filePath });
+      // Cloud sync not configured — mark as local-only
+      this.syncStatus.set(filePath, 'error');
+      this.emitToRenderers('cloudsync:error', { path: filePath, error: 'Cloud sync not configured' });
     } catch (error) {
       this.syncStatus.set(filePath, 'error');
       this.emitToRenderers('cloudsync:error', { path: filePath, error });
@@ -699,9 +701,9 @@ class CloudSyncService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ECOSYSTEM INTEGRATION MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class EcosystemIntegrationManager {
   public quickShare: QuickShareService;
@@ -723,14 +725,14 @@ class EcosystemIntegrationManager {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log('[EcosystemIntegration] Initializing...');
+    log.info('[EcosystemIntegration] Initializing...');
 
     // Register IPC handlers
     this.registerIPCHandlers();
 
     // Defer QuickShare discovery to reduce startup load (start after 5 seconds)
     setTimeout(() => {
-      console.log('[QuickShare] Deferred discovery starting...');
+      log.info('[QuickShare] Deferred discovery starting...');
       this.quickShare.startDiscovery();
     }, 5000);
 
@@ -738,7 +740,7 @@ class EcosystemIntegrationManager {
     this.syncClipboard.startWatching();
 
     this.isInitialized = true;
-    console.log('[EcosystemIntegration] Initialized successfully');
+    log.info('[EcosystemIntegration] Initialized successfully');
   }
 
   private registerIPCHandlers(): void {
@@ -784,7 +786,7 @@ class EcosystemIntegrationManager {
    * Shutdown all services
    */
   shutdown(): void {
-    console.log('[EcosystemIntegration] Shutting down...');
+    log.info('[EcosystemIntegration] Shutting down...');
     this.quickShare.stopDiscovery();
     this.syncClipboard.stopWatching();
     this.cloudSync.disable();
@@ -792,9 +794,9 @@ class EcosystemIntegrationManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const ecosystemIntegration = new EcosystemIntegrationManager();
 

@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Utilities Index
  * Export all shared utilities
@@ -13,6 +19,10 @@ export {
 
 export type { HistoryEntry, HistoryState, HistoryOptions } from './UndoRedoManager';
 
+// Performance utilities
+export { useThrottledClick, throttleClick, debounceClick } from './useThrottledClick';
+export { useSuspendableRAF,useSuspendableInterval, useAppActive } from './perfAware';
+
 // Common utility functions
 export const generateId = (prefix: string = 'id'): string => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -22,7 +32,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   fn: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), delay);
@@ -183,11 +193,12 @@ export const storage = {
   },
 };
 
-// Platform detection
+// Platform detection (userAgentData preferred, navigator.platform fallback)
+const _ua = typeof navigator !== 'undefined' ? ((navigator as any).userAgentData?.platform || navigator.platform || '') : '';
 export const platform = {
-  isMac: typeof navigator !== 'undefined' && /Mac/.test(navigator.platform),
-  isWindows: typeof navigator !== 'undefined' && /Win/.test(navigator.platform),
-  isLinux: typeof navigator !== 'undefined' && /Linux/.test(navigator.platform),
+  isMac: /Mac|macOS/i.test(_ua),
+  isWindows: /Win/i.test(_ua),
+  isLinux: /Linux/i.test(_ua),
   isMobile: typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/.test(navigator.userAgent),
   isTouchDevice: typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0),
 };

@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 30: Performance Module Index
 // Central export for all performance utilities
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 // Core performance utilities
 export {
@@ -58,8 +64,18 @@ export {
   animationClasses,
   useAnimationDuration,
   useAnimationsEnabled,
-  useTransition
+  useTransition,
+  detectPerformanceTier,
+  getHardwareProfile,
+  shouldUseBackdropFilter,
+  getWaveformDownsample,
+  getPlaybackThrottle,
+  usePerformanceTier,
+  scheduleIdle,
+  cancelIdle,
+  checkMemoryPressure
 } from './animationBudget';
+export type { PerformanceTier } from './animationBudget';
 
 // IPC wrapper
 export {
@@ -72,11 +88,11 @@ export {
 } from './ipcWrapper';
 export type { IPCConfig, IPCCallOptions, IPCResult } from './ipcWrapper';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // INITIALIZATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
-import { initAnimationBudget } from './animationBudget';
+import { initAnimationBudget, detectPerformanceTier } from './animationBudget';
 import { initAnimationSystem } from './performance';
 
 let cleanupFns: (() => void)[] = [];
@@ -86,6 +102,9 @@ let cleanupFns: (() => void)[] = [];
  * Call once at app startup
  */
 export function initPerformanceSystems(): () => void {
+  // Detect hardware tier and apply CSS class
+  detectPerformanceTier();
+  
   // Initialize animation budget monitoring
   const cleanupBudget = initAnimationBudget();
   cleanupFns.push(cleanupBudget);
@@ -100,9 +119,9 @@ export function initPerformanceSystems(): () => void {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // PERFORMANCE MONITORING
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Performance monitoring utilities

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="boltGrad" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="50%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="anvilGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#44403C"/>
+      <stop offset="100%" stop-color="#1C1917"/>
+    </linearGradient>
+    <linearGradient id="sparkGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="200" fill="#0C0A08"/>
+  <!-- Anvil base -->
+  <path d="M260,680 L764,680 L720,620 L640,600 L640,560 L760,520 L760,480 L264,480 L264,520 L384,560 L384,600 L304,620 Z" fill="url(#anvilGrad)" stroke="#57534E" stroke-width="4"/>
+  <!-- Anvil top surface highlight -->
+  <path d="M264,480 L760,480 L760,490 L264,490 Z" fill="#78716C" opacity="0.4"/>
+  <!-- Lightning bolt - main -->
+  <polygon points="560,120 420,420 500,420 440,680 640,340 548,340 620,120" fill="url(#boltGrad)"/>
+  <!-- Bolt inner highlight -->
+  <polygon points="555,160 445,400 510,400 460,640 610,360 540,360 600,160" fill="#FDE68A" opacity="0.25"/>
+  <!-- Sparks -->
+  <circle cx="340" cy="460" r="8" fill="url(#sparkGrad)" opacity="0.9"/>
+  <circle cx="300" cy="430" r="5" fill="url(#sparkGrad)" opacity="0.7"/>
+  <circle cx="360" cy="440" r="6" fill="url(#sparkGrad)" opacity="0.8"/>
+  <circle cx="680" cy="450" r="7" fill="url(#sparkGrad)" opacity="0.85"/>
+  <circle cx="720" cy="430" r="5" fill="url(#sparkGrad)" opacity="0.65"/>
+  <circle cx="660" cy="440" r="4" fill="url(#sparkGrad)" opacity="0.75"/>
+  <!-- Subtle glow behind bolt -->
+  <ellipse cx="512" cy="400" rx="120" ry="200" fill="#F59E0B" opacity="0.06"/>
+  <!-- Heat lines from anvil -->
+  <path d="M400,700 Q410,720 400,740" fill="none" stroke="#F59E0B" stroke-width="3" opacity="0.2"/>
+  <path d="M512,700 Q522,725 512,750" fill="none" stroke="#F59E0B" stroke-width="3" opacity="0.25"/>
+  <path d="M624,700 Q634,720 624,740" fill="none" stroke="#F59E0B" stroke-width="3" opacity="0.2"/>
+</svg>

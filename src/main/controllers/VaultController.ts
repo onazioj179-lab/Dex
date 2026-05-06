@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Secure Vault Controller
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * OS-grade password manager and authenticator backend.
  * End-to-end encrypted, locally stored, zero cloud dependency.
@@ -15,15 +21,17 @@
  * - Audit for weak/reused passwords
  */
 
+import log from 'electron-log';
 import { ipcMain, BrowserWindow, clipboard, safeStorage } from 'electron';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import { IPCCrypto } from '../security/IPCCrypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types & Interfaces
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface VaultCredential {
   id: string;
@@ -98,9 +106,9 @@ interface VaultState {
   clipboardTimer: NodeJS.Timeout | null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Constants
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const VAULT_FILE = 'dex-vault.enc';
 const VAULT_VERSION = 1;
@@ -132,9 +140,9 @@ const DEFAULT_CATEGORIES = [
   { id: 'social', name: 'Social', icon: 'users' },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Vault Controller Class
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class VaultController {
   private mainWindow: BrowserWindow | null = null;
@@ -157,9 +165,9 @@ export class VaultController {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     // Vault state
@@ -168,39 +176,39 @@ export class VaultController {
     ipcMain.handle('vault:exists', () => this.vaultExists());
 
     // Vault operations
-    ipcMain.handle('vault:create', (_, masterPassword: string) => this.createVault(masterPassword));
-    ipcMain.handle('vault:unlock', (_, masterPassword: string) => this.unlockVault(masterPassword));
+    ipcMain.handle('vault:create', (_, sealed: any) => this.createVault(IPCCrypto.open(sealed)));
+    ipcMain.handle('vault:unlock', (_, sealed: any) => this.unlockVault(IPCCrypto.open(sealed)));
     ipcMain.handle('vault:lock', () => this.lockVault());
-    ipcMain.handle('vault:changeMasterPassword', (_, current: string, newPass: string) => 
-      this.changeMasterPassword(current, newPass));
+    ipcMain.handle('vault:changeMasterPassword', (_, sealedCurrent: any, sealedNew: any) => 
+      this.changeMasterPassword(IPCCrypto.open(sealedCurrent), IPCCrypto.open(sealedNew)));
 
     // Credentials
     ipcMain.handle('vault:getCredentials', () => this.getCredentials());
     ipcMain.handle('vault:getCredential', (_, id: string) => this.getCredential(id));
-    ipcMain.handle('vault:addCredential', (_, credential: Partial<VaultCredential>) => 
-      this.addCredential(credential));
-    ipcMain.handle('vault:updateCredential', (_, id: string, updates: Partial<VaultCredential>) => 
-      this.updateCredential(id, updates));
+    ipcMain.handle('vault:addCredential', (_, sealed: any) => 
+      this.addCredential(JSON.parse(IPCCrypto.open(sealed))));
+    ipcMain.handle('vault:updateCredential', (_, id: string, sealed: any) => 
+      this.updateCredential(id, JSON.parse(IPCCrypto.open(sealed))));
     ipcMain.handle('vault:deleteCredential', (_, id: string) => this.deleteCredential(id));
     ipcMain.handle('vault:searchCredentials', (_, query: string) => this.searchCredentials(query));
 
     // Authenticator
     ipcMain.handle('vault:getAuthenticators', () => this.getAuthenticators());
-    ipcMain.handle('vault:addAuthenticator', (_, entry: Partial<AuthenticatorEntry>) => 
-      this.addAuthenticator(entry));
-    ipcMain.handle('vault:updateAuthenticator', (_, id: string, updates: Partial<AuthenticatorEntry>) => 
-      this.updateAuthenticator(id, updates));
+    ipcMain.handle('vault:addAuthenticator', (_, sealed: any) => 
+      this.addAuthenticator(JSON.parse(IPCCrypto.open(sealed))));
+    ipcMain.handle('vault:updateAuthenticator', (_, id: string, sealed: any) => 
+      this.updateAuthenticator(id, JSON.parse(IPCCrypto.open(sealed))));
     ipcMain.handle('vault:deleteAuthenticator', (_, id: string) => this.deleteAuthenticator(id));
     ipcMain.handle('vault:generateTOTP', (_, id: string) => this.generateTOTP(id));
-    ipcMain.handle('vault:parseOTPUri', (_, uri: string) => this.parseOTPUri(uri));
+    ipcMain.handle('vault:parseOTPUri', (_, sealed: any) => this.parseOTPUri(IPCCrypto.open(sealed)));
 
     // Password generator
     ipcMain.handle('vault:generatePassword', (_, options?: Partial<VaultSettings['passwordGeneratorOptions']>) => 
       this.generatePassword(options));
 
     // Clipboard
-    ipcMain.handle('vault:copyToClipboard', (_, text: string, autoClear?: boolean) => 
-      this.copyToClipboard(text, autoClear));
+    ipcMain.handle('vault:copyToClipboard', (_, sealed: any, autoClear?: boolean) => 
+      this.copyToClipboard(IPCCrypto.open(sealed), autoClear));
 
     // Audit
     ipcMain.handle('vault:auditPasswords', () => this.auditPasswords());
@@ -211,8 +219,8 @@ export class VaultController {
       this.updateSettings(updates));
 
     // Export/Import
-    ipcMain.handle('vault:export', (_, password: string) => this.exportVault(password));
-    ipcMain.handle('vault:import', (_, data: string, password: string) => this.importVault(data, password));
+    ipcMain.handle('vault:exportVault', (_, sealed: any) => this.exportVault(IPCCrypto.open(sealed)));
+    ipcMain.handle('vault:importVault', (_, data: string, sealed: any) => this.importVault(data, IPCCrypto.open(sealed)));
 
     // Categories
     ipcMain.handle('vault:getCategories', () => this.getCategories());
@@ -220,9 +228,9 @@ export class VaultController {
       this.addCategory(category));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Vault Operations
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private vaultExists(): boolean {
     return fs.existsSync(this.vaultPath);
@@ -261,7 +269,7 @@ export class VaultController {
 
       return { success: true };
     } catch (error) {
-      console.error('[Vault] Create error:', error);
+      log.error('[Vault] Create error:', error);
       return { success: false, error: String(error) };
     }
   }
@@ -304,7 +312,7 @@ export class VaultController {
 
       return { success: true };
     } catch (error) {
-      console.error('[Vault] Unlock error:', error);
+      log.error('[Vault] Unlock error:', error);
       this.masterKey = null;
       return { success: false, error: 'Failed to unlock vault' };
     }
@@ -347,14 +355,14 @@ export class VaultController {
 
       return { success: true };
     } catch (error) {
-      console.error('[Vault] Change password error:', error);
+      log.error('[Vault] Change password error:', error);
       return { success: false, error: String(error) };
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Encryption Helpers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private deriveKey(password: string, salt: Buffer): Buffer {
     return crypto.pbkdf2Sync(password, salt, KEY_DERIVATION_ITERATIONS, 32, 'sha512');
@@ -388,9 +396,9 @@ export class VaultController {
     fs.writeFileSync(this.vaultPath, encryptedData);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Credential Operations
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private getCredentials(): VaultCredential[] {
     if (!this.state.isUnlocked || !this.vaultData) return [];
@@ -519,9 +527,9 @@ export class VaultController {
       .map(c => ({ ...c, password: undefined }));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Authenticator (TOTP) Operations
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private getAuthenticators(): AuthenticatorEntry[] {
     if (!this.state.isUnlocked || !this.vaultData) return [];
@@ -712,9 +720,9 @@ export class VaultController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Password Generator & Audit
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private generatePassword(options?: Partial<VaultSettings['passwordGeneratorOptions']>): string {
     const settings = this.vaultData?.settings || DEFAULT_SETTINGS;
@@ -801,9 +809,9 @@ export class VaultController {
     return { weak, reused, old };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Clipboard Management
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private copyToClipboard(text: string, autoClear: boolean = true): void {
     clipboard.writeText(text);
@@ -830,9 +838,9 @@ export class VaultController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Settings & Categories
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private getSettings(): VaultSettings {
     return this.vaultData?.settings || DEFAULT_SETTINGS;
@@ -887,9 +895,9 @@ export class VaultController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Export/Import
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private exportVault(exportPassword: string): string | null {
     if (!this.state.isUnlocked || !this.vaultData) return null;
@@ -964,9 +972,9 @@ export class VaultController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Auto-Lock & Activity
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private updateActivity(): void {
     this.state.lastActivity = Date.now();
@@ -991,9 +999,9 @@ export class VaultController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // State Management
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private getPublicState(): {
     isUnlocked: boolean;

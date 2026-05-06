@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * IMOSION SECURITY - Encryption, Integrity & DRM
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Handles:
  * - Project file encryption (AES-256-GCM)
@@ -10,15 +16,16 @@
  * - Secure storage for credentials
  */
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES & INTERFACES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface EncryptionOptions {
   algorithm: 'aes-256-gcm' | 'aes-256-cbc';
@@ -60,9 +67,9 @@ export interface SecureStorageEntry {
   updatedAt: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // KEY DERIVATION FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class KeyDerivation {
   static async deriveKey(
@@ -74,7 +81,7 @@ class KeyDerivation {
     switch (method) {
       case 'pbkdf2':
         return new Promise((resolve, reject) => {
-          crypto.pbkdf2(password, salt, 100000, keyLength, 'sha256', (err, key) => {
+          crypto.pbkdf2(password, salt, 310000, keyLength, 'sha256', (err, key) => {
             if (err) reject(err);
             else resolve(key);
           });
@@ -98,9 +105,9 @@ class KeyDerivation {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ENCRYPTION ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class EncryptionEngine {
   private defaultOptions: EncryptionOptions = {
@@ -177,9 +184,9 @@ class EncryptionEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // INTEGRITY CHECKER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class IntegrityChecker {
   computeHash(data: Buffer | string, algorithm: string = 'sha256'): string {
@@ -242,20 +249,15 @@ class IntegrityChecker {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LICENSE MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class LicenseManager {
-  private publicKey: string;
   private currentLicense: License | null = null;
   
   constructor() {
-    // Public key for license verification (in real implementation, this would be embedded)
-    this.publicKey = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3QWJB5D5K2D3k0Y9J7
-...placeholder for actual public key...
------END PUBLIC KEY-----`;
+    // License verification uses HMAC-SHA256 signature validation
   }
   
   getMachineId(): string {
@@ -351,9 +353,9 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3QWJB5D5K2D3k0Y9J7
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURE STORAGE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecureStorage {
   private storagePath: string;
@@ -445,9 +447,9 @@ class SecureStorage {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MAIN SECURITY CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class ImosionSecurity extends EventEmitter {
   private encryptionEngine: EncryptionEngine;
@@ -463,12 +465,12 @@ export class ImosionSecurity extends EventEmitter {
     this.licenseManager = new LicenseManager();
     this.secureStorage = new SecureStorage();
     
-    console.log('[ImosionSecurity] Initialized');
+    log.info('[ImosionSecurity] Initialized');
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Encryption
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async encryptProject(projectData: any, password: string): Promise<EncryptedData> {
     const json = JSON.stringify(projectData);
@@ -493,9 +495,9 @@ export class ImosionSecurity extends EventEmitter {
     await fs.promises.writeFile(outputPath, decrypted);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Integrity
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   computeProjectHash(projectData: any): string {
     return this.integrityChecker.computeHash(JSON.stringify(projectData));
@@ -521,9 +523,9 @@ export class ImosionSecurity extends EventEmitter {
     return this.integrityChecker.verifyHMAC(data, signature, secret);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // License
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async validateLicense(license: License): Promise<{ valid: boolean; reason?: string }> {
     const result = await this.licenseManager.validateLicense(license);
@@ -563,9 +565,9 @@ export class ImosionSecurity extends EventEmitter {
     return trial;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Secure Storage
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async storeCredential(key: string, value: string): Promise<void> {
     await this.secureStorage.set(key, value);
@@ -583,9 +585,9 @@ export class ImosionSecurity extends EventEmitter {
     return this.secureStorage.has(key);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Utilities
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   generateSecureToken(length: number = 32): string {
     return crypto.randomBytes(length).toString('hex');
@@ -605,22 +607,22 @@ export class ImosionSecurity extends EventEmitter {
   
   hashPassword(password: string): { hash: string; salt: string } {
     const salt = crypto.randomBytes(32).toString('hex');
-    const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha256').toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 310000, 64, 'sha256').toString('hex');
     return { hash, salt };
   }
   
   verifyPassword(password: string, hash: string, salt: string): boolean {
-    const computedHash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha256').toString('hex');
+    const computedHash = crypto.pbkdf2Sync(password, salt, 310000, 64, 'sha256').toString('hex');
     return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(computedHash));
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   dispose(): void {
     this.removeAllListeners();
-    console.log('[ImosionSecurity] Disposed');
+    log.info('[ImosionSecurity] Disposed');
   }
 }
 

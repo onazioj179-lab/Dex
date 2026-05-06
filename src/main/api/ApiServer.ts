@@ -1,17 +1,24 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX API Server - REST API & Webhooks for External Integration
 // Enables remote control, automation, and third-party integrations
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import { ipcMain, BrowserWindow, app } from 'electron';
 import * as http from 'http';
 import * as https from 'https';
 import * as crypto from 'crypto';
 import Store from 'electron-store';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface ApiConfig {
   enabled: boolean;
@@ -57,9 +64,9 @@ interface Route {
   handler: RouteHandler;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // API Server
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class DexApiServer {
   private server: http.Server | null = null;
@@ -80,7 +87,7 @@ class DexApiServer {
     return {
       enabled: this.store.get('enabled', false) as boolean,
       port: this.store.get('port', 45678) as number,
-      host: this.store.get('host', '127.0.0.1') as string, // Always bind to localhost by default — never expose to LAN
+      host: this.store.get('host', '127.0.0.1') as string, // Always bind to localhost by default -- never expose to LAN
       apiKey: this.store.get('apiKey', this.generateApiKey()) as string,
       corsOrigins: this.store.get('corsOrigins', ['http://localhost:*']) as string[],
       rateLimit: this.store.get('rateLimit', 100) as number,
@@ -424,7 +431,7 @@ class DexApiServer {
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const config = this.getConfig();
     
-    // CORS headers — restrict to configured origins
+    // CORS headers -- restrict to configured origins
     const origin = req.headers.origin || '';
     const allowedOrigins = config.corsOrigins || ['http://localhost:*'];
     const isAllowed = allowedOrigins.some(pattern => {
@@ -513,14 +520,25 @@ class DexApiServer {
 
   // Parse request body
   private parseBody(req: http.IncomingMessage): Promise<unknown> {
-    return new Promise((resolve) => {
+    const MAX_BODY_SIZE = 1_048_576; // 1MB
+    return new Promise((resolve, reject) => {
       let data = '';
-      req.on('data', chunk => { data += chunk; });
+      let size = 0;
+      req.on('data', chunk => {
+        size += chunk.length;
+        if (size > MAX_BODY_SIZE) {
+          req.destroy();
+          reject(new Error('Request body too large'));
+          return;
+        }
+        data += chunk;
+      });
+      req.on('error', (err) => reject(err));
       req.on('end', () => {
         try {
           resolve(data ? JSON.parse(data) : {});
         } catch (error) {
-          console.warn('[ApiServer] Failed to parse request body:', error);
+          log.warn('[ApiServer] Failed to parse request body:', error);
           resolve({});
         }
       });
@@ -562,6 +580,10 @@ class DexApiServer {
           },
         });
 
+        request.on('error', (err) => {
+          log.warn(`[ApiServer] Webhook request error for ${sub.url}:`, err);
+          sub.failureCount++;
+        });
         request.write(JSON.stringify(webhookPayload));
         request.end();
 
@@ -569,10 +591,10 @@ class DexApiServer {
         sub.lastTriggered = Date.now();
         sub.failureCount = 0;
       } catch (error) {
-        console.warn(`[ApiServer] Webhook delivery failed for ${sub.url}:`, error);
+        log.warn(`[ApiServer] Webhook delivery failed for ${sub.url}:`, error);
         sub.failureCount++;
         if (sub.failureCount >= 5) {
-          console.warn(`[ApiServer] Disabling webhook ${sub.url} after 5 failures`);
+          log.warn(`[ApiServer] Disabling webhook ${sub.url} after 5 failures`);
           sub.enabled = false;
         }
       }
@@ -589,14 +611,15 @@ class DexApiServer {
     this.mainWindow = mainWindow;
     
     this.server = http.createServer((req, res) => {
-      this.handleRequest(req, res).catch(() => {
+      this.handleRequest(req, res).catch((err) => {
+        log.error('[ApiServer] Request failed:', err);
         res.writeHead(500);
         res.end('Internal Server Error');
       });
     });
 
     this.server.listen(config.port, config.host, () => {
-      console.log(`Dex API server running at http://${config.host}:${config.port}`);
+      if (!app.isPackaged) log.info(`Dex API server running at http://${config.host}:${config.port}`);
     });
   }
 
@@ -631,9 +654,9 @@ class DexApiServer {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Exports
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const apiServer = new DexApiServer();
 

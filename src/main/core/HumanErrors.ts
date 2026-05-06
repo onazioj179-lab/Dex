@@ -1,12 +1,18 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Human Error Messages
 // Phase 17: Final Lockdown & Long-Term Trust Foundation
 // Clear, calm, actionable error messages for users
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface HumanError {
   title: string;
@@ -19,14 +25,14 @@ export interface HumanError {
 
 type ErrorCode = string;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // ERROR MESSAGE CATALOG - Human-readable, non-technical, calm
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // System Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   SYSTEM_MEMORY_PRESSURE: {
     title: 'Running low on memory',
     message: 'Your computer is running low on available memory. Dex will continue working, but some features may be slower.',
@@ -47,15 +53,15 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
   SYSTEM_PERMISSION_DENIED: {
     title: 'Permission needed',
     message: 'Dex needs permission to perform this action. You can grant it in Settings.',
-    action: 'Go to Settings → Security to manage permissions.',
+    action: 'Go to Settings Security to manage permissions.',
     actionLabel: 'Open Settings',
     recoverable: true,
     severity: 'warning',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Data Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   DATA_CORRUPTION: {
     title: 'Data needs repair',
     message: 'Some of your data couldn\'t be read properly. Dex will try to recover it automatically.',
@@ -89,9 +95,9 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
     severity: 'info',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Operation Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   OPERATION_TIMEOUT: {
     title: 'Taking longer than expected',
     message: 'This operation is taking a while. It will continue in the background.',
@@ -115,13 +121,13 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
     severity: 'warning',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Encryption Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   ENCRYPTION_INIT_FAILED: {
     title: 'Couldn\'t set up encryption',
     message: 'There was a problem setting up data protection. Your data is still safe, just not encrypted yet.',
-    action: 'Try again from Settings → Security.',
+    action: 'Try again from Settings Security.',
     actionLabel: 'Open Security',
     recoverable: true,
     severity: 'warning',
@@ -144,9 +150,9 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
     severity: 'error',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Action Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   ACTION_APP_NOT_FOUND: {
     title: 'Application not found',
     message: 'Dex couldn\'t find the application. It may have been moved or uninstalled.',
@@ -159,15 +165,15 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
   ACTION_PERMISSION_DENIED: {
     title: 'Permission needed for this action',
     message: 'This action requires a permission that\'s currently disabled.',
-    action: 'Enable the required permission in Settings → Security.',
+    action: 'Enable the required permission in Settings Security.',
     actionLabel: 'View Permissions',
     recoverable: true,
     severity: 'info',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Python Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   PYTHON_EXECUTION_FAILED: {
     title: 'Script couldn\'t run',
     message: 'There was a problem running the automation script.',
@@ -193,9 +199,9 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
     severity: 'info',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Network Errors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   NETWORK_OFFLINE: {
     title: 'You\'re offline',
     message: 'Some features need an internet connection. They\'ll work again when you\'re back online.',
@@ -211,9 +217,9 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
     severity: 'warning',
   },
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Unknown
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   UNKNOWN: {
     title: 'Something unexpected happened',
     message: 'Dex ran into an issue, but your data should be safe.',
@@ -223,9 +229,9 @@ const ERROR_MESSAGES: Record<ErrorCode, HumanError> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HUMAN ERROR HELPER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class HumanErrorsClass {
   /**

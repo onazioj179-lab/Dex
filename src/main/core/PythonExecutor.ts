@@ -1,16 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Python Executor (Hardened)
 // Phase 15: Deep Internal Micro-Optimization
 // Short-lived, scoped, memory-limited Python execution
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface PythonExecutionOptions {
   script: string;
@@ -39,9 +45,9 @@ interface ActiveProcess {
   timeout: NodeJS.Timeout;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PYTHON EXECUTOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PythonExecutorClass {
   private activeProcesses: Map<string, ActiveProcess> = new Map();
@@ -282,9 +288,9 @@ class PythonExecutorClass {
 // Singleton export
 export const pythonExecutor = new PythonExecutorClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PREDEFINED PYTHON OPERATIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const pythonOps = {
   // Get power status

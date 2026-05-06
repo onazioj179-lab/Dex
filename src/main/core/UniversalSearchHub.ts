@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Universal Search Hub
 // One search box finds everything: files, apps, notes, media, actions
 // Instant results, permission-based, no fake indexing
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow, app, shell } from 'electron';
@@ -10,9 +16,9 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type SearchCategory = 
   | 'file'
@@ -58,9 +64,9 @@ export interface SearchConfig {
   recentLimit: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DEFAULT CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_CONFIG: SearchConfig = {
   maxResults: 50,
@@ -70,9 +76,9 @@ const DEFAULT_CONFIG: SearchConfig = {
   recentLimit: 10
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BUILT-IN COMMANDS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const COMMANDS: Array<{ id: string; name: string; keywords: string[]; action: SearchAction }> = [
   { id: 'cmd-new-note', name: 'New Note', keywords: ['create', 'add', 'note'], action: { type: 'execute', target: 'note:create' } },
@@ -89,9 +95,9 @@ const COMMANDS: Array<{ id: string; name: string; keywords: string[]; action: Se
   { id: 'cmd-fullscreen', name: 'Toggle Fullscreen', keywords: ['maximize'], action: { type: 'execute', target: 'window:fullscreen' } },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // UNIVERSAL SEARCH HUB
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class UniversalSearchHubClass extends EventEmitter {
   private providers: Map<string, SearchProvider> = new Map();
@@ -109,9 +115,9 @@ class UniversalSearchHubClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Main search handler
@@ -159,9 +165,9 @@ class UniversalSearchHubClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUILT-IN PROVIDERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerBuiltInProviders(): void {
     // Commands provider (instant, no async needed)
@@ -187,9 +193,9 @@ class UniversalSearchHubClass extends EventEmitter {
     log.info('[UniversalSearch] Built-in providers registered');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PROVIDER MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   registerProvider(provider: SearchProvider): void {
     this.providers.set(provider.name, provider);
@@ -200,9 +206,9 @@ class UniversalSearchHubClass extends EventEmitter {
     return this.providers.delete(name);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MAIN SEARCH
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async search(query: string, options?: Partial<SearchConfig>): Promise<SearchResult[]> {
     const searchId = ++this.searchCounter;
@@ -265,9 +271,9 @@ class UniversalSearchHubClass extends EventEmitter {
     return finalResults;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUILT-IN SEARCHES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private searchCommands(query: string, limit: number): SearchResult[] {
     const results: SearchResult[] = [];
@@ -305,9 +311,9 @@ class UniversalSearchHubClass extends EventEmitter {
       .map((r, i) => ({ ...r, score: 70 - i }));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUICK ACCESS (Empty Query)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getQuickAccess(): SearchResult[] {
     const results: SearchResult[] = [];
@@ -316,7 +322,7 @@ class UniversalSearchHubClass extends EventEmitter {
     results.push(...this.recentResults.slice(0, 5).map((r, i) => ({
       ...r,
       score: 100 - i,
-      subtitle: `Recent • ${r.subtitle || ''}`
+      subtitle: `Recent ${r.subtitle || ''}`
     })));
 
     // Quick commands
@@ -336,9 +342,9 @@ class UniversalSearchHubClass extends EventEmitter {
     return results;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTION EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async executeAction(result: SearchResult): Promise<{ success: boolean; error?: string }> {
     try {
@@ -427,9 +433,9 @@ class UniversalSearchHubClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private trackSearch(query: string): void {
     const trimmed = query.trim();
@@ -470,9 +476,9 @@ class UniversalSearchHubClass extends EventEmitter {
     return [...this.recentSearches];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCORING UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   static calculateScore(query: string, text: string, boost: number = 0): number {
     const q = query.toLowerCase();
@@ -518,9 +524,9 @@ class UniversalSearchHubClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const UniversalSearchHub = new UniversalSearchHubClass();
 export default UniversalSearchHub;

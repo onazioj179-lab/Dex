@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX E2E - Application Launch Tests
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { test, expect } from '@playwright/test';
@@ -36,9 +42,9 @@ test.describe('DEX Application Launch', () => {
     expect(name).toMatch(/dex/i);
   });
 
-  test('should have version 2.0.0', async () => {
+  test('should have version 3.6.0', async () => {
     const version = await getAppVersion(context);
-    expect(version).toBe('2.0.0');
+    expect(version).toBe('3.6.0');
   });
 
   test('should show main window', async () => {

@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Voice Scope Manager
 // Phase 46: Permission-based voice command scopes
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, BrowserWindow } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type VoiceScope = 
   | 'dex-only'
@@ -45,9 +52,9 @@ export interface VoiceScopeStatus {
   lastUsed: number | null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SCOPE DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const VOICE_SCOPES: Record<VoiceScope, ScopeDefinition> = {
   'dex-only': {
@@ -100,9 +107,9 @@ export const VOICE_SCOPES: Record<VoiceScope, ScopeDefinition> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const DEFAULT_SCOPE_CONFIGS: Record<VoiceScope, VoiceScopeConfig> = {
   'dex-only': {
@@ -161,9 +168,9 @@ const scopeStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VOICE SCOPE MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VoiceScopeManager {
   private static instance: VoiceScopeManager;
@@ -178,9 +185,9 @@ class VoiceScopeManager {
     return VoiceScopeManager.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -188,7 +195,7 @@ class VoiceScopeManager {
     this.setupIPC();
 
     this.initialized = true;
-    console.log('[VoiceScopeManager] Initialized');
+    log.info('[VoiceScopeManager] Initialized');
   }
 
   private setupIPC(): void {
@@ -215,9 +222,9 @@ class VoiceScopeManager {
     ipcMain.handle('voiceScope:reset', () => this.resetAllScopes());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCOPE DEFINITIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getScopeDefinitions(): ScopeDefinition[] {
     return Object.values(VOICE_SCOPES);
@@ -227,9 +234,9 @@ class VoiceScopeManager {
     return VOICE_SCOPES[scope];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCOPE STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getAllScopeStatus(): VoiceScopeStatus[] {
     const scopes = scopeStore.get('scopes');
@@ -262,9 +269,9 @@ class VoiceScopeManager {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCOPE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async enableScope(scope: VoiceScope): Promise<boolean> {
     const scopes = scopeStore.get('scopes');
@@ -274,7 +281,7 @@ class VoiceScopeManager {
     scopeStore.set('scopes', scopes);
 
     this.notifyScopeChanged(scope, true);
-    console.log(`[VoiceScopeManager] Scope enabled: ${scope}`);
+    log.info(`[VoiceScopeManager] Scope enabled: ${scope}`);
     return true;
   }
 
@@ -286,7 +293,7 @@ class VoiceScopeManager {
     scopeStore.set('scopes', scopes);
 
     this.notifyScopeChanged(scope, false);
-    console.log(`[VoiceScopeManager] Scope disabled: ${scope}`);
+    log.info(`[VoiceScopeManager] Scope disabled: ${scope}`);
     return true;
   }
 
@@ -310,9 +317,9 @@ class VoiceScopeManager {
     return scopes[scope]?.confirmationLevel ?? 'always';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TARGET MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addAllowedTarget(scope: VoiceScope, target: string): Promise<boolean> {
     const scopes = scopeStore.get('scopes');
@@ -368,9 +375,9 @@ class VoiceScopeManager {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // USAGE TRACKING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordScopeUsage(scope: VoiceScope): void {
     const stats = scopeStore.get('usageStats');
@@ -379,19 +386,19 @@ class VoiceScopeManager {
     scopeStore.set('usageStats', stats);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RESET
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async resetAllScopes(): Promise<boolean> {
     scopeStore.set('scopes', DEFAULT_SCOPE_CONFIGS);
-    console.log('[VoiceScopeManager] All scopes reset to defaults');
+    log.info('[VoiceScopeManager] All scopes reset to defaults');
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private notifyScopeChanged(scope: VoiceScope, enabled: boolean): void {
     const windows = BrowserWindow.getAllWindows();
@@ -402,9 +409,9 @@ class VoiceScopeManager {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getScopeRiskLevel(scope: VoiceScope): 'low' | 'medium' | 'high' {
     return VOICE_SCOPES[scope]?.riskLevel ?? 'high';
@@ -436,9 +443,9 @@ class VoiceScopeManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const voiceScopeManager = VoiceScopeManager.getInstance();
 export default voiceScopeManager;

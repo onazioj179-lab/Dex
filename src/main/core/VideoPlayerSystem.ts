@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Video Player System
 // Apple TV-level feel video player with hardware acceleration
 // No autoplay, subtitle/caption support, minimal UI, keyboard-driven
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, globalShortcut, dialog } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type VideoPlaybackState = 'stopped' | 'playing' | 'paused' | 'loading' | 'buffering';
 export type VideoRepeatMode = 'off' | 'one' | 'all';
@@ -117,9 +123,9 @@ export interface VideoStats {
   byFolder: Record<string, number>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // VIDEO PLAYER SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class VideoPlayerSystemClass extends EventEmitter {
   private videos: Map<string, VideoFile> = new Map();
@@ -165,9 +171,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -185,9 +191,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Playback controls
@@ -362,9 +368,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLAYBACK CONTROLS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async play(videoId?: string): Promise<{ success: boolean }> {
     try {
@@ -568,9 +574,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VOLUME & SPEED
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setVolume(volume: number): { success: boolean } {
     this.config.volume = Math.max(0, Math.min(1, volume));
@@ -604,9 +610,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getState(): {
     playbackState: VideoPlaybackState;
@@ -633,9 +639,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return this.queue.videos[this.queue.currentIndex];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getQueue(): { videos: VideoFile[]; currentIndex: number } {
     return {
@@ -698,9 +704,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUBTITLES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getSubtitleTracks(): SubtitleTrack[] {
     const currentVideo = this.getCurrentVideo();
@@ -805,9 +811,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return tracks.find(t => t.isDefault) || tracks[0];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // AUDIO TRACKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getAudioTracks(): AudioTrackInfo[] {
     const currentVideo = this.getCurrentVideo();
@@ -820,9 +826,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIBRARY MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async addVideos(paths: string[]): Promise<{ added: number; failed: number }> {
     let added = 0;
@@ -940,7 +946,7 @@ class VideoPlayerSystemClass extends EventEmitter {
 
     // Delete video file
     const videoPath = path.join(this.dataPath, 'library', `${videoId}.json`);
-    await fs.unlink(videoPath).catch(() => {});
+    await fs.unlink(videoPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     this.videos.delete(videoId);
     this.emit('video:removed', videoId);
@@ -999,9 +1005,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PLAYLISTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createPlaylist(name: string, videoIds?: string[]): Promise<VideoPlaylist> {
     const id = `playlist-${++this.idCounter}-${Date.now()}`;
@@ -1046,7 +1052,7 @@ class VideoPlayerSystemClass extends EventEmitter {
     if (!this.playlists.has(playlistId)) return { success: false };
 
     const playlistPath = path.join(this.dataPath, 'playlists', `${playlistId}.json`);
-    await fs.unlink(playlistPath).catch(() => {});
+    await fs.unlink(playlistPath).catch((e: unknown) => { log.warn('[DEX]', e); });
 
     this.playlists.delete(playlistId);
     this.emit('playlist:deleted', playlistId);
@@ -1081,9 +1087,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return this.play();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DISPLAY MODES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   enterFullscreen(): { success: boolean } {
     if (this.mainWindow) {
@@ -1135,9 +1141,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCREENSHOT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async takeScreenshot(): Promise<{ success: boolean; path?: string }> {
     const currentVideo = this.getCurrentVideo();
@@ -1163,9 +1169,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): VideoStats {
     const videos = Array.from(this.videos.values());
@@ -1217,9 +1223,9 @@ class VideoPlayerSystemClass extends EventEmitter {
       .sort((a, b) => b.count - a.count);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE DIALOG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async openFileDialog(): Promise<string[]> {
     const result = await dialog.showOpenDialog({
@@ -1238,9 +1244,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return [];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async setConfig(config: Partial<VideoConfig>): Promise<{ success: boolean }> {
     this.config = { ...this.config, ...config };
@@ -1249,9 +1255,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private notifyRenderer(channel: string, data: unknown): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -1259,9 +1265,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadLibrary(): Promise<void> {
     try {
@@ -1362,9 +1368,9 @@ class VideoPlayerSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.saveCurrentPosition();
@@ -1373,9 +1379,9 @@ class VideoPlayerSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const VideoPlayerSystem = new VideoPlayerSystemClass();
 export default VideoPlayerSystem;

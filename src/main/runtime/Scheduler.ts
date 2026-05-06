@@ -1,16 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Central Task Scheduler
 // Phase 28: Backend Architecture Refinement
 // Priority-based scheduling with backpressure handling
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import log from 'electron-log';
 import { resourceManager } from './ResourceManager';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type TaskPriority = 'critical' | 'user' | 'high' | 'normal' | 'low' | 'idle';
 export type TaskState = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -55,9 +61,9 @@ export interface SchedulerStats {
   runningCount: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PRIORITY QUEUE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PriorityQueue {
   private queues: Map<TaskPriority, InternalTask[]> = new Map();
@@ -114,7 +120,7 @@ class PriorityQueue {
   }
 
   sizeByPriority(): Record<TaskPriority, number> {
-    const result: Record<TaskPriority, number> = {} as any;
+    const result = {} as Record<TaskPriority, number>;
     for (const [priority, queue] of this.queues) {
       result[priority] = queue.length;
     }
@@ -128,9 +134,9 @@ class PriorityQueue {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CENTRAL SCHEDULER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class CentralSchedulerClass extends EventEmitter {
   // Task management
@@ -176,17 +182,18 @@ class CentralSchedulerClass extends EventEmitter {
     this.setupResourceManagerListeners();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
     if (this.isRunning) return;
     
     this.isRunning = true;
+    // 5s minimum — scheduled tasks don't need sub-second precision
     this.processInterval = setInterval(() => {
       this.processQueue();
-    }, this.config.processIntervalMs);
+    }, Math.max(this.config.processIntervalMs, 5000));
     
     log.info('[Scheduler] Started');
     this.emit('started');
@@ -222,9 +229,9 @@ class CentralSchedulerClass extends EventEmitter {
     this.emit('stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCHEDULING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Schedule a task for execution
@@ -323,9 +330,9 @@ class CentralSchedulerClass extends EventEmitter {
     return cancelled;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PAUSE & RESUME
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   pause(): void {
     if (this.isPaused) return;
@@ -341,9 +348,9 @@ class CentralSchedulerClass extends EventEmitter {
     this.emit('resumed');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUEUE PROCESSING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private processQueue(): void {
     if (this.isPaused) return;
@@ -460,9 +467,9 @@ class CentralSchedulerClass extends EventEmitter {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATISTICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private recordWaitTime(time: number): void {
     this.waitTimes.push(time);
@@ -488,9 +495,9 @@ class CentralSchedulerClass extends EventEmitter {
     return this.queue.sizeByPriority();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RESOURCE MANAGER INTEGRATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupResourceManagerListeners(): void {
     resourceManager.on('pressureChanged', ({ newPressure }) => {
@@ -513,9 +520,9 @@ class CentralSchedulerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setMaxConcurrent(max: number): void {
     this.config.maxConcurrent = Math.max(1, Math.min(10, max));
@@ -528,9 +535,9 @@ class CentralSchedulerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const scheduler = new CentralSchedulerClass();
 export default scheduler;

@@ -1,0 +1,48 @@
+# ===========================================================================
+# DEX OS -- systemd Service Unit
+# ===========================================================================
+# Auto-launches DEX in kiosk mode after graphical target is reached.
+# Restarts on crash with a 3-second delay. Runs as the 'dex' user.
+# ===========================================================================
+
+[Unit]
+Description=DEX Desktop Environment
+After=graphical.target systemd-user-sessions.service dbus.service
+Wants=network-online.target
+Requires=dbus.service
+
+[Service]
+Type=simple
+User=dex
+Group=dex
+PAMName=login
+Environment=HOME=/home/dex
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DISPLAY=:0
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+
+# Launch DEX via the wrapper script
+ExecStartPre=/usr/bin/sleep 2
+ExecStart=/usr/local/bin/dex-session
+ExecStop=/usr/bin/kill -TERM $MAINPID
+
+# Restart policy -- keep DEX alive
+Restart=on-failure
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=80%
+CPUQuota=90%
+
+# Security hardening
+ProtectSystem=strict
+ReadWritePaths=/home/dex /tmp /run/user/1000
+PrivateTmp=true
+NoNewPrivileges=false
+
+[Install]
+WantedBy=graphical.target

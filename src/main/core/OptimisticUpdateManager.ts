@@ -1,16 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Optimistic Update System
 // Phase 69: Faster Feedback Loop
 // Immediate UI acknowledgment, deferred heavy work, full reversibility
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow } from 'electron';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type OperationType = 
   | 'file_create' | 'file_delete' | 'file_rename' | 'file_move' | 'file_copy'
@@ -45,9 +51,9 @@ export interface OperationResult<T = unknown> {
 export type OperationExecutor<T> = () => Promise<OperationResult<T>>;
 export type RollbackExecutor<T> = (rollbackData: T) => Promise<void>;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // OPTIMISTIC UPDATE MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class OptimisticUpdateManagerClass extends EventEmitter {
   private operations: Map<string, OptimisticOperation> = new Map();
@@ -68,9 +74,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
     this.startCleanup();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     ipcMain.handle('optimistic:submit', async (_event, type: OperationType, optimisticValue: unknown, rollbackData?: unknown) => {
@@ -99,9 +105,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // OPERATION LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Create a new optimistic operation
@@ -329,9 +335,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Get operation status
@@ -370,9 +376,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BROADCAST
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private broadcastOperation(operation: OptimisticOperation, event: string): void {
     const windows = BrowserWindow.getAllWindows();
@@ -390,9 +396,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startCleanup(): void {
     this.cleanupInterval = setInterval(() => {
@@ -434,9 +440,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): {
     total: number;
@@ -466,9 +472,9 @@ class OptimisticUpdateManagerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const OptimisticUpdateManager = new OptimisticUpdateManagerClass();
 export default OptimisticUpdateManager;

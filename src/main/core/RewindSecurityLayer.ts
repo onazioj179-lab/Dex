@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Rewind - Security Layer (Phase 4)
  *
@@ -19,9 +25,9 @@ import * as crypto from 'crypto';
 import * as log from 'electron-log';
 import { app, powerMonitor } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface AuditEntry {
   id: string;
@@ -48,9 +54,9 @@ export interface SecurityStatus {
   auditEntryCount: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURITY LAYER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class RewindSecurityLayer {
   private rewindDir: string;
@@ -77,9 +83,9 @@ class RewindSecurityLayer {
     this.loadAuditLog();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
     // Listen for OS lock/unlock events
@@ -116,9 +122,9 @@ class RewindSecurityLayer {
     log.info('[SecurityLayer] Stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // AUDIT LOG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   addAuditEntry(action: string, detail: string): void {
     const entry: AuditEntry = {
@@ -162,9 +168,9 @@ class RewindSecurityLayer {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA INTEGRITY CHECK
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   runIntegrityCheck(): IntegrityCheckResult {
     try {
@@ -200,7 +206,7 @@ class RewindSecurityLayer {
           if (storedHashes[file] && storedHashes[file] !== hash) {
             mismatchCount++;
           }
-        } catch (_) {}
+        } catch (e) { log.warn('[SecurityLayer] Hash computation error:', e); }
       }
 
       // Save current hashes for next check
@@ -239,7 +245,7 @@ class RewindSecurityLayer {
       if (fs.existsSync(this.hashesFile)) {
         return JSON.parse(fs.readFileSync(this.hashesFile, 'utf-8'));
       }
-    } catch (_) {}
+    } catch (e) { log.warn('[SecurityLayer] Stored hashes load error:', e); }
     return {};
   }
 
@@ -255,9 +261,9 @@ class RewindSecurityLayer {
     return this.lastIntegrityCheck;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SESSION LOCK
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private lockSession(reason: string): void {
     if (this.sessionLocked) return;
@@ -279,9 +285,9 @@ class RewindSecurityLayer {
     return this.sessionLocked;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURE EXPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   signExport(content: string): string {
     const hash = crypto.createHash('sha256').update(content).digest('hex');
@@ -291,9 +297,9 @@ class RewindSecurityLayer {
     return `${content}\n\n---\nSHA-256 Verification: ${hash}\nGenerated: ${new Date().toISOString()}\n`;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatus(): SecurityStatus {
     return {
@@ -308,8 +314,8 @@ class RewindSecurityLayer {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const rewindSecurityLayer = new RewindSecurityLayer();

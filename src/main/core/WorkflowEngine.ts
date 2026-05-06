@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Workflow Execution Engine
 // Phase 20: Deterministic, previewable, reversible execution
 // Steps execute sequentially unless specified
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,9 +30,9 @@ import { documentCreator } from './DocumentCreator';
 import { browserBridge } from './BrowserBridge';
 import { performanceGuardian } from './PerformanceGuardian';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface ExecutionOptions {
   dryRun?: boolean;
@@ -60,9 +66,9 @@ export interface ExecutionContext {
   checkPause: () => Promise<void>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // WORKFLOW ENGINE CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class WorkflowEngineClass extends EventEmitter {
   private executors: Map<string, NodeExecutor> = new Map();
@@ -80,9 +86,9 @@ class WorkflowEngineClass extends EventEmitter {
     this.loadWorkflows();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // WORKFLOW MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Save a workflow
@@ -140,9 +146,9 @@ class WorkflowEngineClass extends EventEmitter {
     return duplicate;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Execute a workflow
@@ -365,9 +371,9 @@ class WorkflowEngineClass extends EventEmitter {
     return this.executionHistory.find(e => e.id === executionId) ?? null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NODE EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async executeNode(
     node: WorkflowNode,
@@ -428,9 +434,9 @@ class WorkflowEngineClass extends EventEmitter {
     log.info(`[WorkflowEngine] Registered executor: ${executor.type}`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUILT-IN EXECUTORS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerBuiltInExecutors(): void {
     // File operation executor
@@ -572,9 +578,29 @@ class WorkflowEngineClass extends EventEmitter {
             result = inputData.join(node.params.delimiter ?? '\n');
             break;
           case 'filter':
-            result = inputData.filter((item: any) => 
-              node.params.predicate ? eval(node.params.predicate)(item) : true
-            );
+            result = inputData.filter((item: any) => {
+              if (!node.params.predicate) return true;
+              // Safe property-based filter: "field:op:value" e.g. "status:eq:active", "age:gt:18"
+              const pred = String(node.params.predicate);
+              const parts = pred.split(':');
+              if (parts.length < 3) return !!item?.[pred];
+              const [field, op, ...rest] = parts;
+              const expected = rest.join(':');
+              const actual = item?.[field];
+              switch (op) {
+                case 'eq': return String(actual) === expected;
+                case 'neq': return String(actual) !== expected;
+                case 'gt': return Number(actual) > Number(expected);
+                case 'gte': return Number(actual) >= Number(expected);
+                case 'lt': return Number(actual) < Number(expected);
+                case 'lte': return Number(actual) <= Number(expected);
+                case 'contains': return String(actual).includes(expected);
+                case 'startsWith': return String(actual).startsWith(expected);
+                case 'endsWith': return String(actual).endsWith(expected);
+                case 'exists': return actual !== undefined && actual !== null;
+                default: return !!actual;
+              }
+            });
             break;
           default:
             result = inputData;
@@ -593,31 +619,30 @@ class WorkflowEngineClass extends EventEmitter {
       type: 'condition',
       execute: async (node, context) => {
         const { expression } = node.params;
-        // Simple expression evaluation (in production, use a safe evaluator)
-        const result = Boolean(expression); // Placeholder
+        // Evaluate truthy/falsy value of the expression string
+        const result = expression !== '' && expression !== '0' && expression !== 'false';
         return { condition: expression, result };
       },
     });
 
-    // App control executor (placeholder)
+    // App control executor
     this.registerExecutor({
       type: 'app-control',
       execute: async (node, context) => {
         const { action, app: appName, params } = node.params;
         context.onLog({ 
-          level: 'info', 
-          message: `App control: ${action} on ${appName}`,
+          level: 'warn', 
+          message: `App control not available: ${action} on ${appName}`,
           nodeId: node.id 
         });
-        // In a real implementation, this would interface with the OS
-        return { action, app: appName, simulated: true };
+        return { action, app: appName, error: 'App control requires OS integration module' };
       },
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async waitForResume(): Promise<void> {
     if (!this.isPaused) return;

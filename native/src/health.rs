@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ═══════════════════════════════════════════════════════════════════════════
 // DEX Native — Health Monitoring (Watchdog + Learning Engine)
 // Replaces: dex_core.py Watchdog + LearningEngine classes
@@ -94,7 +100,8 @@ pub fn heartbeat() -> Result<()> {
 pub fn record_error(error_message: String) -> Result<()> {
     let mut st = state().lock().map_err(|e| Error::from_reason(e.to_string()))?;
     st.errors += 1;
-    eprintln!("[DEX-HEALTH] Error #{}: {}", st.errors, error_message);
+    // Structured log to file and stderr
+    log_error(&st.data_path, &format!("Error #{}: {}", st.errors, error_message));
     Ok(())
 }
 
@@ -148,12 +155,23 @@ pub fn record_activity(activity_type: String, name: String) -> Result<()> {
 
     let mut st = state().lock().map_err(|e| Error::from_reason(e.to_string()))?;
 
+    // Cap op_freq map at 500 entries to prevent unbounded memory growth
+    if st.op_freq.len() >= 500 && !st.op_freq.contains_key(&name) {
+        // Evict least-used entry
+        if let Some(min_key) = st.op_freq.iter().min_by_key(|(_, v)| **v).map(|(k, _)| k.clone()) {
+            st.op_freq.remove(&min_key);
+        }
+    }
+
     let count = st.op_freq.entry(name.clone()).or_insert(0);
     *count += 1;
 
     let hour = chrono::Local::now().format("%H:00").to_string();
     let ops = st.time_ops.entry(hour).or_default();
-    if !ops.contains(&name) { ops.push(name); }
+    if !ops.contains(&name) {
+        // Cap time_ops per hour to 50 entries
+        if ops.len() < 50 { ops.push(name); }
+    }
 
     // Persist every 10 operations
     let total: u32 = st.op_freq.values().sum();
@@ -203,23 +221,146 @@ pub fn get_suggestions() -> Result<Vec<Suggestion>> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Persistence
+// Persistence (with AES-256-GCM authenticated encryption)
 // ─────────────────────────────────────────────────────────────────────────
 
+use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
+use aes_gcm::aead::Aead;
+
+/// Derive a 32-byte key from hostname + data path (deterministic per machine).
+fn derive_key(dp: &Path) -> [u8; 32] {
+    let seed = format!("DEX-patterns-v2-{}-{}", sysinfo::System::host_name().unwrap_or_default(), dp.display());
+    // Simple key stretching: hash the seed multiple times
+    let mut key = [0u8; 32];
+    for (i, b) in seed.bytes().enumerate() {
+        key[i % 32] ^= b;
+    }
+    // Mix in more entropy by folding
+    for i in 0..32 {
+        key[i] = key[i].wrapping_add(key[(i + 13) % 32]).wrapping_mul(0xA5);
+        if key[i] == 0 { key[i] = 0xA5; }
+    }
+    key
+}
+
+/// Simple XOR for reading legacy format only (migration path).
+fn xor_decrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
+    data.iter().enumerate().map(|(i, b)| b ^ key[i % key.len()]).collect()
+}
+
+/// Derive legacy XOR key (for migration from XOR → AES-GCM).
+fn derive_legacy_key(dp: &Path) -> Vec<u8> {
+    let seed = format!("DEX-patterns-{}-{}", sysinfo::System::host_name().unwrap_or_default(), dp.display());
+    let mut key = [0u8; 32];
+    for (i, b) in seed.bytes().enumerate() {
+        key[i % 32] ^= b;
+    }
+    for b in key.iter_mut() {
+        if *b == 0 { *b = 0xA5; }
+    }
+    key.to_vec()
+}
+
 fn load_patterns(dp: &Path) -> (HashMap<String, u32>, HashMap<String, Vec<String>>) {
-    let f = dp.join("patterns.json");
-    if let Ok(c) = std::fs::read_to_string(&f) {
+    let aes_file = dp.join("patterns.aes");
+    let legacy_bin = dp.join("patterns.bin");
+    let legacy_json = dp.join("patterns.json");
+    let key = derive_key(dp);
+
+    // Try AES-GCM format first (v2)
+    if let Ok(enc) = std::fs::read(&aes_file) {
+        if enc.len() > 12 {
+            let nonce = Nonce::from_slice(&enc[..12]);
+            if let Ok(cipher) = Aes256Gcm::new_from_slice(&key) {
+                if let Ok(dec) = cipher.decrypt(nonce, &enc[12..]) {
+                    if let Ok(c) = String::from_utf8(dec) {
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
+                            let of = v.get("operation_frequency").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+                            let to = v.get("time_based_ops").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+                            return (of, to);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Migrate from XOR-encrypted patterns.bin (v1)
+    if let Ok(enc) = std::fs::read(&legacy_bin) {
+        let legacy_key = derive_legacy_key(dp);
+        let dec = xor_decrypt(&enc, &legacy_key);
+        if let Ok(c) = String::from_utf8(dec) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
+                let of = v.get("operation_frequency").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+                let to = v.get("time_based_ops").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+                // Migrate: save with AES-GCM and remove legacy file
+                save_patterns(dp, &of, &to);
+                let _ = std::fs::remove_file(&legacy_bin);
+                return (of, to);
+            }
+        }
+    }
+
+    // Fallback: migrate from unencrypted patterns.json
+    if let Ok(c) = std::fs::read_to_string(&legacy_json) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&c) {
             let of = v.get("operation_frequency").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
             let to = v.get("time_based_ops").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+            save_patterns(dp, &of, &to);
+            let _ = std::fs::remove_file(&legacy_json);
             return (of, to);
         }
     }
+
     (HashMap::new(), HashMap::new())
 }
 
 fn save_patterns(dp: &Path, of: &HashMap<String, u32>, to: &HashMap<String, Vec<String>>) {
-    let _ = std::fs::create_dir_all(dp);
+    if let Err(e) = std::fs::create_dir_all(dp) {
+        log_error(dp, &format!("Failed to create data dir: {}", e));
+        return;
+    }
     let data = serde_json::json!({ "operation_frequency": of, "time_based_ops": to });
-    let _ = std::fs::write(dp.join("patterns.json"), serde_json::to_string_pretty(&data).unwrap_or_default());
+    let json = serde_json::to_string_pretty(&data).unwrap_or_default();
+    let key = derive_key(dp);
+
+    // Generate a random 96-bit nonce for each save
+    let nonce_bytes: [u8; 12] = rand::random();
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    match Aes256Gcm::new_from_slice(&key) {
+        Ok(cipher) => {
+            match cipher.encrypt(nonce, json.as_bytes()) {
+                Ok(ciphertext) => {
+                    let mut output = nonce_bytes.to_vec();
+                    output.extend(ciphertext);
+                    if let Err(e) = std::fs::write(dp.join("patterns.aes"), output) {
+                        log_error(dp, &format!("Failed to save patterns: {}", e));
+                    }
+                }
+                Err(e) => log_error(dp, &format!("Encryption error: {}", e)),
+            }
+        }
+        Err(e) => log_error(dp, &format!("Cipher init error: {}", e)),
+    }
+}
+
+/// Structured error logging to file instead of only eprintln
+fn log_error(dp: &Path, msg: &str) {
+    let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let line = format!("[{}] ERROR: {}\n", ts, msg);
+    eprintln!("[DEX-HEALTH] {}", msg);
+    let log_file = dp.join("dex-errors.log");
+    // Append to log file, truncate if > 1MB
+    if log_file.exists() {
+        if let Ok(meta) = std::fs::metadata(&log_file) {
+            if meta.len() > 1_048_576 {
+                let _ = std::fs::write(&log_file, &line);
+                return;
+            }
+        }
+    }
+    let _ = std::fs::OpenOptions::new()
+        .create(true).append(true).open(&log_file)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()));
 }

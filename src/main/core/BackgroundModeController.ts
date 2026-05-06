@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Background Mode Controller
 // Phase 42: Event-driven background behavior with near-zero impact
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { app, BrowserWindow, powerMonitor, ipcMain } from 'electron';
 import Store from 'electron-store';
+import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type BackgroundState = 'active' | 'idle' | 'sleeping' | 'deep-sleep';
 
@@ -49,9 +56,9 @@ export interface ScheduledTask {
   runOnWake: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const backgroundStore = new Store<{
   config: BackgroundConfig;
@@ -98,9 +105,9 @@ const backgroundStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BACKGROUND MODE CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class BackgroundModeController {
   private static instance: BackgroundModeController;
@@ -124,16 +131,16 @@ class BackgroundModeController {
     return BackgroundModeController.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     const config = backgroundStore.get('config');
     if (!config.enabled) {
-      console.log('[BackgroundModeController] Background mode disabled');
+      log.info('[BackgroundModeController] Background mode disabled');
       return;
     }
 
@@ -149,7 +156,7 @@ class BackgroundModeController {
     this.setState('active');
 
     this.initialized = true;
-    console.log('[BackgroundModeController] Initialized');
+    log.info('[BackgroundModeController] Initialized');
   }
 
   private setupEventListeners(): void {
@@ -195,9 +202,9 @@ class BackgroundModeController {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setState(newState: BackgroundState): void {
     if (this.currentState === newState) return;
@@ -205,7 +212,7 @@ class BackgroundModeController {
     const previousState = this.currentState;
     this.currentState = newState;
 
-    console.log(`[BackgroundModeController] State: ${previousState} → ${newState}`);
+    log.debug(`[BackgroundModeController] State: ${previousState} ${newState}`);
 
     // Update stored status
     const status = backgroundStore.get('status');
@@ -251,9 +258,9 @@ class BackgroundModeController {
     return this.currentState;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SLEEP / WAKE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startSleepTimer(): void {
     if (this.currentState === 'deep-sleep') return;
@@ -280,12 +287,12 @@ class BackgroundModeController {
   }
 
   private enterSleep(reason: string): void {
-    console.log(`[BackgroundModeController] Entering sleep: ${reason}`);
+    log.debug(`[BackgroundModeController] Entering sleep: ${reason}`);
     this.setState('sleeping');
   }
 
   private enterDeepSleep(reason: string): void {
-    console.log(`[BackgroundModeController] Entering deep sleep: ${reason}`);
+    log.debug(`[BackgroundModeController] Entering deep sleep: ${reason}`);
     this.setState('deep-sleep');
 
     // Attempt memory compaction
@@ -300,13 +307,13 @@ class BackgroundModeController {
     // Check wake limit
     if (this.currentState === 'deep-sleep') {
       if (this.wakeCountThisHour >= config.maxWakePerHour) {
-        console.log('[BackgroundModeController] Wake limit reached, staying asleep');
+        log.debug('[BackgroundModeController] Wake limit reached, staying asleep');
         return;
       }
       this.wakeCountThisHour++;
     }
 
-    console.log(`[BackgroundModeController] Waking: ${reason}`);
+    log.debug(`[BackgroundModeController] Waking: ${reason}`);
 
     // Record wake
     const history = backgroundStore.get('wakeHistory');
@@ -336,9 +343,9 @@ class BackgroundModeController {
     this.startSleepTimer();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SERVICE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   registerService(serviceId: string): void {
     this.activeServices.add(serviceId);
@@ -396,9 +403,9 @@ class BackgroundModeController {
     return this.activeServices.has(serviceId);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCHEDULED TASKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getScheduledTasks(): ScheduledTask[] {
     return backgroundStore.get('scheduledTasks');
@@ -465,9 +472,9 @@ class BackgroundModeController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): BackgroundConfig {
     return backgroundStore.get('config');
@@ -480,9 +487,9 @@ class BackgroundModeController {
     return updated;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatus(): BackgroundStatus {
     const status = backgroundStore.get('status');
@@ -506,18 +513,18 @@ class BackgroundModeController {
     return backgroundStore.get('wakeHistory').slice(-limit);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LISTENERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   onStateChange(callback: (state: BackgroundState) => void): () => void {
     this.stateChangeListeners.add(callback);
     return () => this.stateChangeListeners.delete(callback);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   isSleeping(): boolean {
     return this.currentState === 'sleeping' || this.currentState === 'deep-sleep';
@@ -537,9 +544,9 @@ class BackgroundModeController {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const backgroundModeController = BackgroundModeController.getInstance();
 export default backgroundModeController;

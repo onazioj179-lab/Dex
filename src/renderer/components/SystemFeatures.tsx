@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX System Features Integration
  * Provides system-wide features: Notifications, Shortcuts, Theme Manager
@@ -81,9 +87,9 @@ const SimpleToast: React.FC<ToastProps> = ({ notification, onClose }) => {
   
   const colors = {
     info: '#007aff',
-    success: '#34c759',
-    warning: '#ff9f0a',
-    error: '#ff3b30',
+    success: 'var(--color-success)',
+    warning: 'var(--color-warning)',
+    error: 'var(--color-error)',
   };
   
   return (
@@ -167,8 +173,6 @@ export const SystemFeatures: React.FC = memo(() => {
   // UI state
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showSessionRestore, setShowSessionRestore] = useState(false);
-  
   // App state - use correct store API
   const { launchApp } = useAppSubsystem();
   const { notifications, add: addNotification, markRead } = useSimpleNotifications();
@@ -178,26 +182,8 @@ export const SystemFeatures: React.FC = memo(() => {
     initializeTheme();
   }, []);
   
-  // Check for session restore on mount
-  useEffect(() => {
-    try {
-      const sessionData = localStorage.getItem('dex-session');
-      if (sessionData) {
-        const session = JSON.parse(sessionData);
-        const lastActivity = session.lastActivity || 0;
-        const timeSinceLastActivity = Date.now() - lastActivity;
-        
-        // Only offer restore if session is less than 24 hours old
-        // and has running apps
-        if (
-          timeSinceLastActivity < 24 * 60 * 60 * 1000 &&
-          session.runningApps?.length > 0
-        ) {
-          setShowSessionRestore(true);
-        }
-      }
-    } catch {}
-  }, []);
+  // Hot Exit: Session restore is now automatic via Zustand persist middleware
+  // in useRunningApps store. No prompt needed - apps reappear on launch.
   
   // Handlers
   const handleGlobalSearchToggle = useCallback(() => {
@@ -242,16 +228,7 @@ export const SystemFeatures: React.FC = memo(() => {
     launchApp(appId, '/');
   }, [launchApp]);
   
-  const handleSessionRestore = useCallback(() => {
-    // Session restore handled by SessionManager component
-    setShowSessionRestore(false);
-  }, []);
-  
-  const handleSessionDismiss = useCallback(() => {
-    setShowSessionRestore(false);
-    // Clear the old session
-    localStorage.removeItem('dex-session');
-  }, []);
+
   
   // Register global shortcuts
   useGlobalShortcuts(
@@ -281,14 +258,6 @@ export const SystemFeatures: React.FC = memo(() => {
           notifications={notifications}
           onClose={() => setShowNotifications(false)}
           onMarkRead={markRead}
-        />
-      )}
-      
-      {/* Session Restore Dialog */}
-      {showSessionRestore && (
-        <SessionRestoreOverlay
-          onRestore={handleSessionRestore}
-          onDismiss={handleSessionDismiss}
         />
       )}
       
@@ -339,7 +308,7 @@ export const useSessionAutoSave = () => {
           lastActivity: Date.now(),
         };
         localStorage.setItem('dex-session', JSON.stringify(session));
-      } catch {}
+      } catch (e) { console.warn('[DEX]', e); }
     };
     
     // Save every 30 seconds
@@ -371,19 +340,17 @@ export const useSessionAutoSave = () => {
 
 const launcherStyles: Record<string, React.CSSProperties> = {
   overlay: {
-    position: 'fixed', inset: 0, zIndex: 99999,
-    background: 'rgba(0,0,0,0.45)',
-    backdropFilter: 'blur(24px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+    position: 'fixed', inset: 0, zIndex: 'var(--z-max)',
+    background: 'rgba(0,0,0,0.75)',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
     paddingTop: '18vh',
   },
   container: {
     width: 520, maxWidth: '90vw',
     background: 'var(--color-bg-surface, rgba(30,30,30,0.92))',
-    border: '1px solid var(--color-border-default, rgba(255,255,255,0.12))',
+    border: '1px solid var(--color-border-default, var(--color-border))',
     borderRadius: 14,
-    boxShadow: '0 24px 80px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.06)',
+    boxShadow: '0 24px 80px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)',
     overflow: 'hidden',
   },
   input: {
@@ -391,7 +358,7 @@ const launcherStyles: Record<string, React.CSSProperties> = {
     background: 'transparent', border: 'none', outline: 'none',
     fontSize: 17, fontWeight: 300, letterSpacing: '-0.01em',
     color: 'var(--color-text-primary, #fff)',
-    borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+    borderBottom: '1px solid var(--color-border-subtle, var(--color-border-subtle))',
   },
   results: {
     maxHeight: 340, overflowY: 'auto' as const, padding: '4px 0',
@@ -399,7 +366,7 @@ const launcherStyles: Record<string, React.CSSProperties> = {
   resultItem: {
     width: '100%', display: 'flex', alignItems: 'center', gap: 12,
     padding: '10px 16px', background: 'transparent', border: 'none',
-    color: 'var(--color-text-primary, rgba(255,255,255,0.9))',
+    color: 'var(--color-text-primary, var(--color-text-primary))',
     cursor: 'pointer', fontSize: 14, textAlign: 'left' as const,
   },
   appIcon: {
@@ -457,8 +424,8 @@ const GlobalSearchOverlay: React.FC<GlobalSearchOverlayProps> = memo(({ onClose,
   }, [onClose]);
   
   return (
-    <div style={launcherStyles.overlay} onClick={onClose}>
-      <div style={launcherStyles.container} onClick={e => e.stopPropagation()}>
+    <div style={launcherStyles.overlay} onMouseDown={onClose}>
+      <div style={launcherStyles.container} onMouseDown={e => e.stopPropagation()}>
         <input
           type="text"
           value={query}
@@ -508,9 +475,9 @@ const NotificationCenterOverlay: React.FC<NotificationCenterOverlayProps> = memo
   }, [onClose]);
   
   return (
-    <div style={launcherStyles.overlay} onClick={onClose}>
-      <div style={{ ...launcherStyles.container, width: 360 }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.1))' }}>
+    <div style={launcherStyles.overlay} onMouseDown={onClose}>
+      <div style={{ ...launcherStyles.container, width: 360 }} onMouseDown={e => e.stopPropagation()}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border, var(--color-border))' }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Notifications</h3>
         </div>
         <div style={{ maxHeight: 400, overflow: 'auto' }}>
@@ -525,7 +492,7 @@ const NotificationCenterOverlay: React.FC<NotificationCenterOverlayProps> = memo
                 onClick={() => onMarkRead(n.id)}
                 style={{
                   padding: '12px 16px',
-                  borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.05))',
+                  borderBottom: '1px solid var(--color-border, var(--color-bg-hover))',
                   cursor: 'pointer',
                   opacity: n.read ? 0.5 : 1,
                 }}
@@ -543,54 +510,7 @@ const NotificationCenterOverlay: React.FC<NotificationCenterOverlayProps> = memo
 
 NotificationCenterOverlay.displayName = 'NotificationCenterOverlay';
 
-// Session Restore Overlay
-interface SessionRestoreOverlayProps {
-  onRestore: () => void;
-  onDismiss: () => void;
-}
 
-const SessionRestoreOverlay: React.FC<SessionRestoreOverlayProps> = memo(({ onRestore, onDismiss }) => {
-  return (
-    <div style={launcherStyles.overlay}>
-      <div style={{ ...launcherStyles.container, width: 400, padding: 24 }}>
-        <h3 style={{ margin: '0 0 12px 0', fontSize: 18 }}>Restore Previous Session?</h3>
-        <p style={{ margin: '0 0 20px 0', opacity: 0.7, fontSize: 14 }}>
-          Your previous session was interrupted. Would you like to restore your open apps?
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button
-            onClick={onDismiss}
-            style={{
-              padding: '8px 16px',
-              background: 'transparent',
-              border: '1px solid var(--color-border, rgba(255,255,255,0.2))',
-              borderRadius: 6,
-              color: 'inherit',
-              cursor: 'pointer',
-            }}
-          >
-            Start Fresh
-          </button>
-          <button
-            onClick={onRestore}
-            style={{
-              padding: '8px 16px',
-              background: '#007aff',
-              border: 'none',
-              borderRadius: 6,
-              color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            Restore
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-SessionRestoreOverlay.displayName = 'SessionRestoreOverlay';
 
 // Toast Notification
 interface ToastNotificationProps {
@@ -605,8 +525,8 @@ const ToastNotification: React.FC<ToastNotificationProps> = memo(({ notification
     return () => clearTimeout(timer);
   }, [onDismiss]);
   
-  const bgColor = notification.type === 'error' ? '#ff3b30' 
-    : notification.type === 'success' ? '#34c759' 
+  const bgColor = notification.type === 'error' ? 'var(--color-error)' 
+    : notification.type === 'success' ? 'var(--color-success)' 
     : notification.type === 'warning' ? '#ff9500' 
     : '#007aff';
   

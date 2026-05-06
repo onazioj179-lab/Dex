@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - Session & Navigation Hardening Layer
 // Q1 Foundation & Trust: Harden tab, session, and navigation systems
@@ -8,6 +14,7 @@ import { EventEmitter } from 'events';
 import { ipcMain, BrowserWindow, app, webContents } from 'electron';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
@@ -145,7 +152,7 @@ class SessionHardeningClass extends EventEmitter {
 
   shutdown(): void {
     // Save final snapshot before shutdown
-    this.captureSnapshot('shutdown').catch(() => {});
+    this.captureSnapshot('shutdown').catch((e: unknown) => { log.warn('[DEX]', e); });
 
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
@@ -175,10 +182,10 @@ class SessionHardeningClass extends EventEmitter {
   private async loadConfig(): Promise<void> {
     try {
       const configPath = path.join(this.dataPath, 'session-hardening-config.json');
-      if (fs.existsSync(configPath)) {
-        const data = fs.readFileSync(configPath, 'utf-8');
+      try {
+        const data = await fsPromises.readFile(configPath, 'utf-8');
         this.config = { ...DEFAULT_SESSION_CONFIG, ...JSON.parse(data) };
-      }
+      } catch { /* file doesn't exist yet, use defaults */ }
     } catch (error) {
       log.error('[SessionHardening] Failed to load config:', error);
     }
@@ -187,7 +194,7 @@ class SessionHardeningClass extends EventEmitter {
   private async saveConfig(): Promise<void> {
     try {
       const configPath = path.join(this.dataPath, 'session-hardening-config.json');
-      fs.writeFileSync(configPath, JSON.stringify(this.config, null, 2));
+      await fsPromises.writeFile(configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
       log.error('[SessionHardening] Failed to save config:', error);
     }
@@ -196,12 +203,12 @@ class SessionHardeningClass extends EventEmitter {
   private async loadSnapshots(): Promise<void> {
     try {
       const snapshotPath = path.join(this.dataPath, 'session-snapshots.json');
-      if (fs.existsSync(snapshotPath)) {
-        const data = fs.readFileSync(snapshotPath, 'utf-8').trim();
+      try {
+        const data = (await fsPromises.readFile(snapshotPath, 'utf-8')).trim();
         if (data && data.length > 2) {
           this.snapshots = JSON.parse(data);
         }
-      }
+      } catch { /* file doesn't exist yet */ }
     } catch (error) {
       log.warn('[SessionHardening] Failed to load snapshots:', error);
       this.snapshots = [];
@@ -211,7 +218,7 @@ class SessionHardeningClass extends EventEmitter {
   private async saveSnapshots(): Promise<void> {
     try {
       const snapshotPath = path.join(this.dataPath, 'session-snapshots.json');
-      fs.writeFileSync(snapshotPath, JSON.stringify(this.snapshots, null, 2));
+      await fsPromises.writeFile(snapshotPath, JSON.stringify(this.snapshots, null, 2));
     } catch (error) {
       log.error('[SessionHardening] Failed to save snapshots:', error);
     }
@@ -775,7 +782,7 @@ class SessionHardeningClass extends EventEmitter {
   private setupWindowTracking(): void {
     app.on('browser-window-created', (_, window) => {
       window.on('close', () => {
-        this.captureSnapshot('window-close').catch(() => {});
+        this.captureSnapshot('window-close').catch((e: unknown) => { log.warn('[DEX]', e); });
       });
     });
   }

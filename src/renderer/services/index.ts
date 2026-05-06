@@ -1,10 +1,16 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — Services Index
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- Services Index
+ * ===========================================================================
  * 
  * Central export for all system services.
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 // System Services
@@ -167,3 +173,46 @@ export {
   type DailyChallengeState,
   type ActiveChallenge,
 } from './dailyChallenges';
+
+// Focus Session System
+export { useFocusSessionStore } from './FocusSessionSystem';
+
+// Platform Extensions
+export {
+  usePortableModeStore,
+  useRESTAPIStore,
+  useCLIStore,
+  useMobileCompanionStore,
+} from './PlatformExtensions';
+
+// Collaboration Layer
+export {
+  useCRDTSyncStore,
+  useCoEditStore,
+  useCommentsAnnotationsStore,
+} from './CollaborationLayer';
+
+// Rewind Extensions
+export {
+  useVisualTimelineStore,
+  useWorkReportsStore,
+  useMemoryMapStore,
+  CHANGELOG_CATEGORIES,
+} from './RewindExtensions';
+
+// Intelligence Layer
+export {
+  useFocusIntelligenceStore,
+  useContextPredictionStore,
+  useSmartRecentsStore,
+} from './IntelligenceLayer';
+
+// Performance Optimization (Hardware-Aware)
+export {
+  usePerformanceOptimization,
+  safeGetContext2D,
+  safeGetWebGLContext,
+  registerContextLossHandlers,
+  createManagedRAF,
+  startInputActivityReporting,
+} from './PerformanceOptimization';

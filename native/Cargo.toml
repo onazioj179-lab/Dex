@@ -1,36 +1,41 @@
 [package]
 name = "dex-native"
-version = "1.0.0"
+version = "3.6.0"
 edition = "2021"
-description = "DEX native performance modules — system monitoring, file scanning, power management"
+description = "DEX native kernel + performance modules"
 license = "MIT"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-# NAPI-RS — Node-API bindings for Rust (ABI-stable, no rebuild needed per Node version)
-napi = { version = "2", features = ["napi9", "async", "serde-json"] }
+napi = { version = "2", features = ["napi9", "async", "serde-json", "tokio_rt"] }
 napi-derive = "2"
-
-# System monitoring — replaces Python psutil + JS systeminformation + ps-list
 sysinfo = "0.30"
-
-# Parallel directory walking — replaces sync readdirSync recursive scans
 jwalk = "0.8"
-
-# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-# Time handling
 chrono = { version = "0.4", features = ["serde"] }
-
-# Platform-specific user directories
 dirs = "5"
+notify = { version = "6", features = ["serde"] }
+once_cell = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp", "tiff", "ico"] }
+hound = "3.5"
+rayon = "1.10"
+ringbuf = "0.4"
+aes-gcm = "0.10"
+rand = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "fs", "io-util", "macros"] }
+dashmap = "6"
+lru = "0.12"
+parking_lot = "0.12"
+zstd = "0.13"
+memmap2 = "0.9"
+symphonia = { version = "0.5", features = ["mp3", "flac", "ogg", "aac", "pcm", "wav"] }
 
 [build-dependencies]
 napi-build = "2"
+cc = "1"
 
 [profile.release]
 opt-level = 3

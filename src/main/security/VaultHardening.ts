@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - Vault Security Hardening Layer
 // Q1 Foundation & Trust: Finalize vault, password manager, authenticator
@@ -364,30 +370,56 @@ class VaultHardeningClass extends EventEmitter {
    * This is a placeholder - in production, use Have I Been Pwned k-anonymity API
    */
   async checkPasswordBreach(password: string): Promise<BreachCheckResult> {
-    // Generate SHA-1 hash prefix for k-anonymity
+    // Use Have I Been Pwned k-anonymity API (sends only first 5 chars of SHA-1 hash)
     const sha1Hash = crypto.createHash('sha1').update(password).digest('hex').toUpperCase();
     const prefix = sha1Hash.substring(0, 5);
     const suffix = sha1Hash.substring(5);
 
-    // In production, this would call the HIBP API
-    // For now, check against a small list of known breached passwords
-    const commonBreached = [
-      'password', '123456', '12345678', 'qwerty', 'abc123',
-      'password1', 'password123', 'admin', 'letmein', 'welcome',
-    ];
+    try {
+      const https = await import('https');
+      const responseText = await new Promise<string>((resolve, reject) => {
+        const req = https.get(`https://api.pwnedpasswords.com/range/${prefix}`, {
+          headers: { 'User-Agent': 'DEX-PasswordCheck' }
+        }, (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+          res.on('end', () => resolve(data));
+        });
+        req.on('error', reject);
+        req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
+      });
 
-    if (commonBreached.includes(password.toLowerCase())) {
-      return {
-        breached: true,
-        breachCount: 1000000,  // Placeholder
-        sources: ['Common password list'],
-      };
+      // Search for our suffix in the response
+      const lines = responseText.split('\n');
+      for (const line of lines) {
+        const [hashSuffix, count] = line.trim().split(':');
+        if (hashSuffix === suffix) {
+          return {
+            breached: true,
+            breachCount: parseInt(count, 10) || 1,
+            sources: ['Have I Been Pwned'],
+          };
+        }
+      }
+
+      return { breached: false, breachCount: 0 };
+    } catch {
+      // Network error — fall back to common password check
+      const commonBreached = [
+        'password', '123456', '12345678', 'qwerty', 'abc123',
+        'password1', 'password123', 'admin', 'letmein', 'welcome',
+      ];
+
+      if (commonBreached.includes(password.toLowerCase())) {
+        return {
+          breached: true,
+          breachCount: 0,
+          sources: ['Common password list (offline check)'],
+        };
+      }
+
+      return { breached: false, breachCount: 0 };
     }
-
-    return {
-      breached: false,
-      breachCount: 0,
-    };
   }
 
   /**
@@ -646,7 +678,7 @@ class VaultHardeningClass extends EventEmitter {
     this.accessLog = this.accessLog.filter(e => e.timestamp > cutoff);
 
     // Save async
-    this.saveAccessLog().catch(() => {});
+    this.saveAccessLog().catch((e: unknown) => { log.warn('[DEX]', e); });
   }
 
   /**

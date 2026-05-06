@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Audio Controller
 // Phase 67: Audio playback, recording, and management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, dialog } from 'electron';
 import * as fs from 'fs';
@@ -10,9 +16,9 @@ import { app } from 'electron';
 import { DataStore } from '../store/DataStore';
 import { Logger } from '../utils/Logger';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface AudioFile {
   id: string;
@@ -45,9 +51,9 @@ interface RecordingMeta {
   format: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Audio Controller
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class AudioController {
   private dataStore: DataStore;
@@ -89,9 +95,9 @@ export class AudioController {
     this.logger.info(`[Audio] Initialized with ${this.files.length} files`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC Handlers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerHandlers(): void {
     // Get all audio files
@@ -164,9 +170,9 @@ export class AudioController {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Core Methods
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadAudioData(): Promise<void> {
     try {
@@ -273,11 +279,24 @@ export class AudioController {
           if (extensions.has(ext)) {
             const stats = await fs.promises.stat(fullPath);
             
+            // Get actual duration via native module
+            let duration = 0;
+            try {
+              const { getNativeModule } = require('../native');
+              const native = getNativeModule();
+              if (native) {
+                const meta = native.getAudioMetadata(fullPath);
+                duration = meta.durationSecs;
+              }
+            } catch {
+              // Native module unavailable — duration stays 0
+            }
+            
             files.push({
               id: `audio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               name: entry.name,
               path: fullPath,
-              duration: 0, // Would need audio processing to get actual duration
+              duration,
               size: stats.size,
               format: ext.substring(1),
               createdAt: stats.birthtime.getTime(),
@@ -481,9 +500,9 @@ export class AudioController {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.saveAudioData();

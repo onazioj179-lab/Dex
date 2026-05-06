@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Capability Layer: OS-like resource and permission management
 // Unified system-level coordination for files, media, workflows, transfers
 // =============================================================================
 
+import log from 'electron-log';
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -534,7 +541,7 @@ class StorageServiceCapability {
         }
       }
     } catch (err) {
-      console.error('[StorageService] Failed to load:', err);
+      log.error('[StorageService] Failed to load:', err);
     }
   }
   
@@ -543,7 +550,7 @@ class StorageServiceCapability {
       const entries = Array.from(this.storage.values());
       fs.writeFileSync(this.persistPath, JSON.stringify(entries, null, 2));
     } catch (err) {
-      console.error('[StorageService] Failed to persist:', err);
+      log.error('[StorageService] Failed to persist:', err);
     }
   }
   

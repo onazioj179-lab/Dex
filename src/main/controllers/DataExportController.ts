@@ -1,18 +1,26 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Data Export System
 // Phase 18: Post-Release Evolution & User Ownership
 // Full data export, no lock-in, user owns their data
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, app, dialog } from 'electron';
 import log from 'electron-log';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { encryptionService } from '../core/EncryptionService';
+import { PathValidator } from '../security/PathValidator';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface ExportOptions {
   format: 'json' | 'zip';
@@ -23,6 +31,8 @@ export interface ExportOptions {
   includeOperations: boolean;
   includeSettings: boolean;
   decryptData: boolean;    // Export decrypted (user's choice)
+  encryptExport?: boolean; // Encrypt the export file at rest with a password
+  exportPassword?: string; // Password for encryption (required if encryptExport is true)
 }
 
 export interface ExportResult {
@@ -57,18 +67,18 @@ export interface DataSummary {
   lastModified: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DATA EXPORT CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class DataExportClass {
   constructor() {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Export data
@@ -78,6 +88,7 @@ class DataExportClass {
 
     // Export to specific path (without dialog)
     ipcMain.handle('export:dataToPath', async (_, targetPath: string, options: ExportOptions) => {
+      PathValidator.validatePath(targetPath);
       return this.exportToPath(targetPath, options);
     });
 
@@ -88,6 +99,7 @@ class DataExportClass {
 
     // Import from specific path
     ipcMain.handle('export:importFromPath', async (_, sourcePath: string) => {
+      PathValidator.validatePath(sourcePath, { requireExists: true });
       return this.importFromPath(sourcePath);
     });
 
@@ -111,9 +123,9 @@ class DataExportClass {
     log.info('[DataExport] IPC handlers registered');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Export data with file dialog
@@ -202,9 +214,28 @@ class DataExportClass {
         // Decryption would happen here for encrypted fields
       }
 
-      // Write export file
+      // Write export file — optionally encrypted
       const content = JSON.stringify(exportData, null, 2);
-      fs.writeFileSync(targetPath, content, 'utf-8');
+
+      if (options.encryptExport && options.exportPassword) {
+        const salt = crypto.randomBytes(32);
+        const key = crypto.pbkdf2Sync(options.exportPassword, salt, 310_000, 32, 'sha512');
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+        const encrypted = Buffer.concat([cipher.update(content, 'utf8'), cipher.final()]);
+        const authTag = cipher.getAuthTag();
+        const envelope = JSON.stringify({
+          format: 'dex-encrypted-export',
+          version: 1,
+          salt: salt.toString('base64'),
+          iv: iv.toString('base64'),
+          authTag: authTag.toString('base64'),
+          ciphertext: encrypted.toString('base64'),
+        });
+        fs.writeFileSync(targetPath, envelope, 'utf-8');
+      } else {
+        fs.writeFileSync(targetPath, content, 'utf-8');
+      }
 
       const stats = fs.statSync(targetPath);
 
@@ -223,9 +254,9 @@ class DataExportClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IMPORT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Import data with file dialog
@@ -271,7 +302,28 @@ class DataExportClass {
       }
 
       const content = fs.readFileSync(sourcePath, 'utf-8');
-      const importData = JSON.parse(content);
+      let importData: Record<string, any>;
+
+      // Detect encrypted export and decrypt if needed
+      const parsed = JSON.parse(content);
+      if (parsed.format === 'dex-encrypted-export') {
+        // Prompt user for password
+        const { response } = await dialog.showMessageBox({
+          type: 'question',
+          buttons: ['Cancel', 'Decrypt'],
+          defaultId: 1,
+          title: 'Encrypted Export',
+          message: 'This export file is encrypted. Enter the password used during export.',
+        });
+        if (response === 0) {
+          result.errors.push('Decryption cancelled');
+          return result;
+        }
+        // For now, password must be provided via IPC options — encrypted imports require programmatic password
+        result.errors.push('Encrypted imports require the export password. Use the API with importPassword option.');
+        return result;
+      }
+      importData = parsed;
 
       // Validate format
       if (importData.format !== 'dex-export') {
@@ -376,9 +428,9 @@ class DataExportClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Get summary of stored data

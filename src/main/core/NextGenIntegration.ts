@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - NEXT-GEN OS-LEVEL INTEGRATION
 // ===========================================================================
@@ -314,7 +320,7 @@ class NextGenIntegrationClass extends EventEmitter {
   // -------------------------------------------------------------------------
 
   private setupIntegrations(): void {
-    // Intent → Mental Model: Update mental model on intent changes
+    // Intent Mental Model: Update mental model on intent changes
     intentSessionManager.on('intent-activated', (intent) => {
       mentalModelManager.updateSystemState('intent-sessions', {
         lastActivity: {
@@ -324,22 +330,22 @@ class NextGenIntegrationClass extends EventEmitter {
       }, 'user', 'Intent activated');
     });
 
-    // Intent → Security: Lock on intent switch
+    // Intent Security: Lock on intent switch
     intentSessionManager.on('intent-switched', (from, to) => {
       securityContinuumManager.emit('intent-switched', from, to);
     });
 
-    // File System → Search: Index file access patterns
+    // File System Search: Index file access patterns
     usageAwareFileSystem.on('file-accessed', (filePath) => {
       trustworthySearch.emit('file-accessed', filePath);
     });
 
-    // Learning → Automation: Suggest rules from patterns
+    // Learning Automation: Suggest rules from patterns
     localLearningEngine.on('pattern-detected', (pattern) => {
       humanCenteredAutomation.emit('pattern-available', pattern);
     });
 
-    // Security → Vault: Lock vault when trust drops
+    // Security Vault: Lock vault when trust drops
     securityContinuumManager.on('trust-level-changed', (level) => {
       if (level === 'public' || level === 'basic') {
         identityVaultManager.emit('should-lock');
@@ -351,7 +357,7 @@ class NextGenIntegrationClass extends EventEmitter {
       }, 'system', 'Trust level changed');
     });
 
-    // Vault → Mental Model: Update vault status
+    // Vault Mental Model: Update vault status
     identityVaultManager.on('vault-unlocked', () => {
       mentalModelManager.updateSystemState('vault', {
         status: 'active',
@@ -372,7 +378,7 @@ class NextGenIntegrationClass extends EventEmitter {
       }, 'system', 'Vault locked');
     });
 
-    // Idle → All Systems: Pause non-essential on idle
+    // Idle All Systems: Pause non-essential on idle
     idleDisciplineManager.on('idle-mode-changed', (mode) => {
       mentalModelManager.updateSystemState('health', {
         metrics: {
@@ -388,7 +394,7 @@ class NextGenIntegrationClass extends EventEmitter {
       }
     });
 
-    // Session Continuity → Intent: Include intent in session
+    // Session Continuity Intent: Include intent in session
     sessionContinuityManager.on('session-saving', (snapshot) => {
       const currentIntent = intentSessionManager.getActiveIntent();
       if (currentIntent) {
@@ -396,7 +402,7 @@ class NextGenIntegrationClass extends EventEmitter {
       }
     });
 
-    // Undo → Mental Model: Track undo operations
+    // Undo Mental Model: Track undo operations
     systemUndoManager.on('operation-recorded', () => {
       mentalModelManager.updateSystemState('undo', {
         lastActivity: {
@@ -406,12 +412,12 @@ class NextGenIntegrationClass extends EventEmitter {
       }, 'system');
     });
 
-    // Automation → Undo: Record automation operations
+    // Automation Undo: Record automation operations
     humanCenteredAutomation.on('execution-completed', (execution) => {
       systemUndoManager.emit('automation-completed', execution);
     });
 
-    // Media → Intent: Attach media to current intent
+    // Media Intent: Attach media to current intent
     mediaWorkManager.on('artifact-captured', (artifact) => {
       const currentIntent = intentSessionManager.getActiveIntent();
       if (currentIntent) {

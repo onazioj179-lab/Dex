@@ -1,5 +1,11 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * DEX Help Content — Structured help data for every inner app.
+ * DEX Help Content -- Structured help data for every inner app.
  * guide: step-by-step instructions.
  * shortcuts: keyboard reference.
  */

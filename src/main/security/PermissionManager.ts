@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Permission Manager
 // Handles permission checking and management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { DexPermissions } from '../../shared/types';
 import { DataStore } from '../store/DataStore';

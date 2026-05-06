@@ -1,21 +1,26 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — Inner App Subsystem
- * ═══════════════════════════════════════════════════════════════════════════
- * 
+ * ===========================================================================
+ * DEX -- Inner App Subsystem
+ * ===========================================================================
+ *
  * Native OS-grade application framework for inner apps.
  * Apps are first-class citizens with real lifecycle, state, and isolation.
- * 
  * No mocks. No placeholders. No fake states.
- * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * @author     Onazi Treasure OJ
+ * @copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+ * @license    MIT License
+ * ===========================================================================
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { debouncedJsonStorage } from '../utils/debouncedStorage';
+import { useRunningApps } from './runningApps';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// TYPES — App Definition & State
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// TYPES -- App Definition & State
+// ===========================================================================
 
 /** App lifecycle states */
 export type AppState = 'active' | 'background' | 'suspended' | 'terminated';
@@ -46,7 +51,7 @@ export interface AppDefinition {
   permissions: AppPermission[];
   singleton: boolean; // Can only have one instance
   supportsMultiWindow: boolean;
-  category: 'productivity' | 'media' | 'utility' | 'system' | 'development';
+  category: 'productivity' | 'media' | 'utility' | 'system' | 'development' | 'creative';
 }
 
 /** App instance - runtime state */
@@ -107,45 +112,36 @@ export interface WorkSession {
   taskContext: string | null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// APP REGISTRY — Static App Definitions
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// APP REGISTRY -- Static App Definitions
+// ===========================================================================
+
+const APP_VERSION = '3.6.0';
 
 export const APP_REGISTRY: AppDefinition[] = [
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // System Apps
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'home',
     name: 'Home',
     icon: 'home',
-    color: '#ffffff',
-    description: 'DEX home dashboard',
-    version: '2.0.0',
+    color: 'var(--color-text-primary)',
+    description: 'DEX home desktop',
+    version: APP_VERSION,
     permissions: ['filesystem.read'],
     singleton: true,
     supportsMultiWindow: false,
     category: 'system',
   },
-  {
-    id: 'dashboard',
-    name: 'Dashboard',
-    icon: 'dashboard',
-    color: '#3b82f6',
-    description: 'System overview and widgets',
-    version: '2.0.0',
-    permissions: ['filesystem.read', 'system.info'],
-    singleton: true,
-    supportsMultiWindow: false,
-    category: 'system',
-  },
+
   {
     id: 'settings',
     name: 'Settings',
     icon: 'settings',
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary)',
     description: 'System preferences',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'system.info'],
     singleton: true,
     supportsMultiWindow: false,
@@ -157,23 +153,23 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'search',
     color: '#007aff',
     description: 'Universal search across all apps',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read'],
     singleton: true,
     supportsMultiWindow: false,
     category: 'system',
   },
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Productivity Apps
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'files',
     name: 'Files',
     icon: 'folder',
     color: '#007aff',
-    description: 'File manager with AES-256 encryption',
-    version: '2.0.0',
+    description: 'File manager with built-in protection',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'filesystem.delete'],
     singleton: false,
     supportsMultiWindow: true,
@@ -184,8 +180,8 @@ export const APP_REGISTRY: AppDefinition[] = [
     name: 'Notes',
     icon: 'note',
     color: '#ffcc00',
-    description: 'Rich text notes with encryption',
-    version: '2.0.0',
+    description: 'Rich text notes with secure storage',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'clipboard.read', 'clipboard.write'],
     singleton: false,
     supportsMultiWindow: true,
@@ -195,9 +191,9 @@ export const APP_REGISTRY: AppDefinition[] = [
     id: 'tasks',
     name: 'Tasks',
     icon: 'check',
-    color: '#34c759',
+    color: 'var(--color-success)',
     description: 'Task management with priorities',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'notifications'],
     singleton: true,
     supportsMultiWindow: false,
@@ -209,7 +205,7 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'globe',
     color: '#5856d6',
     description: 'Secure browsing with tracking protection',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['network.fetch', 'network.socket', 'clipboard.read', 'clipboard.write'],
     singleton: false,
     supportsMultiWindow: true,
@@ -221,7 +217,7 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'share',
     color: '#10b981',
     description: 'File transfers and sharing',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'network.fetch'],
     singleton: true,
     supportsMultiWindow: false,
@@ -231,9 +227,9 @@ export const APP_REGISTRY: AppDefinition[] = [
     id: 'calendar',
     name: 'Calendar',
     icon: 'calendar',
-    color: '#ff3b30',
+    color: 'var(--color-error)',
     description: 'Event scheduling and reminders',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'notifications'],
     singleton: true,
     supportsMultiWindow: false,
@@ -245,23 +241,23 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'workflow',
     color: '#ff9500',
     description: 'Automation workflows',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'notifications'],
     singleton: true,
     supportsMultiWindow: false,
     category: 'utility',
   },
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Media Apps
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'gallery',
     name: 'Gallery',
     icon: 'image',
     color: '#ff2d55',
     description: 'Photo and image library',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write'],
     singleton: true,
     supportsMultiWindow: false,
@@ -271,9 +267,9 @@ export const APP_REGISTRY: AppDefinition[] = [
     id: 'audio',
     name: 'Music',
     icon: 'music',
-    color: '#ff3b30',
+    color: 'var(--color-error)',
     description: 'Audio player and library',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read'],
     singleton: true,
     supportsMultiWindow: false,
@@ -285,23 +281,23 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'video',
     color: '#af52de',
     description: 'Video player and library',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read'],
     singleton: true,
     supportsMultiWindow: false,
     category: 'media',
   },
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Utility Apps
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'power',
     name: 'Power',
     icon: 'power',
-    color: '#30d158',
+    color: 'var(--color-success)',
     description: 'Power management and optimization',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['system.info'],
     singleton: true,
     supportsMultiWindow: false,
@@ -313,7 +309,7 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'lock',
     color: '#007aff',
     description: 'Secure password and secrets vault',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'clipboard.write'],
     singleton: true,
     supportsMultiWindow: false,
@@ -323,9 +319,9 @@ export const APP_REGISTRY: AppDefinition[] = [
     id: 'calculator',
     name: 'Calculator',
     icon: 'calculator',
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary)',
     description: 'Scientific calculator',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['clipboard.write'],
     singleton: true,
     supportsMultiWindow: false,
@@ -337,23 +333,23 @@ export const APP_REGISTRY: AppDefinition[] = [
     icon: 'lock',
     color: '#007aff',
     description: 'Secure password generator',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['clipboard.write'],
     singleton: true,
     supportsMultiWindow: false,
     category: 'utility',
   },
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Development Apps
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'code',
     name: 'Code',
     icon: 'code',
     color: '#af52de',
     description: 'Code editor with syntax highlighting',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'clipboard.read', 'clipboard.write'],
     singleton: false,
     supportsMultiWindow: true,
@@ -363,99 +359,135 @@ export const APP_REGISTRY: AppDefinition[] = [
     id: 'terminal',
     name: 'Terminal',
     icon: 'terminal',
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary)',
     description: 'Command line interface',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'system.info'],
     singleton: false,
     supportsMultiWindow: true,
     category: 'development',
   },
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DEX Creative Suite
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'videoeditor',
     name: 'VINX',
     icon: 'videoeditor',
     color: '#8b5cf6',
     description: 'Professional video editor',
-    version: '2.0.0',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write'],
     singleton: false,
     supportsMultiWindow: true,
-    category: 'media',
+    category: 'creative',
   },
   {
     id: 'imosion',
     name: 'Imosion',
     icon: 'imosion',
     color: '#f97316',
-    description: 'Motion graphics and animation',
-    version: '2.0.0',
+    description: 'Professional audio workstation and DAW',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write'],
     singleton: false,
     supportsMultiWindow: true,
-    category: 'media',
+    category: 'creative',
   },
   {
     id: 'prism',
     name: 'PRISM',
     icon: 'prism',
     color: '#06b6d4',
-    description: 'Photo editing and enhancement',
-    version: '2.0.0',
+    description: 'Professional photo editing and enhancement',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write'],
     singleton: false,
     supportsMultiWindow: true,
-    category: 'media',
+    category: 'creative',
   },
   {
     id: 'flux',
     name: 'FLUX',
     icon: 'flux',
     color: '#3b82f6',
-    description: 'Audio production and mixing',
-    version: '2.0.0',
+    description: 'Motion graphics and visual effects',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write', 'microphone'],
     singleton: false,
     supportsMultiWindow: true,
-    category: 'media',
+    category: 'creative',
   },
   {
     id: 'forge',
     name: 'FORGE',
     icon: 'forge',
     color: '#f59e0b',
-    description: '3D modeling and design',
-    version: '2.0.0',
+    description: 'Batch media encoding and conversion',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'filesystem.write'],
     singleton: false,
     supportsMultiWindow: true,
-    category: 'media',
+    category: 'creative',
   },
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
+  // AXL Engineering
+  // -------------------------------------------------------------------------
+  {
+    id: 'axl',
+    name: 'AXL',
+    icon: 'axl',
+    color: 'var(--color-accent)',
+    description: 'Professional CAD & engineering design studio',
+    version: APP_VERSION,
+    permissions: ['filesystem.read', 'filesystem.write'],
+    singleton: false,
+    supportsMultiWindow: true,
+    category: 'creative',
+  },
+  
+  // -------------------------------------------------------------------------
   // DEX Rewind
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   {
     id: 'rewind',
     name: 'Rewind',
     icon: 'rewind',
     color: '#0078d4',
-    description: 'Activity logger and search — DVR for your desktop day',
-    version: '2.0.0',
+    description: 'Activity logger and search -- DVR for your desktop day',
+    version: APP_VERSION,
     permissions: ['filesystem.read', 'clipboard.read', 'system.info'],
     singleton: true,
     supportsMultiWindow: false,
     category: 'utility',
   },
+  
+  // -------------------------------------------------------------------------
+  // Collab Hub
+  // -------------------------------------------------------------------------
+  {
+    id: 'collabhub',
+    name: 'Collab Hub',
+    icon: 'collabhub',
+    color: '#5e5ce6',
+    description: 'Real-time collaboration for creative projects with sharing, chat, and checkpoints',
+    version: '3.6.0',
+    permissions: ['network.fetch', 'network.socket', 'notifications'],
+    singleton: true,
+    supportsMultiWindow: false,
+    category: 'productivity',
+  },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+APP_REGISTRY.forEach(app => {
+  app.version = APP_VERSION;
+});
+
+// ===========================================================================
 // APP SUBSYSTEM STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface AppSubsystemState {
   // Active app instances
@@ -532,9 +564,9 @@ export const useAppSubsystem = create<AppSubsystemState>()(
       totalMemoryLimitMB: 512,
       totalCpuLimitPercent: 50,
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // App Lifecycle
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       launchApp: (appId, initialPath = '/', windowId: string | null = null) => {
         const definition = APP_REGISTRY.find(a => a.id === appId);
@@ -578,37 +610,33 @@ export const useAppSubsystem = create<AppSubsystemState>()(
 
         // Suspend currently active app
         const currentActive = state.activeInstanceId;
+        const newInstances = new Map(state.instances);
         if (currentActive) {
-          const current = state.instances.get(currentActive);
+          const current = newInstances.get(currentActive);
           if (current) {
-            current.state = 'background';
-            current.lastActiveAt = now;
+            newInstances.set(currentActive, { ...current, state: 'background', lastActiveAt: now });
           }
         }
 
-        const newInstances = new Map(state.instances);
         newInstances.set(instanceId, instance);
 
-        set({
-          instances: newInstances,
-          activeInstanceId: instanceId,
-        });
-
-        // Pattern Learning: Record app open (background, no UI)
-        try {
-          window.electron?.invoke('patterns:recordAppOpen', appId, initialPath).catch(() => {});
-        } catch { /* state save failed */ }
-
         // Record in work session
-        if (state.currentWorkSession) {
-          state.currentWorkSession.appSequence.push({
+        const newSession = state.currentWorkSession ? {
+          ...state.currentWorkSession,
+          appSequence: [...state.currentWorkSession.appSequence, {
             appId,
             instanceId,
             startedAt: now,
             endedAt: null,
             duration: 0,
-          });
-        }
+          }],
+        } : null;
+
+        set({
+          instances: newInstances,
+          activeInstanceId: instanceId,
+          ...(newSession ? { currentWorkSession: newSession } : {}),
+        });
 
         return instance;
       },
@@ -620,22 +648,23 @@ export const useAppSubsystem = create<AppSubsystemState>()(
 
         const now = Date.now();
         const duration = now - instance.launchedAt;
-        instance.state = 'terminated';
 
         // Pattern Learning: Record app close with duration (background, no UI)
         try {
-          window.electron?.invoke('patterns:recordAppClose', instance.appId, duration).catch(() => {});
+          window.electron?.invoke('patterns:recordAppClose', instance.appId, duration).catch((e: unknown) => { console.warn('[DEX]', e); });
         } catch { /* state save failed */ }
 
-        // Update work session
-        if (state.currentWorkSession) {
-          const appEntry = state.currentWorkSession.appSequence.find(
-            e => e.instanceId === instanceId && !e.endedAt
-          );
-          if (appEntry) {
-            appEntry.endedAt = now;
-            appEntry.duration = now - appEntry.startedAt;
-          }
+        // Update work session immutably
+        let newSession = state.currentWorkSession;
+        if (newSession) {
+          newSession = {
+            ...newSession,
+            appSequence: newSession.appSequence.map(e =>
+              e.instanceId === instanceId && !e.endedAt
+                ? { ...e, endedAt: now, duration: now - e.startedAt }
+                : e
+            ),
+          };
         }
 
         // Remove from instances
@@ -651,13 +680,14 @@ export const useAppSubsystem = create<AppSubsystemState>()(
           newActiveId = remaining[0]?.instanceId || null;
           if (newActiveId) {
             const next = newInstances.get(newActiveId);
-            if (next) next.state = 'active';
+            if (next) newInstances.set(newActiveId, { ...next, state: 'active' });
           }
         }
 
         set({
           instances: newInstances,
           activeInstanceId: newActiveId,
+          ...(newSession ? { currentWorkSession: newSession } : {}),
         });
       },
 
@@ -673,23 +703,23 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         if (state.activeInstanceId && state.activeInstanceId !== instanceId) {
           const current = newInstances.get(state.activeInstanceId);
           if (current) {
-            current.state = 'background';
+            newInstances.set(state.activeInstanceId, { ...current, state: 'background' });
           }
         }
 
         // Activate target
-        instance.state = 'active';
-        instance.lastActiveAt = now;
-        instance.suspendedAt = null;
+        newInstances.set(instanceId, { ...instance, state: 'active', lastActiveAt: now, suspendedAt: null });
 
-        // Update work session
-        if (state.currentWorkSession) {
-          state.currentWorkSession.activeAppId = instance.appId;
+        // Update work session immutably
+        let newSession = state.currentWorkSession;
+        if (newSession) {
+          newSession = { ...newSession, activeAppId: instance.appId };
         }
 
         set({
           instances: newInstances,
           activeInstanceId: instanceId,
+          ...(newSession ? { currentWorkSession: newSession } : {}),
         });
       },
 
@@ -698,11 +728,8 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         const instance = state.instances.get(instanceId);
         if (!instance || instance.state === 'terminated') return;
 
-        instance.state = 'suspended';
-        instance.suspendedAt = Date.now();
-
         const newInstances = new Map(state.instances);
-        newInstances.set(instanceId, instance);
+        newInstances.set(instanceId, { ...instance, state: 'suspended', suspendedAt: Date.now() });
 
         set({ instances: newInstances });
       },
@@ -712,18 +739,15 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         const instance = state.instances.get(instanceId);
         if (!instance || instance.state !== 'suspended') return;
 
-        instance.state = 'background';
-        instance.suspendedAt = null;
-
         const newInstances = new Map(state.instances);
-        newInstances.set(instanceId, instance);
+        newInstances.set(instanceId, { ...instance, state: 'background', suspendedAt: null });
 
         set({ instances: newInstances });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Navigation
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       navigateInApp: (instanceId, path) => {
         const state = get();
@@ -772,9 +796,9 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         return true;
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // State Persistence
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       saveAppState: (instanceId, appState) => {
         const state = get();
@@ -794,9 +818,9 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         return instance?.savedState || null;
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Permissions
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       requestPermission: (instanceId, permission) => {
         const state = get();
@@ -843,9 +867,9 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         return instance?.grantedPermissions.includes(permission) ?? false;
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Intents (App-to-App Communication)
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       sendIntent: (sourceInstanceId, targetAppId, action, data) => {
         const state = get();
@@ -888,9 +912,9 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         set({ pendingIntents: intents });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Work Session
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       startWorkSession: () => {
         const state = get();
@@ -943,7 +967,12 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         if (!state.currentWorkSession) return;
 
         if (!state.currentWorkSession.filesAccessed.includes(filePath)) {
-          state.currentWorkSession.filesAccessed.push(filePath);
+          set({
+            currentWorkSession: {
+              ...state.currentWorkSession,
+              filesAccessed: [...state.currentWorkSession.filesAccessed, filePath],
+            },
+          });
         }
       },
 
@@ -951,14 +980,17 @@ export const useAppSubsystem = create<AppSubsystemState>()(
         const state = get();
         if (!state.currentWorkSession) return;
 
-        state.currentWorkSession.actionsPerformed.push(
-          `${Date.now()}:${action}`
-        );
+        set({
+          currentWorkSession: {
+            ...state.currentWorkSession,
+            actionsPerformed: [...state.currentWorkSession.actionsPerformed, `${Date.now()}:${action}`],
+          },
+        });
       },
 
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
       // Utilities
-      // ─────────────────────────────────────────────────────────────────────
+      // ---------------------------------------------------------------------
 
       getAppDefinition: (appId) => APP_REGISTRY.find(a => a.id === appId),
 
@@ -980,32 +1012,18 @@ export const useAppSubsystem = create<AppSubsystemState>()(
     }),
     {
       name: 'dex-app-subsystem',
+      storage: debouncedJsonStorage,
       partialize: (state) => ({
         permissionGrants: state.permissionGrants,
         workSessionHistory: state.workSessionHistory.slice(-10), // Keep last 10 sessions
-      }),
-      // Custom serialization for Map
-      serialize: (state) => JSON.stringify({
-        ...state,
-        state: {
-          ...state.state,
-          instances: Array.from(state.state.instances?.entries?.() || []),
-        },
-      }),
-      deserialize: (str) => {
-        const data = JSON.parse(str);
-        if (data.state?.instances) {
-          data.state.instances = new Map(data.state.instances);
-        }
-        return data;
-      },
+      } as any),
     }
   )
 );
 
-// ═══════════════════════════════════════════════════════════════════════════
-// HOOKS — Convenience accessors
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// HOOKS -- Convenience accessors
+// ===========================================================================
 
 export const useActiveApp = () => {
   const activeInstanceId = useAppSubsystem(s => s.activeInstanceId);
@@ -1022,9 +1040,9 @@ export const useAppDefinitions = () => APP_REGISTRY;
 
 export const useWorkSession = () => useAppSubsystem(s => s.currentWorkSession);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// IPC BRIDGE — Connect to main process
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
+// IPC BRIDGE -- Connect to main process
+// ===========================================================================
 
 export const initAppSubsystemIPC = () => {
   if (typeof window !== 'undefined' && window.electronAPI) {
@@ -1044,5 +1062,45 @@ export const initAppSubsystemIPC = () => {
           break;
       }
     });
+  }
+  
+  // ===========================================================================
+  // SYNC BRIDGE -- Keep useAppSubsystem in sync with useRunningApps (item 85)
+  // useRunningApps is the source of truth for the dock / AppManager UI.
+  // useAppSubsystem is the deeper OS-like lifecycle layer.
+  // Subscribe to each and keep them consistent.
+  // ===========================================================================
+  try {
+    // When RunningApps changes, reflect into AppSubsystem
+    useRunningApps.subscribe((state: any, prev: any) => {
+      if (state.currentAppId !== prev.currentAppId) {
+        const sub = useAppSubsystem.getState();
+        // Find instance matching the new current app
+        for (const [id, inst] of sub.instances.entries()) {
+          if ((inst as any).appId === state.currentAppId && (inst as any).state !== 'terminated') {
+            sub.focusApp(id);
+            break;
+          }
+        }
+      }
+    });
+    
+    // When AppSubsystem launches/closes, reflect into RunningApps
+    useAppSubsystem.subscribe((state, prev) => {
+      if (state.instances !== prev.instances) {
+        const running = useRunningApps.getState();
+        const alive = Array.from(state.instances.values()).filter((i: any) => i.state !== 'terminated');
+        for (const inst of alive) {
+          if (!running.runningApps.some((a: any) => a.id === (inst as any).appId)) {
+            const def = APP_REGISTRY.find(d => d.id === (inst as any).appId);
+            if (def) {
+              running.launchApp({ id: def.id, name: def.name, icon: def.icon, color: 'var(--color-accent)' });
+            }
+          }
+        }
+      }
+    });
+  } catch {
+    // sync bridge optional — ignore if import fails
   }
 };

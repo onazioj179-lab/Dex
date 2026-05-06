@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — System Integrity Monitor
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- System Integrity Monitor
+ * ===========================================================================
  * 
  * Internal system checks ensuring OS-grade reliability:
  * - App state validation
@@ -10,7 +16,7 @@
  * - Memory leak detection
  * 
  * Failures are logged locally and visible in diagnostics.
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { create } from 'zustand';
@@ -18,9 +24,9 @@ import { useLifecycleManager, AppProcess } from './LifecycleManager';
 import { usePerformanceMonitor } from './PerformanceMonitor';
 import { getSystemServicesStatus, useSystemEvents } from './SystemServices';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Integrity check types */
 export type CheckType = 
@@ -83,9 +89,9 @@ export interface DiagnosticReport {
   recommendations: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // INTEGRITY CHECKS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -433,9 +439,9 @@ const INTEGRITY_CHECKS: IntegrityCheck[] = [
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // INTEGRITY MONITOR STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface IntegrityMonitorState {
   // Check results
@@ -639,9 +645,9 @@ export const useIntegrityMonitor = create<IntegrityMonitorState>((set, get) => (
   },
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // HOOKS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 /** Get overall system integrity health */
 export const useIntegrityHealth = () => {
@@ -660,9 +666,9 @@ export const useFailedChecks = () => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // INTEGRITY PANEL COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import React from 'react';
 
@@ -672,10 +678,10 @@ export const IntegrityPanel: React.FC = () => {
   const { runAllChecks, generateDiagnosticReport } = useIntegrityMonitor.getState();
 
   const healthColor = {
-    healthy: '#34c759',
+    healthy: 'var(--color-success)',
     warning: '#ff9500',
-    error: '#ff3b30',
-    critical: '#ff3b30',
+    error: 'var(--color-error)',
+    critical: 'var(--color-error)',
   }[health];
 
   const handleRunChecks = () => {
@@ -705,7 +711,7 @@ export const IntegrityPanel: React.FC = () => {
               key={check.id}
               style={{
                 ...panelStyles.issue,
-                borderColor: check.severity === 'critical' ? '#ff3b30' : '#ff9500',
+                borderColor: check.severity === 'critical' ? 'var(--color-error)' : '#ff9500',
               }}
             >
               <span style={panelStyles.checkName}>{check.type.replace('_', ' ')}</span>

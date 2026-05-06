@@ -1,9 +1,16 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Select Component
  * Dropdown select with search and multi-select
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import DexIcon from './DexIcon';
 
 // ==================== TYPES ====================
 
@@ -192,20 +199,21 @@ export const Select: React.FC<SelectProps> = ({
       gap: 8,
       height: s.height,
       padding: s.padding,
-      background: 'var(--color-bg-secondary)',
-      border: `1px solid ${error ? '#ef4444' : isOpen ? 'var(--color-accent)' : 'var(--color-border)'}`,
+      background: 'rgba(22,24,28,0.96)',
+      border: `1px solid ${error ? 'var(--color-error)' : isOpen ? 'rgba(10,132,255,0.45)' : 'var(--color-border)'}`,
       borderRadius: 8,
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
+      boxShadow: 'inset 0 0.5px 0 var(--color-bg-hover)',
       transition: 'all 0.15s',
     },
     controlFocused: {
-      boxShadow: `0 0 0 2px ${error ? 'rgba(239, 68, 68, 0.2)' : 'rgba(var(--color-accent-rgb), 0.2)'}`,
+      boxShadow: `0 0 0 2px ${error ? 'rgba(239, 68, 68, 0.2)' : 'rgba(10,132,255,0.18)'}`,
     },
     value: {
       flex: 1,
       fontSize: s.fontSize,
-      color: selectedOption ? 'var(--color-text)' : 'var(--color-text-muted)',
+      color: selectedOption ? 'var(--color-text-primary, #f5f5f7)' : 'var(--color-text-tertiary)',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
@@ -216,7 +224,7 @@ export const Select: React.FC<SelectProps> = ({
       background: 'none',
       outline: 'none',
       fontSize: s.fontSize,
-      color: 'var(--color-text)',
+      color: 'var(--color-text-primary, #f5f5f7)',
     },
     clearButton: {
       padding: 4,
@@ -238,13 +246,13 @@ export const Select: React.FC<SelectProps> = ({
       left: 0,
       right: 0,
       marginTop: 4,
-      background: 'var(--color-bg-secondary)',
+      background: 'rgba(18,20,24,0.98)',
       border: '1px solid var(--color-border)',
       borderRadius: 8,
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+      boxShadow: '0 16px 36px rgba(0,0,0,0.42)',
       maxHeight: 240,
       overflow: 'auto',
-      zIndex: 1000,
+      zIndex: 2400,
     },
     group: {
       padding: '8px 12px 4px',
@@ -260,16 +268,16 @@ export const Select: React.FC<SelectProps> = ({
       gap: 10,
       padding: '10px 12px',
       fontSize: s.fontSize,
-      color: 'var(--color-text)',
+      color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
       transition: 'background 0.1s',
     },
     optionHighlighted: {
-      background: 'var(--color-bg-tertiary)',
+      background: 'var(--color-bg-hover)',
     },
     optionSelected: {
-      background: 'rgba(var(--color-accent-rgb), 0.1)',
-      color: 'var(--color-accent)',
+      background: 'rgba(10,132,255,0.14)',
+      color: '#7cb8ff',
     },
     optionDisabled: {
       opacity: 0.5,
@@ -307,7 +315,7 @@ export const Select: React.FC<SelectProps> = ({
     },
     error: {
       fontSize: 12,
-      color: '#ef4444',
+      color: 'var(--color-error)',
       marginTop: 4,
     },
   };
@@ -343,10 +351,10 @@ export const Select: React.FC<SelectProps> = ({
         {loading && <span>Loading...</span>}
         {clearable && currentValue && !loading && (
           <button style={styles.clearButton} onClick={handleClear}>
-            ×
+            <DexIcon name="close" size={12} />
           </button>
         )}
-        <span style={styles.arrow}>▼</span>
+        <span style={styles.arrow}><DexIcon name="chevron-down" size={12} /></span>
       </div>
 
       {isOpen && (
@@ -501,21 +509,22 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       gap: 6,
       minHeight: s.minHeight,
       padding: '6px 12px',
-      background: 'var(--color-bg-secondary)',
-      border: `1px solid ${isOpen ? 'var(--color-accent)' : 'var(--color-border)'}`,
+      background: 'rgba(22,24,28,0.96)',
+      border: `1px solid ${isOpen ? 'rgba(10,132,255,0.45)' : 'var(--color-border)'}`,
       borderRadius: 8,
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
+      boxShadow: 'inset 0 0.5px 0 var(--color-bg-hover)',
     },
     tag: {
       display: 'flex',
       alignItems: 'center',
       gap: 4,
       padding: '2px 8px',
-      background: 'var(--color-bg-tertiary)',
+      background: 'var(--color-border-subtle)',
       borderRadius: 4,
       fontSize: s.fontSize - 2,
-      color: 'var(--color-text)',
+      color: 'var(--color-text-primary, #f5f5f7)',
     },
     tagRemove: {
       padding: 0,
@@ -545,13 +554,13 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       left: 0,
       right: 0,
       marginTop: 4,
-      background: 'var(--color-bg-secondary)',
+      background: 'rgba(18,20,24,0.98)',
       border: '1px solid var(--color-border)',
       borderRadius: 8,
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+      boxShadow: '0 16px 36px rgba(0,0,0,0.42)',
       maxHeight: 240,
       overflow: 'auto',
-      zIndex: 1000,
+      zIndex: 2400,
     },
     option: {
       display: 'flex',
@@ -559,7 +568,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       gap: 10,
       padding: '10px 12px',
       fontSize: s.fontSize,
-      color: 'var(--color-text)',
+      color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
     },
     checkbox: {
@@ -590,7 +599,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               style={styles.tagRemove}
               onClick={(e) => handleRemove(option.value, e)}
             >
-              ×
+              
             </button>
           </span>
         ))}

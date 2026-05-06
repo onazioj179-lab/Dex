@@ -1,9 +1,15 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Processing Pipeline
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
- * Download → Process → Summarize workflow:
+ * Download Process Summarize workflow:
  * 1. User downloads content (file, document, media)
  * 2. Dex detects the new item (with permission)
  * 3. User is prompted to: Organize, Analyze, Summarize
@@ -17,14 +23,15 @@
  * - Original content untouched
  */
 
+import log from 'electron-log';
 import { ipcMain, app, BrowserWindow, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface ProcessingJob {
   id: string;
@@ -96,9 +103,9 @@ export interface PendingFile {
   source: 'downloads' | 'manual' | 'drop';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Processing Pipeline
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ProcessingPipeline {
   private mainWindow: BrowserWindow | null = null;
@@ -142,9 +149,9 @@ class ProcessingPipeline {
     this.registerIPCHandlers();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Initialization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async initialize(): Promise<void> {
     try {
@@ -174,12 +181,12 @@ class ProcessingPipeline {
         this.startDownloadsWatcher();
       }
       
-      console.log('[ProcessingPipeline] Initialized:', {
+      log.info('[ProcessingPipeline] Initialized:', {
         watchDownloads: this.config.watchDownloads,
         completedJobs: this.completedJobs.length,
       });
     } catch (err) {
-      console.error('[ProcessingPipeline] Initialization error:', err);
+      log.error('[ProcessingPipeline] Initialization error:', err);
     }
   }
 
@@ -187,9 +194,9 @@ class ProcessingPipeline {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // File Detection
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private startDownloadsWatcher(): void {
     const downloadsPath = app.getPath('downloads');
@@ -212,9 +219,9 @@ class ProcessingPipeline {
         }
       });
       
-      console.log('[ProcessingPipeline] Watching downloads folder');
+      log.info('[ProcessingPipeline] Watching downloads folder');
     } catch (err) {
-      console.error('[ProcessingPipeline] Failed to watch downloads:', err);
+      log.error('[ProcessingPipeline] Failed to watch downloads:', err);
     }
   }
 
@@ -257,7 +264,7 @@ class ProcessingPipeline {
         this.promptForProcessing(pending);
       }
     } catch (err) {
-      console.error('[ProcessingPipeline] File detection error:', err);
+      log.error('[ProcessingPipeline] File detection error:', err);
     }
   }
 
@@ -267,9 +274,9 @@ class ProcessingPipeline {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Processing
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async processFile(
     filePath: string,
@@ -483,9 +490,9 @@ class ProcessingPipeline {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Content Processing
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async extractContent(filePath: string, fileType: string): Promise<string> {
     const textTypes = ['.txt', '.md', '.json', '.csv', '.xml', '.html'];
@@ -494,14 +501,14 @@ class ProcessingPipeline {
       return fs.readFileSync(filePath, 'utf-8');
     }
     
-    // For other types, return placeholder
-    // Real implementation would use libraries like pdf-parse, mammoth, etc.
-    return `[Content extraction for ${fileType} files - requires additional processing libraries]`;
+    // For other types, return empty string -- content extraction requires
+    // external libraries (pdf-parse, mammoth, etc.) that are not bundled.
+    return '';
   }
 
   private async transcribeAudio(filePath: string): Promise<string> {
-    // Placeholder - real implementation would use whisper or similar
-    return `[Audio transcription placeholder for ${path.basename(filePath)}]`;
+    // Audio transcription requires Whisper or similar engine -- not bundled.
+    return '';
   }
 
   private async analyzeContent(text: string): Promise<{
@@ -572,9 +579,9 @@ class ProcessingPipeline {
     return ['.mp3', '.wav', '.m4a', '.ogg', '.flac'].includes(fileType);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Output
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async saveOutput(
     job: ProcessingJob,
@@ -646,9 +653,9 @@ class ProcessingPipeline {
     return note;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Manual Operations
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async selectAndProcess(options?: Partial<ProcessingOptions>): Promise<ProcessingJob | null> {
     const result = await dialog.showOpenDialog({
@@ -668,9 +675,9 @@ class ProcessingPipeline {
     return this.processFile(result.filePaths[0], options || {});
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Job Management
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getPendingFiles(): PendingFile[] {
     return Array.from(this.pendingFiles.values());
@@ -710,9 +717,9 @@ class ProcessingPipeline {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Configuration
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getConfig(): PipelineConfig {
     return { ...this.config };
@@ -740,9 +747,9 @@ class ProcessingPipeline {
     fs.writeFileSync(this.jobsFile, JSON.stringify(this.completedJobs, null, 2));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Events
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private emitJobUpdate(job: ProcessingJob): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -750,9 +757,9 @@ class ProcessingPipeline {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     ipcMain.handle('pipeline:getConfig', () => this.getConfig());
@@ -775,9 +782,9 @@ class ProcessingPipeline {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Export
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const processingPipeline = new ProcessingPipeline();
 export default processingPipeline;

@@ -1,17 +1,24 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Self-Healing Manager
 // Phase 44: Automatic state recovery, corruption detection, safe rollback
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type HealthStatus = 'healthy' | 'degraded' | 'critical' | 'recovering';
 
@@ -50,9 +57,9 @@ export interface HealthReport {
   currentIssues: CorruptionReport[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const healingStore = new Store<{
   config: SelfHealingConfig;
@@ -77,9 +84,9 @@ const healingStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SELF-HEALING MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SelfHealingManager {
   private static instance: SelfHealingManager;
@@ -97,9 +104,9 @@ class SelfHealingManager {
     return SelfHealingManager.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -117,7 +124,7 @@ class SelfHealingManager {
     await this.createCheckpoint();
 
     this.initialized = true;
-    console.log('[SelfHealingManager] Initialized');
+    log.info('[SelfHealingManager] Initialized');
   }
 
   private setupIPC(): void {
@@ -138,9 +145,9 @@ class SelfHealingManager {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VALIDATORS & RECOVERY ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerDefaultValidators(): void {
     // Validate settings store
@@ -215,16 +222,16 @@ class SelfHealingManager {
     this.recoveryActions.set(component, action);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HEALTH CHECKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startHealthChecks(): void {
     const config = healingStore.get('config');
     
     this.healthCheckTimer = setInterval(() => {
       this.runHealthCheck().catch(err => {
-        console.error('[SelfHealingManager] Health check failed:', err);
+        log.error('[SelfHealingManager] Health check failed:', err);
       });
     }, config.checkIntervalMs);
   }
@@ -269,7 +276,7 @@ class SelfHealingManager {
           healingStore.set('corruptionHistory', history);
         }
       } catch (error) {
-        console.error(`[SelfHealingManager] Validator ${component} threw:`, error);
+        log.error(`[SelfHealingManager] Validator ${component} threw:`, error);
       }
     }
 
@@ -326,23 +333,23 @@ class SelfHealingManager {
     if (!action) return false;
 
     try {
-      console.log(`[SelfHealingManager] Attempting recovery for ${component}`);
+      log.info(`[SelfHealingManager] Attempting recovery for ${component}`);
       const success = await action();
       
       if (success) {
-        console.log(`[SelfHealingManager] Recovery successful for ${component}`);
+        log.info(`[SelfHealingManager] Recovery successful for ${component}`);
       }
       
       return success;
     } catch (error) {
-      console.error(`[SelfHealingManager] Recovery failed for ${component}:`, error);
+      log.error(`[SelfHealingManager] Recovery failed for ${component}:`, error);
       return false;
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CHECKPOINTS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createCheckpoint(): Promise<StateCheckpoint | null> {
     try {
@@ -402,11 +409,11 @@ class SelfHealingManager {
       }
 
       healingStore.set('checkpoints', checkpoints);
-      console.log(`[SelfHealingManager] Checkpoint created: ${checkpointId}`);
+      log.info(`[SelfHealingManager] Checkpoint created: ${checkpointId}`);
 
       return checkpoint;
     } catch (error) {
-      console.error('[SelfHealingManager] Checkpoint creation failed:', error);
+      log.error('[SelfHealingManager] Checkpoint creation failed:', error);
       return null;
     }
   }
@@ -421,7 +428,7 @@ class SelfHealingManager {
       const checkpoint = checkpoints.find(c => c.id === checkpointId);
 
       if (!checkpoint) {
-        console.error(`[SelfHealingManager] Checkpoint not found: ${checkpointId}`);
+        log.error(`[SelfHealingManager] Checkpoint not found: ${checkpointId}`);
         return false;
       }
 
@@ -429,7 +436,7 @@ class SelfHealingManager {
       const checkpointPath = path.join(userDataPath, 'checkpoints', checkpointId);
 
       if (!fs.existsSync(checkpointPath)) {
-        console.error(`[SelfHealingManager] Checkpoint directory not found: ${checkpointPath}`);
+        log.error(`[SelfHealingManager] Checkpoint directory not found: ${checkpointPath}`);
         return false;
       }
 
@@ -447,17 +454,17 @@ class SelfHealingManager {
         fs.copyFileSync(sourcePath, destPath);
       }
 
-      console.log(`[SelfHealingManager] Rolled back to checkpoint: ${checkpointId}`);
+      log.info(`[SelfHealingManager] Rolled back to checkpoint: ${checkpointId}`);
       return true;
     } catch (error) {
-      console.error('[SelfHealingManager] Rollback failed:', error);
+      log.error('[SelfHealingManager] Rollback failed:', error);
       return false;
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): SelfHealingConfig {
     return healingStore.get('config');
@@ -505,9 +512,9 @@ class SelfHealingManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const selfHealingManager = SelfHealingManager.getInstance();
 export default selfHealingManager;

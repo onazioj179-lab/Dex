@@ -1,10 +1,16 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Clipboard History
  * Access past clipboard items with search
  * Ctrl+Shift+V to open
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 
 // ==================== TYPES ====================
 
@@ -67,8 +73,10 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
   // Load history on mount
   useEffect(() => {
     setHistory(loadHistory());
-    const savedPins = localStorage.getItem('dex-clipboard-pinned');
-    if (savedPins) setPinnedItems(new Set(JSON.parse(savedPins)));
+    try {
+      const savedPins = localStorage.getItem('dex-clipboard-pinned');
+      if (savedPins) setPinnedItems(new Set(JSON.parse(savedPins)));
+    } catch { /* ignore corrupted pins */ }
   }, []);
 
   // Monitor clipboard
@@ -98,7 +106,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     };
 
     checkClipboard();
-    const interval = setInterval(checkClipboard, 1000);
+    const interval = setInterval(checkClipboard, 5000);
     return () => clearInterval(interval);
   }, [isOpen]);
 
@@ -112,18 +120,18 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
   }, [isOpen]);
 
   // Filter items
-  const filteredItems = query.trim()
+  const filteredItems = useMemo(() => query.trim()
     ? history.filter(item => item.content.toLowerCase().includes(query.toLowerCase()))
-    : history;
+    : history, [query, history]);
 
   // Sort: pinned first
-  const sortedItems = [...filteredItems].sort((a, b) => {
+  const sortedItems = useMemo(() => [...filteredItems].sort((a, b) => {
     const aPinned = pinnedItems.has(a.id);
     const bPinned = pinnedItems.has(b.id);
     if (aPinned && !bPinned) return -1;
     if (!aPinned && bPinned) return 1;
     return 0;
-  });
+  }), [filteredItems, pinnedItems]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -205,9 +213,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     overlay: {
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      backdropFilter: 'blur(4px)',
-      zIndex: 10000,
+      background: 'var(--color-bg-elevated)',
+      zIndex: 'var(--z-modal)',
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'center',
@@ -347,13 +354,13 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
   };
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.container} onClick={e => e.stopPropagation()}>
+    <div style={styles.overlay} onMouseDown={onClose}>
+      <div style={styles.container} onMouseDown={e => e.stopPropagation()}>
         <div style={styles.header}>
           <span style={styles.headerIcon}>{Icons.clipboard}</span>
           <span style={styles.title}>Clipboard History</span>
           {history.length > 0 && (
-            <button style={styles.clearBtn} onClick={clearHistory}>Clear All</button>
+            <button style={styles.clearBtn} onClick={clearHistory} aria-label="Clear clipboard history">Clear All</button>
           )}
         </div>
 
@@ -395,7 +402,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
                 >
                   <div style={{
                     ...styles.itemIcon,
-                    background: isSelected ? 'rgba(255,255,255,0.2)' : styles.itemIcon.background,
+                    background: isSelected ? 'var(--color-text-tertiary)' : styles.itemIcon.background,
                     color: isSelected ? '#fff' : styles.itemIcon.color,
                   }}>
                     {item.type === 'text' ? Icons.text : item.type === 'image' ? Icons.image : Icons.file}
@@ -410,7 +417,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
                     <div style={styles.itemMeta}>
                       <span style={{
                         ...styles.itemTime,
-                        color: isSelected ? 'rgba(255,255,255,0.7)' : styles.itemTime.color,
+                        color: isSelected ? 'var(--color-text-secondary)' : styles.itemTime.color,
                       }}>{formatTime(item.timestamp)}</span>
                       {isPinned && <span style={styles.itemPinned}>Pinned</span>}
                     </div>
@@ -472,4 +479,4 @@ export const useClipboardHistory = () => {
   };
 };
 
-export default ClipboardHistory;
+export default memo(ClipboardHistory);

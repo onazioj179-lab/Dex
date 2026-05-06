@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ═══════════════════════════════════════════════════════════════════════════
 // DEX Native — System Monitoring
 // Replaces: psutil + systeminformation for CPU, memory, battery, disk, network
@@ -7,12 +13,20 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use sysinfo::{Disks, Networks, System};
 use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
 
 // ─────────────────────────────────────────────────────────────────────────
-// Shared System instance (sysinfo needs reuse for accurate CPU deltas)
+// Shared instances (reuse for accurate deltas and avoid re-creation)
 // ─────────────────────────────────────────────────────────────────────────
 
 static SYS: OnceLock<Mutex<System>> = OnceLock::new();
+static DISKS: OnceLock<Mutex<(Disks, Instant)>> = OnceLock::new();
+static NETS: OnceLock<Mutex<(Networks, Instant)>> = OnceLock::new();
+
+/// Disk refresh interval -- avoid rescanning on every call
+const DISK_REFRESH_SECS: u64 = 30;
+/// Network refresh interval
+const NET_REFRESH_SECS: u64 = 5;
 
 pub(crate) fn shared_sys() -> &'static Mutex<System> {
     SYS.get_or_init(|| {
@@ -120,11 +134,19 @@ pub fn get_system_stats() -> Result<SystemStats> {
     })
 }
 
-/// Get disk usage for all mounted volumes.
+/// Get disk usage for all mounted volumes (cached, refreshed every 30s).
 #[napi]
 pub fn get_disk_info() -> Result<Vec<DiskInfo>> {
-    let disks = Disks::new_with_refreshed_list();
-    Ok(disks
+    let mut guard = DISKS.get_or_init(|| {
+        Mutex::new((Disks::new_with_refreshed_list(), Instant::now()))
+    }).lock().map_err(|e| Error::from_reason(e.to_string()))?;
+
+    if guard.1.elapsed().as_secs() > DISK_REFRESH_SECS {
+        guard.0 = Disks::new_with_refreshed_list();
+        guard.1 = Instant::now();
+    }
+
+    Ok(guard.0
         .iter()
         .map(|d| {
             let t = d.total_space() as f64;
@@ -143,11 +165,19 @@ pub fn get_disk_info() -> Result<Vec<DiskInfo>> {
         .collect())
 }
 
-/// Get network interface statistics.
+/// Get network interface statistics (cached, refreshed every 5s).
 #[napi]
 pub fn get_network_info() -> Result<Vec<NetworkInfo>> {
-    let nets = Networks::new_with_refreshed_list();
-    Ok(nets
+    let mut guard = NETS.get_or_init(|| {
+        Mutex::new((Networks::new_with_refreshed_list(), Instant::now()))
+    }).lock().map_err(|e| Error::from_reason(e.to_string()))?;
+
+    if guard.1.elapsed().as_secs() > NET_REFRESH_SECS {
+        guard.0 = Networks::new_with_refreshed_list();
+        guard.1 = Instant::now();
+    }
+
+    Ok(guard.0
         .iter()
         .map(|(name, data)| NetworkInfo {
             name: name.clone(),
@@ -241,4 +271,117 @@ fn battery_linux() -> (Option<f64>, Option<bool>, Option<f64>) {
         }
     }
     (None, None, None)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Component Temperatures
+// ─────────────────────────────────────────────────────────────────────────
+
+#[napi(object)]
+#[derive(Clone)]
+pub struct ComponentTemp {
+    pub label: String,
+    pub temperature: f64,
+    pub max: f64,
+    pub critical: Option<f64>,
+}
+
+/// Get component temperatures (CPU, GPU, SSD, etc.)
+#[napi]
+pub fn get_temperatures() -> Result<Vec<ComponentTemp>> {
+    use sysinfo::Components;
+    let components = Components::new_with_refreshed_list();
+    Ok(components
+        .iter()
+        .map(|c| ComponentTemp {
+            label: c.label().to_string(),
+            temperature: c.temperature() as f64,
+            max: c.max() as f64,
+            critical: c.critical().map(|v| v as f64),
+        })
+        .collect())
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// GPU Information
+// ─────────────────────────────────────────────────────────────────────────
+
+#[napi(object)]
+#[derive(Clone)]
+pub struct GpuInfo {
+    pub name: String,
+    pub vendor: String,
+    pub driver: String,
+    pub memory_total_mb: u32,
+}
+
+/// Get GPU information (best-effort, platform-specific)
+#[napi]
+pub fn get_gpu_info() -> Result<Vec<GpuInfo>> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let out = Command::new("wmic")
+            .args(["path", "Win32_VideoController", "get", "Name,AdapterCompatibility,DriverVersion,AdapterRAM", "/format:csv"])
+            .output();
+        match out {
+            Ok(o) => {
+                let txt = String::from_utf8_lossy(&o.stdout);
+                let gpus: Vec<GpuInfo> = txt
+                    .lines()
+                    .skip(1)
+                    .filter(|l| !l.trim().is_empty())
+                    .filter_map(|line| {
+                        let parts: Vec<&str> = line.split(',').collect();
+                        if parts.len() >= 5 {
+                            let ram: u64 = parts[2].trim().parse().unwrap_or(0);
+                            Some(GpuInfo {
+                                vendor: parts[1].trim().to_string(),
+                                memory_total_mb: (ram / (1024 * 1024)) as u32,
+                                driver: parts[3].trim().to_string(),
+                                name: parts[4].trim().to_string(),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                Ok(gpus)
+            }
+            Err(_) => Ok(vec![]),
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(vec![])
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Async system stats variant (non-blocking)
+// ─────────────────────────────────────────────────────────────────────────
+
+#[napi]
+pub async fn get_system_stats_async() -> Result<SystemStats> {
+    get_system_stats()
+}
+
+#[napi]
+pub async fn get_disk_info_async() -> Result<Vec<DiskInfo>> {
+    get_disk_info()
+}
+
+#[napi]
+pub async fn get_network_info_async() -> Result<Vec<NetworkInfo>> {
+    get_network_info()
+}
+
+#[napi]
+pub async fn get_temperatures_async() -> Result<Vec<ComponentTemp>> {
+    get_temperatures()
+}
+
+#[napi]
+pub async fn get_gpu_info_async() -> Result<Vec<GpuInfo>> {
+    get_gpu_info()
 }

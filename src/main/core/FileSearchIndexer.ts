@@ -1,18 +1,25 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Search Indexer
 // FINAL UI FUNCTIONALITY PHASE: Scoped Computer Search
 // Indexes user-approved folders, incremental, pauses during interaction
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ipcMain, BrowserWindow } from 'electron';
 import { DataStore } from '../store/DataStore';
 import { Logger } from '../utils/Logger';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface FileIndexEntry {
   id: string;
@@ -49,9 +56,9 @@ export interface FileSearchResult {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Constants
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const MAX_FILES_PER_SCOPE = 10000;
 const INDEX_BATCH_SIZE = 100;
@@ -72,9 +79,9 @@ const SUPPORTED_EXTENSIONS = new Set([
   '.zip', '.rar', '.7z', '.tar', '.gz',
 ]);
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // File Search Indexer
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class FileSearchIndexer {
   private dataStore: DataStore;
@@ -111,9 +118,9 @@ export class FileSearchIndexer {
     this.logger.info('File Search Indexer initialized');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC Handlers
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerHandlers(): void {
     // Get all indexed scopes
@@ -166,9 +173,9 @@ export class FileSearchIndexer {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Scope Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadScopes(): Promise<void> {
     try {
@@ -268,9 +275,9 @@ export class FileSearchIndexer {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Indexing
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startBackgroundIndexing(): void {
     // Index all enabled scopes that haven't been indexed recently
@@ -417,17 +424,17 @@ export class FileSearchIndexer {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // User Activity & Pause
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startActivityMonitor(): void {
-    // Check for user activity every 100ms during indexing
+    // Check for user activity every 500ms during indexing
     this.activityCheckInterval = setInterval(() => {
       const timeSinceActivity = Date.now() - this.lastUserActivity;
       // Pause if user was active in last 500ms
       this.shouldPause = timeSinceActivity < 500;
-    }, 100);
+    }, 500);
   }
 
   recordUserActivity(): void {
@@ -442,9 +449,9 @@ export class FileSearchIndexer {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Search
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   search(query: string, options?: { limit?: number }): FileSearchResult[] {
     const limit = options?.limit || 10;
@@ -513,15 +520,15 @@ export class FileSearchIndexer {
       .map(({ rawScore, ...result }) => result);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   shutdown(): void {
     if (this.activityCheckInterval) {
       clearInterval(this.activityCheckInterval);
     }
-    this.saveIndex().catch(() => {});
+    this.saveIndex().catch((e: unknown) => { log.warn('[DEX]', e); });
   }
 }
 

@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Built-in Text & Code Editor
 // Full-featured text/code editing with syntax highlighting, multi-file support
 // Keyboard-driven, minimal UI, session persistence
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, dialog } from 'electron';
@@ -11,9 +17,9 @@ import * as path from 'path';
 import log from 'electron-log';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type EditorTheme = 'dark' | 'light' | 'system';
 export type IndentStyle = 'spaces' | 'tabs';
@@ -145,9 +151,9 @@ export interface EditorStats {
   languageBreakdown: Record<string, number>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LANGUAGE DEFINITIONS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const LANGUAGES: LanguageConfig[] = [
   {
@@ -360,9 +366,9 @@ const LANGUAGES: LanguageConfig[] = [
   },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TEXT CODE EDITOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class TextCodeEditorClass extends EventEmitter {
   private documents: Map<string, EditorDocument> = new Map();
@@ -404,9 +410,9 @@ class TextCodeEditorClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -423,9 +429,9 @@ class TextCodeEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Document operations
@@ -667,9 +673,9 @@ class TextCodeEditorClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DOCUMENT OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   newDocument(language = 'plaintext'): EditorDocument {
     const id = `doc-${++this.idCounter}-${Date.now()}`;
@@ -910,9 +916,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONTENT OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getDocument(documentId: string): EditorDocument | null {
     return this.documents.get(documentId) || null;
@@ -1021,9 +1027,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HISTORY (UNDO/REDO)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private addHistoryEntry(doc: EditorDocument, changes: TextChange[]): void {
     const entry: HistoryEntry = {
@@ -1118,9 +1124,9 @@ class TextCodeEditorClass extends EventEmitter {
     return doc ? doc.history.redoStack.length > 0 : false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTIVE DOCUMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setActiveDocument(documentId: string): { success: boolean } {
     if (!this.documents.has(documentId)) return { success: false };
@@ -1137,9 +1143,9 @@ class TextCodeEditorClass extends EventEmitter {
     return this.documents.get(this.activeDocumentId) || null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CURSOR & SELECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setCursorPosition(documentId: string, position: EditorPosition): { success: boolean } {
     const doc = this.documents.get(documentId);
@@ -1172,9 +1178,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true, selection };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SEARCH & REPLACE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   search(documentId: string, options: SearchOptions): SearchResult[] {
     const doc = this.documents.get(documentId);
@@ -1281,9 +1287,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true, replaced: matchCount };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // GO TO
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   goToLine(documentId: string, line: number): { success: boolean } {
     return this.goToPosition(documentId, { line, column: 1 });
@@ -1300,9 +1306,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LANGUAGE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setLanguage(documentId: string, language: string): { success: boolean } {
     const doc = this.documents.get(documentId);
@@ -1330,9 +1336,9 @@ class TextCodeEditorClass extends EventEmitter {
     return 'plaintext';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FORMATTING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   formatDocument(documentId: string): { success: boolean } {
     const doc = this.documents.get(documentId);
@@ -1446,9 +1452,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FOLDING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   foldLine(documentId: string, line: number): { success: boolean } {
     const doc = this.documents.get(documentId);
@@ -1488,9 +1494,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BOOKMARKS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   toggleBookmark(documentId: string, line: number): { success: boolean; bookmarked: boolean } {
     const doc = this.documents.get(documentId);
@@ -1535,9 +1541,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true, line: prevBookmark };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // WORD WRAP & ENCODING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   toggleWordWrap(documentId: string): { success: boolean; enabled: boolean } {
     const doc = this.documents.get(documentId);
@@ -1565,9 +1571,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATISTICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): EditorStats {
     const docs = Array.from(this.documents.values());
@@ -1614,9 +1620,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { lines, words, characters, selected };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SYNC HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private handleContentChange(documentId: string, content: string, changes: TextChange[]): void {
     const doc = this.documents.get(documentId);
@@ -1654,9 +1660,9 @@ class TextCodeEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // AUTO SAVE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private scheduleAutoSave(documentId: string): void {
     if (!this.config.autoSave) return;
@@ -1679,9 +1685,9 @@ class TextCodeEditorClass extends EventEmitter {
     this.autoSaveTimers.set(documentId, timer);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getEndPosition(content: string): EditorPosition {
     const lines = content.split('\n');
@@ -1798,9 +1804,9 @@ class TextCodeEditorClass extends EventEmitter {
     return { success: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadConfig(): Promise<void> {
     try {
@@ -1843,9 +1849,9 @@ class TextCodeEditorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     // Clear all auto-save timers
@@ -1859,9 +1865,9 @@ class TextCodeEditorClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const TextCodeEditor = new TextCodeEditorClass();
 export default TextCodeEditor;

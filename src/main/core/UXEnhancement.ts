@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX OVERVIEW MODE & QUICK PREVIEW
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Premium UX features:
  * - Overview Mode: See all open windows, virtual desktops, and apps at once
@@ -10,13 +16,14 @@
  * - Dynamic Themes: Time-aware wallpapers and system themes
  */
 
+import log from 'electron-log';
 import { app, ipcMain, BrowserWindow, screen, globalShortcut, nativeImage, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface VirtualDesktop {
   id: string;
@@ -86,9 +93,9 @@ interface DynamicTheme {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // OVERVIEW MODE - All Windows & Desktops at Glance
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class OverviewModeService {
   private virtualDesktops: Map<string, VirtualDesktop> = new Map();
@@ -128,7 +135,7 @@ class OverviewModeService {
   showOverview(): void {
     if (this.isOverviewActive) return;
 
-    console.log('[OverviewMode] Activating...');
+    log.info('[OverviewMode] Activating...');
     this.isOverviewActive = true;
 
     // Capture all window thumbnails
@@ -153,7 +160,7 @@ class OverviewModeService {
   hideOverview(): void {
     if (!this.isOverviewActive) return;
 
-    console.log('[OverviewMode] Deactivating...');
+    log.info('[OverviewMode] Deactivating...');
     this.isOverviewActive = false;
 
     BrowserWindow.getAllWindows().forEach(win => {
@@ -297,9 +304,9 @@ class OverviewModeService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // QUICK PREVIEW - Instant File Preview
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class QuickPreviewService {
   private previewWindow: BrowserWindow | null = null;
@@ -336,7 +343,7 @@ class QuickPreviewService {
    */
   async openPreview(filePath: string): Promise<void> {
     if (!fs.existsSync(filePath)) {
-      console.warn('[QuickPreview] File not found:', filePath);
+      log.warn('[QuickPreview] File not found:', filePath);
       return;
     }
 
@@ -351,7 +358,7 @@ class QuickPreviewService {
       metadata,
     };
 
-    console.log(`[QuickPreview] Opening: ${filePath} (${fileType})`);
+    log.info(`[QuickPreview] Opening: ${filePath} (${fileType})`);
 
     // Emit preview data to renderer
     BrowserWindow.getAllWindows().forEach(win => {
@@ -413,7 +420,7 @@ class QuickPreviewService {
         const image = nativeImage.createFromPath(filePath);
         const size = image.getSize();
         metadata.dimensions = { width: size.width, height: size.height };
-      } catch {}
+      } catch (e) { log.warn('[DEX]', e); }
     }
 
     return metadata;
@@ -451,9 +458,9 @@ class QuickPreviewService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SMART TAGS - Advanced File Organization
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SmartTagsService {
   private tags: Map<string, SmartTag> = new Map();
@@ -471,7 +478,7 @@ class SmartTagsService {
         data.forEach((tag: SmartTag) => this.tags.set(tag.id, tag));
       }
     } catch (error) {
-      console.warn('[SmartTags] Failed to load tags:', error);
+      log.warn('[SmartTags] Failed to load tags:', error);
     }
 
     // Initialize default tags if empty
@@ -497,7 +504,7 @@ class SmartTagsService {
     try {
       fs.writeFileSync(this.configPath, JSON.stringify(Array.from(this.tags.values()), null, 2));
     } catch (error) {
-      console.error('[SmartTags] Failed to save tags:', error);
+      log.error('[SmartTags] Failed to save tags:', error);
     }
   }
 
@@ -585,9 +592,9 @@ class SmartTagsService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DYNAMIC THEMES - Time-Aware Themes & Wallpapers
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class DynamicThemesService {
   private currentTheme: DynamicTheme | null = null;
@@ -645,7 +652,7 @@ class DynamicThemesService {
   setTheme(theme: DynamicTheme): void {
     this.currentTheme = theme;
     this.updateThemeBasedOnTime();
-    console.log(`[DynamicThemes] Theme set: ${theme.name}`);
+    log.info(`[DynamicThemes] Theme set: ${theme.name}`);
   }
 
   /**
@@ -697,9 +704,9 @@ class DynamicThemesService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // UX ENHANCEMENT MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class UXEnhancementManager {
   public overviewMode: OverviewModeService;
@@ -721,13 +728,13 @@ class UXEnhancementManager {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    console.log('[UXEnhancement] Initializing...');
+    log.info('[UXEnhancement] Initializing...');
 
     this.registerIPCHandlers();
     this.registerGlobalShortcuts();
 
     this.isInitialized = true;
-    console.log('[UXEnhancement] Initialized successfully');
+    log.info('[UXEnhancement] Initialized successfully');
   }
 
   private registerIPCHandlers(): void {
@@ -782,7 +789,7 @@ class UXEnhancementManager {
    * Shutdown
    */
   shutdown(): void {
-    console.log('[UXEnhancement] Shutting down...');
+    log.info('[UXEnhancement] Shutting down...');
     globalShortcut.unregister('F3');
     globalShortcut.unregister('CommandOrControl+Up');
     this.dynamicThemes.shutdown();
@@ -790,9 +797,9 @@ class UXEnhancementManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const uxEnhancement = new UXEnhancementManager();
 

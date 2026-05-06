@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Longevity Guardian
 // Phase 44: Long-run resource sanity, memory drift detection, flat usage over time
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface LongevityConfig {
   enabled: boolean;
@@ -53,9 +60,9 @@ export interface OrphanedTask {
   status: 'running' | 'stalled' | 'orphaned';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const longevityStore = new Store<{
   config: LongevityConfig;
@@ -86,9 +93,9 @@ const longevityStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LONGEVITY GUARDIAN
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class LongevityGuardian {
   private static instance: LongevityGuardian;
@@ -108,9 +115,9 @@ class LongevityGuardian {
     return LongevityGuardian.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -128,7 +135,7 @@ class LongevityGuardian {
     }
 
     this.initialized = true;
-    console.log('[LongevityGuardian] Initialized');
+    log.info('[LongevityGuardian] Initialized');
   }
 
   private setupIPC(): void {
@@ -149,9 +156,9 @@ class LongevityGuardian {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERIODIC CHECKS (IDLE ONLY)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private startPeriodicChecks(): void {
     const config = longevityStore.get('config');
@@ -168,7 +175,7 @@ class LongevityGuardian {
     const config = longevityStore.get('config');
     if (!config.enabled) return;
 
-    console.log('[LongevityGuardian] Running periodic check');
+    log.info('[LongevityGuardian] Running periodic check');
 
     // Update stats
     const stats = longevityStore.get('stats');
@@ -198,9 +205,9 @@ class LongevityGuardian {
     this.isIdle = idle;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // MEMORY DRIFT DETECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async captureBaseline(): Promise<ResourceBaseline> {
     const usage = process.memoryUsage();
@@ -214,7 +221,7 @@ class LongevityGuardian {
     };
 
     longevityStore.set('baseline', baseline);
-    console.log(`[LongevityGuardian] Baseline captured: ${baseline.heapUsedMB}MB heap`);
+    log.info(`[LongevityGuardian] Baseline captured: ${baseline.heapUsedMB}MB heap`);
 
     return baseline;
   }
@@ -252,9 +259,9 @@ class LongevityGuardian {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CACHE COMPACTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   registerCacheCompactor(compactor: () => Promise<number>): () => void {
     this.cacheCompactors.add(compactor);
@@ -262,7 +269,7 @@ class LongevityGuardian {
   }
 
   async runCompaction(): Promise<number> {
-    console.log('[LongevityGuardian] Running compaction');
+    log.info('[LongevityGuardian] Running compaction');
 
     let totalRecovered = 0;
 
@@ -272,7 +279,7 @@ class LongevityGuardian {
         const recovered = await compactor();
         totalRecovered += recovered;
       } catch (error) {
-        console.error('[LongevityGuardian] Compactor failed:', error);
+        log.error('[LongevityGuardian] Compactor failed:', error);
       }
     }
 
@@ -285,13 +292,13 @@ class LongevityGuardian {
       totalRecovered += Math.round(gcRecovered);
     }
 
-    console.log(`[LongevityGuardian] Compaction recovered ${totalRecovered}MB`);
+    log.info(`[LongevityGuardian] Compaction recovered ${totalRecovered}MB`);
     return totalRecovered;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ORPHANED TASK CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   trackTask(taskId: string, type: string): void {
     this.trackedTasks.set(taskId, {
@@ -339,16 +346,16 @@ class LongevityGuardian {
     const orphaned = this.getOrphanedTasks().filter(t => t.status === 'orphaned');
     
     for (const task of orphaned) {
-      console.log(`[LongevityGuardian] Cleaning up orphaned task: ${task.id}`);
+      log.info(`[LongevityGuardian] Cleaning up orphaned task: ${task.id}`);
       this.trackedTasks.delete(task.id);
     }
 
     return orphaned.length;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): LongevityConfig {
     return longevityStore.get('config');
@@ -371,9 +378,9 @@ class LongevityGuardian {
     return Date.now() - this.startTime;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // GUARANTEES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Verify that performance has not degraded over time
@@ -401,9 +408,9 @@ class LongevityGuardian {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const longevityGuardian = LongevityGuardian.getInstance();
 export default longevityGuardian;

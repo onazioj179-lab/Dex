@@ -1,15 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Background Task Controller
 // Phase 15: Deep Internal Micro-Optimization
 // Manages background work with idle callbacks and interruptibility
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import log from 'electron-log';
-import { powerMonitor } from 'electron';
+import { ipcMain, powerMonitor } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type TaskPriority = 'critical' | 'high' | 'normal' | 'low' | 'idle';
 
@@ -34,9 +40,9 @@ interface RunningTask {
   controller: AbortController;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BACKGROUND TASK CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class BackgroundTaskControllerClass {
   private queue: QueuedTask[] = [];
@@ -88,14 +94,17 @@ class BackgroundTaskControllerClass {
   start(): void {
     if (this.processInterval) return;
 
-    // Use event-driven where possible, minimal polling
+    // Process queue at 5s intervals — sufficient for background work, saves CPU
     this.processInterval = setInterval(() => {
       this.processQueue();
-    }, this.config.processIntervalMs);
+    }, Math.max(this.config.processIntervalMs, 5000));
 
     this.idleCheckInterval = setInterval(() => {
       this.updateIdleState();
-    }, this.config.idleCheckIntervalMs);
+    }, Math.max(this.config.idleCheckIntervalMs, 30000));
+
+    // Expose status to renderer via IPC
+    ipcMain.handle('background-tasks:status', () => this.getStatus());
 
     log.info('[BackgroundTasks] Controller started (optimized for low CPU)');
   }
@@ -367,9 +376,9 @@ class BackgroundTaskControllerClass {
 // Singleton export
 export const backgroundTasks = new BackgroundTaskControllerClass();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // IDLE CALLBACK - Run work during idle periods
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export function scheduleIdleWork(
   work: () => void | Promise<void>,
@@ -389,9 +398,9 @@ export function scheduleIdleWork(
   return id;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BATCH PROCESSOR - Process items in batches with yielding
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export async function processBatch<T>(
   items: T[],

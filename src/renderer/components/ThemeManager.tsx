@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Theme Manager
  * Advanced theme customization with accent colors and presets
@@ -157,9 +163,20 @@ export const applyTheme = (preset: ThemePreset) => {
   localStorage.setItem('dex-accent-color', preset.accentColor);
 };
 
-// Apply just accent color
+// Apply just accent color + derived accent-light/soft/muted variants
 export const applyAccentColor = (color: string) => {
-  document.documentElement.style.setProperty('--color-accent', color);
+  const root = document.documentElement;
+  root.style.setProperty('--color-accent', color);
+  root.style.setProperty('--accent-color', color);
+  // Parse hex to derive RGBA variants
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  if (!isNaN(r)) {
+    root.style.setProperty('--color-accent-light', `rgba(${r}, ${g}, ${b}, 0.10)`);
+    root.style.setProperty('--color-accent-soft', `rgba(${r}, ${g}, ${b}, 0.06)`);
+    root.style.setProperty('--color-accent-muted', `rgba(${r}, ${g}, ${b}, 0.08)`);
+  }
   localStorage.setItem('dex-accent-color', color);
 };
 
@@ -237,8 +254,12 @@ export const ThemeManager: React.FC<ThemeManagerProps> = ({ isOpen, onClose }) =
   if (!isOpen) return null;
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.panel} onClick={e => e.stopPropagation()}>
+    <div style={styles.overlay} onMouseDown={onClose} role="presentation"
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      tabIndex={-1}
+      ref={(el) => el?.focus()}
+    >
+      <div style={styles.panel} onMouseDown={e => e.stopPropagation()}>
         <div style={styles.header}>
           <div style={styles.headerTitle}>
             {Icons.palette}
@@ -351,7 +372,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'fixed',
     inset: 0,
     background: 'rgba(0, 0, 0, 0.3)',
-    zIndex: 99998,
+    zIndex: 'var(--z-max)',
   },
   panel: {
     position: 'fixed',
@@ -386,7 +407,7 @@ const styles: Record<string, React.CSSProperties> = {
   closeBtn: {
     background: 'transparent',
     border: 'none',
-    color: '#71717a',
+    color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
     padding: '4px',
     display: 'flex',
@@ -424,7 +445,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: '6px',
-    color: '#71717a',
+    color: 'var(--color-text-tertiary)',
     fontSize: '13px',
     cursor: 'pointer',
   },

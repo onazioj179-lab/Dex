@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Failure Containment System
 // Phase 45: Fault isolation, crash containment, automatic recovery
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, BrowserWindow } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type FaultDomain = 
   | 'core'
@@ -58,9 +65,9 @@ export interface SafeModeConfig {
   disabledDomains: FaultDomain[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const containmentStore = new Store<{
   config: FailureContainmentConfig;
@@ -99,9 +106,9 @@ const containmentStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FAILURE CONTAINMENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FailureContainment {
   private static instance: FailureContainment;
@@ -118,9 +125,9 @@ class FailureContainment {
     return FailureContainment.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -132,11 +139,11 @@ class FailureContainment {
     // Check if we should be in safe mode
     const safeMode = containmentStore.get('safeMode');
     if (safeMode.active) {
-      console.log('[FailureContainment] Starting in safe mode');
+      log.info('[FailureContainment] Starting in safe mode');
     }
 
     this.initialized = true;
-    console.log('[FailureContainment] Initialized');
+    log.info('[FailureContainment] Initialized');
   }
 
   private setupIPC(): void {
@@ -172,9 +179,9 @@ class FailureContainment {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECOVERY HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private registerDefaultRecoveryHandlers(): void {
     // UI recovery - reload renderer
@@ -205,9 +212,9 @@ class FailureContainment {
     this.recoveryHandlers.set(domain, handler);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FAULT REPORTING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async reportFault(
     domain: FaultDomain,
@@ -246,7 +253,7 @@ class FailureContainment {
     status.healthy = false;
     containmentStore.set('domainStatus', domainStatus);
 
-    console.log(`[FailureContainment] Fault in ${domain}: ${error}`);
+    log.info(`[FailureContainment] Fault in ${domain}: ${error}`);
 
     // Check if isolation is needed
     if (status.faultCount >= config.maxFaultsBeforeIsolation) {
@@ -264,9 +271,9 @@ class FailureContainment {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ISOLATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async isolateDomain(domain: FaultDomain): Promise<boolean> {
     const config = containmentStore.get('config');
@@ -275,7 +282,7 @@ class FailureContainment {
 
     if (status.isolated) return true;
 
-    console.log(`[FailureContainment] Isolating domain: ${domain}`);
+    log.info(`[FailureContainment] Isolating domain: ${domain}`);
 
     status.isolated = true;
     status.healthy = false;
@@ -296,7 +303,7 @@ class FailureContainment {
 
     if (!status.isolated) return true;
 
-    console.log(`[FailureContainment] Restoring domain: ${domain}`);
+    log.info(`[FailureContainment] Restoring domain: ${domain}`);
 
     status.isolated = false;
     status.faultCount = 0;
@@ -318,9 +325,9 @@ class FailureContainment {
     return domainStatus[domain].isolated;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECOVERY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async attemptRecovery(domain: FaultDomain, fault: Fault): Promise<boolean> {
     const config = containmentStore.get('config');
@@ -328,7 +335,7 @@ class FailureContainment {
 
     if (!handler) return false;
     if (fault.recoveryAttempts >= config.maxRecoveryAttempts) {
-      console.log(`[FailureContainment] Max recovery attempts reached for ${domain}`);
+      log.info(`[FailureContainment] Max recovery attempts reached for ${domain}`);
       return false;
     }
 
@@ -345,7 +352,7 @@ class FailureContainment {
         fault.recovered = true;
         status.healthy = true;
         status.faultCount = 0;
-        console.log(`[FailureContainment] Recovery successful for ${domain}`);
+        log.info(`[FailureContainment] Recovery successful for ${domain}`);
       }
 
       status.recoveryInProgress = false;
@@ -353,19 +360,19 @@ class FailureContainment {
 
       return success;
     } catch (error) {
-      console.error(`[FailureContainment] Recovery failed for ${domain}:`, error);
+      log.error(`[FailureContainment] Recovery failed for ${domain}:`, error);
       status.recoveryInProgress = false;
       containmentStore.set('domainStatus', domainStatus);
       return false;
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SAFE MODE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async enterSafeMode(reason: string): Promise<boolean> {
-    console.log(`[FailureContainment] Entering safe mode: ${reason}`);
+    log.info(`[FailureContainment] Entering safe mode: ${reason}`);
 
     const safeMode: SafeModeConfig = {
       active: true,
@@ -388,7 +395,7 @@ class FailureContainment {
     const safeMode = containmentStore.get('safeMode');
     if (!safeMode.active) return true;
 
-    console.log('[FailureContainment] Exiting safe mode');
+    log.info('[FailureContainment] Exiting safe mode');
 
     // Restore all domains
     for (const domain of safeMode.disabledDomains) {
@@ -413,9 +420,9 @@ class FailureContainment {
     return containmentStore.get('safeMode').active;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STABLE CONFIG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   saveStableConfig(config: Record<string, unknown>): void {
     containmentStore.set('lastStableConfig', config);
@@ -430,13 +437,13 @@ class FailureContainment {
     if (!stableConfig) return false;
 
     // Would apply stable config to settings
-    console.log('[FailureContainment] Rolling back to stable config');
+    log.info('[FailureContainment] Rolling back to stable config');
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NOTIFICATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private notifyUser(fault: Fault): void {
     const windows = BrowserWindow.getAllWindows();
@@ -451,9 +458,9 @@ class FailureContainment {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): FailureContainmentConfig {
     return containmentStore.get('config');
@@ -495,9 +502,9 @@ class FailureContainment {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const failureContainment = FailureContainment.getInstance();
 export default failureContainment;

@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 // ===========================================================================
 // DEX - Q1 Foundation Integration Module
 // Unified initialization for all Q1 hardening systems
@@ -105,7 +111,7 @@ class Q1FoundationIntegration {
    * Setup integrations between Q1 systems
    */
   private setupCrossSystemIntegrations(): void {
-    // Auth → Vault: Lock vault when auth session expires
+    // Auth Vault: Lock vault when auth session expires
     authHardening.on('session-invalidated', () => {
       log.info('[Q1Foundation] Auth session invalidated, signaling vault lock');
       vaultHardening.clearClipboardNow();
@@ -116,7 +122,7 @@ class Q1FoundationIntegration {
       vaultHardening.clearClipboardNow();
     });
 
-    // Auth → Session: Record activity from session to extend auth
+    // Auth Session: Record activity from session to extend auth
     sessionHardening.on('navigation-started', () => {
       authHardening.recordActivity();
     });
@@ -125,20 +131,20 @@ class Q1FoundationIntegration {
       authHardening.recordActivity();
     });
 
-    // Session → Vault: Log vault access when tab navigates to sensitive URL
+    // Session Vault: Log vault access when tab navigates to sensitive URL
     sessionHardening.on('navigation-completed', ({ tabId, success }) => {
       if (success) {
         authHardening.recordActivity();
       }
     });
 
-    // Auth lockout → Session: Capture snapshot before lockout
+    // Auth lockout Session: Capture snapshot before lockout
     authHardening.on('lockout', async () => {
       log.info('[Q1Foundation] Auth lockout, capturing session snapshot');
       await sessionHardening.captureSnapshot('auth-lockout');
     });
 
-    // Tab crash → Auth: Don't count as inactivity
+    // Tab crash Auth: Don't count as inactivity
     sessionHardening.on('tab-crashed', () => {
       log.warn('[Q1Foundation] Tab crashed, maintaining auth activity');
       authHardening.recordActivity();

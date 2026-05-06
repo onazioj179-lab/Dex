@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="beamGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#4A9EFF"/>
+      <stop offset="100%" stop-color="#6B3FA0"/>
+    </linearGradient>
+    <linearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2A2A3A"/>
+      <stop offset="100%" stop-color="#1A1A28"/>
+    </linearGradient>
+    <clipPath id="frameClip">
+      <rect x="80" y="80" width="864" height="864" rx="48"/>
+    </clipPath>
+  </defs>
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="200" fill="#0A0C12"/>
+  <!-- Film frame outer shape -->
+  <rect x="80" y="80" width="864" height="864" rx="48" fill="none" stroke="url(#frameGrad)" stroke-width="16"/>
+  <!-- Inner frame border -->
+  <rect x="120" y="120" width="784" height="784" rx="32" fill="none" stroke="#1E1E2E" stroke-width="4"/>
+  <!-- Sprocket holes at corners -->
+  <rect x="108" y="108" width="36" height="52" rx="8" fill="#0A0C12" stroke="#2A2A3A" stroke-width="3"/>
+  <rect x="880" y="108" width="36" height="52" rx="8" fill="#0A0C12" stroke="#2A2A3A" stroke-width="3"/>
+  <rect x="108" y="864" width="36" height="52" rx="8" fill="#0A0C12" stroke="#2A2A3A" stroke-width="3"/>
+  <rect x="880" y="864" width="36" height="52" rx="8" fill="#0A0C12" stroke="#2A2A3A" stroke-width="3"/>
+  <!-- V-shaped converging light beams -->
+  <g clip-path="url(#frameClip)">
+    <!-- Left beam of V -->
+    <polygon points="320,200 512,720 472,720 280,200" fill="url(#beamGrad)" opacity="0.95"/>
+    <!-- Right beam of V -->
+    <polygon points="704,200 552,720 512,720 744,200" fill="url(#beamGrad)" opacity="0.95"/>
+    <!-- Glow at convergence point -->
+    <ellipse cx="512" cy="700" rx="80" ry="40" fill="#6B3FA0" opacity="0.35"/>
+    <!-- Subtle light scatter from beams -->
+    <ellipse cx="512" cy="440" rx="160" ry="280" fill="#4A9EFF" opacity="0.04"/>
+  </g>
+</svg>

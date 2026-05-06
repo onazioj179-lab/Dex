@@ -1,4 +1,10 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Smart Scheduling Controller
 // Intelligent triggers: time, location, app-aware, calendar-based
 // =============================================================================
@@ -577,7 +583,14 @@ class SmartScheduler {
           if (action.params?.internal && mainWindow) {
             mainWindow.webContents.send('browser:navigate', action.target);
           } else {
-            await shell.openExternal(action.target);
+            try {
+              const parsed = new URL(action.target);
+              if (['http:', 'https:'].includes(parsed.protocol)) {
+                await shell.openExternal(action.target);
+              }
+            } catch {
+              // Invalid URL — skip
+            }
           }
         }
         break;
@@ -600,16 +613,9 @@ class SmartScheduler {
         break;
 
       case 'run-script':
-        // Execute shell command
-        if (action.target) {
-          const { exec } = require('child_process');
-          await new Promise<void>((resolve, reject) => {
-            exec(action.target!, { timeout: 30000 }, (error: Error | null) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          });
-        }
+        // Security: Scheduler scripts are disabled for safety
+        // Arbitrary shell execution from scheduled actions is a critical risk vector
+        log.warn(`[Scheduler] Blocked run-script action: ${(action.target || '').substring(0, 80)}`);
         break;
 
       case 'change-mode':

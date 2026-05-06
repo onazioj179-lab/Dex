@@ -1,9 +1,15 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Audio Processor
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
- * Voice → Value Workflow:
+ * Voice Value Workflow:
  * 1. Record quick voice note or import audio
  * 2. Transcribe locally or via user-provided API
  * 3. Summarize and attach to Notes/Files/Projects
@@ -19,10 +25,11 @@ import { ipcMain, app, BrowserWindow, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface AudioRecording {
   id: string;
@@ -98,9 +105,9 @@ export interface AudioConfig {
   providers: TranscriptionProvider[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Audio Processor
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AudioProcessor {
   private mainWindow: BrowserWindow | null = null;
@@ -133,9 +140,9 @@ class AudioProcessor {
     this.registerIPCHandlers();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Initialization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async initialize(): Promise<void> {
     try {
@@ -160,12 +167,12 @@ class AudioProcessor {
         notes.forEach(note => this.audioNotes.set(note.id, note));
       }
       
-      console.log('[AudioProcessor] Initialized:', {
+      log.info('[AudioProcessor] Initialized:', {
         notes: this.audioNotes.size,
         providers: this.config.providers.length,
       });
     } catch (err) {
-      console.error('[AudioProcessor] Initialization error:', err);
+      log.error('[AudioProcessor] Initialization error:', err);
     }
   }
 
@@ -173,9 +180,9 @@ class AudioProcessor {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Recording Management
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async importAudio(filePath?: string): Promise<AudioNote | null> {
     let sourcePath = filePath;
@@ -258,7 +265,7 @@ class AudioProcessor {
     // Auto-transcribe if enabled
     if (this.config.autoTranscribe && this.config.activeProvider) {
       this.transcribe(note.id).catch(err => {
-        console.error('[AudioProcessor] Auto-transcribe failed:', err);
+        log.error('[AudioProcessor] Auto-transcribe failed:', err);
       });
     }
     
@@ -287,9 +294,9 @@ class AudioProcessor {
     return note;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Transcription
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async transcribe(
     noteId: string,
@@ -603,9 +610,9 @@ class AudioProcessor {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Summarization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async summarize(
     noteId: string,
@@ -686,9 +693,9 @@ class AudioProcessor {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Note Management
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getAllNotes(): AudioNote[] {
     return Array.from(this.audioNotes.values())
@@ -727,7 +734,7 @@ class AudioProcessor {
         fs.unlinkSync(note.recording.filePath);
       }
     } catch (err) {
-      console.error('[AudioProcessor] Failed to delete recording:', err);
+      log.error('[AudioProcessor] Failed to delete recording:', err);
     }
     
     this.audioNotes.delete(id);
@@ -738,9 +745,9 @@ class AudioProcessor {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Linking
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async linkToFile(noteId: string, filePath: string): Promise<boolean> {
     const note = this.audioNotes.get(noteId);
@@ -786,9 +793,9 @@ class AudioProcessor {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Export
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async exportNote(noteId: string, outputPath?: string): Promise<string | null> {
     const note = this.audioNotes.get(noteId);
@@ -861,9 +868,9 @@ class AudioProcessor {
     return md;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Provider Management
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getProviders(): TranscriptionProvider[] {
     return this.config.providers.map(p => ({
@@ -933,9 +940,9 @@ class AudioProcessor {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Configuration
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getConfig(): Omit<AudioConfig, 'providers'> & { providerCount: number } {
     return {
@@ -967,9 +974,9 @@ class AudioProcessor {
     fs.writeFileSync(this.notesFile, JSON.stringify(notes, null, 2));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Stats
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getStats(): {
     totalNotes: number;
@@ -989,9 +996,9 @@ class AudioProcessor {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Events
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private emitUpdate(event: string, data: any): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -999,9 +1006,9 @@ class AudioProcessor {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     // Config
@@ -1054,9 +1061,9 @@ class AudioProcessor {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Export
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const audioProcessor = new AudioProcessor();
 export default audioProcessor;

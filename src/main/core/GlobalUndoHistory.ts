@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Global Undo History
 // Global undo history across files, actions, and workflows
 // Activity replay (chronological, filterable)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow } from 'electron';
@@ -10,9 +16,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type UndoActionType = 
   | 'file_create' | 'file_delete' | 'file_rename' | 'file_move' | 'file_copy' | 'file_modify'
@@ -77,9 +83,9 @@ export interface UndoFilter {
   limit?: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GLOBAL UNDO HISTORY
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class GlobalUndoHistoryClass extends EventEmitter {
   private config: UndoConfig;
@@ -102,9 +108,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     this.config.backupPath = path.join(app.getPath('userData'), 'undo-backups');
@@ -118,9 +124,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Record action
@@ -174,9 +180,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RECORDING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async recordAction(
     type: UndoActionType,
@@ -231,7 +237,7 @@ class GlobalUndoHistoryClass extends EventEmitter {
   }
 
   async recordFileRename(oldPath: string, newPath: string): Promise<UndoEntry> {
-    return this.recordAction('file_rename', `Renamed ${path.basename(oldPath)} → ${path.basename(newPath)}`, {
+    return this.recordAction('file_rename', `Renamed ${path.basename(oldPath)} ${path.basename(newPath)}`, {
       type: 'file_rename',
       originalPath: oldPath,
       newPath: newPath
@@ -246,9 +252,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     }, [filePath]);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UNDO / REDO
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async undo(): Promise<{ success: boolean; entry?: UndoEntry; error?: string }> {
     if (this.undoStack.length === 0) {
@@ -401,9 +407,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BACKUP MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async createBackup(entry: UndoEntry): Promise<void> {
     if (!entry.undoData.originalPath) return;
@@ -418,9 +424,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // GROUPS (Batch Operations)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   startGroup(name: string): UndoGroup {
     const group: UndoGroup = {
@@ -442,9 +448,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     return group || null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HISTORY & TIMELINE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getHistory(filter?: UndoFilter): UndoEntry[] {
     let entries = Array.from(this.entries.values());
@@ -526,9 +532,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async clearHistory(): Promise<{ success: boolean }> {
     // Delete all backups
@@ -591,9 +597,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     }, 60 * 60 * 1000);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return `undo-${++this.entryIdCounter}-${Date.now()}`;
@@ -609,9 +615,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   shutdown(): void {
     if (this.cleanupTimer) {
@@ -621,9 +627,9 @@ class GlobalUndoHistoryClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const GlobalUndoHistory = new GlobalUndoHistoryClass();
 export default GlobalUndoHistory;

@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Watchdog Controller
 // Phase 10: Internal self-monitoring for long-term stability
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { BrowserWindow, ipcMain, app } from 'electron';
 import { Logger } from '../utils/Logger';
@@ -76,13 +82,13 @@ class WatchdogController {
       return { success: true };
     });
 
-    this.logger.info(' Watchdog handlers registered');
+    this.logger.info('Watchdog handlers registered');
   }
 
   start(): void {
     if (this.checkInterval) return;
 
-    this.logger.info(' Watchdog started - monitoring system health');
+    this.logger.info('Watchdog started - monitoring system health');
     
     // Initial check
     this.runHealthCheck();
@@ -107,7 +113,7 @@ class WatchdogController {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
-    this.logger.info(' Watchdog stopped');
+    this.logger.info('Watchdog stopped');
   }
 
   private async runHealthCheck(): Promise<HealthStatus> {
@@ -120,7 +126,7 @@ class WatchdogController {
     const memoryMB = memoryUsage.heapUsed / (1024 * 1024);
 
     if (memoryMB > this.config.maxMemoryMB) {
-      warnings.push(` High memory usage: ${memoryMB.toFixed(0)}MB`);
+      warnings.push(`High memory usage: ${memoryMB.toFixed(0)}MB`);
     }
 
     // CPU check (estimated from event loop)
@@ -129,7 +135,7 @@ class WatchdogController {
 
     // Error count check
     if (this.errorCount > this.config.errorThreshold) {
-      warnings.push(` High error count: ${this.errorCount} errors in session`);
+      warnings.push(`High error count: ${this.errorCount} errors in session`);
     }
 
     // Check if renderer is responsive
@@ -175,7 +181,7 @@ class WatchdogController {
     if (this.recentErrors.length > 50) {
       this.recentErrors.shift();
     }
-    this.logger.error(' Watchdog recorded error', { message, count: this.errorCount });
+    this.logger.error('Watchdog recorded error', { message, count: this.errorCount });
   }
 
   getHealth(): HealthStatus {
@@ -236,6 +242,33 @@ class WatchdogController {
   updateConfig(newConfig: Partial<WatchdogConfig>): void {
     this.config = { ...this.config, ...newConfig };
     this.logger.info('Watchdog config updated', this.config);
+  }
+
+  // -------------------------------------------------------------------------
+  // Renderer heartbeat tracking (called from main.ts renderer:heartbeat handler)
+  // -------------------------------------------------------------------------
+
+  private lastRendererHeartbeat: { t: number; heapUsedMB: number; frameTimeMs: number } | null = null;
+  private _rendererFreezeTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly RENDERER_TIMEOUT_MS = 15_000;
+
+  recordRendererHeartbeat(data: { t: number; heapUsedMB: number; frameTimeMs: number }): void {
+    this.lastRendererHeartbeat = data;
+    if (data.heapUsedMB > 512) {
+      this.recordError(`Renderer heap high: ${data.heapUsedMB.toFixed(0)} MB`);
+    }
+    if (data.frameTimeMs > 50) {
+      this.logger.warn('Renderer frame slow', { frameTimeMs: data.frameTimeMs });
+    }
+    // Restart the stall timer
+    if (this._rendererFreezeTimer) clearTimeout(this._rendererFreezeTimer);
+    this._rendererFreezeTimer = setTimeout(() => {
+      this.recordError(`Renderer appears frozen: no heartbeat for ${this.RENDERER_TIMEOUT_MS / 1000}s`);
+    }, this.RENDERER_TIMEOUT_MS);
+  }
+
+  getLastRendererHeartbeat(): typeof this.lastRendererHeartbeat {
+    return this.lastRendererHeartbeat;
   }
 }
 

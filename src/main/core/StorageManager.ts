@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Storage Manager
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Efficient, structured storage layer for Dex system data.
  * 
@@ -13,14 +19,15 @@
  * - Cleanup: Automatic removal of unused cache data
  */
 
+import log from 'electron-log';
 import { ipcMain, app, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export interface StorageConfig {
   maxStorageMB: number;          // Hard limit in MB (default: 500MB)
@@ -74,9 +81,9 @@ interface MetadataIndex {
   metadata: Record<string, any>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Storage Manager
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class StorageManager {
   private mainWindow: BrowserWindow | null = null;
@@ -120,9 +127,9 @@ class StorageManager {
     this.registerIPCHandlers();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Initialization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async initialize(): Promise<void> {
     try {
@@ -155,13 +162,13 @@ class StorageManager {
         await this.runCleanup();
       }
       
-      console.log('[StorageManager] Initialized:', {
+      log.info('[StorageManager] Initialized:', {
         usedMB: stats.totalUsedMB.toFixed(2),
         limitMB: this.config.maxStorageMB,
         files: stats.fileCount,
       });
     } catch (err) {
-      console.error('[StorageManager] Initialization error:', err);
+      log.error('[StorageManager] Initialization error:', err);
     }
   }
 
@@ -184,9 +191,9 @@ class StorageManager {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Storage Operations
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   /**
    * Store data in Dex storage (not user files)
@@ -245,7 +252,7 @@ class StorageManager {
       
       return { success: true, path: filePath };
     } catch (err: any) {
-      console.error('[StorageManager] Store error:', err);
+      log.error('[StorageManager] Store error:', err);
       return { success: false, error: err.message };
     }
   }
@@ -276,7 +283,7 @@ class StorageManager {
       const data = fs.readFileSync(filePath, 'utf-8');
       return JSON.parse(data);
     } catch (err) {
-      console.error('[StorageManager] Retrieve error:', err);
+      log.error('[StorageManager] Retrieve error:', err);
       return null;
     }
   }
@@ -309,7 +316,7 @@ class StorageManager {
       
       return true;
     } catch (err) {
-      console.error('[StorageManager] Delete error:', err);
+      log.error('[StorageManager] Delete error:', err);
       return false;
     }
   }
@@ -364,9 +371,9 @@ class StorageManager {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Statistics & Monitoring
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async getStats(): Promise<StorageStats> {
     const breakdown = {
@@ -490,16 +497,16 @@ class StorageManager {
     return locations;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Cleanup & Maintenance
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async runCleanup(): Promise<{
     deletedFiles: number;
     freedBytes: number;
     categories: Record<string, number>;
   }> {
-    console.log('[StorageManager] Running cleanup...');
+    log.info('[StorageManager] Running cleanup...');
     
     let deletedFiles = 0;
     let freedBytes = 0;
@@ -552,7 +559,7 @@ class StorageManager {
     // Record cleanup time
     this.recordCleanupTime();
     
-    console.log('[StorageManager] Cleanup complete:', {
+    log.info('[StorageManager] Cleanup complete:', {
       deletedFiles,
       freedMB: (freedBytes / (1024 * 1024)).toFixed(2),
     });
@@ -585,7 +592,7 @@ class StorageManager {
         }
       }
     } catch (err) {
-      console.error('[StorageManager] Clean directory error:', err);
+      log.error('[StorageManager] Clean directory error:', err);
     }
     
     return { deleted, freed };
@@ -640,9 +647,9 @@ class StorageManager {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Configuration
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getConfig(): StorageConfig {
     return { ...this.config };
@@ -675,9 +682,9 @@ class StorageManager {
     fs.writeFileSync(this.indexFilePath, JSON.stringify(entries, null, 2));
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Search & Query
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async search(query: string, options?: {
     types?: MetadataIndex['type'][];
@@ -731,9 +738,9 @@ class StorageManager {
     return results.sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Events
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private emitStorageChange(): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -743,9 +750,9 @@ class StorageManager {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     ipcMain.handle('storage:getStats', () => this.getStats());
@@ -771,9 +778,9 @@ class StorageManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Export
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const storageManager = new StorageManager();
 export default storageManager;

@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * IMOSION AUDIO ENGINE - Core Audio Processing System
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Real-time audio engine with:
  * - Low-latency audio processing
@@ -12,10 +18,12 @@
  */
 
 import { EventEmitter } from 'events';
+import { CppSignal, isCppAvailable } from '../native/cpp-bridge';
+import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES & INTERFACES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type AudioDriver = 'asio' | 'wasapi' | 'coreaudio' | 'alsa' | 'pulseaudio' | 'jack';
 
@@ -91,9 +99,9 @@ export interface MeteringData {
   phaseCorrelation: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // AUDIO BUFFER POOL - Memory Management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class AudioBufferPool {
   private pools: Map<number, Float32Array[]> = new Map();
@@ -125,9 +133,9 @@ class AudioBufferPool {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // DELAY COMPENSATION MANAGER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class DelayCompensationManager {
   private nodeLatencies: Map<string, number> = new Map();
@@ -170,9 +178,9 @@ class DelayCompensationManager {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TIME STRETCH & PITCH SHIFT ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class TimeStretchEngine {
   private windowSize = 4096;
@@ -257,9 +265,9 @@ export class TimeStretchEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MULTI-CORE AUDIO PROCESSOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface ProcessTask {
   nodeId: string;
@@ -316,9 +324,9 @@ class MultiCoreProcessor {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // METERING ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class MeteringEngine {
   private integrationTime = 0.3; // 300ms for RMS
@@ -424,9 +432,9 @@ class MeteringEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MAIN AUDIO ENGINE CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class ImosionAudioEngine extends EventEmitter {
   private config: AudioEngineConfig;
@@ -483,11 +491,12 @@ export class ImosionAudioEngine extends EventEmitter {
     this.multiCore = new MultiCoreProcessor(this.config.maxCores);
     this.metering = new MeteringEngine();
     
-    console.log('[ImosionAudioEngine] Initialized:', {
+    log.info('[ImosionAudioEngine] Initialized:', {
       sampleRate: this.config.sampleRate,
       bufferSize: this.config.bufferSize,
       driver: this.config.driver,
-      cores: this.multiCore.getWorkerCount()
+      cores: this.multiCore.getWorkerCount(),
+      cppSignalDSP: isCppAvailable(),
     });
   }
   
@@ -499,9 +508,9 @@ export class ImosionAudioEngine extends EventEmitter {
     return 'wasapi';
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Device Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async getAvailableDevices(): Promise<AudioDeviceInfo[]> {
     // In a real implementation, this would query native audio APIs
@@ -574,14 +583,14 @@ export class ImosionAudioEngine extends EventEmitter {
     };
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Engine Control
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async start(): Promise<void> {
     if (this.isRunning) return;
     
-    console.log('[ImosionAudioEngine] Starting...');
+    log.info('[ImosionAudioEngine] Starting...');
     this.isRunning = true;
     this.emit('started');
     
@@ -592,7 +601,7 @@ export class ImosionAudioEngine extends EventEmitter {
   async stop(): Promise<void> {
     if (!this.isRunning) return;
     
-    console.log('[ImosionAudioEngine] Stopping...');
+    log.info('[ImosionAudioEngine] Stopping...');
     this.isRunning = false;
     this.transport.playing = false;
     this.transport.recording = false;
@@ -605,7 +614,7 @@ export class ImosionAudioEngine extends EventEmitter {
   }
   
   private startProcessingLoop(): void {
-    // Simulated processing loop - in real implementation, this would be driven by audio hardware
+    // Processing loop driven by buffer timing (real audio I/O requires native driver integration)
     const processInterval = (this.config.bufferSize / this.config.sampleRate) * 1000;
     
     const process = () => {
@@ -669,9 +678,9 @@ export class ImosionAudioEngine extends EventEmitter {
     // and handle plugin processing, delay compensation, etc.
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Transport Control
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   play(): void {
     this.transport.playing = true;
@@ -717,9 +726,9 @@ export class ImosionAudioEngine extends EventEmitter {
     return { ...this.transport };
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Audio Graph Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   addNode(node: AudioNode): void {
     this.audioGraph.set(node.id, node);
@@ -755,9 +764,9 @@ export class ImosionAudioEngine extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Plugin Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async loadPlugin(path: string, type: 'vst3' | 'au' | 'builtin'): Promise<PluginInstance> {
     const id = `plugin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -800,9 +809,9 @@ export class ImosionAudioEngine extends EventEmitter {
     }
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Time Stretch & Pitch Shift
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   timeStretchAudio(input: Float32Array, stretchFactor: number): Float32Array {
     return this.timeStretch.timeStretch(input, stretchFactor);
@@ -812,17 +821,17 @@ export class ImosionAudioEngine extends EventEmitter {
     return this.timeStretch.pitchShift(input, semitones);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Metering
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getMetering(nodeId: string, buffer: Float32Array[]): MeteringData {
     return this.metering.calculateMetering(nodeId, buffer, this.config.sampleRate);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Performance Monitoring
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getPerformanceStats(): { cpuUsage: number; bufferUnderruns: number; latency: number } {
     return {
@@ -836,9 +845,9 @@ export class ImosionAudioEngine extends EventEmitter {
     this.bufferUnderruns = 0;
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Configuration
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   getConfig(): AudioEngineConfig {
     return { ...this.config };
@@ -859,9 +868,9 @@ export class ImosionAudioEngine extends EventEmitter {
     this.emit('configChanged', this.config);
   }
   
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Cleanup
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   
   async dispose(): Promise<void> {
     await this.stop();
@@ -869,7 +878,7 @@ export class ImosionAudioEngine extends EventEmitter {
     this.audioGraph.clear();
     this.plugins.clear();
     this.removeAllListeners();
-    console.log('[ImosionAudioEngine] Disposed');
+    log.info('[ImosionAudioEngine] Disposed');
   }
 }
 

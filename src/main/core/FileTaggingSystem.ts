@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - File Tagging & Labeling System
 // Non-destructive metadata tagging for files and folders
 // User-defined tags, color labels, searchable metadata
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow } from 'electron';
@@ -11,9 +17,9 @@ import * as path from 'path';
 import log from 'electron-log';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type LabelColor = 
   | 'none' 
@@ -77,9 +83,9 @@ export interface TaggingConfig {
   inheritParentTags: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PRESET COLORS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const LABEL_COLORS: Record<LabelColor, string> = {
   none: 'transparent',
@@ -97,9 +103,9 @@ const DEFAULT_TAG_COLORS = [
   '#a855f7', '#ec4899', '#14b8a6', '#6366f1', '#8b5cf6',
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FILE TAGGING SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FileTaggingSystemClass extends EventEmitter {
   private tags: Map<string, Tag> = new Map();
@@ -123,9 +129,9 @@ class FileTaggingSystemClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -140,12 +146,12 @@ class FileTaggingSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
-    // ── Tag Management ────────────────────────────────────────────────────
+    // -- Tag Management ----------------------------------------------------
     ipcMain.handle('tags:create', async (_event, name: string, color?: string, description?: string) => {
       return this.createTag(name, color, description);
     });
@@ -174,7 +180,7 @@ class FileTaggingSystemClass extends EventEmitter {
       return this.suggestTags(filePath);
     });
 
-    // ── File Tagging ──────────────────────────────────────────────────────
+    // -- File Tagging ------------------------------------------------------
     ipcMain.handle('tagging:addTag', async (_event, filePath: string, tagId: string) => {
       return this.addTagToFile(filePath, tagId);
     });
@@ -215,7 +221,7 @@ class FileTaggingSystemClass extends EventEmitter {
       return this.clearFileMetadata(filePath);
     });
 
-    // ── Batch Operations ──────────────────────────────────────────────────
+    // -- Batch Operations --------------------------------------------------
     ipcMain.handle('tagging:batchAddTag', async (_event, filePaths: string[], tagId: string) => {
       return this.batchAddTag(filePaths, tagId);
     });
@@ -228,7 +234,7 @@ class FileTaggingSystemClass extends EventEmitter {
       return this.batchSetLabel(filePaths, label);
     });
 
-    // ── Query & Search ────────────────────────────────────────────────────
+    // -- Query & Search ----------------------------------------------------
     ipcMain.handle('tagging:findByTag', (_event, tagId: string) => {
       return this.findFilesByTag(tagId);
     });
@@ -249,7 +255,7 @@ class FileTaggingSystemClass extends EventEmitter {
       return this.searchTaggedFiles(query);
     });
 
-    // ── Stats & Config ────────────────────────────────────────────────────
+    // -- Stats & Config ----------------------------------------------------
     ipcMain.handle('tagging:stats', () => this.getStats());
     ipcMain.handle('tagging:config', () => this.config);
     ipcMain.handle('tagging:setConfig', async (_event, config: Partial<TaggingConfig>) => {
@@ -258,7 +264,7 @@ class FileTaggingSystemClass extends EventEmitter {
       return { success: true };
     });
 
-    // ── File Path Updates ─────────────────────────────────────────────────
+    // -- File Path Updates -------------------------------------------------
     ipcMain.handle('tagging:onFileMove', async (_event, oldPath: string, newPath: string) => {
       return this.handleFileMove(oldPath, newPath);
     });
@@ -268,9 +274,9 @@ class FileTaggingSystemClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TAG MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   createTag(name: string, color?: string, description?: string): Tag {
     const normalizedName = name.trim().toLowerCase();
@@ -430,9 +436,9 @@ class FileTaggingSystemClass extends EventEmitter {
       .filter(Boolean);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE TAGGING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getOrCreateMetadata(filePath: string): FileMetadata {
     let metadata = this.fileMetadata.get(filePath);
@@ -641,9 +647,9 @@ class FileTaggingSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BATCH OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   batchAddTag(filePaths: string[], tagId: string): { success: number; failed: number } {
     let success = 0;
@@ -684,9 +690,9 @@ class FileTaggingSystemClass extends EventEmitter {
     return { success, failed };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERY & SEARCH
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   findFilesByTag(tagId: string): string[] {
     const results: string[] = [];
@@ -836,9 +842,9 @@ class FileTaggingSystemClass extends EventEmitter {
     return results.sort((a, b) => b.score - a.score);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE PATH UPDATES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   handleFileMove(oldPath: string, newPath: string): { success: boolean } {
     const metadata = this.fileMetadata.get(oldPath);
@@ -867,9 +873,9 @@ class FileTaggingSystemClass extends EventEmitter {
     return this.clearFileMetadata(filePath);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): TagStats {
     const tagUsage: Record<string, number> = {};
@@ -901,9 +907,9 @@ class FileTaggingSystemClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private hashPath(filePath: string): string {
     return crypto.createHash('md5').update(filePath).digest('hex');
@@ -931,9 +937,9 @@ class FileTaggingSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadData(): Promise<void> {
     try {
@@ -1000,9 +1006,9 @@ class FileTaggingSystemClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     if (this.saveTimer) {
@@ -1013,16 +1019,16 @@ class FileTaggingSystemClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // LABEL COLOR HELPERS (Export for UI)
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const getLabelColor = (label: LabelColor): string => LABEL_COLORS[label];
 export const getAllLabelColors = (): typeof LABEL_COLORS => ({ ...LABEL_COLORS });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const FileTaggingSystem = new FileTaggingSystemClass();
 export default FileTaggingSystem;

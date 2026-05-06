@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Gallery Viewer
 // Premium image gallery with virtualized grid, smooth scrolling, keyboard nav
 // No background scanning, no forced import, no re-encoding
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain, BrowserWindow, nativeImage, shell } from 'electron';
@@ -11,9 +17,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type GalleryViewMode = 'grid' | 'focus' | 'filmstrip' | 'list';
 export type SortField = 'name' | 'date' | 'size' | 'type' | 'rating';
@@ -125,9 +131,9 @@ export interface GalleryConfig {
   loopNavigation: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SUPPORTED FORMATS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const IMAGE_EXTENSIONS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg',
@@ -139,9 +145,9 @@ const DESIGN_EXTENSIONS = new Set([
   '.psd', '.ai', '.sketch', '.fig', '.xd',
 ]);
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // GALLERY VIEWER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class GalleryViewerClass extends EventEmitter {
   private images: Map<string, GalleryImage> = new Map();
@@ -184,9 +190,9 @@ class GalleryViewerClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     this.mainWindow = mainWindow || null;
@@ -205,9 +211,9 @@ class GalleryViewerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Folder operations
@@ -329,9 +335,9 @@ class GalleryViewerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FOLDER OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async openFolder(folderPath: string): Promise<GalleryImage[]> {
     const absolutePath = path.isAbsolute(folderPath) ? folderPath : path.resolve(folderPath);
@@ -425,9 +431,9 @@ class GalleryViewerClass extends EventEmitter {
     return Array.from(this.folders.values());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IMAGE LOADING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadImagesFromFolder(folderPath: string): Promise<GalleryImage[]> {
     const entries = await fs.readdir(folderPath, { withFileTypes: true });
@@ -490,7 +496,7 @@ class GalleryViewerClass extends EventEmitter {
       this.images.set(image.id, image);
       
       // Generate thumbnail in background (don't block)
-      this.generateThumbnail(image.id).catch(() => {});
+      this.generateThumbnail(image.id).catch((e: unknown) => { log.warn('[DEX]', e); });
       
       return image;
     } catch (error) {
@@ -509,9 +515,9 @@ class GalleryViewerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // THUMBNAILS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async generateThumbnail(imageId: string): Promise<string | null> {
     const image = this.images.get(imageId);
@@ -577,9 +583,9 @@ class GalleryViewerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IMAGE RETRIEVAL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getImages(filter?: GalleryFilter): GalleryImage[] {
     let images = Array.from(this.images.values());
@@ -615,9 +621,9 @@ class GalleryViewerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VIRTUALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getVirtualizedImages(range: VirtualizedRange, filter?: GalleryFilter): GalleryImage[] {
     const allImages = this.getImages(filter);
@@ -632,9 +638,9 @@ class GalleryViewerClass extends EventEmitter {
     return this.getImages(filter).length;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // VIEW MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setView(view: GalleryViewMode): GalleryViewMode {
     const previousView = this.currentView;
@@ -646,9 +652,9 @@ class GalleryViewerClass extends EventEmitter {
     return view;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SELECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   selectImage(imageId: string, extend = false, range = false): GallerySelection {
     const images = this.getImages();
@@ -698,9 +704,9 @@ class GalleryViewerClass extends EventEmitter {
     return this.selection;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NAVIGATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   navigate(direction: 'next' | 'previous' | 'first' | 'last'): GalleryImage | null {
     const images = this.getImages();
@@ -770,20 +776,20 @@ class GalleryViewerClass extends EventEmitter {
       // Preload next
       const nextIndex = currentIndex + offset;
       if (nextIndex < images.length) {
-        this.getThumbnail(images[nextIndex].id).catch(() => {});
+        this.getThumbnail(images[nextIndex].id).catch((e: unknown) => { log.warn('[DEX]', e); });
       }
       
       // Preload previous
       const prevIndex = currentIndex - offset;
       if (prevIndex >= 0) {
-        this.getThumbnail(images[prevIndex].id).catch(() => {});
+        this.getThumbnail(images[prevIndex].id).catch((e: unknown) => { log.warn('[DEX]', e); });
       }
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SORTING & FILTERING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setSort(sort: GallerySort): GallerySort {
     this.sort = sort;
@@ -898,9 +904,9 @@ class GalleryViewerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // METADATA UPDATES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async updateImageMetadata(imageId: string, updates: Partial<GalleryImage>): Promise<GalleryImage | null> {
     const image = this.images.get(imageId);
@@ -952,9 +958,9 @@ class GalleryViewerClass extends EventEmitter {
     return image.tags;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): GalleryStats {
     const images = Array.from(this.images.values());
@@ -1004,9 +1010,9 @@ class GalleryViewerClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // EXTERNAL ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async openInExplorer(imageId: string): Promise<boolean> {
     const image = this.images.get(imageId);
@@ -1024,9 +1030,9 @@ class GalleryViewerClass extends EventEmitter {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async loadConfig(): Promise<void> {
     const configPath = path.join(this.dataPath, 'config.json');
@@ -1052,9 +1058,9 @@ class GalleryViewerClass extends EventEmitter {
     return this.config;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadGalleryData(): Promise<void> {
     const dataPath = path.join(this.dataPath, 'gallery-data.json');
@@ -1086,9 +1092,9 @@ class GalleryViewerClass extends EventEmitter {
     await fs.writeFile(dataPath, JSON.stringify(data, null, 2));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HELPERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return crypto.randomBytes(8).toString('hex');
@@ -1116,9 +1122,9 @@ class GalleryViewerClass extends EventEmitter {
     return mimeTypes[extension] || 'application/octet-stream';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEYBOARD NAVIGATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   handleKeyPress(key: string, modifiers: { ctrl?: boolean; shift?: boolean; alt?: boolean }): boolean {
     switch (key) {
@@ -1177,9 +1183,9 @@ class GalleryViewerClass extends EventEmitter {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async shutdown(): Promise<void> {
     await this.saveGalleryData();
@@ -1188,9 +1194,9 @@ class GalleryViewerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const GalleryViewer = new GalleryViewerClass();
 export default GalleryViewer;

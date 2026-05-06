@@ -1,1 +1,0 @@
-export { AuthSettings } from './SystemHealth';

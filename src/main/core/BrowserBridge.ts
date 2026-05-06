@@ -1,19 +1,26 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Browser Bridge (Chrome Pairing)
 // Phase 19: Optional web-assisted tasks through browser pairing
 // User must approve browser pairing - every action is visible
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { Logger } from '../utils/Logger';
 import { EventEmitter } from 'events';
+import * as crypto from 'crypto';
 import * as http from 'http';
 import * as url from 'url';
 
 const log = new Logger();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type BridgeStatus = 'disconnected' | 'connecting' | 'connected' | 'pairing';
 
@@ -56,9 +63,9 @@ export interface PairingRequest {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // BROWSER BRIDGE CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class BrowserBridgeClass extends EventEmitter {
   private status: BridgeStatus = 'disconnected';
@@ -74,9 +81,9 @@ class BrowserBridgeClass extends EventEmitter {
     super();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONNECTION MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Start the bridge server for browser pairing
@@ -126,7 +133,7 @@ class BrowserBridgeClass extends EventEmitter {
    * Start pairing process
    */
   startPairing(): PairingRequest {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase();
     
     this.pairingRequest = {
       code,
@@ -172,9 +179,9 @@ class BrowserBridgeClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // WEB ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Navigate to URL
@@ -253,9 +260,9 @@ class BrowserBridgeClass extends EventEmitter {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // REQUEST HANDLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     // CORS headers for browser extension
@@ -312,7 +319,13 @@ class BrowserBridgeClass extends EventEmitter {
     }
 
     let body = '';
-    req.on('data', chunk => body += chunk);
+    let bodySize = 0;
+    const MAX_BODY = 65536;
+    req.on('data', chunk => {
+      bodySize += chunk.length;
+      if (bodySize > MAX_BODY) { req.destroy(); return; }
+      body += chunk;
+    });
     req.on('end', () => {
       try {
         const data = JSON.parse(body);
@@ -397,7 +410,13 @@ class BrowserBridgeClass extends EventEmitter {
     }
 
     let body = '';
-    req.on('data', chunk => body += chunk);
+    let bodySize2 = 0;
+    const MAX_BODY2 = 65536;
+    req.on('data', chunk => {
+      bodySize2 += chunk.length;
+      if (bodySize2 > MAX_BODY2) { req.destroy(); return; }
+      body += chunk;
+    });
     req.on('end', () => {
       try {
         const data = JSON.parse(body);
@@ -447,9 +466,9 @@ class BrowserBridgeClass extends EventEmitter {
     res.end(JSON.stringify({ ok: true }));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async createAction(
     type: WebAction['type'],
@@ -482,7 +501,7 @@ class BrowserBridgeClass extends EventEmitter {
 
     this.pendingActions.set(action.id, action);
     this.emit('actionCreated', action);
-    log.info(`[BrowserBridge] Created action: ${type} → ${target}`);
+    log.info(`[BrowserBridge] Created action: ${type} ${target}`);
 
     return action;
   }

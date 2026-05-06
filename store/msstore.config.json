@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json.schemastore.org/msstore-config.json",
+  "appId": "com.onazioj.dex",
+  "productId": "9NXXXXXXXX",
+  "storeId": "XXXXXXXX",
+  "displayName": "DEX",
+  "publisherDisplayName": "Onazi Treasure OJ",
+  "description": {
+    "short": "Personal Control Hub for Desktop Automation",
+    "full": "DEX is a powerful desktop automation and productivity suite that puts you in complete control of your digital workflow. With professional-grade creative tools, system management, and automation capabilities, DEX helps you work smarter and faster.\n\nKey Features:\n- PRISM: Professional image editing with layers, filters, and RAW support\n- VINX: Video editing with timeline, effects, and multi-track audio\n- IMOSION: Audio production with DAW-style interface\n- FLUX: Animation and motion graphics\n- AXL: CAD and 3D modeling\n- FORGE: Web development IDE\n- Notes, Browser, File Manager, and more\n\nBuilt for Windows 10/11 with native performance."
+  },
+  "category": "Productivity",
+  "subcategory": "Utilities & Tools",
+  "keywords": [
+    "automation",
+    "productivity",
+    "desktop",
+    "workflow",
+    "image editor",
+    "video editor",
+    "audio",
+    "creative",
+    "system tools"
+  ],
+  "ageRating": "3+",
+  "markets": ["US", "GB", "CA", "AU", "DE", "FR", "IT", "ES", "JP", "KR", "BR", "IN"],
+  "pricing": {
+    "model": "free",
+    "trial": false
+  },
+  "requirements": {
+    "minimumOS": "Windows.Desktop 10.0.17763.0",
+    "recommendedOS": "Windows.Desktop 10.0.22000.0",
+    "architecture": ["x64"],
+    "memory": "4GB",
+    "storage": "500MB"
+  },
+  "capabilities": [
+    "runFullTrust",
+    "broadFileSystemAccess",
+    "removableStorage"
+  ],
+  "screenshots": [
+    {
+      "path": "store/screenshots/home.png",
+      "caption": "DEX Dashboard - Your command center"
+    },
+    {
+      "path": "store/screenshots/prism.png",
+      "caption": "PRISM Image Editor - Professional photo editing"
+    },
+    {
+      "path": "store/screenshots/vinx.png",
+      "caption": "VINX Video Editor - Timeline-based video editing"
+    },
+    {
+      "path": "store/screenshots/automation.png",
+      "caption": "Automation - Create powerful workflows"
+    }
+  ],
+  "icons": {
+    "square44x44": "assets/icons/Square44x44Logo.png",
+    "square150x150": "assets/icons/Square150x150Logo.png",
+    "wide310x150": "assets/icons/Wide310x150Logo.png",
+    "square310x310": "assets/icons/Square310x310Logo.png"
+  },
+  "privacyPolicyUrl": "https://dex-app.com/privacy",
+  "supportUrl": "https://dex-app.com/support",
+  "websiteUrl": "https://dex-app.com",
+  "notes": "DEX stores all data locally. Network features are opt-in."
+}

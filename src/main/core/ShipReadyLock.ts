@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Ship-Ready Lock (Phase 50)
 // Final verification, acceptance testing, and production configuration
 // =============================================================================
 
+import log from 'electron-log';
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,7 +19,7 @@ import * as path from 'path';
 // -----------------------------------------------------------------------------
 
 export const SHIP_READY_CONFIG = {
-  version: '1.0.0',
+  version: '3.6.0',
   buildDate: new Date().toISOString(),
   phase: 50,
   status: 'ship-ready',
@@ -351,12 +358,12 @@ export const acceptanceTestRunner = new AcceptanceTestRunner();
 // Run verification on startup (in development)
 export async function runStartupVerification(): Promise<void> {
   if (process.env.NODE_ENV === 'development') {
-    console.log('[DEX] Running ship-ready verification...');
+    log.info('[DEX] Running ship-ready verification...');
     const results = await shipReadyVerification.runAllVerifications();
-    console.log(`[DEX] Verification: ${results.passed} passed, ${results.failed} failed, ${results.warnings} warnings`);
+    log.info(`[DEX] Verification: ${results.passed} passed, ${results.failed} failed, ${results.warnings} warnings`);
     
     if (results.failed > 0) {
-      console.warn('[DEX] Some verifications failed - check report');
+      log.warn('[DEX] Some verifications failed - check report');
     }
   }
 }
@@ -368,9 +375,9 @@ export function saveVerificationReport(): string {
   
   try {
     fs.writeFileSync(reportPath, report, 'utf8');
-    console.log(`[DEX] Verification report saved to: ${reportPath}`);
+    log.info(`[DEX] Verification report saved to: ${reportPath}`);
   } catch (error) {
-    console.error('[DEX] Failed to save verification report:', error);
+    log.error('[DEX] Failed to save verification report:', error);
   }
   
   return report;

@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Automation Controller (Phase 27)
 // Backend handler for block-based automations
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { exec } from 'child_process';
@@ -10,6 +16,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DataStore } from '../store/DataStore';
 import { Logger } from '../utils/Logger';
+import { NativeProcesses, isNativeAvailable } from '../native/bridge';
 
 const execAsync = promisify(exec);
 
@@ -69,54 +76,53 @@ export class AutomationController {
   private registerHandlers(): void {
     // Get all automations
     ipcMain.handle('automation:getAll', async () => {
-      return this.getAutomations();
+      try { return this.getAutomations(); } catch (e) { this.logger.error('[AutomationController] getAll error', e); return []; }
     });
 
     // Get single automation
     ipcMain.handle('automation:get', async (_, id: string) => {
-      return this.getAutomation(id);
+      try { return this.getAutomation(id); } catch (e) { this.logger.error('[AutomationController] get error', e); return null; }
     });
 
     // Save automation
     ipcMain.handle('automation:save', async (_, automation: Automation) => {
-      return this.saveAutomation(automation);
+      try { return this.saveAutomation(automation); } catch (e) { this.logger.error('[AutomationController] save error', e); return { success: false, error: String(e) }; }
     });
 
     // Delete automation
     ipcMain.handle('automation:delete', async (_, id: string) => {
-      return this.deleteAutomation(id);
+      try { return this.deleteAutomation(id); } catch (e) { this.logger.error('[AutomationController] delete error', e); return { success: false, error: String(e) }; }
     });
 
     // Execute automation
     ipcMain.handle('automation:execute', async (event, id: string) => {
-      const window = BrowserWindow.fromWebContents(event.sender);
-      return this.executeAutomation(id, window);
+      try { const window = BrowserWindow.fromWebContents(event.sender); return this.executeAutomation(id, window); } catch (e) { this.logger.error('[AutomationController] execute error', e); return { success: false, error: String(e) }; }
     });
 
     // Cancel running automation
     ipcMain.handle('automation:cancel', async (_, id: string) => {
-      return this.cancelAutomation(id);
+      try { return this.cancelAutomation(id); } catch (e) { this.logger.error('[AutomationController] cancel error', e); return { success: false, error: String(e) }; }
     });
 
     // Toggle favorite
     ipcMain.handle('automation:toggleFavorite', async (_, id: string) => {
-      return this.toggleFavorite(id);
+      try { return this.toggleFavorite(id); } catch (e) { this.logger.error('[AutomationController] toggleFavorite error', e); return { success: false, error: String(e) }; }
     });
 
     // Duplicate automation
     ipcMain.handle('automation:duplicate', async (_, id: string) => {
-      return this.duplicateAutomation(id);
+      try { return this.duplicateAutomation(id); } catch (e) { this.logger.error('[AutomationController] duplicate error', e); return { success: false, error: String(e) }; }
     });
 
     this.logger.info('[AutomationController] Handlers registered');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CRUD Operations
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getAutomations(): Automation[] {
-    const data = (this.dataStore as any).store.get('automations') || [];
+    const data = (this.dataStore as unknown as { store: { get(key: string): any } }).store.get('automations') || [];
     return data;
   }
 
@@ -145,7 +151,7 @@ export class AutomationController {
       automations.push(automation);
     }
     
-    (this.dataStore as any).store.set('automations', automations);
+    (this.dataStore as unknown as { store: { set(key: string, value: unknown): void } }).store.set('automations', automations);
     this.logger.info(`[AutomationController] Saved automation: ${automation.name}`);
     
     return existingIndex >= 0 ? automations[existingIndex] : automation;
@@ -154,7 +160,7 @@ export class AutomationController {
   private deleteAutomation(id: string): boolean {
     const automations = this.getAutomations();
     const filtered = automations.filter(a => a.id !== id);
-    (this.dataStore as any).store.set('automations', filtered);
+    (this.dataStore as unknown as { store: { set(key: string, value: unknown): void } }).store.set('automations', filtered);
     this.logger.info(`[AutomationController] Deleted automation: ${id}`);
     return true;
   }
@@ -191,9 +197,9 @@ export class AutomationController {
     return this.saveAutomation(duplicate);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Execution Engine
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async executeAutomation(id: string, window: BrowserWindow | null): Promise<ExecutionResult> {
     const automation = this.getAutomation(id);
@@ -335,9 +341,9 @@ export class AutomationController {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Block Executors
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async executeBlock(block: Block, window: BrowserWindow | null): Promise<{ success: boolean; message: string; data?: any }> {
     const { type, config } = block;
@@ -383,8 +389,18 @@ export class AutomationController {
       case 'group':
         return { success: true, message: 'Group executed' };
       
-      case 'send-file':
-        return { success: true, message: 'File send not yet implemented' };
+      case 'send-file': {
+        const filePath = config?.path || config?.file;
+        const destination = config?.destination || config?.to;
+        if (!filePath) return { success: false, message: 'No file path specified for send-file' };
+        if (!destination) return { success: false, message: 'No destination specified for send-file' };
+        try {
+          await fs.promises.copyFile(filePath, destination);
+          return { success: true, message: `File sent to ${destination}` };
+        } catch (err) {
+          return { success: false, message: `File send failed: ${err}` };
+        }
+      }
       
       default:
         return { success: false, message: `Unknown block type: ${type}` };
@@ -449,8 +465,7 @@ export class AutomationController {
     }
 
     const platform = process.platform;
-    const force = config.force ? '/F' : '';
-    let command: string;
+    const force = !!config.force;
 
     // Extract process name from app
     let processName = app;
@@ -458,12 +473,18 @@ export class AutomationController {
       processName = `${app}.exe`;
     }
 
-    if (platform === 'win32') {
-      command = `taskkill /IM "${processName}" ${force}`.trim();
-    } else if (platform === 'darwin') {
-      command = config.force ? `pkill -9 -x "${app}"` : `pkill -x "${app}"`;
+    // Use native module (AV-safe) on Windows when available
+    if (platform === 'win32' && isNativeAvailable()) {
+      const result = NativeProcesses.closeByName(processName, force);
+      return { success: result.success, message: result.message };
+    }
+
+    // Fallback for macOS/Linux or when native unavailable
+    let command: string;
+    if (platform === 'darwin') {
+      command = force ? `pkill -9 -x "${app}"` : `pkill -x "${app}"`;
     } else {
-      command = config.force ? `pkill -9 "${app}"` : `pkill "${app}"`;
+      command = force ? `pkill -9 "${app}"` : `pkill "${app}"`;
     }
 
     try {

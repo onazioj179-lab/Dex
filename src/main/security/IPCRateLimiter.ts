@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - IPC Rate Limiter
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * Prevents abuse of expensive IPC operations from the renderer process.
  * Rate limits are per-channel with configurable windows and limits.
@@ -48,33 +54,38 @@ class IPCRateLimiter {
 
   /**
    * Check if an IPC call should be permitted.
+   * @param channel   IPC channel name
+   * @param senderId  Optional webContents ID — when provided the limit is
+   *                  scoped per-window so one renderer cannot starve others.
    * Returns true if allowed, false if rate limited.
    */
-  check(channel: string): boolean {
+  check(channel: string, senderId?: number): boolean {
     const config = this.customLimits.get(channel) || DEFAULT_LIMITS[channel];
     if (!config) return true; // No limit configured for this channel
 
+    // Per-sender key when available; fall back to global channel key
+    const key = senderId !== undefined ? `${channel}:${senderId}` : channel;
     const now = Date.now();
-    let timestamps = this.callTimestamps.get(channel) || [];
-    
+    let timestamps = this.callTimestamps.get(key) || [];
+
     // Remove expired timestamps
     timestamps = timestamps.filter(t => now - t < config.windowMs);
-    
+
     if (timestamps.length >= config.maxCalls) {
-      log.warn(`[RateLimiter] Rate limit exceeded for IPC channel: ${channel} (${timestamps.length}/${config.maxCalls} in ${config.windowMs}ms)`);
+      log.warn(`[RateLimiter] Rate limit exceeded for IPC channel: ${channel}${senderId !== undefined ? ` (sender ${senderId})` : ''} (${timestamps.length}/${config.maxCalls} in ${config.windowMs}ms)`);
       return false;
     }
 
     timestamps.push(now);
-    this.callTimestamps.set(channel, timestamps);
+    this.callTimestamps.set(key, timestamps);
     return true;
   }
 
   /**
    * Apply rate limiting and throw if exceeded.
    */
-  enforce(channel: string): void {
-    if (!this.check(channel)) {
+  enforce(channel: string, senderId?: number): void {
+    if (!this.check(channel, senderId)) {
       throw new Error(`Rate limit exceeded for ${channel}. Please try again later.`);
     }
   }
@@ -106,5 +117,6 @@ class IPCRateLimiter {
 
 export const ipcRateLimiter = new IPCRateLimiter();
 
-// Auto-cleanup every 5 minutes
-setInterval(() => ipcRateLimiter.cleanup(), 5 * 60 * 1000);
+// Auto-cleanup every 5 minutes (stored for shutdown cleanup)
+const cleanupInterval = setInterval(() => ipcRateLimiter.cleanup(), 5 * 60 * 1000);
+process.on('exit', () => clearInterval(cleanupInterval));

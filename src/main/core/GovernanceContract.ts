@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Governance Contract
 // Phase 58 + 59: AI + Plugin Boundaries & Post-Launch Evolution Rules
 // IMMUTABLE ARCHITECTURAL CONTRACTS - DO NOT MODIFY WITHOUT EXPLICIT APPROVAL
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CORE LAWS (ABSOLUTE - NEVER CHANGE)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const CORE_LAWS = {
   // AI + Plugin Separation (Phase 58)
@@ -39,9 +46,9 @@ export const CORE_LAWS = {
   NO_BEHAVIORAL_DRIFT: true,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // PERFORMANCE CONTRACT (PERMANENT)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const PERFORMANCE_CONTRACT = {
   // CPU/GPU Guarantees
@@ -68,9 +75,9 @@ export const PERFORMANCE_CONTRACT = {
   NO_ALWAYS_ON_SERVICES: true,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // AI BOUNDARIES (LOCKED)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const AI_BOUNDARIES = {
   // Capabilities
@@ -95,9 +102,9 @@ export const AI_BOUNDARIES = {
   USER_EDITS_CONTEXT_BEFORE_SEND: true,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // PLUGIN BOUNDARIES (LOCKED)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const PLUGIN_BOUNDARIES = {
   // Capabilities
@@ -120,9 +127,9 @@ export const PLUGIN_BOUNDARIES = {
   MAX_CONCURRENT_OPS: 5,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // DATA FLOW RULES
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const DATA_FLOW_RULES = {
   // Allowed Flows
@@ -140,9 +147,9 @@ export const DATA_FLOW_RULES = {
   AI_CODE_AUTO_EXECUTE: false,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // EVOLUTION RULES (POST-LAUNCH)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const EVOLUTION_RULES = {
   // Allowed Change Types
@@ -168,9 +175,9 @@ export const EVOLUTION_RULES = {
   VISUAL_LANGUAGE_FROZEN: true,
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // FORBIDDEN FOREVER
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const FORBIDDEN_FOREVER = [
   'Autonomous AI agents',
@@ -190,9 +197,9 @@ export const FORBIDDEN_FOREVER = [
   'Trend-chasing features',
 ] as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Governance Enforcer
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface ViolationReport {
   type: 'ai' | 'plugin' | 'core' | 'data';
@@ -218,15 +225,15 @@ class GovernanceEnforcer extends EventEmitter {
 
   constructor() {
     super();
-    console.log('[Governance] Contract enforcer initialized');
-    console.log('[Governance] Core laws locked');
-    console.log('[Governance] Performance contract active');
-    console.log('[Governance] AI permanently disabled - privacy mode');
+    log.info('[Governance] Contract enforcer initialized');
+    log.info('[Governance] Core laws locked');
+    log.info('[Governance] Performance contract active');
+    log.info('[Governance] AI permanently disabled - privacy mode');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Execution Validation
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   validateExecution(request: ExecutionRequest): { allowed: boolean; reason?: string } {
     // Rule: AI cannot execute actions directly
@@ -271,9 +278,9 @@ class GovernanceEnforcer extends EventEmitter {
     return { allowed: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Data Flow Validation
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   validateDataFlow(from: string, to: string, dataType: string): { allowed: boolean; reason?: string } {
     // AI to Plugin direct: FORBIDDEN
@@ -294,9 +301,9 @@ class GovernanceEnforcer extends EventEmitter {
     return { allowed: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Permission Validation
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   validatePermissionChange(
     source: 'ai' | 'plugin',
@@ -333,9 +340,9 @@ class GovernanceEnforcer extends EventEmitter {
     return { allowed: true };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Resource Limits
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   checkResourceLimits(source: 'ai' | 'plugin', metrics: {
     memoryMB?: number;
@@ -360,9 +367,9 @@ class GovernanceEnforcer extends EventEmitter {
     return { withinLimits: violations.length === 0, violations };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Violation Reporting
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private reportViolation(report: ViolationReport): void {
     this.violations.push(report);
@@ -375,9 +382,9 @@ class GovernanceEnforcer extends EventEmitter {
 
     // Log critical violations
     if (report.severity === 'critical') {
-      console.error(`[Governance] CRITICAL VIOLATION: ${report.rule} - ${report.description}`);
+      log.error(`[Governance] CRITICAL VIOLATION: ${report.rule} - ${report.description}`);
     } else {
-      console.warn(`[Governance] ${report.severity.toUpperCase()}: ${report.rule}`);
+      log.warn(`[Governance] ${report.severity.toUpperCase()}: ${report.rule}`);
     }
   }
 
@@ -389,19 +396,19 @@ class GovernanceEnforcer extends EventEmitter {
     this.violations = [];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // State Management
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   setAIEnabled(enabled: boolean): void {
     // AI is permanently disabled in DEX - use local pattern learning instead
     this.aiEnabled = false;  // Always false - AI removed
-    console.log(`[Governance] AI permanently disabled - privacy mode`);
+    log.info(`[Governance] AI permanently disabled - privacy mode`);
   }
 
   setPluginsEnabled(enabled: boolean): void {
     this.pluginsEnabled = enabled;
-    console.log(`[Governance] Plugins ${enabled ? 'enabled' : 'disabled'}`);
+    log.info(`[Governance] Plugins ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   isAIEnabled(): boolean {
@@ -412,9 +419,9 @@ class GovernanceEnforcer extends EventEmitter {
     return this.pluginsEnabled;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // Contract Export
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getContracts(): {
     coreLaws: typeof CORE_LAWS;
@@ -440,9 +447,9 @@ class GovernanceEnforcer extends EventEmitter {
 // Singleton instance
 export const governanceEnforcer = new GovernanceEnforcer();
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Mediated Action Executor
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface MediatedAction {
   id: string;
@@ -540,9 +547,9 @@ class MediatedActionExecutor {
 
 export const mediatedExecutor = new MediatedActionExecutor();
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Export governance status for UI
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export function getGovernanceStatus(): {
   aiEnabled: boolean;
@@ -560,9 +567,9 @@ export function getGovernanceStatus(): {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // IPC Handler Registration
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 import { ipcMain } from 'electron';
 
@@ -620,5 +627,5 @@ export function registerGovernanceHandlers(): void {
     return governanceEnforcer.validateDataFlow(from, to, dataType);
   });
 
-  console.log('[Governance] IPC handlers registered');
+  log.info('[Governance] IPC handlers registered');
 }

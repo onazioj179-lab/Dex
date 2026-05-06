@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Phase 52: Advanced Plugin System Architecture
 // Enhanced sandbox enforcement, permission system, resource budgeting
 // =============================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as crypto from 'crypto';
 import * as vm from 'vm';
@@ -867,7 +874,7 @@ export function initializePhase52(): {
 
   // Handle violations
   resourceBudgets.on('violation', (violation: ResourceViolation) => {
-    console.warn(`[Phase52] Resource violation:`, violation);
+    log.warn(`[Phase52] Resource violation:`, violation);
     
     if (violation.action === 'suspend') {
       // Auto-revoke permissions if severely over budget
@@ -914,7 +921,7 @@ export function initializePhase52(): {
     };
   };
 
-  console.log('[Phase52] Advanced Plugin Architecture initialized');
+  log.info('[Phase52] Advanced Plugin Architecture initialized');
 
   return {
     permissionEnforcer,

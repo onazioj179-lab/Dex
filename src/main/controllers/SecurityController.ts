@@ -1,17 +1,24 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Security Controller
 // Phase 11: Permission audit, sandbox boundaries, security hardening
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, app, session, BrowserWindow } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
+import { IPCCrypto } from '../security/IPCCrypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PERMISSION REGISTRY
 // Documents all permissions the app uses and why
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface Permission {
   id: string;
@@ -144,9 +151,9 @@ const PERMISSIONS_REGISTRY: Permission[] = [
   }
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURITY CONTROLLER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecurityController {
   private permissions: Map<string, Permission>;
@@ -238,7 +245,7 @@ class SecurityController {
         contents.executeJavaScript(`
           window.eval = function() { throw new Error('eval is disabled'); };
           window.Function = function() { throw new Error('Function constructor is disabled'); };
-        `).catch(() => {});
+        `).catch((e: unknown) => { log.warn('[DEX]', e); });
       });
     });
 
@@ -368,10 +375,10 @@ class SecurityController {
 
 export const securityController = new SecurityController();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PHASE 39 & 40: EXTENDED SECURITY HANDLERS
 // Defensive Security Core, Transfer Hub, Network Hygiene
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { SecurityCore } from '../security/SecurityCore';
 import { SecureKeyManager } from '../security/SecureKeyManager';
@@ -379,12 +386,15 @@ import { SecureTransferHub } from '../security/SecureTransferHub';
 import { NetworkHygieneMonitor } from '../security/NetworkHygieneMonitor';
 import { dialog } from 'electron';
 
+// Track active secure contexts for isolation
+const activeSecureContexts = new Map<string, { createdAt: number; permissions: Set<string> }>();
+
 export function registerExtendedSecurityHandlers(): void {
   log.info('[SecurityController] Registering Phase 39/40 security handlers...');
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURITY CORE HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('security:get-layered-status', async () => {
     try {
@@ -468,9 +478,9 @@ export function registerExtendedSecurityHandlers(): void {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // KEY MANAGER HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('keys:list', async () => {
     try {
@@ -541,9 +551,9 @@ export function registerExtendedSecurityHandlers(): void {
     return SecureKeyManager.updateRotationPolicy(updates);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // TRANSFER HUB HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('transfer:get-config', async () => {
     return SecureTransferHub.getConfig();
@@ -626,9 +636,9 @@ export function registerExtendedSecurityHandlers(): void {
     return await SecureTransferHub.cleanupQuarantine(days);
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NETWORK HYGIENE HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('network:get-hygiene-config', async () => {
     return NetworkHygieneMonitor.getConfig();
@@ -701,9 +711,9 @@ export function registerExtendedSecurityHandlers(): void {
     return true;
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURITY CORE HANDLERS (matching preload securityCore:*)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('securityCore:getStatus', async () => {
     try {
@@ -785,6 +795,14 @@ export function registerExtendedSecurityHandlers(): void {
 
   ipcMain.handle('securityCore:createSecureContext', async (_, contextId: string) => {
     try {
+      if (activeSecureContexts.has(contextId)) {
+        return { success: false, error: 'Context already exists' };
+      }
+      activeSecureContexts.set(contextId, {
+        createdAt: Date.now(),
+        permissions: new Set(),
+      });
+      log.info(`[SecurityCore] Secure context created: ${contextId}`);
       return { success: true, contextId };
     } catch (error) {
       return { success: false };
@@ -793,6 +811,10 @@ export function registerExtendedSecurityHandlers(): void {
 
   ipcMain.handle('securityCore:destroySecureContext', async (_, contextId: string) => {
     try {
+      const deleted = activeSecureContexts.delete(contextId);
+      if (deleted) {
+        log.info(`[SecurityCore] Secure context destroyed: ${contextId}`);
+      }
       return { success: true };
     } catch (error) {
       return { success: false };
@@ -826,9 +848,9 @@ export function registerExtendedSecurityHandlers(): void {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURE KEYS HANDLERS (matching preload secureKeys:*)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('secureKeys:listKeys', async () => {
     try {
@@ -864,8 +886,9 @@ export function registerExtendedSecurityHandlers(): void {
     }
   });
 
-  ipcMain.handle('secureKeys:unlock', async (_, password: string) => {
+  ipcMain.handle('secureKeys:unlock', async (_, sealed: any) => {
     try {
+      const password = IPCCrypto.open(sealed);
       return await SecureKeyManager.unlock(password);
     } catch (error) {
       return false;
@@ -876,9 +899,9 @@ export function registerExtendedSecurityHandlers(): void {
     return !SecureKeyManager.isUnlocked();
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURE TRANSFER HANDLERS (matching preload secureTransfer:*)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('secureTransfer:getTransfers', async () => {
     try {
@@ -920,9 +943,9 @@ export function registerExtendedSecurityHandlers(): void {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NETWORK HYGIENE HANDLERS (matching preload networkHygiene:*)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   ipcMain.handle('networkHygiene:getStatus', async () => {
     try {

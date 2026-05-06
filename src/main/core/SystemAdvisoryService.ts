@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - System Advisory Service
 // Phase 42: Suggestions only, never enforce - quiet, dismissible, disableable
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain, BrowserWindow } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type AdvisoryType = 
   | 'performance'
@@ -59,9 +66,9 @@ export interface AdvisoryStats {
   typeBreakdown: Record<AdvisoryType, number>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const advisoryStore = new Store<{
   config: AdvisoryConfig;
@@ -104,9 +111,9 @@ const advisoryStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SYSTEM ADVISORY SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SystemAdvisoryService {
   private static instance: SystemAdvisoryService;
@@ -123,9 +130,9 @@ class SystemAdvisoryService {
     return SystemAdvisoryService.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -140,7 +147,7 @@ class SystemAdvisoryService {
     this.setupIPC();
 
     this.initialized = true;
-    console.log('[SystemAdvisoryService] Initialized');
+    log.info('[SystemAdvisoryService] Initialized');
   }
 
   private setupIPC(): void {
@@ -154,7 +161,7 @@ class SystemAdvisoryService {
 
   private registerDefaultHandlers(): void {
     this.actionHandlers.set('clear-cache', async () => {
-      console.log('[Advisory] Clearing cache...');
+      log.info('[Advisory] Clearing cache...');
       // Would integrate with cache system
     });
 
@@ -163,7 +170,7 @@ class SystemAdvisoryService {
     });
 
     this.actionHandlers.set('run-maintenance', async () => {
-      console.log('[Advisory] Running maintenance...');
+      log.info('[Advisory] Running maintenance...');
       // Would integrate with maintenance system
     });
   }
@@ -172,9 +179,9 @@ class SystemAdvisoryService {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ADVISORY CREATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async suggest(options: {
     type: AdvisoryType;
@@ -250,7 +257,7 @@ class SystemAdvisoryService {
     // Send to renderer
     this.notifyRenderer(advisory);
 
-    console.log(`[SystemAdvisoryService] Suggested: ${advisory.title}`);
+    log.info(`[SystemAdvisoryService] Suggested: ${advisory.title}`);
     return advisory;
   }
 
@@ -301,9 +308,9 @@ class SystemAdvisoryService {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ADVISORY ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async dismiss(advisoryId: string): Promise<boolean> {
     const activeAdvisories = advisoryStore.get('activeAdvisories');
@@ -345,9 +352,9 @@ class SystemAdvisoryService {
     if (handler) {
       try {
         await handler();
-        console.log(`[SystemAdvisoryService] Executed action: ${advisory.actionId}`);
+        log.info(`[SystemAdvisoryService] Executed action: ${advisory.actionId}`);
       } catch (error) {
-        console.error(`[SystemAdvisoryService] Action failed:`, error);
+        log.error(`[SystemAdvisoryService] Action failed:`, error);
         return false;
       }
     }
@@ -365,9 +372,9 @@ class SystemAdvisoryService {
     this.actionHandlers.set(actionId, handler);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUILT-IN ADVISORIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async checkMemory(): Promise<void> {
     const memoryUsage = process.memoryUsage();
@@ -432,9 +439,9 @@ class SystemAdvisoryService {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getActiveAdvisories(): Advisory[] {
     this.cleanExpiredAdvisories();
@@ -459,9 +466,9 @@ class SystemAdvisoryService {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONFIGURATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): AdvisoryConfig {
     return advisoryStore.get('config');
@@ -484,9 +491,9 @@ class SystemAdvisoryService {
     await this.updateConfig({ enabled: true });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATISTICS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStats(): AdvisoryStats {
     return advisoryStore.get('stats');
@@ -504,9 +511,9 @@ class SystemAdvisoryService {
     advisoryStore.set('stats', stats);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LISTENERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   onAdvisory(callback: (advisory: Advisory) => void): () => void {
     this.advisoryListeners.add(callback);
@@ -523,9 +530,9 @@ class SystemAdvisoryService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const systemAdvisoryService = SystemAdvisoryService.getInstance();
 export default systemAdvisoryService;

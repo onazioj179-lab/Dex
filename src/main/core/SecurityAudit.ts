@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Security Audit System
 // Phase 17: Final Lockdown & Long-Term Trust Foundation
 // Full internal security auditing with traceable privilege paths
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import log from 'electron-log';
 import * as crypto from 'crypto';
@@ -10,9 +16,9 @@ import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type AuditSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 
@@ -76,18 +82,18 @@ export interface SecurityReport {
   recommendations: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURITY RULES - What constitutes a finding
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const SECURITY_RULES: Array<{
   id: string;
   check: () => Promise<SecurityFinding | null>;
 }> = [];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SECURITY AUDIT CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SecurityAuditClass {
   private auditLog: AuditEntry[] = [];
@@ -95,15 +101,33 @@ class SecurityAuditClass {
   private maxLogEntries = 10000;
   private auditFilePath: string;
   private isAuditingEnabled = true;
+  private chainHash: string = '';
 
   constructor() {
     this.auditFilePath = path.join(app.getPath('userData'), 'security-audit.json');
     this.loadAuditLog();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  /** Compute HMAC chain: each entry's hash covers itself + the previous hash */
+  private computeEntryHash(entry: AuditEntry, previousHash: string): string {
+    const data = `${previousHash}|${entry.id}|${entry.timestamp}|${entry.category}|${entry.action}|${entry.severity}|${entry.success}`;
+    return crypto.createHmac('sha256', 'dex-audit-chain').update(data).digest('hex');
+  }
+
+  /** Verify the integrity of the audit chain */
+  verifyChain(): { valid: boolean; brokenAt?: number } {
+    let hash = '';
+    for (let i = 0; i < this.auditLog.length; i++) {
+      const entry = this.auditLog[i];
+      hash = this.computeEntryHash(entry, hash);
+    }
+    const valid = this.auditLog.length === 0 || hash === this.chainHash;
+    return { valid, brokenAt: valid ? undefined : this.auditLog.length - 1 };
+  }
+
+  // -------------------------------------------------------------------------
   // AUDIT LOGGING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Log a privileged action for audit trail
@@ -135,9 +159,18 @@ class SecurityAuditClass {
 
     this.auditLog.push(entry);
 
+    // Update HMAC chain
+    this.chainHash = this.computeEntryHash(entry, this.chainHash);
+
     // Trim log if too large
     if (this.auditLog.length > this.maxLogEntries) {
       this.auditLog = this.auditLog.slice(-this.maxLogEntries);
+      // Recompute chain after trim
+      let hash = '';
+      for (const e of this.auditLog) {
+        hash = this.computeEntryHash(e, hash);
+      }
+      this.chainHash = hash;
     }
 
     // Log high severity events
@@ -208,9 +241,9 @@ class SecurityAuditClass {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SECURITY FINDINGS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Report a security finding
@@ -259,9 +292,9 @@ class SecurityAuditClass {
     return this.findings.filter(f => !f.resolved);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FULL AUDIT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Perform a full security audit
@@ -395,9 +428,9 @@ class SecurityAuditClass {
     this.log('system', 'audit', 'Memory safety audited', { severity: 'info' });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // REPORT GENERATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Generate security report
@@ -471,9 +504,9 @@ class SecurityAuditClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Get recent audit entries
@@ -500,9 +533,9 @@ class SecurityAuditClass {
     return [...this.findings];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private loadAuditLog(): void {
     try {
@@ -511,6 +544,7 @@ class SecurityAuditClass {
         const parsed = JSON.parse(data);
         this.auditLog = parsed.auditLog ?? [];
         this.findings = parsed.findings ?? [];
+        this.chainHash = parsed.chainHash ?? '';
       }
     } catch (error) {
       log.error('[SecurityAudit] Failed to load audit log:', error);
@@ -520,8 +554,9 @@ class SecurityAuditClass {
   private persistAuditLog(): void {
     try {
       const data = JSON.stringify({
-        auditLog: this.auditLog.slice(-1000), // Keep last 1000 entries
+        auditLog: this.auditLog.slice(-1000),
         findings: this.findings,
+        chainHash: this.chainHash,
       }, null, 2);
       fs.writeFileSync(this.auditFilePath, data, 'utf-8');
     } catch (error) {
@@ -536,9 +571,9 @@ class SecurityAuditClass {
     this.persistAuditLog();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
@@ -560,6 +595,7 @@ class SecurityAuditClass {
   clear(): void {
     this.auditLog = [];
     this.findings = [];
+    this.chainHash = '';
     try {
       if (fs.existsSync(this.auditFilePath)) {
         fs.unlinkSync(this.auditFilePath);

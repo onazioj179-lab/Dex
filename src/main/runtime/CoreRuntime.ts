@@ -1,16 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Core Runtime Layer
 // Phase 28: Backend Architecture Refinement
 // App lifecycle, global state, session manager, shutdown/restart handling
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { EventEmitter } from 'events';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type AppState = 
   | 'initializing' 
@@ -58,9 +64,9 @@ export interface StartupHook {
   required: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CORE RUNTIME CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class CoreRuntimeClass extends EventEmitter {
   private state: AppState = 'initializing';
@@ -97,9 +103,9 @@ class CoreRuntimeClass extends EventEmitter {
     log.info(`[CoreRuntime] Session started: ${this.session.id}`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Initialize the runtime - call this before app.whenReady()
@@ -149,9 +155,9 @@ class CoreRuntimeClass extends EventEmitter {
     log.info('[CoreRuntime] Runtime started');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getState(): AppState {
     return this.state;
@@ -167,7 +173,7 @@ class CoreRuntimeClass extends EventEmitter {
     this.session.state = newState;
     this.session.lastActivityAt = Date.now();
     
-    log.info(`[CoreRuntime] State: ${oldState} → ${newState}`);
+    log.info(`[CoreRuntime] State: ${oldState} ${newState}`);
     this.emit('stateChange', { oldState, newState });
     
     // Notify renderer
@@ -178,9 +184,9 @@ class CoreRuntimeClass extends EventEmitter {
     this.session.lastActivityAt = Date.now();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUBSYSTEM REGISTRATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Register a subsystem for coordinated shutdown
@@ -204,9 +210,9 @@ class CoreRuntimeClass extends EventEmitter {
     this.shutdownHooks.push(hook);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SHUTDOWN & RESTART
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Request graceful shutdown
@@ -312,9 +318,9 @@ class CoreRuntimeClass extends EventEmitter {
     }, this.config.restartDelayMs);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SUSPEND & RESUME
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Handle system suspend (sleep/hibernate)
@@ -346,9 +352,9 @@ class CoreRuntimeClass extends EventEmitter {
     this.setState('running');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HEALTH MONITORING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private performHealthCheck(): void {
     const memoryUsage = process.memoryUsage();
@@ -384,9 +390,9 @@ class CoreRuntimeClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     ipcMain.handle('runtime:getState', () => this.state);
@@ -401,9 +407,9 @@ class CoreRuntimeClass extends EventEmitter {
     log.info('[CoreRuntime] IPC handlers registered');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PROCESS HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupProcessHandlers(): void {
     // Handle uncaught exceptions
@@ -437,9 +443,9 @@ class CoreRuntimeClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const coreRuntime = new CoreRuntimeClass();
 export default coreRuntime;

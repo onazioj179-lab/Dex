@@ -34,9 +34,33 @@ native/target/
 native/node_modules/
 native/*.node
 native/npm/
+src/native/dex-core/target/
+src/native/dex-core/node_modules/
 coverage/
 playwright-report/
 
 # Build debris
 *.bak
-tsc-output.txt
+tsc-*.txt
+tsc_*.txt
+vite-errors.txt
+vite_build.txt
+baseline-*.txt
+build_output.txt
+build-*.txt
+
+# Temp/scratch files
+temp_*
+full_test*.txt
+renderer_test*.txt
+vitest_*.txt
+r[0-9].txt
+rp[0-9].txt
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Archived old versions
+_archive_v2/

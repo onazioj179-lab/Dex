@@ -1,0 +1,27 @@
+DEX - Personal Control Hub for Desktop Automation
+===================================================
+
+Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+
+Author:    Onazi Treasure OJ
+Email:     onazi.treasure@outlook.com
+License:   MIT License (see LICENSE file)
+
+This software was designed, built, and maintained by Onazi Treasure OJ.
+The DEX name, logo, and brand assets are the property of Onazi Treasure OJ.
+
+Third-Party Acknowledgements
+----------------------------
+DEX is built with the following open-source technologies:
+
+  - Electron 28      (MIT License)       - Desktop application framework
+  - React 18         (MIT License)       - User interface library
+  - Zustand 4        (MIT License)       - State management
+  - Vite 5           (MIT License)       - Build tooling
+  - TypeScript 5     (Apache-2.0)        - Type system
+  - Tailwind CSS 3   (MIT License)       - Utility CSS framework
+  - Playwright       (Apache-2.0)        - End-to-end testing
+  - Vitest           (MIT License)       - Unit testing
+
+Full third-party license texts are available in node_modules or at
+the respective project repositories.

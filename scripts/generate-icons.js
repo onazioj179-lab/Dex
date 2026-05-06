@@ -1,11 +1,17 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 #!/usr/bin/env node
 /**
  * DEX Icon Generator
  * Converts SVG icon to all required formats for electron-builder:
- * - icon.png (1024x1024) — master
- * - icon.ico (256x256) — Windows
- * - 256x256.png — Windows fallback
- * - tray-icon.png (32x32) — System tray
+ * - icon.png (1024x1024) -- master
+ * - icon.ico (256x256) -- Windows
+ * - 256x256.png -- Windows fallback
+ * - tray-icon.png (32x32) -- System tray
  */
 
 const sharp = require('sharp');

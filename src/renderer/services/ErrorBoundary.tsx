@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * DEX — App Error Boundary & Isolation
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
+ * DEX -- App Error Boundary & Isolation
+ * ===========================================================================
  * 
  * Fault containment system ensuring:
  * - One sub-app crash cannot crash Dex
@@ -13,16 +19,17 @@
  * - Automatic crash recovery
  * - Error reporting and diagnostics
  * - Graceful degradation
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import React, { Component, ErrorInfo, ReactNode, useCallback, useMemo } from 'react';
 import { useLifecycleManager, AppProcess } from './LifecycleManager';
 import { useSystemEvents } from './SystemServices';
+import { useRunningApps } from '../store/runningApps';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface AppErrorBoundaryProps {
   instanceId: string;
@@ -61,9 +68,9 @@ interface CrashReport {
   memoryUsage?: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CRASH REPORTER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -90,9 +97,9 @@ export const clearCrashReports = () => {
   crashReports.length = 0;
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // APP ERROR BOUNDARY
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   private startTime: number;
@@ -150,12 +157,13 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
     submitCrashReport(report);
 
-    // Notify lifecycle manager
+    // Notify lifecycle manager (use updated crashCount: prevState + 1)
+    const updatedCrashCount = (this.state.crashCount || 0) + 1;
     useLifecycleManager.getState().handleCrash(instanceId, {
       code: error.name,
       message: error.message,
       timestamp: now,
-      recoverable: this.state.crashCount < 3,
+      recoverable: updatedCrashCount < 3,
     });
 
     // Emit system event
@@ -195,8 +203,10 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   };
 
   handleClose = () => {
-    const { instanceId } = this.props;
+    const { instanceId, appId } = this.props;
     useLifecycleManager.getState().terminateProcess(instanceId, 'User closed after crash');
+    // Actually close the app in the running apps store so it navigates away
+    useRunningApps.getState().closeApp(appId);
   };
 
   render() {
@@ -223,9 +233,9 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // CRASH SCREEN UI
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface CrashScreenProps {
   appName: string;
@@ -387,7 +397,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(10,132,255,0.25)',
     background: 'rgba(10,132,255,0.15)',
     color: 'var(--color-accent, #0a84ff)',
-    backdropFilter: 'blur(8px)',
   },
   details: {
     marginTop: 'var(--space-6, 24px)',
@@ -414,9 +423,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PROCESS ISOLATION WRAPPER
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface ProcessIsolationProps {
   process: AppProcess;
@@ -451,14 +460,9 @@ export const ProcessIsolation: React.FC<ProcessIsolationProps> = ({
     return null;
   }
 
-  // Show loading for launching state
+  // Skip loading screen — instant app opening (macOS Tahoe style)
   if (process.lifecycleState === 'launching') {
-    return (
-      <div style={loadingStyles.container}>
-        <div style={loadingStyles.spinner} />
-        <span style={loadingStyles.text}>Loading {appName}...</span>
-      </div>
-    );
+    return null;
   }
 
   // Show offline state
@@ -534,9 +538,9 @@ const loadingStyles: Record<string, React.CSSProperties> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STATE SCREENS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface StateScreenProps {
   title: string;
@@ -618,8 +622,74 @@ const stateStyles: Record<string, React.CSSProperties> = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type { CrashReport };
+
+// ===========================================================================
+// VIEW ERROR BOUNDARY (lightweight, for sub-views within apps)
+// ===========================================================================
+
+interface ViewErrorBoundaryProps {
+  viewName: string;
+  children: ReactNode;
+}
+
+interface ViewErrorBoundaryState {
+  hasError: boolean;
+  errorMessage: string;
+  showDetails: boolean;
+  resetKey: number;
+}
+
+export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBoundaryState> {
+  constructor(props: ViewErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, errorMessage: '', showDetails: false, resetKey: 0 };
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<ViewErrorBoundaryState> {
+    return { hasError: true, errorMessage: error.message || 'Unknown error' };
+  }
+
+  componentDidCatch(error: Error): void {
+    submitCrashReport({
+      id: generateId(),
+      instanceId: `view-${this.props.viewName}`,
+      appId: 'view',
+      error: { name: error.name, message: error.message, stack: error.stack },
+      errorInfo: { componentStack: '' },
+      timestamp: Date.now(),
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      sessionDuration: 0,
+    });
+  }
+
+  private reloadView = () => {
+    this.setState(prev => ({ hasError: false, showDetails: false, resetKey: prev.resetKey + 1 }));
+  };
+
+  render() {
+    if (!this.state.hasError) {
+      return <div key={this.state.resetKey} style={{ display: 'flex', flexDirection: 'column' as const, flex: 1, minHeight: 0, height: '100%' }}>{this.props.children}</div>;
+    }
+
+    return (
+      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>View error in {this.props.viewName}</div>
+        <div style={{ fontSize: 12, opacity: 0.75 }}>Something went wrong in this view. The issue was logged.</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={this.reloadView} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 8, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>Reload view</button>
+          <button onClick={() => this.setState(prev => ({ ...prev, showDetails: !prev.showDetails }))} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 8, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
+            {this.state.showDetails ? 'Hide error details' : 'View error details'}
+          </button>
+        </div>
+        {this.state.showDetails && (
+          <pre style={{ margin: 0, padding: 8, borderRadius: 6, background: 'rgba(0,0,0,0.2)', fontSize: 11, overflowX: 'auto' }}>{this.state.errorMessage}</pre>
+        )}
+      </div>
+    );
+  }
+}

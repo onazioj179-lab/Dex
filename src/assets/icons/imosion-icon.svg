@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#DC2626"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="50%" stop-color="#EA580C"/>
+      <stop offset="100%" stop-color="#C2410C"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="200" fill="#0C0A14"/>
+  <!-- Outer ring -->
+  <circle cx="512" cy="512" r="360" fill="none" stroke="url(#ringGrad)" stroke-width="12" opacity="0.3"/>
+  <!-- Sound wave arcs - left side -->
+  <path d="M320,512 Q320,340 400,280" fill="none" stroke="url(#waveGrad)" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+  <path d="M280,512 Q280,290 400,210" fill="none" stroke="url(#waveGrad)" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+  <path d="M240,512 Q240,240 400,150" fill="none" stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" opacity="0.3"/>
+  <!-- Sound wave arcs - right side -->
+  <path d="M704,512 Q704,340 624,280" fill="none" stroke="url(#waveGrad)" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+  <path d="M744,512 Q744,290 624,210" fill="none" stroke="url(#waveGrad)" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+  <path d="M784,512 Q784,240 624,150" fill="none" stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" opacity="0.3"/>
+  <!-- Sound wave arcs - left bottom -->
+  <path d="M320,512 Q320,684 400,744" fill="none" stroke="url(#waveGrad)" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+  <path d="M280,512 Q280,734 400,814" fill="none" stroke="url(#waveGrad)" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+  <path d="M240,512 Q240,784 400,874" fill="none" stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" opacity="0.3"/>
+  <!-- Sound wave arcs - right bottom -->
+  <path d="M704,512 Q704,684 624,744" fill="none" stroke="url(#waveGrad)" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+  <path d="M744,512 Q744,734 624,814" fill="none" stroke="url(#waveGrad)" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+  <path d="M784,512 Q784,784 624,874" fill="none" stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" opacity="0.3"/>
+  <!-- Center microphone body -->
+  <rect x="462" y="360" width="100" height="200" rx="50" fill="url(#waveGrad)"/>
+  <!-- Microphone stand -->
+  <line x1="512" y1="560" x2="512" y2="660" stroke="#F97316" stroke-width="14" stroke-linecap="round"/>
+  <line x1="440" y1="660" x2="584" y2="660" stroke="#F97316" stroke-width="14" stroke-linecap="round"/>
+  <!-- Microphone pickup arc -->
+  <path d="M430,520 Q430,610 512,610 Q594,610 594,520" fill="none" stroke="#F97316" stroke-width="12" stroke-linecap="round" opacity="0.8"/>
+  <!-- Inner glow -->
+  <ellipse cx="512" cy="460" rx="30" ry="60" fill="#FFF" opacity="0.08"/>
+</svg>

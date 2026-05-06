@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 31: Keyboard Navigation System
 // Central keyboard shortcut management and navigation
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { useEffect, useCallback, useRef } from 'react';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // KEYBOARD SHORTCUTS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface KeyboardShortcut {
   id: string;
@@ -59,9 +65,9 @@ export function setShortcutsEnabled(enabled: boolean): void {
   shortcutsEnabled = enabled;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // DEFAULT SHORTCUTS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const DEFAULT_SHORTCUTS: Omit<KeyboardShortcut, 'handler'>[] = [
   // Navigation
@@ -197,9 +203,9 @@ export const DEFAULT_SHORTCUTS: Omit<KeyboardShortcut, 'handler'>[] = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // KEY EVENT MATCHING
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Check if a keyboard event matches a shortcut
@@ -230,12 +236,14 @@ function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): bool
 export function formatShortcut(shortcut: KeyboardShortcut | Omit<KeyboardShortcut, 'handler'>): string {
   const parts: string[] = [];
   const modifiers = shortcut.modifiers || [];
+  const _p = (navigator as any).userAgentData?.platform || navigator.platform || '';
+  const _isMac = /Mac|macOS/i.test(_p);
 
   if (modifiers.includes('ctrl') || modifiers.includes('meta')) {
-    parts.push(navigator.platform.includes('Mac') ? '⌘' : 'Ctrl');
+    parts.push(_isMac ? '' : 'Ctrl');
   }
   if (modifiers.includes('alt')) {
-    parts.push(navigator.platform.includes('Mac') ? '⌥' : 'Alt');
+    parts.push(_isMac ? '' : 'Alt');
   }
   if (modifiers.includes('shift')) {
     parts.push('Shift');
@@ -252,22 +260,22 @@ export function formatShortcut(shortcut: KeyboardShortcut | Omit<KeyboardShortcu
       'ArrowDown': 'arrow-down',
       'ArrowLeft': 'arrow-left',
       'ArrowRight': 'arrow-right',
-      'Enter': '↵',
+      'Enter': '',
       'Escape': 'Esc',
       'Delete': 'Del',
-      'Backspace': '⌫',
+      'Backspace': '',
       ' ': 'Space',
     };
     key = keyMap[key] || key;
   }
   parts.push(key);
 
-  return parts.join(navigator.platform.includes('Mac') ? '' : '+');
+  return parts.join(_isMac ? '' : '+');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // GLOBAL KEYBOARD HANDLER
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 let globalHandlerAttached = false;
 
@@ -312,9 +320,9 @@ export function initKeyboardNavigation(): () => void {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // REACT HOOKS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Hook to register a keyboard shortcut
@@ -391,9 +399,9 @@ export function useKeyboardNavigation(): void {
   }, []);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // FOCUS ZONE COMPONENT HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export type FocusZone = 'activity-bar' | 'sidebar' | 'editor' | 'panel' | 'command-palette';
 

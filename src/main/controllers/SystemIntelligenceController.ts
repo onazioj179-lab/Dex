@@ -1,7 +1,13 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - System Intelligence Controller
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * LOCAL-ONLY pattern learning and intelligent suggestions:
  * - Usage-based learning (what files, apps, workflows are used when)
@@ -16,15 +22,16 @@
  * - Opt-in (disabled by default, user controls everything)
  */
 
+import log from 'electron-log';
 import { ipcMain, BrowserWindow } from 'electron';
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Types
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface UsageEvent {
   id: string;
@@ -92,9 +99,9 @@ interface IntelligenceState {
   lastAnalysis: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // System Intelligence Controller
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SystemIntelligenceController {
   private mainWindow: BrowserWindow | null = null;
@@ -119,7 +126,7 @@ class SystemIntelligenceController {
     
     // Default configuration - conservative, opt-in
     this.config = {
-      enabled: false,                 // Must be explicitly enabled
+      enabled: true,                  // Enabled by default
       learningEnabled: true,
       suggestionsEnabled: true,
       retentionDays: 30,
@@ -137,9 +144,30 @@ class SystemIntelligenceController {
     this.registerIPCHandlers();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  private readJsonFile<T>(filePath: string, fallback: T): T {
+    try {
+      if (!fs.existsSync(filePath)) return fallback;
+      const raw = fs.readFileSync(filePath, 'utf-8').trim();
+      if (!raw) return fallback;
+      return JSON.parse(raw) as T;
+    } catch (error) {
+      log.warn(`[SystemIntelligence] Failed to parse ${path.basename(filePath)}, resetting file`, error);
+      this.writeJsonFile(filePath, fallback);
+      return fallback;
+    }
+  }
+
+  private writeJsonFile(filePath: string, data: unknown): void {
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (error) {
+      log.warn(`[SystemIntelligence] Failed to write ${path.basename(filePath)}`, error);
+    }
+  }
+
+  // ===========================================================================
   // Initialization
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async initialize(): Promise<void> {
     try {
@@ -150,24 +178,21 @@ class SystemIntelligenceController {
       
       // Load configuration
       if (fs.existsSync(this.configFile)) {
-        const data = fs.readFileSync(this.configFile, 'utf-8');
-        this.config = { ...this.config, ...JSON.parse(data) };
+        this.config = { ...this.config, ...this.readJsonFile<Partial<IntelligenceConfig>>(this.configFile, {}) };
       }
       
       // Load events (only if enabled)
       if (this.config.enabled && fs.existsSync(this.eventsFile)) {
-        const data = fs.readFileSync(this.eventsFile, 'utf-8');
-        this.events = JSON.parse(data);
+        this.events = this.readJsonFile<UsageEvent[]>(this.eventsFile, []);
         this.pruneOldEvents();
       }
       
       // Load patterns
       if (this.config.enabled && fs.existsSync(this.patternsFile)) {
-        const data = fs.readFileSync(this.patternsFile, 'utf-8');
-        this.patterns = JSON.parse(data);
+        this.patterns = this.readJsonFile<UsagePattern[]>(this.patternsFile, []);
       }
       
-      console.log('[SystemIntelligence] Initialized:', {
+      if (!app.isPackaged) log.info('[SystemIntelligence] Initialized:', {
         enabled: this.config.enabled,
         events: this.events.length,
         patterns: this.patterns.length,
@@ -178,7 +203,7 @@ class SystemIntelligenceController {
         this.scheduleAnalysis();
       }
     } catch (err) {
-      console.error('[SystemIntelligence] Initialization error:', err);
+      log.error('[SystemIntelligence] Initialization error:', err);
     }
   }
 
@@ -186,9 +211,9 @@ class SystemIntelligenceController {
     this.mainWindow = window;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Event Recording
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async recordEvent(
     type: UsageEvent['type'],
@@ -223,14 +248,14 @@ class SystemIntelligenceController {
     this.checkRealtimePatterns(event);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Pattern Detection
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private async analyzePatterns(): Promise<void> {
     if (!this.config.enabled) return;
     
-    console.log('[SystemIntelligence] Running pattern analysis...');
+    if (!app.isPackaged) log.info('[SystemIntelligence] Running pattern analysis...');
     
     const newPatterns: UsagePattern[] = [];
     
@@ -252,7 +277,7 @@ class SystemIntelligenceController {
     // Persist
     await this.savePatterns();
     
-    console.log('[SystemIntelligence] Analysis complete:', {
+    if (!app.isPackaged) log.info('[SystemIntelligence] Analysis complete:', {
       patterns: this.patterns.length,
       suggestions: this.suggestions.length,
     });
@@ -391,9 +416,9 @@ class SystemIntelligenceController {
       .slice(0, 100);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Suggestions
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private generateSuggestions(): void {
     if (!this.config.suggestionsEnabled) return;
@@ -478,9 +503,9 @@ class SystemIntelligenceController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // File Management Intelligence
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   async getFileOrganizationSuggestions(directory: string): Promise<Suggestion[]> {
     if (!this.config.enabled || !this.config.categories.optimization) {
@@ -543,15 +568,15 @@ class SystemIntelligenceController {
         });
       }
     } catch (err) {
-      console.error('[SystemIntelligence] File analysis error:', err);
+      log.error('[SystemIntelligence] File analysis error:', err);
     }
     
     return suggestions;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Public API
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   getState(): IntelligenceState {
     return {
@@ -655,9 +680,9 @@ class SystemIntelligenceController {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // Helpers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private scheduleAnalysis(): void {
     // Run analysis every hour
@@ -675,7 +700,7 @@ class SystemIntelligenceController {
     try {
       fs.writeFileSync(this.eventsFile, JSON.stringify(this.events, null, 2));
     } catch (err) {
-      console.error('[SystemIntelligence] Failed to save events:', err);
+      log.error('[SystemIntelligence] Failed to save events:', err);
     }
   }
 
@@ -683,7 +708,7 @@ class SystemIntelligenceController {
     try {
       fs.writeFileSync(this.patternsFile, JSON.stringify(this.patterns, null, 2));
     } catch (err) {
-      console.error('[SystemIntelligence] Failed to save patterns:', err);
+      log.error('[SystemIntelligence] Failed to save patterns:', err);
     }
   }
 
@@ -715,9 +740,9 @@ class SystemIntelligenceController {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // IPC Handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   private registerIPCHandlers(): void {
     ipcMain.handle('intelligence:getState', () => this.getState());
@@ -742,9 +767,9 @@ class SystemIntelligenceController {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Export
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const systemIntelligenceController = new SystemIntelligenceController();
 export default systemIntelligenceController;

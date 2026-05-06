@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
  * DEX Universal Undo/Redo System
  * Non-destructive editing with history management
@@ -311,7 +317,8 @@ export function useUndoRedoShortcuts(
         return;
       }
 
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const _p = (navigator as any).userAgentData?.platform || navigator.platform || '';
+      const isMac = /Mac|macOS/i.test(_p);
       const modifier = isMac ? e.metaKey : e.ctrlKey;
 
       if (modifier && e.key === 'z' && !e.shiftKey) {
@@ -409,7 +416,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     padding: '10px 12px',
-    borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+    borderBottom: '1px solid var(--color-border, var(--color-border))',
   },
   title: {
     fontSize: 12,
@@ -425,7 +432,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     padding: '2px 8px',
     fontSize: 11,
     background: 'transparent',
-    border: '1px solid var(--color-border, rgba(255,255,255,0.2))',
+    border: '1px solid var(--color-border, var(--color-text-tertiary))',
     borderRadius: 4,
     color: 'var(--color-text-secondary, #999)',
     cursor: 'pointer',
@@ -442,11 +449,11 @@ const panelStyles: Record<string, React.CSSProperties> = {
     padding: '8px 12px',
     cursor: 'pointer',
     transition: 'background 0.15s',
-    borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.05))',
+    borderBottom: '1px solid var(--color-border-subtle, var(--color-bg-hover))',
   },
   itemActive: {
     background: 'var(--color-accent, #007aff)',
-    color: '#fff',
+    color: 'var(--color-text-inverse)',
   },
   itemFuture: {
     opacity: 0.5,

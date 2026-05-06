@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Folder Rules Engine
 // Folder-level rules engine (light, preview-based automation)
-// Safe experimentation / sandbox mode (preview → apply → rollback)
-// ═══════════════════════════════════════════════════════════════════════════
+// Safe experimentation / sandbox mode (preview apply rollback)
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { app, ipcMain } from 'electron';
@@ -11,9 +17,9 @@ import * as fsSync from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type RuleTrigger = 'manual' | 'on_add' | 'on_modify' | 'scheduled';
 export type RuleActionType = 'move' | 'copy' | 'rename' | 'organize' | 'tag' | 'delete' | 'convert' | 'custom';
@@ -75,9 +81,9 @@ export interface RuleExecutionResult {
   undoId?: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // FOLDER RULES ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class FolderRulesEngineClass extends EventEmitter {
   private rules: Map<string, FolderRule> = new Map();
@@ -89,9 +95,9 @@ class FolderRulesEngineClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     this.rulesPath = path.join(app.getPath('userData'), 'folder-rules.json');
@@ -99,9 +105,9 @@ class FolderRulesEngineClass extends EventEmitter {
     log.info(`[FolderRules] Initialized with ${this.rules.size} rules`);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Create rule
@@ -150,9 +156,9 @@ class FolderRulesEngineClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RULE MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async createRule(ruleData: Omit<FolderRule, 'id' | 'createdAt' | 'runCount'>): Promise<FolderRule> {
     const rule: FolderRule = {
@@ -209,9 +215,9 @@ class FolderRulesEngineClass extends EventEmitter {
       .filter(r => r.enabled && r.folderPath === folderPath);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // RULE EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async previewRule(ruleId: string): Promise<RulePreview | null> {
     const rule = this.rules.get(ruleId);
@@ -298,9 +304,9 @@ class FolderRulesEngineClass extends EventEmitter {
     return result;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE MATCHING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async getMatchingFiles(rule: FolderRule): Promise<string[]> {
     const matchingFiles: string[] = [];
@@ -449,9 +455,9 @@ class FolderRulesEngineClass extends EventEmitter {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTION EXECUTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async previewFileAction(rule: FolderRule, filePath: string): Promise<RulePreviewItem> {
     const item: RulePreviewItem = {
@@ -587,9 +593,9 @@ class FolderRulesEngineClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PERSISTENCE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async loadRules(): Promise<void> {
     try {
@@ -609,18 +615,18 @@ class FolderRulesEngineClass extends EventEmitter {
     await fs.writeFile(this.rulesPath, JSON.stringify(rules, null, 2));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private generateId(): string {
     return `rule-${++this.ruleIdCounter}-${Date.now()}`;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const FolderRulesEngine = new FolderRulesEngineClass();
 export default FolderRulesEngine;

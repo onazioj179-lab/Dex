@@ -1,4 +1,10 @@
-const FALLBACK_VERSION = import.meta.env.VITE_APP_VERSION || '0.0.0';
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+const FALLBACK_VERSION = import.meta.env.VITE_APP_VERSION || '3.6.0';
 
 export const getBundledAppVersion = (): string => FALLBACK_VERSION;
 

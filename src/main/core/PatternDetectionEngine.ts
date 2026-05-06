@@ -1,14 +1,21 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Pattern Detection Engine
 // Phase 43: Smart opt-in pattern detection - local only, user controlled
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
+import log from 'electron-log';
 import Store from 'electron-store';
 import { ipcMain } from 'electron';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type PatternType = 
   | 'time-of-day'
@@ -60,9 +67,9 @@ export interface PatternSummary {
   plainLanguage: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const patternStore = new Store<{
   config: PatternDetectionConfig;
@@ -75,7 +82,7 @@ const patternStore = new Store<{
   name: 'pattern-detection',
   defaults: {
     config: {
-      enabled: false,                 // OFF by default - explicit opt-in required
+      enabled: true,                  // Enabled by default
       pausedUntil: null,
       allowedPatterns: ['time-of-day', 'feature-frequency', 'workflow-sequence', 'session-duration', 'idle-active'],
       retentionDays: 30,
@@ -90,9 +97,9 @@ const patternStore = new Store<{
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // PATTERN DETECTION ENGINE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class PatternDetectionEngine {
   private static instance: PatternDetectionEngine;
@@ -110,9 +117,9 @@ class PatternDetectionEngine {
     return PatternDetectionEngine.instance;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // INITIALIZATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -122,7 +129,7 @@ class PatternDetectionEngine {
     this.currentSessionStart = Date.now();
 
     this.initialized = true;
-    console.log('[PatternDetectionEngine] Initialized (detection disabled by default)');
+    log.info('[PatternDetectionEngine] Initialized (detection disabled by default)');
   }
 
   private setupIPC(): void {
@@ -144,9 +151,9 @@ class PatternDetectionEngine {
     this.initialized = false;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ENABLE/DISABLE (EXPLICIT USER CONTROL)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   isEnabled(): boolean {
     const config = patternStore.get('config');
@@ -160,7 +167,7 @@ class PatternDetectionEngine {
     config.enabled = true;
     config.pausedUntil = null;
     patternStore.set('config', config);
-    console.log('[PatternDetectionEngine] Enabled by user');
+    log.info('[PatternDetectionEngine] Enabled by user');
     return true;
   }
 
@@ -168,7 +175,7 @@ class PatternDetectionEngine {
     const config = patternStore.get('config');
     config.enabled = false;
     patternStore.set('config', config);
-    console.log('[PatternDetectionEngine] Disabled by user');
+    log.info('[PatternDetectionEngine] Disabled by user');
     return true;
   }
 
@@ -176,7 +183,7 @@ class PatternDetectionEngine {
     const config = patternStore.get('config');
     config.pausedUntil = Date.now() + (hours * 60 * 60 * 1000);
     patternStore.set('config', config);
-    console.log(`[PatternDetectionEngine] Paused for ${hours} hours`);
+    log.info(`[PatternDetectionEngine] Paused for ${hours} hours`);
     return true;
   }
 
@@ -195,13 +202,13 @@ class PatternDetectionEngine {
     patternStore.set('lastAnalysis', 0);
     this.recentFeatures = [];
     this.recentWorkflowSteps = [];
-    console.log('[PatternDetectionEngine] All patterns reset');
+    log.info('[PatternDetectionEngine] All patterns reset');
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // DATA COLLECTION (ONLY WHEN ENABLED)
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   recordFeatureUse(featureId: string): void {
     if (!this.isEnabled()) return;
@@ -277,9 +284,9 @@ class PatternDetectionEngine {
     patternStore.set('sessionDurations', durations);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PATTERN DETECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private detectWorkflowSequence(): void {
     if (this.recentWorkflowSteps.length < 3) return;
@@ -368,9 +375,9 @@ class PatternDetectionEngine {
     return patterns;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // QUERIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getConfig(): PatternDetectionConfig {
     return patternStore.get('config');
@@ -457,9 +464,9 @@ class PatternDetectionEngine {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private cleanupOldData(): void {
     const config = patternStore.get('config');
@@ -483,9 +490,9 @@ class PatternDetectionEngine {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const patternDetectionEngine = PatternDetectionEngine.getInstance();
 export default patternDetectionEngine;

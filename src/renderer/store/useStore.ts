@@ -1,10 +1,17 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
 import { performanceManager } from '../utils/PerformanceManager';
 import type { DexAction, DexMode, DexRule, LogEntry, SystemStatus, DexPermissions } from '../../shared/types';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // THEME STORE - Light/Dark mode management
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 type Theme = 'dark' | 'light';
 
@@ -14,11 +21,21 @@ interface ThemeState {
   toggleTheme: () => void;
 }
 
-export const useThemeStore = create<ThemeState>((set, get) => ({
+export const useThemeStore = create<ThemeState>((set, get) => {
+  // Async load from IPC backend on startup
+  (window as any).electron?.invoke?.('capability:storage:get', 'dex-theme').then((saved: string | null) => {
+    if (saved === 'light' || saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', saved);
+      set({ theme: saved });
+    }
+  }).catch((e: unknown) => { console.warn('[DEX]', e); });
+
+  return {
   theme: (localStorage.getItem('dex-theme') as Theme) || 'dark',
   
   setTheme: (theme) => {
     localStorage.setItem('dex-theme', theme);
+    (window as any).electron?.invoke?.('capability:storage:set', 'dex-theme', theme).catch((e: unknown) => { console.warn('[DEX]', e); });
     document.documentElement.setAttribute('data-theme', theme);
     set({ theme });
   },
@@ -26,10 +43,12 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   toggleTheme: () => {
     const newTheme = get().theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('dex-theme', newTheme);
+    (window as any).electron?.invoke?.('capability:storage:set', 'dex-theme', newTheme).catch((e: unknown) => { console.warn('[DEX]', e); });
     document.documentElement.setAttribute('data-theme', newTheme);
     set({ theme: newTheme });
   },
-}));
+  };
+});
 
 // Initialize theme on load - always default to dark if no saved theme
 const initTheme = () => {
@@ -48,9 +67,9 @@ const initTheme = () => {
 };
 initTheme();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // MAIN DEX STORE
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 interface DexState {
   // Data
@@ -86,7 +105,8 @@ interface DexState {
   refreshSystemStatus: () => Promise<void>;
 }
 
-export const useStore = create<DexState>((set) => ({
+// Devtools middleware is disabled in production via enabled flag (line at end of store)
+export const useStore = create<DexState>()(devtools((set) => ({
   // Initial state
   actions: [],
   modes: [],
@@ -202,4 +222,33 @@ export const useStore = create<DexState>((set) => ({
       console.error('Failed to refresh system status:', err);
     }
   },
-}));
+}), { name: 'DexStore', enabled: import.meta.env.DEV }));
+
+// ---- Selectors ----
+export const selectActions = (s: DexState) => s.actions;
+export const selectModes = (s: DexState) => s.modes;
+export const selectRules = (s: DexState) => s.rules;
+export const selectLogs = (s: DexState) => s.logs;
+export const selectSystemStatus = (s: DexState) => s.systemStatus;
+export const selectActiveMode = (s: DexState) => s.activeMode;
+export const selectPermissions = (s: DexState) => s.permissions;
+export const selectIsLoading = (s: DexState) => s.loading;
+export const selectEmergencyStopped = (s: DexState) => s.emergencyStopped;
+
+// ---- Auto-refresh on window focus (stale-while-revalidate pattern) ----
+// Refreshes system status and logs when the user returns to the window,
+// but only if data is older than the staleness threshold.
+const STALE_THRESHOLD_MS = 30_000; // 30 seconds
+let _lastRefreshAt = 0;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', () => {
+    const now = Date.now();
+    if (now - _lastRefreshAt < STALE_THRESHOLD_MS) return;
+    _lastRefreshAt = now;
+    const store = useStore.getState();
+    // Run low-cost refreshes — heavy ones stay background-queued
+    store.refreshSystemStatus().catch(() => {});
+    store.refreshLogs().catch(() => {});
+  });
+}

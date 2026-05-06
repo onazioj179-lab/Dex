@@ -1,0 +1,56 @@
+# DEX - Code Owners
+#
+# This file declares ownership of files and directories so that pull requests
+# automatically request review from the right people.
+#
+# Format: <pattern>   <owner1> <owner2> ...
+# Owners are referenced by GitHub handle. Patterns follow the .gitignore syntax.
+#
+# Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+
+# Default owner for everything in the repo.
+*                       @onazioj
+
+# Build, packaging, release tooling.
+/scripts/               @onazioj
+/.github/               @onazioj
+/release/               @onazioj
+/store/                 @onazioj
+/assets/                @onazioj
+package.json            @onazioj
+package-lock.json       @onazioj
+electron-builder.yml    @onazioj
+vite.config.ts          @onazioj
+vitest.config.ts        @onazioj
+playwright.config.ts    @onazioj
+tsconfig*.json          @onazioj
+tailwind.config.js      @onazioj
+postcss.config.js       @onazioj
+
+# Main process (privileged code requires extra scrutiny).
+/src/main/              @onazioj
+/src/main/security/     @onazioj
+/src/main/signing/      @onazioj
+/src/main/transfer/     @onazioj
+
+# Native modules (Rust, FFI, security-critical).
+/native/                @onazioj
+/src/native/            @onazioj
+
+# Renderer (UI surface).
+/src/renderer/          @onazioj
+
+# DEX-OS (Linux distribution build).
+/dex-os/                @onazioj
+
+# Documentation and governance.
+/docs/                  @onazioj
+LICENSE                 @onazioj
+NOTICE                  @onazioj
+AUTHORS                 @onazioj
+COPYRIGHT               @onazioj
+TERMS.md                @onazioj
+PRIVACY.md              @onazioj
+SECURITY.md             @onazioj
+CODEOWNERS              @onazioj
+README.md               @onazioj

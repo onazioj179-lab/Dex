@@ -1,735 +1,473 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * DEX Number Input Component
- * Numeric input with increment/decrement controls
+ * NumberInput - Scrub-to-adjust number input
+ * 
+ * Features:
+ * - Drag left/right to adjust value
+ * - Click to edit directly
+ * - Shift for fine adjustment
+ * - Up/Down arrow keys
+ * - Double-click to reset
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { colors, radius } from '../styles/tokens';
 
-// ==================== TYPES ====================
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-interface NumberInputProps {
-  value?: number;
+export interface NumberInputProps {
+  /** Current value */
+  value: number;
+  /** Value change callback */
+  onChange: (value: number) => void;
+  /** Minimum value */
+  min?: number;
+  /** Maximum value */
+  max?: number;
+  /** Step increment */
+  step?: number;
+  /** Default value for reset */
   defaultValue?: number;
-  onChange?: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
+  /** Number of decimal places */
   precision?: number;
+  /** Label */
+  label?: string;
+  /** Unit suffix (px, %, deg, etc.) */
+  unit?: string;
+  /** Disabled state */
   disabled?: boolean;
-  readOnly?: boolean;
-  placeholder?: string;
-  size?: 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'filled' | 'unstyled';
-  showButtons?: boolean;
-  buttonsPosition?: 'left' | 'right' | 'sides';
-  allowNegative?: boolean;
-  allowDecimal?: boolean;
-  prefix?: string;
-  suffix?: string;
-  format?: (value: number) => string;
-  parse?: (value: string) => number;
-  clampOnBlur?: boolean;
-  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
-  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  /** Width */
+  width?: number | string;
+  /** Show value while dragging */
+  showDragPreview?: boolean;
 }
 
-interface CurrencyInputProps {
-  value?: number;
-  onChange?: (value: number) => void;
-  currency?: string;
-  locale?: string;
-  min?: number;
-  max?: number;
-  disabled?: boolean;
-  placeholder?: string;
-}
-
-interface PercentInputProps {
-  value?: number; // 0-100
-  onChange?: (value: number) => void;
-  min?: number;
-  max?: number;
-  precision?: number;
-  disabled?: boolean;
-  showSymbol?: boolean;
-}
-
-interface QuantityInputProps {
-  value?: number;
-  onChange?: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  size?: 'sm' | 'md' | 'lg';
-  disabled?: boolean;
-}
-
-// ==================== NUMBER INPUT ====================
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export const NumberInput: React.FC<NumberInputProps> = ({
-  value: controlledValue,
-  defaultValue = 0,
+  value,
   onChange,
   min = -Infinity,
   max = Infinity,
   step = 1,
-  precision,
+  defaultValue,
+  precision = 0,
+  label,
+  unit,
   disabled = false,
-  readOnly = false,
-  placeholder,
-  size = 'md',
-  variant = 'default',
-  showButtons = true,
-  buttonsPosition = 'right',
-  allowNegative = true,
-  allowDecimal = true,
-  prefix,
-  suffix,
-  format,
-  parse,
-  clampOnBlur = true,
-  onBlur,
-  onFocus,
+  width = 80,
+  showDragPreview = true,
 }) => {
-  const [internalValue, setInternalValue] = useState(defaultValue);
-  const [inputValue, setInputValue] = useState(String(defaultValue));
-  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const incrementIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const startX = useRef(0);
+  const startValue = useRef(0);
 
-  const value = controlledValue ?? internalValue;
+  // Format value for display
+  const formatValue = (v: number): string => {
+    return v.toFixed(precision);
+  };
 
-  const clamp = useCallback((val: number): number => {
-    return Math.min(max, Math.max(min, val));
-  }, [min, max]);
-
-  const formatValue = useCallback((val: number): string => {
-    if (format) return format(val);
-    if (precision !== undefined) {
-      return val.toFixed(precision);
-    }
-    return String(val);
-  }, [format, precision]);
-
-  const parseValue = useCallback((str: string): number => {
-    if (parse) return parse(str);
+  // Handle drag start
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (disabled || isEditing) return;
+    e.preventDefault();
     
-    // Remove any non-numeric characters except minus and decimal
-    let cleaned = str.replace(/[^\d.-]/g, '');
-    
-    if (!allowNegative) {
-      cleaned = cleaned.replace(/-/g, '');
-    }
-    
-    if (!allowDecimal) {
-      cleaned = cleaned.split('.')[0];
-    }
+    startX.current = e.clientX;
+    startValue.current = value;
+    setIsDragging(true);
+  }, [disabled, isEditing, value]);
 
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : parsed;
-  }, [parse, allowNegative, allowDecimal]);
-
+  // Handle drag
   useEffect(() => {
-    if (!isFocused) {
-      setInputValue(formatValue(value));
-    }
-  }, [value, isFocused, formatValue]);
+    if (!isDragging) return;
 
-  const updateValue = useCallback((newValue: number) => {
-    const clamped = clamp(newValue);
-    setInternalValue(clamped);
-    onChange?.(clamped);
-  }, [clamp, onChange]);
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startX.current;
+      
+      // Fine adjustment with Shift
+      const sensitivity = e.shiftKey ? 0.1 : 1;
+      const delta = Math.round(deltaX * sensitivity) * step;
+      const newValue = Math.max(min, Math.min(max, startValue.current + delta));
+      
+      onChange(Number(newValue.toFixed(precision)));
+    };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setInputValue(raw);
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
 
-    const parsed = parseValue(raw);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, onChange, min, max, step, precision]);
+
+  // Handle click to edit
+  const handleClick = useCallback(() => {
+    if (disabled || isDragging) return;
+    setIsEditing(true);
+    setEditValue(formatValue(value));
+  }, [disabled, isDragging, value, precision]);
+
+  // Handle edit input change
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditValue(e.target.value);
+  }, []);
+
+  // Handle edit blur/submit
+  const handleEditBlur = useCallback(() => {
+    const parsed = parseFloat(editValue);
     if (!isNaN(parsed)) {
-      setInternalValue(parsed);
-      onChange?.(parsed);
+      const clamped = Math.max(min, Math.min(max, parsed));
+      onChange(Number(clamped.toFixed(precision)));
     }
-  };
+    setIsEditing(false);
+  }, [editValue, onChange, min, max, precision]);
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    setIsFocused(false);
-
-    if (clampOnBlur) {
-      const clamped = clamp(parseValue(inputValue));
-      updateValue(clamped);
-      setInputValue(formatValue(clamped));
-    }
-
-    onBlur?.(e);
-  };
-
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    setIsFocused(true);
-    onFocus?.(e);
-  };
-
-  const increment = useCallback(() => {
-    if (disabled || readOnly) return;
-    updateValue(value + step);
-  }, [value, step, disabled, readOnly, updateValue]);
-
-  const decrement = useCallback(() => {
-    if (disabled || readOnly) return;
-    updateValue(value - step);
-  }, [value, step, disabled, readOnly, updateValue]);
-
-  const startIncrement = (direction: 'up' | 'down') => {
-    if (direction === 'up') {
-      increment();
-    } else {
-      decrement();
-    }
-
-    incrementIntervalRef.current = setInterval(() => {
-      if (direction === 'up') {
-        setInternalValue(prev => {
-          const newVal = clamp(prev + step);
-          onChange?.(newVal);
-          return newVal;
-        });
-      } else {
-        setInternalValue(prev => {
-          const newVal = clamp(prev - step);
-          onChange?.(newVal);
-          return newVal;
-        });
+  // Handle keyboard
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (isEditing) {
+      if (e.key === 'Enter') {
+        handleEditBlur();
+      } else if (e.key === 'Escape') {
+        setIsEditing(false);
       }
-    }, 100);
-  };
-
-  const stopIncrement = () => {
-    if (incrementIntervalRef.current) {
-      clearInterval(incrementIntervalRef.current);
-      incrementIntervalRef.current = null;
+      return;
     }
-  };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const multiplier = e.shiftKey ? 10 : 1;
+    
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      increment();
+      const newValue = Math.min(max, value + step * multiplier);
+      onChange(Number(newValue.toFixed(precision)));
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      decrement();
+      const newValue = Math.max(min, value - step * multiplier);
+      onChange(Number(newValue.toFixed(precision)));
     }
-  };
+  }, [isEditing, handleEditBlur, value, onChange, min, max, step, precision]);
 
-  const sizes = {
-    sm: { height: 28, fontSize: 12, buttonWidth: 24, padding: '0 8px' },
-    md: { height: 36, fontSize: 14, buttonWidth: 32, padding: '0 12px' },
-    lg: { height: 44, fontSize: 16, buttonWidth: 40, padding: '0 16px' },
-  };
-
-  const s = sizes[size];
-
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'inline-flex',
-      alignItems: 'stretch',
-      borderRadius: 6,
-      border: variant === 'unstyled' ? 'none' : '1px solid var(--color-border)',
-      background: variant === 'filled' ? 'var(--color-bg-tertiary)' : 'var(--color-bg-secondary)',
-      overflow: 'hidden',
-      opacity: disabled ? 0.5 : 1,
-    },
-    containerFocused: {
-      borderColor: 'var(--color-accent)',
-      boxShadow: '0 0 0 2px rgba(var(--color-accent-rgb), 0.2)',
-    },
-    inputWrapper: {
-      display: 'flex',
-      alignItems: 'center',
-      flex: 1,
-      padding: s.padding,
-      gap: 4,
-    },
-    input: {
-      flex: 1,
-      border: 'none',
-      background: 'none',
-      outline: 'none',
-      fontSize: s.fontSize,
-      color: 'var(--color-text)',
-      fontFamily: 'inherit',
-      minWidth: 40,
-      textAlign: 'left',
-    },
-    prefix: {
-      fontSize: s.fontSize,
-      color: 'var(--color-text-muted)',
-    },
-    suffix: {
-      fontSize: s.fontSize,
-      color: 'var(--color-text-muted)',
-    },
-    button: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: s.buttonWidth,
-      height: s.height,
-      background: 'var(--color-bg-tertiary)',
-      border: 'none',
-      cursor: disabled || readOnly ? 'not-allowed' : 'pointer',
-      color: 'var(--color-text)',
-      fontSize: s.fontSize,
-      transition: 'background 0.15s',
-      userSelect: 'none',
-    },
-    buttonLeft: {
-      borderRight: '1px solid var(--color-border)',
-    },
-    buttonRight: {
-      borderLeft: '1px solid var(--color-border)',
-    },
-    verticalButtons: {
-      display: 'flex',
-      flexDirection: 'column',
-      borderLeft: '1px solid var(--color-border)',
-    },
-    verticalButton: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: s.buttonWidth * 0.75,
-      flex: 1,
-      background: 'var(--color-bg-tertiary)',
-      border: 'none',
-      cursor: disabled || readOnly ? 'not-allowed' : 'pointer',
-      color: 'var(--color-text-muted)',
-      fontSize: 8,
-      transition: 'background 0.15s',
-    },
-  };
-
-  const renderButtons = () => {
-    if (!showButtons) return null;
-
-    if (buttonsPosition === 'sides') {
-      return null; // Buttons rendered separately
+  // Handle double-click to reset
+  const handleDoubleClick = useCallback(() => {
+    if (!disabled && defaultValue !== undefined) {
+      onChange(defaultValue);
     }
+  }, [disabled, defaultValue, onChange]);
 
-    if (buttonsPosition === 'left') {
-      return (
-        <div style={styles.verticalButtons}>
-          <button
-            style={styles.verticalButton}
-            onMouseDown={() => startIncrement('up')}
-            onMouseUp={stopIncrement}
-            onMouseLeave={stopIncrement}
-            disabled={disabled || readOnly || value >= max}
-            tabIndex={-1}
-          >
-            ▲
-          </button>
-          <button
-            style={{ ...styles.verticalButton, borderTop: '1px solid var(--color-border)' }}
-            onMouseDown={() => startIncrement('down')}
-            onMouseUp={stopIncrement}
-            onMouseLeave={stopIncrement}
-            disabled={disabled || readOnly || value <= min}
-            tabIndex={-1}
-          >
-            ▼
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <div style={styles.verticalButtons}>
-        <button
-          style={styles.verticalButton}
-          onMouseDown={() => startIncrement('up')}
-          onMouseUp={stopIncrement}
-          onMouseLeave={stopIncrement}
-          disabled={disabled || readOnly || value >= max}
-          tabIndex={-1}
-        >
-          ▲
-        </button>
-        <button
-          style={{ ...styles.verticalButton, borderTop: '1px solid var(--color-border)' }}
-          onMouseDown={() => startIncrement('down')}
-          onMouseUp={stopIncrement}
-          onMouseLeave={stopIncrement}
-          disabled={disabled || readOnly || value <= min}
-          tabIndex={-1}
-        >
-          ▼
-        </button>
-      </div>
-    );
-  };
-
-  return (
-    <div
-      style={{
-        ...styles.container,
-        ...(isFocused && variant !== 'unstyled' ? styles.containerFocused : {}),
-      }}
-    >
-      {showButtons && buttonsPosition === 'sides' && (
-        <button
-          style={{ ...styles.button, ...styles.buttonLeft }}
-          onMouseDown={() => startIncrement('down')}
-          onMouseUp={stopIncrement}
-          onMouseLeave={stopIncrement}
-          disabled={disabled || readOnly || value <= min}
-          tabIndex={-1}
-        >
-          −
-        </button>
-      )}
-
-      {buttonsPosition === 'left' && renderButtons()}
-
-      <div style={styles.inputWrapper}>
-        {prefix && <span style={styles.prefix}>{prefix}</span>}
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="decimal"
-          style={styles.input}
-          value={inputValue}
-          onChange={handleInputChange}
-          onBlur={handleBlur}
-          onFocus={handleFocus}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          readOnly={readOnly}
-          placeholder={placeholder}
-        />
-        {suffix && <span style={styles.suffix}>{suffix}</span>}
-      </div>
-
-      {buttonsPosition === 'right' && renderButtons()}
-
-      {showButtons && buttonsPosition === 'sides' && (
-        <button
-          style={{ ...styles.button, ...styles.buttonRight }}
-          onMouseDown={() => startIncrement('up')}
-          onMouseUp={stopIncrement}
-          onMouseLeave={stopIncrement}
-          disabled={disabled || readOnly || value >= max}
-          tabIndex={-1}
-        >
-          +
-        </button>
-      )}
-    </div>
-  );
-};
-
-// ==================== CURRENCY INPUT ====================
-
-export const CurrencyInput: React.FC<CurrencyInputProps> = ({
-  value: controlledValue,
-  onChange,
-  currency = 'USD',
-  locale = 'en-US',
-  min = 0,
-  max = Infinity,
-  disabled = false,
-  placeholder,
-}) => {
-  const [internalValue, setInternalValue] = useState(0);
-  const [inputValue, setInputValue] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-
-  const value = controlledValue ?? internalValue;
-
-  const currencySymbols: Record<string, string> = {
-    USD: '$',
-    EUR: '€',
-    GBP: '£',
-    JPY: '¥',
-    CAD: 'C$',
-    AUD: 'A$',
-    CNY: '¥',
-    INR: '₹',
-    NGN: '₦',
-  };
-
-  const symbol = currencySymbols[currency] || currency;
-
-  const formatCurrency = (val: number): string => {
-    return new Intl.NumberFormat(locale, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(val);
-  };
-
+  // Focus input when editing
   useEffect(() => {
-    if (!isFocused) {
-      setInputValue(formatCurrency(value));
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
     }
-  }, [value, isFocused]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/[^\d.]/g, '');
-    setInputValue(raw);
-
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed)) {
-      const clamped = Math.min(max, Math.max(min, parsed));
-      setInternalValue(clamped);
-      onChange?.(clamped);
-    }
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    setInputValue(formatCurrency(value));
-  };
-
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 4,
-      padding: '8px 12px',
-      background: 'var(--color-bg-secondary)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 6,
-      opacity: disabled ? 0.5 : 1,
-    },
-    containerFocused: {
-      borderColor: 'var(--color-accent)',
-      boxShadow: '0 0 0 2px rgba(var(--color-accent-rgb), 0.2)',
-    },
-    symbol: {
-      color: 'var(--color-text-muted)',
-      fontSize: 14,
-    },
-    input: {
-      flex: 1,
-      border: 'none',
-      background: 'none',
-      outline: 'none',
-      fontSize: 14,
-      color: 'var(--color-text)',
-      fontFamily: 'inherit',
-      minWidth: 80,
-      textAlign: 'right',
-    },
-  };
+  }, [isEditing]);
 
   return (
     <div
       style={{
-        ...styles.container,
-        ...(isFocused ? styles.containerFocused : {}),
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        opacity: disabled ? 0.4 : 1,
       }}
     >
-      <span style={styles.symbol}>{symbol}</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        style={styles.input}
-        value={inputValue}
-        onChange={handleChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={handleBlur}
-        disabled={disabled}
-        placeholder={placeholder || '0.00'}
-      />
+      {label && (
+        <span
+          style={{
+            fontSize: 12,
+            color: colors.text.secondary,
+            userSelect: 'none',
+          }}
+        >
+          {label}
+        </span>
+      )}
+
+      <div
+        onMouseDown={handleMouseDown}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onKeyDown={handleKeyDown}
+        tabIndex={disabled ? -1 : 0}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          width,
+          height: 28,
+          padding: '0 8px',
+          background: isEditing ? colors.bg.inset : colors.bg.hover,
+          border: `1px solid ${isDragging ? colors.accent.default : colors.border.subtle}`,
+          borderRadius: radius.sm,
+          cursor: disabled ? 'not-allowed' : isDragging ? 'ew-resize' : 'text',
+          outline: 'none',
+          transition: 'border-color 0.1s ease, background 0.1s ease',
+        }}
+      >
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={handleInputChange}
+            onBlur={handleEditBlur}
+            onKeyDown={handleKeyDown}
+            style={{
+              width: '100%',
+              height: '100%',
+              padding: 0,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              fontSize: 12,
+              fontFamily: 'var(--font-mono)',
+              color: colors.text.primary,
+              textAlign: 'center',
+            }}
+          />
+        ) : (
+          <span
+            style={{
+              flex: 1,
+              fontSize: 12,
+              fontFamily: 'var(--font-mono)',
+              color: colors.text.primary,
+              textAlign: 'center',
+              userSelect: 'none',
+            }}
+          >
+            {formatValue(value)}
+            {unit && (
+              <span style={{ color: colors.text.tertiary, marginLeft: 2 }}>
+                {unit}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Drag indicator */}
+        {isDragging && showDragPreview && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginBottom: 4,
+              padding: '3px 6px',
+              background: colors.bg.elevated,
+              border: `1px solid ${colors.border.default}`,
+              borderRadius: radius.xs,
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              color: colors.text.primary,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}
+          >
+            {formatValue(value)}{unit}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ==================== PERCENT INPUT ====================
+// ---------------------------------------------------------------------------
+// Coordinate Input (X, Y pair)
+// ---------------------------------------------------------------------------
 
-export const PercentInput: React.FC<PercentInputProps> = ({
-  value: controlledValue,
-  onChange,
-  min = 0,
-  max = 100,
-  precision = 0,
-  disabled = false,
-  showSymbol = true,
-}) => {
-  const [internalValue, setInternalValue] = useState(0);
-  const value = controlledValue ?? internalValue;
-
-  const handleChange = (newValue: number) => {
-    setInternalValue(newValue);
-    onChange?.(newValue);
-  };
-
-  return (
-    <NumberInput
-      value={value}
-      onChange={handleChange}
-      min={min}
-      max={max}
-      step={1}
-      precision={precision}
-      suffix={showSymbol ? '%' : undefined}
-      disabled={disabled}
-      showButtons
-      buttonsPosition="right"
-    />
-  );
-};
-
-// ==================== QUANTITY INPUT ====================
-
-export const QuantityInput: React.FC<QuantityInputProps> = ({
-  value: controlledValue,
-  onChange,
-  min = 0,
-  max = 999,
-  step = 1,
-  size = 'md',
-  disabled = false,
-}) => {
-  const [internalValue, setInternalValue] = useState(min);
-  const value = controlledValue ?? internalValue;
-
-  const handleChange = (newValue: number) => {
-    setInternalValue(newValue);
-    onChange?.(newValue);
-  };
-
-  const sizes = {
-    sm: { height: 28, fontSize: 12 },
-    md: { height: 36, fontSize: 14 },
-    lg: { height: 44, fontSize: 16 },
-  };
-
-  const s = sizes[size];
-
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      borderRadius: 8,
-      border: '1px solid var(--color-border)',
-      background: 'var(--color-bg-secondary)',
-      overflow: 'hidden',
-      opacity: disabled ? 0.5 : 1,
-    },
-    button: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: s.height,
-      height: s.height,
-      background: 'var(--color-bg-tertiary)',
-      border: 'none',
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      color: 'var(--color-text)',
-      fontSize: s.fontSize + 4,
-      fontWeight: 600,
-      transition: 'background 0.15s',
-    },
-    value: {
-      minWidth: 48,
-      height: s.height,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: s.fontSize,
-      fontWeight: 600,
-      color: 'var(--color-text)',
-      borderLeft: '1px solid var(--color-border)',
-      borderRight: '1px solid var(--color-border)',
-    },
-  };
-
-  return (
-    <div style={styles.container}>
-      <button
-        style={styles.button}
-        onClick={() => handleChange(Math.max(min, value - step))}
-        disabled={disabled || value <= min}
-      >
-        −
-      </button>
-      <div style={styles.value}>{value}</div>
-      <button
-        style={styles.button}
-        onClick={() => handleChange(Math.min(max, value + step))}
-        disabled={disabled || value >= max}
-      >
-        +
-      </button>
-    </div>
-  );
-};
-
-// ==================== RANGE NUMBER INPUT ====================
-
-interface RangeNumberInputProps {
-  minValue: number;
-  maxValue: number;
-  onChange: (min: number, max: number) => void;
+export interface CoordinateInputProps {
+  x: number;
+  y: number;
+  onChange: (x: number, y: number) => void;
   min?: number;
   max?: number;
   step?: number;
+  precision?: number;
   disabled?: boolean;
-  separator?: string;
+  labels?: { x: string; y: string };
 }
 
-export const RangeNumberInput: React.FC<RangeNumberInputProps> = ({
-  minValue,
-  maxValue,
+export const CoordinateInput: React.FC<CoordinateInputProps> = ({
+  x,
+  y,
   onChange,
-  min = 0,
-  max = 100,
-  step = 1,
-  disabled = false,
-  separator = '—',
+  min,
+  max,
+  step,
+  precision,
+  disabled,
+  labels = { x: 'X', y: 'Y' },
 }) => {
-  const handleMinChange = (value: number) => {
-    const clampedValue = Math.min(value, maxValue);
-    onChange(clampedValue, maxValue);
-  };
-
-  const handleMaxChange = (value: number) => {
-    const clampedValue = Math.max(value, minValue);
-    onChange(minValue, clampedValue);
-  };
-
-  const styles: Record<string, React.CSSProperties> = {
-    container: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-    },
-    separator: {
-      color: 'var(--color-text-muted)',
-      fontSize: 14,
-    },
-  };
-
   return (
-    <div style={styles.container}>
+    <div style={{ display: 'flex', gap: 8 }}>
       <NumberInput
-        value={minValue}
-        onChange={handleMinChange}
+        value={x}
+        onChange={(v) => onChange(v, y)}
         min={min}
-        max={maxValue}
-        step={step}
-        disabled={disabled}
-        showButtons
-      />
-      <span style={styles.separator}>{separator}</span>
-      <NumberInput
-        value={maxValue}
-        onChange={handleMaxChange}
-        min={minValue}
         max={max}
         step={step}
+        precision={precision}
         disabled={disabled}
-        showButtons
+        label={labels.x}
+        width={70}
+      />
+      <NumberInput
+        value={y}
+        onChange={(v) => onChange(x, v)}
+        min={min}
+        max={max}
+        step={step}
+        precision={precision}
+        disabled={disabled}
+        label={labels.y}
+        width={70}
+      />
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Size Input (Width, Height pair with link)
+// ---------------------------------------------------------------------------
+
+export interface SizeInputProps {
+  width: number;
+  height: number;
+  onChange: (width: number, height: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  precision?: number;
+  disabled?: boolean;
+  linked?: boolean;
+  onLinkChange?: (linked: boolean) => void;
+}
+
+export const SizeInput: React.FC<SizeInputProps> = ({
+  width,
+  height,
+  onChange,
+  min = 1,
+  max,
+  step = 1,
+  precision = 0,
+  disabled,
+  linked = false,
+  onLinkChange,
+}) => {
+  const aspectRatio = useRef(width / height);
+
+  const handleWidthChange = (newWidth: number) => {
+    if (linked) {
+      const newHeight = Math.round(newWidth / aspectRatio.current);
+      onChange(newWidth, Math.max(min, newHeight));
+    } else {
+      onChange(newWidth, height);
+    }
+  };
+
+  const handleHeightChange = (newHeight: number) => {
+    if (linked) {
+      const newWidth = Math.round(newHeight * aspectRatio.current);
+      onChange(Math.max(min, newWidth), newHeight);
+    } else {
+      onChange(width, newHeight);
+    }
+  };
+
+  // Update aspect ratio when link is toggled on
+  useEffect(() => {
+    if (linked) {
+      aspectRatio.current = width / height;
+    }
+  }, [linked, width, height]);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <NumberInput
+        value={width}
+        onChange={handleWidthChange}
+        min={min}
+        max={max}
+        step={step}
+        precision={precision}
+        disabled={disabled}
+        label="W"
+        unit="px"
+        width={70}
+      />
+
+      {/* Link button */}
+      {onLinkChange && (
+        <button
+          onClick={() => onLinkChange(!linked)}
+          disabled={disabled}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 24,
+            height: 24,
+            padding: 0,
+            background: linked ? colors.accent.soft : 'transparent',
+            border: `1px solid ${linked ? colors.accent.default : colors.border.subtle}`,
+            borderRadius: radius.sm,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            color: linked ? colors.accent.default : colors.text.tertiary,
+            transition: 'all 0.1s ease',
+          }}
+          title={linked ? 'Unlink dimensions' : 'Link dimensions'}
+        >
+          <svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+            {linked ? (
+              <path
+                d="M5.5 7H8.5M4 5H3.5C2.12 5 1 6.12 1 7.5S2.12 10 3.5 10H5M9 5h.5c1.38 0 2.5 1.12 2.5 2.5S11.88 10 10.5 10H9"
+                stroke="currentColor"
+                strokeWidth={1.2}
+                strokeLinecap="round"
+              />
+            ) : (
+              <path
+                d="M4 5H3.5C2.12 5 1 6.12 1 7.5S2.12 10 3.5 10H5M9 5h.5c1.38 0 2.5 1.12 2.5 2.5S11.88 10 10.5 10H9"
+                stroke="currentColor"
+                strokeWidth={1.2}
+                strokeLinecap="round"
+              />
+            )}
+          </svg>
+        </button>
+      )}
+
+      <NumberInput
+        value={height}
+        onChange={handleHeightChange}
+        min={min}
+        max={max}
+        step={step}
+        precision={precision}
+        disabled={disabled}
+        label="H"
+        unit="px"
+        width={70}
       />
     </div>
   );

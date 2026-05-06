@@ -1,11 +1,17 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Phase 31: Accessibility Utilities
 // Core utilities for keyboard navigation, focus management, and ARIA
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // FOCUS MANAGEMENT
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Focusable element selectors
@@ -96,9 +102,9 @@ export function getActiveElement(): HTMLElement | null {
   return document.activeElement as HTMLElement;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // FOCUS TRAP
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface FocusTrapOptions {
   onEscape?: () => void;
@@ -224,9 +230,9 @@ export function createFocusTrap(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // ROVING TABINDEX
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface RovingTabindexOptions {
   orientation?: 'horizontal' | 'vertical' | 'both';
@@ -355,9 +361,9 @@ export function createRovingTabindex(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // SCREEN READER ANNOUNCEMENTS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 let announcer: HTMLElement | null = null;
 
@@ -419,9 +425,9 @@ export function announceStatus(message: string): void {
   announce(message, 'polite');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // ARIA HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Generate a unique ID for ARIA relationships
@@ -502,9 +508,9 @@ export function setCurrent(
   element.setAttribute('aria-current', current);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // KEYBOARD DETECTION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 let isKeyboardUser = false;
 
@@ -541,9 +547,9 @@ export function isUsingKeyboard(): boolean {
   return isKeyboardUser;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // SKIP LINKS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Create a skip link element
@@ -569,9 +575,9 @@ export function createSkipLink(
   return link;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // REDUCED MOTION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Check if user prefers reduced motion
@@ -599,9 +605,9 @@ export function onReducedMotionChange(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // HIGH CONTRAST
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Check if user prefers high contrast
@@ -626,5 +632,221 @@ export function onHighContrastChange(
   
   return () => {
     mediaQuery.removeEventListener('change', handler);
+  };
+}
+
+// -----------------------------------------------------------------------------
+// ICON BUTTON ARIA LABELS 🔘
+// Predefined labels for common icon-only buttons
+// -----------------------------------------------------------------------------
+
+export const ICON_BUTTON_LABELS = {
+  // Window controls
+  close: 'Close',
+  minimize: 'Minimize window',
+  maximize: 'Maximize window',
+  restore: 'Restore window',
+  fullscreen: 'Enter fullscreen',
+  exitFullscreen: 'Exit fullscreen',
+  
+  // Navigation
+  back: 'Go back',
+  forward: 'Go forward',
+  home: 'Go home',
+  refresh: 'Refresh',
+  menu: 'Open menu',
+  sidebar: 'Toggle sidebar',
+  
+  // Common actions
+  add: 'Add new',
+  remove: 'Remove',
+  delete: 'Delete',
+  edit: 'Edit',
+  save: 'Save',
+  cancel: 'Cancel',
+  search: 'Search',
+  filter: 'Filter',
+  sort: 'Sort',
+  copy: 'Copy',
+  paste: 'Paste',
+  cut: 'Cut',
+  undo: 'Undo',
+  redo: 'Redo',
+  duplicate: 'Duplicate',
+  rename: 'Rename',
+  share: 'Share',
+  download: 'Download',
+  upload: 'Upload',
+  export: 'Export',
+  import: 'Import',
+  print: 'Print',
+  
+  // Media controls
+  play: 'Play',
+  pause: 'Pause',
+  stop: 'Stop',
+  record: 'Record',
+  mute: 'Mute',
+  unmute: 'Unmute',
+  volumeUp: 'Increase volume',
+  volumeDown: 'Decrease volume',
+  skipForward: 'Skip forward',
+  skipBack: 'Skip back',
+  fastForward: 'Fast forward',
+  rewind: 'Rewind',
+  loop: 'Toggle loop',
+  shuffle: 'Toggle shuffle',
+  
+  // View controls
+  gridView: 'Grid view',
+  listView: 'List view',
+  galleryView: 'Gallery view',
+  columnView: 'Column view',
+  zoomIn: 'Zoom in',
+  zoomOut: 'Zoom out',
+  zoomFit: 'Fit to window',
+  zoomActual: 'Actual size',
+  expand: 'Expand',
+  collapse: 'Collapse',
+  showMore: 'Show more',
+  showLess: 'Show less',
+  
+  // State toggles
+  favorite: 'Add to favorites',
+  unfavorite: 'Remove from favorites',
+  pin: 'Pin',
+  unpin: 'Unpin',
+  lock: 'Lock',
+  unlock: 'Unlock',
+  star: 'Star',
+  unstar: 'Remove star',
+  bookmark: 'Bookmark',
+  archive: 'Archive',
+  
+  // Settings & system
+  settings: 'Settings',
+  preferences: 'Preferences',
+  help: 'Help',
+  info: 'Information',
+  about: 'About',
+  notifications: 'Notifications',
+  profile: 'Profile',
+  logout: 'Log out',
+  
+  // Creative tools (VINX, Imosion, PRISM, FLUX, FORGE, AXL)
+  brush: 'Brush tool',
+  pencil: 'Pencil tool',
+  eraser: 'Eraser tool',
+  eyedropper: 'Color picker',
+  fill: 'Fill tool',
+  gradient: 'Gradient tool',
+  text: 'Text tool',
+  shape: 'Shape tool',
+  select: 'Selection tool',
+  move: 'Move tool',
+  crop: 'Crop',
+  rotate: 'Rotate',
+  flip: 'Flip',
+  flipHorizontal: 'Flip horizontal',
+  flipVertical: 'Flip vertical',
+  layers: 'Layers panel',
+  effects: 'Effects panel',
+  filters: 'Filters',
+  adjustments: 'Adjustments',
+  
+  // Timeline/Animation
+  timeline: 'Timeline',
+  keyframe: 'Add keyframe',
+  removeKeyframe: 'Remove keyframe',
+  playhead: 'Move playhead',
+  trimStart: 'Trim start',
+  trimEnd: 'Trim end',
+  split: 'Split clip',
+  merge: 'Merge clips',
+  
+  // Audio (AXL/VINX)
+  waveform: 'Toggle waveform',
+  spectrum: 'Spectrum analyzer',
+  mixer: 'Mixer panel',
+  eq: 'Equalizer',
+  compressor: 'Compressor',
+  reverb: 'Reverb effect',
+  
+  // 3D (FORGE)
+  orbit: 'Orbit view',
+  pan: 'Pan view',
+  dolly: 'Dolly view',
+  wireframe: 'Toggle wireframe',
+  shading: 'Toggle shading',
+  material: 'Material panel',
+  lighting: 'Lighting panel',
+  render: 'Render',
+  
+  // File browser
+  newFolder: 'New folder',
+  newFile: 'New file',
+  openFolder: 'Open folder',
+  openFile: 'Open file',
+  parentFolder: 'Go to parent folder',
+  
+  // Misc
+  more: 'More options',
+  overflow: 'More actions',
+  drag: 'Drag handle',
+  resize: 'Resize',
+  attach: 'Attach file',
+  link: 'Insert link',
+  emoji: 'Insert emoji',
+  code: 'Insert code',
+  table: 'Insert table',
+  image: 'Insert image',
+  send: 'Send',
+  clear: 'Clear',
+  reset: 'Reset',
+} as const;
+
+export type IconButtonLabelKey = keyof typeof ICON_BUTTON_LABELS;
+
+/**
+ * Get aria-label for an icon button
+ */
+export function getIconButtonLabel(key: IconButtonLabelKey): string {
+  return ICON_BUTTON_LABELS[key];
+}
+
+/**
+ * Create accessible props for icon-only buttons
+ */
+export function iconButtonProps(
+  key: IconButtonLabelKey,
+  options?: {
+    pressed?: boolean;
+    expanded?: boolean;
+    disabled?: boolean;
+    controls?: string;
+  }
+): Record<string, string | boolean | undefined> {
+  const label = ICON_BUTTON_LABELS[key];
+  return {
+    'aria-label': label,
+    title: label,
+    ...(options?.pressed !== undefined && { 'aria-pressed': options.pressed }),
+    ...(options?.expanded !== undefined && { 'aria-expanded': options.expanded }),
+    ...(options?.disabled && { 'aria-disabled': true }),
+    ...(options?.controls && { 'aria-controls': options.controls }),
+  };
+}
+
+/**
+ * Create accessible props for toggle icon buttons
+ */
+export function toggleIconProps(
+  label: string,
+  pressed: boolean
+): Record<string, string | boolean> {
+  return {
+    'aria-label': label,
+    'aria-pressed': pressed,
+    title: `${label} (${pressed ? 'on' : 'off'})`,
   };
 }

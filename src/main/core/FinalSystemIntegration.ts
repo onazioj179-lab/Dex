@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Final System Integration
 // Unified runtime, performance ceiling, platform contract
 // =============================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as os from 'os';
 
@@ -1050,11 +1057,11 @@ export function initializeFinalSystem(): {
   });
 
   performance.on('violation', (snapshot: PerformanceSnapshot) => {
-    console.warn('[FinalSystem] Performance violation:', snapshot.violations);
+    log.warn('[FinalSystem] Performance violation:', snapshot.violations);
   });
 
   silence.on('silence:violation', (violations: string[]) => {
-    console.warn('[FinalSystem] Background silence violation:', violations);
+    log.warn('[FinalSystem] Background silence violation:', violations);
   });
 
   // Start monitoring
@@ -1103,7 +1110,7 @@ export function initializeFinalSystem(): {
     await lifecycle.shutdown();
   };
 
-  console.log('[FinalSystem] Initialized - Platform Contract v' + PLATFORM_CONTRACT.version);
+  log.info('[FinalSystem] Initialized - Platform Contract v' + PLATFORM_CONTRACT.version);
 
   return {
     lifecycle,

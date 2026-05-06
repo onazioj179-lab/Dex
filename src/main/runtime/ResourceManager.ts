@@ -1,17 +1,23 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Resource Manager
 // Phase 28: Backend Architecture Refinement
 // CPU and memory self-limits, background task throttling, pressure handling
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { powerMonitor } from 'electron';
 import log from 'electron-log';
 import * as os from 'os';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ResourcePressure = 'none' | 'low' | 'medium' | 'high' | 'critical';
 export type PowerState = 'ac' | 'battery' | 'low-battery' | 'charging';
@@ -53,9 +59,9 @@ export interface ThrottleState {
   since?: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // RESOURCE MANAGER CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ResourceManagerClass extends EventEmitter {
   // State
@@ -104,9 +110,9 @@ class ResourceManagerClass extends EventEmitter {
     this.initializeBudgets();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // LIFECYCLE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   start(): void {
     if (this.monitorInterval) return;
@@ -142,9 +148,9 @@ class ResourceManagerClass extends EventEmitter {
     this.emit('stopped');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // BUDGET MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private initializeBudgets(): void {
     this.budgets.set('workflow', { name: 'Workflow Engine', allocated: 128, used: 0, unit: 'MB' });
@@ -191,9 +197,9 @@ class ResourceManagerClass extends EventEmitter {
     return Array.from(this.budgets.values());
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // THROTTLING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Get current throttle level (0-1)
@@ -289,9 +295,9 @@ class ResourceManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // USAGE COLLECTION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private collectUsage(): void {
     const memoryUsage = process.memoryUsage();
@@ -348,9 +354,9 @@ class ResourceManagerClass extends EventEmitter {
     return Math.max(0, actual - expected);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // PRESSURE EVALUATION
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private evaluatePressure(): void {
     if (this.usageHistory.length < this.config.pressureCheckCount) return;
@@ -395,7 +401,7 @@ class ResourceManagerClass extends EventEmitter {
       const oldPressure = this.pressure;
       this.pressure = newPressure;
       
-      log.info(`[ResourceManager] Pressure: ${oldPressure} → ${newPressure}`);
+      log.info(`[ResourceManager] Pressure: ${oldPressure} ${newPressure}`);
       this.emit('pressureChanged', { oldPressure, newPressure });
       
       // Trigger cleanup on high pressure
@@ -419,9 +425,9 @@ class ResourceManagerClass extends EventEmitter {
     return levels[pressure];
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IDLE STATE
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Record user/system activity
@@ -448,9 +454,9 @@ class ResourceManagerClass extends EventEmitter {
     return this.systemState === 'idle';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CLEANUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private requestCleanup(): void {
     log.info('[ResourceManager] Requesting cleanup');
@@ -486,9 +492,9 @@ class ResourceManagerClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // POWER MONITORING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupPowerMonitoring(): void {
     powerMonitor.on('on-ac', () => {
@@ -519,9 +525,9 @@ class ResourceManagerClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // STATUS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getStatus(): {
     pressure: ResourcePressure;
@@ -551,9 +557,9 @@ class ResourceManagerClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const resourceManager = new ResourceManagerClass();
 export default resourceManager;

@@ -1,6 +1,18 @@
 extern crate napi_build;
 
 fn main() {
+    // ── Compile AXL C solid geometry kernel ───────────────────────────────
+    // Pure C mesh kernel (like Blender's core). Compiled to a static lib,
+    // linked into the final .node binary so Rust can call it via FFI.
+    cc::Build::new()
+        .file("src/c/axl_solid.c")
+        .include("src/c")
+        .opt_level(3)
+        .warnings(true)
+        .flag_if_supported("-std=c11")
+        .flag_if_supported("-ffast-math")
+        .compile("axl_solid");
+
     // On Windows with GNU toolchain, napi-build expects libnode.dll which doesn't
     // ship with standard Node.js. We generate a GNU import library from a .def file
     // using dlltool, then set LIBNODE_PATH so napi-build finds it.

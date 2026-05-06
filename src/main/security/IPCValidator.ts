@@ -1,13 +1,19 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - IPC Validation Middleware
 // Input validation for all IPC channels
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 type ValidatorFn = (data: unknown) => { valid: boolean; error?: string; sanitized?: unknown };
 
@@ -34,16 +40,22 @@ interface ChannelSchema {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Rate Limiter
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class RateLimiter {
   private calls: Map<string, number[]> = new Map();
-  
-  check(channel: string, maxCalls: number, windowMs: number): boolean {
+
+  /**
+   * @param senderId  Optional webContents ID — when provided the limit is
+   *                  enforced per-window, preventing one chatty renderer
+   *                  from exhausting the shared limit for all windows.
+   */
+  check(channel: string, maxCalls: number, windowMs: number, senderId?: number): boolean {
     const now = Date.now();
-    const key = channel;
+    // Scope the key per-sender when available, fall back to global channel
+    const key = senderId !== undefined ? `${channel}:${senderId}` : channel;
     
     if (!this.calls.has(key)) {
       this.calls.set(key, []);
@@ -72,9 +84,9 @@ class RateLimiter {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Input Sanitizer
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class InputSanitizer {
   // Remove potentially dangerous characters for XSS
@@ -89,26 +101,21 @@ export class InputSanitizer {
       .trim();
   }
   
-  // Sanitize file paths to prevent traversal
+  // Sanitize file paths to prevent traversal — reject malicious input entirely
   static sanitizePath(input: string): string {
     if (typeof input !== 'string') return '';
     
-    // Iteratively remove traversal sequences until none remain
-    let sanitized = input;
-    let prev = '';
-    while (sanitized !== prev) {
-      prev = sanitized;
-      sanitized = sanitized
-        .replace(/\.\.\/+/g, '')   // Remove ../ (with trailing slashes)
-        .replace(/\.\.\\+/g, '')  // Remove ..\ (with trailing backslashes)
-        .replace(/\.\.$/g, '');     // Remove trailing ..
-    }
+    // Block null bytes
+    if (input.includes('\0')) return '';
+    
+    // Normalize separators to forward slash for consistent checking
+    const normalized = input.replace(/\\/g, '/');
+    
+    // Reject any path containing traversal sequences (../ or .. at end)
+    if (/(?:^|\/)\.\.(?:\/|$)/.test(normalized)) return '';
     
     // Remove leading slashes/backslashes to prevent absolute path injection
-    sanitized = sanitized.replace(/^[\/\\]+/, '');
-    
-    // Block null bytes
-    sanitized = sanitized.replace(/\0/g, '');
+    const sanitized = input.replace(/^[\/\\]+/, '');
     
     return sanitized.trim();
   }
@@ -154,9 +161,9 @@ export class InputSanitizer {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Validator
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export class IPCValidator {
   private rateLimiter = new RateLimiter();
@@ -376,7 +383,7 @@ export class IPCValidator {
   }
   
   // Validate IPC call
-  validate(channel: string, args: unknown[]): { 
+  validate(channel: string, args: unknown[], senderId?: number): { 
     valid: boolean; 
     error?: string; 
     sanitizedArgs?: unknown[];
@@ -392,12 +399,13 @@ export class IPCValidator {
       };
     }
     
-    // Check rate limit
+    // Check rate limit (per-sender when senderId is available)
     if (schema.rateLimit) {
       const allowed = this.rateLimiter.check(
-        channel, 
-        schema.rateLimit.maxCalls, 
-        schema.rateLimit.windowMs
+        channel,
+        schema.rateLimit.maxCalls,
+        schema.rateLimit.windowMs,
+        senderId
       );
       
       if (!allowed) {
@@ -449,7 +457,7 @@ export class IPCValidator {
       this.validationErrors = this.validationErrors.slice(-100);
     }
     
-    console.warn(`[IPCValidator] Validation failed for ${channel}: ${error}`);
+    // Logged via structured error array; electron-log import avoided to keep this module lightweight
   }
   
   // Get validation errors for debugging
@@ -471,9 +479,9 @@ export class IPCValidator {
 // Singleton instance
 export const ipcValidator = new IPCValidator();
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Middleware Helper
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 /**
  * Wrap an IPC handler with validation
@@ -483,7 +491,9 @@ export function withValidation<T>(
   handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<T>
 ): (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<T> {
   return async (event: IpcMainInvokeEvent, ...args: unknown[]): Promise<T> => {
-    const validation = ipcValidator.validate(channel, args);
+    // Pass sender ID so rate limits are enforced per-window
+    const senderId = event.sender?.id;
+    const validation = ipcValidator.validate(channel, args, senderId);
     
     if (!validation.valid) {
       throw new Error(`Validation failed: ${validation.error}`);

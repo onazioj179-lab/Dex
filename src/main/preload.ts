@@ -1,18 +1,46 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX - Personal Control Hub for Desktop Automation
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * 
  * @author     Onazi Treasure OJ
  * @copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * @license    MIT License
- * @version    2.0.0
+ * @version    3.6.0
  * 
  * Preload Script - Context Bridge for Secure IPC
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import * as crypto from 'crypto';
+
+// ---------------------------------------------------------------------------
+// IPC Envelope Encryption (preload side)
+// Fetches the session key from main once, then seals sensitive payloads
+// locally with AES-256-GCM before they cross IPC channels.
+// ---------------------------------------------------------------------------
+
+let _ipcSessionKey: Buffer | null = null;
+
+async function ensureIPCKey(): Promise<Buffer> {
+  if (_ipcSessionKey) return _ipcSessionKey;
+  const keyB64: string | null = await ipcRenderer.invoke('ipc-crypto:getSessionKey');
+  if (!keyB64) throw new Error('IPCCrypto session key not available');
+  _ipcSessionKey = Buffer.from(keyB64, 'base64');
+  return _ipcSessionKey;
+}
+
+interface SealedEnvelope { v: 1; iv: string; tag: string; ct: string; }
+
+async function sealForIPC(plaintext: string): Promise<SealedEnvelope> {
+  const key = await ensureIPCKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
+  const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return { v: 1, iv: iv.toString('base64'), tag: tag.toString('base64'), ct: ct.toString('base64') };
+}
 
 // Type definitions for exposed APIs
 export interface DexAPI {
@@ -25,6 +53,7 @@ export interface DexAPI {
     isWindows: boolean;
     isLinux: boolean;
     os: string;
+    homeDir: string;
   };
 
   // Window controls
@@ -33,6 +62,7 @@ export interface DexAPI {
     maximize: () => void;
     close: () => void;
     hide: () => void;
+    setTitleBarOverlay: (enabled: boolean) => Promise<any>;
   };
 
   // Actions
@@ -67,6 +97,9 @@ export interface DexAPI {
   system: {
     getStatus: () => Promise<any>;
     getProcesses: () => Promise<any[]>;
+    claimResources: (enable: boolean) => Promise<any>;
+    reservationStatus: () => Promise<any>;
+    releasePid: (pid: number) => Promise<any>;
   };
 
   // Power & Performance
@@ -79,6 +112,17 @@ export interface DexAPI {
     closeProcess: (pid: number, force?: boolean) => Promise<any>;
     freeMemory: () => Promise<any>;
     getSuggestedCleanup: () => Promise<any>;
+    setCpuLimit: (val: number) => Promise<any>;
+    setGpuLimit: (val: number) => Promise<any>;
+    setFanCurve: (val: number) => Promise<any>;
+  };
+
+  // OS Controls
+  os: {
+    lockScreen: () => Promise<any>;
+    shutdown: () => Promise<any>;
+    restart: () => Promise<any>;
+    sleep: () => Promise<any>;
   };
 
   // Operations
@@ -206,6 +250,14 @@ export interface DexAPI {
     reportError: (error: { message: string; stack?: string }) => Promise<any>;
   };
 
+  // Crash Reporter -- local-only crash stats
+  crashReporter: {
+    getStats: () => Promise<any>;
+    getRecent: (limit?: number) => Promise<any[]>;
+    clear: () => Promise<any>;
+    reportRendererError: (data: { message: string; stack?: string }) => Promise<any>;
+  };
+
   // Authentication
   auth: {
     getState: () => Promise<any>;
@@ -220,6 +272,10 @@ export interface DexAPI {
     updateConfig: (updates: any) => Promise<{ success: boolean }>;
     lock: () => Promise<void>;
     clearCredentials: (currentPassword?: string) => Promise<{ success: boolean; error?: string }>;
+    changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+    changePin: (currentPin: string, newPin: string) => Promise<{ success: boolean; error?: string }>;
+    generateRecoveryCodes: () => Promise<{ success: boolean; codes?: string[] }>;
+    authenticateRecovery: (code: string) => Promise<{ success: boolean; error?: string; token?: string }>;
     verifySession: (token: string) => Promise<boolean>;
     getLockoutStatus: () => Promise<{ isLockedOut: boolean; remainingMinutes: number; attemptsRemaining: number }>;
     onStateChange: (callback: (state: any) => void) => void;
@@ -917,6 +973,7 @@ export interface DexAPI {
     applyPreset: (presetId: string) => Promise<any>;
     export: () => Promise<any>;
     import: (config: any) => Promise<boolean>;
+    getSystemAccentColor: () => Promise<string | null>;
   };
 
   //  PHASE 41: MEDIA WORKSPACE - Universal media handling
@@ -1096,6 +1153,73 @@ export interface DexAPI {
     reject: () => Promise<boolean>;
     getPending: () => Promise<any>;
     getPatterns: () => Promise<any[]>;
+  };
+
+  //  UKI VOICE ASSISTANT - Memory & Context
+  uki: {
+    getStatus: () => Promise<any>;
+    getConfig: () => Promise<any>;
+    updateConfig: (partial: any) => Promise<any>;
+    resetConfig: () => Promise<any>;
+    startListening: () => Promise<void>;
+    stopListening: () => Promise<boolean>;
+    toggle: () => Promise<string>;
+    transcript: (text: string) => Promise<boolean>;
+    query: (text: string) => Promise<any>;
+    confirm: (confirmed: boolean) => Promise<boolean>;
+    setContext: (page: string | null, appId: string | null) => void;
+    // Memory
+    memoryRecord: (entry: { type: string; summary: string; appId?: string; pageId?: string; category?: string; action?: string; success?: boolean }) => Promise<boolean>;
+    memorySearch: (query: string, limit?: number) => Promise<any[]>;
+    memoryRecent: (limit?: number) => Promise<any[]>;
+    memoryStats: () => Promise<any>;
+    memoryCleanup: () => Promise<number>;
+    memoryClear: () => Promise<boolean>;
+    // Copilot (Claude-like AI coworker)
+    copilot: {
+      getConfig: () => Promise<any>;
+      updateConfig: (config: any) => Promise<any>;
+      setContext: (context: any) => Promise<boolean>;
+      sendMessage: (content: string) => Promise<any>;
+      getConversation: () => Promise<any[]>;
+      clearConversation: () => Promise<boolean>;
+      getSuggestions: () => Promise<any[]>;
+      executeAction: (actionId: string) => Promise<any>;
+      isThinking: () => Promise<boolean>;
+    };
+    // Blueprint generator (A2)
+    blueprint: {
+      generate: (prompt: string, kind?: string) => Promise<any>;
+      tweak: (blueprintId: string, change: { key: string; value: unknown }) => Promise<any>;
+    };
+    // Rewind memory recall (A4)
+    recall: (query: string, options?: Record<string, unknown>) => Promise<any>;
+    // Creative operator (A3)
+    operator: {
+      dispatch: (action: unknown) => Promise<any>;
+      audit: (limit?: number) => Promise<any[]>;
+    };
+  };
+
+  //  Defense orchestrator (D3)
+  defense: {
+    status: () => Promise<any>;
+    report: (signal: unknown) => Promise<any>;
+    lockdown: (enable: boolean) => Promise<any>;
+    onSnapshot: (cb: (p: unknown) => void) => void;
+    onQuarantine: (cb: (p: unknown) => void) => void;
+    onVaultLock: (cb: (p: unknown) => void) => void;
+    onNetworkLockdown: (cb: (p: unknown) => void) => void;
+    onRestoreFiles: (cb: (p: unknown) => void) => void;
+    onNexusEmergency: (cb: (p: unknown) => void) => void;
+  };
+
+  //  Nexus biometrics (D2)
+  nexusBio: {
+    list: () => Promise<any>;
+    enroll: (payload: { kind: string; label?: string }) => Promise<any>;
+    test: (id: string) => Promise<any>;
+    revoke: (id: string) => Promise<any>;
   };
 
   //  PHASE 46: VOICE SCOPES - Permission management
@@ -1318,9 +1442,9 @@ export interface DexAPI {
     updateSettings: (settings: any) => Promise<any>;
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // SYSTEM STORAGE, AUTOMATION & LEARNING INTELLIGENCE
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   // System Storage - Efficient structured storage
   storage: {
@@ -1357,7 +1481,7 @@ export interface DexAPI {
     deny: (automationId: string) => Promise<boolean>;
   };
 
-  // Processing Pipeline - Download → Process → Summarize
+  // Processing Pipeline - Download Process Summarize
   pipeline: {
     getConfig: () => Promise<any>;
     updateConfig: (updates: any) => Promise<boolean>;
@@ -1371,7 +1495,7 @@ export interface DexAPI {
     cancelJob: (id: string) => Promise<boolean>;
   };
 
-  // Audio Processor - Voice → Value workflows
+  // Audio Processor - Voice Value workflows
   audio: {
     getConfig: () => Promise<any>;
     updateConfig: (updates: any) => Promise<boolean>;
@@ -1452,23 +1576,23 @@ export interface DexAPI {
     getStorageInfo: () => Promise<any>;
     isRecording: () => Promise<boolean>;
     getDaySummary: (dateStr?: string) => Promise<any>;
-    // Phase 2 — Screenshots
+    // Phase 2 -- Screenshots
     getScreenshots: (dateStr?: string) => Promise<any[]>;
     getScreenshotData: (filepath: string) => Promise<string | null>;
     getScreenshotStorageInfo: () => Promise<{ totalSizeBytes: number; totalCount: number }>;
     openScreenshotsFolder: () => Promise<boolean>;
     captureScreenshotNow: () => Promise<boolean>;
-    // Phase 2 — Smart Summary
+    // Phase 2 -- Smart Summary
     getSmartSummary: (dateStr?: string) => Promise<any>;
     generateSummaryNow: (dateStr?: string) => Promise<any>;
     getWeekSummaries: () => Promise<any[]>;
     exportSummary: (dateStr?: string) => Promise<string | null>;
-    // Phase 2 — AI Status
+    // Phase 2 -- AI Status
     getAIStatus: () => Promise<{ available: boolean; enabled: boolean; model: string }>;
     // User profile
     getUsername: () => Promise<string>;
     getAppVersion: () => Promise<string>;
-    // Phase 4 — Learning Engine
+    // Phase 4 -- Learning Engine
     getLearningStatus: () => Promise<any>;
     getLearnedPatterns: () => Promise<any>;
     getPredictedNextApp: () => Promise<string | null>;
@@ -1476,34 +1600,34 @@ export interface DexAPI {
     isInPeakWindow: () => Promise<boolean>;
     getSuggestedDistractions: () => Promise<string[]>;
     recordSearchClick: (query: string, entryId: string) => Promise<boolean>;
-    // Phase 4 — Security Layer
+    // Phase 4 -- Security Layer
     getSecurityStatus: () => Promise<any>;
     runIntegrityCheck: () => Promise<any>;
     getAuditLog: (limit?: number) => Promise<any[]>;
     isSessionLocked: () => Promise<boolean>;
     unlockSession: () => Promise<boolean>;
-    // Phase 4 — DEX Bridge
+    // Phase 4 -- DEX Bridge
     getBridgeStatus: () => Promise<any>;
     isDndActive: () => Promise<boolean>;
-    // Phase 4 — Combined Backend Status
+    // Phase 4 -- Combined Backend Status
     getBackendStatus: () => Promise<any>;
-    // Phase 5 — Crash Recovery
+    // Phase 5 -- Crash Recovery
     getCrashRecoveryStatus: () => Promise<any>;
     restoreCrashedSession: () => Promise<{ restored: boolean; reason: string }>;
     dismissCrashRecovery: () => Promise<boolean>;
-    // Phase 5 — Backup
+    // Phase 5 -- Backup
     getBackupSettings: () => Promise<any>;
     setBackupSchedule: (schedule: 'daily' | '3days' | 'weekly') => Promise<boolean>;
     setBackupFolder: (folder: string) => Promise<boolean>;
     runBackupNow: () => Promise<any>;
     pickBackupFolder: () => Promise<string | null>;
     restoreBackupFromPicker: () => Promise<any>;
-    // Phase 5 — Profiles
+    // Phase 5 -- Profiles
     getWorkspaceProfiles: () => Promise<any[]>;
     getActiveWorkspaceProfile: () => Promise<any>;
     saveWorkspaceProfile: (profile: any) => Promise<any>;
     deleteWorkspaceProfile: (profileId: string) => Promise<boolean>;
-    // Phase 5 — Onboarding
+    // Phase 5 -- Onboarding
     getOnboardingState: () => Promise<{ completed: boolean }>;
     skipOnboarding: () => Promise<boolean>;
     completeOnboarding: (payload: {
@@ -1512,27 +1636,67 @@ export interface DexAPI {
       aiSearchEnabled: boolean;
       autoDelete30Days: boolean;
     }) => Promise<boolean>;
-    // Phase 5 — Focus recovery
+    // Phase 5 -- Focus recovery
     setFocusSessionState: (state: Record<string, any> | null) => Promise<boolean>;
     getFocusSessionState: () => Promise<Record<string, any> | null>;
     startFocusSession: (goalText: string) => Promise<any>;
     endFocusSession: () => Promise<any>;
     getFocusSessions: () => Promise<any[]>;
-    // Phase 6 — Analytics
+    // Phase 6 -- Analytics
     getAnalyticsSnapshot: () => Promise<any>;
     recomputeAnalyticsNow: () => Promise<any>;
-    // Phase 7 — Plugins
+    // Phase 7 -- Plugins
     getPlugins: () => Promise<any[]>;
     setPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
     reloadPlugins: () => Promise<any[]>;
     openPluginsFolder: () => Promise<boolean>;
     getPluginCommands: () => Promise<Array<{ pluginId: string; name: string }>>;
     runPluginCommand: (pluginId: string, name: string, payload?: any) => Promise<any>;
-    // Phase 7 — Logging
+    // Phase 7 -- Logging
     getTodayLogs: () => Promise<string>;
     openLogsFolder: () => Promise<boolean>;
     onBackgroundError: (callback: (payload: { message: string; timestamp: number }) => void) => void;
     offBackgroundError: (callback: (payload: { message: string; timestamp: number }) => void) => void;
+  };
+
+  // DTP: DEX Transfer Protocol - high-speed device-to-device transfers
+  dtp: {
+    startServer: () => Promise<any>;
+    stopServer: () => Promise<any>;
+    startDiscovery: () => Promise<any>;
+    stopDiscovery: () => Promise<any>;
+    getDevices: () => Promise<any[]>;
+    refreshDevices: () => Promise<any>;
+    sendFiles: (args: { files: string[]; targetAddress: string; targetPort?: number; sessionToken: string }) => Promise<any>;
+    cancelSend: (transferId: string) => Promise<any>;
+    pauseSend: (transferId: string) => Promise<any>;
+    resumeSend: (transferId: string) => Promise<any>;
+    approveDevice: (deviceId: string) => Promise<any>;
+    denyDevice: (deviceId: string) => Promise<any>;
+    pauseReceive: (transferId: string) => Promise<any>;
+    cancelReceive: (transferId: string) => Promise<any>;
+    getHistory: (limit?: number) => Promise<any[]>;
+    getTrustedDevices: () => Promise<any[]>;
+    removeTrustedDevice: (deviceId: string) => Promise<any>;
+    measureBandwidth: (args: { address: string; port?: number }) => Promise<any>;
+    onDeviceFound: (callback: (device: any) => void) => void;
+    onDeviceLost: (callback: (device: any) => void) => void;
+    onDevicePending: (callback: (info: any) => void) => void;
+    onSendProgress: (callback: (progress: any) => void) => void;
+    onSendComplete: (callback: (result: any) => void) => void;
+    onSendError: (callback: (error: any) => void) => void;
+    onTransferProgress: (callback: (info: any) => void) => void;
+    onTransferComplete: (callback: (info: any) => void) => void;
+    onTransferError: (callback: (info: any) => void) => void;
+    offDeviceFound: (callback: (device: any) => void) => void;
+    offDeviceLost: (callback: (device: any) => void) => void;
+    offSendProgress: (callback: (progress: any) => void) => void;
+    offTransferProgress: (callback: (info: any) => void) => void;
+  };
+
+  //  User Profile API
+  user: {
+    getProfile: () => Promise<{ username: string; displayName: string; hostname: string; platform: string; arch: string }>;
   };
 }
 const invokePrefixAllowlist = [
@@ -1573,6 +1737,7 @@ const invokePrefixAllowlist = [
   'shell:',
   'splitview:',
   'power:',
+  'xenon:',
   'patterns:',
   'stability:',
   'memory:',
@@ -1599,6 +1764,7 @@ const invokePrefixAllowlist = [
   'health:',
   'diagnostics:',
   'encryption:',
+  'security:',
   'vault:',
   'trust:',
   'watchdog:',
@@ -1613,9 +1779,109 @@ const invokePrefixAllowlist = [
   'sync:',
   'api:',
   'video:',
+  // Unified Systems (13 Production Subsystems)
+  'notification-center:',
+  'global-search:',
+  'media-library:',
+  'version-history:',
+  'task-queue:',
+  'recycle-bin:',
+  'layout:',
+  'deeplink:',
+  'scratchpad:',
+  'localization:',
+  'feedback:',
+  'multiwindow:',
+  'batch:',
+  'state-sync:',
+  // Deep Backend Systems (11-Part Architecture Pass)
+  'perf-instrument:',
+  'db-cluster:',
+  'plugin-gate:',
+  'event-bus:',
+  'intelligence:',
+  'startup-sequencer:',
+  'shutdown-sequencer:',
+  'thread:',
+  'plugin-security:',
+  'motion:',
+  // DEX Rewind System Journal (5-Part Architecture)
+  'journal:',
+  // Feature Suite (38 New Subsystems)
+  'session-replay:',
+  'project-linker:',
+  'daily-briefing:',
+  'relationship-graph:',
+  'time-tracking:',
+  'goals:',
+  'snapshot-comparison:',
+  'project-health:',
+  'duplication-detector:',
+  'keyboard-nav:',
+  'project-archiver:',
+  'daily-note:',
+  'content-expiry:',
+  'search-history:',
+  'live-collaboration:',
+  'smart-grouping:',
+  'voice-memo:',
+  'project-timeline:',
+  'link-preview:',
+  'stats-dashboard:',
+  'export-bundle:',
+  'file-watcher:',
+  'word-count:',
+  'smart-rename:',
+  'vinx-presentation:',
+  'project-comparison:',
+  'dashboard:',
+  'reminder:',
+  'fts:',
+  'dependencies:',
+  'color-labels:',
+  'read-later:',
+  'bulk-metadata:',
+  'activity-feed:',
+  'project-lock:',
+  'theme-schedule:',
+  'nl-task:',
+  'changelog:',
+  // Game System
+  'game-system:',
+  // DEX Notes (SQLite-backed)
+  'dexnotes:',
+  // OS Mode Shell
+  'os:',
+  'dex:',
+  // Rust Native Module IPC
+  'native:',
+  'native-core:',
+  // UKI Voice Assistant
+  'uki:',
+  // File Watcher
+  'watch:',
+  // File system access
+  'fs:',
+  // Workflow script execution
+  'workflow:',
+  // Inner App Stability
+  'stability:',
+  // System Completeness
+  'multimonitor:',
+  'multiuser:',
+  'devplatform:',
+  'licensing:',
+  'help:',
+  'i18n:',
+  'migration:',
+  'backup:',
+  'import:',
+  'health:',
+  'uninstall:',
+  'user:',
 ];
 
-const invokeExactAllowlist = new Set(['intent:getStatus']);
+const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline']);
 const listenerWrappers = new WeakMap<(...args: any[]) => void, (...args: any[]) => void>();
 
 function isAllowedDynamicInvokeChannel(channel: string): boolean {
@@ -1643,6 +1909,7 @@ const api: DexAPI = {
     isWindows: process.platform === 'win32',
     isLinux: process.platform === 'linux',
     os: process.platform,
+    homeDir: process.env.HOME || process.env.USERPROFILE || '',
   },
 
   window: {
@@ -1650,6 +1917,7 @@ const api: DexAPI = {
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
     hide: () => ipcRenderer.invoke('window:hide'),
+    setTitleBarOverlay: (enabled: boolean) => ipcRenderer.invoke('window:setTitleBarOverlay', enabled),
   },
 
   actions: {
@@ -1680,6 +1948,30 @@ const api: DexAPI = {
   system: {
     getStatus: () => ipcRenderer.invoke('system:getStatus'),
     getProcesses: () => ipcRenderer.invoke('system:getProcesses'),
+    // Performance Reservation (lower priority of background processes)
+    claimResources: (enable: boolean, options?: Record<string, unknown>) =>
+      ipcRenderer.invoke('system:claimResources', enable, options),
+    reservationStatus: () => ipcRenderer.invoke('system:reservationStatus'),
+    releasePid: (pid: number) => ipcRenderer.invoke('system:releasePid', pid),
+  },
+
+  defense: {
+    status: () => ipcRenderer.invoke('defense:status'),
+    report: (signal: unknown) => ipcRenderer.invoke('defense:report', signal),
+    lockdown: (enable: boolean) => ipcRenderer.invoke('defense:lockdown', enable),
+    onSnapshot: (cb: (p: unknown) => void) => { ipcRenderer.on('defense:snapshot', (_e, p) => cb(p)); },
+    onQuarantine: (cb: (p: unknown) => void) => { ipcRenderer.on('defense:quarantine', (_e, p) => cb(p)); },
+    onVaultLock: (cb: (p: unknown) => void) => { ipcRenderer.on('defense:vault-lock', (_e, p) => cb(p)); },
+    onNetworkLockdown: (cb: (p: unknown) => void) => { ipcRenderer.on('defense:network-lockdown', (_e, p) => cb(p)); },
+    onRestoreFiles: (cb: (p: unknown) => void) => { ipcRenderer.on('defense:restore-files', (_e, p) => cb(p)); },
+    onNexusEmergency: (cb: (p: unknown) => void) => { ipcRenderer.on('nexus:emergency', (_e, p) => cb(p)); },
+  },
+
+  nexusBio: {
+    list: () => ipcRenderer.invoke('nexus:biometric:list'),
+    enroll: (payload: { kind: string; label?: string }) => ipcRenderer.invoke('nexus:biometric:enroll', payload),
+    test: (id: string) => ipcRenderer.invoke('nexus:biometric:test', id),
+    revoke: (id: string) => ipcRenderer.invoke('nexus:biometric:revoke', id),
   },
 
   power: {
@@ -1691,6 +1983,16 @@ const api: DexAPI = {
     closeProcess: (pid, force = false) => ipcRenderer.invoke('power:closeProcess', pid, force),
     freeMemory: () => ipcRenderer.invoke('power:freeMemory'),
     getSuggestedCleanup: () => ipcRenderer.invoke('power:getSuggestedCleanup'),
+    setCpuLimit: (val: number) => ipcRenderer.invoke('power:setCpuLimit', val),
+    setGpuLimit: (val: number) => ipcRenderer.invoke('power:setGpuLimit', val),
+    setFanCurve: (val: number) => ipcRenderer.invoke('power:setFanCurve', val),
+  },
+
+  os: {
+    lockScreen: () => ipcRenderer.invoke('os:lockScreen'),
+    shutdown: () => ipcRenderer.invoke('os:shutdown'),
+    restart: () => ipcRenderer.invoke('os:restart'),
+    sleep: () => ipcRenderer.invoke('os:sleep'),
   },
 
   operations: {
@@ -1830,21 +2132,34 @@ const api: DexAPI = {
     reportError: (error) => ipcRenderer.invoke('diagnostics:reportError', error),
   },
 
+  // Crash Reporter -- local-only crash stats
+  crashReporter: {
+    getStats: () => ipcRenderer.invoke('crash-reporter:getStats'),
+    getRecent: (limit?: number) => ipcRenderer.invoke('crash-reporter:getRecent', limit),
+    clear: () => ipcRenderer.invoke('crash-reporter:clear'),
+    reportRendererError: (data: { message: string; stack?: string }) =>
+      ipcRenderer.invoke('crash-reporter:reportRendererError', data),
+  },
+
   // Authentication
   auth: {
     getState: () => ipcRenderer.invoke('auth:getState'),
     getConfig: () => ipcRenderer.invoke('auth:getConfig'),
     biometricsAvailable: () => ipcRenderer.invoke('auth:biometricsAvailable'),
-    authenticatePassword: (password) => ipcRenderer.invoke('auth:authenticatePassword', password),
-    authenticatePin: (pin) => ipcRenderer.invoke('auth:authenticatePin', pin),
+    authenticatePassword: async (password: string) => ipcRenderer.invoke('auth:authenticatePassword', await sealForIPC(password)),
+    authenticatePin: async (pin: string) => ipcRenderer.invoke('auth:authenticatePin', await sealForIPC(pin)),
     authenticateBiometric: () => ipcRenderer.invoke('auth:authenticateBiometric'),
-    setPassword: (password) => ipcRenderer.invoke('auth:setPassword', password),
-    setPin: (pin) => ipcRenderer.invoke('auth:setPin', pin),
+    setPassword: async (password: string) => ipcRenderer.invoke('auth:setPassword', await sealForIPC(password)),
+    setPin: async (pin: string) => ipcRenderer.invoke('auth:setPin', await sealForIPC(pin)),
     enableBiometric: () => ipcRenderer.invoke('auth:enableBiometric'),
     updateConfig: (updates) => ipcRenderer.invoke('auth:updateConfig', updates),
     lock: () => ipcRenderer.invoke('auth:lock'),
-    clearCredentials: (currentPassword) => ipcRenderer.invoke('auth:clearCredentials', currentPassword),
-    verifySession: (token) => ipcRenderer.invoke('auth:verifySession', token),
+    clearCredentials: async (currentPassword?: string) => ipcRenderer.invoke('auth:clearCredentials', currentPassword ? await sealForIPC(currentPassword) : undefined),
+    changePassword: async (currentPassword: string, newPassword: string) => ipcRenderer.invoke('auth:changePassword', await sealForIPC(JSON.stringify({ currentPassword, newPassword }))),
+    changePin: async (currentPin: string, newPin: string) => ipcRenderer.invoke('auth:changePin', await sealForIPC(JSON.stringify({ currentPin, newPin }))),
+    generateRecoveryCodes: () => ipcRenderer.invoke('auth:generateRecoveryCodes'),
+    authenticateRecovery: async (code: string) => ipcRenderer.invoke('auth:authenticateRecovery', await sealForIPC(code)),
+    verifySession: async (token: string) => ipcRenderer.invoke('auth:verifySession', await sealForIPC(token)),
     getLockoutStatus: () => ipcRenderer.invoke('auth:getLockoutStatus'),
     onStateChange: (callback) => ipcRenderer.on('auth:stateChanged', (_, state) => callback(state)),
   },
@@ -1853,36 +2168,36 @@ const api: DexAPI = {
   vault: {
     getState: () => ipcRenderer.invoke('vault:getState'),
     exists: () => ipcRenderer.invoke('vault:exists'),
-    create: (masterPassword) => ipcRenderer.invoke('vault:create', masterPassword),
-    unlock: (masterPassword) => ipcRenderer.invoke('vault:unlock', masterPassword),
+    create: async (masterPassword: string) => ipcRenderer.invoke('vault:create', await sealForIPC(masterPassword)),
+    unlock: async (masterPassword: string) => ipcRenderer.invoke('vault:unlock', await sealForIPC(masterPassword)),
     lock: () => ipcRenderer.invoke('vault:lock'),
     
     getCredentials: () => ipcRenderer.invoke('vault:getCredentials'),
     getCredential: (id) => ipcRenderer.invoke('vault:getCredential', id),
-    addCredential: (credential) => ipcRenderer.invoke('vault:addCredential', credential),
-    updateCredential: (id, updates) => ipcRenderer.invoke('vault:updateCredential', id, updates),
+    addCredential: async (credential: any) => ipcRenderer.invoke('vault:addCredential', await sealForIPC(JSON.stringify(credential))),
+    updateCredential: async (id: string, updates: any) => ipcRenderer.invoke('vault:updateCredential', id, await sealForIPC(JSON.stringify(updates))),
     deleteCredential: (id) => ipcRenderer.invoke('vault:deleteCredential', id),
     searchCredentials: (query) => ipcRenderer.invoke('vault:searchCredentials', query),
     
     getAuthenticators: () => ipcRenderer.invoke('vault:getAuthenticators'),
-    addAuthenticator: (entry) => ipcRenderer.invoke('vault:addAuthenticator', entry),
-    updateAuthenticator: (id, updates) => ipcRenderer.invoke('vault:updateAuthenticator', id, updates),
+    addAuthenticator: async (entry: any) => ipcRenderer.invoke('vault:addAuthenticator', await sealForIPC(JSON.stringify(entry))),
+    updateAuthenticator: async (id: string, updates: any) => ipcRenderer.invoke('vault:updateAuthenticator', id, await sealForIPC(JSON.stringify(updates))),
     deleteAuthenticator: (id) => ipcRenderer.invoke('vault:deleteAuthenticator', id),
     generateTOTP: (id) => ipcRenderer.invoke('vault:generateTOTP', id),
-    generateTOTPFromSecret: (secret, options) => ipcRenderer.invoke('vault:generateTOTPFromSecret', secret, options),
-    parseOTPUri: (uri) => ipcRenderer.invoke('vault:parseOTPUri', uri),
+    generateTOTPFromSecret: async (secret: string, options: any) => ipcRenderer.invoke('vault:generateTOTPFromSecret', await sealForIPC(secret), options),
+    parseOTPUri: async (uri: string) => ipcRenderer.invoke('vault:parseOTPUri', await sealForIPC(uri)),
     
     getSettings: () => ipcRenderer.invoke('vault:getSettings'),
     updateSettings: (updates) => ipcRenderer.invoke('vault:updateSettings', updates),
     
     generatePassword: (options) => ipcRenderer.invoke('vault:generatePassword', options),
-    assessPasswordStrength: (password) => ipcRenderer.invoke('vault:assessPasswordStrength', password),
+    assessPasswordStrength: async (password: string) => ipcRenderer.invoke('vault:assessPasswordStrength', await sealForIPC(password)),
     auditPasswords: () => ipcRenderer.invoke('vault:auditPasswords'),
-    copyToClipboard: (text) => ipcRenderer.invoke('vault:copyToClipboard', text),
+    copyToClipboard: async (text: string) => ipcRenderer.invoke('vault:copyToClipboard', await sealForIPC(text)),
     
-    exportVault: (exportPassword) => ipcRenderer.invoke('vault:exportVault', exportPassword),
-    importVault: (data, exportPassword) => ipcRenderer.invoke('vault:importVault', data, exportPassword),
-    changeMasterPassword: (currentPassword, newPassword) => ipcRenderer.invoke('vault:changeMasterPassword', currentPassword, newPassword),
+    exportVault: async (exportPassword: string) => ipcRenderer.invoke('vault:exportVault', await sealForIPC(exportPassword)),
+    importVault: async (data: string, exportPassword: string) => ipcRenderer.invoke('vault:importVault', data, await sealForIPC(exportPassword)),
+    changeMasterPassword: async (currentPassword: string, newPassword: string) => ipcRenderer.invoke('vault:changeMasterPassword', await sealForIPC(currentPassword), await sealForIPC(newPassword)),
     
     onStateChange: (callback) => ipcRenderer.on('vault:stateChanged', (_, state) => callback(state)),
   },
@@ -2086,9 +2401,9 @@ const api: DexAPI = {
     getStatus: () => ipcRenderer.invoke('encryption:getStatus'),
     getConfig: () => ipcRenderer.invoke('encryption:getConfig'),
     updateConfig: (updates) => ipcRenderer.invoke('encryption:updateConfig', updates),
-    initWithPassword: (password) => ipcRenderer.invoke('encryption:initWithPassword', password),
+    initWithPassword: async (password: string) => ipcRenderer.invoke('encryption:initWithPassword', await sealForIPC(password)),
     initWithSystemKey: () => ipcRenderer.invoke('encryption:initWithSystemKey'),
-    unlock: (password) => ipcRenderer.invoke('encryption:unlock', password),
+    unlock: async (password: string) => ipcRenderer.invoke('encryption:unlock', await sealForIPC(password)),
     lock: () => ipcRenderer.invoke('encryption:lock'),
     disable: () => ipcRenderer.invoke('encryption:disable'),
   },
@@ -2197,7 +2512,7 @@ const api: DexAPI = {
     getStatus: () => ipcRenderer.invoke('browser:getStatus'),
     navigate: (url) => ipcRenderer.invoke('browser:navigate', url),
     readPage: () => ipcRenderer.invoke('browser:readPage'),
-    fillField: (selector, value) => ipcRenderer.invoke('browser:fillField', selector, value),
+    fillField: async (selector: string, value: string) => ipcRenderer.invoke('browser:fillField', selector, await sealForIPC(value)),
     click: (selector) => ipcRenderer.invoke('browser:click', selector),
     download: (url, filename) => ipcRenderer.invoke('browser:download', url, filename),
     getPendingActions: () => ipcRenderer.invoke('browser:getPendingActions'),
@@ -2248,6 +2563,11 @@ const api: DexAPI = {
     executeCode: (code) => ipcRenderer.invoke('scripting:execute-code', code),
     stop: (id) => ipcRenderer.invoke('scripting:stop', id),
     getTemplates: () => ipcRenderer.invoke('scripting:get-templates'),
+  },
+
+  //  User Profile API
+  user: {
+    getProfile: () => ipcRenderer.invoke('user:getProfile') as Promise<{ username: string; displayName: string; hostname: string; platform: string; arch: string }>,
   },
 
   //  ULTRA-LOW RESOURCE MODE: Resource Governor API
@@ -2393,13 +2713,13 @@ const api: DexAPI = {
   secureKeys: {
     listKeys: () => ipcRenderer.invoke('secureKeys:listKeys'),
     generateKey: (name, purpose) => ipcRenderer.invoke('secureKeys:generateKey', name, purpose),
-    deriveKey: (name, passphrase, purpose) => ipcRenderer.invoke('secureKeys:deriveKey', name, passphrase, purpose),
+    deriveKey: async (name: string, passphrase: string, purpose: string) => ipcRenderer.invoke('secureKeys:deriveKey', name, await sealForIPC(passphrase), purpose),
     deleteKey: (keyId) => ipcRenderer.invoke('secureKeys:deleteKey', keyId),
     rotateKey: (keyId) => ipcRenderer.invoke('secureKeys:rotateKey', keyId),
     isLocked: () => ipcRenderer.invoke('secureKeys:isLocked'),
     lock: () => ipcRenderer.invoke('secureKeys:lock'),
-    unlock: (passphrase) => ipcRenderer.invoke('secureKeys:unlock', passphrase),
-    encrypt: (keyId, data) => ipcRenderer.invoke('secureKeys:encrypt', keyId, data),
+    unlock: async (passphrase: string) => ipcRenderer.invoke('secureKeys:unlock', await sealForIPC(passphrase)),
+    encrypt: async (keyId: string, data: string) => ipcRenderer.invoke('secureKeys:encrypt', keyId, await sealForIPC(data)),
     decrypt: (keyId, encrypted) => ipcRenderer.invoke('secureKeys:decrypt', keyId, encrypted),
     getKeyInfo: (keyId) => ipcRenderer.invoke('secureKeys:getKeyInfo', keyId),
   },
@@ -2471,6 +2791,7 @@ const api: DexAPI = {
     applyPreset: (presetId) => ipcRenderer.invoke('theme:applyPreset', presetId),
     export: () => ipcRenderer.invoke('theme:export'),
     import: (config) => ipcRenderer.invoke('theme:import', config),
+    getSystemAccentColor: () => ipcRenderer.invoke('theme:getSystemAccentColor'),
   },
 
   //  Phase 41: Media Workspace - Universal media handling
@@ -2672,6 +2993,55 @@ const api: DexAPI = {
     clearHistory: () => ipcRenderer.invoke('voiceFeedback:clearHistory'),
   },
 
+  //  UKI Voice Assistant - Memory & Context
+  uki: {
+    getStatus: () => ipcRenderer.invoke('uki:getStatus'),
+    getConfig: () => ipcRenderer.invoke('uki:getConfig'),
+    updateConfig: (partial) => ipcRenderer.invoke('uki:updateConfig', partial),
+    resetConfig: () => ipcRenderer.invoke('uki:resetConfig'),
+    startListening: () => ipcRenderer.invoke('uki:startListening'),
+    stopListening: () => ipcRenderer.invoke('uki:stopListening'),
+    toggle: () => ipcRenderer.invoke('uki:toggle'),
+    transcript: async (text: string) => ipcRenderer.invoke('uki:transcript', await sealForIPC(text)),
+    query: async (text: string) => ipcRenderer.invoke('uki:query', await sealForIPC(text)),
+    confirm: (confirmed) => ipcRenderer.invoke('uki:confirm', confirmed),
+    setContext: (page, appId) => ipcRenderer.send('uki:setContext', page, appId),
+    // Memory
+    memoryRecord: (entry) => ipcRenderer.invoke('uki:memoryRecord', entry),
+    memorySearch: (query, limit = 20) => ipcRenderer.invoke('uki:memorySearch', query, limit),
+    memoryRecent: (limit = 10) => ipcRenderer.invoke('uki:memoryRecent', limit),
+    memoryStats: () => ipcRenderer.invoke('uki:memoryStats'),
+    memoryCleanup: () => ipcRenderer.invoke('uki:memoryCleanup'),
+    memoryClear: () => ipcRenderer.invoke('uki:memoryClear'),
+    // Copilot (Claude-like AI coworker)
+    copilot: {
+      getConfig: () => ipcRenderer.invoke('uki:copilot:getConfig'),
+      updateConfig: (config: any) => ipcRenderer.invoke('uki:copilot:updateConfig', config),
+      setContext: (context: any) => ipcRenderer.invoke('uki:copilot:setContext', context),
+      sendMessage: async (content: string) => ipcRenderer.invoke('uki:copilot:sendMessage', await sealForIPC(content)),
+      getConversation: () => ipcRenderer.invoke('uki:copilot:getConversation'),
+      clearConversation: () => ipcRenderer.invoke('uki:copilot:clearConversation'),
+      getSuggestions: () => ipcRenderer.invoke('uki:copilot:getSuggestions'),
+      executeAction: (actionId: string) => ipcRenderer.invoke('uki:copilot:executeAction', actionId),
+      isThinking: () => ipcRenderer.invoke('uki:copilot:isThinking'),
+    },
+    // Blueprint generator (AXL / scaffold)
+    blueprint: {
+      generate: async (prompt: string, kind?: string) =>
+        ipcRenderer.invoke('uki:blueprint:generate', await sealForIPC(prompt), kind),
+      tweak: (blueprintId: string, change: { key: string; value: unknown }) =>
+        ipcRenderer.invoke('uki:blueprint:tweak', blueprintId, change),
+    },
+    // Cross-source recall (knowledge + native + rewind)
+    recall: async (query: string, options?: Record<string, unknown>) =>
+      ipcRenderer.invoke('uki:recall', await sealForIPC(query), options),
+    // Creative operator dispatch
+    operator: {
+      dispatch: (action: unknown) => ipcRenderer.invoke('uki:operator:dispatch', action),
+      audit: (limit?: number) => ipcRenderer.invoke('uki:operator:audit', limit),
+    },
+  },
+
   //  AI DISABLED - Privacy-first system uses local Pattern Learning instead
   ai: {
     getStatus: () => Promise.resolve({ enabled: false, hasProviders: false, activeProvider: null, providers: [] }),
@@ -2792,9 +3162,9 @@ const api: DexAPI = {
     updateSettings: (settings: any) => ipcRenderer.invoke('voiceNotes:updateSettings', settings),
   },
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
   // SYSTEM STORAGE, AUTOMATION & LEARNING INTELLIGENCE
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ===========================================================================
 
   // System Storage - Efficient structured storage
   storage: {
@@ -2831,7 +3201,7 @@ const api: DexAPI = {
     deny: (automationId: string) => ipcRenderer.invoke('automationEngine:deny', automationId),
   },
 
-  // Processing Pipeline - Download → Process → Summarize
+  // Processing Pipeline - Download Process Summarize
   pipeline: {
     getConfig: () => ipcRenderer.invoke('pipeline:getConfig'),
     updateConfig: (updates: any) => ipcRenderer.invoke('pipeline:updateConfig', updates),
@@ -2845,7 +3215,7 @@ const api: DexAPI = {
     cancelJob: (id: string) => ipcRenderer.invoke('pipeline:cancelJob', id),
   },
 
-  // Audio Processor - Voice → Value workflows
+  // Audio Processor - Voice Value workflows
   audio: {
     getConfig: () => ipcRenderer.invoke('audio:getConfig'),
     updateConfig: (updates: any) => ipcRenderer.invoke('audio:updateConfig', updates),
@@ -3087,6 +3457,19 @@ const api: DexAPI = {
       'governance:statusUpdated',
       'governance:auditEntry',
       'governance:emergencyStop',
+      // Feature Suite (38 New Subsystems) events
+      'smart-rename:completed',
+      'color-labels:changed',
+      'project-lock:changed',
+      'reminder:fired',
+      'activity-feed:new',
+      'keyboard-nav:stateChanged',
+      'live-collaboration:peersChanged',
+      'file-watcher:detected',
+      'theme-schedule:changed',
+      'nl-task:created',
+      'event-bus:event',
+      'browser:new-tab',
     ];
     if (validChannels.includes(channel)) {
       const wrapped = (_event: any, ...args: any[]) => callback(...args);
@@ -3124,23 +3507,23 @@ const api: DexAPI = {
     getStorageInfo: () => ipcRenderer.invoke('rewind:getStorageInfo'),
     isRecording: () => ipcRenderer.invoke('rewind:isRecording'),
     getDaySummary: (dateStr?: string) => ipcRenderer.invoke('rewind:getDaySummary', dateStr),
-    // Phase 2 — Screenshots
+    // Phase 2 -- Screenshots
     getScreenshots: (dateStr?: string) => ipcRenderer.invoke('rewind:getScreenshots', dateStr),
     getScreenshotData: (filepath: string) => ipcRenderer.invoke('rewind:getScreenshotData', filepath),
     getScreenshotStorageInfo: () => ipcRenderer.invoke('rewind:getScreenshotStorageInfo'),
     openScreenshotsFolder: () => ipcRenderer.invoke('rewind:openScreenshotsFolder'),
     captureScreenshotNow: () => ipcRenderer.invoke('rewind:captureScreenshotNow'),
-    // Phase 2 — Smart Summary
+    // Phase 2 -- Smart Summary
     getSmartSummary: (dateStr?: string) => ipcRenderer.invoke('rewind:getSmartSummary', dateStr),
     generateSummaryNow: (dateStr?: string) => ipcRenderer.invoke('rewind:generateSummaryNow', dateStr),
     getWeekSummaries: () => ipcRenderer.invoke('rewind:getWeekSummaries'),
     exportSummary: (dateStr?: string) => ipcRenderer.invoke('rewind:exportSummary', dateStr),
-    // Phase 2 — AI Status
+    // Phase 2 -- AI Status
     getAIStatus: () => ipcRenderer.invoke('rewind:getAIStatus'),
     // User profile
     getUsername: () => ipcRenderer.invoke('rewind:getUsername'),
     getAppVersion: () => ipcRenderer.invoke('rewind:getAppVersion'),
-    // Phase 4 — Learning Engine
+    // Phase 4 -- Learning Engine
     getLearningStatus: () => ipcRenderer.invoke('rewind:getLearningStatus'),
     getLearnedPatterns: () => ipcRenderer.invoke('rewind:getLearnedPatterns'),
     getPredictedNextApp: () => ipcRenderer.invoke('rewind:getPredictedNextApp'),
@@ -3148,34 +3531,34 @@ const api: DexAPI = {
     isInPeakWindow: () => ipcRenderer.invoke('rewind:isInPeakWindow'),
     getSuggestedDistractions: () => ipcRenderer.invoke('rewind:getSuggestedDistractions'),
     recordSearchClick: (query: string, entryId: string) => ipcRenderer.invoke('rewind:recordSearchClick', query, entryId),
-    // Phase 4 — Security Layer
+    // Phase 4 -- Security Layer
     getSecurityStatus: () => ipcRenderer.invoke('rewind:getSecurityStatus'),
     runIntegrityCheck: () => ipcRenderer.invoke('rewind:runIntegrityCheck'),
     getAuditLog: (limit?: number) => ipcRenderer.invoke('rewind:getAuditLog', limit),
     isSessionLocked: () => ipcRenderer.invoke('rewind:isSessionLocked'),
     unlockSession: () => ipcRenderer.invoke('rewind:unlockSession'),
-    // Phase 4 — DEX Bridge
+    // Phase 4 -- DEX Bridge
     getBridgeStatus: () => ipcRenderer.invoke('rewind:getBridgeStatus'),
     isDndActive: () => ipcRenderer.invoke('rewind:isDndActive'),
-    // Phase 4 — Combined Backend Status
+    // Phase 4 -- Combined Backend Status
     getBackendStatus: () => ipcRenderer.invoke('rewind:getBackendStatus'),
-    // Phase 5 — Crash Recovery
+    // Phase 5 -- Crash Recovery
     getCrashRecoveryStatus: () => ipcRenderer.invoke('rewind:getCrashRecoveryStatus'),
     restoreCrashedSession: () => ipcRenderer.invoke('rewind:restoreCrashedSession'),
     dismissCrashRecovery: () => ipcRenderer.invoke('rewind:dismissCrashRecovery'),
-    // Phase 5 — Backup
+    // Phase 5 -- Backup
     getBackupSettings: () => ipcRenderer.invoke('rewind:getBackupSettings'),
     setBackupSchedule: (schedule: 'daily' | '3days' | 'weekly') => ipcRenderer.invoke('rewind:setBackupSchedule', schedule),
     setBackupFolder: (folder: string) => ipcRenderer.invoke('rewind:setBackupFolder', folder),
     runBackupNow: () => ipcRenderer.invoke('rewind:runBackupNow'),
     pickBackupFolder: () => ipcRenderer.invoke('rewind:pickBackupFolder'),
     restoreBackupFromPicker: () => ipcRenderer.invoke('rewind:restoreBackupFromPicker'),
-    // Phase 5 — Profiles
+    // Phase 5 -- Profiles
     getWorkspaceProfiles: () => ipcRenderer.invoke('rewind:getWorkspaceProfiles'),
     getActiveWorkspaceProfile: () => ipcRenderer.invoke('rewind:getActiveWorkspaceProfile'),
     saveWorkspaceProfile: (profile: any) => ipcRenderer.invoke('rewind:saveWorkspaceProfile', profile),
     deleteWorkspaceProfile: (profileId: string) => ipcRenderer.invoke('rewind:deleteWorkspaceProfile', profileId),
-    // Phase 5 — Onboarding
+    // Phase 5 -- Onboarding
     getOnboardingState: () => ipcRenderer.invoke('rewind:getOnboardingState'),
     skipOnboarding: () => ipcRenderer.invoke('rewind:skipOnboarding'),
     completeOnboarding: (payload: {
@@ -3184,23 +3567,23 @@ const api: DexAPI = {
       aiSearchEnabled: boolean;
       autoDelete30Days: boolean;
     }) => ipcRenderer.invoke('rewind:completeOnboarding', payload),
-    // Phase 5 — Focus recovery
+    // Phase 5 -- Focus recovery
     setFocusSessionState: (state: Record<string, any> | null) => ipcRenderer.invoke('rewind:setFocusSessionState', state),
     getFocusSessionState: () => ipcRenderer.invoke('rewind:getFocusSessionState'),
     startFocusSession: (goalText: string) => ipcRenderer.invoke('rewind:startFocusSession', goalText),
     endFocusSession: () => ipcRenderer.invoke('rewind:endFocusSession'),
     getFocusSessions: () => ipcRenderer.invoke('rewind:getFocusSessions'),
-    // Phase 6 — Analytics
+    // Phase 6 -- Analytics
     getAnalyticsSnapshot: () => ipcRenderer.invoke('rewind:getAnalyticsSnapshot'),
     recomputeAnalyticsNow: () => ipcRenderer.invoke('rewind:recomputeAnalyticsNow'),
-    // Phase 7 — Plugins
+    // Phase 7 -- Plugins
     getPlugins: () => ipcRenderer.invoke('rewind:getPlugins'),
     setPluginEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke('rewind:setPluginEnabled', id, enabled),
     reloadPlugins: () => ipcRenderer.invoke('rewind:reloadPlugins'),
     openPluginsFolder: () => ipcRenderer.invoke('rewind:openPluginsFolder'),
     getPluginCommands: () => ipcRenderer.invoke('rewind:getPluginCommands'),
     runPluginCommand: (pluginId: string, name: string, payload?: any) => ipcRenderer.invoke('rewind:runPluginCommand', pluginId, name, payload),
-    // Phase 7 — Logging
+    // Phase 7 -- Logging
     getTodayLogs: () => ipcRenderer.invoke('rewind:getTodayLogs'),
     openLogsFolder: () => ipcRenderer.invoke('rewind:openLogsFolder'),
     onBackgroundError: (callback: (payload: { message: string; timestamp: number }) => void) => {
@@ -3212,6 +3595,98 @@ const api: DexAPI = {
       const wrapped = listenerWrappers.get(callback as any);
       if (!wrapped) return;
       ipcRenderer.removeListener('rewind:backgroundError', wrapped);
+      listenerWrappers.delete(callback as any);
+    },
+  },
+
+  // DTP: DEX Transfer Protocol
+  dtp: {
+    startServer: () => ipcRenderer.invoke('dtp:startServer'),
+    stopServer: () => ipcRenderer.invoke('dtp:stopServer'),
+    startDiscovery: () => ipcRenderer.invoke('dtp:startDiscovery'),
+    stopDiscovery: () => ipcRenderer.invoke('dtp:stopDiscovery'),
+    getDevices: () => ipcRenderer.invoke('dtp:getDevices'),
+    refreshDevices: () => ipcRenderer.invoke('dtp:refreshDevices'),
+    sendFiles: async (args: { files: string[]; targetAddress: string; targetPort?: number; sessionToken: string }) =>
+      ipcRenderer.invoke('dtp:sendFiles', { ...args, sessionToken: await sealForIPC(args.sessionToken) }),
+    cancelSend: (transferId: string) => ipcRenderer.invoke('dtp:cancelSend', transferId),
+    pauseSend: (transferId: string) => ipcRenderer.invoke('dtp:pauseSend', transferId),
+    resumeSend: (transferId: string) => ipcRenderer.invoke('dtp:resumeSend', transferId),
+    approveDevice: (deviceId: string) => ipcRenderer.invoke('dtp:approveDevice', deviceId),
+    denyDevice: (deviceId: string) => ipcRenderer.invoke('dtp:denyDevice', deviceId),
+    pauseReceive: (transferId: string) => ipcRenderer.invoke('dtp:pauseReceive', transferId),
+    cancelReceive: (transferId: string) => ipcRenderer.invoke('dtp:cancelReceive', transferId),
+    getHistory: (limit?: number) => ipcRenderer.invoke('dtp:getHistory', limit),
+    getTrustedDevices: () => ipcRenderer.invoke('dtp:getTrustedDevices'),
+    removeTrustedDevice: (deviceId: string) => ipcRenderer.invoke('dtp:removeTrustedDevice', deviceId),
+    measureBandwidth: (args: { address: string; port?: number }) => ipcRenderer.invoke('dtp:measureBandwidth', args),
+    onDeviceFound: (callback: (device: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, device: any) => callback(device);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:device-found', wrapped);
+    },
+    onDeviceLost: (callback: (device: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, device: any) => callback(device);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:device-lost', wrapped);
+    },
+    onDevicePending: (callback: (info: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, info: any) => callback(info);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:device-pending', wrapped);
+    },
+    onSendProgress: (callback: (progress: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, progress: any) => callback(progress);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:send-progress', wrapped);
+    },
+    onSendComplete: (callback: (result: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, result: any) => callback(result);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:send-complete', wrapped);
+    },
+    onSendError: (callback: (error: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, error: any) => callback(error);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:send-error', wrapped);
+    },
+    onTransferProgress: (callback: (info: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, info: any) => callback(info);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:transfer-progress', wrapped);
+    },
+    onTransferComplete: (callback: (info: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, info: any) => callback(info);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:transfer-complete', wrapped);
+    },
+    onTransferError: (callback: (info: any) => void) => {
+      const wrapped = (_e: Electron.IpcRendererEvent, info: any) => callback(info);
+      listenerWrappers.set(callback as any, wrapped as any);
+      ipcRenderer.on('dtp:transfer-error', wrapped);
+    },
+    offDeviceFound: (callback: (device: any) => void) => {
+      const wrapped = listenerWrappers.get(callback as any);
+      if (!wrapped) return;
+      ipcRenderer.removeListener('dtp:device-found', wrapped);
+      listenerWrappers.delete(callback as any);
+    },
+    offDeviceLost: (callback: (device: any) => void) => {
+      const wrapped = listenerWrappers.get(callback as any);
+      if (!wrapped) return;
+      ipcRenderer.removeListener('dtp:device-lost', wrapped);
+      listenerWrappers.delete(callback as any);
+    },
+    offSendProgress: (callback: (progress: any) => void) => {
+      const wrapped = listenerWrappers.get(callback as any);
+      if (!wrapped) return;
+      ipcRenderer.removeListener('dtp:send-progress', wrapped);
+      listenerWrappers.delete(callback as any);
+    },
+    offTransferProgress: (callback: (info: any) => void) => {
+      const wrapped = listenerWrappers.get(callback as any);
+      if (!wrapped) return;
+      ipcRenderer.removeListener('dtp:transfer-progress', wrapped);
       listenerWrappers.delete(callback as any);
     },
   },
@@ -3248,12 +3723,19 @@ const q1FoundationAPI = {
   isInitialized: () => ipcRenderer.invoke('q1Foundation:isInitialized'),
 };
 
+// Startup performance diagnostics
+const diagnosticsAPI = {
+  getStartupTimeline: () => ipcRenderer.invoke('startup:timeline'),
+};
+
 contextBridge.exposeInMainWorld('dex', api);
 contextBridge.exposeInMainWorld('q1Foundation', q1FoundationAPI);
+contextBridge.exposeInMainWorld('dexDiagnostics', diagnosticsAPI);
 
-// Legacy backward-compatible bridge — many renderer components reference
+// Legacy backward-compatible bridge -- many renderer components reference
 // window.electron.invoke / window.electron.ipcRenderer.*
 // Wire them to the same validated API so those calls succeed.
+// Item 146: Hardened legacy bridge -- all channels go through allowlist
 const electronLegacyBridge = {
   invoke: (channel: string, ...args: any[]) => {
     if (!isAllowedDynamicInvokeChannel(channel)) {
@@ -3264,15 +3746,31 @@ const electronLegacyBridge = {
   },
   ipcRenderer: {
     send: (channel: string, ...args: any[]) => {
+      if (!isAllowedDynamicInvokeChannel(channel)) {
+        console.warn(`[electron-bridge] Blocked IPC send channel: ${channel}`);
+        return;
+      }
       ipcRenderer.send(channel, ...args);
     },
     sendSync: (channel: string, ...args: any[]) => {
+      if (!isAllowedDynamicInvokeChannel(channel)) {
+        console.warn(`[electron-bridge] Blocked IPC sendSync channel: ${channel}`);
+        return undefined;
+      }
       return ipcRenderer.sendSync(channel, ...args);
     },
     invoke: (channel: string, ...args: any[]) => {
+      if (!isAllowedDynamicInvokeChannel(channel)) {
+        console.warn(`[electron-bridge] Blocked IPC invoke channel: ${channel}`);
+        return Promise.resolve(undefined);
+      }
       return ipcRenderer.invoke(channel, ...args);
     },
     on: (channel: string, callback: (...args: any[]) => void) => {
+      if (!isAllowedDynamicInvokeChannel(channel)) {
+        console.warn(`[electron-bridge] Blocked IPC listener channel: ${channel}`);
+        return;
+      }
       const wrapper = (_event: any, ...callbackArgs: any[]) => callback(...callbackArgs);
       ipcRenderer.on(channel, wrapper);
     },

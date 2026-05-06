@@ -1,8 +1,14 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  * DEX Backend Test Runner
  * Run all backend tests and report results
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===========================================================================
  */
 
 const path = require('path');
@@ -12,15 +18,15 @@ const { spawn } = require('child_process');
 // Get project root
 const projectRoot = path.join(__dirname, '..');
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // Test Runner
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 async function runAllTests() {
   console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('===============================================================');
   console.log('  DEX BACKEND TEST SUITE');
-  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('===============================================================');
   console.log('');
 
   const suiteResults = [];
@@ -29,9 +35,9 @@ async function runAllTests() {
   let totalFailed = 0;
 
   // Test: Directory Structure
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('DIRECTORY STRUCTURE');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   
   const requiredDirs = [
     'src/main',
@@ -52,7 +58,7 @@ async function runAllTests() {
   for (const dir of requiredDirs) {
     const fullPath = path.join(projectRoot, dir);
     const exists = fs.existsSync(fullPath);
-    console.log(`${exists ? '✓' : '✗'} ${dir}`);
+    console.log(`${exists ? '' : ''} ${dir}`);
     if (exists) dirPassed++; else dirFailed++;
   }
   totalPassed += dirPassed;
@@ -61,9 +67,9 @@ async function runAllTests() {
 
   // Test: Required Files
   console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('REQUIRED FILES');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
 
   const requiredFiles = [
     'src/main/main.ts',
@@ -80,7 +86,7 @@ async function runAllTests() {
   for (const file of requiredFiles) {
     const fullPath = path.join(projectRoot, file);
     const exists = fs.existsSync(fullPath);
-    console.log(`${exists ? '✓' : '✗'} ${file}`);
+    console.log(`${exists ? '' : ''} ${file}`);
     if (exists) filePassed++; else fileFailed++;
   }
   totalPassed += filePassed;
@@ -89,9 +95,9 @@ async function runAllTests() {
 
   // Test: Controllers
   console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('CONTROLLERS');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
 
   const controllersPath = path.join(projectRoot, 'src/main/controllers');
   let ctrlCount = 0;
@@ -100,7 +106,7 @@ async function runAllTests() {
     ctrlCount = controllers.length;
     console.log(`  Found ${controllers.length} controllers`);
     for (const ctrl of controllers) {
-      console.log(`✓ ${ctrl}`);
+      console.log(`${ctrl}`);
     }
   }
   totalPassed += ctrlCount;
@@ -108,9 +114,9 @@ async function runAllTests() {
 
   // Test: Engine
   console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('ENGINE SYSTEMS');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
 
   const enginePath = path.join(projectRoot, 'src/main/engine');
   let engineCount = 0;
@@ -119,7 +125,7 @@ async function runAllTests() {
     engineCount = engines.length;
     console.log(`  Found ${engines.length} engine files`);
     for (const eng of engines) {
-      console.log(`✓ ${eng}`);
+      console.log(`${eng}`);
     }
   }
   totalPassed += engineCount;
@@ -127,9 +133,9 @@ async function runAllTests() {
 
   // Test: Core
   console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('CORE SYSTEMS');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
 
   const corePath = path.join(projectRoot, 'src/main/core');
   let coreCount = 0;
@@ -138,7 +144,7 @@ async function runAllTests() {
     coreCount = coreFiles.length;
     console.log(`  Found ${coreFiles.length} core files`);
     for (const core of coreFiles) {
-      console.log(`✓ ${core}`);
+      console.log(`${core}`);
     }
   }
   totalPassed += coreCount;
@@ -146,9 +152,9 @@ async function runAllTests() {
 
   // Test: Python
   console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('PYTHON BRIDGE');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
 
   const pythonAvailable = await new Promise((resolve) => {
     const proc = spawn('python', ['--version']);
@@ -156,15 +162,15 @@ async function runAllTests() {
     proc.on('error', () => resolve(false));
   });
   
-  console.log(`${pythonAvailable ? '✓' : '✗'} Python available`);
+  console.log(`${pythonAvailable ? '' : ''} Python available`);
   if (pythonAvailable) totalPassed++; else totalFailed++;
   suiteResults.push({ suite: 'Python Bridge', passed: pythonAvailable ? 1 : 0, failed: pythonAvailable ? 0 : 1 });
 
   // UI Integration Tests
   console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
   console.log('UI INTEGRATION TESTS');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
 
   const uiTests = {
     'Settings Page': {
@@ -229,7 +235,7 @@ async function runAllTests() {
   for (const [suite, tests] of Object.entries(uiTests)) {
     console.log(`\n  ${suite}:`);
     for (const [test, passed] of Object.entries(tests)) {
-      console.log(`    ${passed ? '✓' : '✗'} ${test}`);
+      console.log(`    ${passed ? '' : ''} ${test}`);
       if (passed) uiPassed++; else uiFailed++;
     }
   }
@@ -243,9 +249,9 @@ async function runAllTests() {
   const totalTests = totalPassed + totalFailed;
 
   console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('===============================================================');
   console.log('  TEST SUMMARY');
-  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('===============================================================');
   console.log('');
   
   for (const suite of suiteResults) {
@@ -259,13 +265,13 @@ async function runAllTests() {
   console.log('');
 
   if (totalFailed === 0) {
-    console.log('  ✓ ALL TESTS PASSED');
+    console.log('  ALL TESTS PASSED');
   } else {
-    console.log(`  ✗ ${totalFailed} TESTS FAILED`);
+    console.log(`  ${totalFailed} TESTS FAILED`);
   }
 
   console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('===============================================================');
   
   process.exit(totalFailed === 0 ? 0 : 1);
 }

@@ -2,23 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Allow the app to be run on macOS -->
+    <!-- App sandbox enabled for macOS security compliance -->
     <key>com.apple.security.app-sandbox</key>
-    <false/>
+    <true/>
     
-    <!-- Required for system monitoring features -->
+    <!-- Required for NAPI native module JIT -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
     
-    <!-- Allow unsigned executables (for Python backend) -->
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <true/>
-    
-    <!-- Allow loading libraries from non-standard paths -->
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
-    
-    <!-- Required for accessibility features -->
+    <!-- Required for accessibility/automation features -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
     
@@ -30,8 +22,8 @@
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
     
-    <!-- Hardened runtime exception for Python -->
-    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <!-- Downloads folder access -->
+    <key>com.apple.security.files.downloads.read-write</key>
     <true/>
 </dict>
 </plist>

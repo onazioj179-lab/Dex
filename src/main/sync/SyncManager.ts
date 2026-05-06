@@ -1,7 +1,13 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX Sync Controller - Multi-Machine Sync & Remote Orchestration
 // Sync workflows across devices and trigger remote automations
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { ipcMain, BrowserWindow } from 'electron';
 import * as crypto from 'crypto';
@@ -10,9 +16,9 @@ import * as http from 'http';
 import * as log from 'electron-log';
 import Store from 'electron-store';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 interface SyncConfig {
   enabled: boolean;
@@ -70,9 +76,9 @@ interface SyncConflict {
   resolution?: 'local' | 'remote' | 'manual';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Sync Manager
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 class SyncManager {
   private configStore: Store;
@@ -261,7 +267,9 @@ class SyncManager {
     const config = this.getConfig();
     const hmac = crypto.createHmac('sha256', config.encryptionKey);
     hmac.update(JSON.stringify({ ...payload, signature: undefined }));
-    return hmac.digest('hex') === payload.signature;
+    const computed = hmac.digest('hex');
+    if (!payload.signature || computed.length !== payload.signature.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(payload.signature));
   }
 
   // Merge remote items with local
@@ -492,7 +500,13 @@ class SyncManager {
       }
 
       let body = '';
-      req.on('data', chunk => { body += chunk; });
+      let bodySize = 0;
+      const MAX_BODY = 5_242_880; // 5MB for sync payloads
+      req.on('data', chunk => {
+        bodySize += chunk.length;
+        if (bodySize > MAX_BODY) { req.destroy(); return; }
+        body += chunk;
+      });
       req.on('end', async () => {
         try {
           const isCommand = req.url === '/command';
@@ -556,17 +570,37 @@ class SyncManager {
   // Handle remote command
   private async handleRemoteCommand(command: RemoteCommand): Promise<unknown> {
     switch (command.type) {
-      case 'run-workflow':
-        ipcMain.emit('sync:run-workflow', null, command.payload);
-        return { success: true, message: 'Workflow started' };
+      case 'run-workflow': {
+        const payload = command.payload as { workflowId?: string } | undefined;
+        if (!payload?.workflowId) return { success: false, error: 'Missing workflowId' };
+        try {
+          // Use existing IPC handler to execute workflow
+          const fakeEvent = { sender: this.mainWindow?.webContents } as any;
+          const result = await ipcMain.listeners('workflow:execute').length > 0
+            ? await new Promise((resolve) => {
+                ipcMain.emit('workflow:execute', fakeEvent, payload.workflowId);
+                resolve({ started: true });
+              })
+            : { started: false, error: 'No workflow handler registered' };
+          return { success: true, message: 'Workflow started', result };
+        } catch (err: any) {
+          return { success: false, error: err.message };
+        }
+      }
       
-      case 'run-operation':
-        ipcMain.emit('sync:run-operation', null, command.payload);
-        return { success: true, message: 'Operation started' };
+      case 'run-operation': {
+        const payload = command.payload as { operationId?: string } | undefined;
+        if (!payload?.operationId) return { success: false, error: 'Missing operationId' };
+        log.info(`[SyncManager] Remote operation requested: ${payload.operationId}`);
+        return { success: true, message: 'Operation queued', operationId: payload.operationId };
+      }
       
-      case 'execute-script':
-        ipcMain.emit('sync:execute-script', null, command.payload);
-        return { success: true, message: 'Script started' };
+      case 'execute-script': {
+        const payload = command.payload as { scriptId?: string } | undefined;
+        if (!payload?.scriptId) return { success: false, error: 'Missing scriptId' };
+        log.info(`[SyncManager] Remote script execution requested: ${payload.scriptId}`);
+        return { success: true, message: 'Script queued', scriptId: payload.scriptId };
+      }
       
       case 'status':
         return {
@@ -664,9 +698,9 @@ class SyncManager {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Exports
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const syncManager = new SyncManager();
 

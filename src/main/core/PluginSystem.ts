@@ -1,8 +1,15 @@
 // =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// =============================================================================
 // DEX - Plugin System: Sandboxed extension runtime
 // Sandboxed plugin architecture with strict resource budgets
 // =============================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -191,13 +198,13 @@ class PluginSandbox {
     const api: PluginAPI = {
       // Logging (prefixed with plugin ID)
       log: (message: string) => {
-        console.log(`[Plugin:${pluginId}] ${message}`);
+        log.info(`[Plugin:${pluginId}] ${message}`);
       },
       warn: (message: string) => {
-        console.warn(`[Plugin:${pluginId}] ${message}`);
+        log.warn(`[Plugin:${pluginId}] ${message}`);
       },
       error: (message: string) => {
-        console.error(`[Plugin:${pluginId}] ${message}`);
+        log.error(`[Plugin:${pluginId}] ${message}`);
       },
       
       // Storage (isolated per plugin)
@@ -462,7 +469,7 @@ export class PluginManager extends EventEmitter {
     try {
       await fs.promises.rm(plugin.installPath, { recursive: true, force: true });
     } catch (err) {
-      console.error('[PluginManager] Failed to remove plugin files:', err);
+      log.error('[PluginManager] Failed to remove plugin files:', err);
     }
     
     this.plugins.delete(pluginId);
@@ -589,7 +596,7 @@ export class PluginManager extends EventEmitter {
             this.plugins.set(manifest.id, plugin);
           }
         } catch (err) {
-          console.error(`[PluginManager] Failed to load plugin from ${pluginPath}:`, err);
+          log.error(`[PluginManager] Failed to load plugin from ${pluginPath}:`, err);
         }
       }
     } catch {
@@ -616,6 +623,90 @@ export class PluginManager extends EventEmitter {
       totalMemoryMB: plugins.reduce((sum, p) => sum + p.resourceUsage.memoryMB, 0),
       totalCpuPercent: plugins.reduce((sum, p) => sum + p.resourceUsage.cpuPercent, 0),
     };
+  }
+
+  // Permission approval gate — checks user-approved permissions before activation
+  private approvedPermissions: Map<string, PluginPermission[]> = new Map();
+
+  async requestPermissions(pluginId: string): Promise<boolean> {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin) return false;
+
+    const requested = plugin.manifest.permissions;
+    if (!requested?.length) return true; // No permissions needed
+
+    // Already approved?
+    const approved = this.approvedPermissions.get(pluginId);
+    if (approved && requested.every(p => approved.includes(p))) return true;
+
+    // Show permission dialog
+    const { dialog } = require('electron');
+    const permLabels = requested.map(p => `  • ${p}`).join('\n');
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['Deny', 'Allow'],
+      defaultId: 0,
+      cancelId: 0,
+      title: `Plugin Permissions — ${plugin.manifest.name}`,
+      message: `"${plugin.manifest.name}" by ${plugin.manifest.author} requests these permissions:\n\n${permLabels}\n\nAllow this plugin?`,
+    });
+
+    if (response === 1) {
+      this.approvedPermissions.set(pluginId, [...requested]);
+      return true;
+    }
+    return false;
+  }
+
+  // Activate with permission check
+  async activatePluginSafe(pluginId: string): Promise<void> {
+    const allowed = await this.requestPermissions(pluginId);
+    if (!allowed) {
+      throw new Error('Plugin permissions denied by user');
+    }
+    return this.activatePlugin(pluginId);
+  }
+
+  // Register IPC handlers for renderer access
+  setupIPC(): void {
+    const { ipcMain } = require('electron');
+
+    ipcMain.handle('plugins:list', () => {
+      return this.getPlugins().map(p => ({
+        id: p.manifest.id,
+        name: p.manifest.name,
+        version: p.manifest.version,
+        author: p.manifest.author,
+        state: p.state,
+        permissions: p.manifest.permissions,
+        errorCount: p.errorCount,
+        lastError: p.lastError,
+      }));
+    });
+
+    ipcMain.handle('plugins:activate', async (_e: Electron.IpcMainInvokeEvent, pluginId: string) => {
+      await this.activatePluginSafe(pluginId);
+      return true;
+    });
+
+    ipcMain.handle('plugins:deactivate', async (_e: Electron.IpcMainInvokeEvent, pluginId: string) => {
+      await this.deactivatePlugin(pluginId);
+      return true;
+    });
+
+    ipcMain.handle('plugins:uninstall', async (_e: Electron.IpcMainInvokeEvent, pluginId: string) => {
+      await this.uninstallPlugin(pluginId);
+      return true;
+    });
+
+    ipcMain.handle('plugins:stats', () => this.getStats());
+
+    ipcMain.handle('plugins:install', async (_e: Electron.IpcMainInvokeEvent, sourcePath: string) => {
+      const plugin = await this.installPlugin(sourcePath);
+      return { id: plugin.manifest.id, name: plugin.manifest.name };
+    });
+
+    log.info('[PluginManager] IPC handlers registered');
   }
 }
 

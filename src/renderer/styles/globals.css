@@ -13,12 +13,194 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
+/* ── Thin Auto-Hide Scrollbars (OS-like) ─────────────────────────────────── */
+/* Thin scrollbar by default, visible on hover for discoverability */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  user-select: none;
+  -webkit-user-select: none;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  transition: background 0.04s;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.18);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.28);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* ── Touch-Friendly Global Styles ──────────────────────────────────────────── */
+
+/* ── Perceived Smoothness Layer ────────────────────────────────────────────── */
+/* These rules make 30fps feel like 60 and 60 feel like 120 by using          */
+/* GPU-composited properties, optimized rendering hints, and longer           */
+/* easing curves that mask dropped frames.                                    */
+
+/* Force GPU compositing for all animated/interactive elements */
+[data-dock-item],
+[data-app-container],
+.dex-app-container {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Longer easings mask frame drops -- the animation continues to look smooth */
+/* even when frames are skipped because the mid-curve motion is gentler      */
+button,
+[role="button"],
+[data-dock-item] button {
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* Contain paint on all app containers to limit repaints */
+.dex-app-container {
+  contain: layout style paint;
+}
+
+/* Disable backdrop-filter on low-tier machines globally */
+html[data-perf-tier="low"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+}
+
+/* Mid-tier: reduce blur radius globally for all elements */
+html[data-perf-tier="mid"] * {
+  --dex-blur: 8px;
+}
+html[data-perf-tier="mid"] [style*="backdrop-filter"] {
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* Reduce infinite animations on low-tier to prevent battery/CPU drain */
+html[data-perf-tier="low"] .pulse,
+html[data-perf-tier="low"] .skeleton,
+html[data-perf-tier="low"] .animate-pulse,
+html[data-perf-tier="low"] .animate-spin,
+html[data-perf-tier="low"] .animate-float,
+html[data-perf-tier="low"] .badge-live,
+html[data-perf-tier="low"] .badge-unread,
+html[data-perf-tier="low"] .loading-dots > span,
+html[data-perf-tier="low"] .browser-loading,
+html[data-perf-tier="low"] .notification-dot,
+html[data-perf-tier="low"] .dex-skeleton {
+  animation: none !important;
+}
+
+/* ── Focus-Visible Ring (Tahoe a11y) ──────────────────────────────────────── */
+/* CRITICAL: Use !important to override inline `outline: none` styles scattered
+   across the codebase. This ensures keyboard users always see focus indicators
+   while mouse users get the clean look developers intended. */
+:focus-visible {
+  outline: 2px solid rgba(74, 158, 255, 0.55) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+/* Specific focus styles for interactive elements */
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent, rgba(74, 158, 255, 0.55)) !important;
+  outline-offset: 2px !important;
+}
+
+/* Custom focus ring for checkbox/radio to match design */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline-offset: 3px !important;
+}
+
+/* ── Skip Navigation Link ─────────────────────────────────────────────────── */
+.dex-skip-nav {
+  position: fixed;
+  top: -100%;
+  left: 16px;
+  z-index: var(--z-emergency);
+  padding: 8px 18px;
+  background: var(--color-accent);
+  color: #000;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  letter-spacing: 0.01em;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.dex-skip-nav:focus {
+  top: 8px;
+}
+
+/* ── High-contrast mode overrides ────────────────────────────────────────── */
+@media (forced-colors: active) {
+  * { border-color: CanvasText !important; }
+  button, [role="button"] { border: 1px solid ButtonText !important; }
+}
+
+/* ── ARIA live region for screen readers ─────────────────────────────────── */
+/* .dex-sr-only and .sr-only are unified in the utility section below */
+
 @media (pointer: coarse) {
   button, [role="button"], a, select { min-height: 44px; min-width: 44px; }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { border-radius: 8px; }
   button, a, input, select, textarea { touch-action: manipulation; }
+
+  /* Larger drag handles and resize grips for touch */
+  [data-resize-handle],
+  [data-drag-handle] {
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  /* Scrollable containers get momentum scrolling */
+  [data-app-container] [style*="overflow"] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Slider/range inputs need bigger touch targets */
+  input[type="range"] {
+    min-height: 36px;
+    cursor: pointer;
+  }
+
+  /* Context menu items need bigger touch targets */
+  [role="menuitem"],
+  [role="option"] {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* Pen/stylus input -- finer precision mode */
+@media (pointer: fine) and (any-pointer: fine) {
+  /* Creative app canvases allow all touch actions for pen precision */
+  [data-app-container] canvas {
+    touch-action: none;
+  }
 }
 
 button, [role="button"] {
@@ -28,6 +210,11 @@ button, [role="button"] {
   -webkit-user-select: none;
 }
 
+input, textarea, [contenteditable="true"], [contenteditable], webview, .selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 button:active, [role="button"]:active {
   opacity: 0.7;
   transition: opacity 0.05s ease;
@@ -35,18 +222,25 @@ button:active, [role="button"]:active {
 
 /* ── Performance Optimizations ─────────────────────────────────────────────── */
 
-/* GPU-accelerated scrolling containers */
-[style*="overflow: auto"],
-[style*="overflow: hidden"],
-[style*="overflow-y: auto"],
-[style*="overflow-x: auto"] {
-  will-change: scroll-position;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Content containment for app panels — prevents cross-panel relayout */
+/* Content containment for app panels -- prevents cross-panel relayout */
 [data-app-container] {
   contain: layout style;
+}
+
+/* Inactive app containers: skip rendering entirely to save CPU/GPU */
+[data-app-container][data-app-state="background"],
+[data-app-container][data-app-state="suspended"] {
+  content-visibility: hidden;
+  contain: strict;
+}
+
+/* Image decode optimization -- offload to compositor thread */
+img {
+  content-visibility: auto;
+  image-rendering: auto;
+}
+[data-perf-tier="low"] img {
+  image-rendering: optimizeSpeed;
 }
 
 /* Reduce motion for users who prefer it */
@@ -81,7 +275,7 @@ button:active, [role="button"]:active {
   background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
   background-size: 200% 100%;
   animation: dex-shimmer 1.5s ease-in-out infinite;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -130,7 +324,7 @@ button:active, [role="button"]:active {
 }
 
 /* Paint containment — scoped to non-layout-breaking selectors */
-.app-card, .dock-item, .game-card {
+.app-card, .dock-item {
   contain: layout style paint;
 }
 
@@ -139,7 +333,6 @@ button:active, [role="button"]:active {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -150,75 +343,279 @@ button:active, [role="button"]:active {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MICRO-TRANSITIONS - Instant performance-optimized animations
+   AUTO-ADAPT: Low HDD / Low CPU / Low GPU / Low RAM systems
+   Detected via data-perf-tier on <html> — low / mid / high / ultra
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Global smooth transitions for interactive elements - MINIMAL for performance */
+/* LOW (budget hardware, weak GPU) — maximum savings */
+[data-perf-tier="low"] *, [data-perf-tier="low"] *::before, [data-perf-tier="low"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+[data-perf-tier="low"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  border-radius: 4px !important;
+  will-change: auto !important;
+  contain: layout style !important;
+}
+[data-perf-tier="low"] [style*="backdrop"],
+[data-perf-tier="low"] [style*="blur"] {
+  background: rgba(20,20,22,0.99) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+[data-perf-tier="low"] img, [data-perf-tier="low"] video {
+  image-rendering: optimizeSpeed;
+  will-change: auto !important;
+}
+[data-perf-tier="low"] canvas { image-rendering: pixelated; }
+[data-perf-tier="low"] .decorative, [data-perf-tier="low"] .particle-bg,
+[data-perf-tier="low"] .ambient-glow, [data-perf-tier="low"] [class*="gradient-bg"] {
+  display: none !important;
+}
+[data-perf-tier="low"] ::-webkit-scrollbar { width: 4px; background: transparent; }
+[data-perf-tier="low"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+/* Low: limit font rendering overhead */
+[data-perf-tier="low"] { -webkit-font-smoothing: auto !important; font-smooth: auto !important; }
+/* Low: flat borders instead of shadows */
+[data-perf-tier="low"] .card, [data-perf-tier="low"] .panel {
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MID TIER: Balance performance and beauty (4-core, 4-8GB, integrated GPU)
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-perf-tier="mid"] * {
+  transition-duration: 80ms !important;
+}
+[data-perf-tier="mid"] *::before, [data-perf-tier="mid"] *::after {
+  animation-duration: 100ms !important;
+}
+/* Mid: cap all backdrop-filter blur at 8px for performance */
+[data-perf-tier="mid"] [style*="backdrop-filter"] {
+  backdrop-filter: blur(8px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+}
+/* Mid: reduce heavy shadows */
+[data-perf-tier="mid"] [style*="box-shadow"] {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+}
+/* Mid: lower-res canvas rendering for integrated GPUs */
+[data-perf-tier="mid"] canvas {
+  image-rendering: auto;
+}
+/* Mid: reduce gradient complexity */
+[data-perf-tier="mid"] [style*="linear-gradient"],
+[data-perf-tier="mid"] [style*="radial-gradient"] {
+  filter: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MEMORY PRESSURE: When JS detects high memory, apply via data attribute
+   ═══════════════════════════════════════════════════════════════════════════ */
+html[data-memory-pressure="high"] img:not([data-keep]) {
+  image-rendering: optimizeSpeed;
+  content-visibility: auto;
+}
+html[data-memory-pressure="high"] video:not([data-playing]) {
+  display: none !important;
+}
+html[data-memory-pressure="high"] canvas:not([data-active]) {
+  content-visibility: hidden;
+}
+html[data-memory-pressure="high"] .decorative,
+html[data-memory-pressure="high"] .particle-bg,
+html[data-memory-pressure="high"] .ambient-glow {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OFFSCREEN APP CLEANUP: Invisible apps get zero GPU/CPU cost
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-app-container][data-app-state="background"] canvas,
+[data-app-container][data-app-state="suspended"] canvas {
+  content-visibility: hidden;
+}
+[data-app-container][data-app-state="background"] video,
+[data-app-container][data-app-state="suspended"] video {
+  content-visibility: hidden;
+}
+[data-app-container][data-app-state="background"] iframe,
+[data-app-container][data-app-state="suspended"] iframe {
+  content-visibility: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WINDOW BLUR: Power saving when DEX is not the focused application
+   ═══════════════════════════════════════════════════════════════════════════ */
+html[data-window-focus="blurred"] * {
+  animation-play-state: paused !important;
+}
+html[data-window-focus="blurred"] video:not([data-playing]),
+html[data-window-focus="blurred"] canvas:not([data-active]) {
+  content-visibility: hidden;
+}
+html[data-window-focus="blurred"] .decorative,
+html[data-window-focus="blurred"] .particle-bg,
+html[data-window-focus="blurred"] .ambient-glow {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VIRTUAL LIST PERFORMANCE
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dex-virtual-viewport {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  contain: strict;
+}
+.dex-virtual-viewport > .dex-virtual-spacer {
+  contain: strict;
+  pointer-events: none;
+}
+.dex-virtual-viewport > .dex-virtual-window {
+  contain: layout style;
+}
+.dex-virtual-viewport > .dex-virtual-window > * {
+  contain: layout style paint;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAZY IMAGE: Fade-in on load
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dex-lazy-img {
+  opacity: 0;
+  transition: opacity 0.04s ease;
+}
+.dex-lazy-img[data-loaded="true"] {
+  opacity: 1;
+}
+[data-perf-tier="low"] .dex-lazy-img {
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH TRANSITIONS - Fluid, responsive animations
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Global smooth transitions for interactive elements */
 button, a, input, select, textarea,
 [role="button"], [tabindex] {
   transition: 
-    background-color 30ms var(--ease-out),
-    border-color 30ms var(--ease-out),
-    color 30ms var(--ease-out),
-    opacity 40ms var(--ease-out);
-  /* Removed transform and box-shadow transitions for instant feel */
+    background-color 0.12s cubic-bezier(0.2, 0, 0.2, 1),
+    border-color 0.12s cubic-bezier(0.2, 0, 0.2, 1),
+    color 0.1s cubic-bezier(0.2, 0, 0.2, 1),
+    opacity 0.1s cubic-bezier(0.2, 0, 0.2, 1),
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.12s cubic-bezier(0.2, 0, 0.2, 1);
+}
+/* Dock buttons: smooth hover & scale */
+[data-dock-item] button {
+  transition: color 0.1s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.12s ease;
 }
 
-/* Hover lift effect - minimal */
+/* Hover lift effect -- smooth spring */
 .hover-lift {
-  transition: transform 50ms var(--ease-out);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0.2, 1);
 }
 .hover-lift:hover {
-  transform: translateY(-1px);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
 
-/* Press effect - instant tactile feedback */
+/* Press effect -- smooth tactile feedback */
 .press-effect:active {
+  transform: scale(0.96);
+  transition-duration: 100ms;
+}
+
+/* Smooth hover scale for cards and interactive containers */
+.hover-scale {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+.hover-scale:active {
   transform: scale(0.98);
-  transition-duration: 20ms;
 }
 
 /* Fade transitions */
 .fade-in {
-  animation: fadeIn 150ms var(--ease-out) forwards;
+  animation: fadeIn 0.2s cubic-bezier(0.2, 0, 0.2, 1) forwards;
 }
 .fade-out {
-  animation: fadeOut 100ms var(--ease-out) forwards;
+  animation: fadeOut 0.15s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(8px); }
+  60% { opacity: 1; transform: translateY(-2px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeOut {
   from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(4px); }
+  to { opacity: 0; transform: translateY(8px); }
 }
 
 /* Scale transitions for modals/popups */
 .scale-in {
-  animation: scaleIn 120ms var(--ease-out) forwards;
+  animation: scaleIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.92); }
+  60% { opacity: 1; transform: scale(1.02); }
   to { opacity: 1; transform: scale(1); }
 }
 
 /* Slide transitions */
 .slide-up {
-  animation: slideUp 150ms var(--ease-out) forwards;
+  animation: slideUp 0.25s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+.slide-down {
+  animation: slideDown 0.25s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+.slide-left {
+  animation: slideLeft 0.25s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+.slide-right {
+  animation: slideRight 0.25s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(16px); }
+  60% { transform: translateY(-3px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  60% { transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideLeft {
+  from { opacity: 0; transform: translateX(16px); }
+  60% { transform: translateX(-3px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-16px); }
+  60% { transform: translateX(3px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 /* Smooth color transitions for panels */
 .smooth-bg {
-  transition: background-color 80ms var(--ease-out);
+  transition: background-color 0.04s cubic-bezier(0, 0, 0.2, 1);
 }
 
 /* Pulse animation for loading states */
@@ -244,6 +641,494 @@ button, a, input, select, textarea,
 }
 
 /* Selection, :focus-visible, and .app-shell are handled by design-system.css */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERCEIVED SMOOTHNESS ENGINE — Makes 30fps feel like 60fps
+   Lower-end machines benefit most: longer easings mask frame drops,
+   GPU-composited properties avoid main-thread layout, and
+   content-visibility skips painting for offscreen content.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* -- App open/close: scale + fade for a native-OS feel -------------------- */
+@keyframes dex-app-open {
+  0%   { opacity: 0; transform: scale(0.94) translateY(8px); }
+  60%  { opacity: 1; transform: scale(1.01) translateY(-1px); }
+  100% { opacity: 1; transform: scale(1)    translateY(0); }
+}
+@keyframes dex-app-close {
+  0%   { opacity: 1; transform: scale(1)    translateY(0); }
+  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
+}
+.dex-app-opening {
+  animation: dex-app-open 0.32s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  will-change: transform, opacity;
+}
+.dex-app-closing {
+  animation: dex-app-close 0.18s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+/* -- Paused apps: suspended state to prevent black screen ----------------- */
+.dex-app-paused {
+  visibility: hidden !important;
+  animation-play-state: paused !important;
+  pointer-events: none !important;
+  content-visibility: hidden !important;
+}
+.dex-app-paused *,
+.dex-app-paused *::before,
+.dex-app-paused *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+/* Stop requestAnimationFrame, video, audio when paused via data attribute */
+[data-app-state="paused"] video,
+[data-app-state="paused"] audio {
+  /* Will be paused via JS, but ensure no playback */
+}
+[data-app-state="paused"] canvas {
+  /* Canvas rendering should be paused by the app */
+}
+
+/* -- Menu/panel slide: smooth spring pop from source ---------------------- */
+@keyframes dex-menu-pop {
+  0%   { opacity: 0; transform: scale(0.92) translateY(8px); }
+  60%  { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1)    translateY(0); }
+}
+.dex-menu-entering {
+  animation: dex-menu-pop 0.28s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* -- Notification slide-in from top right --------------------------------- */
+@keyframes dex-notify-in {
+  0%   { opacity: 0; transform: translateX(48px) scale(0.95); }
+  60%  { opacity: 1; transform: translateX(-4px) scale(1.01); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes dex-notify-out {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(48px) scale(0.95); }
+}
+.dex-notify-enter { animation: dex-notify-in 0.32s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+.dex-notify-exit  { animation: dex-notify-out 0.15s cubic-bezier(0.4, 0, 1, 1) forwards; }
+
+/* -- Smooth page/tab transitions ------------------------------------------ */
+@keyframes dex-page-in {
+  0%   { opacity: 0; transform: translateX(20px); }
+  50%  { opacity: 1; transform: translateX(-4px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes dex-page-out {
+  0%   { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-20px); }
+}
+.dex-page-entering {
+  animation: dex-page-in 0.28s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+.dex-page-exiting {
+  animation: dex-page-out 0.18s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  pointer-events: none;
+}
+
+/* -- Tab switch crossfade -------------------------------------------------- */
+@keyframes dex-tab-in {
+  0%   { opacity: 0; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.dex-tab-entering {
+  animation: dex-tab-in 0.2s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+
+/* -- Dock tooltip smooth -------------------------------------------------- */
+.dex-tooltip-anim {
+  animation: dex-menu-pop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* -- Scroll smoothness for app containers --------------------------------- */
+.dex-app-container,
+.dex-scroll-smooth {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* -- GPU hint: promote fixed/sticky elements to compositor layers --------- */
+.dex-dock-container,
+[data-dock-container],
+.top-bar,
+.dex-status-bar {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* -- Smooth opacity for iconography (prevents pop-in flicker) ------------- */
+.dex-app-icon,
+.dex-dock-icon {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+/* -- Panel glass transitions: smooth background shift --------------------- */
+.dex-glass-panel {
+  transition:
+    background-color 0.1s cubic-bezier(0, 0, 0.2, 1),
+    backdrop-filter 0.1s cubic-bezier(0, 0, 0.2, 1),
+    box-shadow 0.1s cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* -- Sidebar expand/collapse ---------------------------------------------- */
+@keyframes dex-sidebar-expand {
+  0%   { width: 0; opacity: 0; }
+  60%  { opacity: 1; }
+  100% { width: var(--sidebar-width, 260px); opacity: 1; }
+}
+@keyframes dex-sidebar-collapse {
+  0%   { width: var(--sidebar-width, 260px); opacity: 1; }
+  100% { width: 0; opacity: 0; }
+}
+.dex-sidebar-expanding {
+  animation: dex-sidebar-expand 0.25s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  overflow: hidden;
+}
+.dex-sidebar-collapsing {
+  animation: dex-sidebar-collapse 0.2s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  overflow: hidden;
+}
+
+/* -- Window snap animation (smooth tiling) -------------------------------- */
+@keyframes dex-snap-in {
+  0%   { opacity: 0.9; transform: scale(0.96); }
+  50%  { transform: scale(1.008); }
+  100% { opacity: 1; transform: scale(1); }
+}
+[data-floating-window] {
+  -webkit-app-region: no-drag !important;
+  transition:
+    left 0.32s cubic-bezier(0.23, 1, 0.32, 1),
+    top 0.32s cubic-bezier(0.23, 1, 0.32, 1),
+    width 0.32s cubic-bezier(0.23, 1, 0.32, 1),
+    height 0.32s cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 0.25s ease,
+    opacity 0.2s ease;
+}
+/* Disable transitions during active drag/resize */
+[data-floating-window][data-dragging="true"],
+[data-floating-window][data-resizing="true"] {
+  transition: box-shadow 0.15s ease !important;
+}
+[data-floating-window].dex-snapping {
+  animation: dex-snap-in 0.28s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* -- Snap zone preview pulse ---------------------------------------------- */
+@keyframes dex-snap-zone-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+/* -- UKI mic button pulse ------------------------------------------------- */
+@keyframes ukiPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}
+
+@keyframes activityDone {
+  0% { opacity: 1; transform: scale(1); }
+  60% { opacity: 0.8; transform: scale(1.02); }
+  100% { opacity: 0.6; transform: scale(0.97); }
+}
+
+/* -- Vinx dropdown item a11y -- keyboard/focus support -------------------- */
+.vinx-dropdown-item {
+  outline: none;
+}
+.vinx-dropdown-item:focus-visible {
+  background: rgba(74, 158, 255, 0.12);
+  outline: 2px solid var(--color-accent, #4a9eff);
+  outline-offset: -2px;
+}
+
+/* -- Touch/multi-touch gesture support ------------------------------------ */
+.dex-gesture-area {
+  touch-action: pan-x pan-y pinch-zoom;
+  -ms-touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* -- Shared interactive hover states for glass UI elements ---------------- */
+.dex-hover-lift {
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), background 0.12s ease, box-shadow 0.15s ease;
+}
+.dex-hover-lift:hover { 
+  transform: scale(1.02) translateY(-2px); 
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.dex-hover-lift:active { transform: scale(0.98); }
+
+.dex-hover-bg {
+  transition: background 0.12s ease;
+}
+.dex-hover-bg:hover {
+  background: rgba(255,255,255,0.06) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH LIST ANIMATIONS - Staggered entry for list items
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes dex-list-item-in {
+  0%   { opacity: 0; transform: translateY(8px); }
+  60%  { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.dex-list-item {
+  animation: dex-list-item-in 0.25s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+.dex-list-item:nth-child(1)  { animation-delay: 0.02s; }
+.dex-list-item:nth-child(2)  { animation-delay: 0.04s; }
+.dex-list-item:nth-child(3)  { animation-delay: 0.06s; }
+.dex-list-item:nth-child(4)  { animation-delay: 0.08s; }
+.dex-list-item:nth-child(5)  { animation-delay: 0.10s; }
+.dex-list-item:nth-child(6)  { animation-delay: 0.12s; }
+.dex-list-item:nth-child(7)  { animation-delay: 0.14s; }
+.dex-list-item:nth-child(8)  { animation-delay: 0.16s; }
+.dex-list-item:nth-child(n+9) { animation-delay: 0.18s; }
+
+/* Smooth hover for list rows */
+.dex-list-row {
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.dex-list-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+.dex-list-row:active {
+  transform: scale(0.995);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH SCROLL CONTAINER - Native smooth scrolling with momentum
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dex-smooth-scroll {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DROPDOWN / MENU SMOOTH ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes dex-dropdown-in {
+  0%   { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  60%  { opacity: 1; transform: scale(1.01) translateY(1px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes dex-dropdown-out {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.96) translateY(-4px); }
+}
+.dex-dropdown-entering {
+  animation: dex-dropdown-in 0.2s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+.dex-dropdown-exiting {
+  animation: dex-dropdown-out 0.12s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+/* Menu item hover -- smooth slide indicator */
+.dex-menu-item {
+  position: relative;
+  transition: background 0.12s ease, color 0.1s ease;
+}
+.dex-menu-item::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  background: var(--color-accent);
+  border-radius: 2px;
+  transform: translateY(-50%);
+  transition: height 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dex-menu-item:hover::before,
+.dex-menu-item:focus-visible::before {
+  height: 60%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH CARD INTERACTIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dex-card {
+  transition: 
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease,
+    border-color 0.15s ease;
+}
+.dex-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  border-color: rgba(255,255,255,0.12);
+}
+.dex-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH TOGGLE / SWITCH
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dex-toggle-track {
+  transition: background 0.2s ease;
+}
+.dex-toggle-thumb {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+}
+.dex-toggle-thumb:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUTTON RIPPLE EFFECT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dex-btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.dex-btn-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.2), transparent 60%);
+  opacity: 0;
+  transform: scale(0);
+  transition: transform 0.4s ease, opacity 0.3s ease;
+  pointer-events: none;
+}
+.dex-btn-ripple:active::after {
+  opacity: 1;
+  transform: scale(2);
+  transition: transform 0.1s ease, opacity 0s;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dex-progress-bar {
+  transition: width 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.dex-progress-bar-indeterminate {
+  animation: dex-progress-indeterminate 1.5s ease-in-out infinite;
+}
+@keyframes dex-progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMOOTH ACCORDION / COLLAPSE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dex-accordion-content {
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s ease;
+}
+.dex-accordion-content[data-state="closed"] {
+  max-height: 0;
+  opacity: 0;
+}
+.dex-accordion-content[data-state="open"] {
+  opacity: 1;
+}
+.dex-accordion-trigger {
+  transition: background 0.12s ease;
+}
+.dex-accordion-trigger:hover {
+  background: rgba(255,255,255,0.04);
+}
+.dex-accordion-icon {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dex-accordion-trigger[data-state="open"] .dex-accordion-icon {
+  transform: rotate(180deg);
+}
+
+.dex-hover-card {
+  transition: transform 0.04s cubic-bezier(0.23,1,0.32,1), background 0.03s ease, box-shadow 0.03s ease;
+}
+.dex-hover-card:hover {
+  background: rgba(255,255,255,0.04) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Floating window will-change promoted into CSS (remove inline willChange) */
+[data-floating-window] {
+  will-change: left, top, width, height;
+}
+
+/* ── Creative suite optimizations ─────────────────────────────────────────── */
+/* Promote canvas/timeline elements to GPU layers for 60fps rendering */
+.dex-timeline-track,
+.dex-piano-roll,
+.dex-canvas-layer,
+.dex-waveform,
+.dex-keyframe-editor {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+  contain: layout style paint;
+}
+
+/* Smooth scrubbing for timelines */
+.dex-timeline-scrub {
+  scroll-behavior: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+
+/* -- Low-end specific: fast but not instant (still feels alive) ----------- */
+[data-perf-tier="low"] .dex-app-opening { animation-duration: 0.12s; }
+[data-perf-tier="low"] .dex-app-closing { animation-duration: 0.08s; }
+[data-perf-tier="low"] .dex-menu-entering { animation-duration: 0.12s; }
+[data-perf-tier="low"] .dex-notify-enter { animation-duration: 0.14s; }
+
+/* Low tier already has animation: none !important via the main low-tier block */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT THRASH PREVENTION — Contain repaints to minimal areas
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Dock magnification: isolate reflow from rest of page */
+[data-dock-container] {
+  contain: layout style;
+  isolation: isolate;
+}
+
+/* App windows: each is a compositing layer, repaints don't cross */
+[data-app-container] {
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+/* Sidebar navigations: prevent typing input from reflowing lists */
+.dex-sidebar-nav {
+  contain: layout style;
+}
+
+/* Content areas with scroll: isolate scroll-induced repaints */
+.dex-content-scroll {
+  contain: layout style paint;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 
 .app-main {
   flex: 1;
@@ -351,8 +1236,6 @@ button, a, input, select, textarea,
   gap: 4px;
   padding: 8px 12px;
   background: var(--color-bg-overlay, rgba(18, 18, 20, 0.98));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-float, 0 8px 32px rgba(0, 0, 0, 0.6));
 }
@@ -1219,34 +2102,99 @@ button, a, input, select, textarea,
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Scrollbar (Release-Polished)
+   CRITICAL: Prevent ALL interactive elements from triggering window drag
+   This stops the app from being dragged when clicking on buttons, dock items, etc.
+   ───────────────────────────────────────────────────────────────────────────── */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[role="menuitem"],
+[role="option"],
+[role="link"],
+[role="checkbox"],
+[role="radio"],
+[role="tab"],
+[role="listitem"],
+[tabindex],
+.dock-item,
+.dock-button,
+.launchpad-app,
+.app-card,
+.floating-window,
+[data-dock-item],
+[data-app-container],
+[data-clickable],
+.window-controls,
+.close-button,
+.minimize-button,
+.maximize-button,
+.menu-item,
+.dropdown-item,
+.sidebar-item,
+.context-menu,
+.spotlight-item,
+.spotlight-result,
+[data-focusable] {
+  -webkit-app-region: no-drag !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DROPDOWN/MENU GLOBAL FIXES - High z-index, clean overlap, no blur
+   ───────────────────────────────────────────────────────────────────────────── */
+[role="menu"],
+[role="listbox"],
+.dropdown,
+.context-menu,
+.popover-content,
+[data-radix-popper-content-wrapper],
+[data-dropdown-menu],
+[data-context-menu] {
+  z-index: var(--z-menu, 9500) !important;
+  background: var(--color-bg-elevated, #1c1c1e) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  isolation: isolate;
+}
+
+/* When a floating window contains an open menu/dropdown, raise it above dock */
+.floating-window:has([role="menu"]),
+.floating-window:has([role="listbox"]),
+.floating-window:has(.dropdown),
+.floating-window:has(.context-menu),
+.floating-window:has([data-state="open"]),
+[data-floating-window]:has([role="menu"]),
+[data-floating-window]:has([role="listbox"]),
+[data-floating-window]:has(.dropdown),
+[data-floating-window]:has([data-state="open"]) {
+  z-index: 5500 !important;
+  /* Disable clip-path when menu is open so it can escape window bounds */
+  clip-path: none !important;
+}
+
+/* App menus inside floating windows - ensure visibility above window chrome */
+[data-floating-window] [role="menu"],
+[data-floating-window] .frosted-dropdown,
+[data-floating-window] .dropdown {
+  z-index: 10000 !important;
+  position: absolute;
+}
+
+/* Force menus above dock */
+.dex-dock ~ [role="menu"],
+.dex-dock ~ .dropdown,
+.dex-dock ~ .context-menu {
+  z-index: 9600 !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Scrollbar (Hidden globally - no visible scrollbars)
    ───────────────────────────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: var(--radius-full);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
+/* All scrollbars hidden via global policy in top of file.
+   Content remains scrollable via mousewheel/trackpad/touch. */
 
 /* Thin scrollbar variant */
 .scrollbar-thin::-webkit-scrollbar {
@@ -1356,14 +2304,14 @@ button, a, input, select, textarea,
 }
 
 .voice-orb.listening {
-  transform: scale(1.1);
+  transform: scale(1.02);
   box-shadow: 0 4px 32px rgba(16, 185, 129, 0.5);
-  animation: pulse 1.5s infinite;
+  animation: voiceOrbPulse 2s infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1.1); }
-  50% { transform: scale(1.15); }
+@keyframes voiceOrbPulse {
+  0%, 100% { transform: scale(1.02); }
+  50% { transform: scale(1.05); }
 }
 
 .voice-hero p {
@@ -2004,6 +2952,94 @@ button, a, input, select, textarea,
   transition: all var(--duration-fast) var(--ease-out);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Shell Interaction Keyframes
+   (used by src/renderer/shell/ components)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes checkDraw {
+  from { stroke-dashoffset: 12; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes inputShake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(6px); }
+  40%  { transform: translateX(-6px); }
+  60%  { transform: translateX(4px); }
+  80%  { transform: translateX(-4px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes shimmerSlide {
+  from { left: -40px; }
+  to   { left: 100%; }
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.75; }
+}
+
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toolbarIn {
+  from { opacity: 0; transform: translateX(-50%) scale(0.95); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+@keyframes wallpaperFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes wallpaperFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes overviewCardIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bannerSlideIn {
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes contextMenuIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes quickLookIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes copyConfirm {
+  0%   { opacity: 0; transform: scale(0.6); }
+  50%  { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+
+/* Dock bounce — minimal tap feedback */
+@keyframes dockBounce {
+  0%, 100% { transform: translateY(0); }
+}
+
+/* App enter — macOS Tahoe zoom spring */
+@keyframes appEnter {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Reduce Motion handled by design-system.css — see also :L195 */
+
 .browser-btn:hover {
   background: var(--bg-inset);
   color: var(--text-primary);
@@ -2042,9 +3078,7 @@ button, a, input, select, textarea,
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin defined in utility section above */
 
 .browser-actions {
   display: flex;
@@ -2113,7 +3147,7 @@ button, a, input, select, textarea,
    Utility Classes (Release-Ready)
    ───────────────────────────────────────────────────────────────────────────── */
 
-/* Visually hidden but accessible */
+/* Visually hidden but accessible — alias for .dex-sr-only */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -2125,6 +3159,7 @@ button, a, input, select, textarea,
   white-space: nowrap;
   border: 0;
 }
+.dex-sr-only { /* alias */ }
 
 /* Truncate text */
 .truncate {
@@ -2172,14 +3207,7 @@ button, a, input, select, textarea,
    Loading States (Release-Ready)
    ───────────────────────────────────────────────────────────────────────────── */
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+/* @keyframes spin, pulse defined above — deduplicated */
 
 @keyframes fade-in {
   from { opacity: 0; }
@@ -2283,6 +3311,74 @@ button, a, input, select, textarea,
   }
 }
 
+/* ── Small-screen & Modal Sizing ──────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  /* Constrain modals/dialogs to viewport */
+  [role="dialog"],
+  .modal,
+  .dialog,
+  .panel-overlay {
+    max-width: min(90vw, 500px) !important;
+    max-height: 90vh !important;
+    overflow-y: auto;
+  }
+
+  /* Stack toolbar buttons vertically when space is tight */
+  .toolbar-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Collapse side panels */
+  .side-panel,
+  .sidebar {
+    width: min(70vw, 280px) !important;
+  }
+
+  /* Tighter padding on app containers */
+  .app-container,
+  .page-container {
+    padding: 8px !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .top-bar-right .traffic-lights {
+    gap: 4px;
+  }
+
+  .nav-items {
+    padding: 2px 4px;
+  }
+
+  /* Hide non-essential status-bar items */
+  .status-bar-item:not(.status-bar-essential) {
+    display: none;
+  }
+}
+
+/* ── Fractional DPI & High-Density Screens ────────────────────────────────── */
+
+@media (-webkit-min-device-pixel-ratio: 1.25),
+       (min-resolution: 120dpi) {
+  /* Prevent sub-pixel blurring on fractional scale factors */
+  .top-bar,
+  .nav-items,
+  .dock,
+  .status-bar {
+    transform: translateZ(0);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Crisp 1px borders on HiDPI */
+  .divider,
+  .separator,
+  .border-line {
+    border-width: 0.5px;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    DEX v2.0 — Bold & Slick Global Polish
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2356,13 +3452,2362 @@ button:active:not(:disabled),
   box-shadow: 0 2px 6px rgba(10, 132, 255, 0.2);
 }
 
-/* Scrollbar: cleaner on dark bg */
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+/* Scrollbar: thin auto-show - see top of file */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OS-LIKE POLISH — Native feel enhancements
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Crisp text rendering across all platforms */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  background-color: var(--color-bg-base, #0C0C0E) !important;
+  color: var(--color-text-primary, #F2F2F2);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow: hidden;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-  background-clip: padding-box;
+
+/* Native-like text selection -- subtle tint, not a heavy highlight */
+::selection {
+  background: rgba(74, 158, 255, 0.18);
+  color: inherit;
+}
+
+/* Prevent drag on images and links (OS feel) */
+img, a, button, svg {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Allow text selection in content areas */
+p, span, h1, h2, h3, h4, h5, h6, li, td, th, pre, code, textarea, input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Smooth resize transitions for panels */
+[data-app-container] {
+  transition: width 0.15s ease, height 0.15s ease;
+}
+
+/* ── Global Select / Dropdown Styling ────────────────────────────────────── */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-bg-tertiary, #1e1e22);
+  color: var(--color-text-primary, #f5f5f7);
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  padding: 5px 28px 5px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2386868b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px 6px;
+}
+select:hover {
+  border-color: rgba(255,255,255,0.16);
+  background-color: var(--color-bg-hover, #1e1e22);
+}
+select:focus {
+  border-color: var(--color-accent, #4a9eff);
+  box-shadow: 0 0 0 2px rgba(74,158,255,0.15);
+}
+select option {
+  background: var(--color-bg-surface, #161618);
+  color: var(--color-text-primary, #f5f5f7);
+  padding: 6px 10px;
+}
+
+/* Subtle focus ring that feels native */
+:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.6);
+  outline-offset: 1px;
+  border-radius: inherit;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Loading cursor for async operations */
+[data-loading="true"] {
+  cursor: progress !important;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Disabled state -- OS native feel */
+[disabled], :disabled, [aria-disabled="true"] {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ITEMS 157-180: ENHANCED WIDGET & PAGE POLISH
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Item 157: Enhanced card hover feedback */
+.card:hover,
+.dex-card:hover,
+[data-card]:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Item 158: Smooth section transitions */
+.section-header,
+.dex-section-label {
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+/* Item 159: Improved input field focus animation */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Item 160: Better toggle switch animation */
+.dex-toggle,
+.toggle-switch {
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLASS TYPOGRAPHY HIERARCHY — Tahoe-precision type scale
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Display — hero/splash titles */
+.dex-type-display {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  color: var(--color-text-primary, #e5e5ea);
+}
+
+/* Title — section headers */
+.dex-type-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+  color: var(--color-text-primary, #e5e5ea);
+}
+
+/* Headline — card/panel headers */
+.dex-type-headline {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.35;
+  color: var(--color-text-primary, #e5e5ea);
+}
+
+/* Body — default prose */
+.dex-type-body {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #aeaeb2);
+}
+
+/* Caption — metadata & hints */
+.dex-type-caption {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+  color: var(--color-text-tertiary, #636366);
+}
+
+/* Label — uppercase micro labels */
+.dex-type-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: var(--color-text-tertiary, #636366);
+}
+
+/* Mono — code/terminal */
+.dex-type-mono {
+  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #aeaeb2);
+}
+
+/* ── Glass Card Sharp Primitive ──────────────────────────────────────────── */
+.dex-glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dex-glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dex-toggle .toggle-knob,
+.toggle-switch .toggle-knob {
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Item 161: Enhanced tab indicator */
+
+/* -- Stage Manager -------------------------------------------------------- */
+[role="navigation"][aria-label="Stage Manager"]::-webkit-scrollbar { display: none; }
+.tab-active::after,
+[role="tab"][aria-selected="true"]::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-accent, #0a84ff);
+  border-radius: 1px;
+  animation: tabSlideIn 0.2s ease;
+}
+@keyframes tabSlideIn {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Item 162: Consistent scrollbar across pages */
+.page-content,
+.dex-page,
+[data-page-scroll] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+.page-content::-webkit-scrollbar,
+.dex-page::-webkit-scrollbar,
+[data-page-scroll]::-webkit-scrollbar {
+  width: 6px;
+}
+.page-content::-webkit-scrollbar-thumb,
+.dex-page::-webkit-scrollbar-thumb,
+[data-page-scroll]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+.page-content::-webkit-scrollbar-thumb:hover,
+.dex-page::-webkit-scrollbar-thumb:hover,
+[data-page-scroll]::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Item 163: Improved empty state styling */
+.empty-state,
+[data-empty-state] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Item 164: Glass sidebar polish for app pages — blur handled by glassMenu.ts tier system */
+.dex-sidebar,
+[data-sidebar] {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  contain: layout style;
+}
+
+/* Item 165: Better modal entry animation */
+[role="dialog"],
+.dex-modal {
+  animation: modalEntry 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes modalEntry {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Item 166: Toasts slide in from top-right */
+.toast,
+[data-toast] {
+  animation: toastSlideIn 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Item 167: Button press depth feedback */
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.99);
+  transition: transform 0.08s ease;
+}
+
+/* Item 168: Badge pulse for unread counts */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.badge-unread,
+[data-unread-count]:not([data-unread-count="0"]) .badge {
+  animation: badgePulse 3s ease-in-out infinite;
+}
+
+/* Item 169: Skeleton loading shimmer — uses .skeleton rule + @keyframes shimmer defined above */
+
+/* Item 170: Context menu smooth appearance */
+[role="menu"] {
+  animation: menuAppear 0.15s ease-out;
+}
+@keyframes menuAppear {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Item 171: Better file grid item transitions */
+.file-item,
+[data-file-item] {
+  transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+.file-item:hover,
+[data-file-item]:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Item 172: Progress bar glow for active transfers */
+progress::-webkit-progress-value,
+.progress-bar-fill {
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(10, 132, 255, 0.3);
+}
+
+/* Item 173: Toolbar hover state consistency */
+[role="toolbar"] button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  transition: background 0.03s ease;
+}
+
+/* Item 174: Improved list row keyboard focus */
+[role="listbox"] [role="option"]:focus-visible,
+[role="list"] [role="listitem"]:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.5);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* Item 175: Tooltip entrance animation */
+[role="tooltip"],
+.dex-tooltip {
+  animation: tooltipFade 0.15s ease-out;
+  pointer-events: none;
+}
+@keyframes tooltipFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Item 176: Breadcrumb / path bar styling */
+.breadcrumb,
+[data-breadcrumb] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.breadcrumb a,
+.breadcrumb button,
+[data-breadcrumb] a,
+[data-breadcrumb] button {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.breadcrumb a:hover,
+.breadcrumb button:hover,
+[data-breadcrumb] a:hover,
+[data-breadcrumb] button:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Item 177: Enhanced search result highlighting */
+.search-highlight,
+mark {
+  background: rgba(10, 132, 255, 0.25);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Item 178: Notification dot */
+.notification-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff453a;
+  box-shadow: 0 0 4px rgba(255, 69, 58, 0.4);
+  animation: notificationPulse 2s ease-in-out infinite;
+}
+@keyframes notificationPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* 🚀 Item 181: Floating window drag optimization -- disable effects during drag */
+[data-floating-window][data-dragging="true"],
+[data-floating-window][data-resizing="true"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+  cursor: grabbing !important;
+}
+
+/* Item 179: Drag-and-drop visual feedback */
+[data-dragging="true"]:not([data-floating-window]) {
+  opacity: 0.5;
+  transform: scale(0.95);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+[data-drop-target="true"] {
+  outline: 2px dashed rgba(10, 132, 255, 0.5);
+  outline-offset: 2px;
+  background: rgba(10, 132, 255, 0.05);
+  transition: outline 0.15s ease, background 0.15s ease;
+}
+
+/* Item 180: Keyboard skip to main content link enhancement */
+.dex-skip-nav {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  z-index: var(--z-emergency, 50000);
+  padding: 8px 16px;
+  background: var(--color-accent, #0a84ff);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+.dex-skip-nav:focus {
+  top: 8px;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ITEMS 181-200: PERFORMANCE & SYSTEM POLISH
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Item 181: GPU compositing hints for frequently animated elements */
+.dock-item,
+[data-dock-item],
+.floating-window,
+[data-detached-window] {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Item 182: Content containment for heavy page layouts */
+.dex-page-files,
+.dex-page-gallery,
+.dex-page-browser,
+.dex-page-notes {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Item 183: Optimized table rendering */
+table, .data-table {
+  table-layout: fixed;
+}
+
+/* Item 184: Better font loading with local stack */
+body {
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif);
+  font-display: swap;
+}
+
+/* Item 185: Reduced paint area for tooltips/popovers */
+[role="tooltip"],
+[role="menu"],
+.popover,
+.dex-popover {
+  contain: layout paint;
+  isolation: isolate;
+}
+
+/* Item 186: Smooth scroll for all app containers */
+[data-app-container] {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+/* Item 187: System font monospace for code areas */
+pre, code, .code-editor, [data-code] {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+
+/* Item 188: Responsive font scaling for very small windows */
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .dock-item button,
+  [data-dock-item] button { min-width: 36px; min-height: 36px; }
+}
+
+/* Item 189: High DPI media query optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .icon, svg {
+    shape-rendering: geometricPrecision;
+  }
+}
+
+/* Item 190: Print optimization for notes/documents */
+@media print {
+  .dock, [role="toolbar"], .title-bar, .dex-skip-nav,
+  [data-dock-item], .floating-window {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  [data-app-container][data-app-state="foreground"] {
+    position: static !important;
+    overflow: visible !important;
+  }
+}
+
+/* Item 191: Safe area insets for notch/rounded displays */
+.title-bar,
+[role="toolbar"] {
+  padding-top: env(safe-area-inset-top, 0);
+}
+.dock,
+[role="navigation"] {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Item 192: Consistent placeholder text color */
+::placeholder {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.35));
+  opacity: 1;
+}
+
+/* Item 193: Autofill background fix (Chrome/Electron) */
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px var(--color-bg-elevated, #1c1c1e) inset !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
+  caret-color: var(--color-text-primary);
+}
+
+/* Item 194: Reduced opacity for background apps */
+[data-app-state="background"] {
+  pointer-events: none;
+}
+
+/* Item 195: Better accordion/collapsible styling */
+details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  user-select: none;
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+/* Item 196: Truncate with fade-out for long text */
+.text-fade-truncate {
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.text-fade-truncate::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, transparent, var(--color-bg-base));
+  pointer-events: none;
+}
+
+/* Item 197: Better link styling within content */
+.content-area a,
+[data-content] a {
+  color: var(--color-accent, #0a84ff);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.12s ease;
+}
+.content-area a:hover,
+[data-content] a:hover {
+  border-bottom-color: var(--color-accent, #0a84ff);
+}
+
+/* Item 198: Visual indicator for active/current nav items */
+[aria-current="page"],
+[aria-current="true"] {
+  background: rgba(10, 132, 255, 0.12);
+  color: var(--color-accent, #0a84ff);
+  font-weight: 600;
+}
+
+/* Item 199: Improved textarea auto-resize hint */
+textarea {
+  field-sizing: content;
+  min-height: 2lh;
+}
+
+/* Item 200: Global transition performance -- batch paints */
+.batch-transition,
+[data-batch-transition] {
+  transition-behavior: allow-discrete;
+  content-visibility: auto;
+}
+
+/* ================================================================
+   Phase 2: Button Highlight & Active States - macOS Tahoe Polish
+   ================================================================ */
+
+/* Item 47: Subtle press-down scale on all icon buttons */
+.dex-app-container button {
+  transition: transform 0.1s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.dex-app-container button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Item 48: Hover glow on interactive buttons */
+.dex-app-container button:hover:not(:disabled) {
+  box-shadow: 0 0 6px rgba(74, 158, 255, 0.1);
+}
+
+/* Item 49: Standardized disabled button style */
+.dex-app-container button:disabled,
+.dex-app-container button[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+}
+
+/* Item 50: Focus-visible ring for keyboard navigation */
+.dex-app-container button:focus-visible {
+  outline: 2px solid rgba(74, 158, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Item 51: Toggle button active state -- filled accent background */
+.dex-app-container button[aria-pressed="true"] {
+  box-shadow: inset 0 0 12px rgba(74, 158, 255, 0.08);
+}
+
+/* Item 57: Active track highlight in mixer/arrange */
+.dex-app-container [aria-selected="true"],
+.dex-app-container [data-active="true"] {
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.3);
+}
+
+/* ================================================================
+   Smooth Drag & Drop Interactions
+   ================================================================ */
+
+/* Dragging state: element being dragged */
+[data-dragging="true"],
+.dragging {
+  opacity: 0.85;
+  cursor: grabbing !important;
+  z-index: var(--z-drag-overlay, 10000);
+  transition: none !important; /* No transition during active drag */
+}
+
+/* Drop target highlight */
+[data-drop-target="true"],
+.drop-target {
+  outline: 2px dashed rgba(10, 132, 255, 0.4);
+  outline-offset: -2px;
+  background: rgba(10, 132, 255, 0.04) !important;
+}
+
+/* Smooth clip/item movement in creative apps */
+.dex-app-container [data-clip],
+.dex-app-container [data-track-item] {
+  will-change: transform;
+  transition: transform 0.08s ease-out;
+}
+
+.dex-app-container [data-clip]:active,
+.dex-app-container [data-track-item]:active {
+  transition: none;
+}
+
+/* Custom scrollbar for touch -- wider thumb */
+@media (pointer: coarse) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+/* ================================================================
+   Smooth Modal / Overlay Entrance Animations
+   ================================================================ */
+
+/* Fixed modal backdrop with gentle fade */
+[style*="position: fixed"][style*="inset: 0"],
+[style*="position:fixed"][style*="inset:0"] {
+  animation: modalBackdropIn 0.18s ease-out both;
+}
+
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Modal content scale-in */
+[style*="position: fixed"] > [style*="border-radius"] {
+  animation: modalContentIn 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@keyframes modalContentIn {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Smooth list item hover/focus */
+.dex-app-container [role="listitem"],
+.dex-app-container [role="menuitem"],
+.dex-app-container [role="option"] {
+  transition: background 0.12s ease, color 0.12s ease, transform 0.1s ease;
+}
+
+/* Smooth panel slide transitions */
+[style*="position: absolute"][style*="overflow: hidden"] {
+  transition: opacity 0.15s ease-out;
+}
+
+/* ================================================================
+   ENHANCED INTERACTIVE STATES - Depth & Feel
+   ================================================================ */
+
+/* Universal button highlight on hover - adds depth */
+button:not(:disabled):hover,
+[role="button"]:not([aria-disabled="true"]):hover {
+  filter: brightness(1.08);
+}
+
+/* Pressed state depth */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  filter: brightness(0.95);
+  transform: scale(0.98);
+}
+
+/* Enhanced hover glow for primary actions */
+.dex-btn-primary:hover,
+button[data-variant="primary"]:hover {
+  box-shadow: 0 2px 12px rgba(10, 132, 255, 0.25), 0 0 0 1px rgba(10, 132, 255, 0.2);
+}
+
+/* Smooth hover background for clickable items */
+.dex-clickable:hover,
+[data-clickable]:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Enhanced list item hover with left accent */
+.dex-list-item:hover,
+[data-list-item]:hover {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 3px 0 0 var(--color-accent, #0A84FF);
+}
+
+/* Icon button hover glow */
+.dex-icon-btn:hover,
+button[aria-label]:not([aria-label=""]):hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+/* Toolbar button active indicator */
+.dex-toolbar-btn.active,
+.dex-toolbar-btn[aria-pressed="true"] {
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--color-accent, #0A84FF);
+}
+
+/* Card hover lift effect */
+.dex-card:hover,
+[data-card]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Sidebar item hover */
+.dex-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  padding-left: calc(var(--sidebar-padding, 12px) + 2px);
+}
+
+/* Tab hover underline preview */
+.dex-tab:hover:not(.active) {
+  color: var(--color-text-primary);
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Active tab accent */
+.dex-tab.active {
+  color: var(--color-accent, #0A84FF);
+  box-shadow: inset 0 -2px 0 var(--color-accent, #0A84FF);
+}
+
+/* Input field focus glow */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2), inset 0 0 0 1px rgba(10, 132, 255, 0.4);
+  border-color: var(--color-accent, #0A84FF);
+}
+
+/* Dropdown/select hover */
+select:hover:not(:disabled),
+.dex-select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Slider/range hover */
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Toggle switch hover glow */
+.dex-toggle:hover,
+[role="switch"]:hover {
+  box-shadow: 0 0 8px rgba(10, 132, 255, 0.2);
+}
+
+/* Context menu item hover */
+[role="menuitem"]:hover {
+  background: rgba(10, 132, 255, 0.15) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* File/folder item hover */
+.file-item:hover,
+.folder-item:hover,
+[data-file-item]:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+/* Selected state highlight */
+[aria-selected="true"],
+.selected,
+[data-selected="true"] {
+  background: rgba(10, 132, 255, 0.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.25);
+}
+
+/* Focused within containers */
+:focus-within > .dex-label,
+:focus-within > label {
+  color: var(--color-accent, #0A84FF);
+}
+
+/* Navigation arrows hover */
+.nav-arrow:hover,
+[data-nav-arrow]:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.1);
+}
+
+/* Close/action button hover states */
+.close-btn:hover,
+[aria-label*="close" i]:hover,
+[aria-label*="Close" i]:hover {
+  background: rgba(255, 69, 58, 0.15);
+  color: #FF453A;
+}
+
+/* Minimize button hover */
+[aria-label*="minimize" i]:hover,
+[aria-label*="Minimize" i]:hover {
+  background: rgba(255, 214, 10, 0.15);
+  color: #FFD60A;
+}
+
+/* Maximize button hover */
+[aria-label*="maximize" i]:hover,
+[aria-label*="Maximize" i]:hover {
+  background: rgba(48, 209, 88, 0.15);
+  color: #30D158;
+}
+
+/* Smooth transitions for all interactive elements */
+button, [role="button"], a, input, select, textarea,
+[tabindex]:not([tabindex="-1"]) {
+  transition: 
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease,
+    filter 0.1s ease,
+    opacity 0.15s ease;
+}
+
+/* Ensure buttons are always clickable (override any accidental blocking) */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+
+/* ================================================================
+   FUTURISTIC ANIMATIONS & TRANSITIONS
+   ================================================================ */
+
+/* Smooth app window entrance animation */
+@keyframes appWindowEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes appWindowExit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Apply to app containers */
+.dex-app-container[data-entering="true"] {
+  animation: appWindowEnter 0.2s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* Subtle pulsing glow for active elements */
+@keyframes subtleGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba(10, 132, 255, 0); }
+  50% { box-shadow: 0 0 12px rgba(10, 132, 255, 0.2); }
+}
+
+.active-glow {
+  animation: subtleGlow 2s ease-in-out infinite;
+}
+
+/* Smooth slide-in for panels */
+@keyframes slideInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.slide-in-left { animation: slideInLeft 0.2s ease-out forwards; }
+.slide-in-right { animation: slideInRight 0.2s ease-out forwards; }
+.slide-in-up { animation: slideInUp 0.2s ease-out forwards; }
+.slide-in-down { animation: slideInDown 0.2s ease-out forwards; }
+
+/* Ripple effect for buttons */
+@keyframes ripple {
+  from {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%);
+  border-radius: inherit;
+  pointer-events: none;
+  transform: scale(0);
+  opacity: 0;
+}
+
+.ripple-effect:active::after {
+  animation: ripple 0.4s ease-out;
+}
+
+/* Hover shine effect for cards */
+.hover-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,0.08),
+    transparent
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.hover-shine:hover::before {
+  left: 100%;
+}
+
+/* Enhanced focus ring */
+:focus-visible {
+  outline: none;
+  box-shadow: 
+    0 0 0 2px var(--color-bg-primary, #1E1E1E),
+    0 0 0 4px var(--color-accent, #0A84FF) !important;
+}
+
+/* Smooth tooltip animations */
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+[data-tooltip]::after {
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+/* Badge pulse animation */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.badge-pulse {
+  animation: badgePulse 1.5s ease-in-out infinite;
+}
+
+/* Notification slide */
+@keyframes notificationSlide {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-enter {
+  animation: notificationSlide 0.3s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* Smooth accordion/collapse */
+.accordion-content {
+  overflow: hidden;
+  transition: max-height 0.25s ease-out, opacity 0.2s ease-out;
+}
+
+/* Loading skeleton shimmer */
+@keyframes shimmerSlide {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmerSlide 1.5s ease-in-out infinite;
+}
+
+/* Modal backdrop animation */
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-backdrop {
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+/* Typewriter cursor blink */
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink {
+  animation: cursorBlink 1s step-end infinite;
+}
+
+/* Progress bar animation */
+@keyframes progressGlow {
+  0% { box-shadow: 0 0 4px rgba(10, 132, 255, 0.4); }
+  50% { box-shadow: 0 0 8px rgba(10, 132, 255, 0.6); }
+  100% { box-shadow: 0 0 4px rgba(10, 132, 255, 0.4); }
+}
+
+.progress-bar {
+  animation: progressGlow 2s ease-in-out infinite;
+}
+
+/* Stagger animation helper for lists */
+.stagger-children > * {
+  opacity: 0;
+  animation: slideInUp 0.3s ease-out forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.03s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.06s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.09s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.12s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.18s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.21s; }
+.stagger-children > *:nth-child(9) { animation-delay: 0.24s; }
+.stagger-children > *:nth-child(10) { animation-delay: 0.27s; }
+
+/* Hover lift for interactive cards */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+}
+
+/* Smooth color transitions for theme changes */
+:root {
+  transition: 
+    --color-bg-primary 0.3s ease,
+    --color-bg-secondary 0.3s ease,
+    --color-text-primary 0.3s ease,
+    background-color 0.3s ease;
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & USABILITY ENHANCEMENTS
+   ========================================================================== */
+
+/* Keyboard shortcut hint badge */
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono, 'SF Mono', monospace);
+  color: var(--color-text-muted, #8e8e93);
+  background: var(--color-bg-tertiary, rgba(255,255,255,0.06));
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08));
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-left: 8px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.kbd-hint:hover,
+button:hover .kbd-hint,
+[role="button"]:hover .kbd-hint {
+  opacity: 1;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus indicator for interactive elements */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 
+    0 0 0 2px var(--color-bg-primary, #1E1E1E),
+    0 0 0 4px var(--color-accent, #0A84FF);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  * {
+    border-color: currentColor !important;
+  }
+  
+  .kbd-hint {
+    border-width: 2px;
+    opacity: 1;
+  }
+  
+  button, [role="button"] {
+    border: 2px solid currentColor !important;
+  }
+}
+
+/* Improve touch targets for mobile/tablet */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Increase spacing between interactive elements */
+  .toolbar button,
+  .button-group button {
+    margin: 4px;
+  }
+}
+
+/* Loading state indicator */
+[aria-busy="true"] {
+  cursor: wait;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Error state styling */
+[aria-invalid="true"] {
+  border-color: var(--color-error, #FF453A) !important;
+  box-shadow: 0 0 0 1px var(--color-error, #FF453A);
+}
+
+/* Required field indicator */
+[aria-required="true"]::after {
+  content: ' *';
+  color: var(--color-error, #FF453A);
+}
+
+/* Disabled state */
+[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Live region for announcements */
+[aria-live="polite"],
+[aria-live="assertive"] {
+  /* Visually hidden but announced by screen readers */
+}
+
+/* Progress indicators */
+[role="progressbar"] {
+  position: relative;
+  overflow: hidden;
+}
+
+[role="progressbar"]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,0.1),
+    transparent
+  );
+  animation: progressShine 1.5s ease-in-out infinite;
+}
+
+@keyframes progressShine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Interactive element cursor states */
+[role="button"]:not([aria-disabled="true"]),
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Expandable sections */
+[aria-expanded="false"] + .expandable-content {
+  display: none;
+}
+
+[aria-expanded="true"] + .expandable-content {
+  display: block;
+}
+
+/* Tab panel visibility */
+[role="tabpanel"][hidden] {
+  display: none;
+}
+
+/* Dialog backdrop */
+[role="dialog"]::backdrop,
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+/* Alert styling */
+[role="alert"] {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--color-warning, #FF9F0A);
+  background: rgba(255, 159, 10, 0.1);
+}
+
+[role="alert"][data-type="error"] {
+  border-left-color: var(--color-error, #FF453A);
+  background: rgba(255, 69, 58, 0.1);
+}
+
+[role="alert"][data-type="success"] {
+  border-left-color: var(--color-success, #30D158);
+  background: rgba(48, 209, 88, 0.1);
+}
+
+/* =============================================================================
+   RESPONSIVE FLEX LAYOUTS - Auto-rearranging lists and grids
+   ============================================================================= */
+
+/* Flex list that wraps and adjusts based on container size */
+.dex-flex-list,
+[data-flex-list] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--flex-gap, 8px);
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+.dex-flex-list > *,
+[data-flex-list] > * {
+  flex: 1 1 var(--flex-min-width, 200px);
+  min-width: var(--flex-min-width, 200px);
+  max-width: var(--flex-max-width, 100%);
+}
+
+/* Auto-fit grid that fills available space */
+.dex-auto-grid,
+[data-auto-grid] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--grid-min, 180px), 1fr));
+  gap: var(--grid-gap, 12px);
+}
+
+/* =============================================================================
+   ACCESSIBILITY STYLES - UKI Voice Assistant Accessibility Features
+   ============================================================================= */
+
+/* High Contrast Mode */
+html.high-contrast,
+:root.high-contrast {
+  --color-bg-base: #000000 !important;
+  --color-bg-surface: #0a0a0a !important;
+  --color-bg-elevated: #1a1a1a !important;
+  --color-text-primary: #ffffff !important;
+  --color-text-secondary: #e0e0e0 !important;
+  --color-border: #ffffff !important;
+  --color-accent: #00ffff !important;
+  --color-success: #00ff00 !important;
+  --color-error: #ff0000 !important;
+  --color-warning: #ffff00 !important;
+}
+
+.high-contrast * {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.high-contrast button,
+.high-contrast a,
+.high-contrast [role="button"],
+.high-contrast input,
+.high-contrast select {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.high-contrast button:focus-visible,
+.high-contrast a:focus-visible,
+.high-contrast [role="button"]:focus-visible,
+.high-contrast input:focus-visible,
+.high-contrast select:focus-visible {
+  outline-color: #00ffff !important;
+}
+
+/* Reduce Motion Mode */
+html.reduce-motion,
+:root.reduce-motion {
+  scroll-behavior: auto !important;
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Focus Mode - Hide non-essential UI */
+html.focus-mode,
+:root.focus-mode {
+  --dock-opacity: 0.3;
+  --topbar-opacity: 0.5;
+}
+
+.focus-mode [data-dock-container] {
+  opacity: var(--dock-opacity);
+  transition: opacity 0.3s ease;
+}
+
+.focus-mode [data-dock-container]:hover,
+.focus-mode [data-dock-container]:focus-within {
+  opacity: 1;
+}
+
+.focus-mode .dex-notification,
+.focus-mode .dex-tooltip,
+.focus-mode [data-floating-panel] {
+  display: none !important;
+}
+
+/* Enhanced focus indicators for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-accent, #4a9eff) !important;
+  outline-offset: 2px !important;
+}
+
+/* Skip link for screen readers */
+.dex-skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-accent);
+  color: white;
+  padding: 8px 16px;
+  z-index: 100000;
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+}
+
+.dex-skip-link:focus {
+  top: 0;
+}
+
+/* Screen reader only content */
+.sr-only,
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Larger touch targets for accessibility */
+.a11y-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Improved focus ring for dark themes */
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: #4a9eff !important;
+  }
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Respect user's contrast preferences */
+@media (prefers-contrast: more) {
+  :root {
+    --color-border: rgba(255, 255, 255, 0.5) !important;
+  }
+  
+  button, a, [role="button"] {
+    border: 1px solid currentColor !important;
+  }
+}
+
+/* Large text mode - triggered via UKI voice command */
+html[style*="font-size: 110"] *,
+html[style*="font-size: 115"] *,
+html[style*="font-size: 120"] * {
+  line-height: 1.6 !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* UKI Overlay Accessibility Enhancements */
+[data-uki-overlay] {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+[data-uki-overlay] [role="status"] {
+  font-weight: 600;
+}
+
+/* Ensure UKI responses are readable */
+[data-uki-response] {
+  max-width: 60ch;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Compact list for small containers */
+.dex-compact-list,
+[data-compact-list] {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dex-compact-list > *,
+[data-compact-list] > * {
+  padding: 6px 10px;
+  min-height: 32px;
+}
+
+/* Container query responsive layouts */
+@container (max-width: 400px) {
+  .dex-flex-list,
+  [data-flex-list] {
+    flex-direction: column;
+  }
+  
+  .dex-flex-list > *,
+  [data-flex-list] > * {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}
+
+@container (max-width: 300px) {
+  .dex-auto-grid,
+  [data-auto-grid] {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =============================================================================
+   COLLAPSIBLE SECTIONS - Auto-collapse on small screens/windows
+   ============================================================================= */
+
+/* Collapsible panel */
+.dex-collapsible,
+[data-collapsible] {
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease,
+              padding 0.2s ease;
+}
+
+.dex-collapsible.collapsed,
+[data-collapsible][data-collapsed="true"] {
+  max-height: 0 !important;
+  opacity: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  pointer-events: none;
+}
+
+/* Collapse trigger button */
+.dex-collapse-trigger,
+[data-collapse-trigger] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.dex-collapse-trigger:hover,
+[data-collapse-trigger]:hover {
+  background: var(--color-bg-hover);
+}
+
+.dex-collapse-trigger::after,
+[data-collapse-trigger]::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.dex-collapse-trigger[aria-expanded="false"]::after,
+[data-collapse-trigger][aria-expanded="false"]::after {
+  transform: rotate(-45deg);
+}
+
+/* Auto-collapse sections when window is small */
+@media (max-width: 500px) {
+  .dex-auto-collapse,
+  [data-auto-collapse] {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+  
+  .dex-auto-collapse.expanded,
+  [data-auto-collapse][data-expanded="true"] {
+    max-height: none;
+    opacity: 1;
+  }
+}
+
+/* Section that collapses to icon-only */
+.dex-icon-collapse,
+[data-icon-collapse] {
+  transition: width 0.2s ease, padding 0.2s ease;
+}
+
+@container (max-width: 250px) {
+  .dex-icon-collapse .label,
+  [data-icon-collapse] .label,
+  .dex-icon-collapse [data-label],
+  [data-icon-collapse] [data-label] {
+    display: none;
+  }
+  
+  .dex-icon-collapse,
+  [data-icon-collapse] {
+    width: auto;
+    padding: 8px;
+  }
+}
+
+/* =============================================================================
+   WINDOW RESIZE HANDLES - Visible, accessible resize grips
+   ============================================================================= */
+
+/* Resize handle base */
+.dex-resize-handle,
+[data-resize-handle] {
+  position: absolute;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+/* Show on window hover or focus-within */
+[data-floating-window]:hover .dex-resize-handle,
+[data-floating-window]:focus-within .dex-resize-handle,
+[data-floating-window]:hover [data-resize-handle],
+[data-floating-window]:focus-within [data-resize-handle] {
+  opacity: 1;
+}
+
+/* Edge handles */
+.dex-resize-handle[data-edge="right"],
+[data-resize-handle="right"] {
+  right: 0;
+  top: 32px;
+  bottom: 16px;
+  width: 6px;
+  cursor: ew-resize;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.08));
+}
+
+.dex-resize-handle[data-edge="left"],
+[data-resize-handle="left"] {
+  left: 0;
+  top: 32px;
+  bottom: 16px;
+  width: 6px;
+  cursor: ew-resize;
+  background: linear-gradient(to left, transparent, rgba(255,255,255,0.08));
+}
+
+.dex-resize-handle[data-edge="bottom"],
+[data-resize-handle="bottom"] {
+  bottom: 0;
+  left: 16px;
+  right: 16px;
+  height: 6px;
+  cursor: ns-resize;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.08));
+}
+
+.dex-resize-handle[data-edge="top"],
+[data-resize-handle="top"] {
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 6px;
+  cursor: ns-resize;
+  background: linear-gradient(to top, transparent, rgba(255,255,255,0.08));
+}
+
+/* Corner handles */
+.dex-resize-handle[data-corner="se"],
+[data-resize-handle="se"] {
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+}
+
+.dex-resize-handle[data-corner="se"]::after,
+[data-resize-handle="se"]::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 10px;
+  height: 10px;
+  background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.15) 50%);
+  border-radius: 0 0 4px 0;
+}
+
+.dex-resize-handle[data-corner="sw"],
+[data-resize-handle="sw"] {
+  left: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: sw-resize;
+}
+
+.dex-resize-handle[data-corner="nw"],
+[data-resize-handle="nw"] {
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nw-resize;
+}
+
+.dex-resize-handle[data-corner="ne"],
+[data-resize-handle="ne"] {
+  right: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  cursor: ne-resize;
+}
+
+/* Resize handle hover state */
+.dex-resize-handle:hover,
+[data-resize-handle]:hover {
+  opacity: 1 !important;
+  background: rgba(10, 132, 255, 0.2);
+}
+
+/* Resize grip indicator (bottom-right) */
+.dex-resize-grip,
+[data-resize-grip] {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.dex-resize-grip::before,
+[data-resize-grip]::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-text-tertiary);
+  border-bottom: 2px solid var(--color-text-tertiary);
+}
+
+.dex-resize-grip::after,
+[data-resize-grip]::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 4px;
+  height: 4px;
+  border-right: 2px solid var(--color-text-tertiary);
+  border-bottom: 2px solid var(--color-text-tertiary);
+}
+
+[data-floating-window]:hover .dex-resize-grip,
+[data-floating-window]:hover [data-resize-grip] {
+  opacity: 0.7;
+}
+
+/* =============================================================================
+   CONTAINER QUERY SUPPORT - Enable container queries on app containers
+   ============================================================================= */
+
+.dex-app-container,
+[data-app-container],
+.app-content,
+[data-dex-app] {
+  container-type: inline-size;
+  container-name: app-container;
+}
+
+/* List items that stack/rearrange in small containers */
+@container app-container (max-width: 350px) {
+  .dex-list-item,
+  [data-list-item] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .dex-list-item .actions,
+  [data-list-item] .actions,
+  .dex-list-item [data-actions],
+  [data-list-item] [data-actions] {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@container app-container (max-width: 280px) {
+  /* Hide secondary info on very small containers */
+  .dex-secondary-info,
+  [data-secondary-info] {
+    display: none;
+  }
+  
+  /* Reduce padding */
+  .dex-card,
+  [data-card] {
+    padding: 8px;
+  }
+}
+
+/* =============================================================================
+   PERFORMANCE OPTIMIZATIONS
+   ============================================================================= */
+
+/* GPU-accelerated transforms for smooth dragging */
+[data-dragging="true"],
+.dragging {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Contain layout for better performance */
+.dex-contained,
+[data-contained] {
+  contain: layout style;
+}
+
+/* Isolated stacking context */
+.dex-isolated,
+[data-isolated] {
+  isolation: isolate;
+}
+
+/* Content visibility for off-screen optimization */
+.dex-offscreen-optimize,
+[data-offscreen-optimize] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* =============================================================================
+   ENHANCED SCROLLING
+   ============================================================================= */
+
+/* Smooth scroll with momentum */
+.dex-scroll,
+[data-scroll] {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Horizontal scroll container */
+.dex-scroll-x,
+[data-scroll-x] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+}
+
+.dex-scroll-x > *,
+[data-scroll-x] > * {
+  scroll-snap-align: start;
+}
+
+/* Fade edges for scrollable content */
+.dex-scroll-fade,
+[data-scroll-fade] {
+  position: relative;
+}
+
+.dex-scroll-fade::before,
+[data-scroll-fade]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, var(--color-bg-base), transparent);
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.dex-scroll-fade::after,
+[data-scroll-fade]::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to left, var(--color-bg-base), transparent);
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.dex-scroll-fade.scrolled-left::before,
+[data-scroll-fade][data-scrolled-left]::before {
+  opacity: 1;
+}
+
+.dex-scroll-fade.scrolled-right::after,
+[data-scroll-fade][data-scrolled-right]::after {
+  opacity: 1;
+}
+
+/* =============================================================================
+   PANEL RESPONSIVE LAYOUTS
+   ============================================================================= */
+
+/* Split panel that stacks on small screens */
+.dex-split-panel,
+[data-split-panel] {
+  display: grid;
+  grid-template-columns: var(--split-primary, 1fr) var(--split-secondary, 1fr);
+  gap: var(--split-gap, 16px);
+}
+
+@container app-container (max-width: 500px) {
+  .dex-split-panel,
+  [data-split-panel] {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+}
+
+/* Sidebar that collapses to bottom sheet on small screens */
+.dex-adaptive-sidebar,
+[data-adaptive-sidebar] {
+  display: grid;
+  grid-template-columns: var(--sidebar-width, 240px) 1fr;
+  gap: 0;
+}
+
+@container app-container (max-width: 600px) {
+  .dex-adaptive-sidebar,
+  [data-adaptive-sidebar] {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  
+  .dex-adaptive-sidebar > :first-child,
+  [data-adaptive-sidebar] > :first-child {
+    order: 2;
+    max-height: 40vh;
+    border-top: 1px solid var(--color-border);
+    border-left: none;
+  }
+}
+
+/* =============================================================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================================================= */
+
+/* Focus visible styles for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip focus ring for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* High contrast focus for important controls */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.2);
+}
+
+/* Screen reader only text */
+.sr-only,
+[data-sr-only] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .dex-collapsible,
+  [data-collapsible] {
+    transition: none;
+  }
+}
+
+/* =============================================================================
+   MICRO-INTERACTIONS
+   ============================================================================= */
+
+/* Subtle press effect for interactive elements */
+.dex-pressable,
+[data-pressable] {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+.dex-pressable:active,
+[data-pressable]:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Hover lift effect */
+.dex-hover-lift,
+[data-hover-lift] {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dex-hover-lift:hover,
+[data-hover-lift]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Glow on hover */
+.dex-hover-glow,
+[data-hover-glow] {
+  transition: box-shadow 0.2s ease;
+}
+
+.dex-hover-glow:hover,
+[data-hover-glow]:hover {
+  box-shadow: 0 0 20px rgba(10, 132, 255, 0.3);
+}
+
+/* =============================================================================
+   LOADING STATES
+   ============================================================================= */
+
+/* Pulse loading indicator */
+.dex-loading-pulse,
+[data-loading-pulse] {
+  animation: dex-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes dex-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Skeleton shimmer */
+.dex-skeleton,
+[data-skeleton] {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-hover) 0%,
+    var(--color-bg-elevated) 50%,
+    var(--color-bg-hover) 100%
+  );
+  background-size: 200% 100%;
+  animation: dex-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes dex-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+   ============================================================================= */
+
+/* Truncate text with ellipsis */
+.dex-truncate,
+[data-truncate] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Multi-line truncation */
+.dex-line-clamp-2,
+[data-line-clamp="2"] {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dex-line-clamp-3,
+[data-line-clamp="3"] {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Flex gap utilities */
+.dex-gap-xs { gap: 4px; }
+.dex-gap-sm { gap: 8px; }
+.dex-gap-md { gap: 12px; }
+.dex-gap-lg { gap: 16px; }
+.dex-gap-xl { gap: 24px; }
+
+/* Responsive hiding */
+@container app-container (max-width: 400px) {
+  .dex-hide-sm,
+  [data-hide-sm] {
+    display: none !important;
+  }
+}
+
+@container app-container (max-width: 500px) {
+  .dex-hide-md,
+  [data-hide-md] {
+    display: none !important;
+  }
+}
+
+/* =============================================================================
+   FLOATING WINDOW ENHANCEMENTS
+   ============================================================================= */
+
+/* Smooth window snap animation */
+[data-floating-window].snapping {
+  transition: left 0.2s ease, top 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+
+/* Window shadow on drag */
+[data-floating-window][data-dragging="true"] {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Minimize animation */
+@keyframes dex-window-minimize {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5) translateY(100px); }
+}
+
+@keyframes dex-window-restore {
+  0% { opacity: 0; transform: scale(0.5) translateY(100px); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.dex-window-minimizing {
+  animation: dex-window-minimize 0.25s ease-in forwards;
+}
+
+.dex-window-restoring {
+  animation: dex-window-restore 0.25s ease-out forwards;
+}
+
+/* =============================================================================
+   SPOTLIGHT SEARCH ENHANCEMENTS
+   ============================================================================= */
+
+/* Spotlight results scroll container */
+.spotlight-results-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.spotlight-results-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.spotlight-results-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.spotlight-results-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.spotlight-results-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* Spotlight results dropdown animation */
+@keyframes spotlightResultsIn {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Result item hover state */
+.spotlight-results-scroll [role="option"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }

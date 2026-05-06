@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - External Connectors Framework
 // Phase 19: Connector-based external file access
 // User explicitly connects each source with clear permission scope
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,9 +17,9 @@ import { Logger } from '../utils/Logger';
 
 const log = new Logger();
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type ConnectorType = 'local-folder' | 'external-drive' | 'network-share' | 'cloud-storage';
 export type ConnectorStatus = 'connected' | 'disconnected' | 'error' | 'pending';
@@ -62,9 +68,9 @@ export interface ConnectorOperation {
   error?: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // EXTERNAL CONNECTORS CLASS
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class ExternalConnectorsClass {
   private connectors: Map<string, ConnectorConfig> = new Map();
@@ -75,9 +81,9 @@ class ExternalConnectorsClass {
     this.loadConnectors();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONNECTOR MANAGEMENT
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Add a new connector
@@ -188,9 +194,9 @@ class ExternalConnectorsClass {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // FILE OPERATIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * List files in connector
@@ -355,7 +361,7 @@ class ExternalConnectorsClass {
 
       fs.writeFileSync(localPath, content);
       this.logOperation(connectorId, 'copy', relativePath, true);
-      log.info(`[Connectors] Copied to local: ${relativePath} → ${localPath}`);
+      log.info(`[Connectors] Copied to local: ${relativePath} ${localPath}`);
       return true;
 
     } catch (error) {
@@ -382,9 +388,9 @@ class ExternalConnectorsClass {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // AUDIT LOG
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   /**
    * Get operation log
@@ -401,9 +407,9 @@ class ExternalConnectorsClass {
     log.info('[Connectors] Operation log cleared');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // UTILITIES
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private logOperation(
     connectorId: string,

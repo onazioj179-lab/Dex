@@ -1,8 +1,14 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi.treasure@outlook.com>
+// Licensed under the MIT License. See LICENSE in the project root.
+// =============================================================================
+// ===========================================================================
 // DEX - Smart Duplicate Detector
 // Smart duplicate detection (suggest-only, never auto-delete)
 // Safe, preview-based, user-controlled
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
@@ -12,9 +18,9 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import log from 'electron-log';
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export type DuplicateType = 'exact' | 'similar_name' | 'similar_size' | 'similar_content';
 
@@ -61,9 +67,9 @@ export interface ScanConfig {
   quickHashOnly: boolean;       // Only hash first/last chunks
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SMART DUPLICATE DETECTOR
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 class SmartDuplicateDetectorClass extends EventEmitter {
   private activeScan: ScanResult | null = null;
@@ -76,9 +82,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
     this.setupIPC();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // IPC SETUP
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private setupIPC(): void {
     // Start scan
@@ -122,9 +128,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // SCANNING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   async startScan(folderPath: string, userConfig?: Partial<ScanConfig>): Promise<ScanResult> {
     if (this.activeScan && this.activeScan.status === 'scanning') {
@@ -416,9 +422,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
     return result;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // HASHING
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private async fullHash(filePath: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -460,9 +466,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // NAME SIMILARITY
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   private getBaseName(filePath: string): string {
     const name = path.basename(filePath, path.extname(filePath));
@@ -507,9 +513,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
     return name.toLowerCase() === pattern.toLowerCase();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   previewAction(groupId: string, keepPath: string): {
     keep: DuplicateFile;
@@ -665,9 +671,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
   // CONTROL
-  // ─────────────────────────────────────────────────────────────────────────
+  // -------------------------------------------------------------------------
 
   getProgress(): ScanResult | null {
     return this.activeScan;
@@ -686,9 +692,9 @@ class SmartDuplicateDetectorClass extends EventEmitter {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 // SINGLETON EXPORT
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 export const SmartDuplicateDetector = new SmartDuplicateDetectorClass();
 export default SmartDuplicateDetector;
