@@ -92,7 +92,7 @@ const VIOLET = '#BF5AF2';        // Highlight Violet
 const FONT_STACK = 'Consolas, "SF Mono", "Fira Code", "Courier New", monospace';
 const CYBER_COLORS = [ICE_BLUE, ELECTRIC, GLOW];
 
-// ✨ Enhanced visual palette for better contrast and style
+// Enhanced visual palette for better contrast and style
 const CYAN_BRIGHT = '#64D2FF';   // Bright cyan for images
 const GOLD_ACCENT = '#FFD700';   // Gold for achievements
 const NEON_PINK = '#FF66B2';     // Neon pink for highlights
@@ -1777,12 +1777,12 @@ const Nexus: React.FC = () => {
         ctx.globalAlpha = 0.6;
         ctx.fill();
 
-        // Inner shield icon (lock)
+        // Inner shield label
         ctx.globalAlpha = 0.9;
         ctx.fillStyle = shieldColor;
         ctx.font = `700 ${Math.round(14 * dpr)}px ${FONT_STACK}`;
         ctx.textAlign = 'center';
-        ctx.fillText('⛨', shieldCx, shieldCy - 8 * dpr);
+        ctx.fillText('SEC', shieldCx, shieldCy - 8 * dpr);
 
         // Shield score
         ctx.fillStyle = '#fff';

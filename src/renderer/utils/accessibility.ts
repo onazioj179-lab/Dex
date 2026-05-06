@@ -636,7 +636,7 @@ export function onHighContrastChange(
 }
 
 // -----------------------------------------------------------------------------
-// ICON BUTTON ARIA LABELS 🔘
+// ICON BUTTON ARIA LABELS
 // Predefined labels for common icon-only buttons
 // -----------------------------------------------------------------------------
 

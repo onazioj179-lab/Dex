@@ -603,7 +603,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
                 >
-                  {copied ? '✓ Copied' : 'Copy Link'}
+                  {copied ? 'Copied' : 'Copy Link'}
                 </button>
               )}
             </div>

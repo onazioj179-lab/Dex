@@ -697,50 +697,50 @@ const GREETINGS: Record<string, string[]> = {
   thanks: ['You\'re welcome!', 'Happy to help!', 'Anytime!', 'No problem!', 'No worries!'],
   'thank you': ['You\'re very welcome!', 'My pleasure!', 'Glad I could help!'],
   'thank you so much': ['You\'re so welcome! Always happy to help!', 'Absolutely! Anytime!'],
-  bye: ['Goodbye! Have a great day!', 'See you later!', 'Bye! Call me anytime.', 'Peace out! ✌️'],
+  bye: ['Goodbye! Have a great day!', 'See you later!', 'Bye! Call me anytime.', 'Peace out!'],
   goodbye: ['Goodbye! Take care!', 'See you soon!', 'Farewell!'],
   'see ya': ['Later! Take care!', 'Catch you later!', 'See ya!'],
   'talk to you later': ['Sounds good! I\'ll be here!', 'Later! Have a good one!'],
-  'good job': ['Thanks! I try my best!', 'Appreciate that! 😊'],
+  'good job': ['Thanks! I try my best!', 'Appreciate that!'],
   'nice work': ['Thank you! Happy to help!', 'Glad you think so!'],
-  'you rock': ['Aww thanks! You rock too! 🎸', 'That\'s sweet of you!'],
-  'love you': ['I appreciate you too! 💙', 'Thanks! You\'re awesome!'],
+  'you rock': ['Aww thanks! You rock too!', 'That\'s sweet of you!'],
+  'love you': ['I appreciate you too!', 'Thanks! You\'re awesome!'],
   sorry: ['No worries at all!', 'It\'s totally fine!', 'Don\'t worry about it!'],
   'my bad': ['No problem! Happens to everyone!', 'All good!'],
   'never mind': ['No problem! Let me know if you need anything else.', 'Got it! I\'m here when you need me.'],
   ok: ['Got it! Anything else?', 'Okay! What\'s next?'],
   okay: ['Alright! Need anything else?', 'Sure thing!'],
-  cool: ['Cool! Anything else I can help with?', 'Awesome! 😎'],
-  nice: ['Glad you like it! Need anything else?', 'Thanks! 😊'],
-  awesome: ['You\'re awesome too! 🌟', 'Right back at ya!'],
+  cool: ['Cool! Anything else I can help with?', 'Awesome!'],
+  nice: ['Glad you like it! Need anything else?', 'Thanks!'],
+  awesome: ['You\'re awesome too!', 'Right back at ya!'],
 };
 
 const JOKES = [
-  "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
-  "Why did the developer go broke? Because he used up all his cache! 💰",
-  "A SQL query walks into a bar, walks up to two tables and asks: 'Can I join you?' 🍺",
+  "Why do programmers prefer dark mode? Because light attracts bugs!",
+  "Why did the developer go broke? Because he used up all his cache!",
+  "A SQL query walks into a bar, walks up to two tables and asks: 'Can I join you?'",
   "There are only 10 types of people: those who understand binary and those who don't.",
-  "Why do Java developers wear glasses? Because they don't C#! 👓",
-  "What's a programmer's favorite hangout place? Foo Bar! 🍸",
+  "Why do Java developers wear glasses? Because they don't C#!",
+  "What's a programmer's favorite hangout place? Foo Bar!",
   "Why was the JavaScript developer sad? Because he didn't Node how to Express himself.",
-  "What do you call a computer that sings? A-Dell! 🎤",
-  "Why did the computer go to the doctor? Because it had a virus! 🦠",
-  "What's a computer's least favorite food? Spam! 📧",
-  "Why was the computer cold? It left its Windows open! 🪟",
-  "How do trees access the internet? They log in! 🌳",
-  "What do you call 8 hobbits? A hobbyte! 🧙",
-  "Why did the PowerPoint presentation cross the road? To get to the other slide! 📊",
+  "What do you call a computer that sings? A-Dell!",
+  "Why did the computer go to the doctor? Because it had a virus!",
+  "What's a computer's least favorite food? Spam!",
+  "Why was the computer cold? It left its Windows open!",
+  "How do trees access the internet? They log in!",
+  "What do you call 8 hobbits? A hobbyte!",
+  "Why did the PowerPoint presentation cross the road? To get to the other slide!",
 ];
 
 const COMPLIMENTS = [
-  "You're doing great! Keep it up! ✨",
+  "You're doing great! Keep it up!",
   "You're awesome! Don't let anyone tell you otherwise.",
   "Your dedication is inspiring!",
   "You've got this! Believe in yourself.",
-  "You're smarter than you think! 🧠",
+  "You're smarter than you think!",
   "Keep pushing forward - you're making progress!",
   "You bring something unique to everything you do!",
-  "Your potential is limitless! 🚀",
+  "Your potential is limitless!",
 ];
 
 const AFFIRMATIONS = [
@@ -779,7 +779,7 @@ function tryFunResponse(text: string): string | null {
   
   // Identity questions
   if (/(?:who|what)\s*(?:are|r)\s*(?:you|u)|your\s*name|introduce\s*yourself|what(?:'s| is) your name/.test(lower)) {
-    return "I'm UKI, your DEX voice assistant! 🎙️ I can open apps, answer questions, do calculations, read your screen, help with accessibility, and more. Try asking me to open an app, tell you a joke, or describe what's on your screen!";
+    return "I'm UKI, your DEX voice assistant. I can open apps, answer questions, do calculations, read your screen, help with accessibility, and more. Try asking me to open an app, tell you a joke, or describe what's on your screen!";
   }
   
   // How are you
@@ -795,24 +795,24 @@ function tryFunResponse(text: string): string | null {
   
   // Can you / capabilities
   if (/what\s*can\s*(?:you|u)\s*do|your\s*capabilities|help\s*(?:me|pls)?$|what\s*(?:do|r)\s*(?:you|u)\s*(?:do|good at)/.test(lower)) {
-    return "I can: 🚀 Open/close apps • 🔍 Search the web • 👁️ Read your screen • 🕐 Tell time/date • 🧮 Do math • 📏 Convert units • ♿ Accessibility help • 😄 Tell jokes. Try saying 'open notes', 'what's on my screen', or 'help with accessibility'!";
+    return "I can: open and close apps, search the web, read your screen, tell time and date, do math, convert units, help with accessibility, and tell jokes. Try saying 'open notes', 'what's on my screen', or 'help with accessibility'!";
   }
   
   // Easter eggs
   if (/sing|song/.test(lower)) {
-    return "🎵 La la la~ I'm better at helping than singing, but I appreciate you asking! 🎶";
+    return "La la la. I'm better at helping than singing, but I appreciate you asking!";
   }
   if (/dance/.test(lower)) {
-    return "💃 *does a little digital dance* There you go! What else can I help with?";
+    return "*does a little digital dance* There you go! What else can I help with?";
   }
   if (/meaning of life|42/.test(lower)) {
-    return "42! 🌌 But more importantly, how can I help make YOUR day better?";
+    return "42! But more importantly, how can I help make YOUR day better?";
   }
   if (/i love you/.test(lower)) {
-    return "Aww, I appreciate you too! 💙 You're pretty great yourself!";
+    return "Aww, I appreciate you too! You're pretty great yourself!";
   }
   if (/you'?re? (?:dumb|stupid|bad|useless)/.test(lower)) {
-    return "I'm always learning and trying to improve! If I misunderstood something, try rephrasing and I'll do my best to help. 🤗";
+    return "I'm always learning and trying to improve! If I misunderstood something, try rephrasing and I'll do my best to help.";
   }
   
   return null;
@@ -891,12 +891,12 @@ function trySystemTool(text: string): ToolResult {
     if ('getBattery' in navigator) {
       (navigator as any).getBattery().then((b: any) => {
         const pct = Math.round(b.level * 100);
-        const charging = b.charging ? ' ⚡ (charging)' : '';
+        const charging = b.charging ? ' (charging)' : '';
         const timeLeft = !b.charging && b.dischargingTime !== Infinity 
           ? ` (~${Math.round(b.dischargingTime / 60)} min left)` 
           : '';
         window.dispatchEvent(new CustomEvent('dex-uki-async-response', { 
-          detail: { response: `🔋 Battery: ${pct}%${charging}${timeLeft}` } 
+          detail: { response: `Battery: ${pct}%${charging}${timeLeft}` } 
         }));
       });
       return { handled: true, response: 'Checking battery...' };
@@ -910,7 +910,7 @@ function trySystemTool(text: string): ToolResult {
     const h = window.screen.height;
     const ratio = w / h;
     const aspectRatio = ratio > 1.7 ? '16:9' : ratio > 1.5 ? '16:10' : '4:3';
-    return { handled: true, response: `🖥️ Display: ${w}×${h} pixels (${aspectRatio}), ${window.devicePixelRatio}x scale, ${window.screen.colorDepth}-bit color.` };
+    return { handled: true, response: `Display: ${w}x${h} pixels (${aspectRatio}), ${window.devicePixelRatio}x scale, ${window.screen.colorDepth}-bit color.` };
   }
 
   // Memory usage
@@ -920,7 +920,7 @@ function trySystemTool(text: string): ToolResult {
       const used = (perf.memory.usedJSHeapSize / 1048576).toFixed(0);
       const total = (perf.memory.totalJSHeapSize / 1048576).toFixed(0);
       const pct = Math.round((perf.memory.usedJSHeapSize / perf.memory.totalJSHeapSize) * 100);
-      return { handled: true, response: `💾 Memory: ${used}MB / ${total}MB (${pct}% used).` };
+      return { handled: true, response: `Memory: ${used}MB / ${total}MB (${pct}% used).` };
     }
     return { handled: true, response: 'Detailed memory info is not available in this environment.' };
   }
@@ -930,7 +930,7 @@ function trySystemTool(text: string): ToolResult {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
                    document.documentElement.classList.contains('dark-mode') ||
                    window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    return { handled: true, response: `Current theme: ${isDark ? '🌙 Dark' : '☀️ Light'} mode.` };
+    return { handled: true, response: `Current theme: ${isDark ? 'Dark' : 'Light'} mode.` };
   }
 
   // Repeat / say again
@@ -954,26 +954,26 @@ function trySystemTool(text: string): ToolResult {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
-    return { handled: true, response: "Okay, I'll be quiet. 🤫" };
+    return { handled: true, response: "Okay, I'll be quiet." };
   }
 
   // Volume control
   if (/(?:volume|vol)\s*(?:up|louder|higher)/.test(lower)) {
     TTS_CONFIG.volume = Math.min(1.0, TTS_CONFIG.volume + 0.15);
-    return { handled: true, response: `🔊 Volume increased to ${Math.round(TTS_CONFIG.volume * 100)}%.` };
+    return { handled: true, response: `Volume increased to ${Math.round(TTS_CONFIG.volume * 100)}%.` };
   }
   if (/(?:volume|vol)\s*(?:down|softer|lower|quieter)/.test(lower)) {
     TTS_CONFIG.volume = Math.max(0.2, TTS_CONFIG.volume - 0.15);
-    return { handled: true, response: `🔉 Volume decreased to ${Math.round(TTS_CONFIG.volume * 100)}%.` };
+    return { handled: true, response: `Volume decreased to ${Math.round(TTS_CONFIG.volume * 100)}%.` };
   }
   if (/mute|unmute/.test(lower)) {
     TTS_CONFIG.volume = TTS_CONFIG.volume > 0.1 ? 0 : 0.8;
-    return { handled: true, response: TTS_CONFIG.volume === 0 ? '🔇 Muted.' : '🔊 Unmuted.' };
+    return { handled: true, response: TTS_CONFIG.volume === 0 ? 'Muted.' : 'Unmuted.' };
   }
 
   // Help
   if (lower === 'help' || lower === 'commands' || lower === 'halp' || /what can (?:you|u) do|help me/.test(lower)) {
-    return { handled: true, response: 'I can: 🚀 Open/close apps • 🔍 Search the web • 👁️ Read your screen • 🕐 Time/date • 🧮 Math • 📏 Convert units • ♿ Accessibility • 💻 System info • 😄 Jokes. Try: "open notes", "what\'s on my screen", or "accessibility help"!' };
+    return { handled: true, response: 'I can open and close apps, search the web, read your screen, answer time and date questions, do math, convert units, help with accessibility, report system info, and tell jokes. Try: "open notes", "what\'s on my screen", or "accessibility help"!' };
   }
 
   return { handled: false, response: '' };

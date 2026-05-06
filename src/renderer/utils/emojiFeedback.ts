@@ -1,109 +1,109 @@
 /**
- * DEX Platform - Emoji Feedback System
+ * DEX Platform - Text Feedback System
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  *
- * Provides emoji-enhanced feedback messages, status indicators,
- * and celebratory animations for user interactions.
+ * Provides compact text-token feedback messages and status indicators without
+ * emoji glyphs, so DEX UI renders consistently across platforms.
  */
 
 // ============================================================================
-// Status Emoji Mapping
+// Status Token Mapping
 // ============================================================================
 
 export const STATUS_EMOJIS = {
   // Success states
-  success: '✅',
-  completed: '🎉',
-  saved: '💾',
-  uploaded: '📤',
-  downloaded: '📥',
-  synced: '🔄',
-  connected: '🔗',
-  
+  success: 'OK',
+  completed: 'DONE',
+  saved: 'SAVE',
+  uploaded: 'UP',
+  downloaded: 'DOWN',
+  synced: 'SYNC',
+  connected: 'LINK',
+
   // Warning states
-  warning: '⚠️',
-  attention: '👀',
-  pending: '⏳',
-  slow: '🐢',
-  
+  warning: 'WARN',
+  attention: 'LOOK',
+  pending: 'WAIT',
+  slow: 'SLOW',
+
   // Error states
-  error: '❌',
-  failed: '💥',
-  offline: '📴',
-  disconnected: '🔌',
-  
+  error: 'ERR',
+  failed: 'FAIL',
+  offline: 'OFF',
+  disconnected: 'DISC',
+
   // Info states
-  info: 'ℹ️',
-  tip: '💡',
-  new: '🆕',
-  update: '🔔',
-  
+  info: 'INFO',
+  tip: 'TIP',
+  new: 'NEW',
+  update: 'UPDATE',
+
   // Actions
-  loading: '⏳',
-  processing: '⚙️',
-  searching: '🔍',
-  thinking: '🧠',
-  
+  loading: 'LOAD',
+  processing: 'PROC',
+  searching: 'SEARCH',
+  thinking: 'THINK',
+
   // Creative
-  music: '🎵',
-  video: '🎬',
-  image: '🖼️',
-  animation: '✨',
-  design: '🎨',
-  code: '💻',
-  
+  music: 'AUDIO',
+  video: 'VIDEO',
+  image: 'IMAGE',
+  animation: 'MOTION',
+  design: 'DESIGN',
+  code: 'CODE',
+
   // Files
-  file: '📄',
-  folder: '📁',
-  archive: '📦',
-  document: '📑',
-  
+  file: 'FILE',
+  folder: 'FOLDER',
+  archive: 'ARCH',
+  document: 'DOC',
+
   // Achievements
-  trophy: '🏆',
-  medal: '🥇',
-  star: '⭐',
-  fire: '🔥',
-  rocket: '🚀',
-  crown: '👑',
-  gem: '💎',
-  
+  trophy: 'AWARD',
+  medal: 'MEDAL',
+  star: 'STAR',
+  fire: 'HOT',
+  rocket: 'LAUNCH',
+  crown: 'PRO',
+  gem: 'GEM',
+
   // Misc
-  love: '❤️',
-  thumbsUp: '👍',
-  thumbsDown: '👎',
-  wave: '👋',
-  celebration: '🎊',
-  party: '🥳',
-  magic: '🪄',
-  sparkles: '✨',
-  lightning: '⚡',
-  lock: '🔒',
-  unlock: '🔓',
-  key: '🔑',
-  shield: '🛡️',
-  target: '🎯',
-  calendar: '📅',
-  clock: '🕐',
-  alarm: '⏰',
-  bell: '🔔',
-  microphone: '🎤',
-  speaker: '🔊',
-  mute: '🔇',
-  eye: '👁️',
-  heart: '💖',
-  brain: '🧠',
-  battery: '🔋',
-  plug: '🔌',
-  wifi: '📶',
-  location: '📍',
-  map: '🗺️',
-  compass: '🧭',
-  sun: '☀️',
-  moon: '🌙',
-  cloud: '☁️',
-  rain: '🌧️',
-  snow: '❄️',
-  temperature: '🌡️',
+  love: 'LIKE',
+  thumbsUp: 'UP',
+  thumbsDown: 'DOWN',
+  wave: 'HELLO',
+  celebration: 'CELEB',
+  party: 'PARTY',
+  magic: 'MAGIC',
+  sparkles: 'SPARK',
+  lightning: 'FAST',
+  lock: 'LOCK',
+  unlock: 'UNLOCK',
+  key: 'KEY',
+  shield: 'SAFE',
+  target: 'TARGET',
+  calendar: 'CAL',
+  clock: 'TIME',
+  alarm: 'ALARM',
+  bell: 'BELL',
+  microphone: 'MIC',
+  speaker: 'AUDIO',
+  mute: 'MUTE',
+  eye: 'VIEW',
+  heart: 'HEART',
+  brain: 'AI',
+  battery: 'BAT',
+  plug: 'POWER',
+  wifi: 'NET',
+  location: 'LOC',
+  map: 'MAP',
+  compass: 'NAV',
+  sun: 'DAY',
+  moon: 'NIGHT',
+  cloud: 'CLOUD',
+  rain: 'RAIN',
+  snow: 'SNOW',
+  temperature: 'TEMP',
 } as const;
 
 export type StatusEmojiKey = keyof typeof STATUS_EMOJIS;
@@ -120,213 +120,157 @@ export interface FeedbackMessage {
 }
 
 export const FEEDBACK_MESSAGES: Record<string, FeedbackMessage> = {
-  // File operations
-  fileSaved: { emoji: '💾', title: 'Saved!', type: 'success' },
-  fileCreated: { emoji: '📄', title: 'File Created', type: 'success' },
-  fileDeleted: { emoji: '🗑️', title: 'Moved to Trash', type: 'info' },
-  fileCopied: { emoji: '📋', title: 'Copied!', type: 'success' },
-  fileMoved: { emoji: '📦', title: 'Moved!', type: 'success' },
-  fileNotFound: { emoji: '🔍', title: 'File Not Found', type: 'error' },
-  
-  // Export/Import
-  exportComplete: { emoji: '📤', title: 'Export Complete!', type: 'success' },
-  importComplete: { emoji: '📥', title: 'Import Complete!', type: 'success' },
-  exportFailed: { emoji: '❌', title: 'Export Failed', type: 'error' },
-  importFailed: { emoji: '❌', title: 'Import Failed', type: 'error' },
-  
-  // Sync
-  syncComplete: { emoji: '🔄', title: 'Synced!', type: 'success' },
-  syncFailed: { emoji: '📴', title: 'Sync Failed', type: 'error' },
-  syncPending: { emoji: '⏳', title: 'Syncing...', type: 'info' },
-  
-  // Authentication
-  loggedIn: { emoji: '👋', title: 'Welcome back!', type: 'success' },
-  loggedOut: { emoji: '👋', title: 'See you later!', type: 'info' },
-  sessionExpired: { emoji: '⏰', title: 'Session Expired', type: 'warning' },
-  
-  // Creative apps
-  renderComplete: { emoji: '🎬', title: 'Render Complete!', type: 'success' },
-  renderFailed: { emoji: '💥', title: 'Render Failed', type: 'error' },
-  renderStarted: { emoji: '⚙️', title: 'Rendering...', type: 'info' },
-  audioExported: { emoji: '🎵', title: 'Audio Exported!', type: 'success' },
-  imageExported: { emoji: '🖼️', title: 'Image Exported!', type: 'success' },
-  
-  // Achievements
-  levelUp: { emoji: '🎉', title: 'Level Up!', type: 'success' },
-  badgeEarned: { emoji: '🏆', title: 'Badge Earned!', type: 'success' },
-  streakContinued: { emoji: '🔥', title: 'Streak Continues!', type: 'success' },
-  goalReached: { emoji: '🎯', title: 'Goal Reached!', type: 'success' },
-  
-  // Errors
-  unknownError: { emoji: '😕', title: 'Something went wrong', type: 'error' },
-  networkError: { emoji: '📶', title: 'Network Error', type: 'error' },
-  permissionDenied: { emoji: '🔒', title: 'Permission Denied', type: 'error' },
-  diskFull: { emoji: '💾', title: 'Disk Full', type: 'error' },
-  
-  // Warnings
-  unsavedChanges: { emoji: '⚠️', title: 'Unsaved Changes', type: 'warning' },
-  lowBattery: { emoji: '🪫', title: 'Low Battery', type: 'warning' },
-  lowStorage: { emoji: '📦', title: 'Low Storage', type: 'warning' },
-  
-  // Info
-  updateAvailable: { emoji: '🆕', title: 'Update Available', type: 'info' },
-  featureNew: { emoji: '✨', title: 'New Feature!', type: 'info' },
-  tipOfTheDay: { emoji: '💡', title: 'Tip of the Day', type: 'info' },
+  fileSaved: { emoji: 'SAVE', title: 'Saved!', type: 'success' },
+  fileCreated: { emoji: 'FILE', title: 'File Created', type: 'success' },
+  fileDeleted: { emoji: 'DEL', title: 'Moved to Trash', type: 'info' },
+  fileCopied: { emoji: 'COPY', title: 'Copied!', type: 'success' },
+  fileMoved: { emoji: 'MOVE', title: 'Moved!', type: 'success' },
+  fileNotFound: { emoji: 'SEARCH', title: 'File Not Found', type: 'error' },
+
+  exportComplete: { emoji: 'UP', title: 'Export Complete!', type: 'success' },
+  importComplete: { emoji: 'DOWN', title: 'Import Complete!', type: 'success' },
+  exportFailed: { emoji: 'ERR', title: 'Export Failed', type: 'error' },
+  importFailed: { emoji: 'ERR', title: 'Import Failed', type: 'error' },
+
+  syncComplete: { emoji: 'SYNC', title: 'Synced!', type: 'success' },
+  syncFailed: { emoji: 'OFF', title: 'Sync Failed', type: 'error' },
+  syncPending: { emoji: 'WAIT', title: 'Syncing...', type: 'info' },
+
+  loggedIn: { emoji: 'HELLO', title: 'Welcome back!', type: 'success' },
+  loggedOut: { emoji: 'BYE', title: 'See you later!', type: 'info' },
+  sessionExpired: { emoji: 'TIME', title: 'Session Expired', type: 'warning' },
+
+  renderComplete: { emoji: 'VIDEO', title: 'Render Complete!', type: 'success' },
+  renderFailed: { emoji: 'FAIL', title: 'Render Failed', type: 'error' },
+  renderStarted: { emoji: 'PROC', title: 'Rendering...', type: 'info' },
+  audioExported: { emoji: 'AUDIO', title: 'Audio Exported!', type: 'success' },
+  imageExported: { emoji: 'IMAGE', title: 'Image Exported!', type: 'success' },
+
+  levelUp: { emoji: 'LEVEL', title: 'Level Up!', type: 'success' },
+  badgeEarned: { emoji: 'AWARD', title: 'Badge Earned!', type: 'success' },
+  streakContinued: { emoji: 'STREAK', title: 'Streak Continues!', type: 'success' },
+  goalReached: { emoji: 'TARGET', title: 'Goal Reached!', type: 'success' },
+
+  unknownError: { emoji: 'ERR', title: 'Something went wrong', type: 'error' },
+  networkError: { emoji: 'NET', title: 'Network Error', type: 'error' },
+  permissionDenied: { emoji: 'LOCK', title: 'Permission Denied', type: 'error' },
+  diskFull: { emoji: 'DISK', title: 'Disk Full', type: 'error' },
+
+  unsavedChanges: { emoji: 'WARN', title: 'Unsaved Changes', type: 'warning' },
+  lowBattery: { emoji: 'BAT', title: 'Low Battery', type: 'warning' },
+  lowStorage: { emoji: 'DISK', title: 'Low Storage', type: 'warning' },
+
+  updateAvailable: { emoji: 'NEW', title: 'Update Available', type: 'info' },
+  featureNew: { emoji: 'NEW', title: 'New Feature!', type: 'info' },
+  tipOfTheDay: { emoji: 'TIP', title: 'Tip of the Day', type: 'info' },
 };
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-/**
- * Get emoji for a status key
- */
 export function getEmoji(key: StatusEmojiKey): string {
-  return STATUS_EMOJIS[key] || '📌';
+  return STATUS_EMOJIS[key] || 'INFO';
 }
 
-/**
- * Get feedback message for a key
- */
 export function getFeedback(key: keyof typeof FEEDBACK_MESSAGES): FeedbackMessage {
-  return FEEDBACK_MESSAGES[key] || { emoji: 'ℹ️', title: key, type: 'info' };
+  return FEEDBACK_MESSAGES[key] || { emoji: 'INFO', title: key, type: 'info' };
 }
 
-/**
- * Format a message with emoji prefix
- */
 export function formatWithEmoji(
   message: string,
   emoji: string | StatusEmojiKey = 'info'
 ): string {
-  const e = emoji in STATUS_EMOJIS ? STATUS_EMOJIS[emoji as StatusEmojiKey] : emoji;
-  return `${e} ${message}`;
+  const token = emoji in STATUS_EMOJIS ? STATUS_EMOJIS[emoji as StatusEmojiKey] : emoji;
+  return `[${token}] ${message}`;
 }
 
-/**
- * Get appropriate emoji for file type
- */
 export function getFileEmoji(filename: string, isDir = false): string {
-  if (isDir) return '📁';
-  
+  if (isDir) return 'FOLDER';
+
   const ext = filename.split('.').pop()?.toLowerCase() || '';
-  
-  // Images
-  if (/^(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/.test(ext)) return '🖼️';
-  
-  // Videos
-  if (/^(mp4|mov|avi|mkv|webm|flv|wmv)$/.test(ext)) return '🎬';
-  
-  // Audio
-  if (/^(mp3|wav|flac|aac|ogg|m4a|wma)$/.test(ext)) return '🎵';
-  
-  // Documents
-  if (/^(pdf)$/.test(ext)) return '📕';
-  if (/^(doc|docx|odt|rtf)$/.test(ext)) return '📄';
-  if (/^(xls|xlsx|csv)$/.test(ext)) return '📊';
-  if (/^(ppt|pptx)$/.test(ext)) return '📽️';
-  if (/^(txt|md)$/.test(ext)) return '📝';
-  
-  // Code
-  if (/^(ts|tsx|js|jsx)$/.test(ext)) return '💛';
-  if (/^(py)$/.test(ext)) return '🐍';
-  if (/^(rs)$/.test(ext)) return '🦀';
-  if (/^(go)$/.test(ext)) return '🐹';
-  if (/^(java|kt)$/.test(ext)) return '☕';
-  if (/^(c|cpp|h|hpp)$/.test(ext)) return '⚙️';
-  if (/^(css|scss|sass|less)$/.test(ext)) return '🎨';
-  if (/^(html|htm)$/.test(ext)) return '🌐';
-  if (/^(json|yaml|yml|toml|xml)$/.test(ext)) return '📋';
-  
-  // Archives
-  if (/^(zip|rar|7z|tar|gz|bz2)$/.test(ext)) return '📦';
-  
-  // 3D
-  if (/^(obj|fbx|gltf|glb|blend|stl)$/.test(ext)) return '🧊';
-  
-  // Fonts
-  if (/^(ttf|otf|woff|woff2)$/.test(ext)) return '🔤';
-  
-  // Executables
-  if (/^(exe|msi|app|dmg)$/.test(ext)) return '⚙️';
-  
-  return '📄';
+
+  if (/^(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/.test(ext)) return 'IMAGE';
+  if (/^(mp4|mov|avi|mkv|webm|flv|wmv)$/.test(ext)) return 'VIDEO';
+  if (/^(mp3|wav|flac|aac|ogg|m4a|wma)$/.test(ext)) return 'AUDIO';
+  if (/^(pdf)$/.test(ext)) return 'PDF';
+  if (/^(doc|docx|odt|rtf)$/.test(ext)) return 'DOC';
+  if (/^(xls|xlsx|csv)$/.test(ext)) return 'SHEET';
+  if (/^(ppt|pptx)$/.test(ext)) return 'SLIDE';
+  if (/^(txt|md)$/.test(ext)) return 'TEXT';
+  if (/^(ts|tsx|js|jsx)$/.test(ext)) return 'JS';
+  if (/^(py)$/.test(ext)) return 'PY';
+  if (/^(rs)$/.test(ext)) return 'RS';
+  if (/^(go)$/.test(ext)) return 'GO';
+  if (/^(java|kt)$/.test(ext)) return 'JAVA';
+  if (/^(c|cpp|h|hpp)$/.test(ext)) return 'CPP';
+  if (/^(css|scss|sass|less)$/.test(ext)) return 'CSS';
+  if (/^(html|htm)$/.test(ext)) return 'HTML';
+  if (/^(json|yaml|yml|toml|xml)$/.test(ext)) return 'DATA';
+  if (/^(zip|rar|7z|tar|gz|bz2)$/.test(ext)) return 'ARCH';
+  if (/^(obj|fbx|gltf|glb|blend|stl)$/.test(ext)) return '3D';
+  if (/^(ttf|otf|woff|woff2)$/.test(ext)) return 'FONT';
+  if (/^(exe|msi|app|dmg)$/.test(ext)) return 'APP';
+
+  return 'FILE';
 }
 
-/**
- * Get status emoji with color hint
- */
 export function getStatusEmoji(
   status: 'success' | 'warning' | 'error' | 'info' | 'pending'
 ): string {
   switch (status) {
-    case 'success': return '✅';
-    case 'warning': return '⚠️';
-    case 'error': return '❌';
-    case 'info': return 'ℹ️';
-    case 'pending': return '⏳';
-    default: return '📌';
+    case 'success': return 'OK';
+    case 'warning': return 'WARN';
+    case 'error': return 'ERR';
+    case 'info': return 'INFO';
+    case 'pending': return 'WAIT';
+    default: return 'INFO';
   }
 }
 
-/**
- * Get progress emoji based on percentage
- */
 export function getProgressEmoji(percent: number): string {
-  if (percent >= 100) return '🎉';
-  if (percent >= 90) return '🔥';
-  if (percent >= 75) return '⚡';
-  if (percent >= 50) return '💪';
-  if (percent >= 25) return '🚀';
-  return '🏁';
+  if (percent >= 100) return 'DONE';
+  if (percent >= 90) return 'FAST';
+  if (percent >= 75) return 'HIGH';
+  if (percent >= 50) return 'MID';
+  if (percent >= 25) return 'LOW';
+  return 'START';
 }
 
-/**
- * Get random celebration emoji
- */
 export function getRandomCelebration(): string {
-  const celebrations = ['🎉', '🎊', '🥳', '🏆', '⭐', '🌟', '✨', '💫', '🎯', '🚀', '🔥', '💎', '👏', '🙌'];
+  const celebrations = ['DONE', 'AWARD', 'STAR', 'TARGET', 'LAUNCH', 'PRO'];
   return celebrations[Math.floor(Math.random() * celebrations.length)];
 }
 
-/**
- * Get weather emoji
- */
 export function getWeatherEmoji(condition: string): string {
-  const c = condition.toLowerCase();
-  if (c.includes('clear') || c.includes('sunny')) return '☀️';
-  if (c.includes('cloud') && c.includes('sun')) return '⛅';
-  if (c.includes('cloud')) return '☁️';
-  if (c.includes('rain')) return '🌧️';
-  if (c.includes('storm') || c.includes('thunder')) return '⛈️';
-  if (c.includes('snow')) return '❄️';
-  if (c.includes('fog') || c.includes('mist')) return '🌫️';
-  if (c.includes('wind')) return '💨';
-  if (c.includes('night') || c.includes('moon')) return '🌙';
-  return '🌡️';
+  const value = condition.toLowerCase();
+  if (value.includes('clear') || value.includes('sunny')) return 'SUN';
+  if (value.includes('cloud') && value.includes('sun')) return 'PARTLY';
+  if (value.includes('cloud')) return 'CLOUD';
+  if (value.includes('rain')) return 'RAIN';
+  if (value.includes('storm') || value.includes('thunder')) return 'STORM';
+  if (value.includes('snow')) return 'SNOW';
+  if (value.includes('fog') || value.includes('mist')) return 'FOG';
+  if (value.includes('wind')) return 'WIND';
+  if (value.includes('night') || value.includes('moon')) return 'NIGHT';
+  return 'TEMP';
 }
 
-/**
- * Get battery emoji based on level
- */
 export function getBatteryEmoji(level: number, charging = false): string {
-  if (charging) return '🔌';
-  if (level > 80) return '🔋';
-  if (level > 50) return '🔋';
-  if (level > 20) return '🪫';
-  return '🪫';
+  if (charging) return 'POWER';
+  if (level > 80) return 'BAT100';
+  if (level > 50) return 'BAT75';
+  if (level > 20) return 'BAT25';
+  return 'BATLOW';
 }
 
-/**
- * Get time-of-day greeting with emoji
- */
 export function getTimeGreeting(): { emoji: string; greeting: string } {
   const hour = new Date().getHours();
-  if (hour < 6) return { emoji: '🌙', greeting: 'Good night' };
-  if (hour < 12) return { emoji: '☀️', greeting: 'Good morning' };
-  if (hour < 17) return { emoji: '🌤️', greeting: 'Good afternoon' };
-  if (hour < 21) return { emoji: '🌆', greeting: 'Good evening' };
-  return { emoji: '🌙', greeting: 'Good night' };
+  if (hour < 6) return { emoji: 'NIGHT', greeting: 'Good night' };
+  if (hour < 12) return { emoji: 'DAY', greeting: 'Good morning' };
+  if (hour < 17) return { emoji: 'DAY', greeting: 'Good afternoon' };
+  if (hour < 21) return { emoji: 'EVE', greeting: 'Good evening' };
+  return { emoji: 'NIGHT', greeting: 'Good night' };
 }
 
 // ============================================================================
@@ -338,36 +282,4 @@ export const CELEBRATION_CLASSES = {
   sparkle: 'animate-sparkle',
   bounce: 'animate-bounce',
   pulse: 'animate-pulse',
-  shake: 'animate-shake',
-  glow: 'animate-glow',
 } as const;
-
-/**
- * Trigger a celebration effect by adding a class to an element
- */
-export function triggerCelebration(
-  element: HTMLElement,
-  effect: keyof typeof CELEBRATION_CLASSES = 'confetti',
-  duration = 1000
-): void {
-  const className = CELEBRATION_CLASSES[effect];
-  element.classList.add(className);
-  setTimeout(() => element.classList.remove(className), duration);
-}
-
-// Default export
-export default {
-  STATUS_EMOJIS,
-  FEEDBACK_MESSAGES,
-  getEmoji,
-  getFeedback,
-  formatWithEmoji,
-  getFileEmoji,
-  getStatusEmoji,
-  getProgressEmoji,
-  getRandomCelebration,
-  getWeatherEmoji,
-  getBatteryEmoji,
-  getTimeGreeting,
-  triggerCelebration,
-};

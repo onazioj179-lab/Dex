@@ -513,7 +513,7 @@ const ICON_PATHS: Record<string, string> = {
   'tooltip': '<rect x="2" y="4" width="20" height="12" rx="2"/><path d="M12 16v4"/><path d="M10 20h4"/>',
   'shortcut-key': '<rect x="2" y="6" width="8" height="12" rx="2"/><rect x="14" y="6" width="8" height="12" rx="2"/><path d="M6 11v2"/><path d="M18 11v2"/>',
 
-  // Emoji-Style System Icons ✨🎯🚀
+  // Engagement system icons
   'emoji-star': '<path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" fill="currentColor"/>',
   'emoji-fire': '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="currentColor"/>',
   'emoji-rocket': '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" fill="currentColor"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
@@ -630,11 +630,11 @@ export const ICON_NAME_MAP: Record<string, string> = {
   'picker': 'color-picker', 'eyedropper': 'pipette',
   'white-noise': 'noise-generator', 'ambient': 'noise-generator',
   
-  // Emoji aliases for common use
-  '⭐': 'emoji-star', '🌟': 'emoji-star', '✨': 'emoji-sparkle',
-  '🔥': 'emoji-fire', '🚀': 'emoji-rocket', '🎯': 'emoji-target',
-  '✅': 'emoji-check', '💜': 'emoji-heart', '⚡': 'emoji-lightning',
-  '🏆': 'emoji-trophy', '🥇': 'emoji-medal', '👑': 'emoji-crown',
+  // Text aliases for common use
+  'star': 'emoji-star', 'sparkle': 'emoji-sparkle',
+  'flame': 'emoji-fire', 'launch': 'emoji-rocket', 'target': 'emoji-target',
+  'check': 'emoji-check', 'heart': 'emoji-heart', 'fast': 'emoji-lightning',
+  'award': 'emoji-trophy', 'medal': 'emoji-medal', 'crown': 'emoji-crown',
 };
 
 export function resolveIconName(name: string): string {

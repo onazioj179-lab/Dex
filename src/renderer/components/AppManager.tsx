@@ -1356,7 +1356,7 @@ export const AppManager: React.FC = () => {
       top:          { x: PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
       bottom:       { x: PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
       center:       { x: Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
-      maximize:     { x: 0, y: 0, w: W, h: H }, // 🎯 True full screen - no gaps
+      maximize:     { x: 0, y: 0, w: W, h: H }, // True full screen - no gaps
     };
 
     const rect = positions[position];
@@ -1946,7 +1946,7 @@ export const AppManager: React.FC = () => {
                     currentX = Math.max(-detBounds.w + 60, Math.min(maxX, origX + ev.clientX - startX));
                     currentY = Math.max(0, Math.min(maxY, origY + ev.clientY - startY));
                     if (el) {
-                      // 🚀 Use transform during drag for GPU acceleration
+                      // Use transform during drag for GPU acceleration
                       el.style.transform = `translate(${currentX - origX}px, ${currentY - origY}px)`;
                     }
                     // Live snap zone preview

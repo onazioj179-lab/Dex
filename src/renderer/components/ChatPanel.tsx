@@ -337,7 +337,7 @@ const formatDate = (timestamp: number): string => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const QUICK_REACTIONS = ['👍', '❤️', '🎉', '🔥', '👀', '💯'];
+const QUICK_REACTIONS = ['Like', 'Love', 'Done', 'Hot', 'Seen', '100'];
 
 // ---------------------------------------------------------------------------
 // COMPONENT
@@ -634,7 +634,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
               style={{ background: 'none', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 2 }}
               aria-label="Dismiss"
             >
-              ✕
+              x
             </button>
           </div>
         )}

@@ -378,12 +378,12 @@ const styles: Record<string, React.CSSProperties> = {
 
 // App colors and icons
 const APP_THEMES: Record<string, { bg: string; color: string; icon: string }> = {
-  vinx: { bg: 'linear-gradient(135deg, #ff6b6b, #ee5a5a)', color: '#ff6b6b', icon: '🎬' },
-  imosion: { bg: 'linear-gradient(135deg, #845ef7, #7048e8)', color: '#845ef7', icon: '🎵' },
-  prism: { bg: 'linear-gradient(135deg, #22b8cf, #15aabf)', color: '#22b8cf', icon: '🎨' },
-  flux: { bg: 'linear-gradient(135deg, #ff922b, #fd7e14)', color: '#ff922b', icon: '✨' },
-  forge: { bg: 'linear-gradient(135deg, #51cf66, #40c057)', color: '#51cf66', icon: '⚙️' },
-  axl: { bg: 'linear-gradient(135deg, #339af0, #228be6)', color: '#339af0', icon: '📐' },
+  vinx: { bg: 'linear-gradient(135deg, #ff6b6b, #ee5a5a)', color: '#ff6b6b', icon: 'V' },
+  imosion: { bg: 'linear-gradient(135deg, #845ef7, #7048e8)', color: '#845ef7', icon: 'I' },
+  prism: { bg: 'linear-gradient(135deg, #22b8cf, #15aabf)', color: '#22b8cf', icon: 'P' },
+  flux: { bg: 'linear-gradient(135deg, #ff922b, #fd7e14)', color: '#ff922b', icon: 'F' },
+  forge: { bg: 'linear-gradient(135deg, #51cf66, #40c057)', color: '#51cf66', icon: 'G' },
+  axl: { bg: 'linear-gradient(135deg, #339af0, #228be6)', color: '#339af0', icon: 'A' },
 };
 
 // ---------------------------------------------------------------------------
@@ -500,7 +500,7 @@ const CollabHub: React.FC = () => {
             ? `${req.requesterName} was granted access`
             : `${req.requesterName}'s request was denied`,
           description: req.message || `Requested ${req.requestedRole} access to ${p.name}`,
-          icon: req.status === 'pending' ? '🔔' : req.status === 'approved' ? '✅' : '❌',
+          icon: req.status === 'pending' ? '!' : req.status === 'approved' ? 'OK' : 'NO',
           iconBg: req.status === 'pending' 
             ? 'linear-gradient(135deg, #ff9f0a, #ff6b00)'
             : req.status === 'approved'
@@ -522,7 +522,7 @@ const CollabHub: React.FC = () => {
           timestamp: cp.timestamp,
           title: cp.autoSave ? 'Auto-saved checkpoint' : `Checkpoint: ${cp.name}`,
           description: `${cp.creatorName} saved a checkpoint on ${p.name}`,
-          icon: '💾',
+          icon: 'SAVE',
           iconBg: 'linear-gradient(135deg, #30d158, #34c759)',
         });
       });
@@ -540,7 +540,7 @@ const CollabHub: React.FC = () => {
           timestamp: c.joinedAt,
           title: `${c.name} joined`,
           description: `Joined ${p.name} as ${c.role}${c.isVisitor ? ' (visitor)' : ''}`,
-          icon: '👤',
+          icon: 'USER',
           iconBg: 'linear-gradient(135deg, #5e5ce6, #bf5af2)',
         });
       });
@@ -654,10 +654,10 @@ const CollabHub: React.FC = () => {
       {/* Tabs */}
       <div style={styles.tabs}>
         {([
-          { id: 'projects' as const, label: 'My Projects', icon: '📁', badge: 0 },
-          { id: 'shared' as const, label: 'Shared with Me', icon: '👥', badge: 0 },
-          { id: 'checkpoints' as const, label: 'Checkpoints', icon: '💾', badge: 0 },
-          { id: 'activity' as const, label: 'Activity', icon: '📊', badge: pendingRequests },
+          { id: 'projects' as const, label: 'My Projects', icon: 'PRJ', badge: 0 },
+          { id: 'shared' as const, label: 'Shared with Me', icon: 'TEAM', badge: 0 },
+          { id: 'checkpoints' as const, label: 'Checkpoints', icon: 'SAVE', badge: 0 },
+          { id: 'activity' as const, label: 'Activity', icon: 'LOG', badge: pendingRequests },
         ]).map(tab => (
           <button
             key={tab.id}
@@ -727,7 +727,7 @@ const CollabHub: React.FC = () => {
                   }}
                   onClick={() => setFilter(f === 'All' ? null : f)}
                 >
-                  {f === 'All' ? '🌐 All' : `${APP_THEMES[f]?.icon || ''} ${f.charAt(0).toUpperCase() + f.slice(1)}`}
+                  {f === 'All' ? 'All' : `${APP_THEMES[f]?.icon || ''} ${f.charAt(0).toUpperCase() + f.slice(1)}`}
                 </button>
               ))}
             </div>

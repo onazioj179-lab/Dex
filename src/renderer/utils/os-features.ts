@@ -188,7 +188,7 @@ export function createCalculatorProvider(): SpotlightProvider {
             type: 'calculation',
             title: formatResult(result),
             subtitle: query,
-            icon: '🧮',
+            icon: 'calculator',
             action: { type: 'copy', value: formatResult(result) },
             score: 100,
           }];
@@ -262,7 +262,7 @@ export function createFileSearchProvider(
         type: file.type,
         title: file.name,
         subtitle: file.path,
-        icon: file.type === 'folder' ? '📁' : '📄',
+        icon: file.type === 'folder' ? 'folder' : 'file',
         action: { type: 'open' as const, target: file.path },
         score: file.name.toLowerCase().startsWith(query.toLowerCase()) ? 85 : 70,
         metadata: { modified: file.modified, size: file.size },
@@ -1117,7 +1117,7 @@ export const clockWidgetDefinition: WidgetDefinition = {
   type: 'clock',
   name: 'Clock',
   description: 'Displays current time',
-  icon: '🕐',
+  icon: 'clock',
   supportedSizes: ['small', 'medium'],
   defaultSize: 'small',
   configSchema: {
@@ -1165,7 +1165,7 @@ export const weatherWidgetDefinition: WidgetDefinition = {
   type: 'weather',
   name: 'Weather',
   description: 'Current weather conditions',
-  icon: '🌤️',
+  icon: 'weather',
   supportedSizes: ['small', 'medium', 'large'],
   defaultSize: 'medium',
   configSchema: {
@@ -1182,13 +1182,13 @@ export const weatherWidgetDefinition: WidgetDefinition = {
     return {
       temp: 22,
       condition: 'Partly Cloudy',
-      icon: '⛅',
+      icon: 'partly-cloudy',
       humidity: 65,
       wind: 12,
       forecast: [
-        { day: 'Mon', high: 24, low: 18, icon: '☀️' },
-        { day: 'Tue', high: 22, low: 17, icon: '⛅' },
-        { day: 'Wed', high: 20, low: 15, icon: '🌧️' },
+        { day: 'Mon', high: 24, low: 18, icon: 'sunny' },
+        { day: 'Tue', high: 22, low: 17, icon: 'partly-cloudy' },
+        { day: 'Wed', high: 20, low: 15, icon: 'rain' },
       ],
     };
   },
@@ -1214,7 +1214,7 @@ export const calendarWidgetDefinition: WidgetDefinition = {
   type: 'calendar',
   name: 'Calendar',
   description: 'Upcoming events',
-  icon: '📅',
+  icon: 'calendar',
   supportedSizes: ['medium', 'large'],
   defaultSize: 'medium',
   fetchData: async () => {
@@ -1247,7 +1247,7 @@ export const notesWidgetDefinition: WidgetDefinition = {
   type: 'notes',
   name: 'Quick Notes',
   description: 'Sticky note widget',
-  icon: '📝',
+  icon: 'notes',
   supportedSizes: ['small', 'medium', 'large'],
   defaultSize: 'medium',
   configSchema: {
@@ -1485,13 +1485,13 @@ export class QuickActionsManager {
   
   getGroups(): QuickActionGroup[] {
     const categoryInfo: Record<QuickActionCategory, { title: string; icon: string }> = {
-      connectivity: { title: 'Connectivity', icon: '📡' },
-      display: { title: 'Display', icon: '🖥️' },
-      sound: { title: 'Sound', icon: '🔊' },
-      system: { title: 'System', icon: '⚙️' },
-      accessibility: { title: 'Accessibility', icon: '♿' },
-      power: { title: 'Power', icon: '🔋' },
-      shortcuts: { title: 'Shortcuts', icon: '⚡' },
+      connectivity: { title: 'Connectivity', icon: 'net' },
+      display: { title: 'Display', icon: 'display' },
+      sound: { title: 'Sound', icon: 'sound' },
+      system: { title: 'System', icon: 'system' },
+      accessibility: { title: 'Accessibility', icon: 'access' },
+      power: { title: 'Power', icon: 'power' },
+      shortcuts: { title: 'Shortcuts', icon: 'keys' },
     };
     
     const groups = new Map<QuickActionCategory, QuickAction[]>();
@@ -1534,7 +1534,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'wifi',
       title: 'Wi-Fi',
-      icon: '📶',
+      icon: 'wifi',
       category: 'connectivity',
       isToggle: true,
       toggleState: true,
@@ -1544,7 +1544,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'bluetooth',
       title: 'Bluetooth',
-      icon: '📱',
+      icon: 'phone',
       category: 'connectivity',
       isToggle: true,
       toggleState: false,
@@ -1554,7 +1554,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'airplane',
       title: 'Airplane Mode',
-      icon: '✈️',
+      icon: 'airplane',
       category: 'connectivity',
       isToggle: true,
       toggleState: false,
@@ -1566,7 +1566,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'dark-mode',
       title: 'Dark Mode',
-      icon: '🌙',
+      icon: 'moon',
       category: 'display',
       isToggle: true,
       toggleState: true,
@@ -1576,7 +1576,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'night-shift',
       title: 'Night Shift',
-      icon: '🌅',
+      icon: 'sunrise',
       category: 'display',
       isToggle: true,
       toggleState: false,
@@ -1586,7 +1586,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'screen-mirror',
       title: 'Screen Mirroring',
-      icon: '📺',
+      icon: 'screen',
       category: 'display',
       execute: () => { console.log('Screen Mirror'); },
     },
@@ -1595,7 +1595,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'mute',
       title: 'Mute',
-      icon: '🔇',
+      icon: 'mute',
       category: 'sound',
       isToggle: true,
       toggleState: false,
@@ -1605,7 +1605,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'dnd',
       title: 'Do Not Disturb',
-      icon: '🔕',
+      icon: 'dnd',
       category: 'sound',
       isToggle: true,
       toggleState: false,
@@ -1617,7 +1617,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'lock-screen',
       title: 'Lock Screen',
-      icon: '🔒',
+      icon: 'lock',
       category: 'system',
       execute: () => { console.log('Lock Screen'); },
       shortcut: 'Cmd+Ctrl+Q',
@@ -1625,7 +1625,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'screenshot',
       title: 'Screenshot',
-      icon: '📸',
+      icon: 'camera',
       category: 'system',
       execute: () => { console.log('Screenshot'); },
       shortcut: 'Cmd+Shift+3',
@@ -1633,7 +1633,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'screen-record',
       title: 'Screen Recording',
-      icon: '⏺️',
+      icon: 'record',
       category: 'system',
       isToggle: true,
       toggleState: false,
@@ -1645,7 +1645,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'zoom',
       title: 'Zoom',
-      icon: '🔍',
+      icon: 'zoom',
       category: 'accessibility',
       isToggle: true,
       toggleState: false,
@@ -1655,7 +1655,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'voice-over',
       title: 'VoiceOver',
-      icon: '🗣️',
+      icon: 'voice',
       category: 'accessibility',
       isToggle: true,
       toggleState: false,
@@ -1667,7 +1667,7 @@ export function createBuiltInQuickActions(): QuickAction[] {
     {
       id: 'low-power',
       title: 'Low Power Mode',
-      icon: '🔋',
+      icon: 'battery',
       category: 'power',
       isToggle: true,
       toggleState: false,
@@ -1744,7 +1744,7 @@ export function createControlCenterSliders(): SliderControl[] {
     {
       id: 'brightness',
       label: 'Brightness',
-      icon: '☀️',
+      icon: 'brightness',
       value: 80,
       min: 0,
       max: 100,
@@ -1756,7 +1756,7 @@ export function createControlCenterSliders(): SliderControl[] {
     {
       id: 'volume',
       label: 'Volume',
-      icon: '🔊',
+      icon: 'volume',
       value: 50,
       min: 0,
       max: 100,

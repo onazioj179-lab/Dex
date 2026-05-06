@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 /**
- * Memory Pressure Monitoring 🧠
+ * Memory Pressure Monitoring
  * 
  * Monitors memory usage and provides hooks for components to respond to
  * memory pressure events. Integrates with the adaptive canvas system.
@@ -301,11 +301,11 @@ export function useAdaptiveQuality(): 'high' | 'medium' | 'low' {
  * Format memory info for display
  */
 export function formatMemoryInfo(info: MemoryInfo): string {
-  const emoji = info.pressureLevel === 'critical' ? '🔴' 
-    : info.pressureLevel === 'moderate' ? '🟡' 
-    : '🟢';
+  const status = info.pressureLevel === 'critical' ? 'CRITICAL'
+    : info.pressureLevel === 'moderate' ? 'MODERATE'
+    : 'NORMAL';
   
-  return `${emoji} ${info.usedHeapMB.toFixed(0)}MB / ${info.heapLimitMB.toFixed(0)}MB (${(info.usagePercent * 100).toFixed(0)}%)`;
+  return `${status} ${info.usedHeapMB.toFixed(0)}MB / ${info.heapLimitMB.toFixed(0)}MB (${(info.usagePercent * 100).toFixed(0)}%)`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

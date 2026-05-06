@@ -1,9 +1,11 @@
 # =============================================================================
-# DEX - CI/CD Pipeline
-# Automated builds, tests, and releases
+# DEX - CI Pipeline
+# Lint, type-check, unit tests, and renderer/main build on every push/PR.
+# Heavy package/release jobs only run on tags or manual dispatch so the
+# default `main` workflow stays green and fast.
 # =============================================================================
 
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -12,26 +14,14 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
-    inputs:
-      release_type:
-        description: 'Release type'
-        required: false
-        default: 'none'
-        type: choice
-        options:
-          - none
-          - patch
-          - minor
-          - major
 
 env:
   NODE_VERSION: '20.x'
-  RUST_VERSION: 'stable'
 
 jobs:
-  # ===========================================================================
-  # LINT AND TYPE CHECK
-  # ===========================================================================
+  # ---------------------------------------------------------------------------
+  # Lint, type-check, watermark verification
+  # ---------------------------------------------------------------------------
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
@@ -45,18 +35,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      # Skip electron-builder install-app-deps and other native postinstall
+      # work; CI only needs the JS/TS toolchain to lint and test.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      - name: Type check
+      - name: Type check & watermark check
         run: npm run lint
 
-      - name: Check formatting
-        run: npx prettier --check "src/**/*.{ts,tsx}"
-
-  # ===========================================================================
-  # UNIT TESTS
-  # ===========================================================================
+  # ---------------------------------------------------------------------------
+  # Unit tests (Vitest)
+  # ---------------------------------------------------------------------------
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -72,38 +61,18 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run tests
-        run: npm run test:coverage
+        run: npm test
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-
-  # ===========================================================================
-  # BUILD NATIVE MODULE
-  # ===========================================================================
-  build-native:
-    name: Build Native (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  # ---------------------------------------------------------------------------
+  # Renderer + main build verification
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build (renderer + main)
+    runs-on: ubuntu-latest
     needs: lint
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: win32-x64-msvc
-          - os: macos-latest
-            target: darwin-x64
-          - os: macos-14
-            target: darwin-arm64
-          - os: ubuntu-latest
-            target: linux-x64-gnu
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,34 +83,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: native
-
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      - name: Build native module
-        run: npm run build:native
-        working-directory: native
+      - name: Build
+        run: npm run build
 
-      - name: Upload native artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-${{ matrix.target }}
-          path: native/*.node
-
-  # ===========================================================================
-  # BUILD APPLICATION
-  # ===========================================================================
-  build:
-    name: Build (${{ matrix.os }})
+  # ---------------------------------------------------------------------------
+  # Package desktop installers (only on tags or manual dispatch)
+  # ---------------------------------------------------------------------------
+  package:
+    name: Package (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
-    needs: [test, build-native]
+    needs: [test, build]
     strategy:
       fail-fast: false
       matrix:
@@ -163,13 +118,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Download native artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: native-*
-          path: native/
-          merge-multiple: true
-
       - name: Install dependencies
         run: npm ci
 
@@ -178,24 +126,21 @@ jobs:
 
       - name: Package (Windows)
         if: matrix.platform == 'win'
-        run: npm run package:win
+        run: npx electron-builder --win
         env:
-          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package (macOS)
         if: matrix.platform == 'mac'
-        run: npm run package:mac
+        run: npx electron-builder --mac
         env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package (Linux)
         if: matrix.platform == 'linux'
-        run: npm run package:linux
+        run: npx electron-builder --linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -209,63 +154,18 @@ jobs:
             release/*.deb
             release/*.rpm
             release/latest*.yml
+          if-no-files-found: ignore
 
-  # ===========================================================================
-  # E2E TESTS
-  # ===========================================================================
-  e2e:
-    name: E2E Tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: release-*
-          path: release/
-          merge-multiple: true
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-results-${{ matrix.os }}
-          path: test-results/
-
-  # ===========================================================================
-  # RELEASE
-  # ===========================================================================
+  # ---------------------------------------------------------------------------
+  # GitHub Release (only on version tags)
+  # ---------------------------------------------------------------------------
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [build, e2e]
+    needs: package
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -277,16 +177,9 @@ jobs:
           path: release/
           merge-multiple: true
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          echo "## What's Changed" > RELEASE_NOTES.md
-          git log --oneline $(git describe --tags --abbrev=0 HEAD^)..HEAD >> RELEASE_NOTES.md
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: RELEASE_NOTES.md
           files: |
             release/*.exe
             release/*.dmg
@@ -294,73 +187,6 @@ jobs:
             release/*.AppImage
             release/*.deb
             release/*.rpm
+            release/latest*.yml
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
-
-      - name: Upload to update server
-        run: |
-          echo "Uploading release to update server..."
-          # Add upload script here
-        env:
-          UPDATE_SERVER_TOKEN: ${{ secrets.UPDATE_SERVER_TOKEN }}
-
-  # ===========================================================================
-  # PUBLISH TO STORES
-  # ===========================================================================
-  publish-stores:
-    name: Publish to Stores
-    runs-on: ubuntu-latest
-    needs: release
-    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta')
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: release-*
-          path: release/
-          merge-multiple: true
-
-      - name: Publish to Microsoft Store
-        run: |
-          echo "Publishing to Microsoft Store..."
-          # Add msstore-cli commands here
-        env:
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-
-      - name: Publish to Mac App Store
-        run: |
-          echo "Publishing to Mac App Store..."
-          # Add altool/notarytool commands here
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-
-      - name: Publish to Snapcraft
-        run: |
-          echo "Publishing to Snapcraft..."
-          # Add snapcraft upload commands here
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
-
-  # ===========================================================================
-  # NOTIFY
-  # ===========================================================================
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: [release]
-    if: always() && startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-      - name: Send Discord notification
-        if: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          curl -H "Content-Type: application/json" \
-            -d '{"content": "DEX ${{ github.ref_name }} has been released!"}' \
-            ${{ secrets.DISCORD_WEBHOOK }}

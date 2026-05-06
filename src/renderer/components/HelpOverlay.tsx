@@ -54,9 +54,9 @@ const HELP_SECTIONS: HelpSection[] = [
     title: 'Getting Started',
     icon: 'rocket',
     tips: [
-      { id: 'welcome', target: '', title: '👋 Welcome to DEX', content: 'DEX is your complete creative workspace. Use the dock at the bottom to launch apps, or press Ctrl+K for the command palette.' },
-      { id: 'uki', target: '', title: '🎙️ Meet UKI', content: 'UKI is your AI assistant. Say "Hey UKI" or press the microphone button to get help, open apps, or ask questions.' },
-      { id: 'navigation', target: '', title: '⌨️ Quick Navigation', content: 'Use Ctrl+1-9 to jump between apps. Hold Ctrl to see all shortcuts.' },
+      { id: 'welcome', target: '', title: 'Welcome to DEX', content: 'DEX is your complete creative workspace. Use the dock at the bottom to launch apps, or press Ctrl+K for the command palette.' },
+      { id: 'uki', target: '', title: 'Meet UKI', content: 'UKI is your AI assistant. Say "Hey UKI" or press the microphone button to get help, open apps, or ask questions.' },
+      { id: 'navigation', target: '', title: 'Quick Navigation', content: 'Use Ctrl+1-9 to jump between apps. Hold Ctrl to see all shortcuts.' },
     ],
   },
   {
@@ -64,12 +64,12 @@ const HELP_SECTIONS: HelpSection[] = [
     title: 'Creative Suite',
     icon: 'palette',
     tips: [
-      { id: 'vinx', target: '', title: '🎬 VINX', content: 'Professional video editor. Import clips, arrange on timeline, add effects. JKL keys for shuttle control.' },
-      { id: 'imosion', target: '', title: '🎵 Imosion', content: 'Digital audio workstation. Record, mix, master. Arm tracks with R, use M for metronome.' },
-      { id: 'prism', target: '', title: '🖼️ PRISM', content: 'Image editor with layers. Non-destructive editing, AI-powered tools. V=Move, B=Brush.' },
-      { id: 'flux', target: '', title: '✨ FLUX', content: 'Motion graphics and animation. Create stunning visuals with behaviors and keyframes.' },
-      { id: 'forge', target: '', title: '⚙️ FORGE', content: 'Media encoder and converter. Queue files, set formats, batch process.' },
-      { id: 'axl', target: '', title: '📐 AXL', content: 'CAD design tool. Create technical drawings with precision tools. G=Move, R=Rotate, S=Scale.' },
+      { id: 'vinx', target: '', title: 'VINX', content: 'Professional video editor. Import clips, arrange on timeline, add effects. JKL keys for shuttle control.' },
+      { id: 'imosion', target: '', title: 'Imosion', content: 'Digital audio workstation. Record, mix, master. Arm tracks with R, use M for metronome.' },
+      { id: 'prism', target: '', title: 'PRISM', content: 'Image editor with layers. Non-destructive editing, AI-powered tools. V=Move, B=Brush.' },
+      { id: 'flux', target: '', title: 'FLUX', content: 'Motion graphics and animation. Create stunning visuals with behaviors and keyframes.' },
+      { id: 'forge', target: '', title: 'FORGE', content: 'Media encoder and converter. Queue files, set formats, batch process.' },
+      { id: 'axl', target: '', title: 'AXL', content: 'CAD design tool. Create technical drawings with precision tools. G=Move, R=Rotate, S=Scale.' },
     ],
   },
   {
@@ -77,11 +77,11 @@ const HELP_SECTIONS: HelpSection[] = [
     title: 'Productivity',
     icon: 'briefcase',
     tips: [
-      { id: 'files', target: '', title: '📁 Files', content: 'Browse and manage your files. Drag & drop supported. Use tags for organization.' },
-      { id: 'notes', target: '', title: '📝 Notes', content: 'Create rich text notes with markdown support. Organize in folders.' },
-      { id: 'tasks', target: '', title: '✅ Tasks', content: 'Manage to-do lists with due dates, priorities, and subtasks.' },
-      { id: 'calendar', target: '', title: '📅 Calendar', content: 'Schedule events and reminders. Syncs with your accounts.' },
-      { id: 'kanban', target: '', title: '📋 Kanban', content: 'Visual project management. Drag cards between columns to track progress.' },
+      { id: 'files', target: '', title: 'Files', content: 'Browse and manage your files. Drag & drop supported. Use tags for organization.' },
+      { id: 'notes', target: '', title: 'Notes', content: 'Create rich text notes with markdown support. Organize in folders.' },
+      { id: 'tasks', target: '', title: 'Tasks', content: 'Manage to-do lists with due dates, priorities, and subtasks.' },
+      { id: 'calendar', target: '', title: 'Calendar', content: 'Schedule events and reminders. Syncs with your accounts.' },
+      { id: 'kanban', target: '', title: 'Kanban', content: 'Visual project management. Drag cards between columns to track progress.' },
     ],
   },
   {
@@ -89,26 +89,26 @@ const HELP_SECTIONS: HelpSection[] = [
     title: 'System Features',
     icon: 'settings',
     tips: [
-      { id: 'nexus', target: '', title: '🔮 Nexus', content: 'Visual knowledge graph and file explorer. Explore your data in 3D space.' },
-      { id: 'spotlight', target: '', title: '🔍 Spotlight', content: 'Press Ctrl+K to search files, apps, and commands instantly.' },
-      { id: 'notifications', target: '', title: '🔔 Notifications', content: 'Click the bell icon to view notifications and alerts.' },
-      { id: 'settings', target: '', title: '⚙️ Settings', content: 'Customize DEX appearance, privacy, and performance options.' },
+      { id: 'nexus', target: '', title: 'Nexus', content: 'Visual knowledge graph and file explorer. Explore your data in 3D space.' },
+      { id: 'spotlight', target: '', title: 'Spotlight', content: 'Press Ctrl+K to search files, apps, and commands instantly.' },
+      { id: 'notifications', target: '', title: 'Notifications', content: 'Click the bell icon to view notifications and alerts.' },
+      { id: 'settings', target: '', title: 'Settings', content: 'Customize DEX appearance, privacy, and performance options.' },
     ],
   },
 ];
 
 // Quick tips shown randomly
 const QUICK_TIPS = [
-  '💡 Double-click the titlebar to maximize a window',
-  '💡 Drag windows to screen edges to snap them',
-  '💡 Use Ctrl+Z to undo in any app',
-  '💡 Right-click for context menus with more options',
-  '💡 Press F11 for fullscreen mode',
-  '💡 Use Ctrl+Tab to switch between open apps',
-  '💡 Drag files onto app icons to open them',
-  '💡 Hold Shift while clicking for multi-select',
-  '💡 Use Ctrl+S to save your work frequently',
-  '💡 Ask UKI "What can you do?" for help',
+  'Tip: Double-click the titlebar to maximize a window',
+  'Tip: Drag windows to screen edges to snap them',
+  'Tip: Use Ctrl+Z to undo in any app',
+  'Tip: Right-click for context menus with more options',
+  'Tip: Press F11 for fullscreen mode',
+  'Tip: Use Ctrl+Tab to switch between open apps',
+  'Tip: Drag files onto app icons to open them',
+  'Tip: Hold Shift while clicking for multi-select',
+  'Tip: Use Ctrl+S to save your work frequently',
+  'Tip: Ask UKI "What can you do?" for help',
 ];
 
 // ============================================================================

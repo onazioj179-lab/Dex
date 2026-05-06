@@ -817,12 +817,12 @@ export interface PortDefinition {
 }
 
 const builtInNodeCategories = [
-  { id: 'triggers', name: 'Triggers', icon: '⚡' },
-  { id: 'actions', name: 'Actions', icon: '▶️' },
-  { id: 'logic', name: 'Logic', icon: '🔀' },
-  { id: 'data', name: 'Data', icon: '📊' },
-  { id: 'integrations', name: 'Integrations', icon: '🔌' },
-  { id: 'ai', name: 'AI', icon: '🤖' },
+  { id: 'triggers', name: 'Triggers', icon: 'trigger' },
+  { id: 'actions', name: 'Actions', icon: 'action' },
+  { id: 'logic', name: 'Logic', icon: 'logic' },
+  { id: 'data', name: 'Data', icon: 'data' },
+  { id: 'integrations', name: 'Integrations', icon: 'plugin' },
+  { id: 'ai', name: 'AI', icon: 'ai' },
 ];
 
 export function searchNodeTemplates(

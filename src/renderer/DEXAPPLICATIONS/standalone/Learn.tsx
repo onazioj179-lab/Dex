@@ -306,7 +306,7 @@ const Learn: React.FC = () => {
         <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
           {(['overview', 'shortcuts', 'apps', 'insights', 'power'] as Tab[]).map(t => (
             <button key={t} style={TAB_STYLE(tab === t)} onClick={() => setTab(t)}>
-              {t === 'power' ? '⚡ Power' : t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === 'power' ? 'Power' : t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
@@ -666,7 +666,7 @@ const Learn: React.FC = () => {
                 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{batteryLevel}%</div>
                 <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
-                  {isCharging ? '⚡ Charging' : 'Battery'}
+                  {isCharging ? 'Charging' : 'Battery'}
                 </div>
               </div>
               <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const }}>

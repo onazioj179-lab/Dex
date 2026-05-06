@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 /**
- * Audio Analysis Utilities 🎵
+ * Audio Analysis Utilities
  * 
  * WebAudio-based utilities for VINX and AXL creative apps.
  * Provides waveform generation, spectrum analysis, and audio processing helpers.

@@ -363,18 +363,18 @@ const ModifierItem = memo(({ mod, onRemove, onMove, onUpdate, onToggle, onCollap
         <div style={styles.modActions}>
           <button style={{ ...styles.iconBtn, color: mod.showInViewport ? 'var(--color-accent)' : undefined }}
             title="Show in Viewport" aria-label="Toggle show in viewport" onClick={e => { e.stopPropagation(); onUpdate({ showInViewport: !mod.showInViewport }); }}>
-            👁
+            View
           </button>
           <button style={{ ...styles.iconBtn, color: mod.enabled ? 'var(--color-accent)' : undefined }}
             title="Enable" aria-label="Toggle modifier enabled" onClick={e => { e.stopPropagation(); onToggle(); }}>
-            ✓
+            On
           </button>
           <button style={styles.iconBtn} title="Move Up" aria-label="Move modifier up" onClick={e => { e.stopPropagation(); onMove('up'); }}>▲</button>
           <button style={styles.iconBtn} title="Move Down" aria-label="Move modifier down" onClick={e => { e.stopPropagation(); onMove('down'); }}>▼</button>
           <button style={styles.iconBtn} title="Duplicate" aria-label="Duplicate modifier" onClick={e => { e.stopPropagation(); onDuplicate(); }}>⧉</button>
-          {onApply && <button style={styles.iconBtn} title="Apply" aria-label="Apply modifier" onClick={e => { e.stopPropagation(); onApply(); }}>✔</button>}
+          {onApply && <button style={styles.iconBtn} title="Apply" aria-label="Apply modifier" onClick={e => { e.stopPropagation(); onApply(); }}>Apply</button>}
           <button style={{ ...styles.iconBtn, color: hovered ? '#ff453a' : undefined }} title="Remove" aria-label="Remove modifier"
-            onClick={e => { e.stopPropagation(); onRemove(); }}>✕</button>
+            onClick={e => { e.stopPropagation(); onRemove(); }}>x</button>
         </div>
         <span style={{ fontSize: 12, marginLeft: 4 }}>{mod.expanded ? '▼' : '▶'}</span>
       </div>

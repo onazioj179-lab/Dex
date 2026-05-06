@@ -230,7 +230,7 @@ const constraintSymbols: Record<Constraint['type'], string> = {
   perpendicular: '⊥',
   tangent: '○',
   equal: '=',
-  fixed: '⚓',
+  fixed: 'fixed',
   concentric: '◎',
 };
 

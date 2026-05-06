@@ -3886,7 +3886,7 @@ mark {
   50% { transform: scale(1.2); }
 }
 
-/* 🚀 Item 181: Floating window drag optimization -- disable effects during drag */
+/* Item 181: Floating window drag optimization -- disable effects during drag */
 [data-floating-window][data-dragging="true"],
 [data-floating-window][data-resizing="true"] {
   backdrop-filter: none !important;

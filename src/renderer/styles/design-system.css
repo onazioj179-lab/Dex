@@ -5271,7 +5271,7 @@ input[type="range"]::-webkit-slider-thumb:active {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 23: PREMIUM TYPOGRAPHY SYSTEM ✨
+  SECTION 23: PREMIUM TYPOGRAPHY SYSTEM
    Sharp, crisp text rendering with system-matching fonts
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -5409,7 +5409,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 24: ENHANCED COLOR PALETTE 🎨
+  SECTION 24: ENHANCED COLOR PALETTE
    Extended semantic colors and app-specific palettes
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -5483,7 +5483,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 25: SYSTEM POLISH ANIMATIONS 💫
+  SECTION 25: SYSTEM POLISH ANIMATIONS
    Smooth, delightful micro-interactions
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -5669,7 +5669,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 26: HELP SYSTEM STYLES 📚
+  SECTION 26: HELP SYSTEM STYLES
    Tooltips, tours, onboarding, and contextual help
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -5864,7 +5864,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 27: CREATIVE SUITE PREMIUM STYLES 🎬🎵🖼️✨⚙️📐
+  SECTION 27: CREATIVE SUITE PREMIUM STYLES
    Professional-grade styling for VINX, Imosion, PRISM, FLUX, FORGE, AXL
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6225,7 +6225,7 @@ html, body {
 .emoji-badge-info { background: rgba(100, 210, 255, 0.15); color: var(--color-info); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 28: ACCESSIBILITY SYSTEM 🎯
+  SECTION 28: ACCESSIBILITY SYSTEM
    Focus rings, skip links, reduced motion, high contrast, screen reader utils
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6433,7 +6433,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 29: MODAL & OVERLAY FIXES 🎭
+  SECTION 29: MODAL & OVERLAY FIXES
    Proper backdrop blocking, focus trapping, and z-index management
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6475,7 +6475,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 30: EMPTY STATE PATTERNS 📭
+  SECTION 30: EMPTY STATE PATTERNS
    Guidance UI for first-time users and empty content areas
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6548,7 +6548,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 31: ICON BUTTON ACCESSIBILITY 🔘
+  SECTION 31: ICON BUTTON ACCESSIBILITY
    Standard styles for icon-only buttons with proper labeling
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6668,7 +6668,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 33: SCROLLBAR PREFERENCES 📜
+  SECTION 33: SCROLLBAR PREFERENCES
    Always-visible option and custom styling
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6752,7 +6752,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 35: APP LAUNCH ANIMATIONS 🚀
+  SECTION 35: APP LAUNCH ANIMATIONS
    Smooth app opening/closing transitions for modern UX flow
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6821,7 +6821,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 36: MODAL & DIALOG ANIMATIONS 💫
+  SECTION 36: MODAL & DIALOG ANIMATIONS
    Backdrop fades and dialog spring-ins
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6880,7 +6880,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 37: TAB & PANEL TRANSITIONS 📋
+  SECTION 37: TAB & PANEL TRANSITIONS
    Smooth content switching animations
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6925,7 +6925,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 38: DOCK ANIMATIONS 🎯
+  SECTION 38: DOCK ANIMATIONS
    Magnification, bounce, and running indicators
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -6967,7 +6967,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 39: FLOATING WINDOW ANIMATIONS 🪟
+  SECTION 39: FLOATING WINDOW ANIMATIONS
    Snap, drag, and resize feedback
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -7009,7 +7009,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 40: WIDGET ANIMATIONS 📦
+  SECTION 40: WIDGET ANIMATIONS
    Edit mode, drag, and add/remove transitions
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -7059,7 +7059,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 41: NOTIFICATION ANIMATIONS 🔔
+  SECTION 41: NOTIFICATION ANIMATIONS
    Banner slide-in, toast pop, and auto-dismiss
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -7131,7 +7131,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 42: CONTEXT MENU ANIMATIONS 📜
+  SECTION 42: CONTEXT MENU ANIMATIONS
    Scale-in with origin point
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -7218,7 +7218,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 44: LAUNCHPAD & OVERVIEW ANIMATIONS 🎨
+  SECTION 44: LAUNCHPAD & OVERVIEW ANIMATIONS
    Grid stagger and overview transitions
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -7263,7 +7263,7 @@ body.modal-open {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SECTION 45: WILL-CHANGE OPTIMIZATION 🚀
+  SECTION 45: WILL-CHANGE OPTIMIZATION
    GPU hints for commonly animated elements
    ═══════════════════════════════════════════════════════════════════════════ */
 
