@@ -670,6 +670,22 @@ export const OnboardingWizard: React.FC<{
     jumpToPolicy();
   }, [jumpToPolicy]);
 
+  const handleQuit = useCallback(() => {
+    const ok = typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm('Quit DEX setup? You can run setup again the next time you launch DEX.')
+      : true;
+    if (!ok) return;
+    try {
+      const electron = (window as unknown as { electron?: { invoke?: (ch: string, ...args: unknown[]) => Promise<unknown> } }).electron;
+      if (electron?.invoke) {
+        electron.invoke('app:quit').catch(() => { /* main will close us */ });
+      }
+    } catch {
+      // best-effort; if IPC unavailable we just stop the wizard
+      setExiting(true);
+    }
+  }, []);
+
   // Item 198: Keyboard navigation for onboarding
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -736,6 +752,51 @@ export const OnboardingWizard: React.FC<{
         {current === 'sampleData' && <SampleDataScreen onNext={(wantSamples) => { setLoadSample(wantSamples); goNext(); }} />}
         {current === 'terms' && <PolicyAcceptanceScreen onAccept={handleAcceptPolicies} />}
         {current === 'ready' && <ReadyScreen onComplete={handleComplete} />}
+        </div>
+
+        {/* Persistent quit footer -- always visible during setup */}
+        <div style={{
+          marginTop: 28, paddingTop: 16,
+          borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: 11, color: 'var(--color-text-tertiary, #888)',
+        }}>
+          <span>Setup can be re-run from Settings any time.</span>
+          <button
+            type="button"
+            onClick={handleQuit}
+            aria-label="Quit DEX setup"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'transparent',
+              color: 'var(--color-text-secondary, #bbb)',
+              border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 11, fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background = 'rgba(255, 80, 80, 0.10)';
+              el.style.color = '#ff8080';
+              el.style.borderColor = 'rgba(255, 80, 80, 0.30)';
+            }}
+            onMouseLeave={e => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background = 'transparent';
+              el.style.color = 'var(--color-text-secondary, #bbb)';
+              el.style.borderColor = 'var(--color-border, rgba(255,255,255,0.12))';
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Quit Setup
+          </button>
         </div>
       </div>
     </div>

@@ -25,6 +25,10 @@ import {
   usePermissionStore, ALL_PERMISSIONS, PERMISSION_LABELS, PERMISSION_DESCRIPTIONS,
   type PermissionId,
 } from '../store/permissionStore';
+import {
+  useNetworkStore, NETWORK_MODE_LABELS, NETWORK_MODE_DESCRIPTIONS,
+  type NetworkMode,
+} from '../store/networkStore';
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
 import PolicyViewer from '../components/PolicyViewer';
@@ -2471,9 +2475,47 @@ export const Settings: React.FC = () => {
   // =========================================================================
   // NETWORK SETTINGS
   // =========================================================================
-  const renderNetworkSettings = () => (
+  const renderNetworkSettings = () => {
+    const networkMode = useNetworkStore.getState().mode;
+    const setNetworkMode = useNetworkStore.getState().setMode;
+    return (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Wi-Fi</h3>
+      <h3 style={styles.sectionTitleFirst}>Network Mode</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        {(['full', 'local-only', 'disabled'] as NetworkMode[]).map(m => {
+          const selected = m === networkMode;
+          return (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setNetworkMode(m)}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 12,
+                background: selected ? 'rgba(74,158,255,0.10)' : 'transparent',
+                border: `1px solid ${selected ? 'rgba(74,158,255,0.40)' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
+                borderRadius: 8, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+                color: 'var(--color-text-primary)',
+                transition: 'background 0.12s, border-color 0.12s',
+              }}
+            >
+              <span style={{
+                marginTop: 3, width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                background: selected ? 'var(--color-accent, #4A9EFF)' : 'transparent',
+                border: `2px solid ${selected ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border)'}`,
+                boxShadow: selected ? 'inset 0 0 0 3px var(--color-bg-elevated, #111)' : 'none',
+              }} />
+              <span style={{ flex: 1 }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{NETWORK_MODE_LABELS[m]}</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4, lineHeight: 1.5 }}>
+                  {NETWORK_MODE_DESCRIPTIONS[m]}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <h3 style={styles.sectionTitle}>Wi-Fi</h3>
       {renderToggle('wifiEnabled', 'Wi-Fi', 'Connect to wireless networks')}
       {renderSelect('preferredNetwork', 'Preferred Network', 'Default network to connect to', [
         { value: 'auto', label: 'Auto (strongest signal)' },
@@ -2515,7 +2557,8 @@ export const Settings: React.FC = () => {
       {renderToggle('allowWebGL', 'Allow WebGL', 'Enable GPU-accelerated graphics in web content')}
       {renderToggle('allowJavaScript', 'Allow JavaScript', 'Enable JavaScript execution in web content')}
     </div>
-  );
+    );
+  };
 
   // =========================================================================
   // FILES SETTINGS

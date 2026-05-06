@@ -42,7 +42,8 @@ import StageManager, { STAGE_STRIP_WIDTH } from '../shell/StageManager';
 import AppSwitcher from '../shell/AppSwitcher';
 import { StaggeredContent } from '../shell/UIComponents';
 import { loadEngagement, saveEngagement, incrementStat, checkAchievements } from '../services/engagement';
-import { usePermissionStore, type PermissionId, ALL_PERMISSIONS, PERMISSION_LABELS } from '../store/permissionStore';
+// Permission store is consumed by QuickControls; keep the import side-effect-free.
+import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
@@ -2946,31 +2947,9 @@ export const AppManager: React.FC = () => {
         {/* WiFi indicator - compact dot */}
         <span title={navigator.onLine ? 'Online' : 'Offline'} style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
 
-        {/* Active permission indicators */}
-        {(() => {
-          const perms = usePermissionStore.getState().permissions;
-          const activePerms = ALL_PERMISSIONS.filter(id => perms[id].enabled);
-          if (activePerms.length === 0) return null;
-          const permIcons: Record<PermissionId, JSX.Element> = {
-            microphone: <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" strokeWidth="2"/></svg>,
-            camera: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
-            bluetooth: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg>,
-            wifi: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>,
-            gps: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
-            network: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>,
-            screen_recording: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
-            notifications: <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>,
-          };
-          return activePerms.slice(0, 4).map(id => (
-            <span
-              key={id}
-              title={`${PERMISSION_LABELS[id]}: Active`}
-              style={{ display: 'flex', alignItems: 'center', color: 'var(--color-warning)', flexShrink: 0, opacity: 0.85 }}
-            >
-              {permIcons[id]}
-            </span>
-          ));
-        })()}
+        {/* Quick Controls -- network mode + permission pills with popovers */}
+        <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
+
         {/* Notification Center bell */}
         <button
           onClick={() => setShowNotifCenter(v => !v)}

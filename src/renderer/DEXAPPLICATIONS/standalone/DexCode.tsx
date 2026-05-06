@@ -7,6 +7,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
+import { Terminal } from '../../components/Terminal';
 
 // ======================================================================
 // FILE SYSTEM INTEGRATION
@@ -627,6 +628,7 @@ const DexCode: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
@@ -804,6 +806,11 @@ const DexCode: React.FC = () => {
       if ((e.ctrlKey || e.metaKey) && e.key === '-') {
         e.preventDefault();
         setFontSize(s => Math.max(s - 1, 9));
+      }
+      // Toggle terminal panel (Ctrl+`)
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        setTerminalOpen(v => !v);
       }
     };
     window.addEventListener('keydown', handler);
@@ -1262,8 +1269,34 @@ const DexCode: React.FC = () => {
           <span>{stats.lines} lines</span>
           <span>{stats.chars} chars</span>
           <span style={{ fontSize: 9 }}>{fontSize}px</span>
-          <span style={{ marginLeft: 'auto' }}>? shortcuts · Ctrl+F find · Ctrl+H replace · Ctrl+S export</span>
+          <button
+            type="button"
+            onClick={() => setTerminalOpen(v => !v)}
+            title="Toggle terminal (Ctrl+`)"
+            aria-label="Toggle terminal"
+            aria-pressed={terminalOpen}
+            style={{
+              marginLeft: 'auto',
+              background: terminalOpen ? 'var(--color-accent, #4A9EFF)' : 'transparent',
+              color: terminalOpen ? '#fff' : 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 4,
+              padding: '2px 8px',
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Terminal
+          </button>
+          <span>? shortcuts · Ctrl+F find · Ctrl+H replace · Ctrl+S export · Ctrl+` terminal</span>
         </div>
+
+        {terminalOpen && (
+          <div style={{ height: 240, padding: '0 12px 12px', flexShrink: 0 }}>
+            <Terminal onClose={() => setTerminalOpen(false)} />
+          </div>
+        )}
       </section>
       {showShortcutsPanel && <KeyboardShortcutsPanel appId="dexcode" onClose={() => setShowShortcutsPanel(false)} />}
     </div>

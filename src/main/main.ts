@@ -65,6 +65,8 @@ import { IPCCrypto } from './security/IPCCrypto';
 
 // System Storage, Automation & Learning Intelligence
 import { storageManager } from './core/StorageManager';
+import { NetworkGuard } from './core/NetworkGuard';
+import { PtyService } from './core/PtyService';
 import { automationEngine } from './core/AutomationEngine';
 import { processingPipeline } from './core/ProcessingPipeline';
 import { audioProcessor } from './core/AudioProcessor';
@@ -2387,6 +2389,22 @@ class DexApp {
     });
 
     // -------------------------------------------------------------------------
+    // App Quit (used by onboarding cancel button + global shortcut)
+    // -------------------------------------------------------------------------
+    ipcMain.handle('app:quit', () => {
+      try {
+        this.isQuitting = true;
+        log.info('[DEX] app:quit invoked from renderer');
+        // Defer so the IPC reply has a chance to flush before tear-down
+        setTimeout(() => app.quit(), 50);
+        return { success: true };
+      } catch (error) {
+        log.error('[DEX] app:quit failed:', error);
+        return { success: false, error: String(error) };
+      }
+    });
+
+    // -------------------------------------------------------------------------
     // OS Mode Shell Controls
     // -------------------------------------------------------------------------
     ipcMain.handle('os:getMode', () => {
@@ -3237,6 +3255,23 @@ class DexApp {
       log.error('[DEX] Release Manager initialize failed:', err);
     });
     log.info('[DEX] Release Manager initialized');
+
+    // -------------------------------------------------------------------------
+    // Network Guard (mode enforcement + connection tracking)
+    // -------------------------------------------------------------------------
+    NetworkGuard.initialize().catch(err => {
+      log.error('[DEX] Network Guard initialize failed:', err);
+    });
+
+    // -------------------------------------------------------------------------
+    // PTY Service (in-app terminal sessions for DexCode + Axle Nexus)
+    // -------------------------------------------------------------------------
+    try {
+      PtyService.setMainWindow(this.mainWindow!);
+      PtyService.initialize();
+    } catch (err) {
+      log.error('[DEX] PTY Service initialize failed:', err);
+    }
 
     // Update Service (VERSION.txt polling, supplements ReleaseManager)
     this.updateService = new UpdateService();

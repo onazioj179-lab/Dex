@@ -1879,6 +1879,10 @@ const invokePrefixAllowlist = [
   'health:',
   'uninstall:',
   'user:',
+  // Network mode + connection control (NetworkGuard)
+  'network:',
+  // PTY / terminal sessions (DexCode terminal)
+  'pty:',
 ];
 
 const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline', 'renderer:heartbeat']);
