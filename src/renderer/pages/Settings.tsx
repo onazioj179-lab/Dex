@@ -2004,28 +2004,44 @@ export const Settings: React.FC = () => {
       
       <div style={styles.aboutDetails}>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Build</span>
-          <span style={styles.aboutValue}>2026.03.12</span>
+          <span style={styles.aboutLabel}>Edition</span>
+          <span style={styles.aboutValue}>DEX Personal</span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Platform</span>
-          <span style={styles.aboutValue}>{navigator.platform || 'Unknown'}</span>
+          <span style={styles.aboutLabel}>Released</span>
+          <span style={styles.aboutValue}>May 2026</span>
         </div>
         <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Engine</span>
-          <span style={styles.aboutValue}>Electron + React 18</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Display</span>
-          <span style={styles.aboutValue}>{screen.width}×{screen.height} @ {Math.round(window.devicePixelRatio * 100)}%</span>
-        </div>
-        <div style={styles.aboutRow}>
-          <span style={styles.aboutLabel}>Memory</span>
-          <span style={styles.aboutValue}>{(navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : `${navigator.hardwareConcurrency || '?'} cores`}</span>
+          <span style={styles.aboutLabel}>Made by</span>
+          <span style={styles.aboutValue}>Onazi Treasure OJ</span>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>License</span>
-          <span style={styles.aboutValue}>MIT</span>
+          <span style={styles.aboutValue}>MIT &middot; Free for personal use</span>
+        </div>
+      </div>
+
+      {/* What you get -- user-facing capability snapshot */}
+      <div style={{ marginTop: 8, marginBottom: 18 }}>
+        <h3 style={styles.sectionTitle}>What DEX does for you</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          {[
+            { title: 'One assistant for everything', body: 'Press the UKI key, type a command, get it done. Notes, files, timers, screenshots, focus mode -- all from one bar.' },
+            { title: 'Plans you can preview', body: 'Anything risky shows you the steps first. You stay in control with a single Run or Cancel.' },
+            { title: 'Apps that work together', body: 'Notes, Tasks, Files, Workflows, Vinx, Axl, Rewind and more share context so you never lose your place.' },
+            { title: 'Yours, on your machine', body: 'Your patterns, history, and shortcuts stay on this device. Optional analytics is off by default.' },
+            { title: 'Built for keyboards', body: 'Every action has a shortcut. The slash menu has dozens of commands; type / to see them.' },
+            { title: 'Always improving', body: 'Free updates roll in automatically. New features show up here, with the changelog one click away.' },
+          ].map(card => (
+            <div key={card.title} style={{
+              padding: '12px 14px', borderRadius: 10,
+              border: '1px solid var(--color-border-subtle)',
+              background: 'rgba(255,255,255,0.03)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{card.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{card.body}</div>
+            </div>
+          ))}
         </div>
       </div>
       

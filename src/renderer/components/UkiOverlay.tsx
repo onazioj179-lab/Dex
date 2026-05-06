@@ -16,6 +16,7 @@ import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { zIndex } from '../styles/tokens';
+import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -955,10 +956,7 @@ function trySystemTool(text: string): ToolResult {
 
   // System info
   if (/(?:system|device|hardware|sys|hw)\s*(?:info|status|specs?)|about\s*(?:this|my|the)\s*(?:system|device|computer|pc)|my (?:specs|computer|pc|system)/.test(lower)) {
-    const mem = navigator.deviceMemory ? `${navigator.deviceMemory}GB RAM` : 'RAM info unavailable';
-    const cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} CPU cores` : 'cores unknown';
-    const platform = navigator.userAgentData?.platform || navigator.platform || 'unknown';
-    return { handled: true, response: `DEX v3.8.1 on ${platform}. ${cores}, ${mem}. Display: ${window.screen.width}×${window.screen.height} @ ${window.devicePixelRatio}x.` };
+    return { handled: true, response: `DEX is running smoothly. For full hardware details, open Settings → System.` };
   }
 
   // Battery
@@ -1257,6 +1255,13 @@ const UkiOverlay: React.FC = () => {
       return;
     }
 
+    // Wave 1 AutoPilot slash commands (parsed into typed PlanGraphs)
+    const autopilot = await runUkiSlashIfApplicable(text);
+    if (autopilot.handled) {
+      streamResponse(autopilot.reply || 'Running…', 'autopilot', text, false);
+      return;
+    }
+
     // Normalize text for better understanding
     const normalized = normalizeText(text);
 
@@ -1449,6 +1454,8 @@ const UkiOverlay: React.FC = () => {
           padding: '8px 14px',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}>
+          {/* AutoPilot pending-approval cards */}
+          <UkiAutoPilotBridge />
           {/* Previous conversation turns */}
           {conversationHistory.slice(-6).map((turn) => (
             <div key={turn.id} style={{ marginBottom: 10, opacity: 0.85 }}>
