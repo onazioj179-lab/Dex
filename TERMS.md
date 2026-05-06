@@ -1,139 +1,129 @@
 # DEX -- Terms of Use
 
-**Effective date:** 2026-05-05
-**Version:** 1.0.0
+**Effective date:** 2026-05-06  
+**Version:** 2.0.0  
+**Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
-By installing, running, or distributing the DEX application ("Software"),
-you agree to these Terms of Use ("Terms") in addition to the [MIT License](LICENSE).
-These Terms summarize your rights and responsibilities. They do not replace
-the LICENSE; the LICENSE is the binding legal grant.
+These Terms are intentionally strict. DEX is a powerful desktop automation, diagnostics, creative, plugin, and system-control environment. By installing, launching, accessing, or using DEX, you agree to these Terms and the DEX Privacy Policy. If you do not agree, do not use DEX.
+
+This document is not a substitute for professional legal advice before commercial release.
 
 ---
 
-## 1. Identity of the Author
+## 1. Owner and Product
 
-DEX is created, owned, and maintained by:
+DEX is created, owned, and maintained by Onazi Treasure OJ. References to "DEX", "we", "us", or "our" mean DEX / Onazi Treasure OJ unless a separate legal entity is later identified.
 
-- **Author:** Onazi Treasure OJ
-- **Email:** onazi.treasure@outlook.com
-- **Project home:** https://github.com/onazioj/dex
+DEX, the DEX name, logo, icon family, product identity, wallpapers, DEX-OS assets, marketplace experience, update channels, documentation, datasets, model behavior, telemetry systems, hosted services, and brand presentation are reserved rights of the owner except where a separate license expressly says otherwise.
 
-All references to "we", "us", or "the Author" in this document refer to
-Onazi Treasure OJ.
+## 2. Source License and Reserved Rights
 
-## 2. Software License
+Portions of DEX source code are provided under the MIT License where that license applies. The MIT License does not grant rights to:
 
-DEX is released under the [MIT License](LICENSE). Subject to that license you
-may:
+- DEX trademarks, logos, names, icons, brand assets, product identity, or trade dress.
+- Hosted services, marketplace listings, update infrastructure, telemetry systems, model systems, datasets, keys, accounts, certificates, or private repositories.
+- Any claim that a fork, redistribution, plugin, or modified build is official, sponsored, endorsed, supported, or produced by DEX.
 
-- Use the Software for any purpose, including commercial use.
-- Copy, modify, merge, publish, distribute, sublicense, and sell copies.
-- Combine the Software with proprietary or open-source code.
+Forks and redistributions must use a different product name, icon, and brand unless written permission is granted.
 
-You must:
+## 3. Acceptance and Eligibility
 
-- Retain the copyright notice and the MIT permission notice in all copies
-  or substantial portions of the Software.
-- Preserve the [NOTICE](NOTICE), [AUTHORS](AUTHORS), and [COPYRIGHT](COPYRIGHT)
-  files when redistributing source.
+You may use DEX only if you can legally accept these Terms. If you use DEX for a company, school, client, employer, or other organization, you represent that you have authority to bind that organization and that the organization is responsible for your use.
 
-## 3. Trademark and Brand
+DEX may require acceptance of updated Terms, Privacy Policy, or data-use terms before continued use after material changes.
 
-The MIT License covers the source code only. It does **not** grant any
-trademark, service mark, trade dress, or brand rights. Specifically:
+## 4. Required Rules
 
-- The "DEX" name, the DEX logo, the wordmark, the icon family, the official
-  wallpapers, and the DEX-OS imagery are reserved trademarks of the Author.
-- You may use the DEX name to describe compatibility, e.g. "Plugin for DEX".
-- You may not use the DEX name or marks to imply endorsement, sponsorship,
-  or origin from the Author without prior written permission.
-- Forks must use a different product name, icon, and brand.
+You must not use DEX to:
 
-## 4. Acceptable Use
+1. Violate law, regulation, contract, intellectual-property rights, privacy rights, or security rights.
+2. Distribute malware, spyware, ransomware, credential theft, hidden surveillance, or unauthorized access tools.
+3. Bypass security, license, authentication, access controls, rate limits, DRM, safety systems, or platform restrictions.
+4. Run unauthorized automation, scraping, spam, phishing, fraud, abuse, or attacks.
+5. Misuse AI/model features, safety systems, plugins, browser tools, file tools, transfer tools, or automation engines.
+6. Exfiltrate data, hide network activity, misrepresent plugin behavior, or deceive users.
+7. Use DEX in safety-critical systems without your own independent engineering, legal, security, and risk review.
 
-You agree not to use DEX:
+## 5. Automation Responsibility
 
-1. To violate any law, regulation, or third-party right.
-2. To distribute malware, surveillance tools, or unauthorized access tools.
-3. To bypass another party's security, license, or access controls.
-4. In safety-critical systems (medical, aviation, nuclear) without your own
-   independent qualification and risk acceptance.
+DEX can create, schedule, run, and coordinate powerful actions. You are responsible for commands, automations, scripts, workflows, plugin actions, files, accounts, credentials, outputs, and third-party effects that you create, approve, run, schedule, share, or distribute through DEX.
 
-## 5. Plugins and Extensions
+DEX is not responsible for losses caused by user instructions, unsafe workflows, unsupported configurations, third-party services, plugins, model outputs, file operations, or automation outcomes.
 
-DEX supports third-party plugins. Plugins are independent works authored by
-their respective publishers and are governed by their own licenses and terms.
-The Author is not responsible for the behavior, content, or licensing of
-third-party plugins. Installing unsigned plugins is at your own risk.
+## 6. Data Use to Improve DEX
 
-## 6. User Data and Privacy
+Subject to the Privacy Policy and available user controls, you grant DEX / Onazi Treasure OJ a worldwide, non-exclusive, royalty-free, sublicensable license to process, analyze, derive insights from, aggregate, de-identify, use, reproduce, modify, create derivative works from, and otherwise use data you provide, submit, generate, or make available through DEX as needed to operate, secure, maintain, troubleshoot, personalize, improve, develop, train, test, and support DEX and related systems.
 
-DEX is **local-first**. Your data lives on your device. The full privacy
-policy is in [PRIVACY.md](PRIVACY.md). In summary:
+This includes permitted diagnostics, product analytics, interaction patterns, feedback, support submissions, user-submitted samples, model interactions, automation examples, plugin metadata, and other data categories described in the Privacy Policy.
 
-- No telemetry is collected by default.
-- Crash reports are local-only unless you opt in to share them.
-- Update checks contact the configured update server only when enabled.
-- Optional cloud sync (when enabled) is end-to-end encrypted.
+## 7. AI, Automation, and Model Improvement
 
-## 7. Updates
+DEX may use permitted data to train, evaluate, tune, test, and improve models, automation systems, recommendations, search, classification, safety systems, abuse detection, ranking, performance systems, and product quality.
 
-DEX may check for updates against a signed update channel. You may switch
-channels (stable / beta / canary) or disable update checks entirely in
-Settings > Updates. Updates are signature-verified and rolled back on
-verification failure.
+Sensitive content is not collected or shared by default. If you intentionally submit content, enable optional analytics, use cloud/AI features, grant plugin permissions, or join a data-improvement program, DEX may process that data as described in the Privacy Policy.
 
-## 8. Warranty Disclaimer
+## 8. Diagnostics and Product Analytics
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. The Author makes no
-representation that the Software is error-free, secure, or suitable for any
-particular use.
+Minimum diagnostics may be required to keep DEX secure, reliable, compatible, updated, and recoverable. Optional product analytics are off by default unless you enable them. Required diagnostics and optional analytics may be used to identify failures, improve performance, prioritize features, protect users, detect abuse, and develop DEX.
 
-## 9. Limitation of Liability
+## 9. Feedback and Submissions
 
-IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
-FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+If you submit feedback, diagnostics, logs, screenshots, crash details, prompts, examples, files, comments, ideas, or other material, you grant DEX the right to use that submission without restriction or compensation to provide support, improve DEX, train/evaluate systems, develop features, enforce safety, and operate the product.
 
-This includes (without limitation) loss of data, loss of profits, business
-interruption, or any consequential, incidental, or punitive damages.
+You are responsible for reviewing submissions before sending them and for ensuring that you have rights to submit the content.
 
-## 10. Indemnity
+## 10. Plugins, Marketplace, and Third Parties
 
-If you redistribute, integrate, or productize DEX, you agree to indemnify
-and hold harmless the Author against claims arising from your modifications,
-configurations, or distributions of the Software.
+Plugins are independent software. You are responsible for plugins you install, permissions you grant, and data you share with plugins. Plugin developers are responsible for their own code, data practices, licenses, and compliance.
 
-## 11. Export Controls
+DEX may review, reject, block, quarantine, disable, delist, remove, rate-limit, or restrict plugins, integrations, accounts, features, workflows, or developers that create risk, violate policy, infringe rights, harm users, threaten infrastructure, or undermine DEX.
 
-You are responsible for complying with all applicable export and import
-laws and regulations relating to the Software, including any cryptography
-contained in DEX or its native modules.
+## 11. Updates, Changes, and Feature Control
 
-## 12. Governing Law
+DEX may provide updates, migrations, compatibility changes, security fixes, model/system changes, policy updates, feature removals, and emergency mitigations. Some changes may be required for security, compatibility, reliability, or legal compliance.
 
-These Terms are governed by the laws of the jurisdiction in which the Author
-resides. To the extent any provision is unenforceable, the remaining
-provisions remain in effect.
+DEX may disable, restrict, or remove risky or unsupported features, integrations, plugins, update channels, or workflows.
 
-## 13. Changes to These Terms
+## 12. Accounts, Secrets, and Credentials
 
-The Author may update these Terms. The current version is the one published
-in this repository at the commit you obtained the Software from. Material
-changes are noted in [docs/CHANGELOG.md](docs/CHANGELOG.md).
+You are responsible for accounts, API keys, passwords, tokens, certificates, vault entries, sync credentials, plugin credentials, and third-party service credentials you use with DEX. DEX is not responsible for unauthorized access caused by your configuration, disclosure, unsafe plugins, compromised devices, or third-party systems.
 
-## 14. Contact
+## 13. Ownership
 
-For licensing questions, brand inquiries, partnership, or legal notices:
+You retain ownership of your content subject to the licenses granted in these Terms. DEX retains all rights in DEX technology, product design, brand, models, systems, software, documentation, and derived product insights.
 
-- **Email:** onazi.treasure@outlook.com
-- **Project:** https://github.com/onazioj/dex
+## 14. No Warranties
+
+DEX is provided "as is" and "as available". To the maximum extent permitted by law, DEX disclaims all warranties, including merchantability, fitness for a particular purpose, non-infringement, accuracy, uninterrupted operation, security, availability, compatibility, and error-free behavior.
+
+## 15. Limitation of Liability
+
+To the maximum extent permitted by law, DEX / Onazi Treasure OJ will not be liable for indirect, incidental, special, consequential, punitive, exemplary, data-loss, profit-loss, business-interruption, security, automation, plugin, model-output, third-party, or reputational damages.
+
+## 16. Indemnity
+
+You agree to defend, indemnify, and hold harmless DEX / Onazi Treasure OJ from claims, losses, liabilities, damages, costs, and expenses arising from your use, misuse, modifications, distributions, automations, plugins, data submissions, rights violations, unlawful conduct, or breach of these Terms.
+
+## 17. Export, Sanctions, and Restricted Use
+
+You are responsible for complying with export controls, sanctions, import laws, cryptography restrictions, and other applicable legal requirements. You must not use DEX where prohibited by law.
+
+## 18. Termination and Enforcement
+
+DEX may suspend, disable, restrict, or terminate access to features, services, update channels, plugin listings, or accounts where needed to enforce these Terms, protect users, protect DEX, comply with law, or reduce risk.
+
+## 19. Governing Law
+
+Until a governing entity and jurisdiction are finalized, these Terms are governed by the laws applicable to the owner where legally permitted. Before public commercial release, this section should be reviewed and finalized by qualified counsel.
+
+## 20. Contact
+
+Questions, legal notices, privacy requests, and security reports should be sent to:
+
+- **Email:** onazi75@gmail.com
+- **Repository:** https://github.com/onazioj179-lab/Dex
 
 ---
 
-**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ**
-Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ**.

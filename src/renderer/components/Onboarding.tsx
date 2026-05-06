@@ -11,6 +11,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, getRequiredPolicyVersions } from '../../shared/policies';
+import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
+
+const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
 
 // ==================== TYPES ====================
 interface AppTip {
@@ -25,7 +29,7 @@ interface OnboardingPreferences {
   autoUpdatesEnabled: boolean;
 }
 
-type OnboardingScreen = 'welcome' | 'hardware' | 'privacy' | 'tour' | 'sampleData' | 'ready';
+type OnboardingScreen = 'welcome' | 'hardware' | 'privacy' | 'tour' | 'sampleData' | 'terms' | 'ready';
 
 // ==================== APP TIPS (minimal) ====================
 export const APP_TIPS: Record<string, AppTip[]> = {
@@ -167,7 +171,7 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
     </p>
     <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
       <button style={ACCENT_BTN} onClick={onNext} aria-label="Get started with setup">Get Started</button>
-      <button style={GHOST_BTN} onClick={onSkip} aria-label="Skip setup wizard">Skip Setup</button>
+      <button style={GHOST_BTN} onClick={onSkip} aria-label="Skip setup wizard and review required policies">Skip Setup</button>
     </div>
   </div>
 );
@@ -275,18 +279,18 @@ const PrivacyScreen: React.FC<{
         Privacy
       </h2>
       <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
-        DEX runs entirely on your machine. You control what data leaves.
+        Required diagnostics keep DEX reliable and secure. Optional analytics stay off unless you turn them on.
       </p>
 
       <Toggle
-        label="Usage Analytics"
-        desc="Anonymous app usage to improve DEX"
+        label="Optional Product Analytics"
+        desc="Feature usage and performance signals to improve DEX"
         value={prefs.analyticsEnabled}
         onToggle={() => onUpdate({ ...prefs, analyticsEnabled: !prefs.analyticsEnabled })}
       />
       <Toggle
-        label="Crash Reports"
-        desc="Send crash data locally -- never to external servers"
+        label="Enhanced Crash Details"
+        desc="Keep richer local crash details for troubleshooting"
         value={prefs.crashReportsEnabled}
         onToggle={() => onUpdate({ ...prefs, crashReportsEnabled: !prefs.crashReportsEnabled })}
       />
@@ -302,15 +306,83 @@ const PrivacyScreen: React.FC<{
         border: '1px solid rgba(74, 158, 255, 0.12)',
         borderRadius: 10, padding: '12px 16px', marginTop: 16, marginBottom: 28,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, marginBottom: 4 }}>Your data stays yours</div>
+        <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, marginBottom: 4 }}>Clear data categories</div>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-          All processing happens locally. No telemetry is sent to remote servers.
-          Crash reports are stored on your machine only.
+          DEX may use required diagnostics to keep the app secure, compatible, and updated.
+          Sensitive content is never collected or shared by default.
         </div>
       </div>
 
       <div style={{ textAlign: 'center' }}>
         <button style={ACCENT_BTN} onClick={onNext}>Continue</button>
+      </div>
+    </div>
+  );
+};
+
+// ==================== SCREEN: REQUIRED POLICIES ====================
+const PolicyAcceptanceScreen: React.FC<{
+  onAccept: () => void;
+}> = ({ onAccept }) => {
+  const [accepted, setAccepted] = useState(false);
+  const required = getRequiredPolicyVersions();
+
+  return (
+    <div style={{ padding: '24px 0' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', textAlign: 'center' }}>
+        Terms & Privacy
+      </h2>
+      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 18px', textAlign: 'center', lineHeight: 1.55 }}>
+        DEX requires acceptance of the current Terms and Privacy Policy before use.
+      </p>
+
+      <div style={{ ...CARD_STYLE, marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
+          Required acceptance
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          {Object.entries(required).map(([slug, version]) => (
+            <div key={slug} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>{slug}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 700 }}>v{version}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+          Data policy v{DATA_POLICY_VERSION}. Contact: {POLICY_CONTACT_EMAIL}.
+        </div>
+      </div>
+
+      <div style={{ maxHeight: 260, overflow: 'hidden', marginBottom: 12 }}>
+        <React.Suspense fallback={null}>
+          <PolicyViewer compact initialPolicy="terms" />
+        </React.Suspense>
+      </div>
+
+      <div style={{ ...CARD_STYLE, marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
+          Data categories
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {DATA_CATEGORIES.slice(0, 6).map(category => (
+            <div key={category.id} style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
+              <span style={{ color: 'var(--color-text-secondary)', fontWeight: 700 }}>{category.label}:</span> {category.defaultState}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 18, cursor: 'pointer' }}>
+        <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} style={{ marginTop: 3 }} />
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+          I accept the DEX Terms of Use and Privacy Policy, including required diagnostics and permitted product-improvement data use described in the policies.
+        </span>
+      </label>
+
+      <div style={{ textAlign: 'center' }}>
+        <button style={{ ...ACCENT_BTN, opacity: accepted ? 1 : 0.45, cursor: accepted ? 'pointer' : 'not-allowed' }} disabled={!accepted} onClick={onAccept}>
+          Accept and Continue
+        </button>
       </div>
     </div>
   );
@@ -439,11 +511,12 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
 export const OnboardingWizard: React.FC<{
   onComplete: () => void;
   onSkip?: () => void;
-}> = ({ onComplete, onSkip }) => {
-  const screens: OnboardingScreen[] = ['welcome', 'hardware', 'privacy', 'tour', 'sampleData', 'ready'];
+}> = ({ onComplete }) => {
+  const screens: OnboardingScreen[] = ['welcome', 'hardware', 'privacy', 'tour', 'sampleData', 'terms', 'ready'];
   const [screenIndex, setScreenIndex] = useState(0);
   const [exiting, setExiting] = useState(false);
   const [loadSample, setLoadSample] = useState(false);
+  const [policyAccepted, setPolicyAccepted] = useState(() => hasAcceptedCurrentPolicies());
   const [prefs, setPrefs] = useState<OnboardingPreferences>({
     analyticsEnabled: false,
     crashReportsEnabled: true,
@@ -467,29 +540,43 @@ export const OnboardingWizard: React.FC<{
     }
   }, [screenIndex]);
 
+  const jumpToPolicy = useCallback(() => {
+    const policyIndex = screens.indexOf('terms');
+    setSlideDir('next');
+    setScreenIndex(policyIndex);
+  }, [screens]);
+
+  const handleAcceptPolicies = useCallback(() => {
+    acceptCurrentPolicies();
+    setOptionalAnalyticsEnabled(prefs.analyticsEnabled);
+    setPolicyAccepted(true);
+    goNext();
+  }, [goNext, prefs.analyticsEnabled]);
+
   const handleComplete = useCallback(() => {
+    if (!policyAccepted && !hasAcceptedCurrentPolicies()) {
+      jumpToPolicy();
+      return;
+    }
     // Save preferences + sample data choice
     try {
       localStorage.setItem('dex-onboarding-prefs', JSON.stringify({ ...prefs, loadSample }));
+      setOptionalAnalyticsEnabled(prefs.analyticsEnabled);
     } catch {
       // storage unavailable
     }
     setExiting(true);
     setTimeout(onComplete, 300);
-  }, [prefs, loadSample, onComplete]);
+  }, [jumpToPolicy, loadSample, onComplete, policyAccepted, prefs]);
 
   const handleSkip = useCallback(() => {
-    setExiting(true);
-    setTimeout(() => {
-      if (onSkip) onSkip();
-      else onComplete();
-    }, 300);
-  }, [onComplete, onSkip]);
+    jumpToPolicy();
+  }, [jumpToPolicy]);
 
   // Item 198: Keyboard navigation for onboarding
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && current !== 'ready') { handleSkip(); }
+      if (e.key === 'Escape' && current !== 'ready' && current !== 'terms') { handleSkip(); }
       else if ((e.key === 'Enter' || e.key === 'ArrowRight') && current !== 'ready') { goNext(); }
       else if (e.key === 'Enter' && current === 'ready') { handleComplete(); }
       else if (e.key === 'ArrowLeft') { goBack(); }
@@ -550,6 +637,7 @@ export const OnboardingWizard: React.FC<{
         {current === 'privacy' && <PrivacyScreen prefs={prefs} onUpdate={setPrefs} onNext={goNext} />}
         {current === 'tour' && <TourScreen onNext={goNext} />}
         {current === 'sampleData' && <SampleDataScreen onNext={(wantSamples) => { setLoadSample(wantSamples); goNext(); }} />}
+        {current === 'terms' && <PolicyAcceptanceScreen onAccept={handleAcceptPolicies} />}
         {current === 'ready' && <ReadyScreen onComplete={handleComplete} />}
         </div>
       </div>
@@ -713,10 +801,14 @@ export const useBeginnerMode = (appId: string) => {
 
 export const useOnboardingCheck = () => {
   const [needsOnboarding, setNeedsOnboarding] = useState(() => {
-    try { return !localStorage.getItem('dex-welcomed'); } catch { return true; }
+    try { return !localStorage.getItem('dex-welcomed') || !hasAcceptedCurrentPolicies(); } catch { return true; }
   });
   const markOnboardingComplete = useCallback(() => {
-    try { localStorage.setItem('dex-welcomed', '1'); setNeedsOnboarding(false); } catch (e) { console.warn('[DEX]', e); }
+    try {
+      if (!hasAcceptedCurrentPolicies()) acceptCurrentPolicies();
+      localStorage.setItem('dex-welcomed', '1');
+      setNeedsOnboarding(false);
+    } catch (e) { console.warn('[DEX]', e); }
   }, []);
   return { needsOnboarding, markOnboardingComplete };
 };

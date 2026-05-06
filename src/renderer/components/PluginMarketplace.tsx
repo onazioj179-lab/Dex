@@ -61,6 +61,7 @@ export const PluginMarketplace: React.FC = () => {
   }, [refreshInstalled, refreshRegistry]);
 
   const install = async (entry: RegistryEntry) => {
+    if (!confirm(`Install ${entry.manifest.name}? Review plugin permissions and publisher trust before enabling. DEX may disable unsafe plugins.`)) return;
     setBusyId(entry.manifest.id);
     setStatus(`Installing ${entry.manifest.name}…`);
     try {
@@ -127,6 +128,19 @@ export const PluginMarketplace: React.FC = () => {
       />
 
       <div style={{ padding: '0 16px 16px', overflowY: 'auto' }}>
+        <GlassSurface
+          variant="card"
+          style={{ padding: 12, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+            Plugin Policy
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+            Plugins can access files, network, credentials, automation, and user content only through declared permissions.
+            DEX may review, block, quarantine, disable, delist, remove, or rate-limit plugins that create risk or violate policy.
+          </div>
+        </GlassSurface>
+
         {status && (
           <GlassSurface
             variant="card"

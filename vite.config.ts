@@ -40,6 +40,8 @@ export default defineConfig({
           if (id.includes('node_modules/d3-force')) return 'd3-vendor';
           // DEX sub-apps into their own chunks (lazy-loadable)
           if (id.includes('DEXAPPLICATIONS/')) {
+            if (id.includes('DEXAPPLICATIONS/axl/engine') || id.includes('DEXAPPLICATIONS/axl/stores/')) return 'app-axl-core';
+            if (id.includes('DEXAPPLICATIONS/axl/components/') || id.includes('DEXAPPLICATIONS/axl/utils/')) return 'app-axl-ui';
             const match = id.match(/DEXAPPLICATIONS\/([^/]+)/);
             return match ? `app-${match[1].toLowerCase()}` : 'dex-apps';
           }

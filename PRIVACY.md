@@ -1,140 +1,117 @@
 # DEX -- Privacy Policy
 
-**Effective date:** 2026-05-05
-**Version:** 1.0.0
-**Author:** Onazi Treasure OJ &lt;onazi.treasure@outlook.com&gt;
+**Effective date:** 2026-05-06  
+**Version:** 2.0.0  
+**Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
-DEX is built on a single principle: **your data lives on your device unless
-you explicitly choose otherwise**. This document explains exactly what data
-DEX touches, where it lives, and what controls you have.
+DEX is designed to feel powerful without being sneaky. The default model is local-first, with required minimal diagnostics for reliability/security and optional product analytics for richer product improvement.
+
+This policy explains what DEX may process, why, and what controls users should have.
 
 ---
 
 ## 1. Summary
 
-| Data | Default | Where it lives | How to disable |
+| Category | Default | Purpose | User control |
 |---|---|---|---|
-| Telemetry / analytics | **Off** | Not collected | N/A |
-| Crash reports | **Local only** | `%APPDATA%/DEX/logs` | Settings > Diagnostics |
-| Update checks | On (HTTPS, signature-verified) | Update server only | Settings > Updates |
-| Cloud sync | **Off** | Your chosen provider, E2E encrypted | Settings > Sync |
-| Plugin network | Per-plugin permission | Plugin sandbox | Settings > Plugins > Permissions |
-| Browser cookies | Per-tab partition | Local IndexedDB | Browser > Clear site data |
-| Files indexed | Local sqlite catalog | `%APPDATA%/DEX/index` | Settings > Files > Indexing |
-| Rewind captures | **Local only**, encrypted at rest | `%APPDATA%/DEX/rewind` | Settings > Rewind |
-| Voice (UKI) | Local on-device by default | Memory + cache only | Settings > UKI |
-| Biometric data | OS-managed (Windows Hello / Touch ID / etc.) | OS keychain | Settings > Security |
+| Required diagnostics | Required | Reliability, security, compatibility, updates, recovery | View category; cannot disable minimum needed signals |
+| Optional product analytics | Off | Product improvement, performance, UX, feature direction | Toggle in Settings |
+| Local personalization | Local | Improve the user's own experience on-device | Clear local data / disable related features |
+| Feedback submissions | User-submitted | Support, troubleshooting, improvement, model/system evaluation | Review before sending |
+| User content samples | User-submitted or opt-in | Improve AI, automation, search, recommendations, safety | Submit/opt in intentionally |
+| Sensitive content | Never by default | Protect secrets and private material | Warning before diagnostic capture when risk exists |
+| Plugin data | Feature-controlled | Plugin operation | Review/revoke plugin permissions |
+| Cloud/sync data | Off by default | Sync, backup, cloud features | Enable/disable and delete where supported |
 
-## 2. Data DEX Stores Locally
+## 2. Required Diagnostics
 
-DEX stores the following on your computer:
+DEX may process minimum diagnostics needed to keep the product secure, reliable, compatible, updated, and recoverable. Examples include:
 
-- **App state**: window positions, focus history, dock layout, theme.
-- **User content**: notes, tasks, calendar entries, browser history,
-  downloads, gallery thumbnails, audio playlists.
-- **System metadata**: indexed file paths, EXIF, audio tags (no file bodies
-  uploaded).
-- **Diagnostic logs**: a rotating ring of log entries kept locally.
-- **Plugin storage**: each plugin gets a private isolated storage shard.
-- **Secrets**: stored in the OS keychain (DPAPI / Keychain / Secret Service)
-  using AES-256-GCM where applicable.
+- App version, build channel, platform, device class, and compatibility state.
+- Crash category, error class, startup timing, update/install state, and health status.
+- Security event category, blocked operation category, and abuse/failure indicators.
 
-You can view, export, or delete any of the above at any time:
-- **View**: Settings > Privacy > Data on device.
-- **Export**: Settings > Privacy > Export all data (signed bundle).
-- **Delete**: Settings > Privacy > Delete (per-category or all).
+Required diagnostics are not intended to include private file contents, passwords, vault secrets, clipboard contents, full screenshots, or full crash dumps.
 
-## 3. Data DEX Does NOT Collect
+## 3. Optional Product Analytics
 
-DEX does not collect, by default:
+Optional analytics are off by default. If enabled, DEX may collect product interaction and performance signals such as:
 
-- Usage telemetry, behavioral analytics, or session replay.
-- Personally identifiable information sent to the Author.
-- Browser history outside the local store.
-- File contents from your file system.
-- Microphone or camera input outside the moment a feature is actively used.
-- Location data, except when a feature you invoke (e.g. Weather) needs it
-  and you accept the per-feature prompt.
+- Feature usage counts and workflow usage statistics.
+- Render, startup, memory, and performance traces.
+- Non-content interaction patterns and reliability indicators.
 
-## 4. Network Egress
+DEX uses optional analytics to improve product quality, prioritize features, improve performance, train/evaluate product systems, and design better user experiences.
 
-DEX makes outbound network requests only in the following cases:
+## 4. Local Personalization
 
-1. **Update checks** to the configured update server, when enabled.
-2. **Browser app** when you navigate to a URL.
-3. **Plugins** that you have granted network permission to.
-4. **Cloud sync** when you have configured and enabled it.
-5. **Optional features** (e.g. weather provider, currency conversion) that
-   you explicitly enable and that show their endpoint in Settings.
+DEX may learn usage patterns on your device to personalize your own experience, such as frequent apps, layout preferences, command patterns, local automation suggestions, and workflow timing. Local personalization does not send those patterns out by default.
 
-Every outbound request is observable in Settings > Diagnostics > Network.
+## 5. Feedback and User-Submitted Samples
 
-## 5. Cloud Sync (Optional)
+When you intentionally submit feedback, logs, screenshots, crash details, prompts, files, snippets, workflow examples, or other samples, DEX may use them to:
 
-When cloud sync is enabled:
+- Provide support and diagnose problems.
+- Improve DEX features, reliability, safety, and performance.
+- Train, evaluate, tune, and test models, automation, recommendations, search, classification, and safety systems.
+- Develop new product capabilities.
 
-- Data is encrypted on your device with a key you control before upload.
-- The Author has no access to your encryption key or your synced data.
-- You may revoke a device or wipe the cloud copy at any time.
-- The cloud provider is configurable; the Author does not host a default
-  cloud sync endpoint.
+Review submissions before sending. Do not submit material you do not have the right to share.
 
-## 6. Plugins
+## 6. Sensitive Content
 
-Each plugin runs in a sandbox with its own permission manifest:
+Passwords, vault items, private files, clipboard content, chats, screenshots, and crash dumps are not collected or shared by default. If a diagnostic, support, cloud, AI, or feedback feature may include sensitive content, DEX should warn you or require your action before submission.
 
-- File system: jailed to a per-plugin private directory plus user-granted dirs.
-- Network: per-host allowlist; off by default.
-- Native module access: explicitly granted per capability.
-- Storage: isolated IndexedDB shard.
+## 7. Network, Cloud, Sync, and Plugins
 
-You can revoke any plugin permission at any time in
-Settings > Plugins > Permissions. Revocation takes effect immediately.
+Network requests occur when needed for enabled features such as updates, browser navigation, plugins with network permission, cloud/sync features, support submissions, required diagnostics, or optional analytics.
 
-## 7. Children's Privacy
+Plugins and third-party services may have their own privacy practices. You are responsible for permissions you grant and third-party services you connect.
 
-DEX is a developer / power-user tool not directed at children under 13.
-The Author does not knowingly collect data from children.
+## 8. How DEX Uses Data
 
-## 8. Security Practices
+DEX may use permitted data to:
 
-- **Encryption at rest** for sensitive stores using AES-256-GCM with keys
-  derived from OS-protected secrets.
-- **Encryption in transit** via TLS for every network call.
-- **Code signing** on Windows and macOS distribution binaries.
-- **Update signature verification** with rollback on mismatch.
-- **Renderer sandboxing**: `nodeIntegration: false`, `contextIsolation: true`,
-  strict CSP, IPC origin assertion.
-- **Defense Orchestrator**: in-app surface for security-relevant events.
+- Provide, maintain, secure, update, troubleshoot, and support the product.
+- Improve reliability, performance, compatibility, accessibility, battery use, and UX.
+- Personalize the experience.
+- Train, evaluate, tune, test, and improve models and automation systems.
+- Detect abuse, protect users, enforce policies, and investigate security incidents.
+- Respond to requests and operate the product/business.
 
-For the full security disclosure policy and contact, see
-[docs/SECURITY.md](docs/SECURITY.md).
+## 9. Data Storage and Retention
 
-## 9. Your Rights
+Local app data may be stored on your device in application storage, IndexedDB, SQLite catalogs, caches, logs, plugin storage, and encrypted stores. Retention depends on the feature and your settings. Optional submissions may be retained as needed for support, security, legal, product improvement, and model/system development unless deletion is required by law or honored through available controls.
 
-You have, with respect to data DEX stores on your device:
+## 10. User Controls
 
-- The right to access, export, and delete your data at any time.
-- The right to disable any optional feature that creates data.
-- The right to reset DEX to factory defaults (with confirmation).
-- The right to inspect every log entry, every IPC message, and every
-  outbound request in Settings > Diagnostics.
+DEX should provide controls to:
 
-## 10. Changes to This Policy
+- View data categories.
+- Toggle optional analytics.
+- Export local data.
+- Delete local data.
+- Review policy versions and acceptance state.
+- Contact DEX at onazi75@gmail.com for privacy requests.
 
-The Author may update this policy. The current text is the one in this
-repository at the commit you obtained the Software from. Material changes
-are noted in [docs/CHANGELOG.md](docs/CHANGELOG.md).
+Some minimum diagnostics may be required for reliability, security, compatibility, and updates.
 
-## 11. Contact
+## 11. Children
 
-Privacy questions or requests:
+DEX is not directed to children under 13 or the minimum age required in your jurisdiction. Do not use DEX if you are not legally allowed to accept the Terms and Privacy Policy.
 
-- **Email:** onazi.treasure@outlook.com
-- **Project:** https://github.com/onazioj/dex
+## 12. Changes
+
+Material changes may require re-acceptance. The current policy version is shown in Settings and in the bundled policy viewer.
+
+## 13. Contact
+
+Privacy requests and questions:
+
+- **Email:** onazi75@gmail.com
+- **Repository:** https://github.com/onazioj179-lab/Dex
 
 ---
 
-**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ**
-Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ**.

@@ -27,6 +27,9 @@ import {
 } from '../store/permissionStore';
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
+import PolicyViewer from '../components/PolicyViewer';
+import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
+import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 
 // ===========================================================================
 // TYPES
@@ -932,6 +935,27 @@ export const Settings: React.FC = () => {
   const [settingsSearch, setSettingsSearch] = useState('');
   const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => loadSettings() || DEFAULT_SETTINGS);
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
+  const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
+  const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
+  const [policyAcceptance, setPolicyAcceptance] = useState(() => readPolicyAcceptance());
+  const [optionalAnalytics, setOptionalAnalytics] = useState(() => isOptionalAnalyticsEnabled());
+
+  const openPolicyViewer = useCallback((slug: PolicySlug) => {
+    setPolicyViewerInitial(slug);
+    setPolicyViewerOpen(true);
+  }, []);
+
+  const toggleOptionalAnalytics = useCallback((enabled: boolean) => {
+    setOptionalAnalyticsEnabled(enabled);
+    setOptionalAnalytics(enabled);
+    toast.info(enabled ? 'Optional analytics enabled' : 'Optional analytics disabled');
+  }, [toast]);
+
+  const resetPolicyAcceptance = useCallback(() => {
+    clearPolicyAcceptance();
+    setPolicyAcceptance(null);
+    toast.info('Policy acceptance reset. DEX will ask again on next launch.');
+  }, [toast]);
   
   // Authentication state
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -2002,18 +2026,84 @@ export const Settings: React.FC = () => {
       </div>
       
       <div style={styles.aboutLinks}>
-        <button style={styles.linkBtn} aria-label="Open DEX website" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', 'https://dex.app') || window.open('https://dex.app', '_blank', 'noopener,noreferrer')}>Website</button>
-        <button style={styles.linkBtn} aria-label="Open documentation" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', 'https://docs.dex.app') || window.open('https://docs.dex.app', '_blank', 'noopener,noreferrer')}>Documentation</button>
-        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', 'https://github.com/dex-app/dex/issues') || window.open('https://github.com/dex-app/dex/issues', '_blank', 'noopener,noreferrer')}>Report Issue</button>
+        <button style={styles.linkBtn} aria-label="Open DEX repository" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', POLICY_REPOSITORY_URL) || window.open(POLICY_REPOSITORY_URL, '_blank', 'noopener,noreferrer')}>Repository</button>
+        <button style={styles.linkBtn} aria-label="Open DEX policies" onClick={() => openPolicyViewer('terms')}>Policies</button>
+        <button style={styles.linkBtn} aria-label="Report an issue" onClick={() => (window as any).electron?.invoke?.('shell:openExternal', `${POLICY_REPOSITORY_URL}/issues`) || window.open(`${POLICY_REPOSITORY_URL}/issues`, '_blank', 'noopener,noreferrer')}>Report Issue</button>
+      </div>
+
+      {/* Legal & Privacy */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={styles.sectionTitle}>Legal & Privacy</h3>
+        <div style={styles.aboutDetails}>
+          <div style={styles.aboutRow}>
+            <span style={styles.aboutLabel}>Policy State</span>
+            <span style={{ ...styles.aboutValue, color: hasAcceptedCurrentPolicies(policyAcceptance) ? 'var(--color-success, #30d158)' : 'var(--status-error, #ef4444)' }}>
+              {hasAcceptedCurrentPolicies(policyAcceptance) ? 'Accepted current policies' : 'Needs review'}
+            </span>
+          </div>
+          <div style={styles.aboutRow}>
+            <span style={styles.aboutLabel}>Data Policy</span>
+            <span style={styles.aboutValue}>v{DATA_POLICY_VERSION}</span>
+          </div>
+          <div style={styles.aboutRow}>
+            <span style={styles.aboutLabel}>Accepted</span>
+            <span style={styles.aboutValue}>{policyAcceptance?.acceptedAt ? new Date(policyAcceptance.acceptedAt).toLocaleString() : 'Not recorded'}</span>
+          </div>
+          <div style={styles.aboutRow}>
+            <span style={styles.aboutLabel}>Contact</span>
+            <span style={styles.aboutValue}>{POLICY_CONTACT_EMAIL}</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+          {POLICY_METADATA.map(policy => (
+            <button key={policy.slug} style={styles.linkBtn} onClick={() => openPolicyViewer(policy.slug)} aria-label={`Open ${policy.title}`}>
+              {policy.title}
+            </button>
+          ))}
+        </div>
+
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Optional Product Analytics</span>
+            <span style={styles.settingDesc}>Feature usage and performance signals used to improve DEX. Off by default.</span>
+          </div>
+          <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={optionalAnalytics}
+              onChange={e => toggleOptionalAnalytics(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+              aria-label="Toggle optional product analytics"
+            />
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 12, background: optionalAnalytics ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+            </span>
+          </label>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 14 }}>
+          {DATA_CATEGORIES.map(category => (
+            <div key={category.id} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.035)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>{category.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
+            </div>
+          ))}
+        </div>
+
+        <button style={styles.linkBtn} onClick={resetPolicyAcceptance} aria-label="Reset policy acceptance">
+          Reset Policy Acceptance
+        </button>
       </div>
 
       {/* Diagnostic Share */}
       <div style={{ marginTop: 24 }}>
         <h3 style={styles.sectionTitle}>Diagnostics</h3>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 12, lineHeight: '1.5' }}>
-          Share diagnostic information with the creator for troubleshooting.
-          This includes your DEX version, OS, app usage stats, and error logs.
-          No personal files or passwords are ever shared.
+          Share diagnostic information with DEX for troubleshooting and product improvement.
+          This includes your DEX version, OS, selected app usage stats, and error logs.
+          Review before sending; personal files, passwords, and vault items are not collected by default.
         </p>
         <button
           aria-label="Share diagnostics via email"
@@ -2064,7 +2154,7 @@ export const Settings: React.FC = () => {
 
             const body = encodeURIComponent(diag.join('\n'));
             const subject = encodeURIComponent('DEX Diagnostic Report - v' + appVersion);
-            window.open('mailto:onazi@dex.app?subject=' + subject + '&body=' + body, '_blank', 'noopener,noreferrer');
+            window.open('mailto:' + POLICY_CONTACT_EMAIL + '?subject=' + subject + '&body=' + body, '_blank', 'noopener,noreferrer');
           }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -3139,6 +3229,12 @@ export const Settings: React.FC = () => {
         </div>
         {renderContent()}
       </div>
+
+      <PolicyViewer
+        open={policyViewerOpen}
+        initialPolicy={policyViewerInitial}
+        onClose={() => setPolicyViewerOpen(false)}
+      />
     </div>
   );
 };

@@ -1,105 +1,93 @@
 # Security Policy - DEX
 
-> **DEX - Personal Control Hub for Desktop Automation**
-> Created by Onazi Treasure OJ | Version 3.6.0
+> **DEX - Personal Control Hub for Desktop Automation**  
+> Created by Onazi Treasure OJ | Version 3.6.0  
+> Contact: onazi75@gmail.com
 
 ## Security Philosophy
 
-DEX is built with a **security-first, local-first** architecture. Network features are disabled by default and must be explicitly enabled.
+DEX is built around a hardened desktop model: renderer isolation, narrow IPC, local-first storage, explicit permission boundaries, plugin controls, and diagnostic signals that help protect reliability and users.
 
 ## Core Security Principles
 
 ### 1. Context Isolation
-- The renderer process is fully sandboxed from Node.js
-- All communication between processes uses validated IPC channels
-- No direct access to system APIs from the UI layer
 
-### 2. No Node Integration
-- `nodeIntegration` is disabled in all browser windows
-- `contextIsolation` is enabled for all windows
-- All system access goes through the secure preload bridge
+- Renderer windows are isolated from Node.js.
+- System access goes through validated preload bridges.
+- IPC channels are allowlisted, rate-limited where appropriate, and validated before handling.
 
-### 3. Content Security Policy
-- Strict CSP headers prevent XSS attacks
-- No inline script execution from untrusted sources
-- Resource loading restricted to local files and approved origins
+### 2. Content Security Policy
 
-### 4. Input Sanitization
-- All IPC messages are validated before processing
-- Input strings are sanitized to prevent injection attacks
-- Path traversal attempts are blocked
-- Rate limiting on sensitive operations
+- CSP headers restrict script execution and resource loading.
+- Untrusted content must not receive broad system access.
+- Browser, plugin, and renderer surfaces are treated as separate trust zones.
 
-### 5. Minimal Permissions
-- DEX requests only the permissions it needs
-- Users can review and revoke permissions at any time
-- Permission changes are logged in the audit trail
+### 3. Input and Path Safety
 
-### 6. Local-First Data
-- All data is stored locally on your device
-- No telemetry by default; API/sync/network capabilities require explicit opt-in
-- Full data export available in JSON and Markdown formats
+- IPC payloads are sanitized and validated.
+- Path traversal and unsafe file operations are blocked.
+- Sensitive operations should require explicit permissions and audit logging.
 
-### 7. Manual Updates
-- Updates are user-controlled, never forced
-- Changelog displayed before installation
-- Rollback capability maintained
-- Data preserved during updates
+### 4. Minimal Permissions
+
+- DEX requests only the permissions needed for enabled features.
+- Users can review and revoke permissions where supported.
+- Plugin permissions are scoped and should be visible before risky actions.
+
+### 5. Required Security Diagnostics
+
+DEX may process minimum security and reliability diagnostics to protect users, detect abuse, investigate incidents, recover from failures, and improve safety systems. These diagnostics are not intended to collect passwords, vault secrets, private file contents, clipboard contents, or screenshots by default.
+
+### 6. Local Data and Sensitive Stores
+
+- Sensitive stores should use OS-protected secrets or strong encryption.
+- Vault/key material must not be exposed to renderer code.
+- Audit logs are local unless a user chooses to submit diagnostics.
 
 ## Security Layers
 
 | Layer | Component | Purpose |
 |-------|-----------|---------|
-| 1 | IPC Validator | Channel allowlisting and message validation |
-| 2 | Input Sanitizer | String sanitization and injection prevention |
-| 3 | Permission Manager | Granular permission control |
-| 4 | Security Audit | Activity logging and compliance |
-| 5 | Encryption Service | Data-at-rest encryption |
-| 6 | Network Hygiene | Domain blocking and connection monitoring |
-| 7 | Secure Transfer | Encrypted file transfers with quarantine |
+| 1 | IPC Validator / SecureIpcRouter | Channel allowlisting, safe envelopes, rate limiting, path validation |
+| 2 | Input Sanitizer | Injection and malformed-input defense |
+| 3 | Permission Manager | Granular feature/plugin permission control |
+| 4 | Security Audit | Local event logging and incident review |
+| 5 | Encryption Service | Data-at-rest protection |
+| 6 | Network Hygiene | Connection visibility, domain controls, and network risk reduction |
+| 7 | Plugin Controls | Review, quarantine, disable, and removal pathways |
 
-## Encryption
+## Plugins and Marketplace Risk
 
-- AES-256-GCM encryption for vault data
-- PBKDF2 key derivation with high iteration count
-- Unique IV per encryption operation
-- Optional system-key or password-based encryption
+Plugins can increase risk. DEX may review, reject, delist, quarantine, disable, remove, rate-limit, or block plugins or developers that create security, privacy, legal, infrastructure, or user-harm risk.
 
 ## Reporting Vulnerabilities
 
-If you discover a security vulnerability in DEX, please report it responsibly:
+If you discover a security vulnerability in DEX, report it responsibly:
 
-1. **Email**: onazi.treasure@outlook.com
-2. **Subject**: `[SECURITY] DEX Vulnerability Report`
-3. **Include**: Steps to reproduce, impact assessment, and suggested fix if possible
+1. **Email:** onazi75@gmail.com
+2. **Subject:** `[SECURITY] DEX Vulnerability Report`
+3. **Include:** steps to reproduce, impact, affected version, proof-of-concept details where safe, and suggested fix if available.
 
-Please do **not** open public issues for security vulnerabilities.
+Do not open public issues for exploitable vulnerabilities.
 
 ## Response Timeline
 
-- **Acknowledgment**: Within 48 hours
-- **Assessment**: Within 7 days
-- **Fix**: Depending on severity, typically within 14-30 days
-- **Disclosure**: Coordinated disclosure after fix is released
+- **Acknowledgment:** target within 48 hours.
+- **Assessment:** target within 7 days.
+- **Fix:** severity-dependent, typically 14-30 days.
+- **Disclosure:** coordinated after mitigation or release.
 
 ## Supported Versions
 
 | Version | Supported |
 |---------|-----------|
-| 1.2.x   | Yes       |
-| 1.1.x   | Security fixes only |
-| < 1.1   | No        |
+| 3.6.x   | Yes       |
+| 3.5.x   | Security fixes when practical |
+| < 3.5   | No        |
 
-## Audit Log
+## User Diagnostic Sharing
 
-DEX maintains a local audit log of all security-relevant events:
-- Permission changes
-- Authentication attempts
-- Vault access
-- File operations on sensitive data
-- IPC validation failures
-
-Access the audit log via **Settings > Security > Audit Log**.
+Logs, screenshots, crash dumps, and support bundles may contain sensitive information. Users should review diagnostic material before sending it. DEX should warn before sharing diagnostics that may include sensitive content.
 
 ---
 
