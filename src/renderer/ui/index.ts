@@ -29,6 +29,9 @@ export type { BadgeProps, BadgeTone, BadgeSize } from './Badge';
 export { TextInput, Textarea } from './TextInput';
 export type { TextInputProps, TextareaProps, InputSize } from './TextInput';
 
+export { AppShell, Toolbar } from './AppShell';
+export type { AppShellProps, ToolbarProps } from './AppShell';
+
 // Re-export the existing pre-tokenized controls so consumers have a single
 // import surface. These already use the design tokens internally.
 export { DexToggle as Toggle, DexCheckbox as Checkbox, DexSlider as Slider } from '../shell/UIComponents';

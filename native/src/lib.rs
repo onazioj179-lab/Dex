@@ -46,6 +46,7 @@ pub use kernel::media::*;
 pub use kernel::video::*;
 pub use kernel::solid::*;
 pub use kernel::compression::*;
+pub use kernel::fuzzy::*;
 
 // ─────────────────────────────────────────────────────────────────────────
 // Structured Error Logging

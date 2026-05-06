@@ -17,3 +17,4 @@ pub mod media;
 pub mod video;
 pub mod solid;
 pub mod compression;
+pub mod fuzzy;

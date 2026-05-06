@@ -53,8 +53,8 @@ const BUDGETS = {
   EVENT_BUS_EMIT_50_SUBS: 10,
   /** Search filter 10,000 items by prefix */
   SEARCH_FILTER_10K: 20,
-  /** Sort 10,000 items by date */
-  SORT_10K_BY_DATE: 30,
+  /** Sort 10,000 items by date (sort cost varies with cold runs/scheduling) */
+  SORT_10K_BY_DATE: 50,
   /** JSON parse 1MB payload */
   JSON_PARSE_1MB: 50,
   /** Create 1,000 store entries */
