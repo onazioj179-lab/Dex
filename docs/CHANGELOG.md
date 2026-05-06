@@ -5,6 +5,34 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.2] - 2026-05-06 -- AutoPilot wired in + friendlier surfaces
+
+### Added
+
+- AutoPilot approval cards now render directly inside the UKI overlay so
+  destructive plans pause inline for one-click Run / Cancel.
+- Slash command suggestion popover above the UKI input box -- type `/`
+  and the top six matching commands appear with a one-line hint.
+- New end-to-end style integration test that verifies a slash command
+  flows from the overlay entry point through ActionBus and back as a
+  result event.
+
+### Changed
+
+- Rewrote the in-app About page to focus on what DEX does for the user.
+  Removed engine, build, platform, display, and memory leak rows.
+- Rewrote the README so it leads with user benefits and drops dev-only
+  build / native / test sections.
+- UKI's "system info" answer now defers to Settings instead of dumping
+  CPU, RAM, and display details into the chat.
+- Slash router falls through cleanly: unknown legacy commands now reach
+  the AutoPilot parser, and only fall back to the unknown-command reply
+  if neither router matched.
+
+### Tests
+
+- 661 passing across 50 suites.
+
 ## [3.8.1] - 2026-05-06 -- UKI AutoPilot Slash Commands
 
 ### Added

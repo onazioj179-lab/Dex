@@ -1,6 +1,6 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.1 - Copyright (c) 2026 - MIT Licensed
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.2 - Copyright (c) 2026 - MIT Licensed
 
 DEX is your personal command bar for the desktop. One key, one bar, anything done. Take notes, run timers, open files, snap a screenshot, focus your screen, mute the room, jump between apps -- without ever leaving the keyboard. Everything happens on your machine.
 
