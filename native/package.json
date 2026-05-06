@@ -1,6 +1,6 @@
 {
   "name": "dex-native",
-  "version": "3.7.3",
+  "version": "3.7.4",
   "private": true,
   "description": "DEX Rust native modules via NAPI-RS",
   "main": "index.js",

@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - FLUX Animation UI Components
+// DEX v3.7.3 - FLUX Animation UI Components
 // Professional motion graphics interface
 // Items 526-550 of the 1000-item improvement plan
 // =============================================================================

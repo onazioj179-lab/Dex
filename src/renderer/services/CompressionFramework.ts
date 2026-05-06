@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Apple-Inspired Compression Framework
+// DEX v3.7.3 - Apple-Inspired Compression Framework
 // =============================================================================
 // Implements compression algorithms similar to Apple's Compression framework:
 // - Fast (LZ4-like): Best for small blocks, 2-3x faster

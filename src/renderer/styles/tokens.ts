@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 /**
- * DEX Design Tokens v3.6.0
+ * DEX Design Tokens v3.7.3
  * 
  * Single source of truth for spacing, sizes, colors, and component styling.
  * Use these tokens instead of hardcoded values for consistency.

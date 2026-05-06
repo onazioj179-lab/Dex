@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Progressive Loading System
+// DEX v3.7.3 - Progressive Loading System
 // Phase C: Optimistic UI (Items 121-135)
 // Show cached data immediately, fetch fresh in background
 // =============================================================================

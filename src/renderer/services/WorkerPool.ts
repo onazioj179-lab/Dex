@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Worker Pool Service
+// DEX v3.7.3 - Worker Pool Service
 // Phase H: Performance Foundations (Items 426-445)
 // Offload heavy computation to workers, never block main thread
 // =============================================================================

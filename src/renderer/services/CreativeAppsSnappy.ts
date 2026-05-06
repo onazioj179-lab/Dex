@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Creative Apps Snappy UX
+// DEX v3.7.3 - Creative Apps Snappy UX
 // Phase E: Creative Apps Snappiness (Items 201-300)
 // App-specific optimizations for AXL, PRISM, VINX, IMOSION, FLUX
 // =============================================================================

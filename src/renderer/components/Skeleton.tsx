@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Skeleton Components
+// DEX v3.7.3 - Skeleton Components
 // Phase C: Optimistic UI (Items 136-150)
 // Show something immediately - skeleton placeholders matching content layout
 // =============================================================================

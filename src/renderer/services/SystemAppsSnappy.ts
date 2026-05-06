@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - System Apps Snappy UX
+// DEX v3.7.3 - System Apps Snappy UX
 // Phase F: System Apps Snappiness (Items 301-375)
 // App-specific optimizations for Files, Browser, Notes, Settings, Terminal
 // =============================================================================

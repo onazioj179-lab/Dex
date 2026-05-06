@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - NOTES App - Organization Engine
+// DEX v3.7.3 - NOTES App - Organization Engine
 // Notebooks, tags, search, and linking
 // Items 776-800 of the 1000-item improvement plan
 // =============================================================================

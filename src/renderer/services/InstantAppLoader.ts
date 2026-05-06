@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Instant App Loader
+// DEX v3.7.3 - Instant App Loader
 // Prefetch, cache, and instant-mount system for snappy app opening
 // =============================================================================
 

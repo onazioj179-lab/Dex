@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Code Signing Infrastructure
+// DEX v3.7.3 - Code Signing Infrastructure
 // Handles certificate management, signing, and verification
 // =============================================================================
 

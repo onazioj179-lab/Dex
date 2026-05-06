@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Snappy UX Integration
+// DEX v3.7.3 - Snappy UX Integration
 // Main entry point for all snappy UX utilities
 // =============================================================================
 

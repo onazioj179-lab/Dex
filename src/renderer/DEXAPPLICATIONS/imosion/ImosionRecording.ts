@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - IMOSION Recording System
+// DEX v3.7.3 - IMOSION Recording System
 // Professional audio recording rivaling Ableton Live / Logic Pro
 // Items 301-325 of the 1000-item improvement plan
 // =============================================================================

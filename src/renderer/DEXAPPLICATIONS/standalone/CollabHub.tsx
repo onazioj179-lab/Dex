@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Collab Hub
+// DEX v3.7.3 - Collab Hub
 // Unified collaboration center for all DEX creative apps
 // Access from anywhere, dock integration, pro features
 // =============================================================================

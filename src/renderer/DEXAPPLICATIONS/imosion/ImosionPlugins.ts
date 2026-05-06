@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - IMOSION Plugins System
+// DEX v3.7.3 - IMOSION Plugins System
 // Professional audio plugins rivaling Waves/FabFilter/Native Instruments
 // Items 376-400 of the 1000-item improvement plan
 // =============================================================================

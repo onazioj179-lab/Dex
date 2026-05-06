@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - IMOSION Audio Editing System
+// DEX v3.7.3 - IMOSION Audio Editing System
 // Professional audio editing rivaling Pro Tools/Audition quality
 // Items 401-425 of the 1000-item improvement plan
 // =============================================================================

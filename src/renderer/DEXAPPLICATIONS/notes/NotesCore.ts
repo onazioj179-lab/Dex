@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - NOTES App - Core Engine
+// DEX v3.7.3 - NOTES App - Core Engine
 // Rich text editing with markdown and blocks
 // Items 751-775 of the 1000-item improvement plan
 // =============================================================================

@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - POLISH - UI Engine
+// DEX v3.7.3 - POLISH - UI Engine
 // Animations, themes, and accessibility
 // Items 951-975 of the 1000-item improvement plan
 // =============================================================================

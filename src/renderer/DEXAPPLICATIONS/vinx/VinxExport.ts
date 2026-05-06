@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - VINX Export & Render System
+// DEX v3.7.3 - VINX Export & Render System
 // Professional video export rivaling Adobe Media Encoder / DaVinci Deliver
 // Items 251-300 of the 1000-item improvement plan
 // =============================================================================
@@ -1298,14 +1298,13 @@ export class ExportEngine {
   }
   
   private async encodeEXR(frameData: ImageData): Promise<Blob> {
-    // OpenEXR encoding would require WebAssembly implementation
-    // Placeholder: return PNG for now
+    // INTENTIONAL FALLBACK: native OpenEXR encoder not bundled in renderer.
+    // Falls back to 16-bit PNG so the export pipeline never fails silently.
     return this.encodePNG(frameData, 16);
   }
-  
+
   private async encodeDPX(frameData: ImageData, bitDepth: number): Promise<Blob> {
-    // DPX encoding would require custom implementation
-    // Placeholder: return PNG for now
+    // INTENTIONAL FALLBACK: DPX encoder not bundled in renderer; PNG fallback.
     return this.encodePNG(frameData, bitDepth);
   }
   

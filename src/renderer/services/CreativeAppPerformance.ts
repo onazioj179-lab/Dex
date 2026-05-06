@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Creative App Performance Layer
+// DEX v3.7.3 - Creative App Performance Layer
 // Specialized optimizations for VINX, Imosion, Prism, Flux, Forge, AXL
 // Uses ProPerformanceEngine for enterprise-grade performance
 // =============================================================================

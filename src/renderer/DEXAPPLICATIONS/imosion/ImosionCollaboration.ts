@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - IMOSION Collaboration System
+// DEX v3.7.3 - IMOSION Collaboration System
 // Professional collaboration rivaling Splice/Soundtrap/BandLab
 // Items 426-450 of the 1000-item improvement plan
 // =============================================================================

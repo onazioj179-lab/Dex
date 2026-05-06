@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - PRISM UI/UX Polish System
+// DEX v3.7.3 - PRISM UI/UX Polish System
 // Professional UI components rivaling Adobe Photoshop/Affinity Photo
 // Items 126-150 of the 1000-item improvement plan
 // =============================================================================

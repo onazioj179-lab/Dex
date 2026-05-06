@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - FLUX Animation Core System
+// DEX v3.7.3 - FLUX Animation Core System
 // Professional animation rivaling After Effects/Motion quality
 // Items 451-475 of the 1000-item improvement plan
 // =============================================================================

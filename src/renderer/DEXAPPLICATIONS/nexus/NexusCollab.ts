@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - NEXUS Cloud - Collaboration Engine
+// DEX v3.7.3 - NEXUS Cloud - Collaboration Engine
 // Real-time collaboration with presence and comments
 // Items 726-750 of the 1000-item improvement plan
 // =============================================================================

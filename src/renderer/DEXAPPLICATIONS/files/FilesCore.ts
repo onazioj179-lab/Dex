@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - FILES Manager - Core Engine
+// DEX v3.7.3 - FILES Manager - Core Engine
 // File operations, multi-pane navigation, and preview
 // Items 851-875 of the 1000-item improvement plan
 // =============================================================================

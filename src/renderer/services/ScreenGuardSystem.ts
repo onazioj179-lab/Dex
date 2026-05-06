@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Screen Guard System
+// DEX v3.7.3 - Screen Guard System
 // Comprehensive black screen prevention and recovery
 // =============================================================================
 

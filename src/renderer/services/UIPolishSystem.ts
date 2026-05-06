@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - UI Polish System
+// DEX v3.7.3 - UI Polish System
 // Unified system for dropdowns, menus, overlays, and UI responsiveness
 // Fixes: Immediate close, z-index management, button responsiveness, black screen
 // =============================================================================

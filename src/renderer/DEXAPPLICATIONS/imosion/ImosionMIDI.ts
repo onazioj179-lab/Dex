@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - IMOSION MIDI System
+// DEX v3.7.3 - IMOSION MIDI System
 // Professional MIDI handling rivaling Ableton Live / Logic Pro
 // Items 326-350 of the 1000-item improvement plan
 // =============================================================================

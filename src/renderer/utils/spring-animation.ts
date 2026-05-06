@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Spring Animation System
+// DEX v3.7.3 - Spring Animation System
 // Phase G: Visual Feedback (Items 376-395)
 // Physics-based spring animations like iOS/macOS
 // =============================================================================

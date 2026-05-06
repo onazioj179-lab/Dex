@@ -1,21 +1,18 @@
 # DEX - Personal Control Hub
 
-> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.6.2 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
+> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.7.4 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
 
 A cross-platform desktop automation app that lets you define rules, modes, and actions to locally control your computer with full transparency.
 
-## What's New in 3.6.2
+## What's New in 3.7
 
-- **Hotfix**: fixes the blank-window regression that appeared in 3.6.1 packaged builds. React and react-dom now share a single vendor chunk so renderer boot never races with the React internals lookup. See `docs/CHANGELOG.md` for details.
-
-## What's New in 3.6.1
-
-- **Privacy quick controls** in the dock: one-tap toggles for microphone, camera, location, and a three-mode network switch (Full / Local-only / Disabled).
-- **Quit Setup** button on every onboarding screen so you can bail out cleanly without force-killing the app.
-- **In-app terminal** in DexCode (toggle with **Ctrl+`**) - a real shell session running inside the editor, no extra window required.
-- **Native fuzzy matcher** (Rust + Rayon) for the command palette, file search, and Spotlight ranking.
-- **Shared UI primitives** (`Button`, `Card`, `Stack`, `Field`, `Badge`, `TextInput`, `Toolbar`, `AppShell`) - one consistent look across all 26+ apps.
-- 619 tests passing across 43 suites, zero TypeScript errors.
+- **ContextBus**: a typed activity bus across the shell — apps, files, tasks, and clipboard activity all flow through one observable seam, making the assistant context-aware without ad-hoc wiring.
+- **Hybrid motion system**: input feedback (hover, focus, fade, progress) is now driven by tuned linear presets, while layout still uses springs. Every surface honours `prefers-reduced-motion`.
+- **Unified palette**: `Ctrl+K` is the canonical command launcher; `Ctrl+Space` opens the UKI conversational panel. One hotkey per intent — no more overlapping search overlays.
+- **UKI slash commands**: `/help`, `/open`, `/note`, `/task`, `/find`, `/run` work directly from the assistant panel; voice input still works alongside.
+- **Cleaner UI primitives**: `Button`, `TextInput`, and `Card` use the new motion presets — interactions feel snappier and more consistent.
+- **Type-tight globals** for the Battery Status, `Performance.memory`, and `Navigator.userAgentData` APIs so the assistant's system replies are checked at compile time.
+- 632 tests passing across 45 suites, TypeScript clean.
 
 ## About DEX (Non-Technical)
 

@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Comprehensive SVG Icon Library
+// DEX v3.7.3 - Comprehensive SVG Icon Library
 // Sharp, professional icons for all creative apps
 // =============================================================================
 

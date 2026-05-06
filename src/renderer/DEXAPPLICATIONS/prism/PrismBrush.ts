@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - PRISM Advanced Brush Engine
+// DEX v3.7.3 - PRISM Advanced Brush Engine
 // Professional brush system rivaling Photoshop/Procreate
 // Items 26-50 of the 1000-item improvement plan
 // =============================================================================

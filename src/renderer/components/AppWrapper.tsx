@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - App Wrapper
+// DEX v3.7.3 - App Wrapper
 // Universal error boundary, loading states, and crash recovery for all apps
 // =============================================================================
 

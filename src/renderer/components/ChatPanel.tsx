@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Collaboration Chat Panel
+// DEX v3.7.3 - Collaboration Chat Panel
 // Real-time messaging for project collaborators (Claude-inspired, better colors)
 // =============================================================================
 

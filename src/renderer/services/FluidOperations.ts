@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Fluid Operations System
+// DEX v3.7.3 - Fluid Operations System
 // GPU-accelerated drag, resize, and animation operations for smooth UX
 // Fixes laggy drag/resize in creative apps and large windows
 // =============================================================================

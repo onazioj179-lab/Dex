@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - VINX Audio System
+// DEX v3.7.3 - VINX Audio System
 // Professional audio editing for video - DaVinci Fairlight quality
 // Items 201-225 of the 1000-item improvement plan
 // =============================================================================

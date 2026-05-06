@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Input Priority System
+// DEX v3.7.3 - Input Priority System
 // Phase B: Instant Input Response (Items 51-100)
 // Ensures input is ALWAYS processed within 16ms (one frame)
 // =============================================================================

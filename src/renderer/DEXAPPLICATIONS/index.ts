@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - APPLICATIONS INDEX
+// DEX v3.7.3 - APPLICATIONS INDEX
 // Central export file for all DEX applications and engines
 // NOTE: Using direct module imports rather than barrel re-exports to avoid
 // name collisions between creative app modules (Layer, Transform, etc.)

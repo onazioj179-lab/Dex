@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - SYSTEM - Security Engine
+// DEX v3.7.3 - SYSTEM - Security Engine
 // Encryption, sandboxing, permissions, and security monitoring
 // Items 926-950 of the 1000-item improvement plan
 // =============================================================================

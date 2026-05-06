@@ -1,6 +1,6 @@
 {
   "name": "@dex/native-cpp",
-  "version": "3.6.0",
+  "version": "3.7.3",
   "description": "DEX C++ native addon -- bloom filter, spatial index, SIMD hashing, signal processing, matrix ops",
   "main": "build/Release/dex_cpp.node",
   "private": true,

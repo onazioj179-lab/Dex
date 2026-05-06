@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Optimistic UI Hooks
+// DEX v3.7.3 - Optimistic UI Hooks
 // Phase C: Optimistic UI (Items 101-120)
 // Update UI immediately, sync in background, revert only on failure
 // =============================================================================

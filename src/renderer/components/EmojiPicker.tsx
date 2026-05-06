@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 /**
- * DEX Emoji Picker v3.6.0
+ * DEX Emoji Picker v3.7.3
  * 
  * Full-featured emoji picker with categories, search, skin tones, and recent emojis.
  * Uses Unicode 15 emoji set organized by standard categories.

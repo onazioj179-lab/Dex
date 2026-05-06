@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 /**
- * DEX UI Components v3.6.0
+ * DEX UI Components v3.7.3
  * 
  * Standardized, accessible UI primitives for consistent design across DEX.
  * All components use design tokens for spacing, colors, and sizing.

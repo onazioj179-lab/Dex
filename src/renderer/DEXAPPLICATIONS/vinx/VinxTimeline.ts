@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - VINX Timeline Core System
+// DEX v3.7.3 - VINX Timeline Core System
 // Professional video timeline rivaling Premiere Pro/DaVinci Resolve/Final Cut
 // Items 151-175 of the 1000-item improvement plan
 // =============================================================================

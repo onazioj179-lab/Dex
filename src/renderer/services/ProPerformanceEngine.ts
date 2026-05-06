@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Pro Performance Engine
+// DEX v3.7.3 - Pro Performance Engine
 // Enterprise-grade performance system inspired by Adobe Premiere Pro & FL Studio
 // =============================================================================
 // Architecture:

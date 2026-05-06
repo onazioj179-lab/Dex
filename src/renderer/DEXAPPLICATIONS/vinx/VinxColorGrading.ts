@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - VINX Color Grading System
+// DEX v3.7.3 - VINX Color Grading System
 // Professional color grading rivaling DaVinci Resolve
 // Items 226-250 of the 1000-item improvement plan
 // =============================================================================

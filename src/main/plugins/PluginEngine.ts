@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Plugin System
+// DEX v3.7.3 - Plugin System
 // Third-party extension support with sandboxing and APIs
 // =============================================================================
 

@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - PRISM Advanced Adjustments System
+// DEX v3.7.3 - PRISM Advanced Adjustments System
 // Professional image adjustments rivaling Lightroom/Capture One
 // Items 76-100 of the 1000-item improvement plan
 // =============================================================================

@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Share Dialog
+// DEX v3.7.3 - Share Dialog
 // Invite collaborators, manage access, and share links
 // =============================================================================
 

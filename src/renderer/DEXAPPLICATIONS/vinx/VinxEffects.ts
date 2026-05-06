@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - VINX Video Effects & Transitions System
+// DEX v3.7.3 - VINX Video Effects & Transitions System
 // Professional video effects rivaling After Effects/DaVinci Resolve
 // Items 176-200 of the 1000-item improvement plan
 // =============================================================================

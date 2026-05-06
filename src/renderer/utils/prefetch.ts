@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Prefetch System
+// DEX v3.7.3 - Prefetch System
 // Phase D: App Switching and Navigation (Items 151-185)
 // Preload apps and navigation targets for instant switching
 // =============================================================================

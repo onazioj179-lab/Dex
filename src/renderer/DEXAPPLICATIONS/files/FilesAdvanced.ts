@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - FILES Manager - Advanced Features
+// DEX v3.7.3 - FILES Manager - Advanced Features
 // Batch operations, compression, cloud integration
 // Items 876-900 of the 1000-item improvement plan
 // =============================================================================

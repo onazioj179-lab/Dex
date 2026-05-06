@@ -5,6 +5,20 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.4] - 2026-05-06 -- Polish: Version Hygiene & Honest Stubs
+
+### Changed
+
+- Synced 70 stale `// DEX v3.6.0 -` source-header comments across renderer,
+  main, and shared trees to the current release line.
+- Bumped [src/native/dex-cpp/package.json](src/native/dex-cpp/package.json)
+  from `3.6.0` to match the rest of the workspace.
+- VINX export fallbacks (`encodeEXR`, `encodeDPX`) and the
+  [UpdateServer](src/main/updates/UpdateServer.ts) manifest skeleton now
+  carry explicit `INTENTIONAL FALLBACK` / `INTENTIONAL STUB` markers and
+  return empty values instead of fake hashes — no more lying placeholders
+  surfacing in shipped manifests.
+
 ## [3.7.3] - 2026-05-06 -- CI Package Pipeline Fix
 
 ### Fixed

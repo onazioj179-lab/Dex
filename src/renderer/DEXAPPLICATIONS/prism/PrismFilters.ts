@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - PRISM Advanced Filters System
+// DEX v3.7.3 - PRISM Advanced Filters System
 // Professional image filters rivaling Photoshop/Affinity Photo
 // Items 101-125 of the 1000-item improvement plan
 // =============================================================================

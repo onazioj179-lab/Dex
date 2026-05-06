@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Auto-Update Server Infrastructure
+// DEX v3.7.3 - Auto-Update Server Infrastructure
 // Handles update distribution, version checking, and rollback
 // =============================================================================
 
@@ -473,16 +473,18 @@ export async function generateReleaseManifest(options: ManifestOptions): Promise
   const assets: ReleaseAsset[] = [];
   
   for (const asset of options.assets) {
-    // In production, calculate actual file size and hash
+    // INTENTIONAL STUB: real size + sha512 are filled in by
+    // electron-builder's publish step. This helper only assembles the
+    // manifest skeleton for the in-process update server.
     assets.push({
       platform: asset.platform,
       arch: asset.arch,
       url: `https://releases.dex-app.com/${options.channel}/${options.version}/${asset.path}`,
-      size: 100000000, // Placeholder
-      sha512: 'placeholder-hash'
+      size: 0,
+      sha512: ''
     });
   }
-  
+
   const manifest: ReleaseInfo = {
     version: options.version,
     channel: options.channel,
@@ -490,9 +492,9 @@ export async function generateReleaseManifest(options: ManifestOptions): Promise
     mandatory: false,
     changelog: options.changelog,
     assets,
-    signature: 'placeholder-signature',
+    signature: '',
     size: assets.reduce((sum, a) => sum + a.size, 0),
-    sha512: 'placeholder-manifest-hash'
+    sha512: ''
   };
   
   return manifest;

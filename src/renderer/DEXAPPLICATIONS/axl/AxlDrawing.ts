@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - AXL CAD Drawing Engine
+// DEX v3.7.3 - AXL CAD Drawing Engine
 // Professional 2D drafting and technical documentation
 // Items 601-625 of the 1000-item improvement plan
 // =============================================================================

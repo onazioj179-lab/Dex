@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - FLUX 3D & Effects System
+// DEX v3.7.3 - FLUX 3D & Effects System
 // Professional 3D compositing and visual effects
 // Items 476-500 of the 1000-item improvement plan
 // =============================================================================

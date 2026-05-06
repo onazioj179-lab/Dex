@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - SYSTEM - Core Engine
+// DEX v3.7.3 - SYSTEM - Core Engine
 // Process management, memory optimization, and system monitoring
 // Items 901-925 of the 1000-item improvement plan
 // =============================================================================

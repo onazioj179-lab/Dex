@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - FORGE Web Development IDE - Live Preview Engine
+// DEX v3.7.3 - FORGE Web Development IDE - Live Preview Engine
 // Real-time preview with hot reload and responsive testing
 // Items 676-700 of the 1000-item improvement plan
 // =============================================================================

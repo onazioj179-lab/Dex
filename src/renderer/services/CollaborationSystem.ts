@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - Collaboration System
+// DEX v3.7.3 - Collaboration System
 // Real-time collaboration, sharing, and access control for creative apps
 // =============================================================================
 

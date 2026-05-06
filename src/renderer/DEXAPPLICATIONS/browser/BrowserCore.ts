@@ -5,7 +5,7 @@
 // Licensed under the MIT License. See LICENSE in the project root.
 // =============================================================================
 // =============================================================================
-// DEX v3.6.0 - BROWSER App - Core Engine
+// DEX v3.7.3 - BROWSER App - Core Engine
 // Tab management, navigation, and history
 // Items 801-825 of the 1000-item improvement plan
 // =============================================================================
