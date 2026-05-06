@@ -1,8 +1,18 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.7 - Copyright (c) 2026 - DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.8 - Copyright (c) 2026 - DEX Software License Agreement v1.0
 
 DEX is your personal command bar for the desktop. One key, one bar, anything done. Take notes, run timers, open files, snap a screenshot, focus your screen, mute the room, jump between apps -- without ever leaving the keyboard. Everything happens on your machine.
+
+## What is new in 3.8.8 -- 2FA, legacy plan, cloud storage, smart UKI by plan
+
+- **Two-factor sign-in.** Optional TOTP (Google Authenticator, Authy, 1Password, any RFC 6238 app). Set it up in Settings > Security; eight one-time recovery codes are printed once and never shown again.
+- **Legacy / handover plan.** Nominate up to 5 people you trust. If you stop using DEX for the inactivity window you choose (default 90 days), DEX emails you first. If 14 more days pass with no reply, your heirs get a one-time link. Off by default, fully under your control, never automatic.
+- **Cloud storage tiers.** Free Viewer gets 10 GB. Personal, Family, Pro, Studio get 50 GB (per seat for Studio). 90% triggers a soft warning, 100% pauses uploads -- never silent overage.
+- **End-to-end encryption.** AES-GCM-256 with a per-object key. If you set a passphrase the cloud literally cannot read your data; PBKDF2-SHA256 600,000 rounds derives the wrap key from your passphrase and a per-account salt. Lose the passphrase, lose the data -- DEX warns you twice.
+- **Backup is opt-in, per category.** Master switch is off until you turn it on. Pick exactly which categories sync (settings, snippets, notes, plans, Nexus graph, media, workspaces, history). Wi-Fi-only and night-only options on by default. Command history is OFF by default because it is sensitive.
+- **Smart UKI scales with your plan.** Free Viewer: 20 plans/day, small model. Personal: 200/day, standard model. Pro: 1000/day, pro model, higher concurrency. Studio: 2000/seat/day. Visible counter in the UKI overlay so there is no surprise.
+- **Hardened rate limiting reaches every cloud route.** Sign-in, account creation, checkout, sync push, UKI plan execution, search, and storage upload all sit behind the same TokenBucket rules.
 
 ## What is new in 3.8.7 -- Accounts, Stripe checkout, and a hardened door
 

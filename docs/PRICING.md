@@ -29,6 +29,17 @@ that keeps your data accessible.
 - All updates within your current major version, free.
 - On-device data, optional cloud sync, optional analytics (off by
   default).
+- **50 GB of cloud storage** (per seat for Studio). Free Viewer gets
+  10 GB so your data stays accessible.
+- **End-to-end encryption** option (passphrase mode). Lose the
+  passphrase, lose the data -- DEX warns you twice before enabling.
+- **Optional 2FA** (TOTP via any authenticator app) plus eight one-time
+  recovery codes.
+- **Optional legacy / handover plan**: nominate up to 5 heirs; if you
+  go inactive for the window you set, DEX emails you first, then them.
+- **Smart UKI scaled to your plan.** Free Viewer 20 plans/day, Personal
+  200/day, Family 600/day pooled, Pro 1000/day, Studio 2000/day per
+  seat. Pro and Studio also get the larger model and higher concurrency.
 - Email support within 2 business days.
 
 ### What Pro and Studio add

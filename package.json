@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "3.8.7",
+  "version": "3.8.8",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",

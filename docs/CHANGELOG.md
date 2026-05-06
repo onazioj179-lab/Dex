@@ -5,6 +5,40 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.8] - 2026-05-06 -- 2FA, legacy plan, cloud storage, smart UKI by plan
+
+### Added
+
+- **2FA.** Optional TOTP via `src/shared/security/totp.ts` and base32
+  codec in `src/shared/security/base32.ts`. Standard 30-second step,
+  6-digit codes, +/-1 step drift window. Recovery code generator.
+- **Legacy handover.** `src/shared/account/legacyHandover.ts` -- pure
+  data model + `decideHandover()` state machine. Owner challenge after
+  inactivity (default 90 days), heir notice if owner ignores for 14
+  days, transfer on heir confirmation. Owner can cancel any time.
+- **Cloud storage quotas.** `src/shared/cloud/quota.ts`: 10 GB Free,
+  50 GB Personal/Family/Pro, 50 GB per seat Studio. Soft warn at 90%,
+  hard block at 100%. `canUpload()` returns the exact byte shortfall.
+- **End-to-end encryption envelope.** `src/shared/cloud/encryption.ts`:
+  AES-GCM-256 + PBKDF2-SHA256 600k rounds. `EncryptedEnvelope` schema
+  v1 with AAD-bound account id + plaintext length, so a stolen blob
+  cannot be replayed across accounts. Async helpers using
+  webcrypto.subtle when present.
+- **Opt-in selective backup.** `src/shared/cloud/backupPolicy.ts`:
+  master switch off by default, eight categories with explicit opt-in,
+  Wi-Fi-only, pause-on-metered, night-only. `shouldRunBackup()`
+  pure decision plus `selectBackupItems()` and `estimateBackupSize()`.
+- **Plan-aware UKI features.** `src/shared/license/planFeatures.ts`:
+  per-plan daily UKI cap, concurrency, model tier, collab seats,
+  storage bytes, and per-account rate-limit override. Single source
+  of truth for renderer banners and server-side limiter.
+- 41 new tests in `tests/unit/wave-future-2fa-cloud.test.ts`.
+
+### Changed
+
+- README + CHANGELOG + PRICING.md describe the new tier benefits in
+  plain English. Storage and UKI numbers added to the plan grid.
+
 ## [3.8.7] - 2026-05-06 -- Accounts, Stripe checkout, hardened door
 
 ### Added
