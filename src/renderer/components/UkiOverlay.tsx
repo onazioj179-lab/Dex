@@ -15,6 +15,7 @@ import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { zIndex } from '../styles/tokens';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -267,11 +268,11 @@ async function getScreenContext(): Promise<ScreenContext> {
   
   try {
     // Get active app from running apps store
-    const store = (window as any).__dexRunningApps;
-    const state = store?.getState?.();
+    const store = window.__dexRunningApps;
+    const state = store?.getState?.() as { focusedAppId?: string; runningApps?: Array<{ id: string; name: string }> } | undefined;
     if (state?.focusedAppId) {
       context.activeApp = state.focusedAppId;
-      const app = state.runningApps?.find((a: any) => a.id === state.focusedAppId);
+      const app = state.runningApps?.find(a => a.id === state.focusedAppId);
       context.windowTitle = app?.name || state.focusedAppId;
     }
     
@@ -939,11 +940,11 @@ function trySystemTool(text: string): ToolResult {
   // Running apps (with slang support)
   if (/(?:running|open|active|opn)\s*(?:apps?|windows?|processes?)|list\s*(?:apps?|open)|what(?:'s| is) (?:open|running)|wat(?:'s| is) opn/.test(lower)) {
     try {
-      const store = (window as any).__dexRunningApps;
+      const store = window.__dexRunningApps;
       const state = store ? store.getState?.() : null;
       const apps = state?.runningApps;
       if (apps && apps.length > 0) {
-        const names = apps.map((a: any) => a.name || a.id);
+        const names = apps.map(a => a.name || a.id);
         return { handled: true, response: `Currently running: ${names.join(', ')} (${apps.length} app${apps.length > 1 ? 's' : ''} open).` };
       }
       return { handled: true, response: 'No apps are currently running. Say "open notes" to launch one!' };
@@ -954,24 +955,23 @@ function trySystemTool(text: string): ToolResult {
 
   // System info
   if (/(?:system|device|hardware|sys|hw)\s*(?:info|status|specs?)|about\s*(?:this|my|the)\s*(?:system|device|computer|pc)|my (?:specs|computer|pc|system)/.test(lower)) {
-    const nav = navigator as any;
-    const mem = nav.deviceMemory ? `${nav.deviceMemory}GB RAM` : 'RAM info unavailable';
-    const cores = nav.hardwareConcurrency ? `${nav.hardwareConcurrency} CPU cores` : 'cores unknown';
-    const platform = nav.userAgentData?.platform || nav.platform || 'unknown';
-    return { handled: true, response: `DEX v3.6.0 on ${platform}. ${cores}, ${mem}. Display: ${window.screen.width}×${window.screen.height} @ ${window.devicePixelRatio}x.` };
+    const mem = navigator.deviceMemory ? `${navigator.deviceMemory}GB RAM` : 'RAM info unavailable';
+    const cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} CPU cores` : 'cores unknown';
+    const platform = navigator.userAgentData?.platform || navigator.platform || 'unknown';
+    return { handled: true, response: `DEX v3.7.0 on ${platform}. ${cores}, ${mem}. Display: ${window.screen.width}×${window.screen.height} @ ${window.devicePixelRatio}x.` };
   }
 
   // Battery
   if (/(?:battery|power|charge|batt)\s*(?:level|status|life|%)?|how much (?:battery|power|charge)/.test(lower)) {
-    if ('getBattery' in navigator) {
-      (navigator as any).getBattery().then((b: any) => {
+    if (typeof navigator.getBattery === 'function') {
+      navigator.getBattery().then(b => {
         const pct = Math.round(b.level * 100);
         const charging = b.charging ? ' (charging)' : '';
-        const timeLeft = !b.charging && b.dischargingTime !== Infinity 
-          ? ` (~${Math.round(b.dischargingTime / 60)} min left)` 
+        const timeLeft = !b.charging && b.dischargingTime !== Infinity
+          ? ` (~${Math.round(b.dischargingTime / 60)} min left)`
           : '';
-        window.dispatchEvent(new CustomEvent('dex-uki-async-response', { 
-          detail: { response: `Battery: ${pct}%${charging}${timeLeft}` } 
+        window.dispatchEvent(new CustomEvent('dex-uki-async-response', {
+          detail: { response: `Battery: ${pct}%${charging}${timeLeft}` }
         }));
       });
       return { handled: true, response: 'Checking battery...' };
@@ -990,11 +990,11 @@ function trySystemTool(text: string): ToolResult {
 
   // Memory usage
   if (/(?:memory|ram|heap|mem)\s*(?:usage|used|free|status)?|how much (?:memory|ram)/.test(lower)) {
-    const perf = (performance as any);
-    if (perf.memory) {
-      const used = (perf.memory.usedJSHeapSize / 1048576).toFixed(0);
-      const total = (perf.memory.totalJSHeapSize / 1048576).toFixed(0);
-      const pct = Math.round((perf.memory.usedJSHeapSize / perf.memory.totalJSHeapSize) * 100);
+    const mem = performance.memory;
+    if (mem) {
+      const used = (mem.usedJSHeapSize / 1048576).toFixed(0);
+      const total = (mem.totalJSHeapSize / 1048576).toFixed(0);
+      const pct = Math.round((mem.usedJSHeapSize / mem.totalJSHeapSize) * 100);
       return { handled: true, response: `Memory: ${used}MB / ${total}MB (${pct}% used).` };
     }
     return { handled: true, response: 'Detailed memory info is not available in this environment.' };
@@ -1358,7 +1358,7 @@ const UkiOverlay: React.FC = () => {
       left: panelPos?.x ?? 20,
       width: 380,
       maxWidth: 'calc(100vw - 40px)',
-      zIndex: 'var(--z-overlay)' as any,
+      zIndex: zIndex.overlay,
       pointerEvents: 'auto',
       animation: panelPos ? 'none' : 'ukiOverlayIn 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
     }}>

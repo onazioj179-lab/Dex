@@ -5,6 +5,27 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.1] - 2026-05-06 -- Type Hygiene Sweep
+
+### Changed
+
+- **Typed window globals** ([src/renderer/types/global.d.ts](src/renderer/types/global.d.ts)):
+  added `Window.__dexRunningApps`, the Battery Status API
+  (`Navigator.getBattery`, `BatteryManager`), `Navigator.deviceMemory`,
+  `Navigator.userAgentData`, and `Performance.memory`. Removes seven
+  `(window as any)` / `(navigator as any)` / `(performance as any)` casts
+  in [UkiOverlay.tsx](src/renderer/components/UkiOverlay.tsx) and
+  [runningApps.ts](src/renderer/store/runningApps.ts).
+- **UkiOverlay** uses the `zIndex.overlay` token instead of casting a CSS
+  custom-property string with `as any`.
+- Stale `DEX v3.6.0` self-reference in UKI system-info reply bumped to
+  `v3.7.0`.
+
+### Removed
+
+- Two debug `console.log` leftovers in [workflow.ts](src/renderer/utils/workflow.ts)
+  (`executeCLI` / `createAPIEndpoint` browser stubs).
+
 ## [3.7.0] - 2026-05-07 -- Boil-the-Ocean: Bus / Motion / Palette / UKI
 
 ### Added

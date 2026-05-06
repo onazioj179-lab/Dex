@@ -1048,5 +1048,38 @@ declare global {
 
     // DEX critical events registry
     __DEX_CRITICAL_EVENTS__?: any[];
+
+    // Zustand store handles exposed for cross-surface tooling (UKI, command palette)
+    __dexRunningApps?: {
+      getState: () => {
+        runningApps: Array<{ id: string; name: string; icon?: string; color?: string }>;
+        launchApp: (app: { id: string; name: string; icon: string; color: string }) => void;
+        currentAppId: string | null;
+      };
+      subscribe: (listener: (state: unknown) => void) => () => void;
+    };
+  }
+
+  // Battery Status API (still vendor-prefixed in some browsers)
+  interface BatteryManager extends EventTarget {
+    readonly charging: boolean;
+    readonly chargingTime: number;
+    readonly dischargingTime: number;
+    readonly level: number;
+  }
+  interface Navigator {
+    getBattery?: () => Promise<BatteryManager>;
+    deviceMemory?: number;
+    userAgentData?: { platform?: string };
+  }
+
+  // performance.memory (Chromium-only)
+  interface PerformanceMemory {
+    readonly jsHeapSizeLimit: number;
+    readonly totalJSHeapSize: number;
+    readonly usedJSHeapSize: number;
+  }
+  interface Performance {
+    readonly memory?: PerformanceMemory;
   }
 }

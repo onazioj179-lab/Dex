@@ -971,21 +971,18 @@ export class IntegrationManager {
   }
 
   // 822. CLI Integration
-  async executeCLI(command: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    // In Electron, this would use child_process
-    // Stub for browser environment
-    console.log('CLI command:', command);
+  async executeCLI(_command: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    // In Electron, this would use child_process; stub for browser environment.
     return { stdout: '', stderr: '', exitCode: 0 };
   }
 
   // 823. API Endpoint
   createAPIEndpoint(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-    path: string,
-    handler: (params: unknown) => Promise<unknown>
+    _method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    _path: string,
+    _handler: (params: unknown) => Promise<unknown>
   ): void {
-    // Register endpoint for external API access
-    console.log('API endpoint registered:', method, path);
+    // Register endpoint for external API access (browser stub).
   }
 
   getWebhook(id: string): WebhookConfig | undefined {

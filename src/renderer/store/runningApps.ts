@@ -223,7 +223,9 @@ export const useRunningApps = create<RunningAppsState>()(
 );
 
 // Expose store globally for UKI system tool access
-(window as any).__dexRunningApps = useRunningApps;
+if (typeof window !== 'undefined') {
+  window.__dexRunningApps = useRunningApps as unknown as Window['__dexRunningApps'];
+}
 
 // ---------------------------------------------------------------------------
 // Selector-based subscriptions (item 146) — minimize re-renders
