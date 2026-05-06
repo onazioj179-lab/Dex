@@ -3258,6 +3258,19 @@ class DexApp {
     }).catch(err => {
       log.error('[DEX] Voice Control Engine error:', err);
     });
+
+    // -------------------------------------------------------------------------
+    // SecureIpcRouter -- mount any channels registered via the secure router.
+    // No-op if nothing was registered. Must run after all controller inits so
+    // late registrations are still picked up. Idempotent — safe to call again.
+    // W2 #76-90: IPC hardening
+    // -------------------------------------------------------------------------
+    try {
+      const { secureIpcRouter } = require('./security/SecureIpcRouter');
+      secureIpcRouter.mount();
+    } catch (err) {
+      log.warn('[DEX] SecureIpcRouter mount failed (continuing):', err);
+    }
   }
 
   private async emergencyStop(): Promise<void> {

@@ -35,6 +35,7 @@ function percent(v: number): string {
 
 const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) => {
   const [snapshots, setSnapshots] = useState<MetricSnapshot[]>([]);
+  const [timeline, setTimeline] = useState<{ totalMs: number; phases: { name: string; durationMs: number }[] } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -42,6 +43,17 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
     update();
     const id = setInterval(update, 2000);
     return () => clearInterval(id);
+  }, [open]);
+
+  // Fetch startup timeline once when panel opens
+  useEffect(() => {
+    if (!open) return;
+    const diag = (window as any).dexDiagnostics;
+    if (diag?.getStartupTimeline) {
+      diag.getStartupTimeline()
+        .then((t: any) => { if (t && Array.isArray(t.phases)) setTimeline(t); })
+        .catch(() => { /* main process may not be ready */ });
+    }
   }, [open]);
 
   if (!open) return null;
@@ -116,6 +128,28 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {renderBudgets.map(s => (
                 <Stat key={s.name} label={s.name.replace('renderer.render.', '')} value={`${s.value.toFixed(1)} ms`} warn={s.value > 16.67} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Startup timeline */}
+        {timeline && timeline.phases.length > 0 && (
+          <section aria-label="Startup timeline">
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              Startup Timeline ({timeline.totalMs} ms total)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
+              {[...timeline.phases].sort((a, b) => b.durationMs - a.durationMs).map(p => (
+                <div key={p.name} style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: 11, fontVariantNumeric: 'tabular-nums',
+                  color: p.durationMs > 500 ? 'var(--status-error, #ef4444)' : 'var(--pg-text-secondary, #9ca3af)',
+                  padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4,
+                }}>
+                  <span style={{ fontFamily: 'ui-monospace, monospace' }}>{p.name}</span>
+                  <span style={{ fontWeight: 600 }}>{p.durationMs} ms</span>
+                </div>
               ))}
             </div>
           </section>

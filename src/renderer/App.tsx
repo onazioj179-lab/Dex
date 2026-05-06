@@ -17,7 +17,7 @@
  * ===========================================================================
  */
 
-import React, { useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import packageJson from '../../package.json';
 import { useAuthStore } from './store/useAuthStore';
 import { useWallpaperStore } from './store/wallpaperStore';
@@ -44,6 +44,7 @@ import { PictureInPicture, usePiPState, closePiP } from './components/PictureInP
 
 // Progressive loading (item 153): Shell + nav immediate, overlays deferred
 const AppManager = lazy(() => import('./components/AppManager').then(m => ({ default: m.AppManager })));
+const DiagnosticsPanel = lazy(() => import('./components/DiagnosticsPanel'));
 const LockScreen = lazy(() => import('./components/LockScreen').then(m => ({ default: m.LockScreen })));
 const KeyboardShortcuts = lazy(() => import('./components/KeyboardShortcuts'));
 
@@ -200,6 +201,19 @@ export const App: React.FC = () => {
 
   // First-run onboarding
   const { needsOnboarding, markOnboardingComplete } = useOnboardingCheck();
+
+  // System Diagnostics overlay (Ctrl+Shift+D)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        setDiagnosticsOpen(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Wallpaper state for global layer
   const wpMode = useWallpaperStore(s => s.mode);
@@ -496,6 +510,13 @@ export const App: React.FC = () => {
           title={pipState.title}
           onClose={closePiP}
         />
+      )}
+
+      {/* System Diagnostics overlay (Ctrl+Shift+D) */}
+      {diagnosticsOpen && (
+        <Suspense fallback={null}>
+          <DiagnosticsPanel open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
+        </Suspense>
       )}
       
       {/* Global wallpaper layer -- sits behind everything, reacts to wallpaper store */}
