@@ -8,7 +8,7 @@
  * Run: node scripts/add-watermarks.js [--check]
  *   --check  Exit non-zero if any file would be changed (CI gate).
  *
- * Author     Onazi Treasure OJ <onazi.treasure@outlook.com>
+ * Author     Onazi Treasure OJ <onazi75@gmail.com>
  * Copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * License    MIT
  */
@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 
 const AUTHOR_NAME = 'Onazi Treasure OJ';
-const AUTHOR_EMAIL = 'onazi.treasure@outlook.com';
+const AUTHOR_EMAIL = 'onazi75@gmail.com';
 const COPYRIGHT_YEAR = '2026';
 const COPYRIGHT_LINE = `Copyright (c) ${COPYRIGHT_YEAR} ${AUTHOR_NAME}. All rights reserved.`;
 const ATTRIBUTION_LINE = `Created by ${AUTHOR_NAME} <${AUTHOR_EMAIL}>`;

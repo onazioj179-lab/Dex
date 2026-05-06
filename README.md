@@ -1,8 +1,17 @@
 # DEX - Personal Control Hub
 
-> **Created by Onazi Treasure OJ** &lt;onazi.treasure@outlook.com&gt; | Version 3.6.0 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
+> **Created by Onazi Treasure OJ** &lt;onazi75@gmail.com&gt; | Version 3.6.1 | Copyright (c) 2026 All Rights Reserved | MIT Licensed
 
 A cross-platform desktop automation app that lets you define rules, modes, and actions to locally control your computer with full transparency.
+
+## What's New in 3.6.1
+
+- **Privacy quick controls** in the dock: one-tap toggles for microphone, camera, location, and a three-mode network switch (Full / Local-only / Disabled).
+- **Quit Setup** button on every onboarding screen so you can bail out cleanly without force-killing the app.
+- **In-app terminal** in DexCode (toggle with **Ctrl+`**) - a real shell session running inside the editor, no extra window required.
+- **Native fuzzy matcher** (Rust + Rayon) for the command palette, file search, and Spotlight ranking.
+- **Shared UI primitives** (`Button`, `Card`, `Stack`, `Field`, `Badge`, `TextInput`, `Toolbar`, `AppShell`) - one consistent look across all 26+ apps.
+- 619 tests passing across 43 suites, zero TypeScript errors.
 
 ## About DEX (Non-Technical)
 
@@ -69,5 +78,5 @@ npm run test:coverage     # With V8 coverage
 
 ---
 
-**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ** &lt;onazi.treasure@outlook.com&gt;
+**DEX** -- Designed, built, and maintained by **Onazi Treasure OJ** &lt;onazi75@gmail.com&gt;
 Copyright (c) 2026 Onazi Treasure OJ. All rights reserved. Licensed under the MIT License.

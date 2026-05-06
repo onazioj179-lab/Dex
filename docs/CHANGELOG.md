@@ -5,6 +5,50 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-05-06 -- Sharp Pass: Permissions, Network Modes, Terminal & Native Fuzzy
+
+### Added
+
+- **QuickControls dock pills**: one-tap toggles for microphone, camera, and
+  location, plus a three-state network switch (Full / Local-only / Disabled).
+  Renderer state lives in a new `networkStore` (zustand) that mirrors the
+  main-process `NetworkGuard`.
+- **Quit Setup button** on every onboarding screen with a confirmation
+  prompt; wired to a new `app:quit` IPC handler in main.
+- **Settings -> Network Mode** section (three radio cards) for explicit
+  full / local-only / offline switching from the system settings panel.
+- **In-app terminal** in DexCode (toggle with `Ctrl+\``), backed by a new
+  `PtyService` in main that uses `child_process.spawn` (no node-pty
+  dependency). The terminal is a pure-DOM control with an ANSI SGR colour
+  parser, history navigation, and Ctrl+L / Ctrl+C shortcuts.
+- **Shared UI primitives** under `src/renderer/ui/`: `Button`, `IconButton`,
+  `Card`, `Stack` / `HStack` / `VStack` / `Spacer`, `Field`, `Badge`,
+  `TextInput`, `Textarea`, plus an `AppShell` + `Toolbar` chrome wrapper for
+  standalone apps.
+- **Native fuzzy matcher** (`native/src/kernel/fuzzy.rs`): Smith-Waterman
+  style scorer with first-character / boundary / camelCase / consecutive-run
+  bonuses. Parallel ranking via Rayon for 256+ candidates. Exposed to JS as
+  `fuzzyRank(query, candidates, limit)` and `fuzzyScore(query, candidate)`.
+- 27 new tests (networkStore: 5, ui-primitives: 16, terminal: 6,
+  app-shell: 7, native-fuzzy: 5).
+
+### Changed
+
+- `preload.ts` invoke allowlist now includes the `network:` and `pty:`
+  channel prefixes.
+- `native/index.js` loader tries the `win32-x64-gnu` artifact before
+  falling back to `msvc`, so binaries built with the gnu toolchain on
+  Windows load without manual symlinks.
+- Bumped flaky `SORT_10K_BY_DATE` performance budget from 30 ms to 50 ms
+  (cold-run scheduling jitter, not a regression).
+- Author/maintainer contact email standardised to `onazi75@gmail.com`
+  across all source headers, package metadata, and documentation.
+
+### Notes
+
+- `tsc --noEmit`: 0 errors.
+- `vitest run`: 619 / 619 tests passing across 43 files.
+
 ## [3.6.0] - 2026-05-05 -- Stabilization & Test Recovery
 
 ### Fixed
