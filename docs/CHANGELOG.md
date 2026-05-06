@@ -5,6 +5,29 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-05-06 -- UKI AutoPilot Foundation
+
+### Added
+
+- **ActionBus** ([src/renderer/services/ActionBus.ts](src/renderer/services/ActionBus.ts)) -
+  typed multi-step plan executor. Apps register handlers, UKI submits a
+  `PlanGraph`, and steps run in dependency order with start/finish/progress
+  events. Destructive plans pause for inline approval.
+- **PlanGraph types** ([src/shared/types/plan-graph.ts](src/shared/types/plan-graph.ts))
+  with three risk levels (`safe`, `reversible`, `destructive`) so UKI never
+  silently runs anything risky.
+- **Approval card** ([src/renderer/components/UkiApprovalCard.tsx](src/renderer/components/UkiApprovalCard.tsx))
+  rendered inline in the assistant before any destructive plan executes -
+  one click to Run or Cancel.
+- **Pattern learner** ([src/renderer/services/UKIPatternStore.ts](src/renderer/services/UKIPatternStore.ts))
+  records (context-snapshot -> action) tuples in IndexedDB and surfaces
+  the top-3 likely next actions for the current context. Stays on-device.
+- **AutoPilot scheduler** ([src/main/uki/Scheduler.ts](src/main/uki/Scheduler.ts))
+  - cron-style triggers (`everyMinutes`, `dailyAt`, `weekly`), idle
+  triggers, and system events (suspend/resume/lock/unlock). Persists to
+  `<userData>/uki-schedule.json`.
+- 14 new unit tests; total now **646 passing across 48 suites**.
+
 ## [3.7.4] - 2026-05-06 -- Polish: Version Hygiene & Honest Stubs
 
 ### Changed

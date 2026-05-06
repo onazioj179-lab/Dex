@@ -100,6 +100,14 @@ class UkiController {
       this.registerShortcut(config.shortcut);
     }
 
+    // Wave 1: UKI AutoPilot scheduler (cron + idle + system events)
+    try {
+      const { initUkiScheduler } = await import('../uki/Scheduler');
+      await initUkiScheduler();
+    } catch (err) {
+      log.warn('[UkiController] AutoPilot scheduler init failed:', err);
+    }
+
     this.initialized = true;
     if (!app.isPackaged) log.info('[UkiController] Initialized');
   }
