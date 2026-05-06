@@ -45,10 +45,10 @@
     "model": "paid",
     "trialDays": 30,
     "plans": [
-      { "id": "personal", "name": "DEX Personal", "monthlyUSD": 4.99, "yearlyUSD": 39, "lifetimeUSD": 79 },
-      { "id": "family", "name": "DEX Family", "yearlyUSD": 79, "lifetimeUSD": 149 },
-      { "id": "pro", "name": "DEX Pro", "monthlyUSD": 9.99, "yearlyUSD": 89, "lifetimeUSD": 149 },
-      { "id": "studio", "name": "DEX Studio", "monthlyUSD": 19.99, "yearlyUSD": 179, "perSeat": true }
+      { "id": "personal", "name": "DEX Personal", "monthlyUSD": 6.99, "yearlyUSD": 49, "lifetimeUSD": 99 },
+      { "id": "family", "name": "DEX Family", "yearlyUSD": 99, "lifetimeUSD": 179 },
+      { "id": "pro", "name": "DEX Pro", "monthlyUSD": 12.99, "yearlyUSD": 119, "lifetimeUSD": 199 },
+      { "id": "studio", "name": "DEX Studio", "monthlyUSD": 24.99, "yearlyUSD": 229, "perSeat": true }
     ],
     "discounts": [
       { "id": "student", "percent": 50 },

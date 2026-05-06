@@ -1,17 +1,24 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.6 - Copyright (c) 2026 - DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.8.7 - Copyright (c) 2026 - DEX Software License Agreement v1.0
 
 DEX is your personal command bar for the desktop. One key, one bar, anything done. Take notes, run timers, open files, snap a screenshot, focus your screen, mute the room, jump between apps -- without ever leaving the keyboard. Everything happens on your machine.
+
+## What is new in 3.8.7 -- Accounts, Stripe checkout, and a hardened door
+
+- **Optional DEX account.** Sign in to keep your settings, snippets, plans, and (optionally) your Nexus graph in sync across devices. Skip it and DEX still works fully. Your data stays yours either way.
+- **Stripe-powered checkout.** Buy any plan in two clicks. Subscriptions, lifetime, per-seat, and discount codes all work. The secret key lives only in our cloud function -- never in the desktop app, never in this public repo.
+- **Hardened door.** Token-bucket rate limits on sign-in, account creation, checkout, and sync. Disposable-email detection. Per-IP and per-device fanout caps. Tor-exit awareness. Constant-time secret compare. Every limit is documented and tested.
+- **Slightly sharper prices.** Personal $6.99/mo or $49/yr ($99 lifetime). Pro $12.99/mo or $119/yr ($199 lifetime). Studio $24.99/seat/mo. Free Viewer remains free, forever, for everyone.
 
 ## What is new in 3.8.6 -- Pricing that favors you
 
 DEX is now a paid product, with a 30-day full-feature free trial and a free read-only viewer that keeps your data accessible after the trial ends.
 
-- **One person, $4.99 / month** or **$39 / year** (save 35%) -- DEX Personal covers every app on your devices.
-- **Pro is $9.99 / month** or **$89 / year**, adds commercial use rights, live collab, and priority support.
-- **Studio is $19.99 / seat / month** for teams, with admin console and a 99.5% uptime SLA.
-- **Lifetime licences** are available for Personal ($79), Family ($149) and Pro ($149) -- one-time payment, every update in the major version included.
+- **One person, $6.99 / month** or **$49 / year** (save 41%) -- DEX Personal covers every app on your devices.
+- **Pro is $12.99 / month** or **$119 / year**, adds commercial use rights, live collab, and priority support.
+- **Studio is $24.99 / seat / month** for teams, with admin console and a 99.5% uptime SLA.
+- **Lifetime licences** are available for Personal ($99), Family ($179) and Pro ($199) -- one-time payment, every update in the major version included.
 - **50% off for students, educators, and non-profits.** **Free DEX Pro for open-source maintainers.** **One free year of Personal if you switch from a paid competitor.**
 - **No ads. No data resale. 14-day no-questions refund. Read-only access kept forever after cancel.** See [PRICING](docs/PRICING.md).
 

@@ -5,6 +5,42 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.7] - 2026-05-06 -- Accounts, Stripe checkout, hardened door
+
+### Added
+
+- **Optional account system.** New `src/shared/account/AccountStore.ts`
+  with sign-in / sign-out, persistent local storage, device registry,
+  effective-tier resolution honouring expiry, and pluggable cloud-sync
+  transport. iCloud-style: works fully without an account; signs in to
+  follow you across devices.
+- **Stripe checkout.** New `src/shared/payment/stripe.ts` builds Stripe
+  Checkout Session payloads, maps DEX plans to Stripe price IDs (slots
+  in source, real IDs go in cloud function env), supports per-seat,
+  lifetime, discount codes, and webhook signature verification with
+  constant-time compare. The secret key lives only server-side.
+- **Rate limiting.** New `src/shared/security/rateLimit.ts` with a
+  pure deterministic `TokenBucket` and `KeyedRateLimiter`. Pre-tuned
+  `LIMITS` catalogue covers sign-in (5/min/IP), account creation
+  (3/day/IP), checkout (10/hr/account), sync push (60/min/device),
+  and UKI plan execution (30/min/account).
+- **Anti-abuse.** New `src/shared/security/abusePrevention.ts` with
+  disposable-email blocking, plausible-email validation, IP/device
+  fanout scoring, Tor-exit awareness, optional Stripe Radar score
+  blending, constant-time string compare, and exponential backoff
+  with jitter.
+- 24 new tests in `tests/unit/account-security-payment.test.ts`.
+
+### Changed
+
+- **Slightly sharper prices.** Personal $6.99/mo (was $4.99), $49/yr
+  (was $39), $99 lifetime (was $79). Pro $12.99/mo (was $9.99),
+  $119/yr (was $89), $199 lifetime (was $149). Studio $24.99/seat/mo
+  (was $19.99). Free Viewer stays $0.
+- README and PRICING.md and store/appstore.config.json updated.
+- The original 12-month price-lock promise stays in force for anyone
+  already on an active plan.
+
 ## [3.8.6] - 2026-05-06 -- Pricing that favors you
 
 ### Changed
