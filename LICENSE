@@ -1,35 +1,143 @@
-MIT License
+DEX Software License Agreement
+Version 1.0 - Effective May 6, 2026
 
 Copyright (c) 2026 Onazi Treasure OJ <onazi75@gmail.com>
-
 DEX -- Personal Control Hub for Desktop Automation
-Created by: Onazi Treasure OJ
-Project:    https://github.com/onazioj/dex
+Project: https://github.com/onazioj179-lab/Dex
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+THIS IS A LEGAL AGREEMENT BETWEEN YOU ("LICENSEE") AND ONAZI TREASURE OJ
+("LICENSOR"). BY DOWNLOADING, INSTALLING, COPYING, OR OTHERWISE USING THE
+DEX SOFTWARE ("SOFTWARE"), YOU AGREE TO BE BOUND BY THIS AGREEMENT. IF YOU
+DO NOT AGREE, DO NOT INSTALL OR USE THE SOFTWARE.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+------------------------------------------------------------------------------
+1. LICENSE GRANT
+------------------------------------------------------------------------------
+
+Subject to the terms below and to a valid, paid subscription or perpetual
+licence purchased from the Licensor or an authorised reseller, the Licensor
+grants the Licensee a non-exclusive, non-transferable, revocable licence to
+install and use the Software on the number of devices and by the number of
+users permitted by the licence tier the Licensee has purchased.
+
+The Software is licensed, not sold.
+
+A 30-day full-feature trial is granted to every new installation at no
+charge. After the trial expires, continued use requires a paid licence.
+
+------------------------------------------------------------------------------
+2. LICENCE TIERS
+------------------------------------------------------------------------------
+
+The licence tiers and their permitted use are described in PRICING.md
+(https://github.com/onazioj179-lab/Dex/blob/main/docs/PRICING.md) and may
+be updated from time to time. Existing perpetual ("Lifetime") licences
+remain valid for the major version under which they were purchased.
+
+------------------------------------------------------------------------------
+3. RESTRICTIONS
+------------------------------------------------------------------------------
+
+Unless expressly permitted in writing by the Licensor, the Licensee shall
+not:
+  (a) sell, rent, lease, sublicense, distribute, or otherwise transfer the
+      Software or any part of it to any third party;
+  (b) modify, reverse engineer, decompile, or disassemble the Software,
+      except to the extent expressly permitted by applicable law;
+  (c) remove, alter, or obscure any proprietary notices, watermarks, or
+      labels on or in the Software;
+  (d) use the Software to develop a competing product;
+  (e) use the Software in safety-critical systems where failure could
+      reasonably be expected to cause death, personal injury, or severe
+      physical or environmental damage.
+
+------------------------------------------------------------------------------
+4. SOURCE CODE
+------------------------------------------------------------------------------
+
+The Software's source code is published in a public repository for the
+purposes of transparency, security review, and community contribution.
+Public availability of source code does NOT grant any licence to use,
+modify, or redistribute the Software outside the terms of this Agreement.
+Pull requests submitted to the public repository are licensed by their
+authors to the Licensor under the Developer Certificate of Origin (DCO).
+
+------------------------------------------------------------------------------
+5. DATA AND PRIVACY
+------------------------------------------------------------------------------
+
+The Software stores user data on the Licensee's local device by default.
+Optional cloud, sync, and analytics features are clearly opt-in and
+disabled by default. The Licensor does not sell, rent, or share Licensee
+data with third parties. See the in-app Privacy section for details.
+
+------------------------------------------------------------------------------
+6. UPDATES
+------------------------------------------------------------------------------
+
+A valid subscription includes all updates released during the subscription
+term. A perpetual ("Lifetime") licence includes all updates within the
+major version under which it was purchased; major-version upgrades may
+require a separate upgrade fee, which the Licensor will offer to existing
+Lifetime holders at a substantial discount.
+
+------------------------------------------------------------------------------
+7. WARRANTY DISCLAIMER
+------------------------------------------------------------------------------
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE LICENSOR DOES
+NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
 
-----
+------------------------------------------------------------------------------
+8. LIMITATION OF LIABILITY
+------------------------------------------------------------------------------
 
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
+OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED
+DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER
+INTANGIBLE LOSSES, ARISING OUT OF OR IN CONNECTION WITH THIS AGREEMENT OR
+THE SOFTWARE. THE LICENSOR'S TOTAL AGGREGATE LIABILITY SHALL NOT EXCEED
+THE AMOUNT THE LICENSEE PAID FOR THE SOFTWARE IN THE TWELVE (12) MONTHS
+PRECEDING THE CLAIM.
+
+------------------------------------------------------------------------------
+9. TERMINATION
+------------------------------------------------------------------------------
+
+This Agreement is effective until terminated. The Licensor may terminate
+it immediately upon notice if the Licensee materially breaches its terms.
+Upon termination the Licensee shall cease all use of the Software and
+destroy all copies in its possession.
+
+------------------------------------------------------------------------------
+10. THIRD-PARTY COMPONENTS
+------------------------------------------------------------------------------
+
+The Software incorporates third-party open-source components, each
+distributed under its own licence. A complete list is available in the
+in-app About > Open Source Notices section. Nothing in this Agreement
+restricts your rights under those licences with respect to those
+components in isolation.
+
+------------------------------------------------------------------------------
+11. GENERAL
+------------------------------------------------------------------------------
+
+This Agreement constitutes the entire agreement between the parties with
+respect to the Software and supersedes all prior or contemporaneous
+agreements, written or oral. If any provision is held unenforceable, the
+remaining provisions remain in full force.
+
+For licensing questions, volume discounts, OEM, education, charity, or
+open-source-maintainer licences, contact: onazi75@gmail.com.
+
+------------------------------------------------------------------------------
 TRADEMARKS
+------------------------------------------------------------------------------
 
-The MIT License above covers source code only. The "DEX" name, the DEX logo,
-the DEX wordmark, the DEX-OS imagery, and the official icon and wallpaper
-artwork are trademarks of Onazi Treasure OJ and are not licensed under the
-MIT grant. See COPYRIGHT and TERMS.md for the brand and trademark policy.
-
+"DEX", "UKI", "Nexus", "Prism", "Vinx", "Imosion", "Flux", "Axl", "Forge",
+"Rewind", and the DEX logo are trademarks of Onazi Treasure OJ. All other
+trademarks are the property of their respective owners.

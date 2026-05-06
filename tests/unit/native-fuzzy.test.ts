@@ -1,7 +1,7 @@
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
-// Licensed under the MIT License. See LICENSE in the project root.
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 import { describe, it, expect } from 'vitest';
 

@@ -1,10 +1,10 @@
 {
   "name": "dex",
-  "version": "3.8.5",
+  "version": "3.8.6",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "homepage": "https://github.com/onazioj179-lab/Dex",
   "repository": {
     "type": "git",

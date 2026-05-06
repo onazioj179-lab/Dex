@@ -10,7 +10,7 @@
  *
  * Author     Onazi Treasure OJ <onazi75@gmail.com>
  * Copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * License    MIT
+ * License    DEX Software License Agreement v1.0 (commercial). See LICENSE.
  */
 
 const fs = require('fs');
@@ -21,7 +21,8 @@ const AUTHOR_EMAIL = 'onazi75@gmail.com';
 const COPYRIGHT_YEAR = '2026';
 const COPYRIGHT_LINE = `Copyright (c) ${COPYRIGHT_YEAR} ${AUTHOR_NAME}. All rights reserved.`;
 const ATTRIBUTION_LINE = `Created by ${AUTHOR_NAME} <${AUTHOR_EMAIL}>`;
-const LICENSE_LINE = 'Licensed under the MIT License. See LICENSE in the project root.';
+const LICENSE_LINE = 'Licensed under the DEX Software License Agreement v1.0. See LICENSE.';
+const LEGACY_LICENSE_LINE = 'Licensed under the DEX Software License Agreement v1.0. See LICENSE.';
 
 const BANNER_DSLASH = [
   '// =============================================================================',
@@ -102,6 +103,10 @@ function migrate(content, banner) {
   const beforeInline = out;
   out = out.replace(LEGACY_LINE_INLINE, (_m, lead) => `${lead} ${COPYRIGHT_LINE}`);
   if (out !== beforeInline) changed = true;
+
+  const beforeMit = out;
+  out = out.split(LEGACY_LICENSE_LINE).join(LICENSE_LINE);
+  if (out !== beforeMit) changed = true;
 
   if (!HAS_CANONICAL.test(out.slice(0, 1200))) {
     out = banner + out.replace(/^\s*/, '');

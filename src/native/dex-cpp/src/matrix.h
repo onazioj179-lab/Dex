@@ -2,7 +2,7 @@
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
-// Licensed under the MIT License. See LICENSE in the project root.
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 // Matrix Operations -- 4x4 matrix math for 3D projection pipelines
 // Column-major layout compatible with OpenGL/WebGL conventions.

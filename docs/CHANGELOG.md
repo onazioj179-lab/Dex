@@ -5,6 +5,31 @@ All notable changes to DEX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.6] - 2026-05-06 -- Pricing that favors you
+
+### Changed
+
+- DEX is now a paid product. Every install gets a 30-day full-feature
+  free trial. After trial, a free read-only viewer keeps every file
+  accessible.
+- New licence: DEX Software License Agreement v1.0 (replaces MIT).
+  Source remains public for transparency, security review, and
+  contribution under the DCO.
+
+### Added
+
+- Public pricing: Personal $4.99/mo or $39/yr ($79 lifetime); Family
+  $79/yr ($149 lifetime); Pro $9.99/mo or $89/yr ($149 lifetime);
+  Studio $19.99/seat/mo or $179/seat/yr.
+- 50% discount for students, educators, charities, and non-profits.
+  Free DEX Pro for open-source maintainers. One free year of Personal
+  for switchers from a paid competitor.
+- 14-day no-questions refund. 12-month price lock on active plans.
+  Read-only access preserved forever after cancellation.
+- New `src/shared/license/pricing.ts` exposes plans, capabilities,
+  trial helpers, and discounts as a typed, testable module.
+- New [docs/PRICING.md](docs/PRICING.md) is the public source of truth.
+
 ## [3.8.5] - 2026-05-06 -- Nexus Futurism
 
 ### Added
