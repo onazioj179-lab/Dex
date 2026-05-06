@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, type PolicySlug } from '../../shared/policies';
 import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
+import { AccountAuthFlow } from './account/AccountAuthFlow';
 
 const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
 
@@ -29,7 +30,7 @@ interface OnboardingPreferences {
   autoUpdatesEnabled: boolean;
 }
 
-type OnboardingScreen = 'welcome' | 'hardware' | 'privacy' | 'tour' | 'sampleData' | 'terms' | 'ready';
+type OnboardingScreen = 'welcome' | 'hardware' | 'privacy' | 'tour' | 'sampleData' | 'terms' | 'account' | 'ready';
 
 // ==================== APP TIPS (minimal) ====================
 export const APP_TIPS: Record<string, AppTip[]> = {
@@ -604,12 +605,27 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
   </div>
 );
 
+// ==================== SCREEN: ACCOUNT (optional) ====================
+const AccountStepScreen: React.FC<{ onDone: () => void }> = ({ onDone }) => (
+  <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+    <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 4px' }}>
+      Sign in or skip
+    </h2>
+    <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 16px', textAlign: 'center', maxWidth: 460, lineHeight: 1.5 }}>
+      An account is optional. DEX runs fully on your machine without one. Sign in or
+      create an account if you want cloud backup, sync, or to publish plugins.
+    </p>
+    <AccountAuthFlow showWelcome={false} onComplete={onDone} />
+  </div>
+);
+
+
 // ==================== FULL ONBOARDING WIZARD (6 SCREENS) ====================
 export const OnboardingWizard: React.FC<{
   onComplete: () => void;
   onSkip?: () => void;
 }> = ({ onComplete }) => {
-  const screens: OnboardingScreen[] = ['welcome', 'hardware', 'privacy', 'tour', 'sampleData', 'terms', 'ready'];
+  const screens: OnboardingScreen[] = ['welcome', 'hardware', 'privacy', 'tour', 'sampleData', 'terms', 'account', 'ready'];
   const [screenIndex, setScreenIndex] = useState(0);
   const [exiting, setExiting] = useState(false);
   const [loadSample, setLoadSample] = useState(false);
@@ -751,6 +767,7 @@ export const OnboardingWizard: React.FC<{
         {current === 'tour' && <TourScreen onNext={goNext} />}
         {current === 'sampleData' && <SampleDataScreen onNext={(wantSamples) => { setLoadSample(wantSamples); goNext(); }} />}
         {current === 'terms' && <PolicyAcceptanceScreen onAccept={handleAcceptPolicies} />}
+        {current === 'account' && <AccountStepScreen onDone={goNext} />}
         {current === 'ready' && <ReadyScreen onComplete={handleComplete} />}
         </div>
 

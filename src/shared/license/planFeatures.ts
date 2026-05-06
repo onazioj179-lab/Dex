@@ -53,7 +53,7 @@ export const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
     ukiConcurrency: 2,
     modelTier: 'standard',
     collabSeats: 1,
-    storageBytes: 50 * ONE_GB,
+    storageBytes: 100 * ONE_GB,
     ukiRateLimit: { capacity: 30, refillPerMs: 30 / 60_000 },      // 30 / min
   },
   family: {
@@ -61,7 +61,7 @@ export const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
     ukiConcurrency: 3,
     modelTier: 'standard',
     collabSeats: 5,
-    storageBytes: 50 * ONE_GB,
+    storageBytes: 100 * ONE_GB,
     ukiRateLimit: { capacity: 60, refillPerMs: 60 / 60_000 },
   },
   pro: {
@@ -69,7 +69,7 @@ export const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
     ukiConcurrency: 4,
     modelTier: 'pro',
     collabSeats: 3,
-    storageBytes: 50 * ONE_GB,
+    storageBytes: 100 * ONE_GB,
     ukiRateLimit: { capacity: 120, refillPerMs: 120 / 60_000 },
   },
   studio: {
@@ -77,7 +77,7 @@ export const PLAN_FEATURES: Record<PlanId, PlanFeatures> = {
     ukiConcurrency: 6,
     modelTier: 'pro',
     collabSeats: 99,
-    storageBytes: 50 * ONE_GB,                                     // per seat
+    storageBytes: 100 * ONE_GB,                                     // per seat
     ukiRateLimit: { capacity: 240, refillPerMs: 240 / 60_000 },
   },
 };

@@ -29,7 +29,7 @@ that keeps your data accessible.
 - All updates within your current major version, free.
 - On-device data, optional cloud sync, optional analytics (off by
   default).
-- **50 GB of cloud storage** (per seat for Studio). Free Viewer gets
+- **100 GB of cloud storage** (per seat for Studio). Free Viewer gets
   10 GB so your data stays accessible.
 - **End-to-end encryption** option (passphrase mode). Lose the
   passphrase, lose the data -- DEX warns you twice before enabling.

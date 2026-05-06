@@ -13,6 +13,7 @@ import React, { useState, memo, useCallback } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
 import { useToastHelpers } from '../components/Toast';
 import { Select } from '../components/Select';
+import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import {
@@ -177,6 +178,7 @@ const SECTIONS: SettingSection[] = [
   { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.creativeapps },
   { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.privacy },
   { id: 'updates', name: 'Updates', icon: Icons.updates },
+  { id: 'account', name: 'Account', icon: Icons.privacy },
   { id: 'about', name: 'About', icon: Icons.about },
 ];
 
@@ -189,6 +191,7 @@ const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'Creative Suite', ids: ['creativeapps'] },
   { label: 'Extensions', ids: ['plugins', 'nexus'] },
   { label: 'Info', ids: ['updates', 'about'] },
+  { label: 'Account', ids: ['account'] },
 ];
 
 const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
@@ -3121,6 +3124,7 @@ export const Settings: React.FC = () => {
       case 'plugins': return <PluginMarketplace />;
       case 'nexus': return <NexusBiometrics />;
       case 'updates': return <UpdateManagerSection />;
+      case 'account': return <AccountSettingsCard />;
       case 'about': return renderAboutSettings();
       default: return renderGeneralSettings();
     }

@@ -51,7 +51,7 @@ A DEX account is optional. If you create one:
 
 If you turn on cloud sync:
 
-- Free Viewer accounts get 10 GB. Paid plans get 50 GB (per seat for
+- Free Viewer accounts get 10 GB. Paid plans get 100 GB (per seat for
   Studio).
 - All cloud objects are encrypted client-side with AES-GCM 256 before
   upload.

@@ -4,11 +4,19 @@
 
 DEX is your personal command bar for the desktop. One key, one bar, anything done. Take notes, run timers, open files, snap a screenshot, focus your screen, mute the room, jump between apps -- without ever leaving the keyboard. Everything happens on your machine.
 
+## What is new in 3.8.9 -- Polished accounts, 100 GB cloud, sharper Pro
+
+- **Paid storage doubled to 100 GB.** Personal, Family, Pro, and Studio (per seat) all get 100 GB of cloud storage. Free Viewer keeps its 10 GB.
+- **Polished account UI.** New welcome / sign-in / sign-up / terms-gate / two-factor / skip / success flow built on the shared design tokens. The Settings -> Account section is now a first-class surface with a storage-usage card and an upgrade prompt.
+- **Onboarding sign-in or skip.** First-launch onboarding now includes an optional account step. Skipping is the recommended default; an account is never required to use DEX.
+- **Pro perks made obvious.** New `proPerks` catalogue + `ProBadge` and `UpgradePrompt` components mean every paid feature shows up consistently with the same headline, blurb, and minimum plan everywhere it appears.
+- **CHANGELOG trimmed.** The public CHANGELOG now documents the current release only; older entries live in git tags and GitHub Releases.
+
 ## What is new in 3.8.8 -- 2FA, legacy plan, cloud storage, smart UKI by plan
 
 - **Two-factor sign-in.** Optional TOTP (Google Authenticator, Authy, 1Password, any RFC 6238 app). Set it up in Settings > Security; eight one-time recovery codes are printed once and never shown again.
 - **Legacy / handover plan.** Nominate up to 5 people you trust. If you stop using DEX for the inactivity window you choose (default 90 days), DEX emails you first. If 14 more days pass with no reply, your heirs get a one-time link. Off by default, fully under your control, never automatic.
-- **Cloud storage tiers.** Free Viewer gets 10 GB. Personal, Family, Pro, Studio get 50 GB (per seat for Studio). 90% triggers a soft warning, 100% pauses uploads -- never silent overage.
+- **Cloud storage tiers.** Free Viewer gets 10 GB. Personal, Family, Pro, Studio get 100 GB (per seat for Studio). 90% triggers a soft warning, 100% pauses uploads -- never silent overage.
 - **End-to-end encryption.** AES-GCM-256 with a per-object key. If you set a passphrase the cloud literally cannot read your data; PBKDF2-SHA256 600,000 rounds derives the wrap key from your passphrase and a per-account salt. Lose the passphrase, lose the data -- DEX warns you twice.
 - **Backup is opt-in, per category.** Master switch is off until you turn it on. Pick exactly which categories sync (settings, snippets, notes, plans, Nexus graph, media, workspaces, history). Wi-Fi-only and night-only options on by default. Command history is OFF by default because it is sensitive.
 - **Smart UKI scales with your plan.** Free Viewer: 20 plans/day, small model. Personal: 200/day, standard model. Pro: 1000/day, pro model, higher concurrency. Studio: 2000/seat/day. Visible counter in the UKI overlay so there is no surprise.

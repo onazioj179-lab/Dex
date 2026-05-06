@@ -200,16 +200,16 @@ describe('Legacy handover', () => {
 });
 
 describe('Cloud quota', () => {
-  it('Free Viewer is 10 GB, paid plans 50 GB', () => {
+  it('Free Viewer is 10 GB, paid plans 100 GB', () => {
     expect(QUOTA_BYTES['free-viewer']).toBe(10 * ONE_GB);
-    expect(QUOTA_BYTES.personal).toBe(50 * ONE_GB);
-    expect(QUOTA_BYTES.pro).toBe(50 * ONE_GB);
-    expect(QUOTA_BYTES.studio).toBe(50 * ONE_GB);
+    expect(QUOTA_BYTES.personal).toBe(100 * ONE_GB);
+    expect(QUOTA_BYTES.pro).toBe(100 * ONE_GB);
+    expect(QUOTA_BYTES.studio).toBe(100 * ONE_GB);
   });
 
   it('quotaFor scales by seats for studio', () => {
     const snap = quotaFor({ planId: 'studio', seats: 4, usedBytes: 0 });
-    expect(snap.totalBytes).toBe(4 * 50 * ONE_GB);
+    expect(snap.totalBytes).toBe(4 * 100 * ONE_GB);
   });
 
   it('warns at 90%, blocks at 100%', () => {

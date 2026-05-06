@@ -23,10 +23,10 @@ export const ONE_GB = 1024 * 1024 * 1024;
 
 export const QUOTA_BYTES: Record<PlanId, number> = {
   'free-viewer': 10 * ONE_GB,
-  personal: 50 * ONE_GB,
-  family: 50 * ONE_GB,    // per household, pooled
-  pro: 50 * ONE_GB,
-  studio: 50 * ONE_GB,    // per seat
+  personal: 100 * ONE_GB,
+  family: 100 * ONE_GB,    // per household, pooled
+  pro: 100 * ONE_GB,
+  studio: 100 * ONE_GB,    // per seat
 };
 
 /** Soft warning at 90% of quota; hard block at 100%. */
