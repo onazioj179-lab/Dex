@@ -18,6 +18,7 @@ import { Button } from '../../ui/Button';
 import { space, radius, fontSize } from '../../styles/tokens';
 import { AccountAuthFlow } from './AccountAuthFlow';
 import { UpgradePrompt } from './ProBadge';
+import { PlanComparePanel } from './PlanComparePanel';
 import { quotaFor, formatBytes } from '../../../shared/cloud/quota';
 import type { PlanId } from '../../../shared/license/pricing';
 
@@ -180,20 +181,15 @@ function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, o
         </div>
       )}
       {panel === 'compare' && (
-        <div style={cardStyle}>
-          <h3 style={cardHeading}>Compare plans</h3>
-          <p style={bodyText}>
-            Free Viewer is read-only with 10 GB cloud. Personal, Family, Pro, and Studio
-            unlock editing, sync, and 100 GB cloud storage.
-          </p>
-          <ul style={{ ...bodyText, paddingLeft: space[5], margin: 0 }}>
-            <li>Personal — single workspace, 100 GB cloud, basic UKI quota</li>
-            <li>Family — shared library across up to 5 people</li>
-            <li>Pro — priority models, larger UKI quota, plugin publishing</li>
-            <li>Studio — every Pro perk plus team seats and audit log retention</li>
-          </ul>
-          <div><Button variant="ghost" size="sm" onClick={onClosePanel}>Close</Button></div>
-        </div>
+        <PlanComparePanel
+          currentPlan={account.plan}
+          onClose={onClosePanel}
+          onChoose={(planId) => {
+            // INTENTIONAL STUB: no billing endpoint configured. The host can
+            // override this surface entirely via the `onComparePlans` prop.
+            onClosePanel();
+          }}
+        />
       )}
     </div>
   );

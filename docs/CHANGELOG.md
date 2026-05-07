@@ -90,6 +90,33 @@ tests across 56 suites for everything above. Total suite is now **973 tests**
 across **56 files**, all passing. `tsc --noEmit` reports zero errors and
 `npm run build` ships clean.
 
+### v3.8.9 follow-up - UI surfaces (no version bump)
+
+The three UI surfaces that the consolidation pass left for later have now
+landed on the same `v3.8.9` line:
+
+- **`PlanComparePanel`** (`src/renderer/components/account/PlanComparePanel.tsx`).
+  Side-by-side plan grid driven entirely by `pricing.PLANS` and `proPerks.PRO_PERKS`.
+  Inline SVG check / dash icons (no emojis), monthly / yearly toggle with savings
+  callout, "Choose plan" Button per column, current-plan column shows a disabled
+  "Current plan" pill. Wired into `AccountSettingsCard` so the inline compare
+  panel is now the rich grid; host code can still override via `onComparePlans`.
+- **`ConfirmDialog`** (`src/renderer/components/ConfirmDialog.tsx`). The
+  in-app replacement for `window.confirm()`. Focus is moved to the primary
+  button on open; Escape cancels, Enter confirms; backdrop dismiss is
+  configurable; destructive variant uses the danger Button styling. Pure
+  presentational, callers own the open state.
+- **`RegistryCommandPalette`** (`src/renderer/components/RegistryCommandPalette.tsx`).
+  Ctrl+K palette wired to the shared `commands/registry`. Distinct from the
+  existing apps-and-themes `CommandPalette`; this one is fully data-driven so
+  any subsystem that calls `registerCommand` shows up immediately. Up / Down
+  / Enter / Escape keyboard support, disabled commands hidden, empty-state
+  copy, group label rendered under each row.
+
+`tests/unit/v389-followup-ui.test.tsx` adds **19 new tests** for these three
+components. Total suite is now **992 tests** across **57 files**, all passing.
+Watermark check, `tsc --noEmit`, and `npm run build` all clean.
+
 ## [3.8.9] - 2026-05-13 -- Polished accounts, 100 GB cloud, sharper Pro
 
 ### Added
