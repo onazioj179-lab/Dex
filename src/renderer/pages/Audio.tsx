@@ -1294,7 +1294,8 @@ export const Audio: React.FC = () => {
             <div style={styles.progressSection}>
               <span style={styles.progressTime}>{formatTime(Math.floor(currentTime))}</span>
               <div style={styles.progressBar}>
-                <div style={{...styles.progressFill, width: `${progress}%`}} />
+                <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 4, background: 'var(--color-border)', borderRadius: 2, pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${progress}%`, ...styles.progressFill }} />
                 <input
                   type="range"
                   min="0"
@@ -1322,7 +1323,8 @@ export const Audio: React.FC = () => {
               ) : Icons.volume}
             </button>
             <div style={styles.volumeBar}>
-              <div style={{...styles.volumeFill, width: `${volume}%`, background: 'var(--color-accent, #0a84ff)'}} />
+              <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 4, background: 'var(--color-border)', borderRadius: 2, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${volume}%`, ...styles.volumeFill, background: 'var(--color-accent, #0a84ff)' }} />
               <input
                 type="range"
                 min="0"
@@ -1701,17 +1703,19 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressBar: {
     flex: 1,
-    height: '4px',
-    background: 'var(--color-border)',
-    borderRadius: '2px',
+    height: '16px',
     position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
   },
   progressFill: {
-    height: '100%',
+    height: '4px',
     background: 'var(--color-text-primary)',
     borderRadius: '2px',
     willChange: 'width',
     transition: 'width 0.1s linear',
+    pointerEvents: 'none',
   },
   progressInput: {
     position: 'absolute',
@@ -1720,6 +1724,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     opacity: 0,
     cursor: 'pointer',
+    margin: 0,
   },
   nowPlayingRight: {
     display: 'flex',
@@ -1730,16 +1735,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   volumeBar: {
     flex: 1,
-    height: '4px',
-    background: 'var(--color-border)',
-    borderRadius: '2px',
+    height: '16px',
     position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
   },
   volumeFill: {
-    height: '100%',
+    height: '4px',
     background: 'var(--color-text-secondary)',
     borderRadius: '2px',
     willChange: 'width',
+    pointerEvents: 'none',
   },
   volumeInput: {
     position: 'absolute',
@@ -1748,6 +1755,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     opacity: 0,
     cursor: 'pointer',
+    margin: 0,
   },
 };
 

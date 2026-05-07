@@ -1260,7 +1260,7 @@ const AXL: React.FC = () => {
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
             onWheel={handleWheel}
-            onContextMenu={e => { e.preventDefault(); if (selectedPartId) { setCtxMenu({ visible: true, x: e.clientX, y: e.clientY }); } }}
+            onContextMenu={e => { e.preventDefault(); setCtxMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
             style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none', imageRendering: 'auto' }}
           />
 
@@ -1998,15 +1998,26 @@ const AXL: React.FC = () => {
       </div>
 
       {/* Right-click context menu */}
-      {ctxMenu.visible && selectedPartId && (() => {
-        const selPart = project.assembly.parts.find(p => p.id === selectedPartId);
-        if (!selPart) return null;
-        const menuItems = [
-          { label: 'Duplicate Part', fn: () => { pStore.duplicatePart(selectedPartId); } },
+      {ctxMenu.visible && (() => {
+        const selPart = selectedPartId ? project.assembly.parts.find(p => p.id === selectedPartId) : null;
+        const partItems = selPart ? [
+          { label: 'Duplicate Part', fn: () => { pStore.duplicatePart(selectedPartId!); } },
           { label: 'Add Feature...', fn: () => { addFeatureToSelected(); } },
           null,
-          { label: 'Delete Part', fn: () => { pStore.deletePart(selectedPartId); vStore.setSelectedPartId(null); }, danger: true },
+          { label: 'Delete Part', fn: () => { pStore.deletePart(selectedPartId!); vStore.setSelectedPartId(null); }, danger: true },
+          null,
+        ] : [];
+        const viewItems = [
+          { label: 'Front View', fn: () => applyStandardView('front') },
+          { label: 'Top View', fn: () => applyStandardView('top') },
+          { label: 'Right View', fn: () => applyStandardView('right') },
+          { label: '3D View', fn: () => applyStandardView('3d') },
+          null,
+          { label: 'Add Box', fn: () => pStore.addPrimitive('box') },
+          { label: 'Add Cylinder', fn: () => pStore.addPrimitive('cylinder') },
+          { label: 'Add Sphere', fn: () => pStore.addPrimitive('sphere') },
         ];
+        const menuItems = [...partItems, ...viewItems];
         return (
           <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 8, padding: '4px 0', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null

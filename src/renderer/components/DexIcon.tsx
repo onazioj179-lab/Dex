@@ -533,6 +533,8 @@ const ICON_PATHS: Record<string, string> = {
 
 // -- Component -------------------------------------------------------------
 
+const warnedMissing = new Set<string>();
+
 interface DexIconProps {
   name: string;
   size?: number;
@@ -550,6 +552,14 @@ const DexIcon: React.FC<DexIconProps> & {
 } = ({ name, size = 16, color = 'currentColor', strokeWidth = 1.5, className, style, onClick, title }) => {
   const pathData = ICON_PATHS[name];
   if (!pathData) {
+    // Dev-time visibility for missing icons (warn once per name)
+    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
+      if (!warnedMissing.has(name)) {
+        warnedMissing.add(name);
+        // eslint-disable-next-line no-console
+        console.warn(`[DexIcon] missing icon: "${name}"`);
+      }
+    }
     // Fallback: render a simple square with first letter
     return (
       <span
