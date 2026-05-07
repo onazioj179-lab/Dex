@@ -10,6 +10,28 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - UKI brain wave A (no version bump)
+
+Foundation for smarter UKI behaviour landed as 7 pure shared modules under
+`src/shared/uki/`:
+
+- `planner.ts` - decompose goals into ordered ActionBus steps with deps,
+  topological sort, plan validation
+- `toolCall.ts` - typed JSON->dispatcher with schema validation, retry
+  backoff, confidence floor and budget gate
+- `memory.ts` - short / working / long-term memory store with substring
+  recall, importance + recency scoring, prune + promote
+- `embeddings.ts` - cosine-similarity index with top-k search (linear scan;
+  later: native sqlite-vec)
+- `skills.ts` - skill registry pairing intent matchers with plan templates;
+  appId-scoped, context-aware ranking
+- `streaming.ts` - async-iterator wrapper for token streams with map / tee /
+  collectToolCalls helpers
+- `appContext.ts` - per-app context resolver registry with bounded
+  prompt-format helper
+
+Coverage: 84 deterministic tests in `tests/unit/v389-uki-brain.test.ts`.
+
 ### v3.8.9 follow-up - consolidation pass (no version bump)
 
 A "boil the ocean" follow-up landed on the same `v3.8.9` line: ~30 new pure
