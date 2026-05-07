@@ -10,6 +10,31 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.0.1.2a - Shell fit, UKI, and Nexus completion fix
+
+Bugfix/completion pass for the v4.0.1 desktop runtime. The packaged semver is
+`4.0.1-2a` so Electron/npm tooling can build a valid installer while the user
+release label remains v4.0.1.2a.
+
+- Fixed new app launches so every app opens into the safe inner workspace below
+  the top bar, with no dock-reserved bottom gap and no accidental dock pop over
+  maximized work.
+- Reworked shell window layout math into a shared tested helper and clamped
+  maximized/restored windows to the visible workspace after resize.
+- Removed blur-heavy app-menu behavior and tightened dropdown/context-menu
+  listener cleanup so menus stop washing out the screen or double-handling
+  pointer events.
+- Fixed UKI typed backend queries so main-process responses are not echoed back
+  through a second local stream/TTS path, and app-control actions only dispatch
+  for explicit commands.
+- Polished Nexus across the full page: calmer DEX graph palette, cleaned top
+  chrome, search dropdown, lower controls, side HUDs, labels, tooltip, and web
+  results panel.
+- Polished Imosion's root app chrome for full-window fit, solid menus, stable
+  scrolling toolbar behavior, and less fragile compact controls.
+- Added missing shared icon definitions used by creative and standalone apps so
+  icon-only buttons no longer render as blank fallback controls.
+
 ## v4.0.1 - "Boil the Ocean" platform deepening (Waves A-J, 169 new tests)
 
 A second 10-wave platform pass shipping pure, deterministic, dependency-free

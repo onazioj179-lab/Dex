@@ -102,8 +102,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         }
       }
     };
-    // Use mousedown for instant close — no click-delay
-    document.addEventListener('mousedown', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('mousedown', handleClick);

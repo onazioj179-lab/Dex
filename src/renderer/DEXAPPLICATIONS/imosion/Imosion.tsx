@@ -4684,7 +4684,7 @@ const Imosion: React.FC = () => {
   const selectedTrackData = selectedTrack ? tracks.find(t => t.id === selectedTrack) ?? null : null;
 
   return (
-    <div ref={containerRef} {...dropProps} style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', userSelect: 'none', position: 'relative', transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties}>
+    <div ref={containerRef} {...dropProps} className="imosion-root" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'linear-gradient(180deg, var(--color-bg-base) 0%, #0f1412 100%)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', userSelect: 'none', position: 'relative', transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style', minWidth: 0 } as React.CSSProperties}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop audio files to import</div>}
       {/* Hidden file input for audio import */}
       <input 
@@ -4731,6 +4731,17 @@ const Imosion: React.FC = () => {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
+        .imosion-root { container-type: size; }
+        .imosion-root button, .imosion-root select, .imosion-root input { font-family: inherit; }
+        .imosion-root button { min-height: 24px; }
+        .imosion-root [role="menu"], .imosion-root .frosted-dropdown, .imosion-root .dropdown {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          background: var(--color-bg-elevated, #1c1c1e) !important;
+        }
+        @container (max-width: 920px) {
+          .imosion-root .divider { display: none; }
+        }
         .resize-handle { cursor: col-resize; background: var(--color-border-subtle); }
         .resize-handle:hover { background: rgba(48,209,88,0.2); }
         .dropdown-item:hover { background: rgba(48,209,88,0.08); }
@@ -4765,7 +4776,7 @@ const Imosion: React.FC = () => {
         .btn-danger { background: #ff453a; border-color: #ff453a; color: #fff; border-radius: 8px; }
         .divider { width: 1px; height: 18px; background: var(--color-border-subtle); margin: 0 4px; }
         .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #30d158; }
-        .frosted-dropdown { background: var(--color-bg-surface-solid, #2C2C2E); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover); }
+        .frosted-dropdown { background: var(--color-bg-elevated, #1C1C1E); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 14px 36px rgba(0,0,0,0.42); }
         .collapsible-header { cursor: pointer; user-select: none; transition: background 0.15s ease; }
         .collapsible-header:hover { background: var(--color-border-subtle); }
         .dropdown-item { transition: background 0.12s ease; }
@@ -4779,7 +4790,7 @@ const Imosion: React.FC = () => {
       `}</style>
 
       {/* Logic Pro-style Control Bar -- unified single bar */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', height: '40px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, gap: '6px', position: 'relative', zIndex: 100 }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', minHeight: '40px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, gap: '6px', position: 'relative', zIndex: 100, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' }}>
         {/* Left: Branding + Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>

@@ -46,6 +46,7 @@ import { loadEngagement, saveEngagement, incrementStat, checkAchievements } from
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
+import { clampWindowToWorkspace, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds } from '../../shared/shell/windowLayout';
 
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
 function lazyRetry<T extends React.ComponentType<any>>(
@@ -146,10 +147,8 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'transfers'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer';
 
-// Simple apps open as centered floating windows (macOS Tahoe style)
-
-// Default floating window sizes per app (macOS Tahoe desktop behavior)
-// Creative apps open maximized for full workspace
+// Default floating window sizes per app. New launches open in the full inner
+// workspace; these sizes are used when users explicitly restore/detach.
 const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boolean }> = {
   browser: { w: 900, h: 600 },
   files: { w: 800, h: 550 },
@@ -719,6 +718,20 @@ export const AppManager: React.FC = () => {
   // Stage Manager left offset for floating windows
   const stageOffset = stageManagerOn && runningApps.filter(a => a.id !== 'home').length > 0 ? STAGE_STRIP_WIDTH : 0;
 
+  const getShellWorkspace = useCallback((padding = 6) => getWorkspaceBounds(
+    { width: window.innerWidth, height: window.innerHeight },
+    {
+      topReserve: 34,
+      dockReserve: 0,
+      leftReserve: stageOffset,
+      padding,
+      minWidth: 320,
+      minHeight: 260,
+    },
+  ), [stageOffset]);
+
+  const getMaximizedWindowBounds = useCallback(() => getShellWorkspace(0), [getShellWorkspace]);
+
   // -- Global stat-bump handler (sourced from all creative apps) -----------
   useEffect(() => {
     const handler = (e: CustomEvent<{ key: string; amount?: number }>) => {
@@ -829,9 +842,10 @@ export const AppManager: React.FC = () => {
   // Auto-hide dock: show on bottom hover, hide after leaving
   // When any window is maximized, dock hides immediately
   const showDock = useCallback(() => {
+    if (anyWindowMaximized && !showAppMenuRef.current && !dockCtxRef.current) return;
     if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
     setTaskbarVisible(true);
-  }, []);
+  }, [anyWindowMaximized]);
   const scheduleDockHide = useCallback(() => {
     if (dockMode === 'always-visible' && !anyWindowMaximized) return;
     if (dockHideTimerRef.current) clearTimeout(dockHideTimerRef.current);
@@ -1200,34 +1214,49 @@ export const AppManager: React.FC = () => {
             next.set(appId, { ...b, z });
             return next;
           }
-          const TOP_BAR = 34;
-          const DOCK_RESERVE = 10;
-          const LEFT_OFFSET = stageOffset;
           const z = nextDetachZ();
           const next = new Map(prev);
-          // Creative/pro apps open maximized for full workspace
-          if (CREATIVE_APPS.has(appId)) {
-            const W = window.innerWidth;
-            const H = window.innerHeight - TOP_BAR - DOCK_RESERVE;
-            next.set(appId, { x: 0, y: TOP_BAR, w: W, h: H, z });
-          } else {
-            const size = APP_WINDOW_SIZES[appId] || { w: 900, h: 650 };
-            const maxW = Math.floor((window.innerWidth - LEFT_OFFSET) * 0.75);
-            const maxH = Math.floor((window.innerHeight - TOP_BAR) * 0.8);
-            const w = Math.min(size.w, maxW);
-            const h = Math.min(size.h, maxH);
-            // Cascade offset so multiple windows don't stack perfectly
-            const CASCADE = 30;
-            const cascade = (prev.size % 9) * CASCADE;
-            const cx = LEFT_OFFSET + Math.round((window.innerWidth - LEFT_OFFSET - w) / 2) - (4 * CASCADE) + cascade;
-            const cy = Math.max(TOP_BAR + 8, Math.round((window.innerHeight - h) / 2) + cascade);
-            next.set(appId, { x: cx, y: cy, w, h, z });
-          }
+          next.set(appId, { ...getMaximizedWindowBounds(), z });
           return next;
         });
       });
     }
-  }, [launchApp, setCurrentRunningApp, stageOffset]);
+  }, [getMaximizedWindowBounds, getShellWorkspace, launchApp, setCurrentRunningApp]);
+
+  const resolveRequestedAppId = useCallback((request: unknown): AppId | null => {
+    if (!request || typeof request !== 'object' || Array.isArray(request)) return null;
+    const payload = request as Record<string, unknown>;
+    const raw = String(payload.appId ?? payload.id ?? payload.appName ?? payload.name ?? '').trim().toLowerCase();
+    if (!raw) return null;
+    const normalized = raw.replace(/[^a-z0-9]+/g, '');
+    const entries = Object.entries(APP_DEFINITIONS) as Array<[AppId, typeof APP_DEFINITIONS[AppId]]>;
+    let hit = entries.find(([id]) => id === raw || id.replace(/[^a-z0-9]+/g, '') === normalized);
+    if (!hit) hit = entries.find(([, def]) => def.name.toLowerCase() === raw || def.name.toLowerCase().replace(/[^a-z0-9]+/g, '') === normalized);
+    if (!hit) hit = entries.find(([, def]) => def.name.toLowerCase().startsWith(raw));
+    if (!hit) hit = LAUNCHPAD_APPS.find(app => app.label.toLowerCase() === raw || app.label.toLowerCase().replace(/[^a-z0-9]+/g, '') === normalized) as any;
+    return hit ? (Array.isArray(hit) ? hit[0] : (hit as { id: AppId }).id) : null;
+  }, []);
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const appId = resolveRequestedAppId((event as CustomEvent).detail);
+      if (!appId || appId === 'home') return;
+      setCurrentApp(appId);
+      setShowAppMenu(false);
+      setAppMenuSearch('');
+    };
+    const onClose = (event: Event) => {
+      const appId = resolveRequestedAppId((event as CustomEvent).detail);
+      if (!appId || appId === 'home') return;
+      handleCloseApp(appId);
+    };
+    window.addEventListener('dex-open-app', onOpen);
+    window.addEventListener('dex-close-app', onClose);
+    return () => {
+      window.removeEventListener('dex-open-app', onOpen);
+      window.removeEventListener('dex-close-app', onClose);
+    };
+  }, [handleCloseApp, resolveRequestedAppId, setCurrentApp]);
 
   const goBack = useCallback(() => {
     const idx = navIndexRef.current;
@@ -1267,31 +1296,26 @@ export const AppManager: React.FC = () => {
     const z = nextDetachZ();
     const size = APP_WINDOW_SIZES[appId] || { w: 900, h: 650 };
     
-    // Creative apps open maximized with exact viewport bounds (no gaps)
+    // Creative apps open to the safe inner workspace, never under chrome/dock.
     if (size.maximized) {
       setDetachedApps(prev => {
         const next = new Map(prev);
-        next.set(appId, { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight, z });
+        next.set(appId, { ...getMaximizedWindowBounds(), z });
         return next;
       });
       if (currentApp === appId) setCurrentApp('home');
       return;
     }
-    
-    const w = Math.min(size.w, Math.floor(window.innerWidth * 0.75));
-    const h = Math.min(size.h, Math.floor(window.innerHeight * 0.8));
-    // Cascade windows to avoid overlap - offset by 30px per existing window
-    const existingCount = detachedApps.size;
-    const cascadeOffset = (existingCount % 6) * 30;
-    const cx = Math.round((window.innerWidth - w) / 2) + cascadeOffset;
-    const cy = Math.max(36, Math.round((window.innerHeight - h) / 2) + cascadeOffset);
+
+    const cascadeOffset = (detachedApps.size % 6) * 26;
+    const fitted = fitWindowToWorkspace(size, getShellWorkspace(10), cascadeOffset);
     setDetachedApps(prev => {
       const next = new Map(prev);
-      next.set(appId, { x: cx, y: cy, w, h, z });
+      next.set(appId, { ...fitted, z });
       return next;
     });
     if (currentApp === appId) setCurrentApp('home');
-  }, [currentApp, setCurrentApp, detachedApps.size]);
+  }, [currentApp, detachedApps.size, getMaximizedWindowBounds, getShellWorkspace, setCurrentApp]);
 
   const bringToFront = useCallback((appId: AppId) => {
     const z = nextDetachZ();
@@ -1339,26 +1363,27 @@ export const AppManager: React.FC = () => {
   // -- Window tiling presets (up to 5 windows) ----------------------------
   type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize';
   const tileWindow = useCallback((appId: AppId, position: TilePosition) => {
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    const workspace = getShellWorkspace(6);
+    const W = workspace.w;
+    const H = workspace.h;
     const PAD = 6;
-    const TOP = 34; // title bar height
-    const DOCK = 10; // dock auto-hides, minimal reserve
-    const usableH = H - TOP - DOCK;
+    const LEFT = workspace.x;
+    const TOP = workspace.y;
+    const usableH = H;
     const halfW = Math.floor((W - PAD * 3) / 2);
     const halfH = Math.floor((usableH - PAD * 3) / 2);
 
     const positions: Record<TilePosition, { x: number; y: number; w: number; h: number }> = {
-      left:         { x: PAD, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
-      right:        { x: PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
-      'top-left':   { x: PAD, y: TOP + PAD, w: halfW, h: halfH },
-      'top-right':  { x: PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
-      'bottom-left':  { x: PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
-      'bottom-right': { x: PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
-      top:          { x: PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
-      bottom:       { x: PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
-      center:       { x: Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
-      maximize:     { x: 0, y: 0, w: W, h: H }, // True full screen - no gaps
+      left:         { x: LEFT + PAD, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
+      right:        { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
+      'top-left':   { x: LEFT + PAD, y: TOP + PAD, w: halfW, h: halfH },
+      'top-right':  { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
+      'bottom-left':  { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+      'bottom-right': { x: LEFT + PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+      top:          { x: LEFT + PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
+      bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
+      center:       { x: LEFT + Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
+      maximize:     { ...workspace },
     };
 
     const rect = positions[position];
@@ -1397,18 +1422,18 @@ export const AppManager: React.FC = () => {
       next.set(appId, { ...rect, z });
       return next;
     });
-  }, [detachedApps, detachApp]);
+  }, [detachedApps, detachApp, getShellWorkspace]);
 
   // Auto tile: arrange all detached windows evenly
   const autoTileAll = useCallback(() => {
     const ids = Array.from(detachedApps.keys());
     if (ids.length === 0) return;
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    const TOP = 28;
-    const DOCK = 72;
+    const workspace = getShellWorkspace(6);
+    const W = workspace.w;
+    const TOP = workspace.y;
+    const LEFT = workspace.x;
     const PAD = 6;
-    const usableH = H - TOP - DOCK;
+    const usableH = workspace.h;
 
     // Pre-defined layouts for 1-6+ windows
     const layouts: Record<number, TilePosition[]> = {
@@ -1428,16 +1453,16 @@ export const AppManager: React.FC = () => {
       const thirdW = Math.floor((W - PAD * 4) / 3);
       const halfH = Math.floor((usableH - PAD * 3) / 2);
       const positions: Record<TilePosition, { x: number; y: number; w: number; h: number }> = {
-        left:         { x: PAD, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
-        right:        { x: PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
-        'top-left':   { x: PAD, y: TOP + PAD, w: halfW, h: halfH },
-        'top-right':  { x: PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
-        'bottom-left':  { x: PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
-        'bottom-right': { x: PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
-        top:          { x: PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
-        bottom:       { x: PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
-        center:       { x: Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
-        maximize:     { x: PAD, y: TOP + PAD, w: W - PAD * 2, h: usableH - PAD * 2 },
+        left:         { x: LEFT + PAD, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
+        right:        { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: usableH - PAD * 2 },
+        'top-left':   { x: LEFT + PAD, y: TOP + PAD, w: halfW, h: halfH },
+        'top-right':  { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
+        'bottom-left':  { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+        'bottom-right': { x: LEFT + PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+        top:          { x: LEFT + PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
+        bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
+        center:       { x: LEFT + Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
+        maximize:     { ...workspace },
       };
 
       // For 6 windows: use a 3x2 grid
@@ -1453,7 +1478,7 @@ export const AppManager: React.FC = () => {
           const z = nextDetachZ();
           const b = next.get(id);
           if (b) next.set(id, {
-            x: PAD * (col + 1) + cellW * col,
+            x: LEFT + PAD * (col + 1) + cellW * col,
             y: TOP + PAD * (row + 1) + cellH * row,
             w: cellW,
             h: cellH,
@@ -1471,7 +1496,29 @@ export const AppManager: React.FC = () => {
       });
       return next;
     });
-  }, [detachedApps]);
+  }, [detachedApps, getShellWorkspace]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const workspace = getShellWorkspace(6);
+      setDetachedApps(prev => {
+        let changed = false;
+        const next = new Map(prev);
+        next.forEach((bounds, appId) => {
+          const clamped = CREATIVE_APPS.has(appId) || isSameWindowBounds(bounds, getMaximizedWindowBounds(), 1)
+            ? getMaximizedWindowBounds()
+            : clampWindowToWorkspace(bounds, workspace);
+          if (!isSameWindowBounds(bounds, clamped, 1)) {
+            next.set(appId, { ...clamped, z: bounds.z });
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [getMaximizedWindowBounds, getShellWorkspace]);
 
   // Keyboard shortcuts -- use ref-based handler to avoid re-registering on every state change
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -1883,17 +1930,18 @@ export const AppManager: React.FC = () => {
       if (isDetached && detBounds) {
         const isMinimized = minimizedApps.has(appId);
         // Exact match for maximized state (no tolerance gaps)
-        const isMaximized = detBounds.x === 0 && detBounds.y === 0 && detBounds.w === window.innerWidth && detBounds.h === window.innerHeight;
+        const maximizedBounds = getMaximizedWindowBounds();
+        const isMaximized = isSameWindowBounds(detBounds, maximizedBounds, 1);
         return (
           <div
             key={appId}
             data-floating-window={appId}
             style={{
               position: 'fixed',
-              left: isMaximized ? 0 : detBounds.x,
-              top: isMaximized ? 0 : detBounds.y,
-              width: isMaximized ? '100vw' : detBounds.w,
-              height: isMaximized ? '100vh' : detBounds.h,
+              left: isMaximized ? maximizedBounds.x : detBounds.x,
+              top: isMaximized ? maximizedBounds.y : detBounds.y,
+              width: isMaximized ? maximizedBounds.w : detBounds.w,
+              height: isMaximized ? maximizedBounds.h : detBounds.h,
               zIndex: detBounds.z,
               display: isMinimized ? 'none' : 'flex', flexDirection: 'column',
               borderRadius: isMaximized ? 0 : 14, overflow: 'hidden',
@@ -1901,11 +1949,11 @@ export const AppManager: React.FC = () => {
               border: isMaximized ? 'none' : '1px solid rgba(255,255,255,0.12)',
               ...adaptiveShadow(isMaximized ? 'none' : '0 20px 60px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)'),
               contain: 'layout style paint',
-              willChange: isMaximized ? 'auto' : 'transform, left, top',
+              willChange: 'auto',
               transition: 'box-shadow 0.2s ease',
             }}
             className="dex-app-opening"
-            onPointerDown={() => bringToFront(appId)}
+            onPointerDown={() => { if (focusedFloatingAppId !== appId) bringToFront(appId); }}
           >
             {/* Floating title bar -- draggable (locked when maximized) */}
             <div
@@ -3575,7 +3623,7 @@ export const AppManager: React.FC = () => {
           position: 'fixed', bottom: 0, left: 0, right: 0,
           height: 36,
           zIndex: 5001, cursor: 'default', background: 'transparent',
-          pointerEvents: 'auto',
+          pointerEvents: anyWindowMaximized ? 'none' : 'auto',
         }}
       >
         {/* Visible touch/pen affordance pill — larger grab handle centered for touch users */}
@@ -3610,20 +3658,21 @@ export const AppManager: React.FC = () => {
             onClick={() => { setShowAppMenu(false); setAppMenuSearch(''); }}
             style={{
               position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.3)',
-              zIndex: 5003,
+              background: 'rgba(0,0,0,0.18)',
+              zIndex: 9000,
               pointerEvents: 'auto',
             } as React.CSSProperties}
           />
           <div
             data-dex-overlay
             data-dex-app-menu-panel
-            role="menu"
+            role="dialog"
+            aria-label="App menu"
             style={{
               position: 'fixed',
               left: '50%', bottom: 72,
               transform: 'translateX(-50%)',
-              zIndex: 5004,
+              zIndex: 9700,
               width: 'min(560px, 90vw)',
               maxHeight: 'calc(100vh - 120px)',
               overflowY: 'auto',
@@ -3632,9 +3681,9 @@ export const AppManager: React.FC = () => {
               scrollbarWidth: 'none',
               WebkitOverflowScrolling: 'touch',
               overscrollBehaviorY: 'contain',
-              background: 'rgba(28, 28, 32, 0.72)',
-              backdropFilter: 'blur(32px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+              background: 'var(--color-bg-elevated, #1c1c1e)',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
               border: '1px solid rgba(255, 255, 255, 0.14)',
               borderRadius: 22,
               padding: '20px 20px 16px',

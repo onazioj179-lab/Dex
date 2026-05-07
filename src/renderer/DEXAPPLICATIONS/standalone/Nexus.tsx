@@ -2,9 +2,9 @@
  * DEX Platform - Nexus
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  *
- * Tactical radar HUD with four morph modes:
+ * Nexus workspace graph with four morph modes:
  *   Starfield  -- deep-space universe with orbital rings
- *   Grid       -- hierarchical radar contact tree
+ *   Grid       -- hierarchical file tree
  *   Cluster    -- contacts grouped by classification
  *   Knowledge  -- UKI memory graph with neural connections
  *
@@ -81,15 +81,15 @@ type ViewMode = 'starfield' | 'grid' | 'cluster' | 'knowledge' | 'security';
 // Constants
 // ---------------------------------------------------------------------------
 
-// -- TACTICAL RADAR PALETTE -- military HUD on black --
-const BG = '#050505';
-const WHITE = '#C0C8C0';
-const ICE_BLUE = '#FF1A1A';      // Radar Red (primary)
-const ELECTRIC = '#00FF41';      // Terminal Green (friend)
-const GLOW = '#FF4040';          // Alert Red (pulse)
-const AMBER = '#FFB020';         // Caution Amber
-const VIOLET = '#BF5AF2';        // Highlight Violet
-const FONT_STACK = 'Consolas, "SF Mono", "Fira Code", "Courier New", monospace';
+// -- DEX graph palette -- calm, high-contrast, and readable inside app windows --
+const BG = '#070B12';
+const WHITE = '#D8E2F0';
+const ICE_BLUE = '#64D2FF';
+const ELECTRIC = '#30D158';
+const GLOW = '#0A84FF';
+const AMBER = '#FFB020';
+const VIOLET = '#BF5AF2';
+const FONT_STACK = 'Inter, "SF Pro Display", "Segoe UI", system-ui, sans-serif';
 const CYBER_COLORS = [ICE_BLUE, ELECTRIC, GLOW];
 
 // Enhanced visual palette for better contrast and style
@@ -232,7 +232,7 @@ function generateParticles(count: number): Particle[] {
 }
 
 // ---------------------------------------------------------------------------
-// Nexus HUD Core — tactical arc-reactor style data visualization
+// Nexus graph core - spatial workspace visualization
 // No characters. Clean geometry, rotating rings, scan lines, data readouts.
 // ---------------------------------------------------------------------------
 
@@ -768,7 +768,7 @@ const Nexus: React.FC = () => {
     layoutDirtyRef.current = true;
   }, []);
 
-  // Start with empty radar — avatar only
+  // Start with an empty graph - avatar only
   useEffect(() => {
     nodesRef.current = [];
     setNodeCount(0);
@@ -1187,10 +1187,10 @@ const Nexus: React.FC = () => {
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, w, h);
 
-      // --- TACTICAL RADAR DISPLAY ---
+      // --- Spatial graph display ---
       const radarMaxR = Math.min(w, h) * 0.4;
 
-      // Concentric radar circles
+      // Concentric depth guides
       for (let ri = 1; ri <= 5; ri++) {
         const rr = (ri / 5) * radarMaxR;
         ctx.beginPath();
@@ -1201,16 +1201,16 @@ const Nexus: React.FC = () => {
         ctx.stroke();
       }
 
-      // Radar sweep (rotating sector with fade trail)
+      // Soft sweep (rotating sector with fade trail)
       const sweepAngle = time * 0.7;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.arc(cx, cy, radarMaxR, sweepAngle - 0.5, sweepAngle);
       ctx.closePath();
       const sweepGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radarMaxR);
-      sweepGrad.addColorStop(0, 'rgba(255,26,26,0.14)');
-      sweepGrad.addColorStop(0.7, 'rgba(255,26,26,0.04)');
-      sweepGrad.addColorStop(1, 'rgba(255,26,26,0)');
+      sweepGrad.addColorStop(0, 'rgba(100,210,255,0.12)');
+      sweepGrad.addColorStop(0.7, 'rgba(100,210,255,0.035)');
+      sweepGrad.addColorStop(1, 'rgba(100,210,255,0)');
       ctx.fillStyle = sweepGrad;
       ctx.globalAlpha = 0.6;
       ctx.fill();
@@ -1267,7 +1267,7 @@ const Nexus: React.FC = () => {
 
       // Moving scan line
       const scanY = (time * 50 * dpr) % h;
-      ctx.fillStyle = `rgba(255,26,26,${0.03 + glitchIntensity * 0.04})`;
+      ctx.fillStyle = `rgba(100,210,255,${0.025 + glitchIntensity * 0.025})`;
       ctx.fillRect(0, scanY, w, 2 * dpr);
 
       // Side range ticks
@@ -1301,7 +1301,7 @@ const Nexus: React.FC = () => {
 
       ctx.globalAlpha = 1;
 
-      // --- Stars (radar contacts) ---
+      // --- Stars (graph nodes) ---
       const starAlpha = modeRef.current === 'starfield' ? 1.0 : 0.25;
       const stars = starsRef.current;
       for (let i = 0; i < stars.length; i++) {
@@ -1580,7 +1580,7 @@ const Nexus: React.FC = () => {
         ctx.globalAlpha = 1;
       }
 
-      // --- Cluster labels (cyberpunk terminal tags) ---
+      // --- Cluster labels ---
       if (currentMode === 'cluster') {
         const categories = Object.keys(CLUSTER_CATEGORIES);
         categories.forEach((cat, ci) => {
@@ -1682,9 +1682,9 @@ const Nexus: React.FC = () => {
         const coreP2 = project3D(0, 0, 0, cam.rotX, cam.rotY, cam.zoom, cx, cy);
         const coreGlow2R = (56 + ukiAmp * 30) * dpr;
         const coreGlow2 = ctx.createRadialGradient(coreP2.sx, coreP2.sy, 0, coreP2.sx, coreP2.sy, coreGlow2R);
-        coreGlow2.addColorStop(0, 'rgba(255,26,26,0.35)');
+        coreGlow2.addColorStop(0, 'rgba(100,210,255,0.26)');
         coreGlow2.addColorStop(0.4, 'rgba(255,64,64,0.15)');
-        coreGlow2.addColorStop(1, 'rgba(255,26,26,0)');
+        coreGlow2.addColorStop(1, 'rgba(100,210,255,0)');
         ctx.fillStyle = coreGlow2;
         ctx.globalAlpha = 0.72 + Math.sin(time * 2) * 0.14 + ukiAmp * 0.2;
         ctx.beginPath();
@@ -1957,7 +1957,7 @@ const Nexus: React.FC = () => {
       const sortedIndices = sortedIndicesRef.current;
       sortedIndices.sort((a, b) => nodes[b].depth - nodes[a].depth);
 
-      // --- Draw nodes (CYBERPUNK: sharp diamond + hex shapes) ---
+      // --- Draw nodes ---
       const sq = searchRef.current.toLowerCase();
       const selIdx = selectedNodeRef.current;
       for (const idx of sortedIndices) {
@@ -2087,7 +2087,7 @@ const Nexus: React.FC = () => {
           ctx.stroke();
         }
 
-        // Targeting brackets around node (like the radar image)
+        // Selection brackets around node
         if (alpha > 0.15 && r > 2) {
           const bS = r * 2.2;
           const bLen = bS * 0.35;
@@ -2120,10 +2120,10 @@ const Nexus: React.FC = () => {
           ctx.stroke();
         }
 
-        // FRIEND / TARGET classification label + contact name
+        // File/folder classification label + contact name
         const showLabel = (isHovered || isSelected || (n.scale > 0.7 && isDir) || n.scale > 1.1) && alpha > 0.3;
         if (showLabel) {
-          const tagLabel = isDir ? 'FRIEND' : 'TARGET';
+          const tagLabel = isDir ? 'FOLDER' : 'FILE';
           const tagColor = isDir ? ELECTRIC : ICE_BLUE;
           const tagSize = Math.round(Math.max(7, 8 * n.scale) * dpr);
           ctx.font = `700 ${tagSize}px ${FONT_STACK}`;
@@ -2145,7 +2145,7 @@ const Nexus: React.FC = () => {
       }
       ctx.globalAlpha = 1;
 
-      // --- Radar tracking lines: lines from contacts to screen edges with labels ---
+      // --- Tracking lines: lines from nodes to screen edges with labels ---
       // Only draw tracking lines for the top 8 most prominent contacts
       const trackingCandidates: { idx: number; score: number }[] = [];
       for (const idx of sortedIndices) {
@@ -2165,7 +2165,7 @@ const Nexus: React.FC = () => {
 
         const isDir = n.file.isDirectory;
         const lineColor = isDir ? ELECTRIC : ICE_BLUE;
-        const tagLabel = isDir ? 'FRIEND' : 'TARGET';
+        const tagLabel = isDir ? 'FOLDER' : 'FILE';
 
         // Pick edge: left half goes left, right half goes right
         const goLeft = n.sx < cx;
@@ -2330,24 +2330,25 @@ const Nexus: React.FC = () => {
   // -----------------------------------------------------------------------
   return (
     <div ref={containerRef} style={{
-      width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: BG,
+      width: '100%', height: '100%', position: 'relative', overflow: 'hidden',
+      background: `radial-gradient(circle at 50% 45%, rgba(100,210,255,0.08), transparent 42%), ${BG}`,
       display: 'flex', flexDirection: 'column',
     }}>
-      {/* ── Top Bar (Cyberpunk Terminal) ── */}
+      {/* ── Top Bar ── */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 12px',
         zIndex: 15,
-        background: 'linear-gradient(180deg, rgba(5,5,5,0.95) 0%, rgba(5,5,5,0.6) 70%, transparent 100%)',
-        borderBottom: '1px solid rgba(255,26,26,0.12)',
+        background: 'linear-gradient(180deg, rgba(7,11,18,0.96) 0%, rgba(7,11,18,0.74) 72%, transparent 100%)',
+        borderBottom: '1px solid rgba(100,210,255,0.14)',
         pointerEvents: 'none',
       }}>
         {/* Title + node count */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
           <div style={{
-            width: 22, height: 22, borderRadius: 0,
-            background: 'transparent',
+            width: 24, height: 24, borderRadius: 8,
+            background: 'rgba(100,210,255,0.08)',
             border: `1.5px solid ${ICE_BLUE}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: `0 0 8px ${ICE_BLUE}44, inset 0 0 4px ${ICE_BLUE}22`,
@@ -2357,9 +2358,9 @@ const Nexus: React.FC = () => {
             </svg>
           </div>
           <div>
-            <div style={{ color: ICE_BLUE, fontSize: 11, fontWeight: 700, letterSpacing: 2.5, fontFamily: FONT_STACK, textTransform: 'uppercase' }}>NEXUS</div>
-            <div style={{ color: ELECTRIC, fontSize: 7, fontWeight: 700, marginTop: 0, fontFamily: FONT_STACK, letterSpacing: 1.2 }}>
-              TRACKING [{nodeCount}] // {mode.toUpperCase()} // RADAR.ONLINE
+            <div style={{ color: ICE_BLUE, fontSize: 12, fontWeight: 700, letterSpacing: 1.2, fontFamily: FONT_STACK, textTransform: 'uppercase' }}>Nexus</div>
+            <div style={{ color: ELECTRIC, fontSize: 8, fontWeight: 700, marginTop: 1, fontFamily: FONT_STACK, letterSpacing: 0.8 }}>
+              {nodeCount} nodes / {mode.toUpperCase()} / LIVE
             </div>
           </div>
         </div>
@@ -2374,10 +2375,10 @@ const Nexus: React.FC = () => {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             height: 28,
-            borderRadius: 0,
+            borderRadius: 10,
             padding: '0 10px',
-            background: searchFocused ? 'rgba(255,26,26,0.06)' : 'rgba(5,5,5,0.8)',
-            border: `1px solid ${searchFocused ? ICE_BLUE : 'rgba(255,26,26,0.15)'}`,
+            background: searchFocused ? 'rgba(100,210,255,0.08)' : 'rgba(11,18,28,0.82)',
+            border: `1px solid ${searchFocused ? ICE_BLUE : 'rgba(100,210,255,0.16)'}`,
             boxShadow: searchFocused ? `0 0 12px ${ICE_BLUE}33, inset 0 0 6px ${ICE_BLUE}11` : 'none',
             transition: 'all 0.2s ease',
           }}>
@@ -2432,14 +2433,14 @@ const Nexus: React.FC = () => {
                 onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
                 aria-label="Clear search"
                 style={{
-                  background: 'rgba(255,26,26,0.15)', border: `1px solid ${ELECTRIC}`,
-                  borderRadius: 0,
-                  width: 18, height: 18, cursor: 'pointer',
+                  background: 'rgba(100,210,255,0.12)', border: `1px solid ${ELECTRIC}`,
+                  borderRadius: 6,
+                  width: 20, height: 20, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,26,26,0.3)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,26,26,0.15)')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.22)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.12)')}
               >
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={ELECTRIC} strokeWidth="3" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -2452,33 +2453,33 @@ const Nexus: React.FC = () => {
           {searchFocused && searchQuery && searchResults.length === 0 && (
             <div style={{
               position: 'absolute', top: 40, left: 0, right: 0,
-              background: 'rgba(5,5,5,0.96)',
-              border: `1px solid rgba(255,26,26,0.15)`,
+              background: 'rgba(11,18,28,0.97)',
+              border: `1px solid rgba(100,210,255,0.18)`,
               borderTop: 'none',
-              borderRadius: 0,
+              borderRadius: '0 0 10px 10px',
               padding: '12px',
               zIndex: 30,
             }}>
-              <div style={{ color: 'rgba(255,26,26,0.4)', fontSize: 10, fontWeight: 700, letterSpacing: 1, fontFamily: FONT_STACK, textAlign: 'center' }}>
-                NO_MATCH // "{searchQuery}"
+              <div style={{ color: 'rgba(216,226,240,0.58)', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, fontFamily: FONT_STACK, textAlign: 'center' }}>
+                No match for "{searchQuery}"
               </div>
             </div>
           )}
           {searchFocused && searchResults.length > 0 && (
             <div style={{
               position: 'absolute', top: 40, left: 0, right: 0,
-              background: 'rgba(5,5,5,0.96)',
+              background: 'rgba(11,18,28,0.97)',
               border: `1px solid ${ICE_BLUE}`,
               borderTop: 'none',
-              borderRadius: 0,
-              boxShadow: `0 8px 32px rgba(0,0,0,0.8), 0 0 20px ${ICE_BLUE}22`,
+              borderRadius: '0 0 10px 10px',
+              boxShadow: `0 12px 34px rgba(0,0,0,0.45), 0 0 20px ${ICE_BLUE}18`,
               padding: '4px 0',
               maxHeight: 280,
               overflowY: 'auto',
               zIndex: 30,
             }}>
-              <div style={{ padding: '4px 12px 6px', color: GLOW, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: FONT_STACK, borderBottom: '1px solid rgba(255,26,26,0.08)', marginBottom: 2 }}>
-                // {searchResults.length} MATCH{searchResults.length !== 1 ? 'ES' : ''}
+              <div style={{ padding: '4px 12px 6px', color: GLOW, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', fontFamily: FONT_STACK, borderBottom: '1px solid rgba(100,210,255,0.1)', marginBottom: 2 }}>
+                {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
               </div>
               {searchResults.map((file, i) => (
                 <div
@@ -2487,7 +2488,7 @@ const Nexus: React.FC = () => {
                     display: 'flex', alignItems: 'center', gap: 8,
                     padding: '6px 12px', cursor: 'pointer',
                     transition: 'background 0.1s',
-                    background: i === searchSelectedIdx ? `rgba(255,26,26,0.1)` : 'transparent',
+                    background: i === searchSelectedIdx ? `rgba(100,210,255,0.12)` : 'transparent',
                     borderLeft: i === searchSelectedIdx ? `2px solid ${ICE_BLUE}` : '2px solid transparent',
                   }}
                   onMouseEnter={() => setSearchSelectedIdx(i)}
@@ -2507,7 +2508,7 @@ const Nexus: React.FC = () => {
                     {String(i).padStart(2, '0')}
                   </span>
                   <div style={{
-                    width: 4, height: 4, borderRadius: 0, flexShrink: 0,
+                    width: 6, height: 6, borderRadius: 3, flexShrink: 0,
                     background: file.isDirectory ? ICE_BLUE : fileColor(file.extension, false),
                     boxShadow: `0 0 6px ${file.isDirectory ? ICE_BLUE : fileColor(file.extension, false)}`,
                   }} />
@@ -2516,8 +2517,8 @@ const Nexus: React.FC = () => {
                       {file.name}
                     </div>
                   </div>
-                  <span style={{ color: 'rgba(255,26,26,0.4)', fontSize: 9, fontFamily: FONT_STACK, fontWeight: 600, flexShrink: 0 }}>
-                    {file.isDirectory ? 'FRIEND' : 'TARGET'}
+                  <span style={{ color: 'rgba(216,226,240,0.45)', fontSize: 9, fontFamily: FONT_STACK, fontWeight: 600, flexShrink: 0 }}>
+                    {file.isDirectory ? 'Folder' : 'File'}
                   </span>
                 </div>
               ))}
@@ -2532,16 +2533,16 @@ const Nexus: React.FC = () => {
           style={{
             pointerEvents: 'auto',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 24, height: 24, borderRadius: 0,
-            background: 'transparent',
-            border: `1px solid rgba(255,26,26,0.2)`,
-            color: 'rgba(255,26,26,0.5)',
+            width: 26, height: 26, borderRadius: 9,
+            background: 'rgba(100,210,255,0.06)',
+            border: `1px solid rgba(100,210,255,0.18)`,
+            color: 'rgba(216,226,240,0.72)',
             cursor: 'pointer',
             transition: 'all 0.2s',
             flexShrink: 0,
           }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = ICE_BLUE; e.currentTarget.style.color = ICE_BLUE; e.currentTarget.style.boxShadow = `0 0 6px ${ICE_BLUE}44`; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,26,26,0.2)'; e.currentTarget.style.color = 'rgba(255,26,26,0.5)'; e.currentTarget.style.boxShadow = 'none'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(100,210,255,0.18)'; e.currentTarget.style.color = 'rgba(216,226,240,0.72)'; e.currentTarget.style.boxShadow = 'none'; }}
           title="Reset view"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -2558,7 +2559,7 @@ const Nexus: React.FC = () => {
         style={{ display: 'block', width: '100%', height: '100%', cursor: 'grab', flex: 1 }}
       />
 
-      {/* ── Bottom Control Bar (Cyberpunk Terminal) ── */}
+      {/* ── Bottom Control Bar ── */}
       <div style={{
         position: 'absolute',
         bottom: 12,
@@ -2566,12 +2567,12 @@ const Nexus: React.FC = () => {
         transform: 'translateX(-50%)',
         display: 'flex',
         alignItems: 'center',
-        gap: 3,
-        padding: '4px 10px',
-        background: 'rgba(5,5,5,0.92)',
-        border: `1px solid rgba(255,26,26,0.18)`,
-        borderRadius: 0,
-        boxShadow: `0 6px 24px rgba(0,0,0,0.5), 0 0 12px ${ICE_BLUE}15`,
+        gap: 4,
+        padding: '5px 10px',
+        background: 'rgba(11,18,28,0.92)',
+        border: `1px solid rgba(100,210,255,0.2)`,
+        borderRadius: 12,
+        boxShadow: `0 8px 26px rgba(0,0,0,0.34), 0 0 12px ${ICE_BLUE}10`,
         zIndex: 10,
       }}>
         <ModeButton
@@ -2613,7 +2614,7 @@ const Nexus: React.FC = () => {
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             padding: '3px 8px', height: 24,
-            background: 'rgba(255,26,26,0.08)',
+            background: 'rgba(100,210,255,0.1)',
             border: `1px solid ${ICE_BLUE}55`,
             color: ICE_BLUE,
             fontSize: 9, fontWeight: 700, fontFamily: FONT_STACK,
@@ -2621,8 +2622,8 @@ const Nexus: React.FC = () => {
             cursor: 'pointer',
             transition: 'all 0.15s ease',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `rgba(255,26,26,0.15)`; (e.currentTarget as HTMLButtonElement).style.borderColor = ICE_BLUE; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `rgba(255,26,26,0.08)`; (e.currentTarget as HTMLButtonElement).style.borderColor = `${ICE_BLUE}55`; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `rgba(100,210,255,0.18)`; (e.currentTarget as HTMLButtonElement).style.borderColor = ICE_BLUE; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `rgba(100,210,255,0.1)`; (e.currentTarget as HTMLButtonElement).style.borderColor = `${ICE_BLUE}55`; }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -2644,7 +2645,7 @@ const Nexus: React.FC = () => {
         />
       </div>
 
-      {/* -- HUD Left Panel: System Readouts (Cyberpunk) -- */}
+      {/* -- HUD Left Panel: System Readouts -- */}
       <div style={{
         position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
         display: 'flex', flexDirection: 'column', gap: 4,
@@ -2658,18 +2659,18 @@ const Nexus: React.FC = () => {
         ].map((item) => (
           <div key={item.label} style={{
             padding: '4px 8px',
-            background: 'rgba(5,5,5,0.8)',
+            background: 'rgba(11,18,28,0.72)',
             borderLeft: `2px solid ${item.color}`,
-            borderRadius: 0,
+            borderRadius: 8,
             boxShadow: `0 0 10px ${item.color}20`,
           }}>
-            <div style={{ fontSize: 7, color: 'rgba(255,26,26,0.35)', letterSpacing: 2, fontWeight: 700 }}>{item.label}</div>
-            <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 1 }}>{item.value}</div>
+            <div style={{ fontSize: 8, color: 'rgba(216,226,240,0.45)', letterSpacing: 1, fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 0.3 }}>{item.value}</div>
           </div>
         ))}
       </div>
 
-      {/* -- HUD Right Panel: Status Indicators (Cyberpunk) -- */}
+      {/* -- HUD Right Panel: Status Indicators -- */}
       <div style={{
         position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
         display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end',
@@ -2683,34 +2684,34 @@ const Nexus: React.FC = () => {
         ].map((item) => (
           <div key={item.label} style={{
             padding: '4px 8px',
-            background: 'rgba(5,5,5,0.8)',
+            background: 'rgba(11,18,28,0.72)',
             borderRight: `2px solid ${item.color}`,
-            borderRadius: 0,
+            borderRadius: 8,
             textAlign: 'right',
             boxShadow: `0 0 10px ${item.color}20`,
           }}>
-            <div style={{ fontSize: 7, color: 'rgba(255,26,26,0.35)', letterSpacing: 2, fontWeight: 700 }}>{item.label}</div>
-            <div style={{ fontSize: 9, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 1 }}>{item.status}</div>
+            <div style={{ fontSize: 8, color: 'rgba(216,226,240,0.45)', letterSpacing: 1, fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontSize: 9, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 0.3 }}>{item.status}</div>
           </div>
         ))}
       </div>
 
-      {/* -- Tooltip (Terminal Style) -- */}
+      {/* -- Tooltip -- */}
       <div ref={tooltipDomRef} style={{
         position: 'absolute',
         pointerEvents: 'none',
-        background: 'rgba(5,5,5,0.95)',
+        background: 'rgba(11,18,28,0.95)',
         border: `1px solid ${ICE_BLUE}`,
-        borderRadius: 0,
+        borderRadius: 8,
         padding: '6px 10px',
         zIndex: 20,
         maxWidth: 260,
-        boxShadow: `0 4px 16px rgba(0,0,0,0.6), 0 0 8px ${ICE_BLUE}22`,
+        boxShadow: `0 8px 24px rgba(0,0,0,0.42), 0 0 8px ${ICE_BLUE}18`,
         display: 'none',
       }}>
         <div style={{ color: ICE_BLUE, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: FONT_STACK, letterSpacing: 0.5 }}>
         </div>
-        <div style={{ color: 'rgba(255,26,26,0.4)', fontSize: 9, marginTop: 2, fontFamily: FONT_STACK, letterSpacing: 0.5 }}>
+        <div style={{ color: 'rgba(216,226,240,0.5)', fontSize: 9, marginTop: 2, fontFamily: FONT_STACK, letterSpacing: 0.3 }}>
         </div>
       </div>
 
@@ -2719,9 +2720,9 @@ const Nexus: React.FC = () => {
         <div style={{
           position: 'absolute', right: 12, top: 60, width: 260,
           maxHeight: 320, overflowY: 'auto',
-          background: 'rgba(5,5,5,0.92)',
+          background: 'rgba(11,18,28,0.94)',
           border: `1px solid ${ICE_BLUE}30`,
-          borderRadius: 0,
+          borderRadius: 12,
           boxShadow: `0 4px 20px rgba(0,0,0,0.4), 0 0 12px ${ICE_BLUE}15`,
           zIndex: 20,
           fontFamily: FONT_STACK,
@@ -2730,14 +2731,14 @@ const Nexus: React.FC = () => {
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '8px 10px',
-            borderBottom: `1px solid rgba(255,26,26,0.12)`,
+            borderBottom: `1px solid rgba(100,210,255,0.12)`,
           }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: ICE_BLUE, letterSpacing: 2, textTransform: 'uppercase' }}>UKI WEB RESULTS</div>
             <button
               onClick={() => setShowWebResults(false)}
               style={{
-                background: 'transparent', border: 'none', color: 'rgba(255,26,26,0.4)',
-                cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0,
+                background: 'transparent', border: 'none', color: 'rgba(216,226,240,0.52)',
+                cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 4,
               }}
             >×</button>
           </div>
@@ -2751,11 +2752,11 @@ const Nexus: React.FC = () => {
                 display: 'block', width: '100%', textAlign: 'left',
                 padding: '8px 10px',
                 background: 'transparent',
-                border: 'none', borderBottom: '1px solid rgba(255,26,26,0.06)',
+                border: 'none', borderBottom: '1px solid rgba(100,210,255,0.08)',
                 cursor: 'pointer',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,26,26,0.08)')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(100,210,255,0.08)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <div style={{ fontSize: 11, color: ICE_BLUE, fontWeight: 600, letterSpacing: 0.5 }}>{r.query}</div>
@@ -2787,8 +2788,9 @@ const Nexus: React.FC = () => {
             <span style={{
               fontSize: 8, color: ICE_BLUE, fontWeight: 700, letterSpacing: 0.5,
               padding: '1px 4px',
-              border: `1px solid rgba(255,26,26,0.15)`,
-              background: 'rgba(5,5,5,0.7)',
+              border: `1px solid rgba(100,210,255,0.18)`,
+              borderRadius: 5,
+              background: 'rgba(11,18,28,0.7)',
             }}>{h.key}</span>
           </div>
         ))}
@@ -2798,7 +2800,7 @@ const Nexus: React.FC = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Sub-components (Cyberpunk Terminal Style)
+// Sub-components
 // ---------------------------------------------------------------------------
 
 const modeBtnBase: React.CSSProperties = {
@@ -2806,8 +2808,8 @@ const modeBtnBase: React.CSSProperties = {
   alignItems: 'center',
   gap: 4,
   padding: '4px 8px',
-  border: `1px solid rgba(255,26,26,0.12)`,
-  borderRadius: 0,
+  border: `1px solid rgba(100,210,255,0.14)`,
+  borderRadius: 8,
   cursor: 'pointer',
   fontSize: 9,
   fontWeight: 700,
@@ -2835,13 +2837,13 @@ const ModeButton = memo(({ label, active, onClick, icon }: {
       style={{
         ...modeBtnBase,
         background: active
-          ? 'rgba(255,26,26,0.12)'
+          ? 'rgba(100,210,255,0.14)'
           : hovered
-          ? 'rgba(255,26,26,0.06)'
+          ? 'rgba(100,210,255,0.08)'
           : 'transparent',
-        boxShadow: active ? `0 0 12px rgba(255,26,26,0.2), inset 0 0 8px rgba(255,26,26,0.1)` : 'none',
-        borderColor: active ? ICE_BLUE : hovered ? 'rgba(255,26,26,0.25)' : 'rgba(255,26,26,0.12)',
-        color: active ? ICE_BLUE : hovered ? 'rgba(255,26,26,0.8)' : WHITE,
+        boxShadow: active ? `0 0 12px rgba(100,210,255,0.18), inset 0 0 8px rgba(100,210,255,0.08)` : 'none',
+        borderColor: active ? ICE_BLUE : hovered ? 'rgba(100,210,255,0.28)' : 'rgba(100,210,255,0.14)',
+        color: active ? ICE_BLUE : hovered ? 'rgba(216,226,240,0.95)' : WHITE,
       }}
     >
       {icon}
@@ -2867,10 +2869,10 @@ const ZoomButton = memo(({ label, onClick, icon }: {
       style={{
         width: 24,
         height: 24,
-        border: `1px solid ${hovered ? ICE_BLUE : 'rgba(255,26,26,0.15)'}`,
-        borderRadius: 0,
-        background: hovered ? 'rgba(255,26,26,0.06)' : 'transparent',
-        color: hovered ? ICE_BLUE : 'rgba(255,26,26,0.6)',
+        border: `1px solid ${hovered ? ICE_BLUE : 'rgba(100,210,255,0.16)'}`,
+        borderRadius: 8,
+        background: hovered ? 'rgba(100,210,255,0.08)' : 'transparent',
+        color: hovered ? ICE_BLUE : 'rgba(216,226,240,0.72)',
         fontSize: 12,
         fontWeight: 700,
         cursor: 'pointer',
@@ -2879,7 +2881,7 @@ const ZoomButton = memo(({ label, onClick, icon }: {
         justifyContent: 'center',
         fontFamily: FONT_STACK,
         transition: 'all 0.15s ease',
-        boxShadow: hovered ? `0 0 6px rgba(255,26,26,0.15)` : 'none',
+        boxShadow: hovered ? `0 0 6px rgba(100,210,255,0.16)` : 'none',
       }}
     >
       {icon}

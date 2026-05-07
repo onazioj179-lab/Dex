@@ -154,6 +154,7 @@ class UkiEngine extends EventEmitter {
     try {
       const { UkiTTS } = await import('./tts/UkiTTS');
       this.ttsEngine = UkiTTS.getInstance();
+      this.ttsEngine.setWindow?.(mainWindow);
     } catch (e) { log.warn('[UKI] TTS module failed to load:', e); }
 
     try {
@@ -234,16 +235,7 @@ class UkiEngine extends EventEmitter {
       this.ttsEngine.stop();
     }
 
-    // Create or reuse session
-    if (!this.session) {
-      this.session = {
-        id: `uki-${Date.now()}`,
-        startedAt: Date.now(),
-        turns: [],
-        activeApp: null,
-        activePage: null,
-      };
-    }
+    this.ensureSession();
 
     this.setState('listening');
     this.sendToRenderer('uki:listeningStarted', {});
@@ -259,6 +251,7 @@ class UkiEngine extends EventEmitter {
   /** Process final ASR transcript -- the main pipeline. */
   async processTranscript(text: string): Promise<void> {
     if (!this.initialized || !text.trim()) return;
+    this.ensureSession();
     // Enforce max input length to prevent abuse
     const safeText = text.trim().slice(0, 2000);
 
@@ -432,6 +425,7 @@ class UkiEngine extends EventEmitter {
   // -----------------------------------------------------------------------
 
   private addTurn(userText: string, intent: string | null, entities: Record<string, unknown>, response: string, success: boolean): void {
+    this.ensureSession();
     if (!this.session) return;
     this.session.turns.push({
       id: `turn-${this.session.turns.length}`,
@@ -460,6 +454,17 @@ class UkiEngine extends EventEmitter {
     try {
       this.mainWindow?.webContents?.send(channel, data);
     } catch { /* window may be closed */ }
+  }
+
+  private ensureSession(): void {
+    if (this.session) return;
+    this.session = {
+      id: `uki-${Date.now()}`,
+      startedAt: Date.now(),
+      turns: [],
+      activeApp: null,
+      activePage: null,
+    };
   }
 
   /** Update active page/app context from renderer. */

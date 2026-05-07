@@ -343,6 +343,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     // Close on outside mousedown (instant)
     useEffect(() => {
       if (!open) return;
+      let removeMouseDown: (() => void) | null = null;
 
       // Small delay to prevent the click that opened it from closing it
       const timeoutId = setTimeout(() => {
@@ -359,10 +360,13 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
         };
 
         document.addEventListener('mousedown', handleMouseDown);
-        return () => document.removeEventListener('mousedown', handleMouseDown);
+        removeMouseDown = () => document.removeEventListener('mousedown', handleMouseDown);
       }, 50);
 
-      return () => clearTimeout(timeoutId);
+      return () => {
+        clearTimeout(timeoutId);
+        removeMouseDown?.();
+      };
     }, [open, onClose, triggerRef]);
 
     // Keyboard navigation

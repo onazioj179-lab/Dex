@@ -14,7 +14,7 @@
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
-import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { APP_DEFINITIONS } from '../store/runningApps';
 import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 
@@ -40,7 +40,7 @@ function tryLaunchApp(name: string): boolean {
   if (!hit) return false;
   const [id, def] = hit;
   try {
-    useRunningApps.getState().launchApp({ id, name: def.name, icon: def.icon || id, color: def.color });
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: id, appName: def.name } }));
     return true;
   } catch { return false; }
 }
@@ -574,27 +574,25 @@ if (typeof window !== 'undefined') {
 // ---------------------------------------------------------------------------
 
 const APP_COMMAND_MAP: Record<string, string> = {
-  notes: 'DexNotes', note: 'DexNotes', notepad: 'DexNotes',
-  browser: 'Browser', web: 'Browser', chrome: 'Browser', safari: 'Browser', internet: 'Browser',
-  files: 'Files', finder: 'Files', explorer: 'Files', documents: 'Files', folder: 'Files',
-  music: 'Imosion', audio: 'Imosion', imosion: 'Imosion', player: 'Imosion', spotify: 'Imosion',
-  settings: 'Settings', preferences: 'Settings', config: 'Settings', options: 'Settings',
-  power: 'Power', activity: 'Power', monitor: 'Power', performance: 'Power', cpu: 'Power',
-  terminal: 'Terminal', shell: 'Terminal', console: 'Terminal', command: 'Terminal', cli: 'Terminal',
-  prism: 'Prism', code: 'Prism', editor: 'Prism', ide: 'Prism',
-  forge: 'Forge', design: 'Forge', draw: 'Forge', illustration: 'Forge',
-  vinx: 'Vinx', video: 'Vinx', movie: 'Vinx', clip: 'Vinx',
-  flux: 'Flux', ai: 'Flux', assistant: 'Flux', chat: 'Flux',
-  axl: 'Axl', image: 'Axl', photo: 'Axl', picture: 'Axl', gallery: 'Axl',
-  calendar: 'Calendar', schedule: 'Calendar', events: 'Calendar',
-  calculator: 'Calculator', calc: 'Calculator', math: 'Calculator',
-  mail: 'Mail', email: 'Mail',
-  nexus: 'Nexus', memory: 'Nexus', knowledge: 'Nexus',
-  store: 'AppStore', apps: 'AppStore', download: 'AppStore',
-  launchpad: 'Launchpad', launcher: 'Launchpad',
-  books: 'Library', library: 'Library', reading: 'Library',
-  weather: 'Weather', forecast: 'Weather',
-  maps: 'Maps', location: 'Maps', directions: 'Maps', navigate: 'Maps',
+  notes: 'notes', note: 'notes', notepad: 'notes',
+  browser: 'browser', web: 'browser', chrome: 'browser', safari: 'browser', internet: 'browser',
+  files: 'files', finder: 'files', explorer: 'files', documents: 'files', folder: 'files',
+  music: 'audio', audio: 'audio', imosion: 'imosion', player: 'audio', spotify: 'audio',
+  settings: 'settings', preferences: 'settings', config: 'settings', options: 'settings',
+  power: 'power', activity: 'power', monitor: 'power', performance: 'power', cpu: 'power',
+  terminal: 'dexcode', shell: 'dexcode', console: 'dexcode', command: 'dexcode', cli: 'dexcode',
+  prism: 'prism', code: 'dexcode', editor: 'dexcode', ide: 'dexcode',
+  forge: 'forge', design: 'forge', draw: 'canvas', illustration: 'canvas',
+  vinx: 'videoeditor', video: 'videoeditor', movie: 'videoeditor', clip: 'videoeditor',
+  flux: 'flux', ai: 'learn', assistant: 'learn', chat: 'collabhub',
+  axl: 'axl', image: 'gallery', photo: 'gallery', picture: 'gallery', gallery: 'gallery',
+  calendar: 'calendar', schedule: 'calendar', events: 'calendar',
+  calculator: 'calculator', calc: 'calculator', math: 'calculator',
+  nexus: 'nexus', memory: 'nexus', knowledge: 'nexus',
+  apps: 'home', launchpad: 'home', launcher: 'home',
+  weather: 'weather', forecast: 'weather',
+  timer: 'timer', stopwatch: 'stopwatch', pomodoro: 'pomodoro',
+  tasks: 'tasks', task: 'tasks', todos: 'tasks', workflow: 'workflows', workflows: 'workflows',
 };
 
 function tryAppCommand(text: string): string | null {
@@ -642,13 +640,14 @@ function tryAppCommand(text: string): string | null {
 }
 
 function dispatchAppCommand(cmd: string): string {
-  const [action, appName] = cmd.split(':');
+  const [action, appId] = cmd.split(':');
+  const appName = APP_DEFINITIONS[appId]?.name || appId;
   if (action === 'open') {
-    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appName } }));
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId, appName } }));
     return `Opening ${appName}...`;
   }
   if (action === 'close') {
-    window.dispatchEvent(new CustomEvent('dex-close-app', { detail: { appName } }));
+    window.dispatchEvent(new CustomEvent('dex-close-app', { detail: { appId, appName } }));
     return `Closing ${appName}...`;
   }
   return '';
@@ -1309,7 +1308,8 @@ const UkiOverlay: React.FC = () => {
         const result = await dex.uki.query(normalized);
         const finalResp = result?.response ?? '';
         if (finalResp) {
-          streamResponse(finalResp, 'ai-query', text);
+          setStreamingResponse(finalResp);
+          useUkiStore.getState().setResponse(finalResp);
         } else {
           // Fallback response if no AI response
           const fallback = "I'm not sure about that. Try asking differently, or say 'help' to see what I can do!";

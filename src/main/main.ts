@@ -991,7 +991,7 @@ class DexApp {
     this.registerPatternLearningHandlers();
 
     // UKI Voice Assistant
-    ukiController.initialize(this.mainWindow!);
+    await ukiController.initialize(this.mainWindow!);
 
     // Performance Reservation + Defense Orchestrator (best-effort)
     try {
