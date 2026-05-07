@@ -10,6 +10,27 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - public copy refresh + pricing bump (no version bump)
+
+Two non-code changes that keep the public surface honest and the unit
+economics safe:
+
+- **README rewritten as a short user-facing page.** The historical
+  "What is new in 3.8.x / 3.8 / 3.7" wall was removed. The intro,
+  "Why people use DEX", trial blurb, pricing table, install pointer,
+  and a single link to this changelog are all that remain. No
+  internals, no protocol names, no encryption ceremony in the
+  README -- those still live in their own docs.
+- **Pricing +30% across every tier** (rounded to clean retail).
+  Personal $8.99/mo, $64/yr, $129 lifetime. Family $129/yr, $239
+  lifetime. Pro $16.99/mo, $155/yr, $259 lifetime. Studio $32.99/seat
+  monthly, $299/seat yearly. Free Viewer stays free. Updated in the
+  single source of truth `src/shared/license/pricing.ts`, mirrored in
+  `store/appstore.config.json`, `docs/PRICING.md`, and `README.md`.
+  All discount programs (student / educator / non-profit / OSS /
+  switcher) and the 30-day trial / 14-day refund stay exactly as
+  before.
+
 ### v3.8.9 follow-up - polish + perf wave F (no version bump)
 
 Two additive primitives so any DEX surface can opt into windowed rendering
