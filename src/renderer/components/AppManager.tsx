@@ -2672,6 +2672,38 @@ export const AppManager: React.FC = () => {
     });
   }, [runningApps]);
 
+  // Convert vertical wheel into horizontal scroll on the tab bar so users
+  // can mouse-wheel through many open tabs without holding Shift.
+  useEffect(() => {
+    const el = tabContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      // Only intercept when there's actually horizontal overflow.
+      if (el.scrollWidth <= el.clientWidth) return;
+      // If the user already provided horizontal delta (touchpad), let it pass.
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Keep the active tab visible (scroll it into view when switching apps).
+  useEffect(() => {
+    const container = tabContainerRef.current;
+    if (!container || !currentApp) return;
+    const tab = tabRefs.current.get(currentApp);
+    if (!tab) return;
+    const cRect = container.getBoundingClientRect();
+    const tRect = tab.getBoundingClientRect();
+    if (tRect.left < cRect.left + 8) {
+      container.scrollBy({ left: tRect.left - cRect.left - 16, behavior: 'smooth' });
+    } else if (tRect.right > cRect.right - 8) {
+      container.scrollBy({ left: tRect.right - cRect.right + 16, behavior: 'smooth' });
+    }
+  }, [currentApp, tabOrder]);
+
   const handleTabDragStart = useCallback((e: React.PointerEvent, appId: string) => {
     e.preventDefault();
     e.stopPropagation();

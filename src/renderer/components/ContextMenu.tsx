@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ContextMenuItem {
   id?: string;
@@ -112,7 +113,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
 
   let actionIdx = -1;
 
-  return (
+  // Render through a portal so the menu escapes any parent transform/filter
+  // (which would otherwise clip a position:fixed element to its parent).
+  return createPortal(
     <div
       ref={menuRef}
       role="menu"
@@ -241,7 +244,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
           </React.Fragment>
         );
       })}
-    </div>
+    </div>,
+    document.body,
   );
 };
 

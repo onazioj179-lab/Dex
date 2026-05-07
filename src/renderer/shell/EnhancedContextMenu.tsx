@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { isReduceMotion } from '../utils/MotionController';
 
 // ---------------------------------------------------------------------------
@@ -106,7 +107,7 @@ export const EnhancedContextMenu: React.FC<EnhancedContextMenuProps> = ({
     return y;
   })();
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop to catch clicks */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-context-menu)' }} onMouseDown={onClose} />
@@ -223,7 +224,8 @@ export const EnhancedContextMenu: React.FC<EnhancedContextMenuProps> = ({
           />
         )}
       </div>
-    </>
+    </>,
+    document.body,
   );
 };
 
