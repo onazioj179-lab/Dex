@@ -10,6 +10,30 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - Nexus uplift wave C (no version bump)
+
+`src/shared/nexus/uplift.ts` adds five pure helper bundles that the Nexus
+shell (or any visualization surface) can wire up without pulling in D3 or
+React:
+
+- `confidenceColor()` maps a UKI confidence score to a node tint that
+  matches the trust palette (high/medium/low + unknown fallback).
+- Time-scrub helpers (`snapshotRange`, `snapshotIndexAt`,
+  `scrubberToIndex`) turn a sorted snapshot list into binary-search lookups
+  so the timeline scrubber stays O(log n).
+- Filter-chip predicate composer (`buildNodeFilter`, `applyNodeFilter`)
+  combines category, confidence band and recency band with AND semantics
+  so chips compose cleanly.
+- 3D orbit camera math (`createOrbitCamera`, `orbitRotate`, `orbitZoom`,
+  `cameraPosition`, `projectPoint`) is matrix-free and side-effect-free,
+  ready for the Nexus 3D view without a heavy linear-algebra dep.
+- Collab cursor LWW reducer (`createCursorMap`, `applyCursorUpdate`,
+  `pruneStaleCursors`, `cursorsOnNode`) is replay-safe and idempotent so
+  the existing P2P channel can drive presence badges without bespoke
+  conflict logic.
+
+Coverage: 39 tests in `tests/unit/v389-nexus-uplift.test.ts`.
+
 ### v3.8.9 follow-up - per-app UKI skills wave D (no version bump)
 
 `src/shared/uki/appSkills.ts` registers 41 per-app skills across 11
