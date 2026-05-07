@@ -10,6 +10,34 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - settings surfaces wave E (no version bump)
+
+`src/renderer/components/settings/` ships seven panes that wire up the
+existing shared modules into a consistent macOS-style settings card. Each
+pane is a stateless presentational component so the host (Settings.tsx)
+keeps owning persisted state.
+
+- `DevicesPane` lists `SessionStore` entries, surfacing trust + revoke
+  actions and a "sign out other devices" shortcut.
+- `ActivityPane` is a searchable view over `auditLog` with text + CSV
+  export buttons that pipe `formatAuditAsText` / `formatAuditAsCsv`.
+- `PluginsPane` shows installed plugins with their `CapabilityLedger`
+  grants and per-capability revoke buttons.
+- `MemoryPane` is a thin wrapper around the wave B `MemoryInspector`
+  giving it the shell chrome.
+- `AccessibilityPane` toggles contrast, colour-blind palette, density
+  and reduced-motion using the existing `theme/accessibility` tokens.
+- `StoragePane` renders the `summariseUsage` breakdown, suggestion list
+  and largest-items list with per-category clean callbacks.
+- `TrashAndVersionsPane` lists `trashBin` entries with restore/purge
+  plus an optional `VersionedFile` history with rollback.
+
+`SettingsPaneShell` provides the shared card layout and `formatBytes` /
+`formatRelative` helpers used by every pane. Each pane is exported from
+`src/renderer/components/settings/index.ts` for easy import.
+
+Coverage: 32 tests in `tests/unit/v389-settings-surfaces.test.tsx`.
+
 ### v3.8.9 follow-up - Nexus uplift wave C (no version bump)
 
 `src/shared/nexus/uplift.ts` adds five pure helper bundles that the Nexus
