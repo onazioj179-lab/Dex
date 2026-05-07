@@ -15,6 +15,13 @@ import { autoUpdater } from 'electron-updater';
 import * as fs from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
+import {
+  computeDowngradeEligibility,
+  type DowngradeEligibility,
+  type InstallRecord,
+  type LicenseTier,
+} from '../../shared/update/downgradeWindow';
+import { licensingManager } from './LicensingManager';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -56,6 +63,8 @@ export interface UpdateStatus {
 const CONFIG_FILE = 'update-config.json';
 const BACKUP_DIR = 'backups';
 const UPDATE_SERVER_CONFIG_FILE = 'update-server.json';
+const INSTALL_HISTORY_FILE = 'update-install-history.json';
+const MAX_INSTALL_HISTORY = 20;
 
 const DEFAULT_CONFIG: UpdateConfig = {
   autoCheck: true, // Check for updates on startup
@@ -81,14 +90,19 @@ export class ReleaseManager {
   private history: Array<{ timestamp: number; event: string; data?: unknown }> = [];
   private updateServerUrl = '';
   private postUpdateMarkerPath: string;
+  private installHistoryPath: string;
+  private installHistory: InstallRecord[] = [];
 
   constructor() {
     const userDataPath = app.getPath('userData');
     this.configPath = path.join(userDataPath, CONFIG_FILE);
     this.backupPath = path.join(userDataPath, BACKUP_DIR);
     this.postUpdateMarkerPath = path.join(userDataPath, 'update-post-install.json');
-    
+    this.installHistoryPath = path.join(userDataPath, INSTALL_HISTORY_FILE);
+
     this.config = this.loadConfig();
+    this.installHistory = this.loadInstallHistory();
+    this.recordCurrentVersionIfNew();
     this.updateServerUrl = this.loadUpdateServerUrl();
     this.status = {
       checking: false,
@@ -135,6 +149,108 @@ export class ReleaseManager {
 
   getConfig(): UpdateConfig {
     return { ...this.config };
+  }
+
+  // -------------------------------------------------------------------------
+  // Install History (for downgrade eligibility)
+  // -------------------------------------------------------------------------
+
+  private loadInstallHistory(): InstallRecord[] {
+    try {
+      if (fs.existsSync(this.installHistoryPath)) {
+        const data = fs.readFileSync(this.installHistoryPath, 'utf-8');
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed.slice(-MAX_INSTALL_HISTORY);
+      }
+    } catch (error) {
+      log.error('[ReleaseManager] Failed to load install history:', error);
+    }
+    return [];
+  }
+
+  private saveInstallHistory(): void {
+    try {
+      fs.writeFileSync(
+        this.installHistoryPath,
+        JSON.stringify(this.installHistory.slice(-MAX_INSTALL_HISTORY), null, 2)
+      );
+    } catch (error) {
+      log.error('[ReleaseManager] Failed to save install history:', error);
+    }
+  }
+
+  private recordCurrentVersionIfNew(): void {
+    const current = app.getVersion();
+    const last = this.installHistory[this.installHistory.length - 1];
+    if (last && last.version === current) return;
+    const record: InstallRecord = {
+      version: current,
+      fromVersion: last ? last.version : null,
+      installedAt: Date.now(),
+    };
+    this.installHistory.push(record);
+    this.saveInstallHistory();
+    log.info('[ReleaseManager] Recorded new install:', record);
+  }
+
+  getCurrentInstallRecord(): InstallRecord | null {
+    return this.installHistory[this.installHistory.length - 1] || null;
+  }
+
+  getInstallHistory(): InstallRecord[] {
+    return [...this.installHistory];
+  }
+
+  /** Returns 'pro' for Pro/Team users, 'free' otherwise. */
+  private getLicenseTier(): LicenseTier {
+    try {
+      const tier = licensingManager.getCurrentTier();
+      if (tier === 'pro' || tier === 'team') return tier;
+      return 'free';
+    } catch {
+      return 'free';
+    }
+  }
+
+  canDowngrade(): DowngradeEligibility {
+    return computeDowngradeEligibility(
+      this.getCurrentInstallRecord(),
+      this.getLicenseTier(),
+      Date.now()
+    );
+  }
+
+  /**
+   * Initiates a downgrade for eligible Pro users. Restores the most recent
+   * backup of user data and opens the GitHub releases page so the user can
+   * download the previous installer. The current binary is not replaced
+   * silently — that would be unsafe — but the user data is rolled back so
+   * the previous version starts cleanly.
+   */
+  async downgrade(): Promise<{ success: boolean; eligibility: DowngradeEligibility; restoredBackup?: string; error?: string }> {
+    const eligibility = this.canDowngrade();
+    if (!eligibility.eligible) {
+      return { success: false, eligibility, error: eligibility.reason };
+    }
+    try {
+      const backups = this.listBackups();
+      const latestBackup = backups[0] || null;
+      if (latestBackup) {
+        const restored = await this.restoreFromBackup(this.resolveBackupDir(latestBackup));
+        if (!restored) {
+          return { success: false, eligibility, error: 'Backup restore failed.' };
+        }
+      }
+      const target = eligibility.targetVersion;
+      const url = target
+        ? `https://github.com/onazioj/dex/releases/tag/v${target}`
+        : 'https://github.com/onazioj/dex/releases';
+      await shell.openExternal(url);
+      this.recordHistory('downgrade-initiated', { targetVersion: target, restoredBackup: latestBackup });
+      return { success: true, eligibility, restoredBackup: latestBackup || undefined };
+    } catch (error) {
+      return { success: false, eligibility, error: (error as Error).message };
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -641,6 +757,11 @@ export class ReleaseManager {
     ipcMain.handle('updates:openReleaseNotes', () => this.openReleaseNotes());
     ipcMain.handle('updates:getChangelog', () => this.getChangelog());
     ipcMain.handle('updates:getReleaseNotesForVersion', (_e, version: string) => this.getReleaseNotesForVersion(version));
+
+    // Pro 30-day downgrade window
+    ipcMain.handle('updates:canDowngrade', () => this.canDowngrade());
+    ipcMain.handle('updates:downgrade', () => this.downgrade());
+    ipcMain.handle('updates:getInstallHistory', () => this.getInstallHistory());
   }
 
   private notifyRenderer(channel: string, data?: unknown): void {

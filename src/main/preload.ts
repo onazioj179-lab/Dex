@@ -228,6 +228,10 @@ export interface DexAPI {
     rollback: (backupId: string) => Promise<any>;
     deleteBackup: (backupId: string) => Promise<any>;
     getUpdateHistory: () => Promise<any[]>;
+    // v4.0.0: Pro 30-day downgrade window
+    canDowngrade: () => Promise<{ eligible: boolean; daysRemaining: number; targetVersion: string | null; reason: string }>;
+    downgrade: () => Promise<{ success: boolean; eligibility: { eligible: boolean; daysRemaining: number; targetVersion: string | null; reason: string }; restoredBackup?: string; error?: string }>;
+    getInstallHistory: () => Promise<Array<{ version: string; fromVersion: string | null; installedAt: number }>>;
   };
 
   // Diagnostics
@@ -2114,6 +2118,10 @@ const api: DexAPI = {
     rollback: (backupId: string) => ipcRenderer.invoke('update:rollback', backupId),
     deleteBackup: (backupId: string) => ipcRenderer.invoke('update:deleteBackup', backupId),
     getUpdateHistory: () => ipcRenderer.invoke('update:getHistory'),
+    // v4.0.0: Pro 30-day downgrade window
+    canDowngrade: () => ipcRenderer.invoke('updates:canDowngrade'),
+    downgrade: () => ipcRenderer.invoke('updates:downgrade'),
+    getInstallHistory: () => ipcRenderer.invoke('updates:getInstallHistory'),
   },
 
   // Phase 11: Diagnostics

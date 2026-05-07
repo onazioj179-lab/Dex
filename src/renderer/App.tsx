@@ -40,6 +40,7 @@ import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHis
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
 import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
 import { SystemFeatures, useSessionAutoSave } from './components/SystemFeatures';
+import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
 
 // Progressive loading (item 153): Shell + nav immediate, overlays deferred
@@ -457,6 +458,11 @@ export const App: React.FC = () => {
       <Suspense fallback={null}>
         <SystemFeatures />
       </Suspense>
+      </AppErrorBoundary>
+
+      {/* v4.0.0: Update notification + Pro 30-day downgrade dropdown (always available) */}
+      <AppErrorBoundary instanceId="update-dropdown" appId="update-dropdown" appName="Update Notification" appColor="#0a84ff">
+        <UpdateNotificationDropdown />
       </AppErrorBoundary>
       
       {/* Unified Systems Overlays — deferred (item 153) */}
