@@ -10,6 +10,27 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - UKI trust UI wave B (no version bump)
+
+User-facing surfaces for the wave A brain landed under
+`src/renderer/components/uki/`:
+
+- `ConfidenceChip.tsx` - low/medium/high pill driven by `confidenceLabel`,
+  numeric percent on hover, compact mode for chrome
+- `CitationsPanel.tsx` - sources list that highlights citation indices
+  actually present in the reply body, with optional click-through
+- `PiiGuardDialog.tsx` - confirm-before-send dialog showing the original
+  text, the redacted text, and every detected finding
+- `MemoryInspector.tsx` - search + filter + forget + JSON export over a
+  `MemoryStore`, tier tabs (all / short / working / long-term)
+- `SkillPicker.tsx` - top-K matched skills for a typed intent with
+  keyboard navigation; blocks skills that need missing context
+- `StreamingResponse.tsx` - incremental render of an async `StreamReader`
+  with done / error / toolCall callbacks
+
+Coverage: 35 deterministic tests in
+`tests/unit/v389-uki-trust-ui.test.tsx` (jsdom + @testing-library).
+
 ### v3.8.9 follow-up - UKI brain wave A (no version bump)
 
 Foundation for smarter UKI behaviour landed as 7 pure shared modules under
