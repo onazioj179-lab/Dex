@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - polish + perf wave F (no version bump)
+
+Two additive primitives so any DEX surface can opt into windowed rendering
+or lazy-loaded apps without a refactor:
+
+- `src/shared/perf/visibleRange.ts` exports `computeFixedRange`,
+  `computeVariableRange` (binary-search prefix sums) and `scrollToIndex`
+  with `start`/`center`/`end`/`auto` alignment. Pure math, no DOM, no
+  React; consumers feed scrollTop / viewportHeight each frame and
+  render only the resulting `[startIndex, endIndex]` window.
+- `src/renderer/components/perf/LazyAppLoader.tsx` exports
+  `withLazyApp(loader, { appId, fallbackVariant, bareFallback })` which
+  pairs `React.lazy` with `Suspense` + the existing `ViewErrorBoundary`
+  + `SkeletonPage` for one-line code splitting of any heavy app.
+  `LazyAppLoadFailure` is the INTENTIONAL FALLBACK component callers
+  can mount when the dynamic import itself rejects.
+
+Coverage: 18 tests in `tests/unit/v389-perf-polish.test.tsx` (10 for
+windowing, 5 for `scrollToIndex`, 3 for the lazy loader).
+
 ### v3.8.9 follow-up - settings surfaces wave E (no version bump)
 
 `src/renderer/components/settings/` ships seven panes that wire up the
