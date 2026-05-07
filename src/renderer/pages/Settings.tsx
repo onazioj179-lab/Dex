@@ -156,6 +156,24 @@ const Icons = {
       <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
     </svg>
   ),
+  plugins: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M9 2v4h6V2"/><path d="M4 6h16v6a4 4 0 0 1-4 4h-1v6h-6v-6H8a4 4 0 0 1-4-4V6z"/>
+    </svg>
+  ),
+  nexus: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>
+      <path d="M9 8a3 3 0 0 1 6 0" stroke-dasharray="2 2"/>
+    </svg>
+  ),
+  account: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="7" r="4"/>
+      <path d="M5 21v-1a7 7 0 0 1 14 0v1"/>
+    </svg>
+  ),
 };
 
 const SECTIONS: SettingSection[] = [
@@ -175,10 +193,10 @@ const SECTIONS: SettingSection[] = [
   { id: 'browser', name: 'Browser', icon: Icons.browser },
   { id: 'uki', name: 'UKI & Memory', icon: Icons.uki },
   { id: 'creativeapps', name: 'Creative Suite', icon: Icons.creativeapps },
-  { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.creativeapps },
-  { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.privacy },
+  { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.plugins },
+  { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.nexus },
   { id: 'updates', name: 'Updates', icon: Icons.updates },
-  { id: 'account', name: 'Account', icon: Icons.privacy },
+  { id: 'account', name: 'Account', icon: Icons.account },
   { id: 'about', name: 'About', icon: Icons.about },
 ];
 
@@ -1321,7 +1339,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Accent Color</h3>
       <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-        {['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff375f', '#64d2ff', 'var(--color-warning)'].map(color => (
+        {['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff375f', '#64d2ff', '#ff9f0a'].map(color => (
           <button
             key={color}
             aria-label={`Select accent color ${color}`}
