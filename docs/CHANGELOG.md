@@ -10,6 +10,27 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - pricing reset to $20 entry, lifetime retired (no version bump)
+
+DEX moves to a Claude-style subscription ladder so the unit economics
+actually cover hosting, sync, support, and continued development:
+
+- **Starting price is now $20/mo** for DEX Personal ($179/yr, save 25%).
+- **DEX Family** $30/mo or $300/yr for up to 5 household members.
+- **DEX Pro** $40/mo or $379/yr (save 21%) -- commercial use, live
+  collab, priority support.
+- **DEX Studio** $60/seat/mo or $599/seat/yr -- admin console, audit
+  log, 99.5% SLA.
+- **Free Viewer** stays free, forever, read-only after trial.
+- **Lifetime licences are retired for now.** All plans are subscription
+  only. Existing lifetime holders keep what they bought; no new
+  lifetime tier is offered. The `lifetime` billing period stays in
+  the type system and Stripe glue so historical receipts render, but
+  no `Plan.prices.lifetime` entries remain.
+- All discount programs (student/educator 50%, non-profit 50%, OSS
+  maintainer free Pro, switcher one free year of Personal) and the
+  30-day trial / 14-day refund are unchanged.
+
 ### v3.8.9 follow-up - public copy refresh + pricing bump (no version bump)
 
 Two non-code changes that keep the public surface honest and the unit

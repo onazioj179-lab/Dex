@@ -84,9 +84,8 @@ export const PLANS: readonly Plan[] = [
     tagline: 'One person, every app, on your machine.',
     bestFor: 'Day-to-day personal use on one or two devices.',
     prices: {
-      monthly: { cents: 899 },
-      yearly: { cents: 6400 },
-      lifetime: { cents: 12900 },
+      monthly: { cents: 2000 },
+      yearly: { cents: 17900 },
     },
     capabilities: {
       maxSeats: 2,
@@ -105,8 +104,8 @@ export const PLANS: readonly Plan[] = [
     tagline: 'One subscription, the whole household.',
     bestFor: 'Up to 5 people sharing one home.',
     prices: {
-      yearly: { cents: 12900 },
-      lifetime: { cents: 23900 },
+      monthly: { cents: 3000 },
+      yearly: { cents: 30000 },
     },
     capabilities: {
       maxSeats: 5,
@@ -125,9 +124,8 @@ export const PLANS: readonly Plan[] = [
     tagline: 'Built for solo creators and freelancers.',
     bestFor: 'Commercial work, live collab, priority support.',
     prices: {
-      monthly: { cents: 1699 },
-      yearly: { cents: 15500 },
-      lifetime: { cents: 25900 },
+      monthly: { cents: 4000 },
+      yearly: { cents: 37900 },
     },
     capabilities: {
       maxSeats: 3,
@@ -146,8 +144,8 @@ export const PLANS: readonly Plan[] = [
     tagline: 'Teams that want admin controls and an SLA.',
     bestFor: 'Studios and small businesses (2+ seats).',
     prices: {
-      monthly: { cents: 3299, unit: 'seat' },
-      yearly: { cents: 29900, unit: 'seat' },
+      monthly: { cents: 6000, unit: 'seat' },
+      yearly: { cents: 59900, unit: 'seat' },
     },
     capabilities: {
       maxSeats: 0, // 0 = per seat purchased

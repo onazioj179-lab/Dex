@@ -29,13 +29,13 @@ reading your data forever.
 
 ## Pricing
 
-| Plan | Monthly | Yearly | Lifetime | Best for |
-|---|---|---|---|---|
-| **Free Viewer** | $0 | $0 | -- | Keep access to your work, forever |
-| **DEX Personal** | $8.99 | $64 (save 41%) | $129 | One person, one or two devices |
-| **DEX Family** | -- | $129 / year | $239 | Up to 5 people in one household |
-| **DEX Pro** | $16.99 | $155 (save 24%) | $259 | Solo creators, freelancers, commercial use |
-| **DEX Studio** | $32.99 / seat | $299 / seat | -- | Teams of 2+, admin console + 99.5% SLA |
+| Plan | Monthly | Yearly | Best for |
+|---|---|---|---|
+| **Free Viewer** | $0 | $0 | Keep access to your work, forever |
+| **DEX Personal** | $20 | $179 (save 25%) | One person, one or two devices |
+| **DEX Family** | $30 | $300 / year | Up to 5 people in one household |
+| **DEX Pro** | $40 | $379 (save 21%) | Solo creators, freelancers, commercial use |
+| **DEX Studio** | $60 / seat | $599 / seat | Teams of 2+, admin console + 99.5% SLA |
 
 - **50% off** for students, educators, and registered non-profits.
 - **Free DEX Pro** for open-source maintainers.

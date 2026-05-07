@@ -14,13 +14,13 @@ that keeps your data accessible.
 
 ## Plans
 
-| Plan | Monthly | Yearly | Lifetime | Best for |
-|---|---|---|---|---|
-| **Free Viewer** | $0 | $0 | -- | Browsing existing projects after trial ends |
-| **DEX Personal** | $8.99 | $64 (save 41%) | $129 | One person, one or two devices |
-| **DEX Family** | -- | $129 / year | $239 | Up to 5 people in one household |
-| **DEX Pro** | $16.99 | $155 (save 24%) | $259 | Solo creators, freelancers, commercial use |
-| **DEX Studio** | $32.99 / seat | $299 / seat | -- | Teams of 2+, includes admin console + SLA |
+| Plan | Monthly | Yearly | Best for |
+|---|---|---|---|
+| **Free Viewer** | $0 | $0 | Browsing existing projects after trial ends |
+| **DEX Personal** | $20 | $179 (save 25%) | One person, one or two devices |
+| **DEX Family** | $30 | $300 / year | Up to 5 people in one household |
+| **DEX Pro** | $40 | $379 (save 21%) | Solo creators, freelancers, commercial use |
+| **DEX Studio** | $60 / seat | $599 / seat | Teams of 2+, includes admin console + SLA |
 
 ### What is in every paid plan
 
@@ -65,17 +65,6 @@ that keeps your data accessible.
   Personal.
 - **Bulk and education site licences:** Volume discounts start at 10
   seats. Email onazi75@gmail.com for a quote.
-
-## Lifetime licences -- read this carefully
-
-A "Lifetime" licence is a one-time payment that covers every update
-released within the major version under which you bought it (for example
-v3.x). When a new major version ships (v4, v5, ...) you can keep using
-your existing version forever, or upgrade at a substantial discount we
-guarantee will be at least 50% off the then-current Lifetime price.
-
-This protects you (your software keeps working) and keeps DEX
-sustainable (we can keep shipping new things).
 
 ## What we promise you
 
