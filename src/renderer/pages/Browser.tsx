@@ -841,7 +841,9 @@ export const Browser: React.FC = () => {
         });
       } else if (url.startsWith('http://') || url.startsWith('https://')) {
         // Let renderer open as a new tab
-        window.electron?.invoke?.('browser:new-tab-request', url).catch(() => {});
+        window.electron?.invoke?.('browser:new-tab-request', url).catch((e: unknown) => {
+          console.warn('[Browser] Failed to request new tab:', e);
+        });
       }
     });
     // Also handle postMessage-based credential capture as fallback

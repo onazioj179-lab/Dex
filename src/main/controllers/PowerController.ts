@@ -452,7 +452,9 @@ export class PowerController {
           freedMB = 30;
         }
         // Request Windows to trim working sets without blocking - fire and forget
-        execAsync(`powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "[System.GC]::Collect()"`).catch(() => {});
+        execAsync(`powershell -NoProfile -NoLogo -NonInteractive -WindowStyle Hidden -Command "[System.GC]::Collect()"`).catch((e: unknown) => {
+          this.logger?.warn?.('Garbage collection request failed', e);
+        });
         freedMB = 20;
       } else if (platform === 'darwin') {
         // macOS: purge command (requires sudo, may fail)
