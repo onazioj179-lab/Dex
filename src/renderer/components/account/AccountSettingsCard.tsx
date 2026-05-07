@@ -61,11 +61,16 @@ function writeAccount(acc: CardAccount | null) {
 export interface AccountSettingsCardProps {
   /** Override storage source for tests. */
   initialAccount?: CardAccount | null;
+  /** Optional callback to open the billing portal. If not supplied, an inline panel is shown. */
+  onManageBilling?: (account: CardAccount) => void;
+  /** Optional callback to open the plan-compare panel. If not supplied, an inline panel is shown. */
+  onComparePlans?: (account: CardAccount) => void;
 }
 
-export function AccountSettingsCard({ initialAccount }: AccountSettingsCardProps = {}) {
+export function AccountSettingsCard({ initialAccount, onManageBilling, onComparePlans }: AccountSettingsCardProps = {}) {
   const [account, setAccount] = useState<CardAccount | null>(() => initialAccount ?? readAccount());
   const [showFlow, setShowFlow] = useState(false);
+  const [panel, setPanel] = useState<'none' | 'billing' | 'compare'>('none');
 
   useEffect(() => { writeAccount(account); }, [account]);
 
@@ -81,6 +86,18 @@ export function AccountSettingsCard({ initialAccount }: AccountSettingsCardProps
 
   const signOut = useCallback(() => setAccount(null), []);
 
+  const handleManageBilling = useCallback(() => {
+    if (!account) return;
+    if (onManageBilling) onManageBilling(account);
+    else setPanel('billing');
+  }, [account, onManageBilling]);
+
+  const handleCompare = useCallback(() => {
+    if (!account) return;
+    if (onComparePlans) onComparePlans(account);
+    else setPanel('compare');
+  }, [account, onComparePlans]);
+
   if (showFlow || !account) {
     return showFlow ? (
       <AccountAuthFlow showWelcome={false} onComplete={handleComplete} />
@@ -89,7 +106,16 @@ export function AccountSettingsCard({ initialAccount }: AccountSettingsCardProps
     );
   }
 
-  return <SignedInView account={account} onSignOut={signOut} />;
+  return (
+    <SignedInView
+      account={account}
+      onSignOut={signOut}
+      onManageBilling={handleManageBilling}
+      onCompare={handleCompare}
+      panel={panel}
+      onClosePanel={() => setPanel('none')}
+    />
+  );
 }
 
 function SignedOutView({ onSignIn }: { onSignIn: () => void }) {
@@ -106,7 +132,14 @@ function SignedOutView({ onSignIn }: { onSignIn: () => void }) {
   );
 }
 
-function SignedInView({ account, onSignOut }: { account: CardAccount; onSignOut: () => void }) {
+function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, onClosePanel }: {
+  account: CardAccount;
+  onSignOut: () => void;
+  onManageBilling: () => void;
+  onCompare: () => void;
+  panel: 'none' | 'billing' | 'compare';
+  onClosePanel: () => void;
+}) {
   const usedBytes = 0;
   const snap = quotaFor({ planId: account.plan, usedBytes });
   return (
@@ -118,7 +151,7 @@ function SignedInView({ account, onSignOut }: { account: CardAccount; onSignOut:
           Plan: <strong style={{ color: 'var(--color-text-primary)' }}>{prettyPlan(account.plan)}</strong>
         </p>
         <div style={{ display: 'flex', gap: space[2], flexWrap: 'wrap' }}>
-          <Button variant="secondary" size="sm" onClick={() => alert('Manage subscription opens billing portal (configured at runtime).')}>Manage subscription</Button>
+          <Button variant="secondary" size="sm" onClick={onManageBilling}>Manage subscription</Button>
           <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
         </div>
       </div>
@@ -130,10 +163,37 @@ function SignedInView({ account, onSignOut }: { account: CardAccount; onSignOut:
         </div>
       </div>
       {account.plan === 'free-viewer' && (
-        <UpgradePrompt
-          currentPlan={account.plan}
-          onCompare={() => alert('Open the Pricing page to compare plans (Settings -> Account -> Compare).')}
-        />
+        <UpgradePrompt currentPlan={account.plan} onCompare={onCompare} />
+      )}
+      {panel === 'billing' && (
+        <div style={cardStyle}>
+          <h3 style={cardHeading}>Manage subscription</h3>
+          <p style={bodyText}>
+            Billing is handled by the configured payment provider. The portal opens in your
+            default browser when DEX is launched with a billing endpoint configured.
+          </p>
+          <p style={bodyText}>
+            INTENTIONAL STUB: this build was launched without a billing endpoint, so the
+            portal cannot open. Set <code>DEX_BILLING_PORTAL_URL</code> to enable.
+          </p>
+          <div><Button variant="ghost" size="sm" onClick={onClosePanel}>Close</Button></div>
+        </div>
+      )}
+      {panel === 'compare' && (
+        <div style={cardStyle}>
+          <h3 style={cardHeading}>Compare plans</h3>
+          <p style={bodyText}>
+            Free Viewer is read-only with 10 GB cloud. Personal, Family, Pro, and Studio
+            unlock editing, sync, and 100 GB cloud storage.
+          </p>
+          <ul style={{ ...bodyText, paddingLeft: space[5], margin: 0 }}>
+            <li>Personal — single workspace, 100 GB cloud, basic UKI quota</li>
+            <li>Family — shared library across up to 5 people</li>
+            <li>Pro — priority models, larger UKI quota, plugin publishing</li>
+            <li>Studio — every Pro perk plus team seats and audit log retention</li>
+          </ul>
+          <div><Button variant="ghost" size="sm" onClick={onClosePanel}>Close</Button></div>
+        </div>
       )}
     </div>
   );
