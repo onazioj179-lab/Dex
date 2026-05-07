@@ -52,7 +52,8 @@ function kMeansClusters(pixels: RGBColor[], k: number, maxIterations = 10): RGBC
     centroids.push({ ...pixels[Math.min(i * step, pixels.length - 1)] });
   }
 
-  let assignments = new Array(pixels.length).fill(0);
+  const assignments = new Array(pixels.length).fill(0);
+  const sums = Array.from({ length: k }, () => ({ r: 0, g: 0, b: 0, count: 0 }));
 
   for (let iter = 0; iter < maxIterations; iter++) {
     let changed = false;
@@ -70,11 +71,30 @@ function kMeansClusters(pixels: RGBColor[], k: number, maxIterations = 10): RGBC
 
     if (!changed) break;
 
-    // Recompute centroids
+    for (const sum of sums) {
+      sum.r = 0;
+      sum.g = 0;
+      sum.b = 0;
+      sum.count = 0;
+    }
+
+    for (let i = 0; i < pixels.length; i++) {
+      const sum = sums[assignments[i]];
+      const pixel = pixels[i];
+      sum.r += pixel.r;
+      sum.g += pixel.g;
+      sum.b += pixel.b;
+      sum.count++;
+    }
+
     for (let c = 0; c < centroids.length; c++) {
-      const group = pixels.filter((_, i) => assignments[i] === c);
-      if (group.length > 0) {
-        centroids[c] = averageColors(group);
+      const sum = sums[c];
+      if (sum.count > 0) {
+        centroids[c] = {
+          r: Math.round(sum.r / sum.count),
+          g: Math.round(sum.g / sum.count),
+          b: Math.round(sum.b / sum.count),
+        };
       }
     }
   }

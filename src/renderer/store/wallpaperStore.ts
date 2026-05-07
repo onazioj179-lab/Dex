@@ -148,6 +148,16 @@ function saveState(s: Partial<WallpaperState>) {
   } catch { /* */ }
 }
 
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleSaveState(s: Partial<WallpaperState>) {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveState(s);
+  }, 160);
+}
+
 // ===========================================================================
 // DEFAULTS
 // ===========================================================================
@@ -224,17 +234,17 @@ export const useWallpaperStore = create<WallpaperState>((set) => {
 
     setBlur: (blur) => {
       set({ blur });
-      set((s) => { saveState(s); return {}; });
+      set((s) => { scheduleSaveState(s); return {}; });
     },
 
     setOpacity: (opacity) => {
       set({ opacity });
-      set((s) => { saveState(s); return {}; });
+      set((s) => { scheduleSaveState(s); return {}; });
     },
 
     setTint: (tint) => {
       set({ tint });
-      set((s) => { saveState(s); return {}; });
+      set((s) => { scheduleSaveState(s); return {}; });
     },
 
     reset: () => {

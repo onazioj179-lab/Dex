@@ -10,6 +10,7 @@
 // =============================================================================
 
 import React, { Component, Suspense, ReactNode, useState, useEffect, useCallback } from 'react';
+import { isReduceMotion } from '../utils/MotionController';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -191,16 +192,16 @@ export function AppLoading({ appName, isCreativeApp }: AppLoadingProps): JSX.Ele
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Animate dots
+    if (isReduceMotion()) return;
+
     const dotInterval = setInterval(() => {
       setDots(d => d.length >= 3 ? '' : d + '.');
-    }, 400);
+    }, 600);
 
-    // Simulate progress for creative apps
     if (isCreativeApp) {
       const progressInterval = setInterval(() => {
-        setProgress(p => Math.min(p + Math.random() * 15, 90));
-      }, 200);
+        setProgress(p => Math.min(p + Math.random() * 12, 90));
+      }, 450);
       return () => {
         clearInterval(dotInterval);
         clearInterval(progressInterval);
@@ -286,20 +287,23 @@ export function AppWrapper({
     const loadTime = Date.now() - mountTime;
     if (import.meta.env.DEV) console.log(`[AppWrapper] ${appName} mounted in ${loadTime}ms`);
 
-    // Record metrics
-    try {
-      const metrics = JSON.parse(localStorage.getItem('dex:app-metrics') || '{}');
-      metrics[appId] = {
-        lastLoad: loadTime,
-        avgLoad: metrics[appId] 
-          ? (metrics[appId].avgLoad * 0.8 + loadTime * 0.2) 
-          : loadTime,
-        opens: (metrics[appId]?.opens || 0) + 1,
-      };
-      localStorage.setItem('dex:app-metrics', JSON.stringify(metrics));
-    } catch {
-      // Ignore
-    }
+    const metricsTimer = window.setTimeout(() => {
+      try {
+        const metrics = JSON.parse(localStorage.getItem('dex:app-metrics') || '{}');
+        metrics[appId] = {
+          lastLoad: loadTime,
+          avgLoad: metrics[appId]
+            ? (metrics[appId].avgLoad * 0.8 + loadTime * 0.2)
+            : loadTime,
+          opens: (metrics[appId]?.opens || 0) + 1,
+        };
+        localStorage.setItem('dex:app-metrics', JSON.stringify(metrics));
+      } catch {
+        // Ignore
+      }
+    }, 0);
+
+    return () => window.clearTimeout(metricsTimer);
   }, [appId, appName, mountTime]);
 
   return (
