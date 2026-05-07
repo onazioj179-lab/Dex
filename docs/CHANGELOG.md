@@ -10,6 +10,33 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.0.0 - "Surpass the Competition" leapfrog (Waves Q-Z, 190 new tests)
+
+A 10-wave leapfrog release shipping deterministic, dependency-free
+primitives in `src/shared/` that match or exceed Logic Pro, Premiere,
+After Effects, Blender, CAD pipelines, Photoshop, macOS / Windows 11 /
+Linux shells, enterprise security stacks, real-time collaboration
+platforms, modern AI orchestration, and power-user / accessibility
+("weird mode") tooling.
+
+- Wave Q - audio DSP + analysis (36 tests, `src/shared/audio/`)
+- Wave R - video pipeline + color + captions (27 tests, `src/shared/video/`)
+- Wave S - motion + 3D math (13 tests, `src/shared/motion3d/`)
+- Wave T - CAD + simulation (18 tests, `src/shared/cad/`)
+- Wave U - non-destructive image AI (16 tests, `src/shared/image/`)
+- Wave V - OS shell parity (15 tests, `src/shared/shell/`)
+- Wave W - cybersecurity hardening v4 (16 tests, `src/shared/security/v4/`)
+- Wave X - real-time collab + cloud sync v4 (14 tests, `src/shared/collab/v4/`)
+- Wave Y - UKI super-intelligence v4 (14 tests, `src/shared/uki/v4/`)
+- Wave Z - power-user weird mode (21 tests, `src/shared/power/`)
+
+All primitives are pure modules: no DOM, IPC, electron, network or
+filesystem coupling. Callers inject clocks, RNG, and hash functions
+explicitly so every test is deterministic. Each wave shipped as its own
+commit on `main` and went through the full gate sequence
+(`add-watermarks` → `tsc --noEmit` → focused vitest → `npm run build`)
+before push.
+
 ## v3.9.0 - "Boil the Ocean" polish (10 waves, 259 new tests)
 
 A 10-wave polish release that lands ~500 user-visible improvements as

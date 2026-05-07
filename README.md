@@ -1,6 +1,6 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 3.9.0 - Copyright (c) 2026 - DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 4.0.0 - Copyright (c) 2026 - DEX Software License Agreement v1.0
 
 DEX is your personal command bar for the desktop. One key, one bar, anything done.
 Take notes, run timers, open files, snap a screenshot, focus your screen, mute the
