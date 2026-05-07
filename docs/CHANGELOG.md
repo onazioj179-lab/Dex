@@ -10,6 +10,77 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.0.1 - "Boil the Ocean" platform deepening (Waves A-J, 169 new tests)
+
+A second 10-wave platform pass shipping pure, deterministic, dependency-free
+modules under `src/shared/` that complement the v4.0.0 Q-Z leapfrog. Every
+module is fully typed, fully unit-tested, watermarked, and free of Electron,
+React, DOM, or Node runtime coupling so it can be reused across main,
+renderer, workers, kernel, native bridges, and headless tooling alike.
+
+- Wave A - creative foundations (`src/shared/creative/foundations.ts`)
+  capped UndoStack with byte budget, autosave scheduler with idle gating,
+  project health checks, export validation against known formats, asset
+  relink suggester (hash -> name+size -> name -> size), background queue
+  summary, and a heuristic preset/budget tier picker.
+- Wave B - audio mastering (`src/shared/audio/mastering.ts`) RBJ biquad
+  cookbook (LP/HP/BP/notch/peaking/lowshelf/highshelf), ADSR envelope,
+  BS.1770 K-weighted LUFS, 4x oversampled true-peak, soft-knee compressor,
+  brick-wall limiter, energy-autocorrelation BPM detector, four pan laws,
+  Krumhansl key detection, beat quantize + humanize, and platform LUFS
+  targets (Spotify/Apple/YouTube/Tidal/broadcast).
+- Wave C - video post (`src/shared/video/post.ts`) proxy spec chooser and
+  byte estimator, scene detector (luma + histogram delta), audio-aligned
+  multicam cross-correlation, SRT + VTT parse/serialize round-trip,
+  histogram + luma waveform, automated QC checks, and drop-frame /
+  non-drop-frame timecode <-> frame conversion.
+- Wave D - image layers (`src/shared/image/layers.ts`) layer stack with 12
+  blend modes, 13 adjustment kinds, recursive group flatten, sRGB <->
+  linear, exposure / contrast / gamma / levels, 1D LUT build + evaluate,
+  tile cache keying, histogram, and auto-correct analysis.
+- Wave E - motion + 3D animation (`src/shared/motion3d/animation.ts`) 16
+  named easings + cubic-bezier solver, keyframe evaluator with clamping,
+  particle stepper with global cap, 2-bone analytic IK, and a sandboxed
+  expression evaluator with allowlist + identifier whitelist.
+- Wave F - CAD measurement (`src/shared/cad/measurement.ts`) 2D / 3D
+  distance, polygon area / perimeter / centroid, signed-tetrahedra mesh
+  volume + surface area, length unit conversion, ISO 2768 tolerance
+  lookup, BOM summary by material, and drill pattern generator.
+- Wave G - shell snap + spaces (`src/shared/shell/snap.ts`) 15 snap
+  presets (halves / thirds / quarters / max / center), multi-display
+  containment lookup, hot-corner + edge detection with deterministic
+  routing, window stack focus traversal that skips minimized windows,
+  and per-space window membership.
+- Wave H - UKI verifier (`src/shared/uki/verifier.ts`) plan verification
+  with risk ranking + per-tool allowedArgs, calibrated confidence
+  combining vector similarity / citation count / tool errors /
+  hallucination flags / retrieval recall / model logprob, citation
+  finder by sentence word-set match, intent matcher (string + regex),
+  and dry-run plan summariser.
+- Wave I - security + privacy (`src/shared/security/privacy.ts`)
+  recursive schema validator (string / number / integer / boolean /
+  array / object / null + min/max/pattern/enum/items/properties/
+  additionalProperties/maxLength/optional), secret redactor for GitHub
+  PATs / OAuth, AWS access + secret keys, JWTs, OpenAI keys, emails,
+  card numbers, E.164 phones, and Win/macOS/Linux user paths,
+  permission grant lifecycle (validity + expiry pruning), semver
+  comparison, sha256 + version validators, and a guarded update
+  evaluator.
+- Wave J - power + macros (`src/shared/power/macros.ts`) snippet engine
+  with `$CLIPBOARD` / `$SELECTION` / `$FILENAME` / `$DATE(fmt)` /
+  `${k}` variables, `$0` cursor, `${N:default}` and `$N` tabstops,
+  macro normaliser + duration + adjacent-text compressor, fuzzy matcher
+  with subseq + consecutive + word-boundary bonuses, hotkey combo
+  normaliser (mod order ctrl -> alt -> shift -> meta), and per-scope
+  conflict detector.
+
+Other improvements:
+
+- Updated `tests/unit/update-aliases.test.ts` to match the current
+  ReleaseManager IPC surface (12 primary + 15 alias/extended channels;
+  was asserting a stale 24).
+- Bumped version `4.0.0` -> `4.0.1`.
+
 ## v4.0.0 - "Surpass the Competition" leapfrog (Waves Q-Z, 190 new tests)
 
 A 10-wave leapfrog release shipping deterministic, dependency-free
