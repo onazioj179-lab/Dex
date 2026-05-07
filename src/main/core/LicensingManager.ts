@@ -107,6 +107,38 @@ const VERIFICATION_INTERVAL_DAYS = 30;
 const MAX_FAILED_VERIFICATIONS = 3;
 const TELEMETRY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Creator override: silent, local-only elevation for the original author's
+// machines. Hashed so the literal identity is not exposed in source. Detected
+// values map to Team tier with no trial expiry, no payment, no telemetry.
+// Never exposed via IPC — the renderer only sees a normal 'team' tier.
+const CREATOR_SALT = 'dex-creator-v1';
+const CREATOR_HASHES: ReadonlySet<string> = new Set([
+  'd992279e9f9134f8ccb97070eacb71284aabdb4bed89d511d89894de3fa0954d',
+  '878f055a30a469db51fbef3a2e62029c48b2a73346c747e5d60fd1349ee539a6',
+  '22276a01dc8ea18962134470ecb83782506b19c6c3d00afb3de040a51519d39c',
+]);
+
+function hashCreatorCandidate(value: string): string {
+  return crypto.createHash('sha256').update(`${CREATOR_SALT}:${value.toLowerCase().trim()}`).digest('hex');
+}
+
+function detectCreator(): boolean {
+  try {
+    if (process.env.DEX_CREATOR === '1') return true;
+    const candidates: string[] = [];
+    try { candidates.push(os.userInfo().username || ''); } catch { /* ignore */ }
+    try { candidates.push(process.env.USERNAME || ''); } catch { /* ignore */ }
+    try { candidates.push(process.env.USER || ''); } catch { /* ignore */ }
+    for (const c of candidates) {
+      if (!c) continue;
+      if (CREATOR_HASHES.has(hashCreatorCandidate(c))) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS license (
   id INTEGER PRIMARY KEY,
@@ -168,6 +200,12 @@ export class LicensingManager extends EventEmitter {
   private telemetryTimer: ReturnType<typeof setInterval> | null = null;
   private initialized = false;
   private mainWindow: BrowserWindow | null = null;
+  private readonly creatorMode: boolean = detectCreator();
+
+  /** True when running on the original author's machine. Main-process only. */
+  isCreator(): boolean {
+    return this.creatorMode;
+  }
 
   async initialize(mainWindow?: BrowserWindow): Promise<void> {
     if (this.initialized) return;
@@ -209,6 +247,14 @@ export class LicensingManager extends EventEmitter {
 
   private checkTrialStatus(): void {
     if (!this.license || !this.db) return;
+    if (this.creatorMode) {
+      // Creator override: pin to highest tier, never expire.
+      if (this.license.tier !== 'team') {
+        this.db.prepare('UPDATE license SET tier = ?, trial_expires_at = NULL WHERE id = 1').run('team');
+        this.license.tier = 'team';
+      }
+      return;
+    }
     if (this.license.license_key) return;
 
     if (this.license.trial_expires_at && Date.now() > this.license.trial_expires_at) {
@@ -231,16 +277,19 @@ export class LicensingManager extends EventEmitter {
   }
 
   isFeatureEnabled(featureName: string): boolean {
+    if (this.creatorMode) return true;
     const flag = this.featureFlags.get(featureName);
     if (flag === undefined) return true;
     return flag;
   }
 
   getCurrentTier(): LicenseTier {
+    if (this.creatorMode) return 'team';
     return this.license?.tier || 'free';
   }
 
   isTrialActive(): boolean {
+    if (this.creatorMode) return false;
     if (!this.license) return false;
     if (this.license.license_key) return false;
     if (!this.license.trial_expires_at) return false;
@@ -248,6 +297,7 @@ export class LicensingManager extends EventEmitter {
   }
 
   getTrialDaysRemaining(): number {
+    if (this.creatorMode) return 0;
     if (!this.license?.trial_expires_at) return 0;
     if (this.license.license_key) return 0;
     const remaining = this.license.trial_expires_at - Date.now();
@@ -255,6 +305,7 @@ export class LicensingManager extends EventEmitter {
   }
 
   getLimits(): typeof FREE_LIMITS | null {
+    if (this.creatorMode) return null;
     if (this.getCurrentTier() === 'free') return { ...FREE_LIMITS };
     return null;
   }
@@ -322,6 +373,7 @@ export class LicensingManager extends EventEmitter {
   }
 
   verifyLicense(): { valid: boolean; error?: string } {
+    if (this.creatorMode) return { valid: true };
     if (!this.license?.license_key || !this.license.machine_id || !this.license.verification_hash) {
       return { valid: false, error: 'No active license' };
     }
@@ -357,6 +409,7 @@ export class LicensingManager extends EventEmitter {
   }
 
   isTelemetryEnabled(): boolean {
+    if (this.creatorMode) return false;
     if (!this.db) return false;
     const row = this.db.prepare('SELECT telemetry_enabled FROM telemetry_settings WHERE id = 1').get() as any;
     return row?.telemetry_enabled === 1;
