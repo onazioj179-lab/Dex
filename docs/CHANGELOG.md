@@ -10,6 +10,22 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.0.1.2c - Smoothness patch
+
+Small performance polish release on top of v4.0.1.2b.
+
+- **App open smoothness**: app load metrics are written after first paint
+  instead of during mount, reducing open-time jank.
+- **Creative app loading**: loading dots/progress update less aggressively and
+  respect reduced-motion settings.
+- **Wallpaper sliders**: blur, opacity, and tint persistence is debounced so
+  dragging controls does not write localStorage on every tiny movement.
+- **Wallpaper accent extraction**: k-means palette extraction no longer creates
+  filtered pixel arrays on every iteration, reducing memory churn during
+  wallpaper changes.
+- **Diagnostics**: browser tab-request and power cleanup failures now log
+  instead of disappearing silently.
+
 ## v4.0.1.2b - Auto-update repo fix + Settings icons + scrubber hit area
 
 Critical bugfix release. The v3.x and v4.0.0/v4.0.1-2a installers were built
