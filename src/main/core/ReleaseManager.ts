@@ -243,8 +243,8 @@ export class ReleaseManager {
       }
       const target = eligibility.targetVersion;
       const url = target
-        ? `https://github.com/onazioj/dex/releases/tag/v${target}`
-        : 'https://github.com/onazioj/dex/releases';
+        ? `https://github.com/onazioj179-lab/Dex/releases/tag/v${target}`
+        : 'https://github.com/onazioj179-lab/Dex/releases';
       await shell.openExternal(url);
       this.recordHistory('downgrade-initiated', { targetVersion: target, restoredBackup: latestBackup });
       return { success: true, eligibility, restoredBackup: latestBackup || undefined };
@@ -644,7 +644,7 @@ export class ReleaseManager {
   }
 
   async openReleaseNotes(): Promise<{ success: boolean; url: string }> {
-    const url = 'https://github.com/onazioj/dex/releases';
+    const url = 'https://github.com/onazioj179-lab/Dex/releases';
     await shell.openExternal(url);
     return { success: true, url };
   }

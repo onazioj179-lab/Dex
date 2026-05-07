@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "4.0.1-2a",
+  "version": "4.0.1-2b",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
@@ -247,8 +247,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "onazioj",
-      "repo": "dex",
+      "owner": "onazioj179-lab",
+      "repo": "Dex",
       "releaseType": "release"
     }
   }

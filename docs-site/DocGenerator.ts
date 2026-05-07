@@ -178,7 +178,7 @@ export const DEFAULT_DOC_CONFIG: DocConfig = {
       { title: 'License', url: '/license' }
     ],
     social: [
-      { platform: 'GitHub', url: 'https://github.com/onazioj/dex', icon: 'github' },
+      { platform: 'GitHub', url: 'https://github.com/onazioj179-lab/Dex', icon: 'github' },
       { platform: 'Twitter', url: 'https://twitter.com/dexapp', icon: 'twitter' },
       { platform: 'Discord', url: 'https://discord.gg/dex', icon: 'discord' }
     ]

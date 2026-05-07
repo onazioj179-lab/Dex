@@ -10,6 +10,33 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.0.1.2b - Auto-update repo fix + Settings icons + scrubber hit area
+
+Critical bugfix release. The v3.x and v4.0.0/v4.0.1-2a installers were built
+with the wrong electron-updater feed (`onazioj/dex` instead of
+`onazioj179-lab/Dex`), so old installs silently failed to discover updates.
+Going forward, fresh installs of v4.0.1-2b+ point at the real GitHub repo and
+will auto-update normally. Existing users must download v4.0.1-2b once
+manually from https://github.com/onazioj179-lab/Dex/releases.
+
+- **Auto-update**: `package.json` `build.publish` now targets
+  `onazioj179-lab/Dex`. `ReleaseManager` downgrade and "open releases"
+  fallback URLs corrected. `DocGenerator` GitHub link corrected.
+- **Settings icons**: Plugin Marketplace, Nexus Biometrics, and Account each
+  get a unique sidebar icon (puzzle / face / user) instead of reusing the
+  privacy / creative-suite icon.
+- **Settings appearance**: Accent color picker had a duplicate
+  `var(--color-warning)` swatch; replaced with distinct `#ff9f0a` so all 8
+  swatches are unique.
+- **Audio scrubber**: progress and volume bars went from a 4 px clickable
+  strip to a 16 px hit area (visible track stays 4 px) so seek/volume drags
+  are reliable.
+- **AXL right-click**: viewport context menu now opens regardless of
+  selection, with view (Front/Top/Right/3D) and Add Primitive entries when
+  no part is selected.
+- **DexIcon**: dev-only `console.warn` once per missing icon name so blank
+  icons surface in DevTools.
+
 ## v4.0.1.2a - Shell fit, UKI, and Nexus completion fix
 
 Bugfix/completion pass for the v4.0.1 desktop runtime. The packaged semver is
