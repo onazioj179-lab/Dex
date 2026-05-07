@@ -10,6 +10,28 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+### v3.8.9 follow-up - per-app UKI skills wave D (no version bump)
+
+`src/shared/uki/appSkills.ts` registers 41 per-app skills across 11
+creative apps, each scoped to its `appId` and namespaced
+`<app>.<verb>` for safe registry merging:
+
+- DexCode (5): explain, fix error, generate test, docstring, refactor
+- Terminal (4): explain command, fix stderr, NL->command, search history
+- Notes / DexNotes (4): rewrite tone, summarize, bulletize, semantic search
+- Forge (4): suggest preset, dedup, watch folder, hash verify
+- VINX (3): highlight reel, captions, smart cuts
+- Prism (4): subject select, bg remove, color match, smart fill
+- Flux (3): suggest animation, expression autocomplete, motion preset
+- Imosion (4): mastering coach, stem separation, tempo/key, podcast cleanup
+- AXL (3): parametric suggest, GD&T, standard parts
+- Rewind (3): semantic search, daily review, pattern detect
+- Gallery (4): auto-album, semantic search, duplicates, story
+
+`loadAppSkillRegistry()` merges any subset (or all) into a single
+`SkillRegistry` for the renderer to drive UKI with. Coverage: 23 tests in
+`tests/unit/v389-uki-app-skills.test.ts`.
+
 ### v3.8.9 follow-up - UKI trust UI wave B (no version bump)
 
 User-facing surfaces for the wave A brain landed under
