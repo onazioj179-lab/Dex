@@ -10,6 +10,111 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v3.9.0 - "Boil the Ocean" polish (10 waves, 259 new tests)
+
+A 10-wave polish release that lands ~500 user-visible improvements as
+deterministic pure-data primitives in `src/shared/`. Every primitive is
+covered by a dedicated test file under `tests/unit/v389-wave<X>-*.test.ts`
+and is wired-in incrementally by the renderer and main process. The test
+suite grew from 1223 to **1482 passing tests across 73 files** with no
+regressions.
+
+Each wave shipped as its own commit on `main` and went through the full
+gate sequence (`add-watermarks` → `tsc --noEmit` → full vitest suite →
+`npm run build`) before push.
+
+### Wave G — Operation smoothness (33 tests)
+- `src/shared/perf/smoothness.ts` — frame-budget stepper with `FRAME_BUDGET_MS=12`,
+  debounce/throttle planners, hover-intent state machine (80 ms),
+  scroll memory with negative-value clamping, priority `PrefetchQueue<T>`
+  with id dedupe, long-task buffer + summariser, reduced-motion-aware
+  effective animation duration helper.
+- `src/shared/perf/optimistic.ts` — `OptimisticStore<T>` with
+  `beginMutation`/`commitMutation` (server-value override) /
+  `rollbackMutation` (drops created entries) and `pruneStale`.
+
+### Wave H — Untouched UI surfaces (16 tests)
+- `src/shared/theme/surfaces.ts` — 18-key empty-state catalogue,
+  `rankPalette` with prefix/substring/subseq scoring + recency boost,
+  scoped key-binding registry (8 scopes, globals-first), focus-ring
+  tokens, TTL-driven toast queue with id-replace and sticky support.
+
+### Wave I — Pricing & revenue plumbing (26 tests)
+- `src/shared/license/revenue.ts` — capability-driven feature gates
+  with trial bypass, `buildPlanPicker` with most-popular/best-value/free
+  badges, per-seat quoting, promo-code format validation, receipt
+  normaliser + sorter, retention ladder (pause → discount → cancel),
+  trial-countdown coloring tiers.
+
+### Wave J — Reliability & self-healing (27 tests)
+- `src/shared/security/reliability.ts` — autosave snapshots with
+  `AUTOSAVE_INTERVAL_MS=60000` and force-on-blur, jittered exponential
+  backoff (`DEFAULT_BACKOFF`), three-state circuit breaker
+  (closed/open/half-open) with cooldown probes, native module health
+  summary (ok/mismatch/failed/missing), disk guard with warn (200 MB)
+  and block (50 MB) thresholds, FIFO crash queue (`CRASH_QUEUE_CAPACITY=50`)
+  with consent-gated upload.
+
+### Wave K — A11y + i18n foundation (33 tests)
+- `src/shared/i18n/a11y.ts` — WCAG `relativeLuminance` + `contrastRatio`,
+  AAA/AA/AA-large classification, color-blind safe palette substitution
+  (Wong palette) for protanopia/deuteranopia/tritanopia, aria-label
+  resolution chain (explicit → tooltip → prettified action id → "Action"),
+  `isFocusable` heuristic, locale-aware `t()` with `{name}` interpolation
+  and English fallback, registerable string tables.
+
+### Wave L — UKI intelligence polish (28 tests)
+- `src/shared/uki/intelligence.ts` — rolling Brier-score calibration with
+  bias clamping, structural plan diff (added/removed/reordered + destructive
+  flag), regex-gated `suggestSkills` from selection text, bounded multi-step
+  undo log (`UNDO_LOG_CAPACITY=100`), 30-day pattern decay, epsilon-greedy
+  suggestion bandit with optimistic priors.
+
+### Wave M — Nexus power features (23 tests)
+- `src/shared/nexus/power.ts` — play/pause/seek time-scrubber state machine
+  with snap-to-step, multi-select with replace/toggle/range-extend gestures,
+  saved-views store with id-replace and capacity, world→minimap projection
+  with bounds checking, JSON + SVG graph exporters with XML escaping.
+
+### Wave N — File ops & storage (28 tests)
+- `src/shared/cloud/fileOps.ts` — DnD planner that reads modifiers
+  (ctrl/alt/shift) and same-vs-cross-root semantics, cancellable bulk
+  operation queue with progress and per-item status, age-based trash
+  purge with reprieve windows, conflict resolver with rename/overwrite/
+  skip/keep-both strategies, priority-ordered sync status badge resolver
+  (error → conflict → offline → syncing → pending → synced).
+
+### Wave O — Onboarding & discovery (23 tests)
+- `src/shared/onboarding/discovery.ts` — tour state machine with
+  next/prev/skip/restart and required-step gating, `TRY_CARDS` catalogue
+  (5 entries across 4 scopes), `DAILY_TIPS` rotator with deterministic
+  djb2-seeded date selection, "?" search index with prefix/contains/title
+  scoring + combo bonus, dependency-gated first-run checklist.
+
+### Wave P — Perf hardening (22 tests)
+- `src/shared/perf/hardening.ts` — chunk planner that bin-packs
+  non-critical apps under `CHUNK_MAX_KB=500`, viewport-relative image
+  lazy-load policy with saveData adjustment, IPC payload trimmer that
+  drops optional fields in declared order under `IPC_PAYLOAD_BUDGET_BYTES=256KB`,
+  fixed-height virtual-scroll window with overscan, four-tier memory
+  pressure classifier with mitigation actions.
+
+### Pricing baseline (carried from v3.8.9)
+- DEX Personal $20/mo or $179/yr (save 25%)
+- DEX Family $30/mo or $300/yr for up to 5 household members
+- DEX Pro $40/mo or $379/yr (save 21%) — commercial use, live collab,
+  priority support
+- DEX Studio $60/seat/mo or $599/seat/yr — admin console, audit log
+- Free Viewer stays free, forever, read-only after trial
+- Lifetime tier remains retired; the `lifetime` billing period stays in
+  the type system only for historical receipts
+
+### Verification
+- `node scripts/add-watermarks.js` — 1155 already canonical, 0 stamped, 0 migrated
+- `npx tsc --noEmit` — 0 errors
+- `npm test -- --run` — **1482 / 1482 passing across 73 test files**
+- `npm run build` — clean, vite + tsc -p tsconfig.main.json both green
+
 ### v3.8.9 follow-up - pricing reset to $20 entry, lifetime retired (no version bump)
 
 DEX moves to a Claude-style subscription ladder so the unit economics
