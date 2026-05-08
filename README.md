@@ -49,6 +49,99 @@ Full breakdown: [docs/PRICING.md](docs/PRICING.md).
 Pre-built installers and updates roll in automatically. Read the in-app About
 page for what is shipping next.
 
+The Windows installer asks you to read and accept the License before any files
+are written. No silent installs.
+
+## What is in the box
+
+DEX is one home for many small, focused apps. Open them from the launchpad,
+search them with `Ctrl+K`, or pin them to the Stage strip on the side.
+
+### Daily
+
+- **Home** -- Your front door. Recents, search, weather, clock, the apps you
+  use most.
+- **Notes** -- Plain-text first. Writes immediately. Search across every note
+  you've ever taken. Markdown when you want it, invisible when you don't.
+- **Tasks** -- Lists, due dates, repeats, and quick-capture from anywhere with
+  one shortcut. Drag to reorder, swipe to complete.
+- **Files** -- A clean file browser tied into your apps. Tabs, previews,
+  bookmarks, drag-and-drop everywhere.
+- **Browser** -- A focused web view with tabs, reader mode, and a one-tap
+  "send to Notes / Tasks / Reader."
+- **Calendar** -- See what's next. Day, week, and month views. Read your
+  system calendars, no account needed.
+- **Workflows** -- Build small automations from blocks (open file, run thing,
+  send notification). Preview the steps before they run.
+
+### Knowledge & focus
+
+- **Nexus** -- Your personal knowledge graph. Notes, links, files, and ideas
+  show up as nodes you can wander through.
+- **Learn** -- A study space with flashcards, quick lessons, and a spaced
+  review schedule that just works.
+- **Rewind** -- A scrollable timeline of what you did today, on this machine.
+  Find that thing you closed an hour ago.
+- **Reader** -- Strip the noise off any web page. Big text, calm background,
+  one-tap save.
+
+### Creative
+
+- **Vinx** -- Sketch, paint, and ink with pressure-aware brushes. Layers,
+  blend modes, and a quiet UI when you want to draw.
+- **Imosion** -- A music studio for ideas. Multi-track audio, sample triggers,
+  effects, automation. Headphone-friendly.
+- **Polish (Flux)** -- Photo edits without a cloud. Crop, levels, masks,
+  presets, batch export.
+- **Prism** -- A live, layer-based visual scene mixer. Plug in clips, shaders,
+  and shapes; perform with the keyboard.
+- **Forge** -- Generate art with on-device models. Prompts, history,
+  reference boards, and you own the outputs.
+- **AXL** -- Parametric 2D drafting and 3D shapes for makers. Snap, dimension,
+  and export to common formats.
+- **Canvas** -- Free-form whiteboard for diagrams, mind-maps, and quick
+  visual notes.
+- **PresentationBuilder** -- Build slide decks fast with smart layouts.
+  Present from your machine, no internet required.
+- **PixelArt** -- Tiny canvas, tile palettes, animation frames. Built for
+  retro art.
+- **PDFViewer** -- Open, page through, and annotate PDFs without dragging in
+  a heavy reader.
+- **Kanban** -- Boards, columns, cards. Move work across stages, drag to
+  reorder, snapshot a board to share.
+- **DexCode** -- A lightweight code scratchpad with syntax highlighting,
+  multi-tab, and search.
+
+### Play & store
+
+- **Games** -- A handful of small, original games to clear your head between
+  tasks.
+- **Store** -- A safe shelf of plug-ins and add-ons made for DEX. Read what
+  each one does, then install with one click.
+
+### The assistant
+
+- **UKI** -- Press `Ctrl+Space` and tell it what you want. UKI is the local
+  helper that drafts, summarizes, opens things, and chains short workflows.
+  Anything risky is shown to you as a plan first.
+
+## Your privacy, in plain words
+
+- Your work lives on your computer. We do not upload your notes, your files,
+  or your screen anywhere by default.
+- The assistant runs on your machine. There is no required cloud account.
+- Cloud sync is **optional**. If you turn it on, you choose what syncs.
+- Analytics is **off** by default. If you turn it on, it is anonymous and you
+  can turn it off again any time.
+- Permissions ask first. Microphone, camera, screen capture, your files,
+  the clipboard -- DEX asks the first time and remembers your answer.
+- Updates are signed. Every update is checked against our publisher key
+  before it can replace anything on disk.
+- We do not sell your data. There are no ads inside DEX. There never will be.
+
+Want details? See [PRIVACY.md](PRIVACY.md), [TERMS.md](TERMS.md), and the
+in-app **Settings -> Privacy & Security** panel.
+
 ## What is new
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the latest release notes.
