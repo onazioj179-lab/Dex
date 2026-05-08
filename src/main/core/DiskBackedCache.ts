@@ -149,7 +149,7 @@ export class DiskBackedCache {
           this.memoryUsed += data.length;
           this.diskUsed -= data.length;
           // Clean up disk file
-          await fs.promises.unlink(entry.filePath).catch((e) => { logger.warn('[DiskBackedCache] unlink failed:', e); });
+          await fs.promises.unlink(entry.filePath).catch((e: unknown) => { logger.warn('[DiskBackedCache] unlink failed:', e); });
           entry.filePath = undefined;
         }
 
@@ -172,7 +172,7 @@ export class DiskBackedCache {
       this.memoryUsed -= entry.sizeBytes;
     } else if (entry.location === 'disk' && entry.filePath) {
       this.diskUsed -= entry.sizeBytes;
-      await fs.promises.unlink(entry.filePath).catch((e) => { logger.warn('[DiskBackedCache] remove unlink failed:', e); });
+      await fs.promises.unlink(entry.filePath).catch((e: unknown) => { logger.warn('[DiskBackedCache] remove unlink failed:', e); });
     }
 
     entry.data = undefined;
@@ -353,7 +353,7 @@ export class DiskBackedCache {
     // Clean up all disk pages
     for (const entry of this.pages.values()) {
       if (entry.location === 'disk' && entry.filePath) {
-        await fs.promises.unlink(entry.filePath).catch((e) => { logger.warn('[DiskBackedCache] shutdown unlink failed:', e); });
+        await fs.promises.unlink(entry.filePath).catch((e: unknown) => { logger.warn('[DiskBackedCache] shutdown unlink failed:', e); });
       }
     }
     this.pages.clear();

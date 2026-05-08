@@ -9,6 +9,7 @@
 // Web Speech API speechSynthesis wrapper
 // ===========================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 
 /**
@@ -146,7 +147,7 @@ class UkiTTSStub extends EventEmitter {
   stop(): void {
     try {
       this.mainWindow?.webContents?.send('uki:tts:stop');
-    } catch (e) { console.warn('[UkiTTS] stop send failed:', e); }
+    } catch (e) { log.warn('[UkiTTS] stop send failed:', e); }
     this.speaking = false;
     if (this.fallbackEndTimer) {
       clearTimeout(this.fallbackEndTimer);

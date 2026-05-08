@@ -9,6 +9,7 @@
 // Handles email management, web tasks, and proactive suggestions
 // =============================================================================
 
+import log from 'electron-log';
 import { ipcMain, BrowserWindow, shell, clipboard, app } from 'electron';
 import Store from 'electron-store';
 import { EventEmitter } from 'events';
@@ -1036,15 +1037,15 @@ class ComputerTasksManager extends EventEmitter {
       
       if (platform === 'win32') {
         const child = spawn('cmd', ['/c', 'start', '', appInfo.path], { detached: true, stdio: 'ignore' });
-        child.on('error', (err) => { console.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
+        child.on('error', (err) => { log.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
         child.unref();
       } else if (platform === 'darwin') {
         const child = spawn('open', [appInfo.path], { detached: true, stdio: 'ignore' });
-        child.on('error', (err) => { console.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
+        child.on('error', (err) => { log.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
         child.unref();
       } else {
         const child = spawn('xdg-open', [appInfo.path], { detached: true, stdio: 'ignore' });
-        child.on('error', (err) => { console.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
+        child.on('error', (err) => { log.warn('[ComputerTasks] Failed to launch app:', appInfo.name, err.message); });
         child.unref();
       }
 

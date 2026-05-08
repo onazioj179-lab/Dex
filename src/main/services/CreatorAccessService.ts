@@ -13,6 +13,7 @@
 // renderer reloads (but never across process restarts — the underlying
 // HMAC secret is regenerated on every boot).
 //
+import log from 'electron-log';
 import { app, ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -44,7 +45,7 @@ function loadNative(): NativeCreatorBindings | null {
       return nativeRef;
     }
   } catch (err) {
-    console.warn('[creator-access] native module unavailable:', err);
+    log.warn('[creator-access] native module unavailable:', err);
   }
   return null;
 }
@@ -79,7 +80,7 @@ function persist(token: PersistedToken | null): void {
     }
     fs.writeFileSync(tokenFile(), JSON.stringify(token, null, 2), 'utf8');
   } catch (err) {
-    console.warn('[creator-access] failed to persist token:', err);
+    log.warn('[creator-access] failed to persist token:', err);
   }
 }
 

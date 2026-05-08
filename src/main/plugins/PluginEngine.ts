@@ -9,6 +9,7 @@
 // Third-party extension support with sandboxing and APIs
 // =============================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 import * as crypto from 'crypto';
 
@@ -456,7 +457,7 @@ export class PluginEngine extends EventEmitter {
       // Load and run activator
       // In production, actually load the plugin module
       const activator: PluginActivator = async (ctx) => {
-        console.log(`Plugin ${ctx.plugin.name} activated`);
+        log.info(`Plugin ${ctx.plugin.name} activated`);
       };
       
       await activator(context);

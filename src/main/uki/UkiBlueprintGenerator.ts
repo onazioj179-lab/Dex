@@ -188,7 +188,7 @@ h1 { color: var(--accent); }
       },
       {
         path: 'main.js',
-        contents: `console.log("${title} ready");\n`,
+        contents: `log.info("${title} ready");\n`,
       },
     ],
   };

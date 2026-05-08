@@ -9,6 +9,7 @@
 // WebSpeech API primary, whisper.cpp / Whisper API fallback
 // ===========================================================================
 
+import log from 'electron-log';
 import { EventEmitter } from 'events';
 
 export interface ASRResult {
@@ -101,13 +102,13 @@ class UkiASREngine extends EventEmitter {
 
   stop(): void {
     if (!this.listening || !this.recognition) return;
-    try { this.recognition.stop(); } catch (e) { console.warn('[UkiASR] stop failed:', e); }
+    try { this.recognition.stop(); } catch (e) { log.warn('[UkiASR] stop failed:', e); }
     this.listening = false;
   }
 
   abort(): void {
     if (!this.recognition) return;
-    try { this.recognition.abort(); } catch (e) { console.warn('[UkiASR] abort failed:', e); }
+    try { this.recognition.abort(); } catch (e) { log.warn('[UkiASR] abort failed:', e); }
     this.listening = false;
   }
 

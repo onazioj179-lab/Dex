@@ -711,7 +711,7 @@ export function makeSafe<T extends (...args: any[]) => any>(
       
       // Handle promises
       if (result instanceof Promise) {
-        return result.catch((e) => {
+        return result.catch((e: unknown) => {
           logError(e instanceof Error ? e : new Error(String(e)));
           return fallbackValue;
         });
