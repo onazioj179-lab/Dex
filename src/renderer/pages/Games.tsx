@@ -7,14 +7,36 @@
  * lets the user launch them.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { glassPanel, glassButton } from '../styles/glassMenu';
 import type { DiscoveredGame, LaunchPlan, PlaytimeRecord } from '../../shared/games/launcher';
 import type { ScanResult } from '../../shared/games/scanner';
 
-const ipc = (): { invoke: (c: string, ...a: any[]) => Promise<any> } => {
+type IpcBridge = { invoke: (c: string, ...a: any[]) => Promise<any> };
+
+const rowStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 8,
+};
+
+const inputStyle: React.CSSProperties = {
+  ...rowStyle,
+  minWidth: 220,
+  padding: '8px 10px',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+};
+
+const ipc = (): IpcBridge => {
   const w = window as any;
-  return w.dexAPI ?? w.electronAPI ?? w.electron;
+  const bridge = w.dexAPI ?? w.electronAPI ?? w.electron;
+  if (!bridge?.invoke) throw new Error('DEX IPC bridge is unavailable');
+  return bridge;
+};
+
+const toMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
 };
 
 export default function Games(): React.ReactElement {
@@ -24,6 +46,7 @@ export default function Games(): React.ReactElement {
   const [busy, setBusy] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [last, setLast] = useState('');
+  const [query, setQuery] = useState('');
 
   const refresh = useCallback(async () => {
     try {
@@ -34,21 +57,30 @@ export default function Games(): React.ReactElement {
       setGames(Array.isArray(list) ? list : []);
       setPlaytime(pt && typeof pt === 'object' ? pt : {});
     } catch (e) {
-      setLast(`refresh failed: ${e instanceof Error ? e.message : String(e)}`);
+      setLast(`Refresh failed: ${toMessage(e)}`);
     }
   }, []);
+
+  const visibleGames = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return [...games]
+      .sort((a, b) => a.title.localeCompare(b.title))
+      .filter(game => !q || game.title.toLowerCase().includes(q) || game.id.toLowerCase().includes(q) || game.source.toLowerCase().includes(q));
+  }, [games, query]);
 
   const onScan = useCallback(async () => {
     setScanning(true);
     setLast('');
     try {
       const r = (await ipc().invoke('games:scan')) as ScanResult;
-      setGames(r.games);
-      setErrors(r.errors);
-      setLast(`scanned: ${r.games.length} games, ${r.errors.length} errors`);
+      const found = Array.isArray(r?.games) ? r.games : [];
+      const scanErrors = Array.isArray(r?.errors) ? r.errors : [];
+      setGames(found);
+      setErrors(scanErrors);
+      setLast(`Scanned: ${found.length} games, ${scanErrors.length} errors`);
       await refresh();
     } catch (e) {
-      setLast(`scan failed: ${e instanceof Error ? e.message : String(e)}`);
+      setLast(`Scan failed: ${toMessage(e)}`);
     } finally {
       setScanning(false);
     }
@@ -61,9 +93,9 @@ export default function Games(): React.ReactElement {
     setLast('');
     try {
       const r = await ipc().invoke('games:launch', id);
-      setLast(r?.ok ? `launched ${id} (pid ${r.pid ?? '?'})` : `failed: ${r?.error ?? 'unknown'}`);
+      setLast(r?.ok ? `Launched ${id} (pid ${r.pid ?? '?'})` : `Launch failed: ${r?.error ?? 'unknown'}`);
     } catch (e) {
-      setLast(`error: ${e instanceof Error ? e.message : String(e)}`);
+      setLast(`Error: ${toMessage(e)}`);
     } finally {
       setBusy(null);
     }
@@ -72,50 +104,62 @@ export default function Games(): React.ReactElement {
   const onPlan = useCallback(async (id: string) => {
     try {
       const p = (await ipc().invoke('games:plan-launch', id)) as LaunchPlan | null;
-      if (!p) { setLast(`no plan for ${id}`); return; }
+      if (!p) { setLast(`No plan for ${id}`); return; }
       setLast(`${p.source}: ${p.command.join(' ')}`);
     } catch (e) {
-      setLast(`error: ${e instanceof Error ? e.message : String(e)}`);
+      setLast(`Error: ${toMessage(e)}`);
     }
   }, []);
 
   return (
     <div className="p-6 h-full overflow-auto" style={glassPanel}>
-      <header className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">Games</h1>
-        <div className="flex gap-2">
-          <button style={glassButton} onClick={refresh}>Refresh</button>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Games</h1>
+          <div className="text-xs opacity-70">{games.length} discovered</div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            aria-label="Search games"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search games"
+            style={inputStyle}
+          />
+          <button style={glassButton} onClick={refresh} disabled={scanning || busy !== null}>Refresh</button>
           <button style={glassButton} onClick={onScan} disabled={scanning}>
-            {scanning ? 'Scanning…' : 'Scan'}
+            {scanning ? 'Scanning...' : 'Scan'}
           </button>
         </div>
       </header>
 
-      {last && <div className="mb-3 text-sm opacity-80" role="status">{last}</div>}
+      {last && <div className="mb-3 text-sm opacity-80 break-words" role="status" aria-live="polite">{last}</div>}
 
       {games.length === 0 ? (
         <div className="opacity-70">No games found yet. Hit Scan to look in default storefront paths.</div>
+      ) : visibleGames.length === 0 ? (
+        <div className="opacity-70">No games match the current search.</div>
       ) : (
         <ul className="space-y-2">
-          {games.map(g => {
+          {visibleGames.map(g => {
             const pt = playtime[g.id];
             return (
-              <li key={g.id} className="flex items-center justify-between p-3 rounded" style={glassPanel}>
+              <li key={g.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3" style={rowStyle}>
                 <div className="min-w-0">
                   <div className="font-medium truncate">{g.title}</div>
                   <div className="text-xs opacity-70 truncate">
-                    {g.source} · {g.id}
-                    {pt ? ` · ${Math.round(pt.totalSec / 60)} min` : ''}
+                    {g.source} - {g.id}
+                    {pt ? ` - ${Math.round(pt.totalSec / 60)} min` : ''}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <button style={glassButton} onClick={() => onPlan(g.id)}>Plan</button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
+                  <button style={glassButton} disabled={busy !== null || scanning} onClick={() => onPlan(g.id)}>Plan</button>
                   <button
                     style={glassButton}
-                    disabled={busy === g.id}
+                    disabled={busy !== null || scanning}
                     onClick={() => onLaunch(g.id)}
                   >
-                    {busy === g.id ? 'Launching…' : 'Launch'}
+                    {busy === g.id ? 'Launching...' : 'Launch'}
                   </button>
                 </div>
               </li>
@@ -129,7 +173,7 @@ export default function Games(): React.ReactElement {
           <summary>{errors.length} scan error{errors.length === 1 ? '' : 's'}</summary>
           <ul className="mt-2 space-y-1">
             {errors.map((er, i) => (
-              <li key={i}>{er.source}: {er.path} — {er.reason}</li>
+              <li key={i}>{er.source}: {er.path} - {er.reason}</li>
             ))}
           </ul>
         </details>
