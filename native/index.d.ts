@@ -377,6 +377,40 @@ export interface ProjectStats {
 }
 /** Quickly analyze a project directory for asset stats (parallel via rayon). */
 export declare function analyzeProjectDir(dirPath: string): ProjectStats
+export interface CreatorChallenge {
+  challenge: string
+  issuedAt: number
+  expiresAt: number
+}
+export interface CreatorVerifyResult {
+  ok: boolean
+  token?: string
+  expiresAt?: number
+  reason?: string
+}
+export interface CreatorTokenStatus {
+  valid: boolean
+  expiresAt?: number
+  reason?: string
+}
+export interface CreatorKeyStatus {
+  configured: boolean
+  fingerprint?: string
+}
+/** Report whether a creator public key is embedded in this build. */
+export declare function creatorKeyStatus(): CreatorKeyStatus
+/** Generate a fresh signing challenge for the creator. */
+export declare function creatorMakeChallenge(): CreatorChallenge
+/**
+ * Verify a challenge signature against the embedded creator public key.
+ * On success returns an HMAC-bound unlock token valid for TOKEN_TTL_SECONDS.
+ */
+export declare function creatorVerifySignature(challenge: string, signatureHex: string): CreatorVerifyResult
+/**
+ * Check whether a previously minted unlock token is still valid in this
+ * process. Tokens never survive a process restart by design.
+ */
+export declare function creatorCheckToken(token: string): CreatorTokenStatus
 export interface KernelSchedulerStats {
   workers: number
   submitted: number

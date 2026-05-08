@@ -35,6 +35,7 @@ import {
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
 import PolicyViewer from '../components/PolicyViewer';
+import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 
@@ -195,6 +196,9 @@ const SECTIONS: SettingSection[] = [
   { id: 'performance', name: 'Performance', icon: Icons.performance },
   { id: 'accessibility', name: 'Accessibility', icon: Icons.accessibility },
   { id: 'window', name: 'Window Management', icon: Icons.window },
+  { id: 'snap', name: 'Frame Snapping', icon: Icons.window },
+  { id: 'permissions', name: 'Permissions', icon: Icons.privacy },
+  { id: 'creator', name: 'Creator Access', icon: Icons.account },
   { id: 'keyboard', name: 'Keyboard Shortcuts', icon: Icons.keyboard },
   { id: 'files', name: 'Files', icon: Icons.files },
   { id: 'storage', name: 'Storage & Data', icon: Icons.storage },
@@ -210,14 +214,15 @@ const SECTIONS: SettingSection[] = [
 
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
-  { label: 'Privacy & Security', ids: ['privacy', 'network'] },
-  { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'files'] },
+  { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
+  { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'accessibility', 'storage', 'browser'] },
   { label: 'Intelligence', ids: ['uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
   { label: 'Extensions', ids: ['plugins', 'nexus'] },
   { label: 'Info', ids: ['updates', 'about'] },
   { label: 'Account', ids: ['account'] },
+  { label: 'Owner', ids: ['creator'] },
 ];
 
 const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
@@ -3323,6 +3328,9 @@ export const Settings: React.FC = () => {
       case 'performance': return renderPerformanceSettings();
       case 'accessibility': return renderAccessibilitySettings();
       case 'window': return renderWindowSettings();
+      case 'snap': return <SnapLayoutsPanel />;
+      case 'permissions': return <PermissionsPanel />;
+      case 'creator': return <CreatorAccessPanel />;
       case 'keyboard': return renderKeyboardSettings();
       case 'files': return renderFilesSettings();
       case 'storage': return renderStorageSettings();

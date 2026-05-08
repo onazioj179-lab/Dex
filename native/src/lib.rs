@@ -22,6 +22,7 @@ mod image_processing;
 mod audio_processing;
 mod video_metadata;
 mod creative;
+mod creator_key;
 mod kernel;
 
 pub use system::*;
@@ -33,6 +34,7 @@ pub use image_processing::*;
 pub use audio_processing::*;
 pub use video_metadata::*;
 pub use creative::*;
+pub use creator_key::*;
 pub use kernel::scheduler::*;
 pub use kernel::memory::*;
 pub use kernel::io_engine::*;

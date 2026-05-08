@@ -286,6 +286,7 @@ import { registerSpeedTestIpc } from './services/SpeedTestService';
 import { registerSystemCapabilitiesIpc, detectCapabilities } from './services/SystemCapabilitiesService';
 import { registerCorePcIpc, verifyCoreIntegrity } from './services/CorePCService';
 import { registerPermissionsIpc } from './services/PermissionsService';
+import { registerCreatorAccessIpc } from './services/CreatorAccessService';
 import { summarize as _readerSummarize } from '../shared/reader/readerSummary';
 import { UpdateService } from './core/UpdateService';
 import { ProductionMonitor } from './core/ProductionMonitor';
@@ -3354,6 +3355,12 @@ class DexApp {
       log.info('[DEX] Reader summary IPC registered');
     } catch (err) {
       log.error('[DEX] Reader summary IPC failed:', err);
+    }
+    try {
+      registerCreatorAccessIpc();
+      log.info('[DEX] Creator access IPC registered');
+    } catch (err) {
+      log.error('[DEX] Creator access IPC failed:', err);
     }
 
     // -------------------------------------------------------------------------

@@ -1887,6 +1887,8 @@ const invokePrefixAllowlist = [
   'network:',
   // PTY / terminal sessions (DexCode terminal)
   'pty:',
+  // Creator-only unlock surface (Ed25519 signed challenge / token)
+  'creator:',
 ];
 
 const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline', 'renderer:heartbeat']);
@@ -3775,6 +3777,14 @@ const dexNativeAPI = {
   reader: {
     summarize: (text: string, options?: { sentences?: number }) =>
       ipcRenderer.invoke('reader:summarize', text, options),
+  },
+  creator: {
+    status: () => ipcRenderer.invoke('creator:status'),
+    challenge: () => ipcRenderer.invoke('creator:challenge'),
+    verify: (challenge: string, signatureHex: string) =>
+      ipcRenderer.invoke('creator:verify', challenge, signatureHex),
+    current: () => ipcRenderer.invoke('creator:current'),
+    lock: () => ipcRenderer.invoke('creator:lock'),
   },
 };
 
