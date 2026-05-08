@@ -19,6 +19,7 @@ import { space, radius, fontSize } from '../../styles/tokens';
 import { AccountAuthFlow } from './AccountAuthFlow';
 import { UpgradePrompt } from './ProBadge';
 import { PlanComparePanel } from './PlanComparePanel';
+import { PaymentMethodPicker } from './PaymentMethodPicker';
 import { quotaFor, formatBytes } from '../../../shared/cloud/quota';
 import type { PlanId, BillingPeriod } from '../../../shared/license/pricing';
 import { buildCheckoutUrl, readCheckoutConfigFromGlobal } from '../../../shared/license/checkout';
@@ -89,7 +90,8 @@ export interface AccountSettingsCardProps {
 export function AccountSettingsCard({ initialAccount, onManageBilling, onComparePlans }: AccountSettingsCardProps = {}) {
   const [account, setAccount] = useState<CardAccount | null>(() => initialAccount ?? readAccount());
   const [showFlow, setShowFlow] = useState(false);
-  const [panel, setPanel] = useState<'none' | 'billing' | 'compare'>('none');
+  const [panel, setPanel] = useState<'none' | 'billing' | 'compare' | 'pay'>('none');
+  const [pending, setPending] = useState<{ planId: PlanId; period: BillingPeriod; seats: number } | null>(null);
 
   useEffect(() => { writeAccount(account); }, [account]);
 
@@ -132,7 +134,9 @@ export function AccountSettingsCard({ initialAccount, onManageBilling, onCompare
       onManageBilling={handleManageBilling}
       onCompare={handleCompare}
       panel={panel}
-      onClosePanel={() => setPanel('none')}
+      pending={pending}
+      onChoosePlan={(planId, period, seats) => { setPending({ planId, period, seats }); setPanel('pay'); }}
+      onClosePanel={() => { setPanel('none'); setPending(null); }}
     />
   );
 }
@@ -151,12 +155,14 @@ function SignedOutView({ onSignIn }: { onSignIn: () => void }) {
   );
 }
 
-function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, onClosePanel }: {
+function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, pending, onChoosePlan, onClosePanel }: {
   account: CardAccount;
   onSignOut: () => void;
   onManageBilling: () => void;
   onCompare: () => void;
-  panel: 'none' | 'billing' | 'compare';
+  panel: 'none' | 'billing' | 'compare' | 'pay';
+  pending: { planId: PlanId; period: BillingPeriod; seats: number } | null;
+  onChoosePlan: (planId: PlanId, period: BillingPeriod, seats: number) => void;
   onClosePanel: () => void;
 }) {
   const usedBytes = 0;
@@ -191,8 +197,18 @@ function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, o
         <PlanComparePanel
           currentPlan={account.plan}
           onClose={onClosePanel}
-          onChoose={(planId, period, seats) => {
-            void startCheckout({ planId, period, seats, email: account.email });
+          onChoose={(planId, period, seats) => { onChoosePlan(planId, period, seats); }}
+        />
+      )}
+      {panel === 'pay' && pending && (
+        <PaymentMethodPicker
+          planId={pending.planId}
+          period={pending.period}
+          seats={pending.seats}
+          email={account.email}
+          onClose={onClosePanel}
+          onContinue={(method) => {
+            if (method.url) { void openExternalUrl(method.url); }
             onClosePanel();
           }}
         />
@@ -209,20 +225,6 @@ function prettyPlan(p: PlanId): string {
     case 'pro':         return 'Pro';
     case 'studio':      return 'Studio';
   }
-}
-
-async function startCheckout(req: { planId: PlanId; period: BillingPeriod; seats: number; email: string }): Promise<void> {
-  const cfg = readCheckoutConfigFromGlobal(typeof window !== 'undefined' ? window : null);
-  const plan = buildCheckoutUrl(
-    {
-      planId: req.planId,
-      period: req.period,
-      seats: req.seats,
-      email: req.email,
-    },
-    cfg,
-  );
-  await openExternalUrl(plan.url);
 }
 
 function BillingPanel({ account, onClose }: { account: CardAccount; onClose: () => void }) {

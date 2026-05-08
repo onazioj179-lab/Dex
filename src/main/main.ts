@@ -478,6 +478,7 @@ class DexApp {
         this.mainWindow.show();
         this.mainWindow.focus();
       }
+      try { this.handleQuickActionArgv(commandLine); } catch (err) { log.warn('[DEX] Quick-action argv handling failed:', err); }
     });
 
     // GPU command-line switches MUST be applied BEFORE app.whenReady()
@@ -604,6 +605,15 @@ class DexApp {
       this.createTray();
     } catch (err) {
       log.warn('[DEX] Tray creation failed, continuing:', err);
+    }
+
+    // OS perk: register a Windows JumpList so right-clicking the taskbar /
+    // Start Menu icon offers Quick Note, Quick Task, Open Files. No-op on
+    // non-Windows hosts -- Electron just ignores the call there.
+    try {
+      this.registerJumpList();
+    } catch (err) {
+      log.warn('[DEX] JumpList registration failed, continuing:', err);
     }
     
     // Start monitoring (non-critical)
@@ -1459,6 +1469,7 @@ class DexApp {
         try { SessionStabilityManager.registerWindow(this.mainWindow); } catch (e) { log.warn('[DEX] SessionStabilityManager registration failed:', e); }
         try { PerformanceEnforcer.registerWindow(this.mainWindow); } catch (e) { log.warn('[DEX] PerformanceEnforcer registration failed:', e); }
       }
+      try { this.handleQuickActionArgv(process.argv); } catch (err) { log.warn('[DEX] Initial quick-action argv handling failed:', err); }
     });
 
     // -- Renderer crash recovery -----------------------------------------
@@ -1783,6 +1794,20 @@ class DexApp {
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Open Dex', click: () => this.mainWindow?.show() },
       { type: 'separator' },
+      { label: 'Quick actions', enabled: false },
+      {
+        label: 'New note',
+        click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'notes', { action: 'new' }); },
+      },
+      {
+        label: 'New task',
+        click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'tasks', { action: 'new' }); },
+      },
+      {
+        label: 'Open files',
+        click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'files'); },
+      },
+      { type: 'separator' },
       { label: 'Rewind', enabled: false },
       {
         label: isRecording ? 'Pause Recording' : 'Resume Recording',
@@ -1809,6 +1834,67 @@ class DexApp {
     ]);
 
     this.tray.setContextMenu(contextMenu);
+  }
+
+  /**
+   * Windows JumpList: tasks shown when the user right-clicks the DEX
+   * taskbar icon or the Start Menu shortcut. Each task re-launches DEX
+   * with a known argv flag the renderer interprets via `navigate:app`.
+   * No-op on macOS / Linux (Electron documents this method as Windows-
+   * only and silently ignores it elsewhere).
+   */
+  private registerJumpList(): void {
+    if (process.platform !== 'win32') return;
+    try {
+      app.setUserTasks([
+        {
+          program: process.execPath,
+          arguments: '--dex-quick=note',
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: 'New note',
+          description: 'Capture a quick note in DEX',
+        },
+        {
+          program: process.execPath,
+          arguments: '--dex-quick=task',
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: 'New task',
+          description: 'Capture a quick task in DEX',
+        },
+        {
+          program: process.execPath,
+          arguments: '--dex-quick=files',
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: 'Open files',
+          description: 'Jump straight to the DEX file browser',
+        },
+      ]);
+      this.logger.info('JumpList tasks registered');
+    } catch (err) {
+      this.logger.warn('JumpList registration failed', err);
+    }
+  }
+
+  /**
+   * Inspect process.argv (and second-instance argv) for `--dex-quick=...`
+   * launched via the JumpList, and forward it to the renderer.
+   */
+  private handleQuickActionArgv(argv: readonly string[]): void {
+    const flag = argv.find(a => a.startsWith('--dex-quick='));
+    if (!flag) return;
+    const which = flag.slice('--dex-quick='.length);
+    if (!this.mainWindow) return;
+    this.mainWindow.show();
+    if (which === 'note') {
+      this.mainWindow.webContents?.send('navigate:app', 'notes', { action: 'new' });
+    } else if (which === 'task') {
+      this.mainWindow.webContents?.send('navigate:app', 'tasks', { action: 'new' });
+    } else if (which === 'files') {
+      this.mainWindow.webContents?.send('navigate:app', 'files');
+    }
   }
 
   private setupIPC(): void {
