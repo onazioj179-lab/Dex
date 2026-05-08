@@ -1550,6 +1550,18 @@ export const Settings: React.FC = () => {
             aria-label="Enable cloud clipboard sync"
           />
         </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Pin Stage Manager open</span>
+            <span style={styles.settingDesc}>Keep the left strip expanded; disable auto-collapse on mouse-leave or maximize.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.stageManagerPinned}
+            onChange={(e) => prefs.setStageManagerPinned(e.target.checked)}
+            aria-label="Pin Stage Manager open"
+          />
+        </div>
 
         <h3 style={styles.sectionTitle}>Diagnostics</h3>
         <div style={styles.settingRow}>

@@ -97,9 +97,17 @@ export const Home: React.FC = () => {
   // Key changes when greeting text changes (new period of day) → triggers CSS re-animation
   const greetingAnimKey = greetingText;
 
-  // Clock tick — update once per minute (useState initializer already sets current time)
+  // Clock tick — poll every second but only re-render on minute boundary
+  // so the displayed HH:MM stays within 1s of wall-clock without wasted renders.
   useEffect(() => {
-    sharedTick.subscribe('home-clock', () => setTime(new Date()), 60000);
+    let lastMinute = Math.floor(Date.now() / 60000);
+    sharedTick.subscribe('home-clock', () => {
+      const m = Math.floor(Date.now() / 60000);
+      if (m !== lastMinute) {
+        lastMinute = m;
+        setTime(new Date());
+      }
+    }, 1000);
     return () => sharedTick.unsubscribe('home-clock');
   }, []);
 

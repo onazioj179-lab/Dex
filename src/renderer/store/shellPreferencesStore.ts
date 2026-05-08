@@ -45,6 +45,8 @@ export interface ShellPreferences {
   preventTabRefreshOnSleep: boolean;
   /** Allow clipboard history to sync across signed-in devices. */
   clipboardCloudSync: boolean;
+  /** Pin Stage Manager strip open (disables auto-collapse on mouse-leave / maximize). */
+  stageManagerPinned: boolean;
 }
 
 export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
@@ -58,6 +60,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   respectUpdateChoice: true,
   preventTabRefreshOnSleep: true,
   clipboardCloudSync: false,
+  stageManagerPinned: false,
 };
 
 interface ShellPreferencesActions {
@@ -71,6 +74,7 @@ interface ShellPreferencesActions {
   setRespectUpdateChoice: (enabled: boolean) => void;
   setPreventTabRefreshOnSleep: (enabled: boolean) => void;
   setClipboardCloudSync: (enabled: boolean) => void;
+  setStageManagerPinned: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -109,6 +113,7 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.respectUpdateChoice = o.respectUpdateChoice !== false; // default true
   base.preventTabRefreshOnSleep = o.preventTabRefreshOnSleep !== false;
   base.clipboardCloudSync = o.clipboardCloudSync === true;
+  base.stageManagerPinned = o.stageManagerPinned === true;
   return base;
 }
 
@@ -254,6 +259,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
     setRespectUpdateChoice: (enabled) => update({ respectUpdateChoice: enabled }),
     setPreventTabRefreshOnSleep: (enabled) => update({ preventTabRefreshOnSleep: enabled }),
     setClipboardCloudSync: (enabled) => update({ clipboardCloudSync: enabled }),
+    setStageManagerPinned: (enabled) => update({ stageManagerPinned: enabled }),
 
     reset: () => {
       const next = { ...DEFAULT_SHELL_PREFERENCES };

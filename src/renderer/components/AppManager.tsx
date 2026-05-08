@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
-import { UnifiedSearch } from './UnifiedSearch';
+// UnifiedSearch retired -- Ctrl+K is owned by CommandPalette (mounted in App.tsx).
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 
 import { useAppTransition } from '../utils/motionHooks';
@@ -563,8 +563,7 @@ export const AppManager: React.FC = () => {
   const dockEdgePref = useShellPreferences((s) => s.dockEdge);
   const dockPresetPref = useShellPreferences((s) => s.dockPreset);
 
-  const [showUnifiedSearch, setShowUnifiedSearch] = useState(false);
-  // showSpotlight retired — Ctrl+K now toggles CommandPalette (App.tsx) and Ctrl+Space toggles UKI panel
+  // Ctrl+K -> CommandPalette (App.tsx). Ctrl+Space -> UKI panel. No legacy unified search overlay.
   const [showAppMenu, setShowAppMenu] = useState(false);
   const showAppMenuRef = useRef(false);
   showAppMenuRef.current = showAppMenu;
@@ -2909,15 +2908,16 @@ export const AppManager: React.FC = () => {
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0 10px 0 8px', height: 26, borderRadius: 6,
                 background: isActive ? 'var(--color-border)' : isDragging ? 'var(--color-bg-elevated)' : 'transparent',
-                border: isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
+                border: isActive ? '1px solid var(--color-border-subtle)' : isDragging ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
-                transform: isDragging ? `translateX(${dragOffset}px) scale(1.02)` : 'translateX(0) scale(1)',
+                transform: isDragging ? `translateX(${dragOffset}px) scale(1.04)` : 'translateX(0) scale(1)',
                 transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.4,0,0.2,1), background 0.12s ease, border-color 0.12s ease',
                 zIndex: isDragging ? 100 : 1,
-                boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
-                opacity: isDragging ? 0.95 : 1,
+                boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.04) inset' : 'none',
+                opacity: isDragging ? 0.97 : 1,
                 touchAction: 'none',
                 userSelect: 'none',
+                willChange: isDragging ? 'transform' : 'auto',
               }}
               onMouseEnter={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -3295,7 +3295,6 @@ export const AppManager: React.FC = () => {
     <div role="application" aria-label="DEX Desktop" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', fontFamily: 'var(--font-family)', overflow: 'hidden', minWidth: 360 }}>
       <a href="#dex-main-content" className="dex-skip-nav">Skip to content</a>
       <div aria-live="polite" aria-atomic="true" className="dex-sr-only" id="dex-live-region" />
-      <UnifiedSearch isOpen={showUnifiedSearch} onClose={() => setShowUnifiedSearch(false)} onNavigate={(p) => setCurrentApp(p as AppId)} />
 
       {renderTitleBar()}
       {renderAppTabBar()}

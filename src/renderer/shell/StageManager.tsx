@@ -19,6 +19,7 @@ import React, { useCallback, useState, useRef, useEffect, memo } from 'react';
 import type { RunningApp } from '../store/runningApps';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { usePerfTier } from '../utils/perfAware';
+import { useShellPreferences } from '../store/shellPreferencesStore';
 
 /** Width of the expanded strip */
 export const STAGE_STRIP_WIDTH = 96;
@@ -181,6 +182,7 @@ StageTile.displayName = 'StageTile';
 // -- Main Stage Manager ---------------------------------------------------
 const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, onSelect, onClose, icons, anyMaximized }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const pinned = useShellPreferences((s) => s.stageManagerPinned);
   const [expanded, setExpanded] = useState(true);
   const autoHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHovering = useRef(false);
@@ -191,13 +193,22 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
     if (autoHideTimer.current) clearTimeout(autoHideTimer.current);
   }, []);
 
-  // Auto-collapse when any window is maximized
+  // When the user pins the strip, force-expand and cancel any pending hide.
   useEffect(() => {
+    if (pinned) {
+      if (autoHideTimer.current) { clearTimeout(autoHideTimer.current); autoHideTimer.current = null; }
+      setExpanded(true);
+    }
+  }, [pinned]);
+
+  // Auto-collapse when any window is maximized (skip when pinned)
+  useEffect(() => {
+    if (pinned) return;
     if (anyMaximized && !isHovering.current) {
       if (autoHideTimer.current) clearTimeout(autoHideTimer.current);
       autoHideTimer.current = setTimeout(() => setExpanded(false), MAX_HIDE_DELAY);
     }
-  }, [anyMaximized]);
+  }, [anyMaximized, pinned]);
 
   const handleStripEnter = useCallback(() => {
     isHovering.current = true;
@@ -208,10 +219,11 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
   const handleStripLeave = useCallback(() => {
     isHovering.current = false;
     setHoveredId(null);
+    if (pinned) return;
     if (autoHideTimer.current) clearTimeout(autoHideTimer.current);
     const delay = anyMaximized ? MAX_HIDE_DELAY : AUTO_HIDE_DELAY;
     autoHideTimer.current = setTimeout(() => setExpanded(false), delay);
-  }, [anyMaximized]);
+  }, [anyMaximized, pinned]);
 
   const handleClose = useCallback((e: React.MouseEvent, appId: string) => {
     e.stopPropagation();
