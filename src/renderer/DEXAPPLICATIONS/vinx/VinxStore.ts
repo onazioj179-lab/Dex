@@ -103,6 +103,8 @@ interface VinxState {
   showLUTBrowser: boolean;
   // New: Multicam mode
   multicamMode: boolean;
+  // New: Multicam angle picker panel
+  showMulticamPanel: boolean;
   // New: Project template dialog
   showTemplateDialog: boolean;
   // New: Loudness metering
@@ -309,6 +311,9 @@ interface VinxState {
   toggleLUTBrowser: () => void;
   // New: Multicam
   toggleMulticamMode: () => void;
+  setShowMulticamPanel: (v: boolean) => void;
+  // Per-clip color grading
+  updateClipColorGrading: (clipId: string, partial: Partial<import('./VinxTypes').ClipColorGrading>) => void;
   // New: Templates
   toggleTemplateDialog: () => void;
   // New: Loudness
@@ -425,6 +430,7 @@ function createDefaultProject(): VinxProject {
     titleData: type === 'title' ? { text: name, fontSize: 48, fontFamily: 'system-ui', fontWeight: 700, color: 'var(--color-text-primary)', backgroundColor: 'transparent', backgroundOpacity: 0, positionX: 0.5, positionY: 0.5, alignment: 'center' as const, presetId: null } : null,
     linkedClipId: null, speedRamp: null, masks: [], compoundClipId: null,
     noiseReduction: null, stabilization: null, isFreezeFrame: false, freezeFrameSource: 0,
+    colorGrading: null, multicamClipId: null,
   });
 
   const v1: Track = { id: 'v1', name: 'V1', type: 'video', height: DEFAULT_TRACK_HEIGHTS.video, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [
@@ -625,6 +631,7 @@ export const useVinxStore = create<VinxState>((set, get) => {
     activeSubtitleTrackId: null,
     showLUTBrowser: false,
     multicamMode: false,
+    showMulticamPanel: false,
     showTemplateDialog: false,
     loudnessMetering: { integratedLUFS: -23, shortTermLUFS: -23, momentaryLUFS: -23, truePeak: -1, loudnessRange: 7, target: -14 },
     showLoudnessPanel: false,
@@ -1200,6 +1207,41 @@ export const useVinxStore = create<VinxState>((set, get) => {
 
     // Multicam
     toggleMulticamMode: () => set(s => ({ multicamMode: !s.multicamMode })),
+    setShowMulticamPanel: (v) => set({ showMulticamPanel: v }),
+    updateClipColorGrading: (clipId, partial) => set(s => {
+      const sequences = s.project.sequences.map(seq => ({
+        ...seq,
+        tracks: seq.tracks.map(tr => ({
+          ...tr,
+          clips: tr.clips.map(c => {
+            if (c.id !== clipId) return c;
+            const current = c.colorGrading ?? {
+              primary: {
+                wheels: {
+                  lift: { r: 0, g: 0, b: 0, master: 0 },
+                  gamma: { r: 0, g: 0, b: 0, master: 0 },
+                  gain: { r: 0, g: 0, b: 0, master: 0 },
+                },
+              },
+            };
+            const next = {
+              ...current,
+              ...partial,
+              primary: {
+                ...current.primary,
+                ...(partial.primary ?? {}),
+                wheels: {
+                  ...current.primary.wheels,
+                  ...((partial.primary && partial.primary.wheels) ?? {}),
+                },
+              },
+            };
+            return { ...c, colorGrading: next };
+          }),
+        })),
+      }));
+      return { project: { ...s.project, sequences, modifiedAt: Date.now() }, isDirty: true };
+    }),
 
     // Templates
     toggleTemplateDialog: () => set(s => ({ showTemplateDialog: !s.showTemplateDialog })),
@@ -1513,6 +1555,7 @@ export const useVinxStore = create<VinxState>((set, get) => {
         effects: [], transitionIn: null, transitionOut: null, keyframes: [], titleData: null, linkedClipId: null,
         speedRamp: null, masks: [], compoundClipId: null, noiseReduction: null, stabilization: null,
         isFreezeFrame: false, freezeFrameSource: 0,
+        colorGrading: null, multicamClipId: null,
       };
       const newSeq = { ...seq, tracks: seq.tracks.map(t => t.id === videoTrack.id ? { ...t, clips: [...t.clips, adjClip] } : t) };
       return { project: { ...s.project, sequences: s.project.sequences.map(sq => sq.id === seq.id ? newSeq : sq) }, isDirty: true };

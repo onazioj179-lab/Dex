@@ -29,6 +29,7 @@ import {
   getPointOnPath,
 } from './FluxFeatures';
 import type { EasingPreset, CompositionSettings } from './FluxFeatures';
+import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 
 // ===========================================================================
 // DEX FLUX - Professional Motion Graphics
@@ -64,6 +65,8 @@ interface Layer {
   shapeStyle?: { fill: string; stroke: string; strokeWidth: number; type: 'rectangle' | 'ellipse' | 'polygon' | 'star' };
   particleEmitter?: { birthRate: number; life: number; lifeRange: number; speed: number; speedRange: number; angle: number; angleRange: number; spin: number; spinRange: number; scale: number; scaleRange: number; color: string; colorRange: number; opacity: number; shape: 'circle' | 'point' | 'rectangle' | 'line' | 'image' };
   animations?: Animation[];
+  easing?: { p1x: number; p1y: number; p2x: number; p2y: number };
+  pathKeyframes?: { time: number; d: string }[];
 }
 
 interface Transform {
@@ -128,6 +131,90 @@ interface ParticleEmitter {
 interface GeneratorSettings {
   type: 'gradient' | 'noise' | 'grid' | 'checkerboard' | 'color' | 'caustics' | 'clouds' | 'starField';
   settings: Record<string, any>;
+}
+
+// ==================== EASING + MORPH HELPERS ====================
+// Apply a cubic-bezier easing curve P0=(0,0), P3=(1,1), with control
+// points P1=(p1x,p1y) and P2=(p2x,p2y). The "param IS time" approximation
+// (use t directly as the bezier parameter and return its Y) matches the
+// expressive feel UI animators expect from After Effects / DaVinci.
+function applyEasing(t: number, e: { p1x: number; p1y: number; p2x: number; p2y: number }): number {
+  const u = Math.max(0, Math.min(1, t));
+  const inv = 1 - u;
+  return 3 * inv * inv * u * e.p1y + 3 * inv * u * u * e.p2y + u * u * u;
+}
+
+// Minimal SVG path parser: supports M, L, Z (absolute) and m, l, z (relative).
+// Implicit lineto continuations after M/L are also accepted.
+function parsePath(d: string): { x: number; y: number }[] {
+  const pts: { x: number; y: number }[] = [];
+  const tokens = d.match(/[MLZmlz]|-?\d+(?:\.\d+)?/g) || [];
+  let i = 0;
+  let cx = 0, cy = 0;
+  let lastCmd: string | null = null;
+  while (i < tokens.length) {
+    const tok = tokens[i];
+    if (/^[MLmlZz]$/.test(tok)) {
+      lastCmd = tok;
+      i++;
+      if (tok === 'Z' || tok === 'z') continue;
+    }
+    if (lastCmd === null) { i++; continue; }
+    if (lastCmd === 'Z' || lastCmd === 'z') continue;
+    const a = parseFloat(tokens[i++]);
+    const b = parseFloat(tokens[i++]);
+    if (Number.isNaN(a) || Number.isNaN(b)) break;
+    if (lastCmd === 'M' || lastCmd === 'L') { cx = a; cy = b; }
+    else { cx += a; cy += b; } // 'm' / 'l' relative
+    pts.push({ x: cx, y: cy });
+    // After an initial M/m, implicit subsequent pairs are L/l.
+    if (lastCmd === 'M') lastCmd = 'L';
+    else if (lastCmd === 'm') lastCmd = 'l';
+  }
+  return pts;
+}
+
+// Resample a polyline to exactly `n` points by walking arc length.
+function resamplePolyline(pts: { x: number; y: number }[], n: number): { x: number; y: number }[] {
+  if (pts.length === 0) return Array.from({ length: n }, () => ({ x: 0, y: 0 }));
+  if (pts.length === 1) return Array.from({ length: n }, () => ({ ...pts[0] }));
+  const segLens: number[] = [];
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const len = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+    segLens.push(len);
+    total += len;
+  }
+  if (total === 0) return Array.from({ length: n }, () => ({ ...pts[0] }));
+  const out: { x: number; y: number }[] = [];
+  for (let k = 0; k < n; k++) {
+    const target = (k / (n - 1)) * total;
+    let acc = 0;
+    let placed = false;
+    for (let i = 0; i < segLens.length; i++) {
+      const next = acc + segLens[i];
+      if (target <= next || i === segLens.length - 1) {
+        const localT = segLens[i] === 0 ? 0 : (target - acc) / segLens[i];
+        const a = pts[i], b = pts[i + 1];
+        out.push({ x: a.x + (b.x - a.x) * localT, y: a.y + (b.y - a.y) * localT });
+        placed = true;
+        break;
+      }
+      acc = next;
+    }
+    if (!placed) out.push({ ...pts[pts.length - 1] });
+  }
+  return out;
+}
+
+// Linearly interpolate two equal-length point arrays.
+function lerpPoints(a: { x: number; y: number }[], b: { x: number; y: number }[], t: number): { x: number; y: number }[] {
+  const n = Math.min(a.length, b.length);
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ x: a[i].x + (b[i].x - a[i].x) * t, y: a[i].y + (b[i].y - a[i].y) * t });
+  }
+  return out;
 }
 
 // ==================== SVG ICONS (Professional) ====================
@@ -361,6 +448,9 @@ const Flux: React.FC = () => {
   // Start with empty canvas — user adds layers as needed
   const [layers, setLayers] = useState<Layer[]>(() => []);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [showEasingPopover, setShowEasingPopover] = useState(false);
+  const [showMorphModal, setShowMorphModal] = useState(false);
+  const [morphPathInput, setMorphPathInput] = useState('');
   
   // Timeline state
   const [currentTime, setCurrentTime] = useState(0);
@@ -1026,6 +1116,57 @@ const Flux: React.FC = () => {
             ctx.fill();
             ctx.stroke();
           }
+          // Path / morph rendering (overrides primitive fill if pathKeyframes present)
+          if (layer.pathKeyframes && layer.pathKeyframes.length > 0) {
+            const kfs = layer.pathKeyframes;
+            const SAMPLES = 64;
+            let pts: { x: number; y: number }[];
+            if (kfs.length === 1) {
+              pts = resamplePolyline(parsePath(kfs[0].d), SAMPLES);
+            } else {
+              const sorted = [...kfs].sort((a, b) => a.time - b.time);
+              const first = sorted[0];
+              const last = sorted[sorted.length - 1];
+              if (currentTime <= first.time) {
+                pts = resamplePolyline(parsePath(first.d), SAMPLES);
+              } else if (currentTime >= last.time) {
+                pts = resamplePolyline(parsePath(last.d), SAMPLES);
+              } else {
+                let k0 = sorted[0], k1 = sorted[1];
+                for (let i = 0; i < sorted.length - 1; i++) {
+                  if (currentTime >= sorted[i].time && currentTime <= sorted[i + 1].time) {
+                    k0 = sorted[i]; k1 = sorted[i + 1]; break;
+                  }
+                }
+                const span = k1.time - k0.time || 1;
+                const raw = (currentTime - k0.time) / span;
+                const eased = layer.easing ? applyEasing(raw, layer.easing) : raw;
+                const a = resamplePolyline(parsePath(k0.d), SAMPLES);
+                const b = resamplePolyline(parsePath(k1.d), SAMPLES);
+                pts = lerpPoints(a, b, eased);
+              }
+            }
+            if (pts.length > 1) {
+              // Center the morphed path on the layer origin using its bbox
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              for (const p of pts) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+              }
+              const cx = (minX + maxX) / 2;
+              const cy = (minY + maxY) / 2;
+              ctx.beginPath();
+              ctx.moveTo(pts[0].x - cx, pts[0].y - cy);
+              for (let i = 1; i < pts.length; i++) {
+                ctx.lineTo(pts[i].x - cx, pts[i].y - cy);
+              }
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+            }
+          }
           ctx.setLineDash([]);
           break;
           
@@ -1655,6 +1796,29 @@ const Flux: React.FC = () => {
     ));
   }, [selectedLayerId]);
 
+  // ===== EASING + MORPH =====
+  const updateLayerEasing = useCallback((easing: EasingValue) => {
+    if (!selectedLayerId) return;
+    setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, easing } : l));
+  }, [selectedLayerId]);
+
+  const applyMorphTarget = useCallback((targetD: string) => {
+    if (!selectedLayerId) return;
+    setLayers(prev => prev.map(l => {
+      if (l.id !== selectedLayerId || l.type !== 'shape') return l;
+      // Seed: a square representing the current primitive shape (-50..50 box).
+      // If pathKeyframes already exist, append a new keyframe at currentTime;
+      // otherwise create [start@0, target@currentTime].
+      const startD = 'M -50 -50 L 50 -50 L 50 50 L -50 50 Z';
+      const existing = l.pathKeyframes || [];
+      const seeded = existing.length > 0 ? existing : [{ time: 0, d: startD }];
+      // Replace any kf at currentTime, else append.
+      const filtered = seeded.filter(k => k.time !== currentTime);
+      const next = [...filtered, { time: currentTime, d: targetD }].sort((a, b) => a.time - b.time);
+      return { ...l, pathKeyframes: next };
+    }));
+  }, [selectedLayerId, currentTime]);
+
   // ===== CANVAS TRANSFORM GIZMO =====
   const canvasToLocal = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -1741,7 +1905,10 @@ const Flux: React.FC = () => {
       const k0 = anim.keyframes[i], k1 = anim.keyframes[i + 1];
       if (time >= k0.time && time <= k1.time) {
         const progress = (time - k0.time) / (k1.time - k0.time);
-        return fluxInterpolate(k0.value, k1.value, progress, k1.easing);
+        const easedProgress = layer.easing
+          ? applyEasing(progress, layer.easing)
+          : progress;
+        return fluxInterpolate(k0.value, k1.value, easedProgress, k1.easing);
       }
     }
     return undefined;
@@ -2609,6 +2776,66 @@ const Flux: React.FC = () => {
                       <span style={styles.sliderValue}>{selectedLayer.transform.opacity}%</span>
                     </div>
                     
+                    {/* Easing curve editor */}
+                    <div style={{ marginTop: '16px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
+                    <button
+                      type="button"
+                      style={{ ...styles.behaviorItem, justifyContent: 'space-between', width: '100%' }}
+                      onClick={() => setShowEasingPopover(v => !v)}
+                      aria-label="Edit easing curve"
+                      aria-expanded={showEasingPopover}
+                    >
+                      <span style={{ fontSize: '11px', fontWeight: 600 }}>
+                        {selectedLayer.easing
+                          ? `cubic-bezier(${selectedLayer.easing.p1x.toFixed(2)}, ${selectedLayer.easing.p1y.toFixed(2)}, ${selectedLayer.easing.p2x.toFixed(2)}, ${selectedLayer.easing.p2y.toFixed(2)})`
+                          : 'Default (per-keyframe)'}
+                      </span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>{showEasingPopover ? Icons.chevronUp : Icons.chevronDown}</span>
+                    </button>
+                    {showEasingPopover && (
+                      <div style={{ padding: '10px', background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)', borderRadius: '10px', marginBottom: '8px' }}>
+                        <EasingCurveEditor
+                          value={selectedLayer.easing || { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1 }}
+                          onChange={updateLayerEasing}
+                        />
+                        {selectedLayer.easing && (
+                          <button
+                            type="button"
+                            style={{ ...styles.btn, marginTop: '8px', color: 'var(--color-text-muted)' }}
+                            onClick={() => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, easing: undefined } : l))}
+                          >
+                            Reset to per-keyframe easing
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Shape morph target */}
+                    {selectedLayer.type === 'shape' && (
+                      <>
+                        <div style={{ marginTop: '16px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Shape Morph</div>
+                        <button
+                          type="button"
+                          style={{ ...styles.behaviorItem, justifyContent: 'space-between', width: '100%' }}
+                          onClick={() => { setMorphPathInput(''); setShowMorphModal(true); }}
+                          aria-label="Morph shape to target SVG path"
+                        >
+                          <span style={{ fontSize: '11px', fontWeight: 600 }}>Morph to...</span>
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: '10px' }}>
+                            {selectedLayer.pathKeyframes?.length ? `${selectedLayer.pathKeyframes.length} kf` : 'no path keys'}
+                          </span>
+                        </button>
+                        {selectedLayer.pathKeyframes && selectedLayer.pathKeyframes.length > 0 && (
+                          <button
+                            type="button"
+                            style={{ ...styles.btn, color: 'var(--color-text-muted)' }}
+                            onClick={() => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, pathKeyframes: undefined } : l))}
+                          >
+                            Clear morph keyframes
+                          </button>
+                        )}
+                      </>
+                    )}
                     {selectedLayer.behaviors.length > 0 && (
                       <>
                         <div style={{ marginTop: '16px', marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Applied Behaviors</div>
@@ -4206,6 +4433,56 @@ const Flux: React.FC = () => {
         );
       })()}
       {showShortcutsPanel && <KeyboardShortcutsPanel appId="flux" onClose={() => setShowShortcutsPanel(false)} />}
+
+      {/* Morph target modal */}
+      {showMorphModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Morph shape to SVG path"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}
+          onClick={() => setShowMorphModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 420, padding: 16, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)', borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: 10 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <strong style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>Morph to target SVG path</strong>
+              <button type="button" style={styles.iconBtn} onClick={() => setShowMorphModal(false)} aria-label="Close morph dialog">{Icons.close}</button>
+            </div>
+            <label style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Target SVG path (M / L / Z commands)</label>
+            <textarea
+              value={morphPathInput}
+              onChange={e => setMorphPathInput(e.target.value)}
+              placeholder="M 0 0 L 100 0 L 50 87 Z"
+              style={{ width: '100%', minHeight: 80, padding: 8, fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, resize: 'vertical' }}
+              aria-label="Target SVG path"
+            />
+            <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
+              Adds a path keyframe at the current playhead time. The shape interpolates from the previous keyframe (or its starting square) to this target.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                style={{ ...styles.btn, padding: '6px 12px', background: 'var(--color-bg-hover)' }}
+                onClick={() => setShowMorphModal(false)}
+              >Cancel</button>
+              <button
+                type="button"
+                style={{ ...styles.btn, ...styles.btnPrimary, padding: '6px 12px' }}
+                disabled={morphPathInput.trim().length === 0}
+                onClick={() => {
+                  const trimmed = morphPathInput.trim();
+                  if (trimmed.length === 0) return;
+                  applyMorphTarget(trimmed);
+                  setShowMorphModal(false);
+                }}
+              >Morph</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

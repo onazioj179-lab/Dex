@@ -205,6 +205,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'worldclock', title: 'Open World Clock', icon: Icons.worldclock, category: 'app', action: () => openApp('worldclock'), keywords: ['timezone', 'time', 'international'] },
     { id: 'noisegenerator', title: 'Open Noise Generator', icon: Icons.noise, category: 'app', action: () => openApp('noisegenerator'), keywords: ['white', 'pink', 'brown', 'ambient', 'focus'] },
     { id: 'achievements', title: 'Open Achievements', icon: Icons.trophy, category: 'app', action: () => openApp('achievements'), keywords: ['progress', 'goals', 'badges'] },
+    { id: 'screenrecorder', title: 'Open Screen Recorder', icon: Icons.video, category: 'app', action: () => openApp('screenrecorder'), keywords: ['record', 'capture', 'screencast', 'video'] },
+    { id: 'presentation', title: 'Open Presentation', icon: Icons.gallery, category: 'app', action: () => openApp('presentation'), keywords: ['slides', 'present', 'deck', 'pdf', 'keynote'] },
+    { id: 'pdfviewer', title: 'Open PDF Viewer', icon: Icons.markdown, category: 'app', action: () => openApp('pdfviewer'), keywords: ['pdf', 'document', 'annotate', 'read'] },
+    { id: 'pixelart', title: 'Open Pixel Art', icon: Icons.colorpicker, category: 'app', action: () => openApp('pixelart'), keywords: ['pixel', 'art', 'sprite', 'nes', 'draw'] },
 
     // Actions
     { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { openApp('notes'); }, keywords: ['add', 'create'] },

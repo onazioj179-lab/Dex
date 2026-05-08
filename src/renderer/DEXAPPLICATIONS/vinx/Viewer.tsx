@@ -215,6 +215,7 @@ const VideoLayer: React.FC<{
             {/* Real video element */}
             {clip.type === 'video' && src && (
             <video
+              data-vinx-preview="true"
               ref={(el) => {
                 if (el) {
                   if (!videoRefs.current.has(clip.id)) {

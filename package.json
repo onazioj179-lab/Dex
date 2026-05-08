@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
@@ -47,6 +47,7 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.24",
     "@types/d3-force": "^3.0.10",
     "better-sqlite3": "^11.6.0",
     "d3-force": "^3.0.0",
@@ -54,6 +55,7 @@
     "electron-log": "^5.0.3",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.7.3",
+    "idb-keyval": "^6.2.2",
     "loudness": "^0.4.2",
     "lucide-react": "^1.7.0",
     "node-schedule": "^2.1.1",

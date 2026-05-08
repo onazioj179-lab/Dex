@@ -57,10 +57,62 @@ const ClockWidget: React.FC = () => {
   );
 };
 
+interface UpcomingCalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  endTime?: string;
+  color?: string;
+  description?: string;
+  recurring?: string;
+}
+
+function readUpcomingCalendarEvents(limit: number): UpcomingCalendarEvent[] {
+  let raw: string | null = null;
+  try { raw = localStorage.getItem('dex-calendar-events'); } catch { return []; }
+  if (!raw) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return []; }
+  if (!Array.isArray(parsed)) return [];
+  const now = new Date();
+  const items: { ev: UpcomingCalendarEvent; ts: number }[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') continue;
+    const ev = item as UpcomingCalendarEvent;
+    if (!ev.date || typeof ev.date !== 'string') continue;
+    const time = typeof ev.time === 'string' && /^\d{2}:\d{2}$/.test(ev.time) ? ev.time : '00:00';
+    const ts = new Date(`${ev.date}T${time}:00`).getTime();
+    if (!Number.isFinite(ts) || ts < now.getTime()) continue;
+    items.push({ ev: { ...ev, time }, ts });
+  }
+  items.sort((a, b) => a.ts - b.ts);
+  return items.slice(0, limit).map(i => i.ev);
+}
+
+function formatRelativeEventTime(date: string, time: string): string {
+  const ts = new Date(`${date}T${time}:00`);
+  if (!Number.isFinite(ts.getTime())) return `${date} ${time}`;
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((startOfDay(ts) - startOfDay(now)) / 86400000);
+  const hhmm = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (dayDiff === 0) return `Today ${hhmm}`;
+  if (dayDiff === 1) return `Tomorrow ${hhmm}`;
+  return `${ts.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${hhmm}`;
+}
+
 const CalendarWidget: React.FC = () => {
   const now = new Date();
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [upcoming, setUpcoming] = useState<UpcomingCalendarEvent[]>(() => readUpcomingCalendarEvents(3));
+  useEffect(() => {
+    const refresh = () => setUpcoming(readUpcomingCalendarEvents(3));
+    refresh();
+    const id = setInterval(refresh, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
   const today = now.getDate();
   const isCurrentMonth = viewMonth === now.getMonth() && viewYear === now.getFullYear();
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
@@ -103,6 +155,25 @@ const CalendarWidget: React.FC = () => {
             </div>
           );
         })}
+      </div>
+      <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--color-border-subtle, var(--color-border))' }}>
+        {upcoming.length === 0 ? (
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>No upcoming events</div>
+        ) : upcoming.map(ev => (
+          <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', minWidth: 0 }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+              background: ev.color || 'var(--color-accent)',
+            }} />
+            <span style={{
+              fontSize: 11, color: 'var(--color-text-primary)', flex: 1, minWidth: 0,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }} title={ev.title}>{ev.title}</span>
+            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+              {formatRelativeEventTime(ev.date, ev.time)}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -540,6 +611,74 @@ const MusicControlsWidget: React.FC = () => {
   );
 };
 
+const DAILY_TIPS: string[] = [
+  'Press Ctrl+K to open the command palette anywhere.',
+  'Drag any window to a screen edge to snap it.',
+  'Hold Ctrl to peek at all keyboard shortcuts.',
+  'Press ? on the home screen to open the shortcuts help.',
+  'Right-click the Home background to add a new widget.',
+  'Use Ctrl+/ to keep the shortcuts overlay sticky.',
+  'Pin a window with the title bar pin button to keep it on top.',
+  'Switch wallpapers from Settings, Appearance, Wallpaper.',
+  'Type a math expression in the command palette for an instant answer.',
+  'Drag a file onto the Notes app to attach it to a note.',
+  'Use Alt+T to open Transfers and inspect background jobs.',
+  'Toggle Compact density in Settings, Appearance for tighter layouts.',
+  'Adjust Text size in Settings, Appearance to scale the whole UI.',
+  'The Reader summary works fully offline -- no model, no network.',
+  'Frame snapping has 16 zones. Drag to a corner for a quarter snap.',
+  'Permissions are batched by capability and remembered with a TTL.',
+  'Creator Access unlocks Power tier features with a signed key.',
+  'Use Ctrl+L to lock the screen instantly.',
+  'Open Quick Settings with Ctrl+, for fast toggles.',
+  'Press F11 to toggle fullscreen on the active window.',
+];
+
+const DailyTipWidget: React.FC = () => {
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const startOfYear = new Date(today.getFullYear(), 0, 0).getTime();
+  const dayOfYear = Math.floor((today.getTime() - startOfYear) / 86400000);
+  const tip = DAILY_TIPS[dayOfYear % DAILY_TIPS.length];
+  const dismissKey = `dex-tip-dismissed-${todayKey}`;
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem(dismissKey) === 'true'; } catch { return false; }
+  });
+  const dismiss = () => {
+    setDismissed(true);
+    try { localStorage.setItem(dismissKey, 'true'); } catch {}
+  };
+  if (dismissed) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+        All caught up
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: 10, height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning, #FF9F0A)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M9 18h6" /><path d="M10 22h4" />
+          <path d="M12 2a7 7 0 0 0-4 12.7c.7.5 1 1.3 1 2.1V18h6v-1.2c0-.8.3-1.6 1-2.1A7 7 0 0 0 12 2z" />
+        </svg>
+        <button
+          onClick={dismiss}
+          aria-label="Dismiss tip"
+          title="Dismiss"
+          style={{
+            background: 'none', border: 'none', color: 'var(--color-text-tertiary)',
+            cursor: 'pointer', padding: 2, fontSize: 14, lineHeight: 1,
+          }}
+        >x</button>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-primary)', lineHeight: 1.4, flex: 1 }}>
+        {tip}
+      </div>
+    </div>
+  );
+};
+
 // Widget content dispatcher
 const WidgetContent: React.FC<{ widget: Widget }> = memo(({ widget }) => {
   switch (widget.type) {
@@ -554,6 +693,7 @@ const WidgetContent: React.FC<{ widget: Widget }> = memo(({ widget }) => {
     case 'battery': return <BatteryWidget />;
     case 'storage': return <StorageWidget />;
     case 'music-controls': return <MusicControlsWidget />;
+    case 'daily-tip': return <DailyTipWidget />;
     default: return <div style={{ padding: 10, color: 'var(--color-text-tertiary)' }}>Unknown widget</div>;
   }
 });

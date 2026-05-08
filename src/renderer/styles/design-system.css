@@ -37,6 +37,10 @@
 }
 
 :root {
+  /* User-adjustable scales (Settings > Appearance > Text & Density) */
+  --font-scale: 1;
+  --density-scale: 1;
+
   /* Backgrounds -- Rich Charcoal (lifted from true black for depth) */
   --color-bg-base: #0C0C0E;
   --color-bg-surface: #161618;
@@ -1001,6 +1005,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  font-size: calc(14px * var(--font-scale));
 }
 
 html, body, #root {

@@ -31,6 +31,21 @@ injectContainmentCSS();
   document.documentElement.setAttribute('data-dpi', dpi);
 })();
 
+// User text-size + density preferences -- apply before first paint
+(() => {
+  try {
+    const raw = localStorage.getItem('dex-font-scale');
+    const v = raw ? parseFloat(raw) : NaN;
+    if (Number.isFinite(v) && v >= 0.8 && v <= 1.4) {
+      document.documentElement.style.setProperty('--font-scale', String(v));
+    }
+  } catch { /* ignore */ }
+  try {
+    const compact = localStorage.getItem('dex-density-compact') === 'true';
+    document.documentElement.style.setProperty('--density-scale', compact ? '0.85' : '1');
+  } catch { /* ignore */ }
+})();
+
 // RC8: Heap Monitor -- start memory pressure tracking
 import { startHeapMonitor } from './utils/HeapMonitor';
 startHeapMonitor();

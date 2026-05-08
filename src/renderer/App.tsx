@@ -48,6 +48,7 @@ const AppManager = lazy(() => import('./components/AppManager').then(m => ({ def
 const DiagnosticsPanel = lazy(() => import('./components/DiagnosticsPanel'));
 const LockScreen = lazy(() => import('./components/LockScreen').then(m => ({ default: m.LockScreen })));
 const KeyboardShortcuts = lazy(() => import('./components/KeyboardShortcuts'));
+const WhatsNewModal = lazy(() => import('./components/WhatsNewModal'));
 
 // Services - OS-Grade System Layer
 import {
@@ -524,6 +525,11 @@ export const App: React.FC = () => {
           <DiagnosticsPanel open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
         </Suspense>
       )}
+
+      {/* What's New modal (shown once per version) */}
+      <Suspense fallback={null}>
+        <WhatsNewModal />
+      </Suspense>
       
       {/* Global wallpaper layer -- sits behind everything, reacts to wallpaper store */}
       <div aria-hidden="true" style={{

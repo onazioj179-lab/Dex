@@ -20,6 +20,7 @@ import { Viewer } from './Viewer';
 import { Inspector } from './Inspector';
 import { Timeline } from './Timeline';
 import { ExportDialog } from './ExportDialog';
+import { MulticamPanel } from './MulticamPanel';
 import { formatTimecode, generateId } from './VinxTypes';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
@@ -275,6 +276,8 @@ const VinxEditor: React.FC = () => {
   const showLUTBrowser = useVinxStore(s => s.showLUTBrowser);
   const toggleMulticamMode = useVinxStore(s => s.toggleMulticamMode);
   const multicamMode = useVinxStore(s => s.multicamMode);
+  const showMulticamPanel = useVinxStore(s => s.showMulticamPanel);
+  const setShowMulticamPanel = useVinxStore(s => s.setShowMulticamPanel);
   const toggleTemplateDialog = useVinxStore(s => s.toggleTemplateDialog);
   const showTemplateDialog = useVinxStore(s => s.showTemplateDialog);
   const toggleLoudnessPanel = useVinxStore(s => s.toggleLoudnessPanel);
@@ -932,6 +935,7 @@ const VinxEditor: React.FC = () => {
               {[
                 { label: 'Subtitles (SRT)', active: showSubtitleEditor, fn: toggleSubtitleEditor },
                 { label: 'Multicam Mode', active: multicamMode, fn: toggleMulticamMode },
+                { label: 'Multicam Angles Panel', active: showMulticamPanel, fn: () => setShowMulticamPanel(!showMulticamPanel) },
                 { label: 'Timecode Overlay', active: timecodeOverlayEnabled, fn: toggleTimecodeOverlay },
               ].map(item => (
                 <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
@@ -1013,6 +1017,56 @@ const VinxEditor: React.FC = () => {
 
       {/* Export dialog overlay */}
       <ExportDialog />
+
+      {/* Multicam angle panel (side drawer) */}
+      {showMulticamPanel && (() => {
+        const sel = selectedClipIds[0] ? getClipById(selectedClipIds[0]) : null;
+        const mcId = sel?.multicamClipId ?? null;
+        const mc = mcId ? (project.multicamClips?.find(m => m.id === mcId) ?? null) : null;
+        return (
+          <div style={{
+            position: 'absolute', right: 0, top: 64, bottom: 24, width: 320,
+            background: 'var(--color-bg-elevated)',
+            borderLeft: '1px solid var(--color-border)',
+            boxShadow: '-8px 0 24px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' as React.CSSProperties['zIndex'],
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Multicam</span>
+              <button
+                aria-label="Close multicam panel"
+                onClick={() => setShowMulticamPanel(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 0, width: 20, height: 20 }}
+              >
+                X
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <MulticamPanel
+                multicamClip={mc}
+                activeAngleId={mc ? mc.angles[mc.activeAngle]?.id : undefined}
+                onSelectAngle={(angleId) => {
+                  if (!mc) return;
+                  const idx = mc.angles.findIndex(a => a.id === angleId);
+                  if (idx >= 0) {
+                    useVinxStore.setState(s => {
+                      const project = s.project;
+                      return {
+                        project: {
+                          ...project,
+                          multicamClips: project.multicamClips.map(m => m.id === mc.id ? { ...m, activeAngle: idx } : m),
+                          modifiedAt: Date.now(),
+                        },
+                        isDirty: true,
+                      };
+                    });
+                  }
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* === NEW FEATURE PANELS === */}
 

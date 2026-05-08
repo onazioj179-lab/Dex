@@ -78,6 +78,31 @@ const KeyboardShortcuts: React.FC = () => {
   }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Escape closes a sticky overlay
+    if (e.key === 'Escape' && sticky) {
+      e.preventDefault();
+      clearRevealTimer();
+      setSticky(false);
+      setVisible(false);
+      return;
+    }
+
+    // "?" opens the sticky overlay (when not typing in an input)
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const target = document.activeElement as HTMLElement | null;
+      const tag = target?.tagName;
+      const isEditable = !!target && (
+        tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable
+      );
+      if (!isEditable) {
+        e.preventDefault();
+        clearRevealTimer();
+        setSticky(true);
+        setVisible(true);
+        return;
+      }
+    }
+
     // Ctrl+/ toggles sticky mode
     if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.code === 'Slash')) {
       e.preventDefault();

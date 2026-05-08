@@ -63,6 +63,14 @@ import {
   drawColorWheel,
   canvasToTIFF,
   canvasToBMP,
+  applyAdjustmentToImageData,
+  defaultAdjustment,
+  curveLUTFromPoints,
+  identityLUT,
+  patchMatchFill,
+  buildSelectionMaskFromAlpha,
+  type AdjustmentParams,
+  type AdjustmentKind,
 } from './PrismEngine';
 import { getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
@@ -94,6 +102,7 @@ interface Layer {
   shapeType?: 'rectangle' | 'ellipse' | 'polygon' | 'line' | 'path';
   adjustmentType?: AdjustmentType;
   adjustmentValues?: Record<string, number>;
+  adjustment?: AdjustmentParams;
   mask?: LayerMask;
   effects?: LayerEffect[];
   children?: Layer[];
@@ -363,6 +372,15 @@ const Prism: React.FC = () => {
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number; layerId: string | null }>({ visible: false, x: 0, y: 0, layerId: null });
+
+  // Adjustment-layer "add" dropdown
+  const [showAddAdjustmentMenu, setShowAddAdjustmentMenu] = useState(false);
+  useEffect(() => {
+    if (!showAddAdjustmentMenu) return;
+    const close = () => setShowAddAdjustmentMenu(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [showAddAdjustmentMenu]);
 
   // Panels
   const [showLayers, setShowLayers] = useState(true);
@@ -755,6 +773,41 @@ const Prism: React.FC = () => {
     setLayers(prev => [newLayer, ...prev]);
     setSelectedLayerId(newLayer.id);
   }, [layers.length, canvasSize]);
+
+  const addAdjustmentLayer = useCallback((kind: AdjustmentKind) => {
+    const labels: Record<AdjustmentKind, string> = {
+      'brightness-contrast': 'Brightness/Contrast',
+      'hue-saturation': 'Hue/Saturation',
+      'curves': 'Curves',
+      'levels': 'Levels',
+    };
+    const newLayer: Layer = {
+      id: `layer-adj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: labels[kind],
+      type: 'adjustment',
+      visible: true,
+      locked: false,
+      opacity: 100,
+      blendMode: 'normal',
+      x: 0,
+      y: 0,
+      width: canvasSize.width,
+      height: canvasSize.height,
+      rotation: 0,
+      adjustment: defaultAdjustment(kind),
+    };
+    setLayers(prev => [newLayer, ...prev]);
+    setSelectedLayerId(newLayer.id);
+  }, [canvasSize]);
+
+  const updateLayerAdjustment = useCallback((id: string, patch: Partial<AdjustmentParams>) => {
+    setLayers(prev => prev.map(l => {
+      if (l.id !== id || l.type !== 'adjustment' || !l.adjustment) return l;
+      // Merge but keep `kind` discriminator stable
+      const merged = { ...l.adjustment, ...patch, kind: l.adjustment.kind } as AdjustmentParams;
+      return { ...l, adjustment: merged };
+    }));
+  }, []);
 
   const deleteLayer = useCallback((id: string) => {
     if (layers.length <= 1) return;
@@ -1934,6 +1987,28 @@ const Prism: React.FC = () => {
     Promise.all(imagePromises).then(results => {
       if (cancelled) return;
       results.forEach(({ layer, img }) => {
+        // Adjustment layers transform the pixels of all layers drawn below
+        // them. Apply per-pixel transform to the current canvas state.
+        if (layer.type === 'adjustment' && layer.adjustment) {
+          const w = canvas.width, h = canvas.height;
+          if (w > 0 && h > 0) {
+            const adjData = ctx.getImageData(0, 0, w, h);
+            applyAdjustmentToImageData(adjData, layer.adjustment);
+            // Respect layer opacity by blending the adjusted result back
+            const op = Math.max(0, Math.min(1, layer.opacity / 100));
+            if (op < 1) {
+              const baseData = ctx.getImageData(0, 0, w, h);
+              const a = adjData.data, b = baseData.data;
+              for (let i = 0; i < a.length; i += 4) {
+                a[i] = (b[i] * (1 - op) + a[i] * op) | 0;
+                a[i + 1] = (b[i + 1] * (1 - op) + a[i + 1] * op) | 0;
+                a[i + 2] = (b[i + 2] * (1 - op) + a[i + 2] * op) | 0;
+              }
+            }
+            ctx.putImageData(adjData, 0, 0);
+          }
+          return;
+        }
         ctx.save();
         ctx.globalAlpha = layer.opacity / 100;
         ctx.globalCompositeOperation = BLEND_MODE_TO_CSS[layer.blendMode] || 'source-over';
@@ -3125,6 +3200,35 @@ const Prism: React.FC = () => {
                 <button style={styles.iconBtn} onClick={() => addLayer('image')} title="Add Layer" aria-label="Add layer">{Icons.plus}</button>
                 <button style={styles.iconBtn} onClick={() => addLayer('text')} title="Add Text" aria-label="Add text layer">{Icons.text}</button>
                 <button style={styles.iconBtn} onClick={() => addLayer('shape')} title="Add Shape" aria-label="Add shape layer">{Icons.shape}</button>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    style={styles.iconBtn}
+                    onClick={(e) => { e.stopPropagation(); setShowAddAdjustmentMenu(v => !v); }}
+                    title="Add Adjustment Layer"
+                    aria-label="Add adjustment layer"
+                    aria-haspopup="menu"
+                    aria-expanded={showAddAdjustmentMenu}
+                  >fx</button>
+                  {showAddAdjustmentMenu && (
+                    <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 6, padding: 4, minWidth: 160, zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                      {([
+                        { kind: 'brightness-contrast' as const, label: 'Brightness/Contrast' },
+                        { kind: 'hue-saturation' as const, label: 'Hue/Saturation' },
+                        { kind: 'curves' as const, label: 'Curves' },
+                        { kind: 'levels' as const, label: 'Levels' },
+                      ]).map(item => (
+                        <div
+                          key={item.kind}
+                          role="menuitem"
+                          tabIndex={0}
+                          style={{ padding: '6px 10px', fontSize: 11, color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: 4 }}
+                          onClick={() => { addAdjustmentLayer(item.kind); setShowAddAdjustmentMenu(false); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addAdjustmentLayer(item.kind); setShowAddAdjustmentMenu(false); } }}
+                        >{item.label}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
@@ -3173,6 +3277,11 @@ const Prism: React.FC = () => {
                     ))}
                   </select>
                 </div>
+                {selectedLayer.type === 'adjustment' && selectedLayer.adjustment && (
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: 8 }}>
+                    Adjustment: {selectedLayer.adjustment.kind}
+                  </div>
+                )}
               </div>
             )}
           </div>

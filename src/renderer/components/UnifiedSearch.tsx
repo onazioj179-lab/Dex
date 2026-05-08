@@ -238,6 +238,10 @@ export const UnifiedSearch: React.FC<UnifiedSearchProps> = ({ isOpen, onClose, o
         { id: 'prism', title: 'Prism', subtitle: 'Photo editing and filters' },
         { id: 'flux', title: 'Flux', subtitle: 'Design and prototyping' },
         { id: 'forge', title: 'Forge', subtitle: 'Code editor and IDE' },
+        { id: 'screenrecorder', title: 'Screen Recorder', subtitle: 'Capture screen to video' },
+        { id: 'presentation', title: 'Presentation', subtitle: 'Slide builder with transitions' },
+        { id: 'pdfviewer', title: 'PDF Viewer', subtitle: 'Read and annotate PDF documents' },
+        { id: 'pixelart', title: 'Pixel Art', subtitle: 'Pixel grid editor with frames' },
       ];
 
       pages.forEach(page => {

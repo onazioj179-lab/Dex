@@ -140,6 +140,10 @@ const Learn = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Learn'));
 const CollabHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CollabHub'));
 const Canvas = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Canvas'));
 const Timer = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Timer'));
+const ScreenRecorder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ScreenRecorder'));
+const PresentationBuilder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PresentationBuilder'));
+const PDFViewer = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PDFViewer'));
+const PixelArt = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PixelArt'));
 
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'transfers'
@@ -147,7 +151,8 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'transfers'
   | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl'
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
-  | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer';
+  | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
+  | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -189,6 +194,10 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   collabhub: { w: 900, h: 650 },
   canvas: { w: 800, h: 600, maximized: true },
   timer: { w: 360, h: 520 },
+  screenrecorder: { w: 720, h: 540 },
+  presentation: { w: 1100, h: 700, maximized: true },
+  pdfviewer: { w: 900, h: 650, maximized: true },
+  pixelart: { w: 900, h: 640, maximized: true },
 };
 
 // Creative/pro apps that open maximized by default
@@ -212,6 +221,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   weather: Weather, worldclock: WorldClock, noisegenerator: NoiseGenerator, dexcode: DexCode,
   nexus: Nexus, learn: Learn, collabhub: CollabHub,
   canvas: Canvas, timer: Timer,
+  screenrecorder: ScreenRecorder, presentation: PresentationBuilder, pdfviewer: PDFViewer, pixelart: PixelArt,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
@@ -347,6 +357,11 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
   // Canvas & Timer
   { id: 'canvas', label: 'Canvas', color: '#FF9500' },
   { id: 'timer', label: 'Timer', color: '#30D158' },
+  // New apps
+  { id: 'screenrecorder', label: 'Screen Rec', color: '#FF453A' },
+  { id: 'presentation', label: 'Presentation', color: '#FF9F0A' },
+  { id: 'pdfviewer', label: 'PDF Viewer', color: '#5E5CE6' },
+  { id: 'pixelart', label: 'Pixel Art', color: '#34C759' },
 ];
 
 // -- App menu categories (module-level, computed once) --------------------
@@ -365,6 +380,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     canvas: 'Tools', timer: 'Tools',
     nexus: 'Tools',
     learn: 'Tools',
+    screenrecorder: 'Media', presentation: 'Productivity', pdfviewer: 'Productivity', pixelart: 'Creative Suite',
     kanban: 'Project Management',
     axl: 'Entertainment',
     achievements: 'Rewards',

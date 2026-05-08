@@ -149,7 +149,42 @@ export interface Clip {
   // New: Freeze frame
   isFreezeFrame: boolean;
   freezeFrameSource: number;
+  // Per-clip primary color grading (DaVinci-style three-way wheels)
+  colorGrading: ClipColorGrading | null;
+  // Multicam reference
+  multicamClipId: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// PER-CLIP COLOR GRADING (three-way wheels)
+// ---------------------------------------------------------------------------
+
+export interface ClipColorWheel {
+  r: number;
+  g: number;
+  b: number;
+  master: number;
+}
+
+export interface ClipColorGrading {
+  primary: {
+    wheels: {
+      lift: ClipColorWheel;
+      gamma: ClipColorWheel;
+      gain: ClipColorWheel;
+    };
+  };
+}
+
+export const DEFAULT_CLIP_COLOR_GRADING: ClipColorGrading = {
+  primary: {
+    wheels: {
+      lift: { r: 0, g: 0, b: 0, master: 0 },
+      gamma: { r: 0, g: 0, b: 0, master: 0 },
+      gain: { r: 0, g: 0, b: 0, master: 0 },
+    },
+  },
+};
 
 export interface ClipTransform {
   positionX: number;

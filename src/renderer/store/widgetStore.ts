@@ -23,7 +23,8 @@ export type WidgetType =
   | 'weather'
   | 'battery'
   | 'storage'
-  | 'music-controls';
+  | 'music-controls'
+  | 'daily-tip';
 
 export interface Widget {
   id: string;
@@ -58,6 +59,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   { type: 'battery', title: 'Battery', icon: 'battery', defaultWidth: 200, defaultHeight: 100, minWidth: 140, minHeight: 80 },
   { type: 'storage', title: 'Storage', icon: 'hard-drive', defaultWidth: 240, defaultHeight: 120, minWidth: 180, minHeight: 90 },
   { type: 'music-controls', title: 'Music', icon: 'music', defaultWidth: 280, defaultHeight: 120, minWidth: 220, minHeight: 100 },
+  { type: 'daily-tip', title: 'Daily Tip', icon: 'lightbulb', defaultWidth: 260, defaultHeight: 130, minWidth: 200, minHeight: 100 },
 ];
 
 const STORAGE_KEY = 'dex-home-widgets';

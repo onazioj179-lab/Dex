@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { glassSidebar } from '../styles/glassMenu';
@@ -308,6 +309,57 @@ const formatDuration = (seconds?: number): string => {
 
 const PLACEHOLDER_COLORS = ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info, #64d2ff)', 'var(--color-accent)', 'var(--color-accent-alt, #5e5ce6)', 'var(--color-tag-purple, #bf5af2)'];
 const getPlaceholderColor = (id: string): string => PLACEHOLDER_COLORS[Math.abs([...id].reduce((a, c) => a + c.charCodeAt(0), 0)) % PLACEHOLDER_COLORS.length];
+
+// ===========================================================================
+// VIRTUALIZED GRID (Phase 4)
+// ===========================================================================
+
+interface VirtualizedMediaGridProps<T extends { id: string }> {
+  parentRef: React.RefObject<HTMLDivElement>;
+  items: T[];
+  columnsCount: number;
+  renderItem: (item: T) => React.ReactNode;
+}
+
+function VirtualizedMediaGrid<T extends { id: string }>({ parentRef, items, columnsCount, renderItem }: VirtualizedMediaGridProps<T>) {
+  const cols = Math.max(1, columnsCount);
+  const rowCount = Math.ceil(items.length / cols);
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 180,
+    overscan: 4,
+  });
+  return (
+    <div ref={parentRef} style={{ height: '100%', overflow: 'auto', contain: 'layout' as any }}>
+      <div style={{ height: rowVirtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const rowStart = virtualRow.index * cols;
+          const rowItems = items.slice(rowStart, rowStart + cols);
+          return (
+            <div
+              key={virtualRow.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: virtualRow.size,
+                transform: `translateY(${virtualRow.start}px)`,
+                display: 'grid',
+                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gap: 16,
+                paddingBottom: 16,
+              }}
+            >
+              {rowItems.map(renderItem)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ===========================================================================
 // COMPONENT
@@ -755,6 +807,26 @@ export const Gallery: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMoreItems]);
 
+  // Phase 4: Virtualized grid (used when visibleMedia.length >= 60)
+  const gridScrollRef = useRef<HTMLDivElement | null>(null);
+  const [columnsCount, setColumnsCount] = useState(6);
+  useEffect(() => {
+    const el = gridScrollRef.current;
+    if (!el) return;
+    const compute = () => {
+      const w = el.clientWidth;
+      // Match styles.grid: minmax(140px, 1fr) with 16px gap
+      const ITEM_MIN = 140;
+      const GAP = 16;
+      const cols = Math.max(1, Math.floor((w + GAP) / (ITEM_MIN + GAP)));
+      setColumnsCount(cols);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const toggleFavorite = useCallback((id: string) => {
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   }, []);
@@ -989,8 +1061,8 @@ export const Gallery: React.FC = () => {
               </button>
             </div>
           ) : viewMode === 'grid' ? (
-            <div style={styles.grid}>
-              {visibleMedia.map(item => (
+            (() => {
+              const renderGridItem = (item: typeof visibleMedia[number]) => (
                 <div key={item.id} style={styles.gridItem} onClick={() => { if (selectionMode) { toggleItemSelection(item.id); } else { setSelectedMedia(item); window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'galleryItemsViewed', amount: 1 } })); } }} onContextMenu={(e) => showCtxMenu(e, buildCtxItems(item))}>
                   {selectionMode && (
                     <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 5, width: 22, height: 22, borderRadius: 6, background: selectedItems.has(item.id) ? 'var(--color-accent)' : 'rgba(0,0,0,0.5)', border: '2px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -1029,8 +1101,20 @@ export const Gallery: React.FC = () => {
                   </div>
                   <span style={styles.itemName}>{item.name}</span>
                 </div>
-              ))}
-            </div>
+              );
+              // Avoid layout shift on tiny libraries
+              if (visibleMedia.length < 60) {
+                return <div style={styles.grid}>{visibleMedia.map(renderGridItem)}</div>;
+              }
+              return (
+                <VirtualizedMediaGrid
+                  parentRef={gridScrollRef}
+                  items={visibleMedia}
+                  columnsCount={columnsCount}
+                  renderItem={renderGridItem}
+                />
+              );
+            })()
           ) : (
             <div style={styles.list}>
               {visibleMedia.map(item => (

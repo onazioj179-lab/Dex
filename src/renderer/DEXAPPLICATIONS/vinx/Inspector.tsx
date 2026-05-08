@@ -12,8 +12,10 @@
 
 import React, { useCallback, useState, useRef, useEffect, memo, useMemo } from 'react';
 import { useVinxStore } from './VinxStore';
-import type { Clip, ClipEffect, ClipTransform, ColorGradeSettings, ScopeType, EffectDefinition, EffectParameterDef, CurvePoint } from './VinxTypes';
-import { EFFECT_DEFINITIONS, AUDIO_EFFECTS, DEFAULT_COLOR_GRADE, formatTimecode } from './VinxTypes';
+import type { Clip, ClipEffect, ClipTransform, ColorGradeSettings, ScopeType, EffectDefinition, EffectParameterDef, CurvePoint, ClipColorGrading } from './VinxTypes';
+import { EFFECT_DEFINITIONS, AUDIO_EFFECTS, DEFAULT_COLOR_GRADE, DEFAULT_CLIP_COLOR_GRADING, formatTimecode } from './VinxTypes';
+import { ColorWheel as PrimaryColorWheel, type ColorWheelValue } from './ColorWheel';
+import { ScopesPanel, type ScopeMode } from './ScopesPanel';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -472,11 +474,67 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
   const toggleScopes = useVinxStore(s => s.toggleScopes);
   const scopeType = useVinxStore(s => s.scopeType);
   const setScopeType = useVinxStore(s => s.setScopeType);
+  const updateClipColorGrading = useVinxStore(s => s.updateClipColorGrading);
+
+  const grading: ClipColorGrading = clip.colorGrading ?? DEFAULT_CLIP_COLOR_GRADING;
+  const wheels = grading.primary.wheels;
+
+  const updateWheel = useCallback((which: 'lift' | 'gamma' | 'gain', v: ColorWheelValue) => {
+    updateClipColorGrading(clip.id, {
+      primary: {
+        wheels: { ...wheels, [which]: v },
+      },
+    });
+  }, [clip.id, wheels, updateClipColorGrading]);
+
+  const [liveScopeMode, setLiveScopeMode] = useState<ScopeMode>('waveform');
+  const [previewVideo, setPreviewVideo] = useState<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    // Resolve video element via DOM (preview tagged with data-vinx-preview)
+    const find = () => document.querySelector<HTMLVideoElement>('video[data-vinx-preview]');
+    setPreviewVideo(find());
+    const id = window.setInterval(() => {
+      const v = find();
+      setPreviewVideo(prev => (prev === v ? prev : v));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <div style={{ flex: 1, overflow: 'auto' }}>
-      {/* Color Wheels */}
-      <div style={sectionHeaderStyle}>Color Wheels</div>
+      {/* Three-way color wheels (per-clip primary correction) */}
+      <div style={sectionHeaderStyle}>Primary (Lift / Gamma / Gain)</div>
+      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start', padding: '4px 4px 8px', gap: 4, flexWrap: 'wrap' }}>
+        <PrimaryColorWheel label="Lift" value={wheels.lift} onChange={v => updateWheel('lift', v)} size={100} />
+        <PrimaryColorWheel label="Gamma" value={wheels.gamma} onChange={v => updateWheel('gamma', v)} size={100} />
+        <PrimaryColorWheel label="Gain" value={wheels.gain} onChange={v => updateWheel('gain', v)} size={100} />
+      </div>
+
+      {/* Live scopes panel sampling preview video */}
+      <div style={sectionHeaderStyle}>Live Scopes</div>
+      <div style={{ padding: '0 8px 8px' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+          {(['waveform', 'vectorscope', 'histogram'] as ScopeMode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => setLiveScopeMode(m)}
+              aria-label={`Live ${m} scope`}
+              style={{
+                padding: '2px 8px', fontSize: 9, border: '1px solid var(--color-border)',
+                borderRadius: 3, background: liveScopeMode === m ? 'rgba(74,158,255,0.15)' : 'transparent',
+                color: liveScopeMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                cursor: 'pointer', textTransform: 'capitalize',
+              }}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <ScopesPanel videoEl={previewVideo} mode={liveScopeMode} height={160} />
+      </div>
+
+      {/* Legacy global wheels (sequence-wide grade) */}
+      <div style={sectionHeaderStyle}>Global Wheels</div>
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '4px 4px 8px' }}>
         <ColorWheel label="Lift" r={colorGrade.liftR} g={colorGrade.liftG} b={colorGrade.liftB}
           onChange={(r, g, b) => setColorGrade({ liftR: r, liftG: g, liftB: b })} />

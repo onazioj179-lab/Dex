@@ -1889,6 +1889,9 @@ const invokePrefixAllowlist = [
   'pty:',
   // Creator-only unlock surface (Ed25519 signed challenge / token)
   'creator:',
+  // Standalone app channels
+  'screencapture:',
+  'dialog:',
 ];
 
 const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline', 'renderer:heartbeat']);

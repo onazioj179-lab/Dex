@@ -27,6 +27,7 @@ import {
   formatBarPosition,
 } from './ImosionFeatures';
 import type { MetronomeSettings, Region, Marker } from './ImosionFeatures';
+import { getDiatonicChords, midiToFrequency } from './ImosionChords';
 import {
   extractWaveformPeaks,
   audioBufferToAIFF,
@@ -2363,6 +2364,9 @@ const Imosion: React.FC = () => {
   const [showVelocityLane, setShowVelocityLane] = useState(true);
   const [showCCLane, setShowCCLane] = useState(false);
   const [pianoRollOctaveRange] = useState({ low: 0, high: 8 }); // C0 to C8 = 96 notes
+  const [showChordTrigger, setShowChordTrigger] = useState(false);
+  const [chordIncludeSeventh, setChordIncludeSeventh] = useState(false);
+  const [chordTriggerMode, setChordTriggerMode] = useState<'major' | 'minor'>('major');
 
   // ===== INSTRUMENT TRACKS =====
   const [instrumentTracks, setInstrumentTracks] = useState<InstrumentTrack[]>([]);
@@ -5762,7 +5766,7 @@ const Imosion: React.FC = () => {
 
         {/* ===== PIANO ROLL VIEW ===== */}
         {viewMode === 'pianoroll' && (
-          <div className="view-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#09090b' }}>
+          <div className="view-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#09090b', position: 'relative' }}>
             {/* Piano Roll Toolbar */}
             <div style={{ padding: '8px 14px', borderBottom: '1px solid #1a1a1e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -5791,6 +5795,7 @@ const Imosion: React.FC = () => {
                 <button aria-label="Select All" onClick={() => setPianoRollSelectedNotes(new Set(pianoRollNotes.map(n => n.id)))} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer' }}>Select All</button>
                 <button aria-label="Delete Selected" onClick={() => { setPianoRollNotes(prev => prev.filter(n => !pianoRollSelectedNotes.has(n.id))); setPianoRollSelectedNotes(new Set()); }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #27272a', background: 'transparent', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}>Delete</button>
                 <button aria-label="Quantize" onClick={() => { setPianoRollNotes(prev => prev.map(n => ({ ...n, startTime: Math.round(n.startTime / pianoRollSnap) * pianoRollSnap, duration: Math.max(pianoRollSnap, Math.round(n.duration / pianoRollSnap) * pianoRollSnap) }))); }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.1)', color: '#bf5af2', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Quantize</button>
+                <button aria-label="Toggle Chord Trigger" onClick={() => setShowChordTrigger(s => !s)} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(100,210,255,0.3)', background: showChordTrigger ? 'rgba(100,210,255,0.2)' : 'transparent', color: showChordTrigger ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>Chords</button>
               </div>
             </div>
             {/* Piano Roll Body */}
@@ -5909,12 +5914,88 @@ const Imosion: React.FC = () => {
                 </div>
               </div>
             )}
+            {/* ===== CHORD TRIGGER PANEL ===== */}
+            {showChordTrigger && (() => {
+              const rootIdx = NOTE_NAMES.indexOf(musicalKey);
+              const rootPitch = 60 + (rootIdx >= 0 ? rootIdx : 0); // root in octave 4
+              const chords = getDiatonicChords(rootPitch, chordTriggerMode, chordIncludeSeventh);
+              const playChord = (pitches: number[]) => {
+                try {
+                  const engine = getAudioEngine();
+                  let ctx = engine.getContext();
+                  if (!ctx) {
+                    engine.init(sampleRate).catch(() => { /* ignore */ });
+                    ctx = engine.getContext() ?? new AudioContext({ sampleRate });
+                  }
+                  if (ctx.state === 'suspended') { ctx.resume().catch(() => { /* ignore */ }); }
+                  const t0 = ctx.currentTime;
+                  const master = ctx.createGain();
+                  master.gain.setValueAtTime(0.3, t0);
+                  master.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+                  master.connect(ctx.destination);
+                  for (const p of pitches) {
+                    const osc = ctx.createOscillator();
+                    osc.type = 'triangle';
+                    osc.frequency.value = midiToFrequency(p);
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(1 / pitches.length, t0);
+                    osc.connect(g); g.connect(master);
+                    osc.start(t0); osc.stop(t0 + 1.25);
+                  }
+                } catch (err) { console.warn('[Imosion] Chord trigger audio error:', err); }
+              };
+              const insertChord = (pitches: number[]) => {
+                const startBeat = Math.round(playbackPosition * (bpm / 60) / pianoRollSnap) * pianoRollSnap;
+                const newNotes: MidiNote[] = pitches.map((p, idx) => ({
+                  id: `chord-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+                  pitch: p, startTime: startBeat, duration: Math.max(pianoRollSnap, 1), velocity: 100, selected: false,
+                }));
+                setPianoRollNotes(prev => [...prev, ...newNotes]);
+              };
+              return (
+                <div style={{ position: 'absolute', top: 56, right: 12, width: 250, background: 'rgba(12,12,14,0.96)', border: '1px solid #27272a', borderRadius: 8, padding: 10, zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64d2ff' }}>Chord Trigger</span>
+                    <button aria-label="Close Chord Trigger" onClick={() => setShowChordTrigger(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <select value={musicalKey} onChange={e => setMusicalKey(e.target.value)} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
+                      {NOTE_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    <div style={{ display: 'flex', background: 'var(--color-border-subtle)', borderRadius: 4, padding: 1 }}>
+                      <button aria-label="Major" onClick={() => setChordTriggerMode('major')} style={{ padding: '3px 8px', borderRadius: 3, border: 'none', background: chordTriggerMode === 'major' ? 'rgba(100,210,255,0.25)' : 'transparent', color: chordTriggerMode === 'major' ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Maj</button>
+                      <button aria-label="Minor" onClick={() => setChordTriggerMode('minor')} style={{ padding: '3px 8px', borderRadius: 3, border: 'none', background: chordTriggerMode === 'minor' ? 'rgba(100,210,255,0.25)' : 'transparent', color: chordTriggerMode === 'minor' ? '#64d2ff' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Min</button>
+                    </div>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--color-text-tertiary)', cursor: 'pointer', marginBottom: 8 }}>
+                    <input type="checkbox" checked={chordIncludeSeventh} onChange={e => setChordIncludeSeventh(e.target.checked)} style={{ accentColor: '#64d2ff' }} />
+                    +seventh
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                    {chords.map((c, i) => (
+                      <button
+                        key={i}
+                        aria-label={`Chord ${c.numeral} ${c.name}`}
+                        onClick={() => playChord(c.pitches)}
+                        onDoubleClick={() => { playChord(c.pitches); insertChord(c.pitches); }}
+                        title={`${c.numeral}  ${c.name} - click to play, double-click to insert`}
+                        style={{
+                          padding: '6px 2px', borderRadius: 4, border: '1px solid #27272a', background: 'var(--color-bg-hover)',
+                          color: c.quality === 'major' ? '#64d2ff' : c.quality === 'minor' ? '#bf5af2' : c.quality === 'diminished' ? 'var(--color-error)' : 'var(--color-warning)',
+                          fontSize: 9, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                        }}
+                      >
+                        <span>{c.numeral}</span>
+                        <span style={{ fontSize: 8, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>Double-click to insert at playhead</div>
+                </div>
+              );
+            })()}
           </div>
         )}
-
-        {/* Automation Lanes (overlay on arrange view) */}
-
-        {/* Automation Lanes (overlay on arrange view) */}
         {showAutomation && viewMode === 'arrange' && (
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px', background: 'linear-gradient(0deg, rgba(9,9,11,0.95), rgba(9,9,11,0.7))', borderTop: '1px solid #27272a', zIndex: 10, display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '4px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1a1a1e', flexShrink: 0 }}>

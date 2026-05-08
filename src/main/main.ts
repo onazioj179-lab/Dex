@@ -13,7 +13,7 @@
  */
 
 // Electron
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, globalShortcut, dialog, systemPreferences, screen, powerMonitor } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, globalShortcut, dialog, systemPreferences, screen, powerMonitor, desktopCapturer } from 'electron';
 import * as log from 'electron-log';
 
 // Node.js
@@ -2706,6 +2706,24 @@ class DexApp {
     // -------------------------------------------------------------------------
     ipcMain.handle('dialog:showOpenDialog', async (_, options) => {
       return dialog.showOpenDialog(this.mainWindow!, options);
+    });
+
+    // Renderer-friendly alias used by standalone apps (PDF Viewer, etc.)
+    ipcMain.handle('files:openDialog', async (_, options) => {
+      return dialog.showOpenDialog(this.mainWindow!, options);
+    });
+
+    // Screen capture sources for the standalone Screen Recorder app
+    ipcMain.handle('screencapture:getSources', async () => {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 320, height: 180 },
+      });
+      return sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        thumbnail: s.thumbnail.toDataURL(),
+      }));
     });
 
     ipcMain.handle('fs:readdir', async (_, dirPath: string) => {

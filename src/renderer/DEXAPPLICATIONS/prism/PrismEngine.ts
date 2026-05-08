@@ -1282,3 +1282,228 @@ export function canvasToBMP(canvas: HTMLCanvasElement): Blob {
 
   return new Blob([buf], { type: 'image/bmp' });
 }
+
+// ===========================================================================
+// ADJUSTMENT LAYERS - typed parameters + pixel transforms
+// ===========================================================================
+
+export type AdjustmentParams =
+  | { kind: 'brightness-contrast'; brightness: number; contrast: number }
+  | { kind: 'hue-saturation'; hue: number; saturation: number; lightness: number }
+  | { kind: 'curves'; rgb: number[] }
+  | { kind: 'levels'; inputBlack: number; inputWhite: number; gamma: number; outputBlack: number; outputWhite: number };
+
+export type AdjustmentKind = AdjustmentParams['kind'];
+
+/** Identity LUT 0..255 */
+export function identityLUT(): number[] {
+  const lut: number[] = new Array(256);
+  for (let i = 0; i < 256; i++) lut[i] = i;
+  return lut;
+}
+
+/** Default adjustment params for each kind */
+export function defaultAdjustment(kind: AdjustmentKind): AdjustmentParams {
+  switch (kind) {
+    case 'brightness-contrast':
+      return { kind: 'brightness-contrast', brightness: 0, contrast: 0 };
+    case 'hue-saturation':
+      return { kind: 'hue-saturation', hue: 0, saturation: 1, lightness: 0 };
+    case 'curves':
+      return { kind: 'curves', rgb: identityLUT() };
+    case 'levels':
+      return { kind: 'levels', inputBlack: 0, inputWhite: 255, gamma: 1, outputBlack: 0, outputWhite: 255 };
+  }
+}
+
+/** Build LUT from 5 control points (0,64,128,192,255) using piecewise linear interpolation. */
+export function curveLUTFromPoints(points: { input: number; output: number }[]): number[] {
+  const sorted = [...points].sort((a, b) => a.input - b.input);
+  const lut: number[] = new Array(256);
+  for (let v = 0; v < 256; v++) {
+    let lo = sorted[0];
+    let hi = sorted[sorted.length - 1];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (v >= sorted[i].input && v <= sorted[i + 1].input) {
+        lo = sorted[i];
+        hi = sorted[i + 1];
+        break;
+      }
+    }
+    if (v <= sorted[0].input) {
+      lut[v] = Math.max(0, Math.min(255, Math.round(sorted[0].output)));
+    } else if (v >= sorted[sorted.length - 1].input) {
+      lut[v] = Math.max(0, Math.min(255, Math.round(sorted[sorted.length - 1].output)));
+    } else {
+      const t = hi.input === lo.input ? 0 : (v - lo.input) / (hi.input - lo.input);
+      lut[v] = Math.max(0, Math.min(255, Math.round(lo.output + t * (hi.output - lo.output))));
+    }
+  }
+  return lut;
+}
+
+/** Apply an adjustment to ImageData in-place. */
+export function applyAdjustmentToImageData(imageData: ImageData, adj: AdjustmentParams): void {
+  const data = imageData.data;
+  const len = data.length;
+  switch (adj.kind) {
+    case 'brightness-contrast': {
+      const b = Math.max(-100, Math.min(100, adj.brightness));
+      const cf = Math.max(0, (100 + Math.max(-100, Math.min(100, adj.contrast))) / 100);
+      const lut = new Uint8ClampedArray(256);
+      for (let v = 0; v < 256; v++) {
+        const out = (v - 128) * cf + 128 + b * 2.55;
+        lut[v] = out < 0 ? 0 : out > 255 ? 255 : out | 0;
+      }
+      for (let i = 0; i < len; i += 4) {
+        data[i] = lut[data[i]];
+        data[i + 1] = lut[data[i + 1]];
+        data[i + 2] = lut[data[i + 2]];
+      }
+      return;
+    }
+    case 'hue-saturation': {
+      const hueShift = adj.hue;
+      const satFactor = Math.max(0, adj.saturation);
+      const lightAdd = Math.max(-1, Math.min(1, adj.lightness));
+      for (let i = 0; i < len; i += 4) {
+        const hsl = rgbToHSL(data[i], data[i + 1], data[i + 2]);
+        let h = (hsl.h + hueShift) % 360;
+        if (h < 0) h += 360;
+        let s = hsl.s * satFactor;
+        if (s < 0) s = 0;
+        if (s > 100) s = 100;
+        let l = hsl.l + lightAdd * 100;
+        if (l < 0) l = 0;
+        if (l > 100) l = 100;
+        const rgb = hslToRGB(h, s, l);
+        data[i] = rgb.r;
+        data[i + 1] = rgb.g;
+        data[i + 2] = rgb.b;
+      }
+      return;
+    }
+    case 'curves': {
+      const lut = adj.rgb;
+      if (!lut || lut.length !== 256) return;
+      for (let i = 0; i < len; i += 4) {
+        data[i] = lut[data[i]] | 0;
+        data[i + 1] = lut[data[i + 1]] | 0;
+        data[i + 2] = lut[data[i + 2]] | 0;
+      }
+      return;
+    }
+    case 'levels': {
+      const ib = Math.max(0, Math.min(255, adj.inputBlack));
+      const iw = Math.max(ib + 1, Math.min(255, adj.inputWhite));
+      const ob = Math.max(0, Math.min(255, adj.outputBlack));
+      const ow = Math.max(0, Math.min(255, adj.outputWhite));
+      const gamma = adj.gamma <= 0 ? 1 : adj.gamma;
+      const inv = 1 / gamma;
+      const range = iw - ib;
+      const outRange = ow - ob;
+      const lut = new Uint8ClampedArray(256);
+      for (let v = 0; v < 256; v++) {
+        let n = (v - ib) / range;
+        if (n < 0) n = 0;
+        else if (n > 1) n = 1;
+        n = Math.pow(n, inv);
+        const out = ob + n * outRange;
+        lut[v] = out < 0 ? 0 : out > 255 ? 255 : out | 0;
+      }
+      for (let i = 0; i < len; i += 4) {
+        data[i] = lut[data[i]];
+        data[i + 1] = lut[data[i + 1]];
+        data[i + 2] = lut[data[i + 2]];
+      }
+      return;
+    }
+  }
+}
+
+// ===========================================================================
+// CONTENT-AWARE FILL (basic patch-match) - operates on ImageData with a mask
+// ===========================================================================
+
+/** Build a binary selection mask (Uint8Array, 1 = selected) from various inputs. */
+export function buildSelectionMaskFromAlpha(mask: Uint8Array | null, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  if (!mask) return out;
+  const len = Math.min(out.length, mask.length);
+  for (let i = 0; i < len; i++) out[i] = mask[i] >= 128 ? 1 : 0;
+  return out;
+}
+
+/**
+ * Fill the masked region of imageData with content sampled from non-selected
+ * pixels in a small spiral neighborhood. Yields control to the event loop
+ * every ~50ms so the UI stays responsive. onProgress reports percent (0..100).
+ */
+export async function patchMatchFill(
+  imageData: ImageData,
+  mask: Uint8Array,
+  onProgress?: (pct: number) => void,
+  searchRadius: number = 32,
+): Promise<void> {
+  const w = imageData.width;
+  const h = imageData.height;
+  const data = imageData.data;
+  // Collect target pixel indices
+  const targets: number[] = [];
+  for (let i = 0; i < mask.length; i++) if (mask[i]) targets.push(i);
+  const total = targets.length;
+  if (total === 0) {
+    onProgress?.(100);
+    return;
+  }
+  // Spiral offsets up to searchRadius
+  const offsets: { dx: number; dy: number; d2: number }[] = [];
+  for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+    for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= searchRadius * searchRadius) offsets.push({ dx, dy, d2 });
+    }
+  }
+  offsets.sort((a, b) => a.d2 - b.d2);
+  const lastYield = { t: Date.now() };
+  let lastReportedPct = -1;
+  for (let ti = 0; ti < total; ti++) {
+    const idx = targets[ti];
+    const x = idx % w;
+    const y = (idx / w) | 0;
+    let r = 0, g = 0, b = 0, n = 0;
+    for (const off of offsets) {
+      const nx = x + off.dx;
+      const ny = y + off.dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const ni = ny * w + nx;
+      if (mask[ni]) continue;
+      const pi = ni * 4;
+      r += data[pi];
+      g += data[pi + 1];
+      b += data[pi + 2];
+      n++;
+      if (n >= 8) break;
+    }
+    if (n > 0) {
+      const pi = idx * 4;
+      data[pi] = (r / n) | 0;
+      data[pi + 1] = (g / n) | 0;
+      data[pi + 2] = (b / n) | 0;
+      // leave alpha as-is
+    }
+    const pct = ((ti + 1) / total) * 100;
+    const reportBucket = Math.floor(pct / 5);
+    if (reportBucket !== lastReportedPct) {
+      lastReportedPct = reportBucket;
+      onProgress?.(Math.min(100, reportBucket * 5));
+    }
+    if (Date.now() - lastYield.t > 50) {
+      lastYield.t = Date.now();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+  }
+  onProgress?.(100);
+}
+

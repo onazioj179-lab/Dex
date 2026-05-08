@@ -967,6 +967,79 @@ const DEFAULT_SETTINGS = {
 // COMPONENT
 // ===============================================================================
 
+const TextDensityControls: React.FC<{
+  sectionTitle: React.CSSProperties;
+  settingRow: React.CSSProperties;
+  settingInfo: React.CSSProperties;
+  settingLabel: React.CSSProperties;
+  settingDesc: React.CSSProperties;
+}> = ({ sectionTitle, settingRow, settingInfo, settingLabel, settingDesc }) => {
+  const [fontScale, setFontScale] = useState<number>(() => {
+    try {
+      const v = parseFloat(localStorage.getItem('dex-font-scale') || '');
+      return Number.isFinite(v) && v >= 0.8 && v <= 1.4 ? v : 1;
+    } catch { return 1; }
+  });
+  const [compact, setCompact] = useState<boolean>(() => {
+    try { return localStorage.getItem('dex-density-compact') === 'true'; } catch { return false; }
+  });
+
+  const applyFontScale = (v: number) => {
+    setFontScale(v);
+    document.documentElement.style.setProperty('--font-scale', String(v));
+    try { localStorage.setItem('dex-font-scale', String(v)); } catch {}
+  };
+  const applyCompact = (v: boolean) => {
+    setCompact(v);
+    document.documentElement.style.setProperty('--density-scale', v ? '0.85' : '1');
+    try { localStorage.setItem('dex-density-compact', String(v)); } catch {}
+  };
+
+  return (
+    <>
+      <h3 style={sectionTitle}>Text & Density</h3>
+      <div style={settingRow}>
+        <div style={settingInfo}>
+          <span style={settingLabel}>Text size</span>
+          <span style={settingDesc}>Scale all UI text ({Math.round(fontScale * 100)}%)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 200 }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>A</span>
+          <input
+            type="range"
+            min="0.8"
+            max="1.4"
+            step="0.05"
+            value={fontScale}
+            onChange={e => applyFontScale(Number(e.target.value))}
+            style={{ flex: 1, accentColor: 'var(--color-accent)' }}
+            aria-label="Text size"
+          />
+          <span style={{ fontSize: 16, color: 'var(--color-text-tertiary)' }}>A</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', minWidth: 36, textAlign: 'right' }}>
+            {Math.round(fontScale * 100)}%
+          </span>
+        </div>
+      </div>
+      <div style={settingRow}>
+        <div style={settingInfo}>
+          <span style={settingLabel}>Compact density</span>
+          <span style={settingDesc}>Tighter spacing for density-aware components</span>
+        </div>
+        <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={compact}
+            onChange={e => applyCompact(e.target.checked)}
+            aria-label="Compact density"
+            style={{ accentColor: 'var(--color-accent)', width: 18, height: 18, cursor: 'pointer' }}
+          />
+        </label>
+      </div>
+    </>
+  );
+};
+
 export const Settings: React.FC = () => {
   const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
@@ -1565,6 +1638,14 @@ export const Settings: React.FC = () => {
         </div>
       </div>
       
+      <TextDensityControls
+        sectionTitle={styles.sectionTitle}
+        settingRow={styles.settingRow}
+        settingInfo={styles.settingInfo}
+        settingLabel={styles.settingLabel}
+        settingDesc={styles.settingDesc}
+      />
+
       <h3 style={styles.sectionTitle}>Visual Effects</h3>
       {renderToggle('reduceMotion', 'Reduce Motion', 'Minimize animated effects')}
       {renderToggle('transparency', 'Transparency', 'Use transparent backgrounds')}
