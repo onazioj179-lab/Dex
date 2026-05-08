@@ -108,9 +108,11 @@ export const glassButtonHover: React.CSSProperties = {
   borderColor: 'var(--color-text-tertiary)',
 };
 
-/** Liquid glass dock -- frosted glass with strong blur */
+/** Liquid glass dock -- frosted glass with strong blur. Background uses the
+ * runtime CSS variable `--dex-glass-bg` (set by shellPreferencesStore) so the
+ * user can tune Liquid-Glass tint and opacity from Settings. */
 export const liquidGlassDock: React.CSSProperties = {
-  background: 'rgba(30, 30, 34, 0.65)',
+  background: 'var(--dex-glass-bg, rgba(30, 30, 34, 0.65))',
   ...adaptiveBlur(32, 180),
   border: '1px solid rgba(255, 255, 255, 0.12)',
   borderRadius: 18,

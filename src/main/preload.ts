@@ -3740,9 +3740,27 @@ const diagnosticsAPI = {
   getStartupTimeline: () => ipcRenderer.invoke('startup:timeline'),
 };
 
+// Native subsystem bridges (May 2026 sweep): archive + Wi-Fi speed test.
+// Kept as a separate `dexNative` object so the strongly-typed `dex` API stays
+// stable for older renderers; new code reads from `window.dexNative`.
+const dexNativeAPI = {
+  archive: {
+    detect: (filePath: string) => ipcRenderer.invoke('archive:detect', filePath),
+    list: (filePath: string) => ipcRenderer.invoke('archive:list', filePath),
+    extract: (filePath: string, outputDir: string) => ipcRenderer.invoke('archive:extract', filePath, outputDir),
+    createZip: (files: { name: string; absPath: string }[], outputPath: string) =>
+      ipcRenderer.invoke('archive:create-zip', files, outputPath),
+    tools: () => ipcRenderer.invoke('archive:tools'),
+  },
+  network: {
+    runSpeedTest: () => ipcRenderer.invoke('network:speedtest:run'),
+  },
+};
+
 contextBridge.exposeInMainWorld('dex', api);
 contextBridge.exposeInMainWorld('q1Foundation', q1FoundationAPI);
 contextBridge.exposeInMainWorld('dexDiagnostics', diagnosticsAPI);
+contextBridge.exposeInMainWorld('dexNative', dexNativeAPI);
 
 // Legacy backward-compatible bridge -- many renderer components reference
 // window.electron.invoke / window.electron.ipcRenderer.*

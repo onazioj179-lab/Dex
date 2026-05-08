@@ -50,6 +50,30 @@ export interface UkiKnowledgeNode {
   timestamp: number;
 }
 
+/**
+ * A single step in UKI's reasoning trail. Captured per intent so the user can
+ * "rewind" any prior turn (replay the query, inspect why UKI chose a route)
+ * and so the UI can render a transparent thought process instead of a black
+ * box. Cap is intentionally small (last 50) to stay cheap on low-end devices.
+ */
+export interface UkiThoughtStep {
+  id: string;
+  /** When the step started, ms epoch. */
+  timestamp: number;
+  /** What the user said / typed. */
+  query: string;
+  /** UKI's classified intent (open, note, task, find, run, chat, ...). */
+  intent: string;
+  /** Top candidates considered before settling on `intent`. */
+  candidates: { intent: string; score: number }[];
+  /** Latency budget UKI took to produce a response, ms. */
+  latencyMs: number;
+  /** Whether the route succeeded. */
+  success: boolean;
+  /** Optional short note (e.g. "low-end mode: skipped semantic match"). */
+  note?: string;
+}
+
 interface UkiStoreState {
   state: UkiUIState;
   transcript: string;
@@ -66,6 +90,9 @@ interface UkiStoreState {
 
   // Live knowledge nodes for Nexus visualization
   knowledgeNodes: UkiKnowledgeNode[];
+
+  // Reasoning trail (rewind)
+  thoughtTrail: UkiThoughtStep[];
 
   // Memory
   memoryStats: MemoryStats;
@@ -86,6 +113,16 @@ interface UkiStoreState {
   reset: () => void;
   addConversationTurn: (turn: UkiConversationTurn) => void;
   setKnowledgeNodes: (nodes: UkiKnowledgeNode[]) => void;
+  /** Append a reasoning step to the rewindable thought trail. */
+  recordThought: (step: UkiThoughtStep) => void;
+  /** Wipe the thought trail (privacy / fresh-start). */
+  clearThoughtTrail: () => void;
+  /**
+   * Replay a previous turn: returns the original query so the caller can
+   * resubmit it through the existing UKI dispatch path. Returns null when
+   * the id is unknown.
+   */
+  rewindThought: (id: string) => string | null;
   setMemoryStats: (stats: MemoryStats) => void;
   setRecentMemories: (records: MemoryRecord[]) => void;
   setMemorySearchResults: (results: MemoryRecord[], query: string) => void;
@@ -110,7 +147,24 @@ function persistHistory(history: UkiConversationTurn[]): void {
   } catch { /* quota exceeded — silently drop */ }
 }
 
-export const useUkiStore = create<UkiStoreState>((set) => ({
+const MAX_THOUGHTS = 50;
+
+function loadThoughtTrail(): UkiThoughtStep[] {
+  try {
+    const raw = localStorage.getItem('dex:uki:thoughts');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(-MAX_THOUGHTS) : [];
+  } catch { return []; }
+}
+
+function persistThoughtTrail(trail: UkiThoughtStep[]): void {
+  try {
+    localStorage.setItem('dex:uki:thoughts', JSON.stringify(trail.slice(-MAX_THOUGHTS)));
+  } catch { /* ignore */ }
+}
+
+export const useUkiStore = create<UkiStoreState>((set, get) => ({
   state: 'idle',
   transcript: '',
   partialTranscript: '',
@@ -126,6 +180,9 @@ export const useUkiStore = create<UkiStoreState>((set) => ({
 
   // Knowledge nodes for Nexus
   knowledgeNodes: [],
+
+  // Rewindable reasoning trail
+  thoughtTrail: loadThoughtTrail(),
 
   // Memory
   memoryStats: { available: false, totalRecords: 0, totalEver: 0 },
@@ -155,6 +212,21 @@ export const useUkiStore = create<UkiStoreState>((set) => ({
     return { conversationHistory: next };
   }),
   setKnowledgeNodes: (nodes) => set({ knowledgeNodes: nodes }),
+
+  recordThought: (step) => set((prev) => {
+    const next = [...prev.thoughtTrail.slice(-(MAX_THOUGHTS - 1)), step];
+    persistThoughtTrail(next);
+    return { thoughtTrail: next };
+  }),
+  clearThoughtTrail: () => {
+    persistThoughtTrail([]);
+    set({ thoughtTrail: [] });
+  },
+  rewindThought: (id) => {
+    const trail = get().thoughtTrail;
+    const found = trail.find((t) => t.id === id);
+    return found ? found.query : null;
+  },
 
   setMemoryStats: (stats) => set({ memoryStats: stats }),
   setRecentMemories: (records) => set({ recentMemories: records }),

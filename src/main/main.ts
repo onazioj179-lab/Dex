@@ -281,6 +281,8 @@ import { personalChangelogManager } from './core/PersonalChangelogManager';
 
 // Release Management (Phase 66)
 import { ReleaseManager } from './core/ReleaseManager';
+import { registerArchiveIpc } from './services/ArchiveService';
+import { registerSpeedTestIpc } from './services/SpeedTestService';
 import { UpdateService } from './core/UpdateService';
 import { ProductionMonitor } from './core/ProductionMonitor';
 
@@ -3283,6 +3285,22 @@ class DexApp {
       log.error('[DEX] Release Manager initialize failed:', err);
     });
     log.info('[DEX] Release Manager initialized');
+
+    // -------------------------------------------------------------------------
+    // Native subsystem services (May 2026 sweep): archive + speed test
+    // -------------------------------------------------------------------------
+    try {
+      registerArchiveIpc();
+      log.info('[DEX] Archive service IPC registered');
+    } catch (err) {
+      log.error('[DEX] Archive service IPC failed:', err);
+    }
+    try {
+      registerSpeedTestIpc();
+      log.info('[DEX] Speed test service IPC registered');
+    } catch (err) {
+      log.error('[DEX] Speed test service IPC failed:', err);
+    }
 
     // -------------------------------------------------------------------------
     // Network Guard (mode enforcement + connection tracking)

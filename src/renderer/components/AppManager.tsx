@@ -20,6 +20,8 @@ import { useAppTransition } from '../utils/motionHooks';
 import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
 import { useUkiStore } from '../store/ukiStore';
 import { liquidGlassDock, glassModal, adaptiveShadow } from '../styles/glassMenu';
+import { computeDockGeometry } from '../../shared/shell/dockGeometry';
+import { useShellPreferences } from '../store/shellPreferencesStore';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 // SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
@@ -531,6 +533,11 @@ export const AppManager: React.FC = () => {
 
   // Dock pinning store
   const { pins: dockPins, pinApp, unpinApp, isPinned: isDockPinned, mode: dockMode, magnification: dockMagnification, magnificationScale, iconSize: dockIconSize } = useDockPins();
+
+  // Shell preferences (movable + compact taskbar) — read reactively so edge /
+  // preset changes from Settings re-render the dock immediately.
+  const dockEdgePref = useShellPreferences((s) => s.dockEdge);
+  const dockPresetPref = useShellPreferences((s) => s.dockPreset);
 
   const [showUnifiedSearch, setShowUnifiedSearch] = useState(false);
   // showSpotlight retired — Ctrl+K now toggles CommandPalette (App.tsx) and Ctrl+Space toggles UKI panel
@@ -3481,30 +3488,45 @@ export const AppManager: React.FC = () => {
         onMouseMove={handleDockMouseMove}
         onMouseLeave={handleDockMouseLeave}
         onTouchStart={showDock}
-        style={{
-          position: 'fixed', bottom: 10, left: '50%', zIndex: 'var(--z-dock)' as unknown as number,
-          transform: taskbarVisible ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(12px)',
-          display: 'flex', justifyContent: 'center',
-          opacity: taskbarVisible ? 1 : 0,
-          transition: 'opacity 0.2s cubic-bezier(0.23,1,0.32,1), transform 0.2s cubic-bezier(0.23,1,0.32,1)',
-          pointerEvents: taskbarVisible ? 'auto' : 'none',
-        }}
+        style={(() => {
+          const geom = computeDockGeometry({ edge: dockEdgePref, preset: dockPresetPref, visible: taskbarVisible });
+          return {
+            ...geom.positionStyle,
+            zIndex: 'var(--z-dock)' as unknown as number,
+            transform: taskbarVisible ? geom.visibleTransform : geom.hiddenTransform,
+            display: 'flex', justifyContent: 'center',
+            opacity: taskbarVisible ? 1 : 0,
+            transition: 'opacity 0.2s cubic-bezier(0.23,1,0.32,1), transform 0.2s cubic-bezier(0.23,1,0.32,1)',
+            pointerEvents: taskbarVisible ? 'auto' : 'none',
+          } as React.CSSProperties;
+        })()}
       >
         <div
           ref={dockRef}
           role="toolbar"
           aria-label="Application dock"
           data-dock-container=""
-          style={{
-            ...liquidGlassDock,
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '4px 10px', borderRadius: 18,
-            overflowX: 'auto', overflowY: 'hidden', maxWidth: '96vw',
-            scrollBehavior: 'smooth',
-            position: 'relative',
-            contain: 'layout style',
-            isolation: 'isolate',
-          } as React.CSSProperties}
+          data-dock-edge={dockEdgePref}
+          data-dock-preset={dockPresetPref}
+          style={(() => {
+            const geom = computeDockGeometry({ edge: dockEdgePref, preset: dockPresetPref, visible: taskbarVisible });
+            return {
+              ...liquidGlassDock,
+              display: 'flex',
+              flexDirection: geom.flexDirection,
+              alignItems: 'center', gap: 6,
+              padding: `${geom.paddingY}px ${geom.paddingX}px`,
+              borderRadius: geom.borderRadius,
+              overflowX: geom.flexDirection === 'row' ? 'auto' : 'hidden',
+              overflowY: geom.flexDirection === 'column' ? 'auto' : 'hidden',
+              maxWidth: geom.flexDirection === 'row' ? '96vw' : undefined,
+              maxHeight: geom.flexDirection === 'column' ? '96vh' : undefined,
+              scrollBehavior: 'smooth',
+              position: 'relative',
+              contain: 'layout style',
+              isolation: 'isolate',
+            } as React.CSSProperties;
+          })()}
         >
           {/* Wallpaper color reflection on dock */}
           <div style={getDockReflectionStyle()} />
