@@ -1892,6 +1892,12 @@ const invokePrefixAllowlist = [
   // Standalone app channels
   'screencapture:',
   'dialog:',
+  // Phase 3 host bridges (Store, Games, Capability, Snapshot, Sync)
+  'store:',
+  'games:',
+  'capability:',
+  'snapshot:',
+  'sync:',
 ];
 
 const invokeExactAllowlist = new Set(['intent:getStatus', 'startup:timeline', 'renderer:heartbeat']);
