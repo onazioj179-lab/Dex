@@ -9,6 +9,8 @@
  * Batch Processing, Queue Management, Preset System
  */
 
+import { pickEncoder, type Codec, type GpuVendor, type EncoderName } from '../../../shared/video/hwEncoder';
+
 // ==================== ENCODING PRESETS ====================
 export interface EncodingPreset {
   id: string;
@@ -423,6 +425,9 @@ export interface QueueJob {
   priority: number;
   fileSize?: number;
   outputSize?: number;
+  attempts?: number;
+  resumeToken?: string;
+  lastErrorCode?: ExportFailureKind;
 }
 
 export interface QueueSettings {
@@ -796,6 +801,106 @@ export function calculatePriority(job: { fileSize: number; duration: number; res
   return Math.max(-10, Math.min(10, priority));
 }
 
+// ---------- export reliability (fixes-first 2026) -------------------------
+
+export type ExportFailureKind =
+  | 'device-lost'
+  | 'oom'
+  | 'io'
+  | 'unsupported-codec'
+  | 'timeout'
+  | 'unknown';
+
+export interface ExportRuntimeProbe {
+  platform: NodeJS.Platform;
+  gpuVendor: GpuVendor;
+  forceCpu?: boolean;
+}
+
+export interface ExportAttempt {
+  attempt: number;
+  delaySec: number;
+  encoder: EncoderName;
+  bitrateScale: number;
+  resolutionScale: number;
+  reason: string;
+}
+
+export interface ExportRecoveryPlan {
+  nonDestructive: true;
+  checkpointHint: 'segment-output' | 'single-file';
+  attempts: ExportAttempt[];
+}
+
+/**
+ * Classify encoder failures into deterministic buckets so retry policy is
+ * predictable and debuggable.
+ */
+export function classifyExportFailure(errorText: string): ExportFailureKind {
+  const e = errorText.toLowerCase();
+  if (e.includes('device lost') || e.includes('driver') || e.includes('gpu hung')) return 'device-lost';
+  if (e.includes('out of memory') || e.includes('cannot allocate') || e.includes('oom')) return 'oom';
+  if (e.includes('permission denied') || e.includes('no space left') || e.includes('i/o') || e.includes('disk')) return 'io';
+  if (e.includes('unsupported') || e.includes('unknown encoder') || e.includes('invalid argument')) return 'unsupported-codec';
+  if (e.includes('timeout') || e.includes('timed out') || e.includes('deadline')) return 'timeout';
+  return 'unknown';
+}
+
+function normalizeCodec(codec?: string): Codec {
+  const c = (codec ?? 'h264').toLowerCase();
+  if (c === 'hevc' || c === 'h265') return 'hevc';
+  if (c === 'av1') return 'av1';
+  return 'h264';
+}
+
+/**
+ * Build a non-destructive retry plan with encoder fallbacks and progressive
+ * quality reduction. Keeps source untouched and enables segment retries.
+ */
+export function buildExportRecoveryPlan(
+  job: Pick<QueueJob, 'preset' | 'id'>,
+  smart: Pick<SmartQueueOptions, 'retryCount' | 'retryDelay'>,
+  runtime: ExportRuntimeProbe,
+  lastError?: string
+): ExportRecoveryPlan {
+  const codec = normalizeCodec(job.preset.settings.videoCodec);
+  const picked = pickEncoder(codec, {
+    platform: runtime.platform,
+    gpu: runtime.gpuVendor,
+    forceCpu: runtime.forceCpu,
+  });
+  const encoders: EncoderName[] = Array.from(new Set([picked.encoder, ...picked.fallbacks]));
+  const failure = lastError ? classifyExportFailure(lastError) : 'unknown';
+  const retryCount = Math.max(0, smart.retryCount);
+  const attempts: ExportAttempt[] = [];
+
+  for (let i = 0; i <= retryCount; i++) {
+    const encoder = encoders[Math.min(i, encoders.length - 1)] ?? picked.encoder;
+    const delaySec = i === 0 ? 0 : smart.retryDelay * i;
+    const resolutionScale = i >= 3 ? 0.5 : i >= 2 ? 0.75 : 1;
+    const bitrateScale = i >= 3 ? 0.65 : i >= 2 ? 0.8 : i >= 1 ? 0.9 : 1;
+    const reason = i === 0 ? 'initial' : `${failure}-recovery`;
+    attempts.push({
+      attempt: i + 1,
+      delaySec,
+      encoder,
+      bitrateScale,
+      resolutionScale,
+      reason,
+    });
+  }
+
+  return {
+    nonDestructive: true,
+    checkpointHint: attempts.length > 2 ? 'segment-output' : 'single-file',
+    attempts,
+  };
+}
+
+export function nextRetryAt(failedAtMs: number, retryDelaySec: number, attempt: number): number {
+  return failedAtMs + Math.max(0, retryDelaySec) * 1000 * Math.max(1, attempt);
+}
+
 // ===========================================================================
 // ITEMS 211-215: MEDIA ANALYSIS
 // ===========================================================================
@@ -964,6 +1069,9 @@ export default {
   saveQueueSettings,
   loadQueueSettings,
   calculatePriority,
+  classifyExportFailure,
+  buildExportRecoveryPlan,
+  nextRetryAt,
   formatMediaInfo,
   createWatchFolder,
   matchesWatchFolder,

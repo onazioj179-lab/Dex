@@ -253,3 +253,156 @@ export const SYNC_BADGE_LABELS: Record<SyncStatus, string> = {
   error: 'Sync error',
   conflict: 'Conflict — needs review',
 };
+
+// -------- offline-aware cloud actions ----------------------------
+
+export type ConnectivityMode = 'online' | 'offline' | 'metered';
+
+export interface CloudActionProbe {
+  kind: 'upload' | 'download' | 'share' | 'sync-delete' | 'local-read' | 'local-write';
+  requiresNetwork: boolean;
+  bytes?: number;
+  /** Explicitly permit this action even on metered links. */
+  allowOnMetered?: boolean;
+}
+
+export interface CloudActionDecision {
+  allowed: boolean;
+  deferred: boolean;
+  reason?: 'offline' | 'metered';
+}
+
+/**
+ * Decide whether a cloud action can execute now.
+ * Offline mode should still allow full local reads/writes.
+ */
+export function evaluateCloudAction(
+  mode: ConnectivityMode,
+  action: CloudActionProbe,
+  meteredSoftLimitBytes: number = 25 * 1024 * 1024
+): CloudActionDecision {
+  if (!action.requiresNetwork) return { allowed: true, deferred: false };
+  if (mode === 'offline') return { allowed: false, deferred: true, reason: 'offline' };
+  if (mode === 'metered' && !action.allowOnMetered && (action.bytes ?? 0) > meteredSoftLimitBytes) {
+    return { allowed: false, deferred: true, reason: 'metered' };
+  }
+  return { allowed: true, deferred: false };
+}
+
+// -------- sync batch planner -------------------------------------
+
+export interface AssetSyncItem {
+  id: string;
+  path: string;
+  sizeBytes: number;
+  direction: 'upload' | 'download';
+  /** Higher means earlier in the queue. */
+  priority?: number;
+  /** Keep visible/critical assets first. */
+  pinned?: boolean;
+  /** Epoch ms for recency-aware ordering. */
+  lastViewedAt?: number;
+}
+
+export interface SyncBatchPlannerOptions {
+  maxConcurrent: number;
+  maxBatchBytes: number;
+  mode?: ConnectivityMode;
+}
+
+export interface SyncBatchPlan {
+  lanes: AssetSyncItem[][];
+  deferred: AssetSyncItem[];
+  totalBytes: number;
+}
+
+/**
+ * Plan transfer batches for quick perceived progress:
+ * pinned/high-priority/recent assets first, then smaller files.
+ */
+export function planSyncBatches(
+  items: readonly AssetSyncItem[],
+  opts: Partial<SyncBatchPlannerOptions> = {}
+): SyncBatchPlan {
+  const maxConcurrent = Math.max(1, opts.maxConcurrent ?? 3);
+  const maxBatchBytes = Math.max(1, opts.maxBatchBytes ?? 256 * 1024 * 1024);
+  const mode = opts.mode ?? 'online';
+
+  const sorted = [...items].sort((a, b) => {
+    const pin = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+    if (pin !== 0) return pin;
+    const prio = (b.priority ?? 0) - (a.priority ?? 0);
+    if (prio !== 0) return prio;
+    const recency = (b.lastViewedAt ?? 0) - (a.lastViewedAt ?? 0);
+    if (recency !== 0) return recency;
+    return a.sizeBytes - b.sizeBytes;
+  });
+
+  const deferred: AssetSyncItem[] = [];
+  const runnable: AssetSyncItem[] = [];
+  for (const it of sorted) {
+    const d = evaluateCloudAction(mode, {
+      kind: it.direction,
+      requiresNetwork: true,
+      bytes: it.sizeBytes,
+      allowOnMetered: Boolean(it.pinned),
+    });
+    if (d.allowed) runnable.push(it);
+    else deferred.push(it);
+  }
+
+  const lanes = Array.from({ length: maxConcurrent }, () => [] as AssetSyncItem[]);
+  const laneBytes = new Array<number>(maxConcurrent).fill(0);
+
+  for (const it of runnable) {
+    let idx = 0;
+    let minBytes = laneBytes[0] ?? 0;
+    for (let i = 1; i < laneBytes.length; i++) {
+      const v = laneBytes[i] ?? 0;
+      if (v < minBytes) {
+        minBytes = v;
+        idx = i;
+      }
+    }
+    // If a single lane is saturated, rotate to next lane to avoid starvation.
+    if ((laneBytes[idx] ?? 0) + it.sizeBytes > maxBatchBytes) {
+      idx = (idx + 1) % maxConcurrent;
+    }
+    lanes[idx]!.push(it);
+    laneBytes[idx] = (laneBytes[idx] ?? 0) + it.sizeBytes;
+  }
+
+  return {
+    lanes,
+    deferred,
+    totalBytes: runnable.reduce((acc, i) => acc + i.sizeBytes, 0),
+  };
+}
+
+// -------- visual folder ranking ----------------------------------
+
+export interface AssetEntry {
+  path: string;
+  name: string;
+  isFolder: boolean;
+  modifiedAt?: number;
+}
+
+/**
+ * Rank entries for quick visual navigation: folders first, then best query
+ * matches, then recency.
+ */
+export function rankAssetEntries(entries: readonly AssetEntry[], query: string = ''): AssetEntry[] {
+  const q = query.trim().toLowerCase();
+  const score = (e: AssetEntry): number => {
+    let s = e.isFolder ? 1000 : 0;
+    const name = e.name.toLowerCase();
+    if (!q) return s + (e.modifiedAt ?? 0) / 1e12;
+    if (name === q) s += 500;
+    else if (name.startsWith(q)) s += 300;
+    else if (name.includes(q)) s += 150;
+    s += (e.modifiedAt ?? 0) / 1e12;
+    return s;
+  };
+  return [...entries].sort((a, b) => score(b) - score(a));
+}

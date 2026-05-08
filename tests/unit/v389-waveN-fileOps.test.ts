@@ -9,6 +9,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  evaluateCloudAction,
+  planSyncBatches,
+  rankAssetEntries,
   SYNC_BADGE_LABELS,
   TRASH_AUTO_PURGE_MS,
   bulkProgress,
@@ -208,5 +211,64 @@ describe('wave N - sync badge', () => {
   it('all statuses have labels', () => {
     expect(SYNC_BADGE_LABELS.synced).toBe('Up to date');
     expect(SYNC_BADGE_LABELS.error).toContain('error');
+  });
+});
+
+// -------- offline/cloud action gating ----------------------------
+
+describe('wave N - cloud action gating', () => {
+  it('allows local actions when offline', () => {
+    const d = evaluateCloudAction('offline', { kind: 'local-write', requiresNetwork: false });
+    expect(d.allowed).toBe(true);
+  });
+
+  it('defers network actions when offline', () => {
+    const d = evaluateCloudAction('offline', { kind: 'upload', requiresNetwork: true, bytes: 10_000_000 });
+    expect(d).toMatchObject({ allowed: false, deferred: true, reason: 'offline' });
+  });
+
+  it('defers large transfers on metered links unless pinned/allowed', () => {
+    const a = evaluateCloudAction('metered', { kind: 'download', requiresNetwork: true, bytes: 50_000_000 });
+    const b = evaluateCloudAction('metered', { kind: 'download', requiresNetwork: true, bytes: 50_000_000, allowOnMetered: true });
+    expect(a.allowed).toBe(false);
+    expect(b.allowed).toBe(true);
+  });
+});
+
+// -------- sync batch planner -------------------------------------
+
+describe('wave N - sync batch planner', () => {
+  it('prioritizes pinned and higher priority assets', () => {
+    const plan = planSyncBatches([
+      { id: 'a', path: '/a', sizeBytes: 10_000_000, direction: 'download', priority: 1 },
+      { id: 'b', path: '/b', sizeBytes: 11_000_000, direction: 'download', priority: 5 },
+      { id: 'c', path: '/c', sizeBytes: 12_000_000, direction: 'download', pinned: true, priority: 0 },
+    ], { maxConcurrent: 1, maxBatchBytes: 100_000_000, mode: 'online' });
+    const ids = plan.lanes[0]!.map(i => i.id);
+    expect(ids[0]).toBe('c');
+    expect(ids[1]).toBe('b');
+  });
+
+  it('defers non-pinned big transfers on metered mode', () => {
+    const plan = planSyncBatches([
+      { id: 'a', path: '/a', sizeBytes: 60_000_000, direction: 'download' },
+      { id: 'b', path: '/b', sizeBytes: 4_000_000, direction: 'download', pinned: true },
+    ], { mode: 'metered', maxConcurrent: 2, maxBatchBytes: 100_000_000 });
+    expect(plan.deferred.map(i => i.id)).toContain('a');
+    expect(plan.deferred.map(i => i.id)).not.toContain('b');
+  });
+});
+
+// -------- visual ranking -----------------------------------------
+
+describe('wave N - visual asset ranking', () => {
+  it('ranks folders first and query-prefix matches higher', () => {
+    const ranked = rankAssetEntries([
+      { path: '/zeta.mov', name: 'zeta.mov', isFolder: false, modifiedAt: 100 },
+      { path: '/shots', name: 'shots', isFolder: true, modifiedAt: 10 },
+      { path: '/scene-01.mov', name: 'scene-01.mov', isFolder: false, modifiedAt: 200 },
+    ], 'sc');
+    expect(ranked[0]!.name).toBe('shots');
+    expect(ranked[1]!.name).toBe('scene-01.mov');
   });
 });
