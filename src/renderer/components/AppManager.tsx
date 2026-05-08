@@ -111,6 +111,8 @@ const Power = lazyRetry(() => import('../pages/Power'));
 const Workflows = lazyRetry(() => import('../pages/Workflows'));
 const Gallery = lazyRetry(() => import('../pages/Gallery'));
 const AudioPage = lazyRetry(() => import('../pages/Audio'));
+const Store = lazyRetry(() => import('../pages/Store'));
+const Games = lazyRetry(() => import('../pages/Games'));
 
 const VideoEditor = lazyRetry(() => import('../DEXAPPLICATIONS/vinx/Vinx'));
 const Imosion = lazyRetry(() => import('../DEXAPPLICATIONS/imosion/Imosion'));
@@ -147,7 +149,7 @@ const PixelArt = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PixelArt'
 
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'transfers'
-  | 'notes' | 'tasks' | 'power' | 'workflows' | 'gallery' | 'audio'
+  | 'notes' | 'tasks' | 'power' | 'workflows' | 'gallery' | 'audio' | 'store' | 'games'
   | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl'
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
@@ -171,6 +173,8 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   rewind: { w: 720, h: 500 },
   tasks: { w: 680, h: 480 },
   workflows: { w: 720, h: 500 },
+  store: { w: 900, h: 640 },
+  games: { w: 900, h: 640 },
   calendar: { w: 680, h: 480 },
   kanban: { w: 720, h: 500 },
   calculator: { w: 340, h: 480 },
@@ -210,7 +214,7 @@ const IS_WINDOWS = navigator.platform.includes('Win');
 const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   home: Home, files: Files, browser: Browser, settings: Settings, transfers: Transfers,
   notes: Notes, tasks: Tasks, power: Power, workflows: Workflows,
-  gallery: Gallery, audio: AudioPage,
+  gallery: Gallery, audio: AudioPage, store: Store, games: Games,
   videoeditor: VideoEditor, imosion: Imosion, prism: Prism, flux: Flux, forge: Forge,
   calculator: Calculator, calendar: Calendar, passwordgenerator: PasswordGenerator,
   rewind: Rewind, kanban: KanbanApp, achievements: AchievementsApp,
@@ -263,6 +267,8 @@ const Icons: Record<string, JSX.Element> = {
   tasks: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
   power: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>,
   workflows: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>,
+  store: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M3 9l1-5h16l1 5"/><path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>,
+  games: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="2" y="6" width="20" height="12" rx="4"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/><circle cx="16" cy="11" r="1"/><circle cx="18" cy="13" r="1"/></svg>,
   gallery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="2" y="2" width="9" height="9" rx="1.5"/><rect x="13" y="2" width="9" height="9" rx="1.5"/><rect x="2" y="13" width="9" height="9" rx="1.5"/><rect x="13" y="13" width="9" height="9" rx="1.5"/></svg>,
   audio: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
   passwordgenerator: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
@@ -318,6 +324,8 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
   { id: 'tasks', label: 'Tasks', color: 'var(--color-warning)' },
   { id: 'calendar', label: 'Calendar', color: 'var(--color-error)' },
   { id: 'workflows', label: 'Workflows', color: '#BF5AF2' },
+  { id: 'store', label: 'Store', color: '#0A84FF' },
+  { id: 'games', label: 'Games', color: '#30D158' },
   // Creative Suite
   { id: 'videoeditor', label: 'VINX', color: '#BF5AF2' },
   { id: 'imosion', label: 'Imosion', color: 'var(--color-success)' },
@@ -371,7 +379,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
   const catOrder = ['System', 'Productivity', 'Creative Suite', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards'];
   const appToCat: Record<string, string> = {
     settings: 'System', power: 'System', recyclebin: 'System',
-    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity',
+    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
     videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
     gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
     calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools',
