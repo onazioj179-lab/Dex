@@ -153,6 +153,12 @@ import { healthMonitor, registerHealthHandlers } from './monitors/HealthMonitor'
 import { PermissionManager } from './security/PermissionManager';
 import { DataStore } from './store/DataStore';
 import { Logger } from './utils/Logger';
+import {
+  cleanupInstallerLifecycle,
+  getInstallerLifecycleAction,
+  isUninstallLifecycleAction,
+  isUninstallLifecycleCommand,
+} from './utils/InstallerLifecycle';
 
 // Security Hardening
 import { ipcValidator, InputSanitizer } from './security/IPCValidator';
@@ -422,6 +428,16 @@ class DexApp {
     log.info('[DEX]   STARTUP SEQUENCE INITIATED');
     log.info('[DEX] ========================================');
     startupTimeline.mark('process:entry');
+
+    const installerLifecycleAction = getInstallerLifecycleAction();
+    if (installerLifecycleAction) {
+      cleanupInstallerLifecycle(installerLifecycleAction);
+      if (isUninstallLifecycleAction(installerLifecycleAction)) {
+        log.info(`[DEX] Installer lifecycle action handled; exiting (${installerLifecycleAction})`);
+        app.exit(0);
+        return;
+      }
+    }
     
     // Single instance lock
     const gotTheLock = app.requestSingleInstanceLock();
@@ -431,7 +447,19 @@ class DexApp {
       return;
     }
 
-    app.on('second-instance', () => {
+    app.on('second-instance', (_event, commandLine) => {
+      if (isUninstallLifecycleCommand(commandLine)) {
+        cleanupInstallerLifecycle('cleanup-before-uninstall');
+        this.isQuitting = true;
+        if (this.tray && !this.tray.isDestroyed()) {
+          this.tray.destroy();
+          this.tray = null;
+        }
+        log.info('[DEX] Uninstall lifecycle requested by second instance; quitting running app');
+        app.quit();
+        return;
+      }
+
       if (this.mainWindow) {
         if (this.mainWindow.isMinimized()) this.mainWindow.restore();
         this.mainWindow.show();

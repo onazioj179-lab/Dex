@@ -26,6 +26,7 @@ interface DowngradeEligibility {
   eligible: boolean;
   daysRemaining: number;
   targetVersion: string | null;
+  targetVersions?: string[];
   reason: string;
 }
 
@@ -168,11 +169,11 @@ export const UpdateNotificationDropdown: React.FC = () => {
     }
   }, [dex]);
 
-  const handleDowngrade = useCallback(async () => {
+  const handleDowngrade = useCallback(async (target?: string) => {
     if (!dex?.updates?.downgrade) return;
     setBusy(true);
     try {
-      const result = await dex.updates.downgrade();
+      const result = await dex.updates.downgrade(target);
       if (!result.success) {
         setError(result.error || result.eligibility?.reason || 'Downgrade failed');
       } else {
@@ -347,19 +348,27 @@ export const UpdateNotificationDropdown: React.FC = () => {
               <div style={{ fontSize: 12, color: COLOR_TEXT, marginBottom: 8, lineHeight: 1.4 }}>
                 {downgrade.reason}
               </div>
-              {downgrade.eligible && downgrade.targetVersion && (
-                <button
-                  type="button"
-                  onClick={handleDowngrade}
-                  disabled={busy}
-                  style={{
-                    ...ghostBtn(busy),
-                    borderColor: COLOR_PRO,
-                    color: COLOR_PRO,
-                  }}
-                >
-                  Downgrade to v{downgrade.targetVersion}
-                </button>
+              {downgrade.eligible && (downgrade.targetVersions?.length || downgrade.targetVersion) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {(downgrade.targetVersions && downgrade.targetVersions.length > 0
+                    ? downgrade.targetVersions
+                    : (downgrade.targetVersion ? [downgrade.targetVersion] : [])
+                  ).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => handleDowngrade(v)}
+                      disabled={busy}
+                      style={{
+                        ...ghostBtn(busy),
+                        borderColor: COLOR_PRO,
+                        color: COLOR_PRO,
+                      }}
+                    >
+                      Downgrade to v{v}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}

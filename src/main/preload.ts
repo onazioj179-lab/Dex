@@ -2120,7 +2120,7 @@ const api: DexAPI = {
     getUpdateHistory: () => ipcRenderer.invoke('update:getHistory'),
     // v4.0.0: Pro 30-day downgrade window
     canDowngrade: () => ipcRenderer.invoke('updates:canDowngrade'),
-    downgrade: () => ipcRenderer.invoke('updates:downgrade'),
+    downgrade: (targetVersion?: string) => ipcRenderer.invoke('updates:downgrade', targetVersion),
     getInstallHistory: () => ipcRenderer.invoke('updates:getInstallHistory'),
   },
 

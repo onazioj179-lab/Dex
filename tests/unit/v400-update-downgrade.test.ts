@@ -7,8 +7,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeDowngradeEligibility,
+  pruneInstallHistory,
   DOWNGRADE_WINDOW_DAYS,
   DOWNGRADE_WINDOW_MS,
+  MAX_DOWNGRADE_TARGETS,
+  MAX_INSTALL_HISTORY,
 } from '../../src/shared/update/downgradeWindow';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -84,5 +87,64 @@ describe('computeDowngradeEligibility', () => {
     );
     expect(almostExpired.eligible).toBe(true);
     expect(almostExpired.daysRemaining).toBeGreaterThanOrEqual(1);
+  });
+
+  it('exposes targetVersions list (legacy single-target fallback)', () => {
+    const result = computeDowngradeEligibility(baseRecord, 'pro', baseRecord.installedAt + DAY);
+    expect(result.targetVersions).toEqual(['3.6.0']);
+  });
+
+  it('returns up to MAX_DOWNGRADE_TARGETS prior versions when history is supplied', () => {
+    const history = [
+      { version: '3.5.0', fromVersion: null, installedAt: baseRecord.installedAt - 3 * DAY },
+      { version: '3.6.0', fromVersion: '3.5.0', installedAt: baseRecord.installedAt - 2 * DAY },
+      { version: '3.7.0', fromVersion: '3.6.0', installedAt: baseRecord.installedAt - DAY },
+      { ...baseRecord, fromVersion: '3.7.0' },
+    ];
+    const result = computeDowngradeEligibility(history[history.length - 1], 'pro', baseRecord.installedAt + DAY, history);
+    expect(result.eligible).toBe(true);
+    expect(result.targetVersions).toEqual(['3.7.0', '3.6.0']);
+    expect(result.targetVersions.length).toBeLessThanOrEqual(MAX_DOWNGRADE_TARGETS);
+    expect(result.targetVersion).toBe('3.7.0');
+  });
+});
+
+describe('pruneInstallHistory', () => {
+  const t0 = 1_700_000_000_000;
+
+  it('returns empty for empty input', () => {
+    expect(pruneInstallHistory([])).toEqual([]);
+  });
+
+  it('caps retention to MAX_INSTALL_HISTORY (current + 2 prior)', () => {
+    const history = Array.from({ length: 6 }, (_, i) => ({
+      version: `1.0.${i}`,
+      fromVersion: i === 0 ? null : `1.0.${i - 1}`,
+      installedAt: t0 + i * DAY,
+    }));
+    const pruned = pruneInstallHistory(history, t0 + 6 * DAY);
+    expect(pruned.length).toBe(MAX_INSTALL_HISTORY);
+    expect(pruned[pruned.length - 1].version).toBe('1.0.5');
+    expect(pruned[0].version).toBe('1.0.3');
+  });
+
+  it('clears prior history once the 30-day window has elapsed', () => {
+    const history = [
+      { version: '1.0.0', fromVersion: null, installedAt: t0 },
+      { version: '1.1.0', fromVersion: '1.0.0', installedAt: t0 + DAY },
+      { version: '1.2.0', fromVersion: '1.1.0', installedAt: t0 + 2 * DAY },
+    ];
+    const pruned = pruneInstallHistory(history, t0 + 2 * DAY + DOWNGRADE_WINDOW_MS + 1);
+    expect(pruned.length).toBe(1);
+    expect(pruned[0].version).toBe('1.2.0');
+  });
+
+  it('keeps history within window when under cap', () => {
+    const history = [
+      { version: '1.0.0', fromVersion: null, installedAt: t0 },
+      { version: '1.1.0', fromVersion: '1.0.0', installedAt: t0 + DAY },
+    ];
+    const pruned = pruneInstallHistory(history, t0 + DAY + DAY);
+    expect(pruned.length).toBe(2);
   });
 });

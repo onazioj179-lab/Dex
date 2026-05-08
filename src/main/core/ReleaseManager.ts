@@ -17,6 +17,8 @@ import * as path from 'path';
 import log from 'electron-log';
 import {
   computeDowngradeEligibility,
+  pruneInstallHistory,
+  MAX_INSTALL_HISTORY,
   type DowngradeEligibility,
   type InstallRecord,
   type LicenseTier,
@@ -64,7 +66,10 @@ const CONFIG_FILE = 'update-config.json';
 const BACKUP_DIR = 'backups';
 const UPDATE_SERVER_CONFIG_FILE = 'update-server.json';
 const INSTALL_HISTORY_FILE = 'update-install-history.json';
-const MAX_INSTALL_HISTORY = 20;
+// MAX_INSTALL_HISTORY is imported from shared/update/downgradeWindow so the
+// retention cap (current + 2 prior versions) stays in lockstep with the
+// downgrade-eligibility math. See downgradeWindow.ts for the policy.
+
 
 const DEFAULT_CONFIG: UpdateConfig = {
   autoCheck: true, // Check for updates on startup
@@ -160,7 +165,10 @@ export class ReleaseManager {
       if (fs.existsSync(this.installHistoryPath)) {
         const data = fs.readFileSync(this.installHistoryPath, 'utf-8');
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed)) return parsed.slice(-MAX_INSTALL_HISTORY);
+        if (Array.isArray(parsed)) {
+          // Apply policy on load: drop expired entries, cap retention.
+          return pruneInstallHistory(parsed as InstallRecord[]);
+        }
       }
     } catch (error) {
       log.error('[ReleaseManager] Failed to load install history:', error);
@@ -170,6 +178,7 @@ export class ReleaseManager {
 
   private saveInstallHistory(): void {
     try {
+      this.installHistory = pruneInstallHistory(this.installHistory);
       fs.writeFileSync(
         this.installHistoryPath,
         JSON.stringify(this.installHistory.slice(-MAX_INSTALL_HISTORY), null, 2)
@@ -216,7 +225,8 @@ export class ReleaseManager {
     return computeDowngradeEligibility(
       this.getCurrentInstallRecord(),
       this.getLicenseTier(),
-      Date.now()
+      Date.now(),
+      this.installHistory
     );
   }
 
@@ -227,10 +237,22 @@ export class ReleaseManager {
    * silently — that would be unsafe — but the user data is rolled back so
    * the previous version starts cleanly.
    */
-  async downgrade(): Promise<{ success: boolean; eligibility: DowngradeEligibility; restoredBackup?: string; error?: string }> {
+  async downgrade(targetVersion?: string): Promise<{ success: boolean; eligibility: DowngradeEligibility; restoredBackup?: string; error?: string }> {
     const eligibility = this.canDowngrade();
     if (!eligibility.eligible) {
       return { success: false, eligibility, error: eligibility.reason };
+    }
+    // Validate the requested target sits within the allowed list.
+    let target: string | null = eligibility.targetVersion;
+    if (targetVersion) {
+      if (!eligibility.targetVersions.includes(targetVersion)) {
+        return {
+          success: false,
+          eligibility,
+          error: `Version v${targetVersion} is not within the allowed downgrade window. Choose one of: ${eligibility.targetVersions.map((v) => 'v' + v).join(', ') || 'none'}.`,
+        };
+      }
+      target = targetVersion;
     }
     try {
       const backups = this.listBackups();
@@ -241,7 +263,6 @@ export class ReleaseManager {
           return { success: false, eligibility, error: 'Backup restore failed.' };
         }
       }
-      const target = eligibility.targetVersion;
       const url = target
         ? `https://github.com/onazioj179-lab/Dex/releases/tag/v${target}`
         : 'https://github.com/onazioj179-lab/Dex/releases';
@@ -760,7 +781,7 @@ export class ReleaseManager {
 
     // Pro 30-day downgrade window
     ipcMain.handle('updates:canDowngrade', () => this.canDowngrade());
-    ipcMain.handle('updates:downgrade', () => this.downgrade());
+    ipcMain.handle('updates:downgrade', (_e, target?: string) => this.downgrade(target));
     ipcMain.handle('updates:getInstallHistory', () => this.getInstallHistory());
   }
 

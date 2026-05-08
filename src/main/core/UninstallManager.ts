@@ -9,6 +9,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import log from 'electron-log';
+import { cleanupWindowsStartupRegistration } from '../utils/InstallerLifecycle';
 
 type DataOption = 'keep' | 'remove_all';
 
@@ -51,41 +52,57 @@ function getDirectorySize(dirPath: string): number {
 }
 
 function getDataDirectories(): string[] {
-  const dirs: string[] = [];
+  const dirs = new Set<string>();
   const platform = process.platform;
+
+  try {
+    dirs.add(app.getPath('userData'));
+  } catch {
+    // App path may be unavailable in test harnesses.
+  }
 
   if (platform === 'win32') {
     const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-    dirs.push(path.join(appData, 'DEX'));
-    dirs.push(path.join(localAppData, 'DEX'));
+    for (const appName of ['DEX', 'Dex', 'dex']) {
+      dirs.add(path.join(appData, appName));
+      dirs.add(path.join(localAppData, appName));
+    }
   } else if (platform === 'darwin') {
-    dirs.push(path.join(os.homedir(), 'Library', 'Application Support', 'DEX'));
+    dirs.add(path.join(os.homedir(), 'Library', 'Application Support', 'DEX'));
   } else {
-    dirs.push(path.join(os.homedir(), '.config', 'DEX'));
-    dirs.push(path.join(os.homedir(), '.local', 'share', 'DEX'));
+    dirs.add(path.join(os.homedir(), '.config', 'DEX'));
+    dirs.add(path.join(os.homedir(), '.local', 'share', 'DEX'));
   }
 
-  return dirs.filter(d => fs.existsSync(d));
+  return Array.from(dirs).filter(dirPath => fs.existsSync(dirPath));
 }
 
 function getCacheDirectories(): string[] {
-  const dirs: string[] = [];
+  const dirs = new Set<string>();
   const platform = process.platform;
+
+  try {
+    dirs.add(app.getPath('sessionData'));
+  } catch {
+    // sessionData can be unavailable in older Electron/test contexts.
+  }
 
   if (platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-    dirs.push(path.join(localAppData, 'DEX', 'Cache'));
-    dirs.push(path.join(localAppData, 'DEX', 'Code Cache'));
-    dirs.push(path.join(localAppData, 'DEX', 'GPUCache'));
+    for (const appName of ['DEX', 'Dex', 'dex']) {
+      dirs.add(path.join(localAppData, appName, 'Cache'));
+      dirs.add(path.join(localAppData, appName, 'Code Cache'));
+      dirs.add(path.join(localAppData, appName, 'GPUCache'));
+    }
   } else if (platform === 'darwin') {
-    dirs.push(path.join(os.homedir(), 'Library', 'Caches', 'DEX'));
-    dirs.push(path.join(os.homedir(), 'Library', 'Caches', 'com.dex.app'));
+    dirs.add(path.join(os.homedir(), 'Library', 'Caches', 'DEX'));
+    dirs.add(path.join(os.homedir(), 'Library', 'Caches', 'com.dex.app'));
   } else {
-    dirs.push(path.join(os.homedir(), '.cache', 'DEX'));
+    dirs.add(path.join(os.homedir(), '.cache', 'DEX'));
   }
 
-  return dirs.filter(d => fs.existsSync(d));
+  return Array.from(dirs).filter(dirPath => fs.existsSync(dirPath));
 }
 
 function getConfigDirectories(): string[] {
@@ -178,6 +195,15 @@ export class UninstallManager {
   async executeUninstall(dataOption: DataOption): Promise<UninstallResult> {
     const removedPaths: string[] = [];
     const errors: string[] = [];
+
+    try {
+      cleanupWindowsStartupRegistration();
+      if (process.platform === 'win32') {
+        removedPaths.push('Windows startup registration');
+      }
+    } catch (error) {
+      errors.push(`Failed to clear startup registration: ${(error as Error).message}`);
+    }
 
     const cacheDirectories = getCacheDirectories();
     for (const dir of cacheDirectories) {
