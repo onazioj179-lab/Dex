@@ -3762,6 +3762,20 @@ const dexNativeAPI = {
   corepc: {
     verify: () => ipcRenderer.invoke('corepc:verify'),
   },
+  permissions: {
+    list: () => ipcRenderer.invoke('permissions:list'),
+    decide: (request: unknown) => ipcRenderer.invoke('permissions:decide', request),
+    planBatch: (requests: unknown[]) => ipcRenderer.invoke('permissions:plan-batch', requests),
+    record: (request: unknown, decision: 'allow' | 'deny', fromGroup?: boolean) =>
+      ipcRenderer.invoke('permissions:record', request, decision, !!fromGroup),
+    revoke: (capability: string, origin: string) =>
+      ipcRenderer.invoke('permissions:revoke', capability, origin),
+    revokeAll: () => ipcRenderer.invoke('permissions:revoke-all'),
+  },
+  reader: {
+    summarize: (text: string, options?: { sentences?: number }) =>
+      ipcRenderer.invoke('reader:summarize', text, options),
+  },
 };
 
 contextBridge.exposeInMainWorld('dex', api);

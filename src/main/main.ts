@@ -285,6 +285,8 @@ import { registerArchiveIpc } from './services/ArchiveService';
 import { registerSpeedTestIpc } from './services/SpeedTestService';
 import { registerSystemCapabilitiesIpc, detectCapabilities } from './services/SystemCapabilitiesService';
 import { registerCorePcIpc, verifyCoreIntegrity } from './services/CorePCService';
+import { registerPermissionsIpc } from './services/PermissionsService';
+import { summarize as _readerSummarize } from '../shared/reader/readerSummary';
 import { UpdateService } from './core/UpdateService';
 import { ProductionMonitor } from './core/ProductionMonitor';
 
@@ -3327,6 +3329,31 @@ class DexApp {
         .catch((err) => log.warn('[DEX] CorePC verify failed:', err));
     } catch (err) {
       log.error('[DEX] CorePC IPC failed:', err);
+    }
+
+    // -------------------------------------------------------------------------
+    // Consolidated permissions surface + extractive reader summary IPC
+    // (May 2026 macOS-style feedback sweep).
+    // -------------------------------------------------------------------------
+    try {
+      registerPermissionsIpc();
+      log.info('[DEX] Permissions IPC registered');
+    } catch (err) {
+      log.error('[DEX] Permissions IPC failed:', err);
+    }
+    try {
+      ipcMain.handle('reader:summarize', (_evt, text: string, options?: { sentences?: number }) => {
+        if (typeof text !== 'string' || text.length === 0) {
+          return { summary: '', picks: [], totalSentences: 0 };
+        }
+        const sentences = options && typeof options.sentences === 'number'
+          ? Math.max(1, Math.min(10, Math.floor(options.sentences)))
+          : 3;
+        return _readerSummarize(text, { sentences });
+      });
+      log.info('[DEX] Reader summary IPC registered');
+    } catch (err) {
+      log.error('[DEX] Reader summary IPC failed:', err);
     }
 
     // -------------------------------------------------------------------------
