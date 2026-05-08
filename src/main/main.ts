@@ -287,6 +287,12 @@ import { registerSystemCapabilitiesIpc, detectCapabilities } from './services/Sy
 import { registerCorePcIpc, verifyCoreIntegrity } from './services/CorePCService';
 import { registerPermissionsIpc } from './services/PermissionsService';
 import { registerCreatorAccessIpc } from './services/CreatorAccessService';
+import { registerAppStoreIpc } from './services/AppStoreService';
+import { registerGamesIpc } from './services/GamesService';
+import { registerCapabilityBrokerIpc } from './services/CapabilityBrokerService';
+import { registerSnapshotIpc } from './services/SnapshotService';
+import { registerWorkflowIpc } from './services/WorkflowService';
+import { registerSyncIpc } from './services/SyncService';
 import { summarize as _readerSummarize } from '../shared/reader/readerSummary';
 import { UpdateService } from './core/UpdateService';
 import { ProductionMonitor } from './core/ProductionMonitor';
@@ -3360,6 +3366,22 @@ class DexApp {
     } catch (err) {
       log.error('[DEX] Permissions IPC failed:', err);
     }
+    // -------------------------------------------------------------------------
+    // Phase 3 host bridges: app store, games, capability broker, snapshot,
+    // workflow runner, sync engine. All wired to IPC for renderer consumption.
+    // -------------------------------------------------------------------------
+    try { registerAppStoreIpc(); log.info('[DEX] AppStore IPC registered'); }
+    catch (err) { log.error('[DEX] AppStore IPC failed:', err); }
+    try { registerGamesIpc(); log.info('[DEX] Games IPC registered'); }
+    catch (err) { log.error('[DEX] Games IPC failed:', err); }
+    try { registerCapabilityBrokerIpc(); log.info('[DEX] CapabilityBroker IPC registered'); }
+    catch (err) { log.error('[DEX] CapabilityBroker IPC failed:', err); }
+    try { registerSnapshotIpc(); log.info('[DEX] Snapshot IPC registered'); }
+    catch (err) { log.error('[DEX] Snapshot IPC failed:', err); }
+    try { registerWorkflowIpc(); log.info('[DEX] Workflow IPC registered'); }
+    catch (err) { log.error('[DEX] Workflow IPC failed:', err); }
+    try { registerSyncIpc(); log.info('[DEX] Sync IPC registered'); }
+    catch (err) { log.error('[DEX] Sync IPC failed:', err); }
     try {
       ipcMain.handle('reader:summarize', (_evt, text: string, options?: { sentences?: number }) => {
         if (typeof text !== 'string' || text.length === 0) {
