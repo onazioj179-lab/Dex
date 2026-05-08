@@ -43,7 +43,7 @@ use parking_lot::Mutex;
 // surface fails closed.
 // ─────────────────────────────────────────────────────────────────────────
 const CREATOR_PUBKEY_HEX: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+    "6ab5ad1669f867d962171fcfe7660ea4d5a0f73a87299d3721f26451f24fc688";
 
 const CHALLENGE_PREFIX: &str = "DEX-CREATOR-v1";
 const CHALLENGE_TTL_SECONDS: u64 = 5 * 60;
