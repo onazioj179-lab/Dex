@@ -11,16 +11,17 @@
 // unit tests in tests/unit/dockGeometry.test.ts.
 
 export type DockEdge = 'bottom' | 'top' | 'left' | 'right';
-export type DockSizePreset = 'compact' | 'regular' | 'large';
+export type DockSizePreset = 'compact' | 'regular' | 'large' | 'floating';
 
 /** Visible/hidden offset in pixels when the dock auto-hides off-screen. */
 const HIDE_OFFSET_PX = 12;
 
-/** Margin from the edge in regular mode. Compact tucks closer to the edge. */
+/** Margin from the edge in regular mode. Compact tucks closer; floating lifts off. */
 const EDGE_MARGIN_BY_PRESET: Record<DockSizePreset, number> = {
   compact: 4,
   regular: 10,
   large: 14,
+  floating: 22,
 };
 
 /** Icon pixel size by preset. Compact halves visual footprint. */
@@ -28,6 +29,7 @@ const ICON_SIZE_BY_PRESET: Record<DockSizePreset, number> = {
   compact: 28,
   regular: 40,
   large: 56,
+  floating: 36,
 };
 
 /** Inner padding of the dock pill by preset. */
@@ -35,6 +37,7 @@ const INNER_PADDING_BY_PRESET: Record<DockSizePreset, { x: number; y: number }> 
   compact: { x: 6, y: 2 },
   regular: { x: 10, y: 4 },
   large: { x: 14, y: 6 },
+  floating: { x: 12, y: 6 },
 };
 
 /** Border radius of the dock pill by preset. */
@@ -42,6 +45,7 @@ const BORDER_RADIUS_BY_PRESET: Record<DockSizePreset, number> = {
   compact: 12,
   regular: 18,
   large: 22,
+  floating: 28,
 };
 
 /** Magnification scale by preset (compact = no magnify to save space). */
@@ -49,6 +53,7 @@ const MAGNIFICATION_BY_PRESET: Record<DockSizePreset, number> = {
   compact: 1.0,
   regular: 1.15,
   large: 1.25,
+  floating: 1.20,
 };
 
 export interface DockGeometryInput {
@@ -149,8 +154,20 @@ export function normalizeDockEdge(value: unknown): DockEdge {
 
 /** Validate / normalize a stored preset value. Falls back to 'regular'. */
 export function normalizeDockPreset(value: unknown): DockSizePreset {
-  if (value === 'compact' || value === 'regular' || value === 'large') return value;
+  if (
+    value === 'compact' ||
+    value === 'regular' ||
+    value === 'large' ||
+    value === 'floating'
+  ) {
+    return value;
+  }
   return 'regular';
+}
+
+/** True when the preset visually "lifts" the dock off the edge. */
+export function isFloatingPreset(preset: DockSizePreset): boolean {
+  return preset === 'floating';
 }
 
 /**

@@ -79,6 +79,10 @@ describe('shellPreferences mergePrefs', () => {
     expect(mergePrefs({ dockPreset: 'huge' }).dockPreset).toBe('regular');
   });
 
+  it('accepts floating dockPreset', () => {
+    expect(mergePrefs({ dockPreset: 'floating' }).dockPreset).toBe('floating');
+  });
+
   it('treats non-true booleans as false (strict)', () => {
     expect(mergePrefs({ nightShift: 'yes' }).nightShift).toBe(false);
     expect(mergePrefs({ nightShift: 1 }).nightShift).toBe(false);

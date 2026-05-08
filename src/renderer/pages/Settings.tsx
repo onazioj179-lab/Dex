@@ -16,6 +16,8 @@ import { Select } from '../components/Select';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
+import { useShellPreferences } from '../store/shellPreferencesStore';
+import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
 import {
   type DeviceTier, ALL_TIERS, getTierLabel, getTierDescription,
   getStoredTier, getHardwareSummary, detectDeviceTier, applyTierPresets,
@@ -134,6 +136,11 @@ const Icons = {
       <rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/><circle cx="6" cy="6" r="1"/><circle cx="10" cy="6" r="1"/>
     </svg>
   ),
+  shell: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="15" width="18" height="6" rx="3"/><circle cx="7" cy="18" r="1"/><circle cx="11" cy="18" r="1"/><circle cx="15" cy="18" r="1"/><path d="M5 11l3-3 3 3 3-4 5 6"/>
+    </svg>
+  ),
   keyboard: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M8 16h8"/>
@@ -179,6 +186,7 @@ const Icons = {
 const SECTIONS: SettingSection[] = [
   { id: 'general', name: 'General', icon: Icons.general },
   { id: 'appearance', name: 'Appearance', icon: Icons.appearance },
+  { id: 'shell', name: 'Shell & Dock', icon: Icons.shell },
   { id: 'sound', name: 'Sound', icon: Icons.sound },
   { id: 'display', name: 'Display', icon: Icons.display },
   { id: 'notifications', name: 'Notifications', icon: Icons.notifications },
@@ -201,7 +209,7 @@ const SECTIONS: SettingSection[] = [
 ];
 
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
-  { label: 'System', ids: ['general', 'appearance', 'sound', 'display'] },
+  { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
   { label: 'Privacy & Security', ids: ['privacy', 'network'] },
   { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'files'] },
   { label: 'Advanced', ids: ['performance', 'accessibility', 'storage', 'browser'] },
@@ -1302,6 +1310,187 @@ export const Settings: React.FC = () => {
       >Reset All Settings to Defaults</button>
     </div>
   );
+
+  // -------------------------------------------------------------------------
+  // Shell & Dock settings (May 2026 sweep): movable + compact taskbar,
+  // Liquid Glass tint/opacity, Night Shift, Low-End Mode, update-choice
+  // honor, on-device AI policy + system capabilities readout.
+  // -------------------------------------------------------------------------
+  const renderShellSettings = () => {
+    const prefs = useShellPreferences();
+    const dockEdges: DockEdge[] = ['bottom', 'left', 'right', 'top'];
+    const dockPresets: DockSizePreset[] = ['compact', 'regular', 'large', 'floating'];
+    return (
+      <div style={styles.settingsContent}>
+        <h3 style={styles.sectionTitleFirst}>Dock Position</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Edge</span>
+            <span style={styles.settingDesc}>Pin the dock to any side of the display.</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {dockEdges.map((edge) => (
+              <button
+                key={edge}
+                style={{
+                  ...styles.button,
+                  background: prefs.dockEdge === edge ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                  color: prefs.dockEdge === edge ? '#fff' : 'var(--color-text-primary)',
+                  textTransform: 'capitalize',
+                }}
+                onClick={() => prefs.setDockEdge(edge)}
+              >{edge}</button>
+            ))}
+          </div>
+        </div>
+
+        <h3 style={styles.sectionTitle}>Dock Size</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Preset</span>
+            <span style={styles.settingDesc}>Compact for screen real-estate, Floating for the lifted Windows-12 look.</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {dockPresets.map((preset) => (
+              <button
+                key={preset}
+                style={{
+                  ...styles.button,
+                  background: prefs.dockPreset === preset ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                  color: prefs.dockPreset === preset ? '#fff' : 'var(--color-text-primary)',
+                  textTransform: 'capitalize',
+                }}
+                onClick={() => prefs.setDockPreset(preset)}
+              >{preset}</button>
+            ))}
+          </div>
+        </div>
+
+        <h3 style={styles.sectionTitle}>Liquid Glass</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Tint</span>
+            <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
+          </div>
+          <input
+            type="color"
+            value={prefs.glassTint}
+            onChange={(e) => prefs.setGlassTint(e.target.value)}
+            style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
+            aria-label="Liquid Glass tint color"
+          />
+        </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Opacity</span>
+            <span style={styles.settingDesc}>{(prefs.glassOpacity * 100).toFixed(0)}% — higher is more solid.</span>
+          </div>
+          <input
+            type="range" min={0.4} max={1} step={0.05}
+            value={prefs.glassOpacity}
+            onChange={(e) => prefs.setGlassOpacity(parseFloat(e.target.value))}
+            style={{ width: 200 }}
+            aria-label="Liquid Glass opacity"
+          />
+        </div>
+
+        <h3 style={styles.sectionTitle}>Comfort & Power</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Night Shift</span>
+            <span style={styles.settingDesc}>Warm color filter for evening use.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.nightShift}
+            onChange={(e) => prefs.setNightShift(e.target.checked)}
+            aria-label="Enable Night Shift"
+          />
+        </div>
+        {prefs.nightShift && (
+          <div style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>Night Shift intensity</span>
+              <span style={styles.settingDesc}>{(prefs.nightShiftIntensity * 100).toFixed(0)}% warm.</span>
+            </div>
+            <input
+              type="range" min={0} max={1} step={0.1}
+              value={prefs.nightShiftIntensity}
+              onChange={(e) => prefs.setNightShiftIntensity(parseFloat(e.target.value))}
+              style={{ width: 200 }}
+              aria-label="Night Shift intensity"
+            />
+          </div>
+        )}
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Low-End Mode</span>
+            <span style={styles.settingDesc}>Treat this device as a low-tier PC: disable blur, animations, and heavy effects.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.lowEndMode}
+            onChange={(e) => prefs.setLowEndMode(e.target.checked)}
+            aria-label="Enable low-end mode"
+          />
+        </div>
+
+        <h3 style={styles.sectionTitle}>Updates & Tabs</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Respect my update choice</span>
+            <span style={styles.settingDesc}>Never auto-select Install. Default to Later in update prompts.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.respectUpdateChoice}
+            onChange={(e) => prefs.setRespectUpdateChoice(e.target.checked)}
+            aria-label="Respect my update choice"
+          />
+        </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Keep tabs alive on sleep</span>
+            <span style={styles.settingDesc}>Prevent browser tabs from being refreshed after the system wakes.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.preventTabRefreshOnSleep}
+            onChange={(e) => prefs.setPreventTabRefreshOnSleep(e.target.checked)}
+            aria-label="Keep tabs alive on sleep"
+          />
+        </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Cloud clipboard sync</span>
+            <span style={styles.settingDesc}>Sync clipboard across signed-in DEX devices (encrypted).</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.clipboardCloudSync}
+            onChange={(e) => prefs.setClipboardCloudSync(e.target.checked)}
+            aria-label="Enable cloud clipboard sync"
+          />
+        </div>
+
+        <h3 style={styles.sectionTitle}>Diagnostics</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Reset shell preferences</span>
+            <span style={styles.settingDesc}>Restore dock, glass, night-shift, and update prefs to defaults.</span>
+          </div>
+          <button
+            style={styles.button}
+            onClick={() => {
+              if (window.confirm('Reset all shell preferences to defaults?')) {
+                prefs.reset();
+              }
+            }}
+          >Reset</button>
+        </div>
+      </div>
+    );
+  };
 
   const renderAppearanceSettings = () => (
     <div style={styles.settingsContent}>
@@ -3125,6 +3314,7 @@ export const Settings: React.FC = () => {
     switch (activeSection) {
       case 'general': return renderGeneralSettings();
       case 'appearance': return renderAppearanceSettings();
+      case 'shell': return renderShellSettings();
       case 'sound': return renderSoundSettings();
       case 'display': return renderDisplaySettings();
       case 'notifications': return renderNotificationSettings();

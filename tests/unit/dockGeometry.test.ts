@@ -59,6 +59,14 @@ describe('dockGeometry', () => {
       expect(large.iconSize).toBeGreaterThan(regular.iconSize);
       expect(large.magnificationScale).toBeGreaterThan(regular.magnificationScale);
     });
+
+    it('floating preset lifts the dock further from the edge', () => {
+      const floating = computeDockGeometry({ edge: 'bottom', preset: 'floating', visible: true });
+      const regular = computeDockGeometry({ edge: 'bottom', preset: 'regular', visible: true });
+      // Larger margin (lifted off the edge) and bigger pill radius.
+      expect(Number(floating.positionStyle.bottom)).toBeGreaterThan(Number(regular.positionStyle.bottom));
+      expect(floating.borderRadius).toBeGreaterThan(regular.borderRadius);
+    });
   });
 
   describe('normalizeDockEdge', () => {
@@ -81,6 +89,7 @@ describe('dockGeometry', () => {
       expect(normalizeDockPreset('compact')).toBe('compact');
       expect(normalizeDockPreset('regular')).toBe('regular');
       expect(normalizeDockPreset('large')).toBe('large');
+      expect(normalizeDockPreset('floating')).toBe('floating');
     });
     it('falls back to regular for unknown values', () => {
       expect(normalizeDockPreset('huge')).toBe('regular');

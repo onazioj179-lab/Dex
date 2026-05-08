@@ -3755,6 +3755,13 @@ const dexNativeAPI = {
   network: {
     runSpeedTest: () => ipcRenderer.invoke('network:speedtest:run'),
   },
+  system: {
+    getCapabilities: () => ipcRenderer.invoke('system:capabilities:get'),
+    refreshCapabilities: () => ipcRenderer.invoke('system:capabilities:refresh'),
+  },
+  corepc: {
+    verify: () => ipcRenderer.invoke('corepc:verify'),
+  },
 };
 
 contextBridge.exposeInMainWorld('dex', api);

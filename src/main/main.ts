@@ -283,6 +283,8 @@ import { personalChangelogManager } from './core/PersonalChangelogManager';
 import { ReleaseManager } from './core/ReleaseManager';
 import { registerArchiveIpc } from './services/ArchiveService';
 import { registerSpeedTestIpc } from './services/SpeedTestService';
+import { registerSystemCapabilitiesIpc, detectCapabilities } from './services/SystemCapabilitiesService';
+import { registerCorePcIpc, verifyCoreIntegrity } from './services/CorePCService';
 import { UpdateService } from './core/UpdateService';
 import { ProductionMonitor } from './core/ProductionMonitor';
 
@@ -3300,6 +3302,31 @@ class DexApp {
       log.info('[DEX] Speed test service IPC registered');
     } catch (err) {
       log.error('[DEX] Speed test service IPC failed:', err);
+    }
+
+    // -------------------------------------------------------------------------
+    // Windows-12-style "CorePC" + system capabilities (NPU/ARM/GPU)
+    // -------------------------------------------------------------------------
+    try {
+      registerSystemCapabilitiesIpc();
+      detectCapabilities(false)
+        .then((caps) => log.info('[DEX] System capabilities:', {
+          arch: caps.arch, cores: caps.cpuCores, ramGB: caps.ramTotalGB,
+          ramTier: caps.ramTier, hasNpu: caps.hasNpu, npuFamily: caps.npuFamily,
+        }))
+        .catch((err) => log.warn('[DEX] System capabilities detect failed:', err));
+    } catch (err) {
+      log.error('[DEX] System capabilities IPC failed:', err);
+    }
+    try {
+      registerCorePcIpc();
+      verifyCoreIntegrity()
+        .then((r) => log.info('[DEX] CorePC integrity:', {
+          status: r.status, changed: r.changedFiles.length, missing: r.missingFiles.length,
+        }))
+        .catch((err) => log.warn('[DEX] CorePC verify failed:', err));
+    } catch (err) {
+      log.error('[DEX] CorePC IPC failed:', err);
     }
 
     // -------------------------------------------------------------------------
