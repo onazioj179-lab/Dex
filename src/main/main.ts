@@ -24,6 +24,8 @@ import * as path from 'path';
 // Shared Types
 import type { DexAction } from '../shared/types';
 import { recordLaunch, tooltipFor, EMPTY_STREAK, type StreakState } from '../shared/engagement/streak';
+import { buildEnvelope, defaultFilename, parseEnvelope, type BackupPayload } from '../shared/backup/envelope';
+import { createHash } from 'crypto';
 
 // Controllers
 import { ActionController } from './controllers/ActionController';
@@ -873,16 +875,7 @@ class DexApp {
       }
     });
 
-    // macOS: Show dock icon badge for notifications + quick actions menu
-    if (isMac) {
-      app.dock?.setMenu(Menu.buildFromTemplate([
-        { label: 'New note', click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'notes', { action: 'new' }); } },
-        { label: 'New task', click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'tasks', { action: 'new' }); } },
-        { label: 'Open files', click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'files'); } },
-        { type: 'separator' },
-        { label: 'New Window', click: () => this.createWindow() },
-      ]));
-    }
+    // DEX is shipped for Windows and Linux. No platform-specific dock menu.
   }
   
   // Show fatal error dialog
@@ -1830,6 +1823,60 @@ class DexApp {
     }
   }
 
+  /**
+   * Sections of the local store that are safe and useful to put in a
+   * user-visible backup. Anything with secrets, machine-bound tokens,
+   * or telemetry IDs stays out on purpose.
+   */
+  private static BACKUP_SECTIONS: readonly string[] = [
+    'notes', 'tasks', 'workflows', 'projects', 'tags',
+    'modes', 'rules', 'sessions', 'sessionNotes', 'sessionTimers',
+    'focusSessions', 'activities', 'themeConfig', 'settings', 'appliedSettings',
+  ];
+
+  private async collectBackupPayload(): Promise<BackupPayload> {
+    const out: BackupPayload = {};
+    for (const key of DexApp.BACKUP_SECTIONS) {
+      try {
+        const value = await this.dataStore.get(key);
+        if (value !== null && value !== undefined) out[key] = value;
+      } catch (err) {
+        log.warn('[DEX] Backup: skipping section', key, err);
+      }
+    }
+    return out;
+  }
+
+  private sha256Hex(input: string): string {
+    return createHash('sha256').update(input, 'utf-8').digest('hex');
+  }
+
+  /**
+   * Tray-driven "Save backup..." flow: collect the user's local data,
+   * wrap it in a versioned envelope with an integrity hash, and write
+   * it to a path the user picks.
+   */
+  private async saveBackup(): Promise<void> {
+    const win = this.mainWindow ?? undefined;
+    const filename = defaultFilename();
+    const result = win
+      ? await dialog.showSaveDialog(win, { title: 'Save DEX backup', defaultPath: filename, filters: [{ name: 'DEX backup', extensions: ['json'] }] })
+      : await dialog.showSaveDialog({ title: 'Save DEX backup', defaultPath: filename, filters: [{ name: 'DEX backup', extensions: ['json'] }] });
+    if (result.canceled || !result.filePath) return;
+    const payload = await this.collectBackupPayload();
+    const envelope = buildEnvelope(payload, app.getVersion(), (s) => this.sha256Hex(s));
+    fs.writeFileSync(result.filePath, JSON.stringify(envelope, null, 2), 'utf-8');
+    if (win) {
+      void dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Backup saved',
+        message: 'DEX saved a copy of your work.',
+        detail: `Backup written to:\n${result.filePath}\n\nKeep this file in a safe place. You can restore it from Settings.`,
+        buttons: ['OK'],
+      });
+    }
+  }
+
   private rebuildTrayMenu(): void {
     if (!this.tray) return;
 
@@ -1873,6 +1920,8 @@ class DexApp {
       },
       { type: 'separator' },
       { label: 'Emergency Stop', click: () => this.emergencyStop() },
+      { type: 'separator' },
+      { label: 'Save backup...', click: () => { this.saveBackup().catch(err => log.error('[DEX] Backup failed:', err)); } },
       { type: 'separator' },
       { label: 'Quit Dex', click: () => this.quit() },
     ]);
@@ -1961,6 +2010,25 @@ class DexApp {
         platform: process.platform,
         arch: process.arch,
       };
+    });
+
+    // ---------------------------------------------------------------------------
+    // Backup / restore IPC (matches tray "Save backup..." flow)
+    // ---------------------------------------------------------------------------
+    ipcMain.handle('backup:save', async () => {
+      try { await this.saveBackup(); return { success: true }; }
+      catch (err: any) { log.error('[DEX] backup:save failed:', err); return { success: false, error: String(err?.message ?? err) }; }
+    });
+    ipcMain.handle('backup:preview', async (_e, raw: string) => {
+      try {
+        const json = JSON.parse(raw);
+        const parsed = parseEnvelope(json, (s) => this.sha256Hex(s));
+        if (!parsed.ok || !parsed.envelope) return { ok: false, reason: parsed.reason ?? 'Invalid backup.' };
+        const sections = Object.keys(parsed.envelope.data);
+        return { ok: true, createdAt: parsed.envelope.createdAt, appVersion: parsed.envelope.appVersion, sections };
+      } catch (err: any) {
+        return { ok: false, reason: `Could not read backup: ${String(err?.message ?? err)}` };
+      }
     });
 
     // ---------------------------------------------------------------------------
