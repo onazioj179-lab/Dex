@@ -46,3 +46,17 @@ export function budgetPercent(state: BudgetState, now: number = Date.now()): num
   if (!Number.isFinite(rolled.limit) || rolled.limit <= 0) return 0;
   return Math.min(100, Math.round((rolled.used / rolled.limit) * 100));
 }
+
+// ---------------------------------------------------------------------------
+// Plan-aware factories. Free tier gets conservative caps; power tier (creator
+// unlock) raises the ceiling roughly 7-20x. See src/shared/plan.ts.
+// ---------------------------------------------------------------------------
+import { limitsFor, type PlanTier } from '../plan';
+
+export function createMinuteBudget(tier: PlanTier, now: number = Date.now()): BudgetState {
+  return createBudget(limitsFor(tier).tokensPerMinute, 60_000, now);
+}
+
+export function createDailyBudget(tier: PlanTier, now: number = Date.now()): BudgetState {
+  return createBudget(limitsFor(tier).tokensPerDay, 24 * 60 * 60 * 1000, now);
+}

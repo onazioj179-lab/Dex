@@ -13,6 +13,7 @@
 //                           "Creative Full Access" surface (single owner)
 //
 import React, { useEffect, useState, useCallback } from 'react';
+import { resolvePlan, limitsFor, planLabel } from '../../../shared/plan';
 
 // ---------- Shared design tokens (kept inline to avoid prop drilling) ----------
 const PANEL: React.CSSProperties = {
@@ -423,6 +424,8 @@ export const CreatorAccessPanel: React.FC = () => {
   }, [refreshState]);
 
   const isUnlocked = !!unlocked?.unlocked;
+  const planTier = resolvePlan(unlocked ?? null);
+  const limits = limitsFor(planTier);
 
   return (
     <div style={PANEL}>
@@ -465,6 +468,23 @@ export const CreatorAccessPanel: React.FC = () => {
           {isUnlocked
             ? <button style={BTN_DANGER} onClick={lock}>Lock now</button>
             : <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{unlocked?.reason ?? ''}</span>}
+        </div>
+
+        <div style={ROW}>
+          <div>
+            <div style={LABEL}>Active plan</div>
+            <div style={DESC}>
+              {planLabel(planTier)} — {limits.tokensPerMinute.toLocaleString()} tok/min,
+              {' '}{limits.contextWindowTokens.toLocaleString()} ctx tokens,
+              {' '}{limits.maxParallelToolCalls} parallel tool calls,
+              {' '}{limits.maxPlanSteps} plan steps.
+            </div>
+          </div>
+          <span style={{
+            fontSize: 11, padding: '3px 10px', borderRadius: 999,
+            background: planTier === 'power' ? 'rgba(94,160,255,0.18)' : 'rgba(150,150,150,0.15)',
+            color: planTier === 'power' ? '#5ea0ff' : 'var(--color-text-secondary)',
+          }}>{planTier === 'power' ? 'Power' : 'Free'}</span>
         </div>
       </div>
 

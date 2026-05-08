@@ -20,9 +20,24 @@
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PRIVATE_SEED_HEX =
-  process.env.DEX_CREATOR_SEED ||
-  'REDACTED';
+// Seed is loaded from (in order):
+//   1. process.env.DEX_CREATOR_SEED
+//   2. file at process.env.DEX_CREATOR_SEED_FILE
+//   3. ~/.dex-creator-seed (default location)
+// Never commit the seed itself to this repo.
+const PRIVATE_SEED_HEX = (function loadSeed() {
+  if (process.env.DEX_CREATOR_SEED) return process.env.DEX_CREATOR_SEED.trim();
+  const os = require('os');
+  const path = require('path');
+  const candidate = process.env.DEX_CREATOR_SEED_FILE
+    || path.join(os.homedir(), '.dex-creator-seed');
+  try {
+    return fs.readFileSync(candidate, 'utf8').trim();
+  } catch {
+    console.error('error: no seed found. Set $env:DEX_CREATOR_SEED or place hex seed at ' + candidate);
+    process.exit(2);
+  }
+})();
 
 function readChallenge() {
   const args = process.argv.slice(2);
