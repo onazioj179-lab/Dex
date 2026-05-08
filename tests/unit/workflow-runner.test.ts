@@ -1,0 +1,74 @@
+import { describe, it, expect, vi } from 'vitest';
+import { runWorkflow, type NodeHandler } from '../../src/shared/apps/workflows/runner';
+import type { WorkflowGraph, TriggerEvent } from '../../src/shared/apps/workflows/workflowGraph';
+
+const graph: WorkflowGraph = {
+  id: 'wf', nodes: [
+    { id: 't', kind: 'trigger', type: 'fs.watch', capabilities: [], config: { glob: '**/*.md' } },
+    { id: 'a', kind: 'action', type: 'http.post', capabilities: ['network'], config: { url: 'x' } },
+    { id: 'b', kind: 'action', type: 'log', capabilities: [], config: {} },
+  ],
+  edges: [{ fromId: 't', toId: 'a' }, { fromId: 'a', toId: 'b' }],
+};
+
+const trigger: TriggerEvent = { kind: 'fs', path: 'docs/doc.md', change: 'add' };
+
+function ctx(caps: string[] = ['network']) {
+  return {
+    log: vi.fn(),
+    hasCapability: (c: string) => caps.includes(c),
+  };
+}
+
+describe('Workflow runner', () => {
+  it('runs in topological order, propagates outputs', async () => {
+    const seen: string[] = [];
+    const handlers: Record<string, NodeHandler> = {
+      'http.post': async (n) => { seen.push(n.id); return { posted: true }; },
+      'log': async (n, inputs) => { seen.push(n.id); return inputs; },
+    };
+    const r = await runWorkflow(graph, trigger, handlers, ctx());
+    expect(r.ok).toBe(true);
+    expect(seen).toEqual(['a', 'b']);
+    expect(r.outputs.b).toMatchObject({ posted: true });
+  });
+
+  it('skips node missing capability', async () => {
+    const handlers: Record<string, NodeHandler> = {
+      'http.post': async () => ({}),
+      'log': async () => ({}),
+    };
+    const r = await runWorkflow(graph, trigger, handlers, ctx([]));
+    expect(r.skipped).toContain('a');
+  });
+
+  it('short-circuits when trigger does not match', async () => {
+    const r = await runWorkflow(graph, { kind: 'fs', path: 'x.txt', change: 'add' }, {}, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.outputs).toEqual({});
+  });
+
+  it('fails on missing handler', async () => {
+    const r = await runWorkflow(graph, trigger, { 'http.post': async () => ({}) }, ctx());
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('no-handler');
+  });
+
+  it('propagates handler error with failedNodeId', async () => {
+    const handlers: Record<string, NodeHandler> = {
+      'http.post': async () => { throw new Error('boom'); },
+      'log': async () => ({}),
+    };
+    const r = await runWorkflow(graph, trigger, handlers, ctx());
+    expect(r.ok).toBe(false);
+    expect(r.failedNodeId).toBe('a');
+    expect(r.error).toBe('boom');
+  });
+
+  it('rejects invalid graph', async () => {
+    const bad: WorkflowGraph = { id: 'b', nodes: [], edges: [] };
+    const r = await runWorkflow(bad, trigger, {}, ctx());
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('graph-invalid');
+  });
+});
