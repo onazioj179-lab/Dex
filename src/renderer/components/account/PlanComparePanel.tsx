@@ -48,16 +48,27 @@ const Dash = () => (
 export interface PlanComparePanelProps {
   /** Currently signed-in plan, used to mark the active column. */
   currentPlan?: PlanId;
-  /** Receives the chosen plan id when a column is selected. */
-  onChoose?: (planId: PlanId, period: BillingPeriod) => void;
+  /**
+   * Receives the chosen plan id when a column is selected. Receives the
+   * billing period and (for Studio) the requested seat count.
+   */
+  onChoose?: (planId: PlanId, period: BillingPeriod, seats: number) => void;
   /** Optional close handler, renders a Close button when provided. */
   onClose?: () => void;
   /** Initial billing period toggle. */
   initialPeriod?: BillingPeriod;
+  /** Initial Studio seat count. Defaults to 2 (the Studio minimum). */
+  initialStudioSeats?: number;
 }
 
-export function PlanComparePanel({ currentPlan, onChoose, onClose, initialPeriod = 'monthly' }: PlanComparePanelProps) {
+export function PlanComparePanel({ currentPlan, onChoose, onClose, initialPeriod = 'monthly', initialStudioSeats = 2 }: PlanComparePanelProps) {
   const [period, setPeriod] = useState<BillingPeriod>(initialPeriod);
+  const [studioSeats, setStudioSeats] = useState<number>(() => {
+    const n = Math.floor(initialStudioSeats);
+    if (!Number.isFinite(n) || n < 2) return 2;
+    if (n > 500) return 500;
+    return n;
+  });
 
   // Group perks by category for readable rows.
   const groupedPerks = useMemo(() => {
@@ -97,6 +108,8 @@ export function PlanComparePanel({ currentPlan, onChoose, onClose, initialPeriod
             plan={p}
             period={period}
             isCurrent={p.id === currentPlan}
+            studioSeats={studioSeats}
+            onStudioSeatsChange={setStudioSeats}
             onChoose={onChoose}
           />
         ))}
@@ -130,11 +143,13 @@ export function PlanComparePanel({ currentPlan, onChoose, onClose, initialPeriod
   );
 }
 
-function PlanHeaderCell({ plan, period, isCurrent, onChoose }: {
+function PlanHeaderCell({ plan, period, isCurrent, studioSeats, onStudioSeatsChange, onChoose }: {
   plan: Plan;
   period: BillingPeriod;
   isCurrent: boolean;
-  onChoose?: (planId: PlanId, period: BillingPeriod) => void;
+  studioSeats: number;
+  onStudioSeatsChange: (n: number) => void;
+  onChoose?: (planId: PlanId, period: BillingPeriod, seats: number) => void;
 }) {
   const price = plan.prices[period];
   const monthly = plan.prices.monthly?.cents ?? 0;
@@ -142,6 +157,9 @@ function PlanHeaderCell({ plan, period, isCurrent, onChoose }: {
   const savings = period === 'yearly' && monthly > 0 && yearly > 0
     ? Math.max(0, monthly * 12 - yearly)
     : 0;
+  const isStudio = plan.id === 'studio';
+  const seatsForChoice = isStudio ? Math.max(1, studioSeats) : 1;
+  const totalCents = isStudio && price ? price.cents * seatsForChoice : (price?.cents ?? 0);
   return (
     <div style={planHeader} role="columnheader" aria-label={plan.name}>
       <div style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold }}>{plan.name}</div>
@@ -149,7 +167,7 @@ function PlanHeaderCell({ plan, period, isCurrent, onChoose }: {
       <div style={{ marginTop: space[2], fontSize: fontSize.lg, fontWeight: fontWeight.semibold }}>
         {price ? formatPrice(price.cents) : '—'}
         <span style={{ fontSize: fontSize.xs, color: 'var(--color-text-secondary)', fontWeight: fontWeight.normal }}>
-          {' '}/ {period === 'monthly' ? 'mo' : 'yr'}
+          {isStudio ? ' / seat' : ''} / {period === 'monthly' ? 'mo' : 'yr'}
         </span>
       </div>
       {savings > 0 && (
@@ -157,11 +175,51 @@ function PlanHeaderCell({ plan, period, isCurrent, onChoose }: {
           Save {formatPrice(savings)} per year
         </div>
       )}
+      {isStudio && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: space[1], marginTop: space[1] }}>
+          <label
+            htmlFor="dex-studio-seats"
+            style={{ fontSize: fontSize.xs, color: 'var(--color-text-secondary)' }}
+          >
+            Seats (2 minimum)
+          </label>
+          <input
+            id="dex-studio-seats"
+            type="number"
+            min={2}
+            max={500}
+            step={1}
+            value={studioSeats}
+            aria-label="Studio seats"
+            onChange={(e) => {
+              const raw = Number.parseInt(e.target.value, 10);
+              if (!Number.isFinite(raw)) { onStudioSeatsChange(2); return; }
+              if (raw < 2) { onStudioSeatsChange(2); return; }
+              if (raw > 500) { onStudioSeatsChange(500); return; }
+              onStudioSeatsChange(raw);
+            }}
+            style={{
+              width: '100%',
+              padding: '4px 8px',
+              fontSize: fontSize.sm,
+              color: 'var(--color-text-primary)',
+              background: 'var(--color-bg-inset, #101012)',
+              border: '1px solid var(--color-border, rgba(255,255,255,0.14))',
+              borderRadius: radius.md,
+            }}
+          />
+          {price && (
+            <div style={{ fontSize: fontSize.xs, color: 'var(--color-text-secondary)' }}>
+              Total: <strong style={{ color: 'var(--color-text-primary)' }}>{formatPrice(totalCents)}</strong> / {period === 'monthly' ? 'mo' : 'yr'}
+            </div>
+          )}
+        </div>
+      )}
       <Button
         variant={isCurrent ? 'secondary' : (plan.id === 'pro' ? 'primary' : 'secondary')}
         size="sm"
         disabled={isCurrent}
-        onClick={() => onChoose?.(plan.id, period)}
+        onClick={() => onChoose?.(plan.id, period, seatsForChoice)}
         fullWidth
       >
         {isCurrent ? 'Current plan' : `Choose ${plan.name}`}

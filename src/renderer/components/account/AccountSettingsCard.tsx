@@ -20,9 +20,27 @@ import { AccountAuthFlow } from './AccountAuthFlow';
 import { UpgradePrompt } from './ProBadge';
 import { PlanComparePanel } from './PlanComparePanel';
 import { quotaFor, formatBytes } from '../../../shared/cloud/quota';
-import type { PlanId } from '../../../shared/license/pricing';
+import type { PlanId, BillingPeriod } from '../../../shared/license/pricing';
+import { buildCheckoutUrl, readCheckoutConfigFromGlobal } from '../../../shared/license/checkout';
 
 const STORAGE_KEY = 'dex.account.v1';
+
+async function openExternalUrl(url: string): Promise<boolean> {
+  try {
+    const w: any = typeof window !== 'undefined' ? window : null;
+    if (w?.electron?.invoke) {
+      await w.electron.invoke('shell:openExternal', url);
+      return true;
+    }
+    if (typeof window !== 'undefined' && window.open) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return true;
+    }
+  } catch {
+    /* INTENTIONAL FALLBACK: opening externally may be blocked. UI shows the URL for manual copy. */
+  }
+  return false;
+}
 
 interface CardAccount {
   email: string;
@@ -167,26 +185,14 @@ function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, o
         <UpgradePrompt currentPlan={account.plan} onCompare={onCompare} />
       )}
       {panel === 'billing' && (
-        <div style={cardStyle}>
-          <h3 style={cardHeading}>Manage subscription</h3>
-          <p style={bodyText}>
-            Billing is handled by the configured payment provider. The portal opens in your
-            default browser when DEX is launched with a billing endpoint configured.
-          </p>
-          <p style={bodyText}>
-            INTENTIONAL STUB: this build was launched without a billing endpoint, so the
-            portal cannot open. Set <code>DEX_BILLING_PORTAL_URL</code> to enable.
-          </p>
-          <div><Button variant="ghost" size="sm" onClick={onClosePanel}>Close</Button></div>
-        </div>
+        <BillingPanel account={account} onClose={onClosePanel} />
       )}
       {panel === 'compare' && (
         <PlanComparePanel
           currentPlan={account.plan}
           onClose={onClosePanel}
-          onChoose={(planId) => {
-            // INTENTIONAL STUB: no billing endpoint configured. The host can
-            // override this surface entirely via the `onComparePlans` prop.
+          onChoose={(planId, period, seats) => {
+            void startCheckout({ planId, period, seats, email: account.email });
             onClosePanel();
           }}
         />
@@ -203,6 +209,51 @@ function prettyPlan(p: PlanId): string {
     case 'pro':         return 'Pro';
     case 'studio':      return 'Studio';
   }
+}
+
+async function startCheckout(req: { planId: PlanId; period: BillingPeriod; seats: number; email: string }): Promise<void> {
+  const cfg = readCheckoutConfigFromGlobal(typeof window !== 'undefined' ? window : null);
+  const plan = buildCheckoutUrl(
+    {
+      planId: req.planId,
+      period: req.period,
+      seats: req.seats,
+      email: req.email,
+    },
+    cfg,
+  );
+  await openExternalUrl(plan.url);
+}
+
+function BillingPanel({ account, onClose }: { account: CardAccount; onClose: () => void }) {
+  const cfg = readCheckoutConfigFromGlobal(typeof window !== 'undefined' ? window : null);
+  const hasEndpoint = typeof cfg.baseUrl === 'string' && cfg.baseUrl.length > 0;
+  const handleManage = useCallback(async () => {
+    if (hasEndpoint && cfg.baseUrl) {
+      // Append a hint so the cloud function can route to the customer portal.
+      const sep = cfg.baseUrl.includes('?') ? '&' : '?';
+      await openExternalUrl(`${cfg.baseUrl}${sep}portal=1&email=${encodeURIComponent(account.email)}`);
+    } else {
+      const fallback = buildCheckoutUrl({ planId: account.plan, period: 'yearly', email: account.email }, cfg);
+      await openExternalUrl(fallback.url);
+    }
+  }, [hasEndpoint, account.email, account.plan, cfg]);
+  return (
+    <div style={cardStyle}>
+      <h3 style={cardHeading}>Manage subscription</h3>
+      <p style={bodyText}>
+        {hasEndpoint
+          ? 'The customer portal opens in your default browser. You can update payment methods, change plan, or cancel from there.'
+          : 'No hosted checkout is configured for this build. The button below opens an email to the publisher with your plan request -- you can buy from there.'}
+      </p>
+      <div style={{ display: 'flex', gap: space[2], flexWrap: 'wrap' }}>
+        <Button variant="primary" size="sm" onClick={handleManage}>
+          {hasEndpoint ? 'Open billing portal' : 'Email the publisher'}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+      </div>
+    </div>
+  );
 }
 
 const cardStyle: React.CSSProperties = {

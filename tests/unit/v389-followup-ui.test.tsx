@@ -33,11 +33,11 @@ describe('PlanComparePanel', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('invokes onChoose with plan id and period', () => {
+  it('invokes onChoose with plan id, period, and seats', () => {
     const onChoose = vi.fn();
     render(<PlanComparePanel onChoose={onChoose} />);
     fireEvent.click(screen.getByText('Choose DEX Pro'));
-    expect(onChoose).toHaveBeenCalledWith('pro', 'monthly');
+    expect(onChoose).toHaveBeenCalledWith('pro', 'monthly', 1);
   });
 
   it('toggles to yearly billing', () => {
@@ -45,7 +45,23 @@ describe('PlanComparePanel', () => {
     render(<PlanComparePanel onChoose={onChoose} />);
     fireEvent.click(screen.getByText('Yearly'));
     fireEvent.click(screen.getByText('Choose DEX Pro'));
-    expect(onChoose).toHaveBeenCalledWith('pro', 'yearly');
+    expect(onChoose).toHaveBeenCalledWith('pro', 'yearly', 1);
+  });
+
+  it('passes Studio seat count to onChoose', () => {
+    const onChoose = vi.fn();
+    render(<PlanComparePanel onChoose={onChoose} initialStudioSeats={5} />);
+    fireEvent.click(screen.getByText('Choose DEX Studio'));
+    expect(onChoose).toHaveBeenCalledWith('studio', 'monthly', 5);
+  });
+
+  it('clamps Studio seats to 2 minimum on input', () => {
+    const onChoose = vi.fn();
+    render(<PlanComparePanel onChoose={onChoose} initialStudioSeats={4} />);
+    const seats = screen.getByLabelText('Studio seats') as HTMLInputElement;
+    fireEvent.change(seats, { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Choose DEX Studio'));
+    expect(onChoose).toHaveBeenCalledWith('studio', 'monthly', 2);
   });
 });
 
