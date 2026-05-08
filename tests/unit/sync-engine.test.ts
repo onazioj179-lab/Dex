@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 import { describe, it, expect, vi } from 'vitest';
 import { SyncEngine, type SyncOp, type PeerSender } from '../../src/shared/sync/syncEngine';
 import type { NetCondition } from '../../src/shared/network/transport';

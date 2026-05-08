@@ -23,6 +23,7 @@ import * as path from 'path';
 
 // Shared Types
 import type { DexAction } from '../shared/types';
+import { recordLaunch, tooltipFor, EMPTY_STREAK, type StreakState } from '../shared/engagement/streak';
 
 // Controllers
 import { ActionController } from './controllers/ActionController';
@@ -872,9 +873,13 @@ class DexApp {
       }
     });
 
-    // macOS: Show dock icon badge for notifications
+    // macOS: Show dock icon badge for notifications + quick actions menu
     if (isMac) {
       app.dock?.setMenu(Menu.buildFromTemplate([
+        { label: 'New note', click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'notes', { action: 'new' }); } },
+        { label: 'New task', click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'tasks', { action: 'new' }); } },
+        { label: 'Open files', click: () => { this.mainWindow?.show(); this.mainWindow?.webContents?.send('navigate:app', 'files'); } },
+        { type: 'separator' },
         { label: 'New Window', click: () => this.createWindow() },
       ]));
     }
@@ -1782,8 +1787,47 @@ class DexApp {
     this.tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
 
     this.rebuildTrayMenu();
-    this.tray.setToolTip('Dex - Control Hub');
+    this.tray.setToolTip(this.streakTooltip());
     this.tray.on('click', () => this.mainWindow?.show());
+  }
+
+  /** Local-day streak (read-only after createTray; updated again on each launch). */
+  private streak: StreakState = EMPTY_STREAK;
+  private streakFile(): string {
+    try { return path.join(app.getPath('userData'), 'engagement.json'); } catch { return ''; }
+  }
+  private loadStreak(): StreakState {
+    try {
+      const file = this.streakFile();
+      if (!file || !fs.existsSync(file)) return EMPTY_STREAK;
+      const raw = fs.readFileSync(file, 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<StreakState>;
+      return {
+        current: typeof parsed.current === 'number' ? parsed.current : 0,
+        longest: typeof parsed.longest === 'number' ? parsed.longest : 0,
+        totalDays: typeof parsed.totalDays === 'number' ? parsed.totalDays : 0,
+        lastDay: typeof parsed.lastDay === 'string' ? parsed.lastDay : '',
+      };
+    } catch { return EMPTY_STREAK; }
+  }
+  private saveStreak(s: StreakState): void {
+    try {
+      const file = this.streakFile();
+      if (!file) return;
+      fs.writeFileSync(file, JSON.stringify(s), 'utf-8');
+    } catch {
+      /* INTENTIONAL FALLBACK: streak is an unimportant local counter; ignore I/O errors. */
+    }
+  }
+  /** Update the streak for today and return a tooltip string for the tray. */
+  private streakTooltip(): string {
+    try {
+      this.streak = recordLaunch(this.loadStreak(), new Date());
+      this.saveStreak(this.streak);
+      return tooltipFor(this.streak);
+    } catch {
+      return 'DEX';
+    }
   }
 
   private rebuildTrayMenu(): void {

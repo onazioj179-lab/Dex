@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 import { describe, it, expect, vi } from 'vitest';
 import { runWorkflow, type NodeHandler } from '../../src/shared/apps/workflows/runner';
 import type { WorkflowGraph, TriggerEvent } from '../../src/shared/apps/workflows/workflowGraph';
