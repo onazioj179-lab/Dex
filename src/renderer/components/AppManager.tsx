@@ -2025,7 +2025,7 @@ export const AppManager: React.FC = () => {
               style={{
                 height: 38, display: 'flex', alignItems: 'center', gap: 8,
                 padding: '0 14px', cursor: 'grab', userSelect: 'none',
-                background: 'rgba(28, 28, 32, 0.96)',
+                background: '#1C1C20',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.12))', flexShrink: 0,
                 justifyContent: 'center',
                 touchAction: 'none',
