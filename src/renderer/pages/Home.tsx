@@ -319,7 +319,7 @@ export const Home: React.FC = () => {
           <div style={{
             fontSize: 52, fontWeight: 500,
             color: '#ffffff',
-            letterSpacing: '-2px', lineHeight: 1,
+            letterSpacing: 0, lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
             textShadow: '0 2px 14px rgba(0,0,0,0.45)',
           }}
@@ -331,7 +331,7 @@ export const Home: React.FC = () => {
           <div style={{
             fontSize: 15, fontWeight: 500,
             color: 'rgba(255,255,255,0.85)',
-            marginTop: 6, letterSpacing: '-0.01em',
+            marginTop: 6, letterSpacing: 0,
             textShadow: '0 1px 8px rgba(0,0,0,0.4)',
           }}>
             {dateStr}
@@ -532,14 +532,14 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     <div style={{ ...glassOverlay, position: 'fixed', inset: 0, zIndex: Z_MODAL, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={onClose}>
       <div onMouseDown={e => e.stopPropagation()} style={{
         ...glassPanel,
-        width: 580, maxHeight: '80vh', overflow: 'hidden', padding: 0,
+        width: 'min(580px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', overflow: 'hidden', padding: 0,
         display: 'flex', flexDirection: 'column',
       }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Wallpaper</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <div style={{ minWidth: 0 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: 0 }}>Wallpaper</h2>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose a desktop background</p>
             </div>
             <button onClick={onClose} aria-label="Close wallpaper picker" className="dex-hover-bg" style={{ background: 'var(--color-border-subtle)', border: 'none', borderRadius: 8, width: 28, height: 28, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
@@ -556,7 +556,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             const redPresets = WALLPAPER_PRESETS.filter(p => ['crimson-dark', 'blood-moon', 'obsidian-ember', 'scarlet-edge', 'inferno'].includes(p.id));
             const livePresets = WALLPAPER_PRESETS.filter(p => p.mode === 'live');
             const renderGrid = (presets: typeof WALLPAPER_PRESETS) => (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10, marginBottom: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 10, marginBottom: 20 }}>
                 {presets.map(p => {
                   const isActive = presetId === p.id;
                   const bg = p.mode === 'solid' ? p.value : (p.thumbnail || p.value);
@@ -587,7 +587,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       {p.mode === 'live' && (
                         <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
                       )}
-                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: '-0.01em' }}>
+                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}
                       </div>
                     </button>
@@ -665,7 +665,7 @@ const ALL_AVAILABLE_APPS = [
   { id: 'videoeditor', label: 'VINX', icon: 'film' },
   { id: 'kanban', label: 'Kanban', icon: 'columns' },
   { id: 'weather', label: 'Weather', icon: 'cloud' },
-  { id: 'nexus', label: 'Nexus', icon: 'bar-chart-2' },
+  { id: 'nexus', label: 'Nexus', icon: 'bar-chart' },
   { id: 'imosion', label: 'Imosion', icon: 'music' },
   { id: 'forge', label: 'Forge', icon: 'zap' },
   { id: 'calculator', label: 'Calculator', icon: 'calculator' },
@@ -673,7 +673,7 @@ const ALL_AVAILABLE_APPS = [
   { id: 'gallery', label: 'Gallery', icon: 'image' },
   { id: 'prism', label: 'Prism', icon: 'image' },
   { id: 'flux', label: 'Flux', icon: 'layers' },
-  { id: 'canvas', label: 'Canvas', icon: 'edit-3' },
+  { id: 'canvas', label: 'Canvas', icon: 'edit' },
   { id: 'timer', label: 'Timer', icon: 'clock' },
   { id: 'rewind', label: 'Rewind', icon: 'rewind' },
 ];
@@ -700,12 +700,13 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
       <style>{`
         .home-app-btn {
           display: flex; flex-direction: column; align-items: center; gap: 6px;
-          padding: 12px; min-width: 68px;
+          width: 76px; min-width: 76px; height: 78px;
+          padding: 8px 6px;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 16px;
+          border-radius: 8px;
           cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+          transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
           position: relative;
           overflow: hidden;
         }
@@ -718,13 +719,13 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
           transition: opacity 0.2s ease;
         }
         .home-app-btn:hover {
-          transform: translateY(-4px) scale(1.05);
+          transform: translateY(-2px);
           background: rgba(255,255,255,0.08);
           border-color: rgba(10,132,255,0.3);
-          box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 20px rgba(10,132,255,0.15);
+          box-shadow: 0 10px 24px rgba(0,0,0,0.24), 0 0 16px rgba(10,132,255,0.12);
         }
         .home-app-btn:hover::before { opacity: 1; }
-        .home-app-btn:active { transform: translateY(-2px) scale(0.98); }
+        .home-app-btn:active { transform: translateY(0); }
         .home-app-btn img, .home-app-btn svg {
           transition: transform 0.2s ease;
         }
@@ -733,7 +734,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
         }
       `}</style>
       <div
-        style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}
+        style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start' }}
         onContextMenu={(e) => handleContext(e)}
       >
         {appsToShow.map((app, i) => (
@@ -746,11 +747,11 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
             style={{ animationDelay: `${i * 0.04}s` }}
           >
             {APP_ICON_PNGS[app.id] ? (
-              <img src={APP_ICON_PNGS[app.id]} alt="" style={{ width: 48, height: 48, borderRadius: 12 }} />
+              <img src={APP_ICON_PNGS[app.id]} alt="" style={{ width: 42, height: 42, borderRadius: 8 }} />
             ) : (
-              <DexIcon name={app.icon} size={48} color="rgba(255,255,255,0.9)" />
+              <DexIcon name={app.icon} size={42} color="rgba(255,255,255,0.9)" />
             )}
-            <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{app.label}</span>
+              <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.3)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.label}</span>
           </button>
         ))}
       </div>

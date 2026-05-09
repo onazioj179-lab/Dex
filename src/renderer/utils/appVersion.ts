@@ -4,7 +4,10 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-const FALLBACK_VERSION = import.meta.env.VITE_APP_VERSION || '3.6.0';
+// VITE_APP_VERSION is wired in vite.config.ts to the live npm_package_version,
+// so this constant is correct for every build. Renderer code should prefer
+// getRuntimeAppVersion() (it asks main and falls back here on failure).
+const FALLBACK_VERSION = (import.meta.env.VITE_APP_VERSION as string) || '0.0.0';
 
 export const getBundledAppVersion = (): string => FALLBACK_VERSION;
 

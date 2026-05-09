@@ -1109,7 +1109,7 @@ const STATE_LABELS: Record<string, { label: string; color: string }> = {
   processing: { label: 'Processing...', color: '#BF5AF2' },
   thinking: { label: 'Thinking...', color: 'var(--color-warning)' },
   speaking: { label: 'Speaking', color: 'var(--color-success)' },
-  error: { label: 'Error', color: 'var(--color-error)' },
+  error: { label: 'Needs attention', color: 'var(--color-warning)' },
 };
 
 const UkiOverlay: React.FC = () => {
@@ -1207,7 +1207,17 @@ const UkiOverlay: React.FC = () => {
   const [streamingResponse, setStreamingResponse] = useState('');
   const streamTarget = useRef('');
   const streamTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const [speakResponses, setSpeakResponses] = useState(true); // TTS toggle
+  const [speakResponses, setSpeakResponses] = useState(() => {
+    try { return localStorage.getItem('dex-uki-speak-responses') !== 'false'; } catch { return true; }
+  });
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem('dex-uki-speak-responses', speakResponses ? 'true' : 'false'); } catch { /* noop */ }
+    if (!speakResponses && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, [speakResponses]);
 
   /** Stream response with typewriter effect and optional TTS */
   const streamResponse = useCallback((reply: string, intent: string, userText: string, speakIt = true) => {
@@ -1244,6 +1254,7 @@ const UkiOverlay: React.FC = () => {
     const text = inputText.trim();
     if (!text) return;
     setInputText('');
+    useUkiStore.getState().setError(null);
     // Cancel any in-progress streaming animation
     if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
 
@@ -1431,11 +1442,48 @@ const UkiOverlay: React.FC = () => {
             </div>
           )}
 
+          <button
+            onClick={() => setSpeakResponses(v => !v)}
+            title={speakResponses ? 'Turn UKI speech off' : 'Turn UKI speech on'}
+            aria-label={speakResponses ? 'Turn UKI speech off' : 'Turn UKI speech on'}
+            aria-pressed={speakResponses}
+            style={{
+              marginLeft: state === 'listening' ? 0 : 'auto',
+              width: 24, height: 22, borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: speakResponses ? 'rgba(10,132,255,0.14)' : 'transparent',
+              border: 'none', color: speakResponses ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {speakResponses ? <path d="M15 9a5 5 0 0 1 0 6" /> : <line x1="16" y1="9" x2="22" y2="15" />}
+              {speakResponses ? <path d="M17.5 6.5a8 8 0 0 1 0 11" /> : <line x1="22" y1="9" x2="16" y2="15" />}
+            </svg>
+          </button>
+
+          <button
+            onClick={() => setCollapsed(v => !v)}
+            title={collapsed ? 'Expand UKI panel' : 'Collapse UKI panel'}
+            aria-label={collapsed ? 'Expand UKI panel' : 'Collapse UKI panel'}
+            aria-expanded={!collapsed}
+            style={{
+              width: 24, height: 22, borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
           {/* Close button */}
           <button
             onClick={() => useUkiStore.getState().reset()}
             style={{
-              marginLeft: 'auto',
+              marginLeft: 0,
               width: 20, height: 20, borderRadius: 6,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none',
@@ -1454,6 +1502,7 @@ const UkiOverlay: React.FC = () => {
 
         {/* Content area -- multi-turn conversation history */}
         <div ref={scrollRef} style={{
+          display: collapsed ? 'none' : 'block',
           maxHeight: 260,
           overflowY: 'auto',
           padding: '8px 14px',
@@ -1548,7 +1597,7 @@ const UkiOverlay: React.FC = () => {
         </div>
 
         {/* Command help panel */}
-        {state === 'listening' && (
+        {!collapsed && state === 'listening' && (
           <div style={{
             borderTop: '1px solid var(--color-bg-hover)',
             padding: '6px 14px 8px',
@@ -1596,7 +1645,7 @@ const UkiOverlay: React.FC = () => {
         <div style={{
           borderTop: '1px solid var(--color-bg-hover)',
           padding: '8px 10px',
-          display: 'flex', alignItems: 'center', gap: 6,
+          display: collapsed ? 'none' : 'flex', alignItems: 'center', gap: 6,
           position: 'relative',
         }}>
           {inputText.startsWith('/') && (() => {

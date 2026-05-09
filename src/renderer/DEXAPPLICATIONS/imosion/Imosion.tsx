@@ -15,6 +15,7 @@ import { useAutoSave } from '../../utils/useAutoSave';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS } from '../../utils/adaptiveCanvas';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
+import { checkPermissionAccess, usePermissionStore } from '../../store/permissionStore';
 import {
   REGION_TYPES,
   COMMON_TIME_SIGNATURES,
@@ -2621,16 +2622,25 @@ const Imosion: React.FC = () => {
 
   // Save data (dual-write: localStorage + IPC) — debounced to avoid heavy serialization on every change
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveProjectData = useCallback((showToast = false) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
+    const json = JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
+    localStorage.setItem('imosion-data', json);
+    (window as any).electron?.invoke?.('capability:storage:set', 'imosion-data', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+    setIsDirty(false);
+    if (showToast) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Imosion project saved' } }));
+    }
+  }, [bitDepth, bpm, buses, installedPlugins, masterSettings, sampleRate, templates, tracks]);
+
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      const customTemplates = templates.filter(t => !DEFAULT_TEMPLATES.find(dt => dt.id === t.id));
-      const json = JSON.stringify({ bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates: customTemplates });
-      localStorage.setItem('imosion-data', json);
-      (window as any).electron?.invoke?.('capability:storage:set', 'imosion-data', json).catch((e: unknown) => { console.warn('[DEX]', e); });
+      saveProjectData(false);
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [bpm, masterSettings, sampleRate, bitDepth, tracks, buses, installedPlugins, templates]);
+  }, [saveProjectData]);
 
   // History tracking for undo/redo (debounced 300ms to avoid excessive deep clones)
   const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -3917,6 +3927,14 @@ const Imosion: React.FC = () => {
   // Recording with selected audio device (earphones, interface, etc.)
   const startRecording = useCallback(async () => {
     try {
+      if (!checkPermissionAccess('microphone', 'imosion')) {
+        const systemGranted = await (window as any).dex?.voice?.requestMicrophonePermission?.().catch(() => false);
+        if (systemGranted) usePermissionStore.getState().setPermission('microphone', true);
+        if (!systemGranted || !checkPermissionAccess('microphone', 'imosion')) {
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Turn on microphone permission to record in Imosion' } }));
+          return;
+        }
+      }
       // Use selected input device for recording (supports any audio interface)
       const constraints: MediaStreamConstraints = {
         audio: {
@@ -4047,7 +4065,14 @@ const Imosion: React.FC = () => {
       if (loopRecording && isLooping) {
         setCompLanes(prev => [...prev, { id: `take-${Date.now()}`, name: `Take ${prev.length + 1}`, active: prev.length === 0 }]);
       }
-    } catch (err) { console.error('Recording error:', err); }
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        usePermissionStore.getState().setPermission('microphone', false);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Microphone access was denied' } }));
+      }
+      console.error('Recording error:', err);
+    }
   }, [currentTime, isPlaying, tracks, sampleRate, selectedInputDevice, latencyMode, bufferSize, bitDepth, loopRecording, isLooping, countInEnabled, countInBars, bpm]);
 
   const stopRecording = useCallback(() => {
@@ -4794,7 +4819,7 @@ const Imosion: React.FC = () => {
       `}</style>
 
       {/* Logic Pro-style Control Bar -- unified single bar */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', minHeight: '40px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, gap: '6px', position: 'relative', zIndex: 100, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', minHeight: '40px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, gap: '6px', position: 'relative', zIndex: 100, overflow: 'visible' }}>
         {/* Left: Branding + Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -4803,12 +4828,12 @@ const Imosion: React.FC = () => {
           </div>
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* File Menu */}
-          <div style={{ position: 'relative' }} onMouseLeave={() => setShowFileMenu(false)}>
+          <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFileMenu(false)}>
             <button aria-label="File menu" onClick={(e) => { e.stopPropagation(); setShowFileMenu(!showFileMenu); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>File {Icon.chevron}</button>
             {showFileMenu && (
-              <div className="tooltip frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '180px', zIndex: 'var(--z-modal)', padding: '4px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+              <div className="tooltip frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '180px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(360px, calc(100vh - 72px))', zIndex: 'var(--z-modal)', padding: '4px', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
                 <div className="dropdown-item" style={{ padding: '7px 12px', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { applyTemplate(DEFAULT_TEMPLATES[3]); setShowFileMenu(false); }}>{Icon.plus} New Project</div>
-                <div className="dropdown-item" style={{ padding: '7px 12px', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>{Icon.save} Save</div>
+                <div className="dropdown-item" style={{ padding: '7px 12px', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { saveProjectData(true); setShowFileMenu(false); }}>{Icon.save} Save</div>
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
                 <div className="dropdown-item" style={{ padding: '7px 12px', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setShowTemplates(true); setShowFileMenu(false); }}>{Icon.template} Templates</div>
                 <div className="dropdown-item" style={{ padding: '7px 12px', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { fileInputRef.current?.click(); setShowFileMenu(false); }}>{Icon.upload} Import Audio</div>
@@ -4826,10 +4851,10 @@ const Imosion: React.FC = () => {
             )}
           </div>
           {/* Tools Menu */}
-          <div style={{ position: 'relative' }} onMouseLeave={() => setShowToolsMenu(false)}>
+          <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowToolsMenu(false)}>
             <button aria-label="Tools menu" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(!showToolsMenu); setShowFileMenu(false); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools {Icon.chevron}</button>
             {showToolsMenu && (
-              <div className="tooltip frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '200px', maxHeight: '420px', overflowY: 'auto', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="tooltip frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '200px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px 12px 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
                 <div className="dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: showEffectsRack ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowEffectsRack(!showEffectsRack); setShowToolsMenu(false); }}>FX Rack {showEffectsRack && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 <div className="dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: showSidechainPanel ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowSidechainPanel(!showSidechainPanel); setShowToolsMenu(false); }}>Sidechain {showSidechainPanel && <span style={{ fontSize: '9px', color: 'var(--color-accent)' }}>ON</span>}</div>
@@ -4887,7 +4912,7 @@ const Imosion: React.FC = () => {
         </div>
 
         {/* Center: Transport + LCD */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
           {/* Transport Controls */}
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-border-subtle)', borderRadius: '10px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
             <button aria-label="Rewind" onClick={() => setCurrentTime(0)} title="Rewind" style={{ width: '28px', height: '26px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#86868b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.rewind}</button>
@@ -6048,12 +6073,12 @@ const Imosion: React.FC = () => {
         {/* Mastering Panel Modal */}
         {showMasteringPanel && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
-            <div style={{ width: '860px', maxHeight: '90vh', background: 'linear-gradient(180deg, #111114, #0a0a0c)', borderRadius: '12px', border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+            <div style={{ width: 'min(860px, calc(100vw - 32px))', maxHeight: 'min(90vh, calc(100vh - 32px))', background: 'linear-gradient(180deg, #111114, #0a0a0c)', borderRadius: '12px', border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
               {/* Header */}
               <div style={{ padding: '14px 20px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                   <div style={{ width: '6px', height: '20px', background: 'linear-gradient(180deg, #bf5af2, #bf5af2)', borderRadius: '3px' }} />
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.3px' }}>Mastering Suite</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Mastering Suite</span>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px 8px', background: 'var(--color-bg-surface)', borderRadius: '4px' }}>Pro</span>
                 </div>
                 <button aria-label="Close Mastering panel" onClick={() => setShowMasteringPanel(false)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="close" size={14} /></button>
@@ -6152,7 +6177,7 @@ const Imosion: React.FC = () => {
         {/* Save Preset Modal */}
         {showSavePresetModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
-            <div style={{ width: '340px', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden' }}>
+            <div style={{ width: 'min(340px, calc(100vw - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', borderBottom: '1px solid #1f1f23' }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Save Preset</span>
               </div>
@@ -6171,7 +6196,7 @@ const Imosion: React.FC = () => {
         {/* Instrument Browser Modal */}
         {showInstrumentBrowser && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
-            <div style={{ width: '680px', maxHeight: '80vh', background: 'linear-gradient(180deg, #111114, #0a0a0c)', borderRadius: '12px', border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+            <div style={{ width: 'min(680px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'linear-gradient(180deg, #111114, #0a0a0c)', borderRadius: '12px', border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
               <div style={{ padding: '14px 20px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: '#bf5af2' }}>Software Instruments</span>
                 <button aria-label="Close" onClick={() => setShowInstrumentBrowser(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '4px' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -7123,7 +7148,7 @@ const Imosion: React.FC = () => {
       {/* Plugin Store Modal */}
       {showPluginStore && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onMouseDown={() => setShowPluginStore(false)}>
-          <div className="modal-content" style={{ width: '600px', maxHeight: '85vh', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(600px, calc(100vw - 32px))', maxHeight: 'min(85vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(48,209,88,0.1), transparent)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ color: 'var(--color-success)' }}>{Icon.store}</span>
@@ -7287,11 +7312,11 @@ const Imosion: React.FC = () => {
       {/* Clip Editor Modal */}
       {showClipEditor && editingClip && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onMouseDown={() => setShowClipEditor(false)}>
-          <div className="modal-content" style={{ width: '520px', maxHeight: '85vh', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(85vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(10,132,255,0.1), transparent)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                 <span style={{ color: 'var(--color-accent)' }}>{Icon.audio}</span>
-                <span style={{ fontSize: '13px', fontWeight: 600 }}>{editingClip.clip.name}</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingClip.clip.name}</span>
               </div>
               <button aria-label="Close" onClick={() => setShowClipEditor(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
             </div>
@@ -7581,12 +7606,12 @@ const Imosion: React.FC = () => {
       {/* Forge Audio Editor - Edison-style sample editor */}
       {showForge && forgeClip && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }} onMouseDown={() => setShowForge(false)}>
-          <div style={{ width: '900px', height: '600px', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid #ff375f40', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div style={{ width: 'min(900px, calc(100vw - 32px))', height: 'min(600px, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid #ff375f40', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }} onMouseDown={(e) => e.stopPropagation()}>
             {/* Forge Header */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
                 <div style={{ width: '6px', height: '20px', background: '#ff375f', borderRadius: '3px' }} />
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#ff375f', letterSpacing: '-0.3px' }}>FORGE</span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#ff375f', letterSpacing: 0, flexShrink: 0 }}>FORGE</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>Audio Editor</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px 8px', background: 'var(--color-bg-surface)', borderRadius: '4px' }}>{forgeClip.clip.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)' }}>{forgeClip.clip.duration.toFixed(2)}s | {forgeClip.clip.waveform.length} samples</span>

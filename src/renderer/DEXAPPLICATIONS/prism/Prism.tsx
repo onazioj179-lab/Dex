@@ -2398,11 +2398,11 @@ const Prism: React.FC = () => {
   // ===== STYLES - CSS VARIABLE BASED FOR THEME SUPPORT =====
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100 },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 800, color: '#ff375f', letterSpacing: '-0.2px' },
-    headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflow: 'hidden', flexWrap: 'wrap', maxHeight: 38, justifyContent: 'center' },
+    headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
-    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease' },
+    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease', whiteSpace: 'nowrap', flexShrink: 0 },
     btnPrimary: { background: '#ff375f', border: '1px solid #ff375f', color: '#fff', fontWeight: 700, borderRadius: '8px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', padding: '8px 4px', gap: '4px', overflow: 'auto' },
@@ -2536,10 +2536,10 @@ const Prism: React.FC = () => {
           <button style={styles.btn} onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" aria-label="Undo">{Icons.undo}</button>
           <button style={styles.btn} onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" aria-label="Redo">{Icons.redo}</button>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <div style={{ position: 'relative' }} onMouseLeave={() => setShowFeaturesMenu(false)}>
+          <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
             <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ background: showFeaturesMenu ? '#2e1520' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#ff375f' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showFeaturesMenu && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '220px', maxHeight: '420px', overflowY: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 2000, padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 2000, padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>ADJUSTMENTS</div>
                 {[
                   { label: 'Curves', active: showCurves, fn: () => setShowCurves(v => !v) },

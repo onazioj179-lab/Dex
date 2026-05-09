@@ -11,6 +11,7 @@
 
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiUIState } from '../store/ukiStore';
+import { checkPermissionAccess, usePermissionStore } from '../store/permissionStore';
 
 let initialized = false;
 let recognition: any = null;
@@ -43,6 +44,14 @@ function createSpeechRecognition(): any {
 function startSpeechRecognition(ipc: any, dex: any): void {
   const store = useUkiStore;
   const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+
+  if (!checkPermissionAccess('microphone', 'uki')) {
+    store.getState().setError('Microphone is off. Turn on the mic permission pill, then try voice again.');
+    store.getState().stopListening();
+    shouldKeepListening = false;
+    recognition = null;
+    return;
+  }
 
   if (!getUserMedia) {
     store.getState().setError('Microphone access is not available in this environment');
@@ -138,6 +147,7 @@ function startSpeechRecognition(ipc: any, dex: any): void {
       recognition = null;
     }
   }).catch((err: any) => {
+    usePermissionStore.getState().setPermission('microphone', false);
     store.getState().setError(`Microphone permission denied: ${err?.message || err}`);
     shouldKeepListening = false;
     recognition = null;

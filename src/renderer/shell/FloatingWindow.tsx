@@ -66,8 +66,10 @@ export interface FloatingWindowProps {
 // ---------------------------------------------------------------------------
 
 const SNAP_EDGE_PX = 24;
-const SNAP_TOP_PX = 4;
-const SNAP_CORNER_PX = 24;
+const SNAP_TOP_PX = 40;
+const SNAP_CORNER_PX = 52;
+const SAFE_TOP = 34;
+const SAFE_GUTTER = 6;
 
 function detectSnapZone(x: number, y: number, windowWidth: number, windowHeight: number): SnapZone | null {
   const nearLeft = x < SNAP_EDGE_PX;
@@ -88,16 +90,18 @@ function detectSnapZone(x: number, y: number, windowWidth: number, windowHeight:
 function getSnapBounds(zone: SnapZone): { x: number; y: number; width: number; height: number } {
   const sw = window.innerWidth;
   const sh = window.innerHeight;
-  const dockH = 68; // Reserve space for dock at bottom
-  const usableH = sh - dockH;
+  const safeX = SAFE_GUTTER;
+  const safeY = SAFE_TOP + SAFE_GUTTER;
+  const safeW = Math.max(320, sw - SAFE_GUTTER * 2);
+  const safeH = Math.max(260, sh - SAFE_TOP - SAFE_GUTTER * 2);
   switch (zone) {
-    case 'full':         return { x: 0, y: 0, width: sw, height: usableH };
-    case 'left':         return { x: 0, y: 0, width: sw / 2, height: usableH };
-    case 'right':        return { x: sw / 2, y: 0, width: sw / 2, height: usableH };
-    case 'top-left':     return { x: 0, y: 0, width: sw / 2, height: usableH / 2 };
-    case 'top-right':    return { x: sw / 2, y: 0, width: sw / 2, height: usableH / 2 };
-    case 'bottom-left':  return { x: 0, y: usableH / 2, width: sw / 2, height: usableH / 2 };
-    case 'bottom-right': return { x: sw / 2, y: usableH / 2, width: sw / 2, height: usableH / 2 };
+    case 'full':         return { x: safeX, y: safeY, width: safeW, height: safeH };
+    case 'left':         return { x: safeX, y: safeY, width: safeW / 2, height: safeH };
+    case 'right':        return { x: safeX + safeW / 2, y: safeY, width: safeW / 2, height: safeH };
+    case 'top-left':     return { x: safeX, y: safeY, width: safeW / 2, height: safeH / 2 };
+    case 'top-right':    return { x: safeX + safeW / 2, y: safeY, width: safeW / 2, height: safeH / 2 };
+    case 'bottom-left':  return { x: safeX, y: safeY + safeH / 2, width: safeW / 2, height: safeH / 2 };
+    case 'bottom-right': return { x: safeX + safeW / 2, y: safeY + safeH / 2, width: safeW / 2, height: safeH / 2 };
   }
 }
 

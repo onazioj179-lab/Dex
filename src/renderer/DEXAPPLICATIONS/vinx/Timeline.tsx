@@ -204,9 +204,9 @@ const TrackHeader: React.FC<{
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
         <span style={{ width: 4, height: 4, borderRadius: 2, background: color, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{track.name}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</span>
       </div>
-      <div style={{ display: 'flex', gap: 2 }}>
+      <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
         <HeaderBtn label="M" active={track.muted} onClick={() => toggleMute(track.id)} activeColor="#FF6B6B" />
         <HeaderBtn label="S" active={track.solo} onClick={() => toggleSolo(track.id)} activeColor="#FFD93D" />
         {track.type === 'video' && (
@@ -521,6 +521,7 @@ const TimelineToolbar: React.FC = memo(() => {
     <div style={{
       height: 28, display: 'flex', alignItems: 'center', gap: 2, padding: '0 6px',
       borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0, background: 'var(--color-bg-base)',
+      minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
     }}>
       {tools.map(t => (
         <button
@@ -557,7 +558,7 @@ const TimelineToolbar: React.FC = memo(() => {
         Snap
       </button>
 
-      <div style={{ flex: 1 }} />
+      <div style={{ flex: '1 1 8px', minWidth: 8 }} />
 
       {/* Track add buttons */}
       <button aria-label="Add video track" onClick={() => addTrack('video')} style={addTrackBtnStyle} title="Add video track">+V</button>
@@ -581,13 +582,13 @@ TimelineToolbar.displayName = 'TimelineToolbar';
 const addTrackBtnStyle: React.CSSProperties = {
   height: 20, fontSize: 9, fontWeight: 600, padding: '0 4px',
   border: '1px solid var(--color-border-subtle)', borderRadius: 3,
-  background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer',
+  background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
 };
 
 const zoomBtnStyle: React.CSSProperties = {
   width: 20, height: 20, fontSize: 12,
   border: '1px solid var(--color-border-subtle)', borderRadius: 3,
-  background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer',
+  background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
 };
 

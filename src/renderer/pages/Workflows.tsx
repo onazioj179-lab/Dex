@@ -958,7 +958,7 @@ export const Workflows: React.FC = () => {
                 onChange={(e) => setSelectedWorkflow(prev => prev ? { ...prev, name: e.target.value } : prev)}
                 style={styles.workflowNameInput}
               />
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={styles.editorActions}>
                 <button
                   style={{ ...styles.backBtn, color: 'var(--color-text-muted)' }}
                   onClick={() => setShowTemplates(!showTemplates)} aria-label="Templates"
@@ -973,7 +973,7 @@ export const Workflows: React.FC = () => {
                 >
                   {Icons.play} Run
                 </button>
-                <button style={styles.saveBtn} aria-label="Save workflow" onClick={saveCurrentWorkflow}>Save</button>
+                <button style={styles.saveBtn} aria-label="Save workflow" onClick={saveCurrentWorkflow}><DexIcon name="save" size={14} /> Save</button>
               </div>
             </div>
 
@@ -1223,23 +1223,28 @@ const styles: Record<string, React.CSSProperties> = {
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '12px 20px', borderBottom: '1px solid var(--color-border)',
+    gap: 12, minWidth: 0,
   },
-  headerLeft: {},
-  headerRight: { display: 'flex', alignItems: 'center', gap: '8px' },
+  headerLeft: { minWidth: 0 },
+  headerRight: {
+    display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px',
+    minWidth: 0, maxWidth: '100%', overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
+  },
   title: { fontSize: '18px', fontWeight: 700, marginBottom: '2px' },
   subtitle: { fontSize: '12px', color: 'var(--color-text-muted)' },
   searchBox: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
     background: 'var(--color-border-subtle)', borderRadius: '8px', color: 'var(--color-text-muted)',
+    minWidth: 150, flexShrink: 0,
   },
   searchInput: {
     background: 'transparent', border: 'none', color: 'var(--color-text-primary)',
-    fontSize: '13px', outline: 'none', width: '150px',
+    fontSize: '13px', outline: 'none', width: '150px', minWidth: 0,
   },
   createBtn: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px',
     border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
-    fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+    fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   },
   workflowGrid: {
     flex: 1, overflow: 'auto', padding: '24px',
@@ -1247,8 +1252,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '16px', alignContent: 'start',
   },
   workflowCard: {
-    background: 'var(--color-bg-elevated)', borderRadius: '16px', padding: '20px',
-    display: 'flex', flexDirection: 'column', gap: '12px',
+    background: 'var(--color-bg-elevated)', borderRadius: '8px', padding: '20px',
+    display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0,
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardIcon: {
@@ -1261,8 +1266,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: '28px', height: '28px', borderRadius: '6px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', cursor: 'pointer',
   },
-  cardTitle: { fontSize: '16px', fontWeight: 600 },
-  cardDescription: { fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.4 },
+  cardTitle: { fontSize: '16px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardDescription: { fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.4, overflowWrap: 'anywhere' },
   cardFooter: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)',
@@ -1275,35 +1280,43 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   // Editor
-  editor: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  editor: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' as const, minWidth: 0 },
   editorHeader: {
     display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px',
     borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)',
+    minWidth: 0, overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
   backBtn: {
     padding: '6px 12px', borderRadius: '6px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-accent)',
     cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 4,
+    whiteSpace: 'nowrap', flexShrink: 0,
   },
   workflowNameInput: {
     flex: 1, background: 'transparent', border: 'none', color: 'var(--color-text-primary)',
-    fontSize: '16px', fontWeight: 600, outline: 'none',
+    fontSize: '16px', fontWeight: 600, outline: 'none', minWidth: 140,
+  },
+  editorActions: {
+    display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
   },
   runEditorBtn: {
     padding: '6px 14px', borderRadius: '8px', border: 'none',
     background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+    whiteSpace: 'nowrap', flexShrink: 0,
   },
   saveBtn: {
     padding: '6px 14px', borderRadius: '8px', border: 'none',
     background: 'var(--color-success, #30d158)', color: 'var(--color-text-inverse)',
-    fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+    fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+    whiteSpace: 'nowrap', flexShrink: 0,
   },
   templatesPanel: {
-    position: 'absolute' as const, top: 52, right: 120, zIndex: 'var(--z-modal)',
+    position: 'absolute' as const, top: 52, right: 16, zIndex: 'var(--z-modal)',
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)', borderRadius: 12,
-    padding: 16, width: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+    padding: 16, width: 'min(280px, calc(100% - 32px))', maxHeight: 'min(420px, calc(100% - 68px))',
+    overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', boxSizing: 'border-box' as const,
   },
   templateCard: {
     display: 'block', width: '100%', textAlign: 'left' as const, padding: '10px 12px',
@@ -1312,7 +1325,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   editorContent: { flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' as const },
   canvasContainer: {
-    flex: 1, position: 'relative' as const, overflow: 'auto',
+    flex: 1, minWidth: 240, position: 'relative' as const, overflow: 'auto',
     background: 'var(--color-bg-base)',
   },
   emptyEditor: {
@@ -1323,8 +1336,9 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Right panel
   rightPanel: {
-    width: '280px', borderLeft: '1px solid var(--color-border)',
+    width: 'clamp(240px, 28%, 320px)', borderLeft: '1px solid var(--color-border)',
     display: 'flex', flexDirection: 'column', background: 'var(--color-bg-secondary)',
+    minWidth: 220, maxWidth: '42%', flexShrink: 0,
   },
   configPanel: { padding: 16, overflowY: 'auto' as const, flex: 1 },
   configInput: {
@@ -1354,12 +1368,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
     borderRadius: '8px', cursor: 'pointer', marginBottom: '4px',
     background: 'var(--color-bg-elevated)', border: 'none', width: '100%',
-    textAlign: 'left' as const, color: 'var(--color-text-primary)',
+    textAlign: 'left' as const, color: 'var(--color-text-primary)', minWidth: 0,
   },
   actionIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', width: 20 },
-  actionInfo: { flex: 1 },
-  actionName: { display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '2px' },
-  actionDesc: { display: 'block', fontSize: '11px', color: 'var(--color-text-muted)' },
+  actionInfo: { flex: 1, minWidth: 0 },
+  actionName: { display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  actionDesc: { display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 };
 
 Workflows.displayName = 'Workflows';

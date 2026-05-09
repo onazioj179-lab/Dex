@@ -115,6 +115,7 @@ export const AdaptiveToolbar = memo(function AdaptiveToolbar({
         flex bg-neutral-900 border-neutral-700
         ${isVertical ? 'border-r' : 'border-b'}
       `}
+      style={{ overflowX: isVertical ? 'hidden' : 'auto', overflowY: isVertical ? 'auto' : 'visible', flexShrink: 0, scrollbarWidth: 'thin' }}
       role="toolbar"
       aria-label="Tools"
     >
@@ -148,6 +149,7 @@ export const AdaptiveToolbar = memo(function AdaptiveToolbar({
                 ${isVertical ? 'left-full top-0 ml-1' : 'top-full left-0 mt-1'}
                 flex ${isVertical ? 'flex-col' : 'flex-row'}
               `}
+              style={{ maxWidth: 'min(280px, calc(100vw - 64px))', maxHeight: 'min(320px, calc(100vh - 80px))', overflow: 'auto' }}
             >
               {tool.subTools.map(subTool => (
                 <button

@@ -81,6 +81,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           padding: `0 ${space[3]}px`,
           height: 36,
           flexShrink: 0,
+          minWidth: 0,
           background: 'var(--color-bg-titlebar, rgba(255,255,255,0.02))',
           borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
         }}
@@ -127,11 +128,21 @@ export const AppShell: React.FC<AppShellProps> = ({
             {subtitle}
           </span>
         )}
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: space[2] }} />
         {headerRight && (
           <div
             data-app-shell-header-right="true"
-            style={{ display: 'flex', alignItems: 'center', gap: space[2] }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              gap: space[2],
+              minWidth: 0,
+              maxWidth: '60%',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              scrollbarWidth: 'thin',
+            }}
           >
             {headerRight}
           </div>
@@ -149,6 +160,10 @@ export const AppShell: React.FC<AppShellProps> = ({
             padding: `0 ${space[3]}px`,
             height: 44,
             flexShrink: 0,
+            minWidth: 0,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'thin',
             borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
           }}
         >
@@ -210,6 +225,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: space[2],
+      minWidth: 0,
+      maxWidth: '100%',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      scrollbarWidth: 'thin',
       borderTop: bordered ? '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))' : undefined,
       borderBottom: bordered ? '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))' : undefined,
       ...style,

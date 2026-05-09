@@ -2025,10 +2025,11 @@ export const AppManager: React.FC = () => {
                 const onMove = (ev: PointerEvent) => {
                   cancelAnimationFrame(rafId);
                   rafId = requestAnimationFrame(() => {
-                    const maxX = window.innerWidth - 60;
-                    const maxY = window.innerHeight - 40;
-                    currentX = Math.max(-detBounds.w + 60, Math.min(maxX, origX + ev.clientX - startX));
-                    currentY = Math.max(0, Math.min(maxY, origY + ev.clientY - startY));
+                    const workspace = getShellWorkspace(6);
+                    const maxX = workspace.x + Math.max(0, workspace.w - detBounds.w);
+                    const maxY = workspace.y + Math.max(0, workspace.h - detBounds.h);
+                    currentX = Math.max(workspace.x, Math.min(maxX, origX + ev.clientX - startX));
+                    currentY = Math.max(workspace.y, Math.min(maxY, origY + ev.clientY - startY));
                     if (el) {
                       // Use transform during drag for GPU acceleration
                       el.style.transform = `translate(${currentX - origX}px, ${currentY - origY}px)`;
@@ -2058,10 +2059,11 @@ export const AppManager: React.FC = () => {
                   snapPreviewRef.current = null;
                   setSnapPreviewZone(null);
                   // Final position
-                  const maxX = window.innerWidth - 60;
-                  const maxY = window.innerHeight - 40;
-                  const finalX = Math.max(-detBounds.w + 60, Math.min(maxX, origX + ev.clientX - startX));
-                  const finalY = Math.max(0, Math.min(maxY, origY + ev.clientY - startY));
+                  const workspace = getShellWorkspace(6);
+                  const maxX = workspace.x + Math.max(0, workspace.w - detBounds.w);
+                  const maxY = workspace.y + Math.max(0, workspace.h - detBounds.h);
+                  const finalX = Math.max(workspace.x, Math.min(maxX, origX + ev.clientX - startX));
+                  const finalY = Math.max(workspace.y, Math.min(maxY, origY + ev.clientY - startY));
                   // Commit snap or final position
                   const zone = detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
@@ -2072,7 +2074,8 @@ export const AppManager: React.FC = () => {
                       const b = prev.get(appId);
                       if (!b) return prev;
                       const next = new Map(prev);
-                      next.set(appId, { ...b, x: finalX, y: finalY });
+                      const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: b.w, h: b.h }, workspace);
+                      next.set(appId, { ...b, ...clamped });
                       return next;
                     });
                   }
@@ -2239,7 +2242,8 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const nw = Math.max(360, startW + ev.clientX - startX);
+                        const workspace = getShellWorkspace(6);
+                        const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
                         if (el) el.style.width = nw + 'px';
                       });
                     };
@@ -2248,12 +2252,14 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
-                      const nw = Math.max(360, startW + ev.clientX - startX);
+                      const workspace = getShellWorkspace(6);
+                      const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
                         if (!b) return prev;
                         const next = new Map(prev);
-                        next.set(appId, { ...b, w: nw });
+                        const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: nw, h: b.h }, workspace);
+                        next.set(appId, { ...b, ...clamped });
                         return next;
                       });
                     };
@@ -2277,7 +2283,8 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const nh = Math.max(280, startH + ev.clientY - startY);
+                        const workspace = getShellWorkspace(6);
+                        const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                         if (el) el.style.height = nh + 'px';
                       });
                     };
@@ -2286,12 +2293,14 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
-                      const nh = Math.max(280, startH + ev.clientY - startY);
+                      const workspace = getShellWorkspace(6);
+                      const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
                         if (!b) return prev;
                         const next = new Map(prev);
-                        next.set(appId, { ...b, h: nh });
+                        const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: b.w, h: nh }, workspace);
+                        next.set(appId, { ...b, ...clamped });
                         return next;
                       });
                     };
@@ -2316,9 +2325,12 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
+                        const workspace = getShellWorkspace(6);
                         const deltaX = ev.clientX - startX;
-                        const nw = Math.max(360, startW - deltaX);
-                        const nl = startLeft + (startW - nw);
+                        const desiredW = Math.max(360, startW - deltaX);
+                        const desiredLeft = startLeft + (startW - desiredW);
+                        const nl = Math.max(workspace.x, desiredLeft);
+                        const nw = startLeft + startW - nl;
                         if (el) {
                           el.style.width = nw + 'px';
                           el.style.left = nl + 'px';
@@ -2330,14 +2342,18 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
+                      const workspace = getShellWorkspace(6);
                       const deltaX = ev.clientX - startX;
-                      const nw = Math.max(360, startW - deltaX);
-                      const nl = startLeft + (startW - nw);
+                      const desiredW = Math.max(360, startW - deltaX);
+                      const desiredLeft = startLeft + (startW - desiredW);
+                      const nl = Math.max(workspace.x, desiredLeft);
+                      const nw = startLeft + startW - nl;
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
                         if (!b) return prev;
                         const next = new Map(prev);
-                        next.set(appId, { ...b, w: nw, x: nl });
+                        const clamped = clampWindowToWorkspace({ x: nl, y: b.y, w: nw, h: b.h }, workspace);
+                        next.set(appId, { ...b, ...clamped });
                         return next;
                       });
                     };
@@ -2362,9 +2378,12 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
+                        const workspace = getShellWorkspace(6);
                         const deltaY = ev.clientY - startY;
-                        const nh = Math.max(280, startH - deltaY);
-                        const nt = startTop + (startH - nh);
+                        const desiredH = Math.max(280, startH - deltaY);
+                        const desiredTop = startTop + (startH - desiredH);
+                        const nt = Math.max(workspace.y, desiredTop);
+                        const nh = startTop + startH - nt;
                         if (el) {
                           el.style.height = nh + 'px';
                           el.style.top = nt + 'px';
@@ -2376,14 +2395,18 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
+                      const workspace = getShellWorkspace(6);
                       const deltaY = ev.clientY - startY;
-                      const nh = Math.max(280, startH - deltaY);
-                      const nt = startTop + (startH - nh);
+                      const desiredH = Math.max(280, startH - deltaY);
+                      const desiredTop = startTop + (startH - desiredH);
+                      const nt = Math.max(workspace.y, desiredTop);
+                      const nh = startTop + startH - nt;
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
                         if (!b) return prev;
                         const next = new Map(prev);
-                        next.set(appId, { ...b, h: nh, y: nt });
+                        const clamped = clampWindowToWorkspace({ x: b.x, y: nt, w: b.w, h: nh }, workspace);
+                        next.set(appId, { ...b, ...clamped });
                         return next;
                       });
                     };
@@ -2410,8 +2433,9 @@ export const AppManager: React.FC = () => {
                 const onMove = (ev: PointerEvent) => {
                   cancelAnimationFrame(rafId);
                   rafId = requestAnimationFrame(() => {
-                    const nw = Math.max(360, startW + ev.clientX - startX);
-                    const nh = Math.max(280, startH + ev.clientY - startY);
+                    const workspace = getShellWorkspace(6);
+                    const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
+                    const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                     if (el) {
                       el.style.width = nw + 'px';
                       el.style.height = nh + 'px';
@@ -2423,13 +2447,15 @@ export const AppManager: React.FC = () => {
                   document.removeEventListener('pointermove', onMove);
                   document.removeEventListener('pointerup', onUp);
                   if (el) el.removeAttribute('data-dragging');
-                  const nw = Math.max(360, startW + ev.clientX - startX);
-                  const nh = Math.max(280, startH + ev.clientY - startY);
+                  const workspace = getShellWorkspace(6);
+                  const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
+                  const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                   setDetachedApps(prev => {
                     const b = prev.get(appId);
                     if (!b) return prev;
                     const next = new Map(prev);
-                    next.set(appId, { ...b, w: nw, h: nh });
+                    const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: nw, h: nh }, workspace);
+                    next.set(appId, { ...b, ...clamped });
                     return next;
                   });
                 };
@@ -3049,7 +3075,7 @@ export const AppManager: React.FC = () => {
           );
         })()}
       </span>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {/* Clock - always visible, date + time clearly separated */}
         <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', letterSpacing: '0.01em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.5)', opacity: 0.95 }}>
           {clockStr}

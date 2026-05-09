@@ -1187,10 +1187,10 @@ const Forge: React.FC = () => {
   // ===== STYLES - MINIMAL =====
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, contain: 'layout style' } as React.CSSProperties,
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100 },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 800, color: 'var(--color-accent)', letterSpacing: '-0.2px' },
-    headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflow: 'hidden', flexWrap: 'wrap', maxHeight: 38, justifyContent: 'center' },
-    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 },
+    headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
+    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
     btnPrimary: { background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: '#5ac8fa', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '8px' },
     btnDanger: { background: '#3a1818', color: '#ff6961', border: '1px solid #4a2020', borderRadius: '8px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
@@ -1372,10 +1372,10 @@ const Forge: React.FC = () => {
             </button>
           )}
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <button aria-label="Tools menu" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showToolsMenu && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxHeight: '420px', overflowY: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
                 {[
                   { label: 'Trim / Split', active: showTrimSplit, fn: () => setShowTrimSplit(v => !v) },

@@ -291,7 +291,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 48,
     fontWeight: 300,
     fontFamily: 'var(--font-mono)',
-    letterSpacing: '-2px',
+    letterSpacing: 0,
   },
   completeText: {
     display: 'block',

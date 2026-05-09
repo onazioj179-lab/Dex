@@ -651,7 +651,11 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
       gap: 8,
       padding: '8px 12px',
       background: '#2d2d2d',
-      borderRadius: 4
+      borderRadius: 4,
+      minWidth: 0,
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      scrollbarWidth: 'thin'
     }}>
       <button
         onClick={onGoToStart}
@@ -748,6 +752,8 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
         fontFamily: 'monospace',
         fontSize: 14,
         color: 'var(--color-text-primary)',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
         background: 'var(--color-bg-input)',
         padding: '4px 8px',
         borderRadius: 3
@@ -993,7 +999,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       gap: 2,
       padding: 4,
       background: '#252526',
-      borderRight: '1px solid #3c3c3c'
+      borderRight: '1px solid #3c3c3c',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      flexShrink: 0,
+      scrollbarWidth: 'thin'
     }}>
       {tools.map(tool => (
         <button
@@ -1006,6 +1016,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             color: activeTool === tool.id ? '#fff' : '#999',
             cursor: 'pointer',
             padding: 8,
+            width: 34,
+            height: 34,
             borderRadius: 4,
             display: 'flex',
             alignItems: 'center',
@@ -1039,6 +1051,9 @@ export const LayerCreator: React.FC<LayerCreatorProps> = ({ onCreateLayer }) => 
     <div className="layer-creator" style={{
       display: 'flex',
       gap: 4,
+      flexWrap: 'wrap',
+      minWidth: 0,
+      maxWidth: '100%',
       padding: '4px 8px',
       background: '#2d2d2d',
       borderRadius: 4
@@ -1058,11 +1073,13 @@ export const LayerCreator: React.FC<LayerCreatorProps> = ({ onCreateLayer }) => 
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            fontSize: 11
+            fontSize: 11,
+            minWidth: 0,
+            maxWidth: 132
           }}
         >
           {type.icon}
-          <span>{type.label}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{type.label}</span>
         </button>
       ))}
     </div>

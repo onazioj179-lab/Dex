@@ -63,15 +63,16 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
       height: 32, gap: 4, padding: '0 8px',
       background: 'var(--color-bg-elevated)',
       borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
       position: 'relative', zIndex: 100,
-      overflowX: 'auto', overflowY: 'hidden',
+      overflowX: 'auto', overflowY: 'visible',
+      minWidth: 0,
     }} className="scrollbar-hidden">
       {/* Project name + mode indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 2 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 2, flexShrink: 0 }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0A84FF" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>
           AXL
@@ -140,14 +141,14 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
 
       {/* Export dropdown */}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', flexShrink: 0 }}>
         <button onClick={(e) => { e.stopPropagation(); ui.toggleExport(); }} title="Export" aria-label="Export" aria-expanded={ui.showExport} aria-haspopup="menu"
           style={{ ...toolBtnStyle(ui.showExport), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span style={{ fontSize: 10 }}>Export</span>
+          <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Export</span>
         </button>
         {ui.showExport && (
-          <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', padding: 4, minWidth: 160, zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
+          <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', padding: 4, minWidth: 160, maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(320px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
             {(['stl', 'gltf', 'dxf', 'pdf', 'json', 'png'] as const).map(fmt => (
               <button key={fmt} onClick={() => { onExport(fmt); ui.toggleExport(); }}
                 className="dex-hover-bg"
@@ -178,28 +179,28 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
       }} title="Add Feature" aria-label="Add Feature" aria-expanded={ui.showFeatureCreate}
         style={{ ...toolBtnStyle(ui.showFeatureCreate), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-        <span style={{ fontSize: 10 }}>Feature</span>
+        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Feature</span>
       </button>
 
       {/* GD&T */}
       <button onClick={ui.toggleGDTCreate} title="GD&T Annotation" aria-label="GD&T Annotation" aria-pressed={ui.showGDTCreate}
         style={{ ...toolBtnStyle(ui.showGDTCreate), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-        <span style={{ fontSize: 10 }}>GD&T</span>
+        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>GD&T</span>
       </button>
 
       {/* Constraints */}
       <button onClick={ui.toggleConstraintPanel} title="Assembly Constraints" aria-label="Assembly Constraints" aria-pressed={ui.showConstraintPanel}
         style={{ ...toolBtnStyle(ui.showConstraintPanel), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        <span style={{ fontSize: 10 }}>Constrain</span>
+        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Constrain</span>
       </button>
 
       {/* AI */}
       <button onClick={ui.toggleAI} title="AI Design Copilot" aria-label="AI Design Copilot" aria-pressed={ui.showAI}
         style={{ ...toolBtnStyle(ui.showAI), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
-        <span style={{ fontSize: 10 }}>AI</span>
+        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>AI</span>
       </button>
     </div>
   );

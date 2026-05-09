@@ -1521,7 +1521,7 @@ const AXL: React.FC = () => {
 
         {/* ─── Parts Library Panel (overlay) ──────────────────────────── */}
         {ui.showPartsLibrary && (
-          <div style={{ position: 'absolute', top: 42, left: 220, width: 320, bottom: 0, background: 'var(--color-bg-elevated)', borderRight: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 42, left: 'min(220px, 32%)', width: 'clamp(220px, calc(100% - 244px), 320px)', bottom: 0, background: 'var(--color-bg-elevated)', borderRight: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Standard Parts</span>
               <button onClick={ui.togglePartsLibrary} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>&times;</button>
@@ -1569,12 +1569,12 @@ const AXL: React.FC = () => {
 
         {/* ─── Feature Creation Panel (overlay) ──────────────────────── */}
         {ui.showFeatureCreate && (
-          <div style={{ position: 'absolute', top: 42, right: 240, width: 260, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Add Feature</span>
               <button onClick={ui.toggleFeatureCreate} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
             </div>
-            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto' }}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 {(['extrude', 'revolve', 'chamfer', 'fillet', 'pattern'] as const).map(ft => (
                   <button key={ft} onClick={() => setFeatureType(ft)}
@@ -1643,7 +1643,7 @@ const AXL: React.FC = () => {
 
         {/* ─── GD&T Creation Panel (overlay) ─────────────────────────── */}
         {ui.showGDTCreate && (
-          <div style={{ position: 'absolute', top: 42, right: 240, width: 260, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>GD&T Annotation</span>
               <button onClick={ui.toggleGDTCreate} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
@@ -1789,7 +1789,7 @@ const AXL: React.FC = () => {
 
         {/* ─── Settings Panel (overlay) ─────────────────────── */}
         {ui.showSettings && (
-          <div style={{ position: 'absolute', top: 42, right: 0, width: 300, bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 42, right: 0, width: 'min(300px, calc(100% - 24px))', bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>Settings</span>
               <button aria-label="Close settings" onClick={() => ui.toggleSettings()} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>&times;</button>
@@ -1878,7 +1878,7 @@ const AXL: React.FC = () => {
 
         {/* ─── AI Design Copilot Panel (overlay) ─────────────────────── */}
         {ui.showAI && (
-          <div style={{ position: 'absolute', top: 42, right: 0, width: 320, bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 42, right: 0, width: 'min(320px, calc(100% - 24px))', bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0A84FF" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>

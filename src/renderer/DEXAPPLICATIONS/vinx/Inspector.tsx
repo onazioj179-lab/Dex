@@ -22,19 +22,20 @@ import { ScopesPanel, type ScopeMode } from './ScopesPanel';
 // ---------------------------------------------------------------------------
 
 const panelStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
+  display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minWidth: 0,
 };
 
 const tabBarStyle: React.CSSProperties = {
   display: 'flex', height: 28, flexShrink: 0, borderBottom: '1px solid var(--color-bg-hover)',
-  background: 'var(--color-bg-base)',
+  background: 'var(--color-bg-base)', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
 };
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
-  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  flex: '1 0 44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
   fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase',
   color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', cursor: 'pointer', userSelect: 'none',
   borderBottom: active ? '1px solid #4A9EFF' : '1px solid transparent',
+  whiteSpace: 'nowrap',
 });
 
 const sectionHeaderStyle: React.CSSProperties = {
@@ -43,7 +44,7 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const propertyRowStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', height: 24,
+  display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', minHeight: 24, minWidth: 0,
 };
 
 const propertyLabelStyle: React.CSSProperties = {
@@ -55,10 +56,11 @@ const numberInputStyle: React.CSSProperties = {
   borderRadius: 3, padding: '0 4px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
   textAlign: 'right', fontFamily: '"SF Mono", "Cascadia Code", "JetBrains Mono", monospace',
   fontVariantNumeric: 'tabular-nums slashed-zero',
+  minWidth: 0,
 };
 
 const sliderContainerStyle: React.CSSProperties = {
-  flex: 1, display: 'flex', alignItems: 'center', gap: 4,
+  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 4,
 };
 
 const keyframeDiamondStyle = (active: boolean): React.CSSProperties => ({
@@ -82,7 +84,7 @@ const Slider: React.FC<{
 }> = memo(({ value, min, max, step = 0.01, onChange }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const progress = (value - min) / (max - min);
+  const progress = Math.max(0, Math.min(1, (value - min) / (max - min || 1)));
 
   const valueFromEvent = useCallback((e: React.PointerEvent | PointerEvent) => {
     if (!trackRef.current) return min;
@@ -109,7 +111,7 @@ const Slider: React.FC<{
   return (
     <div
       ref={trackRef}
-      style={{ flex: 1, height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, position: 'relative', cursor: 'pointer' }}
+      style={{ flex: 1, minWidth: 36, height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, position: 'relative', cursor: 'pointer' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -137,7 +139,7 @@ const PropertyRow: React.FC<{
         <Slider value={value} min={min} max={max} step={step} onChange={onChange} />
         <input
           type="number"
-          style={{ ...numberInputStyle, width: 50, flex: 'none' }}
+          style={{ ...numberInputStyle, width: 48, flex: '0 0 48px' }}
           value={Math.round(value * 100) / 100}
           onChange={e => onChange(Number(e.target.value) || 0)}
           min={min}
@@ -326,11 +328,11 @@ const EffectSection: React.FC<{
         display: 'flex', alignItems: 'center', padding: '6px 8px', gap: 6,
       }}>
         <div style={{
-          width: 8, height: 8, borderRadius: 2,
+          width: 10, height: 10, borderRadius: 3,
           background: effect.enabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
           cursor: 'pointer', flexShrink: 0,
         }} onClick={() => onUpdateParam('__enabled', !effect.enabled)} />
-        <span style={{ flex: 1, fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 600 }}>{effect.name}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{effect.name}</span>
         <button
           aria-label={`Remove ${effect.name} effect`}
           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--color-text-tertiary)', padding: '0 4px' }}
@@ -363,7 +365,7 @@ const EffectSection: React.FC<{
                 style={{
                   padding: '2px 8px', fontSize: 10, border: '1px solid var(--color-border)',
                   borderRadius: 3, background: val ? 'rgba(74,158,255,0.2)' : 'var(--color-border-subtle)',
-                  color: val ? 'var(--color-accent)' : 'var(--color-text-secondary)', cursor: 'pointer',
+                  color: val ? 'var(--color-accent)' : 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0,
                 }}
                 onClick={() => onUpdateParam(param.id, !val)}
               >
@@ -584,7 +586,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
       </div>
       {showScopes && (
         <div style={{ padding: '4px 8px' }}>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
             {(['waveform', 'vectorscope', 'histogram', 'parade'] as ScopeType[]).map(type => (
               <button
                 key={type}
@@ -593,7 +595,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
                   padding: '2px 6px', fontSize: 9, border: '1px solid var(--color-border)',
                   borderRadius: 3, background: scopeType === type ? 'rgba(74,158,255,0.15)' : 'transparent',
                   color: scopeType === type ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
-                  textTransform: 'capitalize',
+                  textTransform: 'capitalize', whiteSpace: 'nowrap', flexShrink: 0,
                 }}
                 onClick={() => setScopeType(type)}
               >
@@ -759,7 +761,7 @@ const CurvesEditor: React.FC<{
         </button>
       </div>
       <div style={{ padding: '2px 8px 4px' }}>
-        <div style={{ display: 'flex', gap: 3, marginBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 3, marginBottom: 4, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
           {CURVE_CHANNELS.map(ch => (
             <button
               key={ch.key}
@@ -768,7 +770,7 @@ const CurvesEditor: React.FC<{
                 border: '1px solid var(--color-border)', borderRadius: 3,
                 background: activeChannel === ch.key ? `${ch.color}20` : 'transparent',
                 color: activeChannel === ch.key ? ch.color : 'var(--color-text-tertiary)',
-                cursor: 'pointer',
+                cursor: 'pointer', flexShrink: 0,
               }}
               onClick={() => setActiveChannel(ch.key)}
             >
@@ -779,7 +781,7 @@ const CurvesEditor: React.FC<{
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          style={{ width: '100%', height: H, background: 'var(--color-bg-base)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', cursor: dragging !== null ? 'grabbing' : 'crosshair', touchAction: 'none' }}
+          style={{ width: '100%', maxWidth: '100%', height: H, background: 'var(--color-bg-base)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', cursor: dragging !== null ? 'grabbing' : 'crosshair', touchAction: 'none', display: 'block' }}
           onPointerDown={handleSvgPointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -975,7 +977,7 @@ const ScopeDisplay: React.FC<{ type: ScopeType }> = memo(({ type }) => {
       ref={canvasRef}
       width={width}
       height={height}
-      style={{ width: '100%', height: 120, borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}
+      style={{ width: '100%', maxWidth: '100%', height: 120, borderRadius: 4, border: '1px solid var(--color-border-subtle)', display: 'block' }}
     />
   );
 });

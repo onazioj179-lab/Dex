@@ -164,10 +164,13 @@ const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
 
   if (!anchorRect) return null;
 
-  // Anchor below the pill, right-aligned to keep it inside the screen.
-  const POPOVER_WIDTH = 240;
-  const right = Math.max(8, window.innerWidth - anchorRect.right);
-  const top = Math.min(window.innerHeight - 16, anchorRect.bottom + 6);
+  const POPOVER_WIDTH = 220;
+  const POPOVER_GUTTER = 8;
+  const TITLEBAR_CLEARANCE = 46;
+  const idealLeft = anchorRect.left + (anchorRect.width / 2) - (POPOVER_WIDTH / 2);
+  const maxLeft = Math.max(POPOVER_GUTTER, window.innerWidth - POPOVER_WIDTH - POPOVER_GUTTER);
+  const left = Math.min(Math.max(idealLeft, POPOVER_GUTTER), maxLeft);
+  const top = Math.max(TITLEBAR_CLEARANCE, anchorRect.bottom + 10);
 
   return (
     <div
@@ -176,8 +179,11 @@ const Popover: React.FC<PopoverProps> = ({ anchorRect, onClose, children }) => {
       style={{
         position: 'fixed',
         top,
-        right,
+        left,
         width: POPOVER_WIDTH,
+        maxWidth: `calc(100vw - ${POPOVER_GUTTER * 2}px)`,
+        maxHeight: `calc(100vh - ${top + POPOVER_GUTTER}px)`,
+        overflow: 'auto',
         zIndex: 'var(--z-popover, 9000)' as React.CSSProperties['zIndex'],
         background: 'var(--color-bg-elevated, #111111)',
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
@@ -269,6 +275,41 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
   const enabled = usePermissionStore(s => s.permissions[id].enabled);
   const setPermission = usePermissionStore(s => s.setPermission);
   const grantedAt = usePermissionStore(s => s.permissions[id].grantedAt);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const togglePermission = useCallback(async () => {
+    setNotice(null);
+    if (enabled) {
+      setPermission(id, false);
+      if (id === 'microphone' && (window as any).speechSynthesis) {
+        try { (window as any).speechSynthesis.cancel(); } catch { /* noop */ }
+      }
+      return;
+    }
+
+    if (id !== 'microphone') {
+      setPermission(id, true);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const granted = await (window as any).dex?.voice?.requestMicrophonePermission?.();
+      if (granted === false) {
+        setNotice('System microphone permission was denied.');
+        setPermission(id, false);
+      } else {
+        setPermission(id, true);
+        setNotice('Microphone is ready for UKI voice.');
+      }
+    } catch {
+      setPermission(id, true);
+      setNotice('Microphone permission is enabled in DEX.');
+    } finally {
+      setBusy(false);
+    }
+  }, [enabled, id, setPermission]);
 
   return (
     <div>
@@ -280,20 +321,21 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
       </p>
       <button
         type="button"
-        onClick={() => setPermission(id, !enabled)}
+        onClick={togglePermission}
+        disabled={busy}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', padding: '8px 10px',
           background: enabled ? 'rgba(61,166,106,0.10)' : 'rgba(255,255,255,0.03)',
           border: `1px solid ${enabled ? 'rgba(61,166,106,0.30)' : 'var(--color-border)'}`,
-          borderRadius: 6, cursor: 'pointer',
+          borderRadius: 6, cursor: busy ? 'wait' : 'pointer',
           color: 'var(--color-text-primary)',
           marginBottom: 8,
           transition: 'background 0.12s, border-color 0.12s',
         }}
       >
         <span style={{ fontSize: 12, fontWeight: 600 }}>
-          {enabled ? 'Granted' : 'Not granted'}
+          {busy ? 'Checking...' : enabled ? 'Granted' : 'Not granted'}
         </span>
         <span style={{
           width: 28, height: 16, borderRadius: 8,
@@ -309,6 +351,11 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
           }} />
         </span>
       </button>
+      {notice && (
+        <div style={{ fontSize: 10, color: enabled ? 'var(--color-success)' : 'var(--color-warning)', lineHeight: 1.35, margin: '0 0 8px' }}>
+          {notice}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8 }}>
         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
           {grantedAt ? `Granted ${new Date(grantedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Off by default'}
@@ -370,7 +417,7 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
 
   return (
     <span
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 0, flexShrink: 0 }}
       onMouseLeave={() => { /* stay open until click outside */ }}
     >
       <Pill

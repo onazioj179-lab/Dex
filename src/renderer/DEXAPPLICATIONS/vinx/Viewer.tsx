@@ -268,6 +268,7 @@ const viewerContainerStyle: React.CSSProperties = {
 const viewerTabBarStyle: React.CSSProperties = {
   display: 'flex', height: 24, flexShrink: 0, background: 'var(--color-bg-base)',
   borderBottom: '1px solid var(--color-bg-hover)',
+  overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
 };
 
 const viewerTabStyle = (active: boolean): React.CSSProperties => ({
@@ -275,6 +276,7 @@ const viewerTabStyle = (active: boolean): React.CSSProperties => ({
   letterSpacing: '0.02em', textTransform: 'uppercase',
   color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', cursor: 'pointer', userSelect: 'none',
   borderBottom: active ? '1px solid #4A9EFF' : '1px solid transparent',
+  whiteSpace: 'nowrap', flexShrink: 0,
 });
 
 const canvasContainerStyle: React.CSSProperties = {
@@ -285,12 +287,13 @@ const canvasContainerStyle: React.CSSProperties = {
 const controlsBarStyle: React.CSSProperties = {
   height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 8px',
   flexShrink: 0, background: 'var(--color-bg-base)', borderTop: '1px solid var(--color-bg-hover)',
+  minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
 };
 
 const timecodeStyle: React.CSSProperties = {
   fontSize: 11, fontFamily: '"SF Mono", "Cascadia Code", "JetBrains Mono", monospace',
   fontVariantNumeric: 'tabular-nums slashed-zero', color: 'var(--color-text-primary)',
-  minWidth: 72, textAlign: 'center', letterSpacing: '0.02em',
+  minWidth: 72, textAlign: 'center', letterSpacing: '0.02em', flexShrink: 0,
 };
 
 const scrubberContainerStyle: React.CSSProperties = {
@@ -306,7 +309,7 @@ const scrubberTrackStyle: React.CSSProperties = {
 const transportBtnStyle: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', padding: 4,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  color: 'var(--color-text-secondary)', width: 24, height: 24,
+  color: 'var(--color-text-secondary)', width: 24, height: 24, flexShrink: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -375,7 +378,7 @@ const FullscreenIcon = () => (
 const overlayBtnStyle = (active: boolean): React.CSSProperties => ({
   background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
   fontSize: 10, color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-  fontWeight: 600, letterSpacing: '0.02em',
+  fontWeight: 600, letterSpacing: '0.02em', whiteSpace: 'nowrap', flexShrink: 0,
 });
 
 // ---------------------------------------------------------------------------
@@ -511,7 +514,7 @@ const ViewerPanel: React.FC<{
     return () => observer.disconnect();
   }, []);
 
-  const aspect = projectWidth / projectHeight;
+  const aspect = projectWidth > 0 && projectHeight > 0 ? projectWidth / projectHeight : 16 / 9;
   const fitWidth = containerSize.h * aspect;
   const fitHeight = containerSize.w / aspect;
   const actualWidth = fitWidth <= containerSize.w ? fitWidth : containerSize.w;
@@ -534,10 +537,10 @@ const ViewerPanel: React.FC<{
         height: 20, display: 'flex', alignItems: 'center', padding: '0 8px',
         fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.04em',
         textTransform: 'uppercase', flexShrink: 0, background: 'var(--color-bg-base)',
-        justifyContent: 'space-between',
+        justifyContent: 'space-between', gap: 8, minWidth: 0,
       }}>
-        <span>{label}</span>
-        <div style={{ display: 'flex', gap: 2 }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin', flexShrink: 0 }}>
           <button aria-label="Toggle safe zones overlay" style={overlayBtnStyle(overlay === 'safe-zones')} onClick={() => setOverlay(overlay === 'safe-zones' ? 'none' : 'safe-zones')}>Safe</button>
           <button aria-label="Toggle grid overlay" style={overlayBtnStyle(overlay === 'grid')} onClick={() => setOverlay(overlay === 'grid' ? 'none' : 'grid')}>Grid</button>
           <button aria-label="Toggle fullscreen" style={{ ...transportBtnStyle, width: 18, height: 18 }} onClick={handleFullscreen}>
@@ -582,7 +585,7 @@ const ViewerPanel: React.FC<{
       {/* Transport controls */}
       <div style={controlsBarStyle}>
         <div style={timecodeStyle}>{formatTimecode(currentFrame, frameRate)}</div>
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: '1 1 8px', minWidth: 8 }} />
         <button aria-label="Skip to start" style={transportBtnStyle} onClick={onSkipBack} title="Go to start"><SkipBackIcon /></button>
         <button aria-label="Previous frame" style={transportBtnStyle} onClick={onStepBack} title="Previous frame"><StepBackIcon /></button>
         {isPlaying ? (
@@ -594,7 +597,7 @@ const ViewerPanel: React.FC<{
         <button aria-label="Next frame" style={transportBtnStyle} onClick={onStepForward} title="Next frame"><StepForwardIcon /></button>
         <button aria-label="Skip to end" style={transportBtnStyle} onClick={onSkipForward} title="Go to end"><SkipForwardIcon /></button>
         <button aria-label="Toggle loop" style={transportBtnStyle} onClick={onToggleLoop} title="Loop"><LoopIcon active={loopEnabled} /></button>
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: '1 1 8px', minWidth: 8 }} />
         <div style={{ ...timecodeStyle, color: 'var(--color-text-tertiary)' }}>{formatTimecode(duration, frameRate)}</div>
       </div>
     </div>

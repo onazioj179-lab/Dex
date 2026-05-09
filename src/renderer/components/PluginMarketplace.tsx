@@ -115,7 +115,7 @@ export const PluginMarketplace: React.FC = () => {
       <GlassToolbar
         title="Plugin Marketplace"
         trailing={
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 4, minWidth: 0, maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'thin' }}>
             {(['installed', 'discover', 'publish'] as Tab[]).map(t => (
               <button
                 key={t}
@@ -230,16 +230,20 @@ const tabBtnStyle = (active: boolean): React.CSSProperties => ({
   fontSize: 12,
   fontWeight: active ? 600 : 500,
   boxShadow: active ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 });
 
 const rowSurfaceStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10,
   padding: 12, marginBottom: 8,
+  minWidth: 0, flexWrap: 'wrap',
 };
 
 const titleLineStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8,
   fontSize: 13, color: 'var(--color-text-primary)',
+  minWidth: 0,
 };
 
 const versionStyle: React.CSSProperties = {
@@ -248,6 +252,7 @@ const versionStyle: React.CSSProperties = {
 
 const subtitleStyle: React.CSSProperties = {
   marginTop: 2, fontSize: 11.5, color: 'var(--color-text-secondary)',
+  overflowWrap: 'anywhere',
 };
 
 const metaStyle: React.CSSProperties = {
@@ -273,6 +278,7 @@ const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties =
     padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
+    whiteSpace: 'nowrap', flexShrink: 0,
   };
   if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
   if (variant === 'danger') return { ...base, background: 'rgba(255,69,58,0.16)', color: '#ff8a82', borderColor: 'rgba(255,69,58,0.4)' };

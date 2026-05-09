@@ -2151,10 +2151,10 @@ const Flux: React.FC = () => {
   // ===== STYLES - MINIMAL =====
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100 },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 700, color: '#bf5af2', letterSpacing: '-0.2px' },
-    headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflow: 'hidden', flexWrap: 'wrap', maxHeight: 38, justifyContent: 'center' },
-    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 },
+    headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
+    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
     btnPrimary: { background: '#bf5af2', color: '#fff', border: '1px solid #bf5af2', borderRadius: '8px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: '8px 4px', gap: '4px' },
@@ -2252,7 +2252,7 @@ const Flux: React.FC = () => {
           </select>
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fps} fps</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={exportVideo} aria-label="Export project">{Icons.download} Export</button>
           <SendToMenu sourceApp="flux" assetKind="video" getAsset={() => {
             const canvas = canvasRef.current;
@@ -2269,10 +2269,10 @@ const Flux: React.FC = () => {
             </button>
           )}
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <div style={{ position: 'relative' }} onMouseLeave={() => setShowFeaturesMenu(false)}>
+          <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
             <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ background: showFeaturesMenu ? 'rgba(191,90,242,0.1)' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#bf5af2' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showFeaturesMenu && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxHeight: '420px', overflowY: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '6px 12px 4px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>ANIMATION</div>
                 {[
                   { label: 'Text Animator', active: showTextAnimator, fn: () => setShowTextAnimator(v => !v) },
@@ -3449,7 +3449,7 @@ const Flux: React.FC = () => {
 
       {/* Composition Templates */}
       {showCompTemplates && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 500, height: 440, background: 'var(--color-bg-elevated)', borderRadius: 14, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 32px))', height: 'min(440px, calc(100vh - 64px))', background: 'var(--color-bg-elevated)', borderRadius: 14, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Composition Templates</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowCompTemplates(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -3705,12 +3705,12 @@ const Flux: React.FC = () => {
 
       {/* Shader Effects Panel */}
       {showShaderEffects && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 520, maxHeight: '80vh', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shader Effects</span>
             <button aria-label="Close Shader Effects panel" onClick={() => setShowShaderEffects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 14, display: 'grid', gridTemplateColumns: '1fr 200px', gap: 12 }}>
+          <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, overflow: 'auto' }}>
             {/* GLSL Editor */}
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>GLSL Fragment Shader</div>

@@ -2339,13 +2339,19 @@ const Nexus: React.FC = () => {
         position: 'absolute', top: 0, left: 0, right: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 12px',
+        gap: 10,
+        minWidth: 0,
+        maxWidth: '100%',
+        overflowX: 'auto',
+        overflowY: 'visible',
+        scrollbarWidth: 'thin',
         zIndex: 15,
         background: 'linear-gradient(180deg, rgba(7,11,18,0.96) 0%, rgba(7,11,18,0.74) 72%, transparent 100%)',
         borderBottom: '1px solid rgba(100,210,255,0.14)',
         pointerEvents: 'none',
       }}>
         {/* Title + node count */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto', minWidth: 0, flexShrink: 0 }}>
           <div style={{
             width: 24, height: 24, borderRadius: 8,
             background: 'rgba(100,210,255,0.08)',
@@ -2368,9 +2374,11 @@ const Nexus: React.FC = () => {
         {/* Search Bar (Terminal Style) */}
         <div style={{
           position: 'relative',
-          width: '100%',
+          width: 'min(380px, 42vw)',
+          minWidth: 170,
           maxWidth: 380,
           pointerEvents: 'auto',
+          flex: '1 1 240px',
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -2474,7 +2482,7 @@ const Nexus: React.FC = () => {
               borderRadius: '0 0 10px 10px',
               boxShadow: `0 12px 34px rgba(0,0,0,0.45), 0 0 20px ${ICE_BLUE}18`,
               padding: '4px 0',
-              maxHeight: 280,
+              maxHeight: 'min(280px, calc(100vh - 98px))',
               overflowY: 'auto',
               zIndex: 30,
             }}>
@@ -2569,6 +2577,10 @@ const Nexus: React.FC = () => {
         alignItems: 'center',
         gap: 4,
         padding: '5px 10px',
+        maxWidth: 'calc(100% - 24px)',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        scrollbarWidth: 'thin',
         background: 'rgba(11,18,28,0.92)',
         border: `1px solid rgba(100,210,255,0.2)`,
         borderRadius: 12,
@@ -2651,6 +2663,7 @@ const Nexus: React.FC = () => {
         display: 'flex', flexDirection: 'column', gap: 4,
         pointerEvents: 'none', zIndex: 12,
         fontFamily: FONT_STACK,
+        maxWidth: 'min(130px, 24vw)',
       }}>
         {[
           { label: 'NODES', value: String(nodeCount), color: ICE_BLUE },
@@ -2676,6 +2689,7 @@ const Nexus: React.FC = () => {
         display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end',
         pointerEvents: 'none', zIndex: 12,
         fontFamily: FONT_STACK,
+        maxWidth: 'min(130px, 24vw)',
       }}>
         {[
           { label: 'SCAN', status: 'ACTIVE', color: ELECTRIC },
@@ -2718,8 +2732,8 @@ const Nexus: React.FC = () => {
       {/* -- UKI Web Search Results Panel (Right Side) -- */}
       {showWebResults && webSearchResults.length > 0 && (
         <div style={{
-          position: 'absolute', right: 12, top: 60, width: 260,
-          maxHeight: 320, overflowY: 'auto',
+          position: 'absolute', right: 12, top: 60, width: 'min(260px, calc(100% - 24px))',
+          maxHeight: 'min(320px, calc(100% - 84px))', overflowY: 'auto',
           background: 'rgba(11,18,28,0.94)',
           border: `1px solid ${ICE_BLUE}30`,
           borderRadius: 12,
@@ -2770,11 +2784,12 @@ const Nexus: React.FC = () => {
 
       {/* -- Hints Legend (Bottom-Right) -- */}
       <div style={{
-        position: 'absolute', bottom: 12, right: 12,
+        position: 'absolute', bottom: 56, right: 12,
         display: 'flex', flexDirection: 'column', gap: 2,
         pointerEvents: 'none', zIndex: 12,
         fontFamily: FONT_STACK,
         opacity: 0.5,
+        maxWidth: 'min(160px, 34vw)',
       }}>
         {[
           { key: 'DRAG', desc: 'ROTATE' },
@@ -2818,6 +2833,8 @@ const modeBtnBase: React.CSSProperties = {
   color: WHITE,
   letterSpacing: 1,
   textTransform: 'uppercase' as const,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
 const ModeButton = memo(({ label, active, onClick, icon }: {

@@ -13,7 +13,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 
-const WHATSNEW_VERSION = '4.1.1';
+// Pulled from package.json at build time via vite.config.ts ('define' block).
+const WHATSNEW_VERSION = (import.meta.env.VITE_APP_VERSION as string) || 'current';
 const STORAGE_KEY = 'dex-last-seen-version';
 
 interface ChangelogEntry {
@@ -23,16 +24,16 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
-    title: 'Creator Access',
-    body: 'Ed25519 signed unlock for Power tier features, with HMAC-bound session tokens.',
+    title: 'Save Backup',
+    body: 'Right-click the tray icon -> Save backup... to write a single, integrity-checked JSON file with your notes, tasks, projects, workflows, modes and settings.',
   },
   {
-    title: 'Power plan',
-    body: 'Higher token budgets, parallel reasoning, and deeper reader summaries.',
+    title: 'Calmer assistant',
+    body: 'UKI no longer carries an old microphone error into a fresh text turn. Permission denials are surfaced once, then cleared.',
   },
   {
-    title: 'Public update mirror',
-    body: 'Faster updates, no GitHub sign-in needed.',
+    title: 'Polish and fixes',
+    body: 'Smaller refinements across the shell so DEX stays out of your way.',
   },
 ];
 

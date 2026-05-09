@@ -73,6 +73,9 @@ class UkiDialogManager {
     if (intent.confidence < 0.5) {
       // Try common corrections first
       const raw = intent.raw.toLowerCase();
+      if (/^(no|nope|nah|nothing|nothing for now|never mind|nevermind|cancel|stop|done|all good|ok|okay|thanks|thank you)[.!\s]*$/i.test(intent.raw.trim())) {
+        return { type: 'proceed', message: 'Okay.' };
+      }
       if (raw.includes('search') || raw.includes('look up') || raw.includes('find')) {
         return { type: 'clarify', message: 'What would you like me to search for? Try saying "search for [topic]" or "look up [query]".' };
       }
@@ -85,10 +88,10 @@ class UkiDialogManager {
         const lastTurn = turns[turns.length - 1];
         const lastCat = lastTurn.intent?.split(':')[0];
         if (lastCat && lastCat !== 'conversation') {
-          return { type: 'clarify', message: `Did you want to do something with ${lastCat}? You said "${intent.raw}".` };
+          return { type: 'clarify', message: `Did you want to do something with ${lastCat}?` };
         }
       }
-      return { type: 'clarify', message: `I didn't catch that. Could you try again? You said "${intent.raw}".` };
+      return { type: 'clarify', message: 'I did not catch that. Could you try again?' };
     }
 
     // Track context for follow-ups

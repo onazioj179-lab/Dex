@@ -31,7 +31,7 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const dialogStyle: React.CSSProperties = {
-  width: 560, maxHeight: '80vh', background: 'var(--color-bg-base)',
+  width: 'min(560px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'var(--color-bg-base)',
   border: '1px solid var(--color-border-subtle)', borderRadius: 8,
   display: 'flex', flexDirection: 'column', overflow: 'hidden',
 };
@@ -47,7 +47,7 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const presetGridStyle: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '0 16px 8px',
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6, padding: '0 16px 8px',
 };
 
 const presetCardStyle = (selected: boolean): React.CSSProperties => ({
@@ -67,7 +67,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   flex: 1, height: 24, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
   borderRadius: 3, padding: '0 6px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
-  fontFamily: 'inherit',
+  fontFamily: 'inherit', minWidth: 0,
 };
 
 const selectStyle: React.CSSProperties = {
