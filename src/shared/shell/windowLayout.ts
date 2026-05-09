@@ -78,6 +78,26 @@ export function clampWindowToWorkspace(bounds: WindowBounds, workspace: WindowBo
   };
 }
 
+/**
+ * Loose clamp used during drag — allows windows to be dragged freely so they
+ * can extend partly off-screen (Windows/macOS behaviour). Only requires that
+ * a slice of the title bar remains reachable so the user can drag it back.
+ */
+export function clampWindowForDrag(bounds: WindowBounds, workspace: WindowBounds, edgeReveal = 80, topReveal = 0): WindowBounds {
+  const w = Math.max(260, Math.floor(bounds.w));
+  const h = Math.max(220, Math.floor(bounds.h));
+  const minX = workspace.x - (w - edgeReveal);
+  const maxX = workspace.x + workspace.w - edgeReveal;
+  const minY = workspace.y - topReveal;                    // title bar may not go above the workspace top
+  const maxY = workspace.y + workspace.h - 40;             // keep 40px of title bar visible
+  return {
+    x: Math.max(minX, Math.min(Math.floor(bounds.x), maxX)),
+    y: Math.max(minY, Math.min(Math.floor(bounds.y), maxY)),
+    w,
+    h,
+  };
+}
+
 export function isSameWindowBounds(a: WindowBounds, b: WindowBounds, tolerance = 0): boolean {
   return Math.abs(a.x - b.x) <= tolerance
     && Math.abs(a.y - b.y) <= tolerance

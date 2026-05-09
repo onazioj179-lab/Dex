@@ -312,9 +312,9 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: '1.0.0', buildDate: '2026-04-18', description: 'Clean drawing canvas for freeform sketching and drawing', category: 'creative' },
   timer: { name: 'Timer', color: '#30D158', icon: 'timer', shortcut: 'Alt+M', version: '1.0.0', buildDate: '2026-04-18', description: 'Simple countdown timer with presets', category: 'utility' },
 
-  // New Standalone Apps (Wave 15)
-  screenrecorder: { name: 'Screen Recorder', color: '#FF453A', icon: 'video', category: 'media', description: 'Record desktop and windows to webm video' },
-  presentation: { name: 'Presentation', color: '#FF9F0A', icon: 'monitor', category: 'productivity', description: 'Build and present slide decks with transitions' },
-  pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'file-text', category: 'productivity', description: 'Read and annotate PDF documents' },
-  pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'palette', category: 'creative', description: 'NES-style pixel grid editor with frames' },
+  // New Standalone Apps (Wave 15) -- unique icon keys (NOT generic file-type icons)
+  screenrecorder: { name: 'Screen Recorder', color: '#FF453A', icon: 'screenrecorder', category: 'media', description: 'Record desktop and windows to webm video' },
+  presentation: { name: 'Presentation', color: '#FF9F0A', icon: 'presentation', category: 'productivity', description: 'Build and present slide decks with transitions' },
+  pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'pdfviewer', category: 'productivity', description: 'Read and annotate PDF documents' },
+  pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'pixelart', category: 'creative', description: 'NES-style pixel grid editor with frames' },
 };

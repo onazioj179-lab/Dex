@@ -265,10 +265,8 @@ export const Home: React.FC = () => {
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
           padding: '10px 24px',
-          background: 'var(--pg-toolbar)',
-          backdropFilter: 'blur(18px) saturate(170%)',
-          WebkitBackdropFilter: 'blur(18px) saturate(170%)',
-          borderBottom: '1px solid var(--pg-border)',
+          background: 'rgba(18, 18, 20, 0.96)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', justifyContent: 'center',
           animation: 'fadeIn 0.15s ease-out',
         }}>
@@ -296,12 +294,10 @@ export const Home: React.FC = () => {
           width: 'fit-content',
           padding: '14px 26px 12px',
           textAlign: 'center',
-          background: 'rgba(8, 12, 20, 0.42)',
-          border: '1px solid rgba(255, 255, 255, 0.16)',
+          background: 'rgba(18, 18, 22, 0.78)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: 18,
-          backdropFilter: 'blur(10px) saturate(135%)',
-          WebkitBackdropFilter: 'blur(10px) saturate(135%)',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
           animation: 'fadeIn 0.2s ease-out',
         }}>
           <div

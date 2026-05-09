@@ -14,17 +14,175 @@
 import { create } from 'zustand';
 
 // ---------------------------------------------------------------------------
-// IPC Helper
+// IPC Helper (with localStorage fallback when window.dex is unavailable —
+// e.g. running the renderer in a plain browser dev server, or when the
+// native better-sqlite3 module fails to load in the main process.)
 // ---------------------------------------------------------------------------
+
+const FALLBACK_KEY = 'dex-notes-fallback-v1';
+type FB = {
+  notes: Record<string, any>;
+  folders: Record<string, any>;
+  tags: Record<string, string[]>;
+  pane: { folders_width: number; list_width: number };
+};
+
+function fbLoad(): FB {
+  try {
+    const raw = localStorage.getItem(FALLBACK_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { notes: {}, folders: {}, tags: {}, pane: { folders_width: 220, list_width: 320 } };
+}
+function fbSave(s: FB) {
+  try { localStorage.setItem(FALLBACK_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+}
+function fbId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function fbToList(n: any): any {
+  return {
+    id: n.id, title: n.title || '', plain_text: n.plain_text || '',
+    word_count: n.word_count || 0, created_at: n.created_at, updated_at: n.updated_at,
+    pinned: n.pinned ? 1 : 0, pin_order: n.pin_order || 0, locked: n.locked ? 1 : 0,
+    color_label: n.color_label || null, folder_id: n.folder_id || null,
+    is_daily_note: 0, is_template: 0, tags: n.tags || [],
+  };
+}
+
+function fallbackInvoke(channel: string, ...args: any[]): any {
+  const s = fbLoad();
+  const now = Date.now();
+  switch (channel) {
+    case 'dexnotes:list': {
+      const opts = (args[0] || {}) as { folder_id?: string | null };
+      const folder = opts.folder_id;
+      let list = Object.values(s.notes).map(fbToList);
+      if (folder !== undefined) list = list.filter(n => n.folder_id === folder);
+      list.sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
+      return list;
+    }
+    case 'dexnotes:get': {
+      const id = args[0] as string;
+      const n = s.notes[id];
+      if (!n) return null;
+      return { ...fbToList(n), content: n.content || '', attachments: [], links: [], backlinks: [] };
+    }
+    case 'dexnotes:create': {
+      const data = args[0] || {};
+      const id = fbId('note');
+      s.notes[id] = {
+        id, title: data.title || '', content: data.content || '', plain_text: data.plain_text || '',
+        folder_id: data.folder_id || null, created_at: now, updated_at: now,
+        pinned: 0, pin_order: 0, locked: 0, color_label: null, tags: [],
+      };
+      fbSave(s);
+      return { id };
+    }
+    case 'dexnotes:update': {
+      const id = args[0] as string;
+      const updates = args[1] || {};
+      if (s.notes[id]) {
+        s.notes[id] = { ...s.notes[id], ...updates, updated_at: now };
+        fbSave(s);
+      }
+      return true;
+    }
+    case 'dexnotes:delete': {
+      const id = args[0] as string;
+      delete s.notes[id];
+      fbSave(s);
+      return true;
+    }
+    case 'dexnotes:restore': return true;
+    case 'dexnotes:duplicate': {
+      const id = args[0] as string;
+      const orig = s.notes[id];
+      if (!orig) return null;
+      const newId = fbId('note');
+      s.notes[newId] = { ...orig, id: newId, title: (orig.title || 'Untitled') + ' copy', created_at: now, updated_at: now };
+      fbSave(s);
+      return { id: newId };
+    }
+    case 'dexnotes:pin': {
+      const id = args[0] as string;
+      const pinned = !!args[1];
+      if (s.notes[id]) { s.notes[id].pinned = pinned ? 1 : 0; fbSave(s); }
+      return true;
+    }
+    case 'dexnotes:listFolders': return Object.values(s.folders);
+    case 'dexnotes:createFolder': {
+      const data = args[0] || {};
+      const id = fbId('folder');
+      s.folders[id] = { id, name: data.name || 'Folder', parent_id: data.parent_id || null, color: null, icon: null, sort_order: 0, created_at: now, children: [] };
+      fbSave(s);
+      return { id };
+    }
+    case 'dexnotes:updateFolder': {
+      const id = args[0] as string;
+      const updates = args[1] || {};
+      if (s.folders[id]) { s.folders[id] = { ...s.folders[id], ...updates }; fbSave(s); }
+      return true;
+    }
+    case 'dexnotes:deleteFolder': {
+      const id = args[0] as string;
+      delete s.folders[id];
+      fbSave(s);
+      return true;
+    }
+    case 'dexnotes:getAllTags': {
+      const set = new Set<string>();
+      Object.values(s.notes).forEach((n: any) => (n.tags || []).forEach((t: string) => set.add(t)));
+      return Array.from(set);
+    }
+    case 'dexnotes:setTags': {
+      const noteId = args[0] as string;
+      const tags = (args[1] as string[]) || [];
+      if (s.notes[noteId]) { s.notes[noteId].tags = tags; fbSave(s); }
+      return true;
+    }
+    case 'dexnotes:getStats': {
+      const total_notes = Object.keys(s.notes).length;
+      const total_folders = Object.keys(s.folders).length;
+      const tagSet = new Set<string>();
+      let total_words = 0;
+      Object.values(s.notes).forEach((n: any) => {
+        (n.tags || []).forEach((t: string) => tagSet.add(t));
+        total_words += n.word_count || 0;
+      });
+      return { total_notes, total_folders, total_tags: tagSet.size, total_attachments: 0, total_words };
+    }
+    case 'dexnotes:listTemplates': return [];
+    case 'dexnotes:getPaneSize': return s.pane;
+    case 'dexnotes:savePaneSize': {
+      const size = args[0] || {};
+      s.pane = { ...s.pane, ...size };
+      fbSave(s);
+      return true;
+    }
+    case 'dexnotes:search': return [];
+    case 'dexnotes:getSuggestions': return [];
+    case 'dexnotes:recordWord': return true;
+    default: return null;
+  }
+}
 
 async function ipc(channel: string, ...args: any[]): Promise<any> {
   try {
     if ((window as any).dex?.invoke) {
-      return await (window as any).dex.invoke(channel, ...args);
+      const result = await (window as any).dex.invoke(channel, ...args);
+      // If main returns null/undefined for a critical channel, fall back so UI still works
+      if (result === null || result === undefined) {
+        if (channel.startsWith('dexnotes:')) return fallbackInvoke(channel, ...args);
+      }
+      return result;
     }
+    // No IPC bridge (browser dev mode) — use localStorage fallback so Notes works
+    if (channel.startsWith('dexnotes:')) return fallbackInvoke(channel, ...args);
     return null;
   } catch (err) {
-    console.warn(`[notesStore] IPC ${channel} failed:`, err);
+    console.warn(`[notesStore] IPC ${channel} failed, using fallback:`, err);
+    if (channel.startsWith('dexnotes:')) return fallbackInvoke(channel, ...args);
     return null;
   }
 }

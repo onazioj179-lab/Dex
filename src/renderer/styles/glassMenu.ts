@@ -115,7 +115,7 @@ export const liquidGlassDock: React.CSSProperties = {
   background: 'var(--dex-glass-bg, rgba(30, 30, 34, 0.65))',
   ...adaptiveBlur(32, 180),
   border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 18,
+  borderRadius: 9999,
   boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
 };
 

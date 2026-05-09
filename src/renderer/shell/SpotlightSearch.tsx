@@ -220,6 +220,94 @@ function groupResults(results: SpotlightResult[]): ResultGroup[] {
 // SPOTLIGHT SEARCH BAR (shared between Home & Overlay)
 // ---------------------------------------------------------------------------
 
+// VOICE MIC BUTTON — Web Speech API for hands-free search
+// Declared BEFORE SpotlightSearch so it's safely in scope under Fast Refresh.
+interface VoiceMicButtonProps {
+  onTranscript: (text: string) => void;
+}
+
+const VoiceMicButton: React.FC<VoiceMicButtonProps> = memo(({ onTranscript }) => {
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const supportedRef = useRef<boolean>(typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
+
+  const stop = useCallback(() => {
+    try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+    setListening(false);
+  }, []);
+
+  const start = useCallback(() => {
+    if (!supportedRef.current) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Voice search not available in this build' } }));
+      return;
+    }
+    try {
+      const Ctor: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const rec = new Ctor();
+      rec.lang = navigator.language || 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.continuous = false;
+      rec.onresult = (e: any) => {
+        const t = e?.results?.[0]?.[0]?.transcript;
+        if (t) onTranscript(String(t).trim());
+      };
+      rec.onerror = (e: any) => {
+        const err = e?.error || 'unknown';
+        const msg = err === 'not-allowed' || err === 'service-not-allowed'
+          ? 'Microphone permission denied. Allow it in your browser/OS to use voice search.'
+          : err === 'no-speech'
+          ? 'No speech detected. Try again.'
+          : err === 'network'
+          ? 'Voice search needs an internet connection.'
+          : `Voice search error: ${err}`;
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: msg } }));
+        setListening(false);
+      };
+      rec.onend = () => setListening(false);
+      recognitionRef.current = rec;
+      rec.start();
+      setListening(true);
+      // Tell the user we're listening so the click isn't silent
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Listening… speak now', duration: 1500 } }));
+    } catch (err: any) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `Could not start voice search: ${err?.message || err}` } }));
+      setListening(false);
+    }
+  }, [onTranscript]);
+
+  useEffect(() => () => { try { recognitionRef.current?.abort(); } catch { /* ignore */ } }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={() => (listening ? stop() : start())}
+      onMouseDown={(e) => e.preventDefault()}
+      aria-label={listening ? 'Stop voice search' : 'Start voice search'}
+      title={listening ? 'Listening… click to stop' : 'Voice search'}
+      style={{
+        width: 28, height: 28, borderRadius: 14,
+        background: listening ? 'rgba(255,69,58,0.95)' : 'rgba(120,120,128,0.24)',
+        border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: listening ? '#fff' : 'rgba(235,235,245,0.85)',
+        transition: 'background 0.15s ease, transform 0.15s ease',
+        flexShrink: 0,
+        boxShadow: listening ? '0 0 0 4px rgba(255,69,58,0.18)' : 'none',
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+  );
+});
+
+VoiceMicButton.displayName = 'VoiceMicButton';
+
 interface SpotlightProps {
   variant: 'home' | 'overlay';
   isOpen?: boolean;
@@ -427,19 +515,19 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   if (variant === 'home') {
     return (
       <div style={{ width: '100%', maxWidth: 680, position: 'relative' }}>
-        {/* Search Bar — wide Tahoe-style pill with refined glass */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          height: 50, padding: '0 22px',
-          background: 'var(--color-bg-hover)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 28,
-          transition: 'border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
+        {/* Search Bar — iOS Tahoe pill, soft focus, embedded mic */}
+        <div className="dex-home-search-pill" style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          height: 46, padding: '0 16px',
+          background: 'rgba(28, 28, 30, 0.94)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 9999,
+          transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
           boxShadow: showResults
-            ? '0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px var(--color-border-subtle), inset 0 0.5px 0 var(--color-bg-hover)'
-            : '0 2px 12px rgba(0,0,0,0.2), inset 0 0.5px 0 var(--color-border-subtle)',
+            ? '0 6px 24px rgba(0,0,0,0.35)'
+            : '0 1px 6px rgba(0,0,0,0.18)',
         }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(235,235,245,0.6)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <input
@@ -448,10 +536,9 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             value={query}
             onChange={e => handleSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={(e) => { 
-              setShowResults(true); 
-              if (!query) setResults(spotlightEngine.search('')); 
-              // Prevent text selection on focus
+            onFocus={(e) => {
+              setShowResults(true);
+              if (!query) setResults(spotlightEngine.search(''));
               e.currentTarget.selectionStart = e.currentTarget.selectionEnd = e.currentTarget.value.length;
             }}
             onBlur={() => setTimeout(() => setShowResults(false), 300)}
@@ -467,8 +554,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             style={{
               flex: 1, height: '100%',
               background: 'transparent', border: 'none', outline: 'none',
-              color: 'var(--color-text-primary)',
-              fontSize: 15, fontWeight: 400,
+              color: 'rgba(255,255,255,0.96)',
+              fontSize: 16, fontWeight: 400,
               fontFamily: 'var(--font-family)',
               letterSpacing: '-0.01em',
               caretColor: 'var(--color-accent)',
@@ -478,21 +565,22 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             <button
               onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
               aria-label="Clear search"
-              className="dex-hover-bg"
               style={{
-                width: 20, height: 20, borderRadius: 10,
-                background: 'var(--color-border)',
+                width: 18, height: 18, borderRadius: 9,
+                background: 'rgba(120,120,128,0.32)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--color-text-secondary)',
+                color: 'rgba(235,235,245,0.85)',
                 transition: 'background 0.12s ease',
+                flexShrink: 0,
               }}
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </button>
           )}
+          <VoiceMicButton onTranscript={(text) => { handleSearch(text); inputRef.current?.focus(); }} />
         </div>
 
         {/* Scrollable results dropdown */}

@@ -10,7 +10,7 @@
  * Grid/list view, search, bins, hover scrub preview.
  */
 
-import React, { useCallback, useRef, useState, memo, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from 'react';
 import { useVinxStore } from './VinxStore';
 import type { MediaItem, MediaBin } from './VinxTypes';
 import {
@@ -268,8 +268,41 @@ const MediaTab: React.FC = memo(() => {
     input.click();
   }, [addMedia]);
 
-  const handleDelete = useCallback(() => {
-    if (selectedMediaId) removeMedia(selectedMediaId);
+  const handleDelete = useCallback((id?: string) => {
+    const target = id ?? selectedMediaId;
+    if (target) removeMedia(target);
+  }, [selectedMediaId, removeMedia]);
+
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; mediaId: string } | null>(null);
+  const handleContextMenu = useCallback((e: React.MouseEvent, mediaId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedMedia(mediaId);
+    setCtxMenu({ x: e.clientX, y: e.clientY, mediaId });
+  }, [setSelectedMedia]);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    window.addEventListener('mousedown', close);
+    window.addEventListener('blur', close);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('blur', close);
+    };
+  }, [ctxMenu]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMediaId) {
+        e.preventDefault();
+        removeMedia(selectedMediaId);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [selectedMediaId, removeMedia]);
 
   return (
@@ -326,6 +359,7 @@ const MediaTab: React.FC = memo(() => {
                 item={item}
                 selected={item.id === selectedMediaId}
                 onClick={() => setSelectedMedia(item.id)}
+                onContextMenu={(e) => handleContextMenu(e, item.id)}
               />
             ))}
           </div>
@@ -336,6 +370,7 @@ const MediaTab: React.FC = memo(() => {
               item={item}
               selected={item.id === selectedMediaId}
               onClick={() => setSelectedMedia(item.id)}
+              onContextMenu={(e) => handleContextMenu(e, item.id)}
             />
           ))
         )}
@@ -345,6 +380,34 @@ const MediaTab: React.FC = memo(() => {
           </div>
         )}
       </div>
+      {ctxMenu && (
+        <div
+          role="menu"
+          aria-label="Media item actions"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999,
+            minWidth: 160, padding: '4px 0',
+            background: 'var(--color-bg-elevated, #1a1a1e)',
+            border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+            fontSize: 12, color: 'var(--color-text-primary)',
+          }}
+        >
+          <button
+            role="menuitem"
+            onClick={() => { handleDelete(ctxMenu.mediaId); setCtxMenu(null); }}
+            style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              background: 'transparent', border: 'none', padding: '8px 14px',
+              color: 'var(--color-error, #ff5f57)', cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          >Delete</button>
+        </div>
+      )}
     </div>
   );
 });
@@ -355,12 +418,12 @@ MediaTab.displayName = 'MediaTab';
 // MEDIA ITEMS
 // ---------------------------------------------------------------------------
 
-const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void }> = memo(({ item, selected, onClick }) => {
+const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void; onContextMenu?: (e: React.MouseEvent) => void }> = memo(({ item, selected, onClick, onContextMenu }) => {
   const typeIcon = item.type === 'video' ? 'V' : item.type === 'audio' ? 'A' : 'I';
   const typeColor = item.type === 'video' ? 'var(--color-accent)' : item.type === 'audio' ? '#3DAF72' : '#D4853A';
 
   return (
-    <div style={listItemStyle(selected)} onClick={onClick} onDoubleClick={onClick}>
+    <div style={listItemStyle(selected)} onClick={onClick} onDoubleClick={onClick} onContextMenu={onContextMenu}>
       <div style={thumbnailStyle}>
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
@@ -383,12 +446,12 @@ const MediaListItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () 
 
 MediaListItem.displayName = 'MediaListItem';
 
-const MediaGridItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void }> = memo(({ item, selected, onClick }) => {
+const MediaGridItem: React.FC<{ item: MediaItem; selected: boolean; onClick: () => void; onContextMenu?: (e: React.MouseEvent) => void }> = memo(({ item, selected, onClick, onContextMenu }) => {
   const typeIcon = item.type === 'video' ? 'V' : item.type === 'audio' ? 'A' : 'I';
   const typeColor = item.type === 'video' ? 'var(--color-accent)' : item.type === 'audio' ? '#3DAF72' : '#D4853A';
 
   return (
-    <div style={gridItemStyle(selected)} onClick={onClick}>
+    <div style={gridItemStyle(selected)} onClick={onClick} onContextMenu={onContextMenu}>
       <div style={{ ...thumbnailStyle, width: 72, height: 40 }}>
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />

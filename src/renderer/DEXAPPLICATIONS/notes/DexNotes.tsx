@@ -265,34 +265,9 @@ const DexNotes: React.FC = () => {
 
   useEffect(() => {
     injectEditorCSS();
-    store.initialize().then(() => {
-      // Verify backend is responsive by checking if dex.invoke is available
-      const dex = (window as any).dex;
-      if (dex?.invoke) {
-        dex.invoke('dexnotes:list', { limit: 1, offset: 0 }).then((r: any) => {
-          if (r === null || r === undefined) {
-            console.warn('[DexNotes] Backend returned null - retrying initialization');
-            // Retry once after a short delay before giving up
-            setTimeout(() => {
-              dex.invoke('dexnotes:list', { limit: 1, offset: 0 }).then((r2: any) => {
-                if (r2 === null || r2 === undefined) {
-                  setInitFailed(true);
-                }
-              }).catch(() => {
-                setInitFailed(true);
-              });
-            }, 1500);
-          }
-        }).catch(() => {
-          // Retry once on network/init timing issues
-          setTimeout(() => {
-            store.initialize().then(() => {
-              dex.invoke('dexnotes:list', { limit: 1, offset: 0 }).catch(() => setInitFailed(true));
-            });
-          }, 2000);
-        });
-      }
-    });
+    // Notes uses an IPC backend with a localStorage fallback (see notesStore.ts).
+    // The fallback guarantees initialize() always succeeds, so no error screen.
+    store.initialize();
     populateTrieFromBackend(wordSuggestions.trie, wordSuggestions.bigram);
   }, []);
 
@@ -308,9 +283,8 @@ const DexNotes: React.FC = () => {
       } else if (!createAttempted.current) {
         createAttempted.current = true;
         store.createNote().then(id => {
-          if (!id) {
-            setInitFailed(true);
-          }
+          // Fallback always returns an id, so this branch is defensive only.
+          if (!id) console.warn('[DexNotes] createNote returned null');
         });
       }
     }

@@ -76,9 +76,9 @@ const TIER_PRESETS: Record<DeviceTier, TierPresets> = {
     blurIntensity: 0,
     glassOpacity: 100,
     animationDurationScale: 0,
-    maxConcurrentApps: 3,
-    undoHistoryDepth: 10,
-    thumbnailCacheSize: 50,
+    maxConcurrentApps: 2,
+    undoHistoryDepth: 5,
+    thumbnailCacheSize: 30,
     previewResolution: '480p',
     deferHeavyApps: true,
     lowPowerMode: true,
@@ -87,16 +87,18 @@ const TIER_PRESETS: Record<DeviceTier, TierPresets> = {
     reduceMotion: false,
     enableBackdropFilter: true,
     enableShadows: true,
-    enableParticles: true,
-    enableLiveWallpaper: true,
-    blurIntensity: 12,
-    glassOpacity: 75,
+    enableParticles: false,
+    enableLiveWallpaper: false,
+    blurIntensity: 8,
+    glassOpacity: 80,
     animationDurationScale: 1,
-    maxConcurrentApps: 8,
-    undoHistoryDepth: 50,
-    thumbnailCacheSize: 300,
-    previewResolution: '1080p',
-    deferHeavyApps: false,
+    maxConcurrentApps: 5,
+    undoHistoryDepth: 30,
+    thumbnailCacheSize: 200,
+    previewResolution: '720p',
+    // Mid still defers heavy apps when backgrounded — mid-range machines crash
+    // when 2+ heavy apps stay resident. They re-mount instantly when foregrounded.
+    deferHeavyApps: true,
     lowPowerMode: false,
   },
   high: {
@@ -148,7 +150,10 @@ export function getHardwareSummary(): HardwareSummary {
   const screenHeight = Math.min(window.screen.height, window.screen.width);
 
   let gpuRenderer = 'unknown';
-  let weakGPU = false;
+  // Conservative default: treat unknown GPUs as weak so first-launch picks a
+  // safer tier on machines where we can't read the renderer string. Better to
+  // start in low/mid and let users opt up than to crash on first open.
+  let weakGPU = true;
   try {
     const c = document.createElement('canvas');
     const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
@@ -156,7 +161,11 @@ export function getHardwareSummary(): HardwareSummary {
       const ext = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
       if (ext) {
         gpuRenderer = (gl as WebGLRenderingContext).getParameter(ext.UNMASKED_RENDERER_WEBGL) || 'unknown';
-        weakGPU = /swiftshader|llvmpipe|mesa|software|microsoft basic/i.test(gpuRenderer);
+        const isSoftware = /swiftshader|llvmpipe|mesa|software|microsoft basic/i.test(gpuRenderer);
+        const isKnownDiscrete = /(nvidia|geforce|rtx|gtx|radeon|rx |arc |intel.*(iris|xe|uhd 7|uhd 6|hd 6))/i.test(gpuRenderer);
+        // Only mark NOT-weak when we positively recognise a real discrete or
+        // modern integrated GPU. Anything else (unknown vendor / very old) stays weak.
+        weakGPU = isSoftware || !isKnownDiscrete;
       }
     }
   } catch { /* no WebGL */ }
@@ -172,16 +181,17 @@ export function getHardwareSummary(): HardwareSummary {
 export function detectDeviceTier(): DeviceTier {
   const hw = getHardwareSummary();
 
-  // Ultra: 16+ cores, 16+ GB, no weak GPU
+  // Ultra: 16+ cores, 16+ GB, confirmed strong GPU
   if (hw.cores >= 16 && hw.memoryGB >= 16 && !hw.weakGPU) return 'ultra';
 
-  // High: 8+ cores, 8+ GB
+  // High: 8+ cores, 8+ GB, confirmed strong GPU
   if (hw.cores >= 8 && hw.memoryGB >= 8 && !hw.weakGPU) return 'high';
 
-  // Mid: 4+ cores, 4+ GB
-  if (hw.cores >= 4 && hw.memoryGB >= 4 && !hw.weakGPU) return 'mid';
+  // Mid: 6+ cores, 8+ GB — require more headroom than before so weak
+  // mid-range machines fall back to low and don't overload on first install.
+  if (hw.cores >= 6 && hw.memoryGB >= 8 && !hw.weakGPU) return 'mid';
 
-  // Low: everything else (budget / older hardware, weak GPU, small screens)
+  // Low: everything else (budget / older hardware, weak/unknown GPU, small screens)
   return 'low';
 }
 

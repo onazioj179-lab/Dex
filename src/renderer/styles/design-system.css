@@ -187,19 +187,9 @@
   --space-16: 64px;
   
   /* ─────────────────────────────────────────────────────────────────────────
-     Z-Index Layers — Tokenized Depth System (Fix #51)
+     Z-Index Layers — see canonical scale below (Unified Shell Layering)
+     This early stub is intentionally minimal; the values below override these.
      ───────────────────────────────────────────────────────────────────────── */
-  
-  --z-base: 0;
-  --z-overlay: 100;
-  --z-sticky: 200;
-  --z-popover: 500;
-  --z-dropdown: 600;
-  --z-modal: 1000;
-  --z-context-menu: 1500;
-  --z-tooltip: 2000;
-  --z-notification: 2500;
-  --z-max: 9999;
   
   /* ─────────────────────────────────────────────────────────────────────────
      Typography -- CLI-grade monospace-forward
@@ -2971,15 +2961,15 @@ body.high-contrast {
 
 /* App enter (macOS Tahoe zoom-in spring) */
 @keyframes appEnter {
-  0%   { opacity: 0; transform: scale(0.88); filter: blur(4px); }
-  50%  { opacity: 1; transform: scale(1.01); filter: blur(0); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  0%   { opacity: 0; transform: scale(0.96); }
+  50%  { opacity: 1; transform: scale(1.005); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* App exit (macOS Tahoe zoom-out) */
 @keyframes appExit {
-  0%   { opacity: 1; transform: scale(1); filter: blur(0); }
-  100% { opacity: 0; transform: scale(0.88); filter: blur(4px); }
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96); }
 }
 
 /* Pulse for notifications / badges */
@@ -4946,18 +4936,19 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
+  /* Xcode-inspired dark palette — readable, calm, distinct */
   --code-bg: transparent;
-  --code-text: var(--color-text-primary);
-  --code-comment: var(--color-text-tertiary);
-  --code-string: var(--color-text-secondary);
-  --code-number: var(--color-text-secondary);
-  --code-keyword: var(--color-text-primary);
-  --code-builtin: var(--color-text-primary);
-  --code-function: var(--color-text-primary);
-  --code-operator: var(--color-text-secondary);
-  --code-type: var(--color-text-primary);
-  --code-constant: var(--color-text-primary);
-  --code-error: var(--color-text-primary);
+  --code-text: #e5e7eb;
+  --code-comment: #6c7986;          /* desaturated slate */
+  --code-string: #fc6a5d;           /* coral */
+  --code-number: #d0bf69;           /* warm gold */
+  --code-keyword: #fc5fa3;          /* magenta-pink */
+  --code-builtin: #67b7a4;          /* teal */
+  --code-function: #67b7ff;         /* blue */
+  --code-operator: #b1d8ff;         /* pale blue */
+  --code-type: #9ef1dd;             /* mint */
+  --code-constant: #d0bf69;         /* gold (same as number) */
+  --code-error: #ff6b6b;
   --code-line-number: var(--color-text-tertiary);
   --code-line-active: var(--color-bg-hover);
   --code-selection: var(--color-bg-active);

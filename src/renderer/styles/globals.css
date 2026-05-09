@@ -134,6 +134,52 @@ input[type="radio"]:focus-visible {
   outline-offset: 3px !important;
 }
 
+/* iOS-style home spotlight pill — soft inset focus instead of hard outline ring */
+.dex-home-search-pill > input:focus,
+.dex-home-search-pill > input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+.dex-home-search-pill:focus-within {
+  border-color: rgba(255,255,255,0.16) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.32), inset 0 0 0 1px rgba(74,158,255,0.18) !important;
+}
+
+/* HARD KILL: never apply a `filter: blur(...)` to the root containers, body, or app shell.
+   Backdrop blur on individual surfaces is fine; whole-page filter blur is not. */
+html,
+body,
+#root,
+#dex-main-content,
+[data-app-shell="true"] {
+  filter: none !important;
+}
+.dex-dof-background,
+.dex-dof-background--heavy,
+.dex-motion-blur--x,
+.dex-motion-blur--y,
+.dex-motion-blur--active {
+  filter: none !important;
+}
+
+/* ── GLOBAL BLUR KILL ───────────────────────────────────────────────────────
+   User wants no blur anywhere in the UI. This rule disables every
+   backdrop-filter and inline filter:blur(...) across the entire app. It runs
+   AFTER all component styles because it lives near the top of globals.css and
+   uses !important. */
+*,
+*::before,
+*::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-no-blur="true"] *,
+html[data-no-blur="true"] *::before,
+html[data-no-blur="true"] *::after {
+  filter: none !important;
+}
+
 /* ── Skip Navigation Link ─────────────────────────────────────────────────── */
 .dex-skip-nav {
   position: fixed;
@@ -5810,4 +5856,89 @@ a:focus-visible {
 .spotlight-results-scroll [role="option"]:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   UI COHESION PASS — v4.1.10
+   Targets: Windows-native blue dropdown highlight, button consistency,
+   tier-aware transform/animation gating, and dropdown popup theming.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ---- Kill the Windows-blue native highlight in <select> dropdowns ---- */
+/* Chromium honors these on <option> in Electron on Windows */
+select option {
+  background-color: var(--color-bg-surface, #161618) !important;
+  color: var(--color-text-primary, #f5f5f7) !important;
+}
+select option:hover,
+select option:focus,
+select option:checked,
+select option:active {
+  background: linear-gradient(0deg, var(--color-bg-hover, #232328), var(--color-bg-hover, #232328)) !important;
+  color: var(--color-text-primary, #f5f5f7) !important;
+  box-shadow: inset 0 0 0 9999px var(--color-bg-hover, #232328) !important;
+}
+select:focus {
+  /* Replace any stray system focus blue with our accent at low intensity */
+  outline: none;
+  border-color: var(--color-accent, #4a9eff) !important;
+}
+
+/* ---- Suppress legacy/system control colors (kills "blue menu") ---- */
+:root {
+  accent-color: var(--color-accent, #4a9eff);
+  color-scheme: dark;
+}
+
+/* ---- Button cohesion: every interactive button gets a unified hover ---- */
+/* Only applies to bare <button> with no inline background; preserves opt-outs */
+button:not(:disabled):not([data-no-cohesion]):hover {
+  filter: brightness(1.08);
+}
+button:not(:disabled):not([data-no-cohesion]):active {
+  filter: brightness(0.95);
+  transform: scale(0.985);
+  transition: transform 0.06s ease, filter 0.06s ease;
+}
+button[disabled],
+button:disabled {
+  cursor: not-allowed !important;
+  filter: saturate(0.4);
+}
+
+/* ---- Tier-aware transform suppression ---- */
+/* Low tier: no transforms anywhere (kill scale/translate hover anims) */
+[data-perf-tier="low"] *:hover,
+[data-perf-tier="low"] *:active,
+[data-perf-tier="low"] *:focus {
+  transform: none !important;
+}
+/* Mid tier: keep transforms but make them snappy/cheap */
+[data-perf-tier="mid"] * {
+  transform-style: flat !important;
+}
+
+/* ---- Overlay / modal stacking guarantees ---- */
+/* Ensure menus, dialogs, and tooltips never get visually hidden by stray
+   inline z-index values used in legacy apps. Each role gets its proper layer. */
+[role="dialog"]:not([data-z-fixed]) {
+  z-index: var(--z-modal, 6000);
+}
+[role="menu"]:not([data-z-fixed]),
+.dex-context-menu,
+.context-menu {
+  z-index: var(--z-context-menu, 9700);
+}
+[role="tooltip"]:not([data-z-fixed]) {
+  z-index: var(--z-tooltip, 9400);
+}
+
+/* ---- Native dropdown calendar/date popups ---- */
+/* Force consistent dark background for date/time pickers */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
 }

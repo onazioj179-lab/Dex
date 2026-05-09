@@ -411,8 +411,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     justifyContent: 'flex-end',
     padding: '20px',
-    maxWidth: 'min(400px, 100%)',
-    margin: '0 auto',
     width: '100%',
   },
   displayArea: {

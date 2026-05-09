@@ -407,10 +407,51 @@ const DexCode: React.FC = () => {
 
   return (
     <div style={S.container}>
+      {/* Activity bar (Xcode-style) -- slim icon column on far left */}
+      <nav style={S.activityBar} aria-label="DexCode activity bar">
+        <button title="Navigator" aria-label="Navigator" style={S.activityBtnActive}>
+          <DexIcon name="folder" size={16} />
+        </button>
+        <button
+          title="Find"
+          aria-label="Find in file"
+          style={S.activityBtn}
+          onClick={() => setShowFind(s => !s)}
+        >
+          <DexIcon name="search" size={16} />
+        </button>
+        <button
+          title="Run"
+          aria-label="Run code"
+          style={S.activityBtn}
+          onClick={runCode}
+          disabled={isRunning}
+        >
+          <DexIcon name="play" size={16} />
+        </button>
+        <button
+          title="Terminal"
+          aria-label="Toggle terminal"
+          style={S.activityBtn}
+          onClick={() => setTerminalOpen(o => !o)}
+        >
+          <DexIcon name="terminal" size={16} />
+        </button>
+        <div style={{ flex: 1 }} />
+        <button
+          title="Shortcuts"
+          aria-label="Keyboard shortcuts"
+          style={S.activityBtn}
+          onClick={() => setShowShortcutsPanel(true)}
+        >
+          <DexIcon name="command" size={16} />
+        </button>
+      </nav>
+
       {/* Sidebar */}
       <aside style={S.sidebar}>
-        <div style={S.sidebarBlock}>
-          <h1 style={{...S.title, fontSize: 18}}>DexCode</h1>
+        <div style={S.sidebarHeader}>
+          <span style={S.sidebarTitle}>DEXCODE</span>
         </div>
 
         {/* File Actions */}
@@ -725,7 +766,7 @@ const DexCode: React.FC = () => {
 const S: Record<string, React.CSSProperties> = {
   container: {
     display: 'grid',
-    gridTemplateColumns: '200px minmax(0, 1fr)',
+    gridTemplateColumns: '44px 220px minmax(0, 1fr)',
     height: '100%',
     width: '100%',
     background: 'var(--color-bg-base)',
@@ -736,11 +777,62 @@ const S: Record<string, React.CSSProperties> = {
     position: 'relative',
     contain: 'layout style',
   },
+  activityBar: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 4,
+    padding: '6px 0',
+    background: 'var(--color-bg-base)',
+    borderRight: '1px solid var(--color-border-subtle)',
+    flexShrink: 0,
+    height: '100%',
+  },
+  activityBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--color-text-secondary)',
+    borderRadius: 6,
+    cursor: 'pointer',
+    transition: 'background 0.12s, color 0.12s',
+  },
+  activityBtnActive: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    border: 'none',
+    background: 'var(--color-accent, #4a9eff)',
+    color: '#fff',
+    borderRadius: 6,
+    cursor: 'pointer',
+  },
+  sidebarHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 28,
+    padding: '0 10px',
+    borderBottom: '1px solid var(--color-border)',
+    flexShrink: 0,
+  },
+  sidebarTitle: {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    color: 'var(--color-text-tertiary)',
+  },
   sidebar: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    padding: 10,
+    gap: 0,
+    padding: 0,
     background: 'var(--color-bg-surface-solid)',
     borderRight: '1px solid var(--color-border)',
     overflow: 'auto',
@@ -749,11 +841,9 @@ const S: Record<string, React.CSSProperties> = {
   sidebarBlock: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
-    padding: 8,
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 8,
+    gap: 4,
+    padding: '8px 10px',
+    borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.04))',
   },
   eyebrow: {
     fontSize: 10,

@@ -48,7 +48,7 @@ import { loadEngagement, saveEngagement, incrementStat, checkAchievements } from
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
-import { clampWindowToWorkspace, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds } from '../../shared/shell/windowLayout';
+import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds } from '../../shared/shell/windowLayout';
 
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
 function lazyRetry<T extends React.ComponentType<any>>(
@@ -659,10 +659,11 @@ export const AppManager: React.FC = () => {
   // -- Detached floating windows (macOS Tahoe style) -----------------------
   const [detachedApps, setDetachedApps] = useState<Map<string, { x: number; y: number; w: number; h: number; z: number }>>(new Map());
   const restoredWindowBoundsRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
-  const detachZCounter = useRef(100);
+  const detachZCounter = useRef(200);
   // Cap floating window z-index below dock layer (dock is 5000)
+  // Baseline 200 keeps floating windows above the system title bar (z=100)
   const nextDetachZ = () => {
-    detachZCounter.current = detachZCounter.current >= 4990 ? 100 : detachZCounter.current + 1;
+    detachZCounter.current = detachZCounter.current >= 4990 ? 200 : detachZCounter.current + 1;
     return detachZCounter.current;
   };
 
@@ -748,19 +749,24 @@ export const AppManager: React.FC = () => {
   // Stage Manager left offset for floating windows
   const stageOffset = stageManagerOn && runningApps.filter(a => a.id !== 'home').length > 0 ? STAGE_STRIP_WIDTH : 0;
 
-  const getShellWorkspace = useCallback((padding = 6) => getWorkspaceBounds(
+  const getShellWorkspace = useCallback((padding = 0) => getWorkspaceBounds(
     { width: window.innerWidth, height: window.innerHeight },
     {
-      topReserve: 34,
+      topReserve: 34 + (showAppTabBar && runningApps.filter(a => a.id !== 'home').length > 0 ? 32 : 0),
       dockReserve: 0,
       leftReserve: stageOffset,
       padding,
       minWidth: 320,
       minHeight: 260,
     },
-  ), [stageOffset]);
+  ), [stageOffset, showAppTabBar, runningApps.length]);
 
-  const getMaximizedWindowBounds = useCallback(() => getShellWorkspace(0), [getShellWorkspace]);
+  const getMaximizedWindowBounds = useCallback(() => ({
+    x: 0,
+    y: 0,
+    w: Math.max(320, window.innerWidth),
+    h: Math.max(260, window.innerHeight),
+  }), []);
 
   // -- Global stat-bump handler (sourced from all creative apps) -----------
   useEffect(() => {
@@ -852,6 +858,26 @@ export const AppManager: React.FC = () => {
     return `${d}  ${t}`;
   });
   const [titlebarMenuOpen, setTitlebarMenuOpen] = useState(false);
+
+  // Close the control-center dropdown on any outside click without painting a
+  // full-screen invisible overlay (which polluted the page with a fixed div).
+  useEffect(() => {
+    if (!titlebarMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('[aria-label="Control center"]')) return;
+      if (target.closest('[aria-label="Open control center"]')) return;
+      setTitlebarMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setTitlebarMenuOpen(false); };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [titlebarMenuOpen]);
 
   // Detect if any floating window is maximized (covers >85% of screen)
   const anyWindowMaximized = useMemo(() => {
@@ -1246,7 +1272,25 @@ export const AppManager: React.FC = () => {
           }
           const z = nextDetachZ();
           const next = new Map(prev);
-          next.set(appId, { ...getMaximizedWindowBounds(), z });
+          // Open at predefined size centered in workspace — keeps content "in frame".
+          // Creative/heavy apps (videoeditor, imosion, etc.) open maximized.
+          const workspace = getMaximizedWindowBounds();
+          const def = APP_WINDOW_SIZES[appId as string];
+          if (def?.maximized) {
+            next.set(appId, { ...workspace, z });
+          } else if (def) {
+            const fitted = fitWindowToWorkspace({ w: def.w, h: def.h }, workspace);
+            const x = Math.max(workspace.x, workspace.x + Math.round((workspace.w - fitted.w) / 2));
+            const y = Math.max(workspace.y, workspace.y + Math.round((workspace.h - fitted.h) / 2));
+            next.set(appId, { x, y, w: fitted.w, h: fitted.h, z });
+          } else {
+            // Unknown app: fall back to a reasonable default size, centered.
+            const w = Math.min(900, Math.max(480, Math.round(workspace.w * 0.6)));
+            const h = Math.min(640, Math.max(380, Math.round(workspace.h * 0.7)));
+            const x = workspace.x + Math.round((workspace.w - w) / 2);
+            const y = workspace.y + Math.round((workspace.h - h) / 2);
+            next.set(appId, { x, y, w, h, z });
+          }
           return next;
         });
       });
@@ -1324,28 +1368,18 @@ export const AppManager: React.FC = () => {
       forceUpdate(n => n + 1);
     }
     const z = nextDetachZ();
-    const size = APP_WINDOW_SIZES[appId] || { w: 900, h: 650 };
-    
-    // Creative apps open to the safe inner workspace, never under chrome/dock.
-    if (size.maximized) {
-      setDetachedApps(prev => {
-        const next = new Map(prev);
-        next.set(appId, { ...getMaximizedWindowBounds(), z });
-        return next;
-      });
-      if (currentApp === appId) setCurrentApp('home');
-      return;
-    }
 
-    const cascadeOffset = (detachedApps.size % 6) * 26;
-    const fitted = fitWindowToWorkspace(size, getShellWorkspace(10), cascadeOffset);
+    // UX: every detached app opens MAXIMIZED so it fills the DEX frame
+    // (no surrounding wallpaper gaps). Users can still drag-restore or
+    // resize from there. Creative apps explicitly mark `maximized: true`
+    // and are unaffected.
     setDetachedApps(prev => {
       const next = new Map(prev);
-      next.set(appId, { ...fitted, z });
+      next.set(appId, { ...getMaximizedWindowBounds(), z });
       return next;
     });
     if (currentApp === appId) setCurrentApp('home');
-  }, [currentApp, detachedApps.size, getMaximizedWindowBounds, getShellWorkspace, setCurrentApp]);
+  }, [currentApp, getMaximizedWindowBounds, setCurrentApp]);
 
   const bringToFront = useCallback((appId: AppId) => {
     const z = nextDetachZ();
@@ -1393,7 +1427,8 @@ export const AppManager: React.FC = () => {
   // -- Window tiling presets (up to 5 windows) ----------------------------
   type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize';
   const tileWindow = useCallback((appId: AppId, position: TilePosition) => {
-    const workspace = getShellWorkspace(6);
+    const workspace = getShellWorkspace(0);
+    const maximizedWorkspace = getMaximizedWindowBounds();
     const W = workspace.w;
     const H = workspace.h;
     const PAD = 6;
@@ -1413,7 +1448,7 @@ export const AppManager: React.FC = () => {
       top:          { x: LEFT + PAD, y: TOP + PAD, w: W - PAD * 2, h: halfH },
       bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
       center:       { x: LEFT + Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
-      maximize:     { ...workspace },
+      maximize:     { ...maximizedWorkspace },
     };
 
     const rect = positions[position];
@@ -1452,13 +1487,13 @@ export const AppManager: React.FC = () => {
       next.set(appId, { ...rect, z });
       return next;
     });
-  }, [detachedApps, detachApp, getShellWorkspace]);
+  }, [detachedApps, detachApp, getMaximizedWindowBounds, getShellWorkspace]);
 
   // Auto tile: arrange all detached windows evenly
   const autoTileAll = useCallback(() => {
     const ids = Array.from(detachedApps.keys());
     if (ids.length === 0) return;
-    const workspace = getShellWorkspace(6);
+    const workspace = getShellWorkspace(0);
     const W = workspace.w;
     const TOP = workspace.y;
     const LEFT = workspace.x;
@@ -1530,7 +1565,7 @@ export const AppManager: React.FC = () => {
 
   useEffect(() => {
     const onResize = () => {
-      const workspace = getShellWorkspace(6);
+      const workspace = getShellWorkspace(0);
       setDetachedApps(prev => {
         let changed = false;
         const next = new Map(prev);
@@ -1985,32 +2020,55 @@ export const AppManager: React.FC = () => {
             className="dex-app-opening"
             onPointerDown={() => { if (focusedFloatingAppId !== appId) bringToFront(appId); }}
           >
-            {/* Floating title bar -- draggable (locked when maximized) */}
+            {/* Floating title bar -- draggable (including maximized restore-drag) */}
             <div
               style={{
                 height: 38, display: 'flex', alignItems: 'center', gap: 8,
-                padding: '0 14px', cursor: isMaximized ? 'default' : 'grab', userSelect: 'none',
-                background: 'var(--color-bg-elevated, rgba(26,26,30,0.95))',
-                backdropFilter: 'blur(16px) saturate(150%)',
-                WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+                padding: '0 14px', cursor: 'grab', userSelect: 'none',
+                background: 'rgba(28, 28, 32, 0.96)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.12))', flexShrink: 0,
                 justifyContent: 'center',
                 touchAction: 'none',
-                WebkitAppRegion: isMaximized ? 'no-drag' : 'drag',
+                WebkitAppRegion: 'drag',
               } as React.CSSProperties}
               onDoubleClick={() => { tileWindow(appId, 'maximize'); }}
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest('button')) return;
-                // When maximized, don't allow dragging — double-click to restore
-                if (isMaximized) return;
                 e.preventDefault();
                 const titleBar = e.currentTarget;
                 titleBar.setPointerCapture(e.pointerId);
                 titleBar.style.cursor = 'grabbing';
                 const startX = e.clientX;
                 const startY = e.clientY;
-                const origX = detBounds.x;
-                const origY = detBounds.y;
+                let dragBounds = detBounds;
+                if (isMaximized) {
+                  const workspace = getMaximizedWindowBounds();
+                  const restored = restoredWindowBoundsRef.current.get(appId)
+                    ?? fitWindowToWorkspace(
+                      {
+                        w: Math.max(680, Math.round(workspace.w * 0.7)),
+                        h: Math.max(460, Math.round(workspace.h * 0.8)),
+                      },
+                      workspace,
+                    );
+                  const pointerRatio = (e.clientX - workspace.x) / Math.max(workspace.w, 1);
+                  const anchoredX = Math.round(e.clientX - restored.w * pointerRatio);
+                  const clampedRestored = clampWindowToWorkspace(
+                    { ...restored, x: anchoredX, y: workspace.y + 8 },
+                    workspace,
+                  );
+                  dragBounds = { ...clampedRestored, z: detBounds.z };
+                  restoredWindowBoundsRef.current.set(appId, clampedRestored);
+                  setDetachedApps(prev => {
+                    const next = new Map(prev);
+                    const current = next.get(appId);
+                    if (!current) return prev;
+                    next.set(appId, { ...current, ...clampedRestored, z: nextDetachZ() });
+                    return next;
+                  });
+                }
+                const origX = dragBounds.x;
+                const origY = dragBounds.y;
                 let currentX = origX;
                 let currentY = origY;
                 let rafId = 0;
@@ -2025,11 +2083,14 @@ export const AppManager: React.FC = () => {
                 const onMove = (ev: PointerEvent) => {
                   cancelAnimationFrame(rafId);
                   rafId = requestAnimationFrame(() => {
-                    const workspace = getShellWorkspace(6);
-                    const maxX = workspace.x + Math.max(0, workspace.w - detBounds.w);
-                    const maxY = workspace.y + Math.max(0, workspace.h - detBounds.h);
-                    currentX = Math.max(workspace.x, Math.min(maxX, origX + ev.clientX - startX));
-                    currentY = Math.max(workspace.y, Math.min(maxY, origY + ev.clientY - startY));
+                    const workspace = getShellWorkspace(0);
+                    // Free-drag: allow movement past edges, only keep part of title bar reachable
+                    const loose = clampWindowForDrag(
+                      { x: origX + ev.clientX - startX, y: origY + ev.clientY - startY, w: dragBounds.w, h: dragBounds.h },
+                      workspace,
+                    );
+                    currentX = loose.x;
+                    currentY = loose.y;
                     if (el) {
                       // Use transform during drag for GPU acceleration
                       el.style.transform = `translate(${currentX - origX}px, ${currentY - origY}px)`;
@@ -2058,12 +2119,14 @@ export const AppManager: React.FC = () => {
                   // Clear preview
                   snapPreviewRef.current = null;
                   setSnapPreviewZone(null);
-                  // Final position
-                  const workspace = getShellWorkspace(6);
-                  const maxX = workspace.x + Math.max(0, workspace.w - detBounds.w);
-                  const maxY = workspace.y + Math.max(0, workspace.h - detBounds.h);
-                  const finalX = Math.max(workspace.x, Math.min(maxX, origX + ev.clientX - startX));
-                  const finalY = Math.max(workspace.y, Math.min(maxY, origY + ev.clientY - startY));
+                  // Final position — free drag (only require a slice of title bar visible)
+                  const workspace = getShellWorkspace(0);
+                  const looseFinal = clampWindowForDrag(
+                    { x: origX + ev.clientX - startX, y: origY + ev.clientY - startY, w: dragBounds.w, h: dragBounds.h },
+                    workspace,
+                  );
+                  const finalX = looseFinal.x;
+                  const finalY = looseFinal.y;
                   // Commit snap or final position
                   const zone = detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
@@ -2074,7 +2137,8 @@ export const AppManager: React.FC = () => {
                       const b = prev.get(appId);
                       if (!b) return prev;
                       const next = new Map(prev);
-                      const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: b.w, h: b.h }, workspace);
+                      // Allow free drag (window may extend off-edge) — keep loose clamp
+                      const clamped = clampWindowForDrag({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
                       next.set(appId, { ...b, ...clamped });
                       return next;
                     });
@@ -2242,7 +2306,7 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(6);
+                        const workspace = getShellWorkspace(0);
                         const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
                         if (el) el.style.width = nw + 'px';
                       });
@@ -2252,7 +2316,7 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(6);
+                      const workspace = getShellWorkspace(0);
                       const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
@@ -2283,7 +2347,7 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(6);
+                        const workspace = getShellWorkspace(0);
                         const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                         if (el) el.style.height = nh + 'px';
                       });
@@ -2293,7 +2357,7 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(6);
+                      const workspace = getShellWorkspace(0);
                       const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
@@ -2325,7 +2389,7 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(6);
+                        const workspace = getShellWorkspace(0);
                         const deltaX = ev.clientX - startX;
                         const desiredW = Math.max(360, startW - deltaX);
                         const desiredLeft = startLeft + (startW - desiredW);
@@ -2342,7 +2406,7 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(6);
+                      const workspace = getShellWorkspace(0);
                       const deltaX = ev.clientX - startX;
                       const desiredW = Math.max(360, startW - deltaX);
                       const desiredLeft = startLeft + (startW - desiredW);
@@ -2378,7 +2442,7 @@ export const AppManager: React.FC = () => {
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(6);
+                        const workspace = getShellWorkspace(0);
                         const deltaY = ev.clientY - startY;
                         const desiredH = Math.max(280, startH - deltaY);
                         const desiredTop = startTop + (startH - desiredH);
@@ -2395,7 +2459,7 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointermove', onMove);
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(6);
+                      const workspace = getShellWorkspace(0);
                       const deltaY = ev.clientY - startY;
                       const desiredH = Math.max(280, startH - deltaY);
                       const desiredTop = startTop + (startH - desiredH);
@@ -2433,7 +2497,7 @@ export const AppManager: React.FC = () => {
                 const onMove = (ev: PointerEvent) => {
                   cancelAnimationFrame(rafId);
                   rafId = requestAnimationFrame(() => {
-                    const workspace = getShellWorkspace(6);
+                    const workspace = getShellWorkspace(0);
                     const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
                     const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                     if (el) {
@@ -2447,7 +2511,7 @@ export const AppManager: React.FC = () => {
                   document.removeEventListener('pointermove', onMove);
                   document.removeEventListener('pointerup', onUp);
                   if (el) el.removeAttribute('data-dragging');
-                  const workspace = getShellWorkspace(6);
+                  const workspace = getShellWorkspace(0);
                   const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
                   const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
                   setDetachedApps(prev => {
@@ -2653,7 +2717,7 @@ export const AppManager: React.FC = () => {
           {/* Continuity indicator ring */}
           {showRing && (
             <div style={{
-              position: 'absolute', inset: -2, borderRadius: 14,
+              position: 'absolute', inset: -3, borderRadius: 9999,
               border: `1.5px solid ${ringColor}`,
               boxShadow: isActive ? `0 0 8px ${item.color}44` : 'none',
               opacity: isMinimized ? 0.6 : 1,
@@ -2684,7 +2748,7 @@ export const AppManager: React.FC = () => {
               width: size, height: size,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent',
-              border: 'none', borderRadius: 12, cursor: 'pointer',
+              border: 'none', borderRadius: 9999, cursor: 'pointer',
               position: 'relative', padding: 0,
               touchAction: 'manipulation',
               color: item.color,
@@ -3030,11 +3094,13 @@ export const AppManager: React.FC = () => {
         fontSize: 13, fontWeight: 500, color: 'var(--color-text-tertiary)',
         position: 'absolute', left: '50%', transform: 'translateX(-50%)',
         letterSpacing: '-0.01em',
-        display: 'flex', alignItems: 'center', gap: 6,
+        display: currentApp === 'home' ? 'none' : 'flex', alignItems: 'center', gap: 6,
         WebkitAppRegion: 'no-drag',
         cursor: 'pointer',
-        maxWidth: 'calc(100% - 400px)',
+        maxWidth: 'calc(100% - 560px)',
         overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
         pointerEvents: 'auto',
       } as React.CSSProperties}>
         {/* Live Activities Strip -- shows running app status */}
@@ -3143,7 +3209,6 @@ export const AppManager: React.FC = () => {
           {/* Dropdown panel */}
           {titlebarMenuOpen && (
             <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-max)' }} onMouseDown={() => setTitlebarMenuOpen(false)} />
               <style>{`@keyframes titlebarDropIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
               <div
                 role="menu"
@@ -3563,14 +3628,12 @@ export const AppManager: React.FC = () => {
               ...liquidGlassDock,
               display: 'flex',
               flexDirection: geom.flexDirection,
-              alignItems: 'center', gap: 6,
-              padding: `${geom.paddingY}px ${geom.paddingX}px`,
-              borderRadius: geom.borderRadius,
-              overflowX: geom.flexDirection === 'row' ? 'auto' : 'hidden',
-              overflowY: geom.flexDirection === 'column' ? 'auto' : 'hidden',
+              alignItems: 'center', gap: 8,
+              padding: `${geom.paddingY + 4}px ${geom.paddingX + 8}px`,
+              borderRadius: 9999,
+              overflow: 'visible',
               maxWidth: geom.flexDirection === 'row' ? '96vw' : undefined,
               maxHeight: geom.flexDirection === 'column' ? '96vh' : undefined,
-              scrollBehavior: 'smooth',
               position: 'relative',
               contain: 'layout style',
               isolation: 'isolate',
