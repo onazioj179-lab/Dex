@@ -265,7 +265,7 @@ export const Home: React.FC = () => {
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
           padding: '10px 24px',
-          background: '#121214',
+          background: 'rgba(18, 18, 20, 0.96)',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', justifyContent: 'center',
           animation: 'fadeIn 0.15s ease-out',

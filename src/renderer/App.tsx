@@ -363,7 +363,14 @@ export const App: React.FC = () => {
   useEffect(() => {
     // Re-apply theme on mount (in case it wasn't applied)
     initializeTheme();
-    
+
+    // Suppress the browser/OS native context menu globally so the user never
+    // sees the translucent native menu on right-click. Custom React menus
+    // (which call e.preventDefault() in their own handlers and open via
+    // onContextMenu before this listener fires) still work normally.
+    const suppressNativeContext = (e: MouseEvent) => { e.preventDefault(); };
+    document.addEventListener('contextmenu', suppressNativeContext);
+
     // === CRITICAL PATH (must run immediately) ===
     // Initialize motion system (spring physics, reduce-motion, scrollbar styles)
     initMotionController();
@@ -418,6 +425,7 @@ export const App: React.FC = () => {
 
     // Cleanup on unmount
     return () => {
+      document.removeEventListener('contextmenu', suppressNativeContext);
       cleanupXenon();
       usePerformanceMonitor.getState().stopMonitoring();
       useIntegrityMonitor.getState().stopMonitoring();
