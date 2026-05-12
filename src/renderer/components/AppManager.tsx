@@ -377,7 +377,8 @@ const hexToRgb = (hex: string): string => {
 
 interface DockItem { id: AppId; label: string; color: string }
 
-// All apps for Launchpad -- ALL 22 apps organized by category
+// All apps for Launchpad -- full DEX app surface organized by category.
+// Keep aligned with APP_DEFINITIONS in src/renderer/store/runningApps.ts.
 const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
   // System
   { id: 'settings', label: 'Settings', color: 'var(--color-text-tertiary)' },

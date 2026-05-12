@@ -318,4 +318,8 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   presentation: { name: 'Presentation', color: '#FF9F0A', icon: 'presentation', category: 'productivity', description: 'Build and present slide decks with transitions' },
   pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'pdfviewer', category: 'productivity', description: 'Read and annotate PDF documents' },
   pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'pixelart', category: 'creative', description: 'NES-style pixel grid editor with frames' },
+
+  // Storefront and Games surfaces (registry-backed so dock, Launchpad, UKI resolve metadata)
+  store: { name: 'Store', color: '#0A84FF', icon: 'store', category: 'system', description: 'Discover and install DEX apps and plugins from the catalog' },
+  games: { name: 'Games', color: '#30D158', icon: 'games', category: 'media', description: 'Built-in casual games hub' },
 };
