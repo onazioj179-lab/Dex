@@ -187,7 +187,10 @@ TimelineRuler.displayName = 'TimelineRuler';
 
 const TrackHeader: React.FC<{
   track: Track;
-}> = memo(({ track }) => {
+  focused: boolean;
+  onFocusTrack: (trackId: string) => void;
+  onNavigateTrack: (trackId: string, dir: 'up' | 'down') => void;
+}> = memo(({ track, focused, onFocusTrack, onNavigateTrack }) => {
   const toggleMute = useVinxStore(s => s.toggleTrackMute);
   const toggleLock = useVinxStore(s => s.toggleTrackLock);
   const toggleVisible = useVinxStore(s => s.toggleTrackVisible);
@@ -200,8 +203,27 @@ const TrackHeader: React.FC<{
       width: TRACK_HEADER_WIDTH, height: track.height, flexShrink: 0,
       display: 'flex', flexDirection: 'column', justifyContent: 'center',
       padding: '0 6px', borderBottom: '1px solid var(--color-border-subtle)',
-      borderRight: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-base)',
-    }}>
+      borderRight: '1px solid var(--color-bg-hover)',
+      background: focused ? 'rgba(74,158,255,0.12)' : 'var(--color-bg-base)',
+      outline: focused ? '1px solid rgba(74,158,255,0.45)' : 'none',
+      outlineOffset: -1,
+    }}
+      tabIndex={0}
+      role="button"
+      data-vinx-track-header-id={track.id}
+      aria-label={`Track ${track.name}`}
+      aria-current={focused ? 'true' : undefined}
+      onFocus={() => onFocusTrack(track.id)}
+      onClick={() => onFocusTrack(track.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          onNavigateTrack(track.id, 'up');
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          onNavigateTrack(track.id, 'down');
+        }
+      }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
         <span style={{ width: 4, height: 4, borderRadius: 2, background: color, flexShrink: 0 }} />
         <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</span>
@@ -624,6 +646,7 @@ export const Timeline: React.FC<{
   const sequence = getActiveSequence();
   const tracks = sequence.tracks;
   const duration = getSequenceDuration();
+  const [focusedTrackId, setFocusedTrackId] = useState<string | null>(tracks[0]?.id ?? null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -637,6 +660,16 @@ export const Timeline: React.FC<{
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!focusedTrackId && tracks[0]?.id) {
+      setFocusedTrackId(tracks[0].id);
+      return;
+    }
+    if (focusedTrackId && !tracks.some((t) => t.id === focusedTrackId)) {
+      setFocusedTrackId(tracks[0]?.id ?? null);
+    }
+  }, [focusedTrackId, tracks]);
 
   const laneWidth = containerWidth - TRACK_HEADER_WIDTH;
   const totalHeight = tracks.reduce((sum, t) => sum + t.height, 0);
@@ -808,6 +841,19 @@ export const Timeline: React.FC<{
     deselectAll();
   }, [deselectAll]);
 
+  const handleTrackKeyboardNavigate = useCallback((trackId: string, dir: 'up' | 'down') => {
+    const idx = tracks.findIndex((t) => t.id === trackId);
+    if (idx < 0) return;
+    const nextIdx = dir === 'up'
+      ? Math.max(0, idx - 1)
+      : Math.min(tracks.length - 1, idx + 1);
+    const nextTrack = tracks[nextIdx];
+    if (!nextTrack) return;
+    setFocusedTrackId(nextTrack.id);
+    const el = containerRef.current?.querySelector<HTMLElement>(`[data-vinx-track-header-id="${nextTrack.id}"]`);
+    el?.focus();
+  }, [tracks]);
+
   // -- Keyboard shortcuts --
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -869,7 +915,12 @@ export const Timeline: React.FC<{
           }}>
             {tracks.map(track => (
               <div key={track.id} style={{ display: 'flex' }}>
-                <TrackHeader track={track} />
+                <TrackHeader
+                  track={track}
+                  focused={focusedTrackId === track.id}
+                  onFocusTrack={setFocusedTrackId}
+                  onNavigateTrack={handleTrackKeyboardNavigate}
+                />
                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                   <TrackLane
                     track={track} zoom={zoom} scrollX={scrollX}
