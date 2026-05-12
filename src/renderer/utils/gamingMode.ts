@@ -20,14 +20,6 @@ export interface GamingThrottleHandle {
   release: () => Promise<void>;
 }
 
-declare global {
-  interface Navigator {
-    wakeLock?: {
-      request: (type: 'screen') => Promise<{ release: () => Promise<void> }>;
-    };
-  }
-}
-
 interface GamingState {
   mode: GamingMode;
   element: HTMLElement | null;

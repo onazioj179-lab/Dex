@@ -2241,7 +2241,7 @@ export function useDragDrop<T>(options: { onDragStart?: (e: DragEvent) => void; 
     const drag = (e: DragEvent) => options.onDrag?.(e);
     const dragEnd = (e: DragEvent) => options.onDragEnd?.(e);
     const dragOver = (e: DragEvent) => e.preventDefault();
-    const drop = (e: DragEvent) => { e.preventDefault(); const data = JSON.parse(e.dataTransfer?.getData("text/plain") || "null"); options.onDrop?.(e, data); };
+    const drop = (e: DragEvent) => { e.preventDefault(); let data: T | null = null; try { data = JSON.parse(e.dataTransfer?.getData("text/plain") || "null"); } catch { data = null; } options.onDrop?.(e, data as T); };
     el.addEventListener("dragstart", dragStart); el.addEventListener("drag", drag); el.addEventListener("dragend", dragEnd); el.addEventListener("dragover", dragOver); el.addEventListener("drop", drop);
     return () => { el.removeEventListener("dragstart", dragStart); el.removeEventListener("drag", drag); el.removeEventListener("dragend", dragEnd); el.removeEventListener("dragover", dragOver); el.removeEventListener("drop", drop); };
   }, [options]);
@@ -2258,7 +2258,7 @@ export function useDropTarget<T>(onDrop: (data: T, pos: { x: number; y: number }
     const el = ref.current; if (!el) return;
     const dragOver = (e: DragEvent) => { e.preventDefault(); setIsOver(true); };
     const dragLeave = () => setIsOver(false);
-    const drop = (e: DragEvent) => { e.preventDefault(); setIsOver(false); const data = JSON.parse(e.dataTransfer?.getData("text/plain") || "null"); onDrop(data, { x: e.clientX, y: e.clientY }); };
+    const drop = (e: DragEvent) => { e.preventDefault(); setIsOver(false); let data: T | null = null; try { data = JSON.parse(e.dataTransfer?.getData("text/plain") || "null"); } catch { data = null; } onDrop(data as T, { x: e.clientX, y: e.clientY }); };
     el.addEventListener("dragover", dragOver); el.addEventListener("dragleave", dragLeave); el.addEventListener("drop", drop);
     return () => { el.removeEventListener("dragover", dragOver); el.removeEventListener("dragleave", dragLeave); el.removeEventListener("drop", drop); };
   }, [onDrop]);
@@ -2277,7 +2277,7 @@ export function useSortable<T>(item: T, onReorder: (from: T, to: T) => void) {
     const dragStart = (e: DragEvent) => { setIsDragging(true); e.dataTransfer?.setData("text/plain", JSON.stringify(item)); };
     const dragEnd = () => setIsDragging(false);
     const dragOver = (e: DragEvent) => e.preventDefault();
-    const drop = (e: DragEvent) => { e.preventDefault(); const from = JSON.parse(e.dataTransfer?.getData("text/plain") || "null"); onReorder(from, item); };
+    const drop = (e: DragEvent) => { e.preventDefault(); let from: T | null = null; try { from = JSON.parse(e.dataTransfer?.getData("text/plain") || "null"); } catch { from = null; } if (from !== null) onReorder(from, item); };
     el.addEventListener("dragstart", dragStart); el.addEventListener("dragend", dragEnd); el.addEventListener("dragover", dragOver); el.addEventListener("drop", drop);
     return () => { el.removeEventListener("dragstart", dragStart); el.removeEventListener("dragend", dragEnd); el.removeEventListener("dragover", dragOver); el.removeEventListener("drop", drop); };
   }, [item, onReorder]);
