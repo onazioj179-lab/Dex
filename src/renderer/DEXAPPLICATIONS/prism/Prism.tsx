@@ -2519,6 +2519,7 @@ const Prism: React.FC = () => {
               style={collabButtonStyles.collabButton}
               onClick={collab.openShareDialog}
               title="Share & Collaborate"
+              aria-label={collab.activeCollaboratorCount > 0 ? `Share project (${collab.activeCollaboratorCount} active collaborators)` : 'Share project'}
             >
               {collab.activeCollaboratorCount > 0 ? `${collab.activeCollaboratorCount} collaborators` : 'Share'}
             </button>
