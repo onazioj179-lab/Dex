@@ -2815,13 +2815,13 @@ const Prism: React.FC = () => {
                   ))}
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
                   <span style={{ color: 'var(--color-text-muted)' }}>Feather:</span>
-                  <input type="range" min="0" max="50" value={selection.feather} onChange={(e) => setSelection(prev => ({ ...prev, feather: Number(e.target.value) }))} style={{ width: '60px', accentColor: '#ff375f' }} />
+                  <input aria-label="Selection feather radius" type="range" min="0" max="50" value={selection.feather} onChange={(e) => setSelection(prev => ({ ...prev, feather: Number(e.target.value) }))} style={{ width: '60px', accentColor: '#ff375f' }} />
                   <span style={{ color: '#ff375f', fontFamily: 'var(--font-mono)', minWidth: '20px' }}>{selection.feather}px</span>
                   {activeTool === 'wand' && (
                     <>
                       <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
                       <span style={{ color: 'var(--color-text-muted)' }}>Tolerance:</span>
-                      <input type="range" min="0" max="255" value={selection.wandTolerance} onChange={(e) => setSelection(prev => ({ ...prev, wandTolerance: Number(e.target.value) }))} style={{ width: '60px', accentColor: '#ff375f' }} />
+                      <input aria-label="Magic wand tolerance" type="range" min="0" max="255" value={selection.wandTolerance} onChange={(e) => setSelection(prev => ({ ...prev, wandTolerance: Number(e.target.value) }))} style={{ width: '60px', accentColor: '#ff375f' }} />
                       <span style={{ color: '#ff375f', fontFamily: 'var(--font-mono)', minWidth: '24px' }}>{selection.wandTolerance}</span>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                         <input type="checkbox" checked={selection.wandContiguous} onChange={(e) => setSelection(prev => ({ ...prev, wandContiguous: e.target.checked }))} />
@@ -2859,7 +2859,7 @@ const Prism: React.FC = () => {
                 <>
                   <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>{activeTool === 'dodge' ? 'Dodge' : 'Burn'}:</span>
                   <span style={{ color: 'var(--color-text-muted)' }}>Exposure:</span>
-                  <input type="range" min="1" max="100" value={dodgeBurnExposure} onChange={e => setDodgeBurnExposure(Number(e.target.value))} style={{ width: '60px', accentColor: 'var(--color-warning)' }} />
+                  <input aria-label="Dodge burn exposure" type="range" min="1" max="100" value={dodgeBurnExposure} onChange={e => setDodgeBurnExposure(Number(e.target.value))} style={{ width: '60px', accentColor: 'var(--color-warning)' }} />
                   <span style={{ color: 'var(--color-warning)', fontFamily: 'var(--font-mono)', minWidth: '24px' }}>{dodgeBurnExposure}%</span>
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
                   <span style={{ color: 'var(--color-text-muted)' }}>Range:</span>
@@ -2881,7 +2881,7 @@ const Prism: React.FC = () => {
                     <option value="Impact, sans-serif">Impact</option>
                     <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
                   </select>
-                  <input type="number" min="8" max="200" value={textFontSize} onChange={e => setTextFontSize(Number(e.target.value))} style={{ width: '44px', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
+                  <input aria-label="Text font size" type="number" min="8" max="200" value={textFontSize} onChange={e => setTextFontSize(Number(e.target.value))} style={{ width: '44px', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
                   <span style={{ color: 'var(--color-text-muted)', fontSize: 9 }}>px</span>
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 2px' }}>|</span>
                   <button onClick={() => setTextBold(b => !b)} aria-label="Toggle bold" style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid ' + (textBold ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textBold ? 'rgba(236,72,153,0.1)' : 'transparent', color: textBold ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>B</button>
@@ -2963,6 +2963,7 @@ const Prism: React.FC = () => {
                 type="range" 
                 min="10" 
                 max="500" 
+                aria-label="Canvas zoom"
                 value={zoom} 
                 onChange={(e) => setZoom(Number(e.target.value))} 
                 style={{ width: '100px', accentColor: '#ff375f', cursor: 'pointer' }} 
@@ -3071,54 +3072,54 @@ const Prism: React.FC = () => {
             <div style={styles.panelContent}>
               <div style={styles.sliderRow}>
                 <span style={styles.sliderLabel}>Brightness</span>
-                <input type="range" min="-100" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} style={styles.slider} />
+                <input aria-label="Brightness adjustment" type="range" min="-100" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} style={styles.slider} />
                 <span style={styles.sliderValue}>{brightness}</span>
               </div>
               <div style={styles.sliderRow}>
                 <span style={styles.sliderLabel}>Contrast</span>
-                <input type="range" min="-100" max="100" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} style={styles.slider} />
+                <input aria-label="Contrast adjustment" type="range" min="-100" max="100" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} style={styles.slider} />
                 <span style={styles.sliderValue}>{contrast}</span>
               </div>
               <div style={styles.sliderRow}>
                 <span style={styles.sliderLabel}>Saturation</span>
-                <input type="range" min="-100" max="100" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} style={styles.slider} />
+                <input aria-label="Saturation adjustment" type="range" min="-100" max="100" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} style={styles.slider} />
                 <span style={styles.sliderValue}>{saturation}</span>
               </div>
               <div style={styles.sliderRow}>
                 <span style={styles.sliderLabel}>Exposure</span>
-                <input type="range" min="-100" max="100" value={exposure} onChange={(e) => setExposure(Number(e.target.value))} style={styles.slider} />
+                <input aria-label="Exposure adjustment" type="range" min="-100" max="100" value={exposure} onChange={(e) => setExposure(Number(e.target.value))} style={styles.slider} />
                 <span style={styles.sliderValue}>{exposure}</span>
               </div>
               {!beginnerMode && (
                 <>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Highlights</span>
-                    <input type="range" min="-100" max="100" value={highlights} onChange={(e) => setHighlights(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Highlights adjustment" type="range" min="-100" max="100" value={highlights} onChange={(e) => setHighlights(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{highlights}</span>
                   </div>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Shadows</span>
-                    <input type="range" min="-100" max="100" value={shadows} onChange={(e) => setShadows(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Shadows adjustment" type="range" min="-100" max="100" value={shadows} onChange={(e) => setShadows(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{shadows}</span>
                   </div>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Temperature</span>
-                    <input type="range" min="-100" max="100" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Temperature adjustment" type="range" min="-100" max="100" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{temperature}</span>
                   </div>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Tint</span>
-                    <input type="range" min="-100" max="100" value={tint} onChange={(e) => setTint(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Tint adjustment" type="range" min="-100" max="100" value={tint} onChange={(e) => setTint(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{tint}</span>
                   </div>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Vibrance</span>
-                    <input type="range" min="-100" max="100" value={vibrance} onChange={(e) => setVibrance(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Vibrance adjustment" type="range" min="-100" max="100" value={vibrance} onChange={(e) => setVibrance(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{vibrance}</span>
                   </div>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Hue</span>
-                    <input type="range" min="-180" max="180" value={hue} onChange={(e) => setHue(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Hue adjustment" type="range" min="-180" max="180" value={hue} onChange={(e) => setHue(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{hue}</span>
                   </div>
                 </>
@@ -3178,7 +3179,7 @@ const Prism: React.FC = () => {
                 <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(236,72,153,0.05)', borderRadius: '8px', border: '1px solid rgba(236,72,153,0.2)' }}>
                   <div style={styles.sliderRow}>
                     <span style={styles.sliderLabel}>Intensity</span>
-                    <input type="range" min="0" max="100" value={filterIntensity} onChange={(e) => setFilterIntensity(Number(e.target.value))} style={styles.slider} />
+                    <input aria-label="Filter intensity" type="range" min="0" max="100" value={filterIntensity} onChange={(e) => setFilterIntensity(Number(e.target.value))} style={styles.slider} />
                     <span style={styles.sliderValue}>{filterIntensity}%</span>
                   </div>
                   <button
@@ -3452,7 +3453,7 @@ const Prism: React.FC = () => {
             {[{ label: 'Brush Size', value: liquifyBrushSize, set: setLiquifyBrushSize, max: 200 }, { label: 'Pressure', value: liquifyPressure, set: setLiquifyPressure, max: 100 }].map(s => (
               <div key={s.label} style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 9, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{s.value}</span></div>
-                <input type="range" min="1" max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
+                <input aria-label={`${s.label} slider`} type="range" min="1" max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
               </div>
             ))}
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -3989,14 +3990,14 @@ const Prism: React.FC = () => {
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Brush Size</span>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>20 px</span>
               </div>
-              <input type="range" min="1" max="200" defaultValue={20} style={{ width: '100%', accentColor: 'var(--color-warning)' }} />
+              <input aria-label="Spot healing brush size" type="range" min="1" max="200" defaultValue={20} style={{ width: '100%', accentColor: 'var(--color-warning)' }} />
             </div>
             <div style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Hardness</span>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>75%</span>
               </div>
-              <input type="range" min="0" max="100" defaultValue={75} style={{ width: '100%', accentColor: 'var(--color-warning)' }} />
+              <input aria-label="Spot healing brush hardness" type="range" min="0" max="100" defaultValue={75} style={{ width: '100%', accentColor: 'var(--color-warning)' }} />
             </div>
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Source Mode</span>
