@@ -51,6 +51,7 @@ import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
 import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
+import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
 
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
 function lazyRetry<T extends React.ComponentType<any>>(
@@ -207,6 +208,27 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   pdfviewer: { w: 900, h: 650, maximized: true },
   pixelart: { w: 900, h: 640, maximized: true },
 };
+
+const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
+  videoeditor: 'videoeditor',
+  imosion: 'imosion',
+  prism: 'prism',
+  flux: 'flux',
+  forge: 'forge',
+  axl: 'axl',
+  notes: 'notes',
+  rewind: 'rewind',
+};
+
+function inferAssetKindFromPath(filePath: string): AssetKind {
+  const lower = filePath.toLowerCase();
+  if (/\.(wav|mp3|ogg|flac|aiff|m4a|aac|webm)$/.test(lower)) return 'audio';
+  if (/\.(mp4|mov|mkv|avi|wmv|webm|m4v|gif)$/.test(lower)) return 'video';
+  if (/\.(png|jpg|jpeg|webp|bmp|tiff|tif|svg|heic)$/.test(lower)) return 'image';
+  if (/\.(obj|fbx|glb|gltf|stl|blend)$/.test(lower)) return 'model';
+  if (/\.(md|txt|rtf|doc|docx|pdf)$/.test(lower)) return 'document';
+  return 'clip';
+}
 
 const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
   browser: { w: 720, h: 460 },
@@ -600,6 +622,7 @@ export const AppManager: React.FC = () => {
   const {
     runningApps, currentAppId, launchApp, closeApp: closeRunningApp, setCurrentApp: setCurrentRunningApp,
   } = useRunningApps();
+  const sendAssetToApp = useCreativeSuite(s => s.sendToApp);
 
   // Dock pinning store
   const { pins: dockPins, pinApp, unpinApp, reorder: reorderDockPins, isPinned: isDockPinned, mode: dockMode, magnification: dockMagnification, magnificationScale, iconSize: dockIconSize } = useDockPins();
@@ -3187,6 +3210,49 @@ export const AppManager: React.FC = () => {
     setCurrentApp(appId);
   }, [minimizedApps, restoreFloatingApp, setCurrentApp]);
 
+  const handleDockFileDrop = useCallback((appId: AppId, e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    openDockApp(appId, e.currentTarget);
+    const target = DOCK_FILE_DROP_TARGETS[appId];
+    if (!target) {
+      window.dispatchEvent(new CustomEvent('dex-toast', {
+        detail: { type: 'info', message: `${APP_DEFINITIONS[appId]?.name || appId} does not support direct file drop routing yet.` },
+      }));
+      return;
+    }
+
+    let delivered = 0;
+    for (const file of files.slice(0, 10)) {
+      const path = (file as File & { path?: string }).path || file.name;
+      const kind = inferAssetKindFromPath(path);
+      const ok = sendAssetToApp({
+        id: `dock-drop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind,
+        name: file.name,
+        sourceApp: 'files',
+        data: path,
+        mimeType: file.type || undefined,
+        metadata: { via: 'dock-drop' },
+        createdAt: Date.now(),
+      }, target);
+      if (ok) delivered++;
+    }
+
+    if (delivered > 0) {
+      window.dispatchEvent(new CustomEvent('dex-toast', {
+        detail: { type: 'success', message: `Sent ${delivered} file${delivered > 1 ? 's' : ''} to ${APP_DEFINITIONS[appId]?.name || appId}` },
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('dex-toast', {
+        detail: { type: 'warning', message: `No compatible files were routed to ${APP_DEFINITIONS[appId]?.name || appId}` },
+      }));
+    }
+  }, [openDockApp, sendAssetToApp]);
+
   // Shortcut hints for dock tooltips
   const dockShortcut: Record<string, string> = {
     home: 'Ctrl+1', settings: 'Ctrl+2', files: 'Ctrl+3', notes: 'Ctrl+4', tasks: 'Ctrl+5',
@@ -3338,6 +3404,10 @@ export const AppManager: React.FC = () => {
               e.preventDefault();
               setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
             }}
+            onDragOver={(e) => {
+              if ((e.dataTransfer?.types || []).includes('Files')) e.preventDefault();
+            }}
+            onDrop={(e) => handleDockFileDrop(item.id, e)}
             onKeyDown={(e) => handleDockKeyDown(e, items)}
             data-dock-app-id={item.id}
             data-dock-icon={item.id}
