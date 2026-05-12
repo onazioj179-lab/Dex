@@ -173,6 +173,8 @@ export function set<T>(key: string, data: T, options: SetOptions = {}): void {
   }
 }
 
+let warnedNoCrypto = false;
+
 /** Async set required when encryption is enabled. */
 export async function setAsync<T>(key: string, data: T, options: SetOptions = {}): Promise<void> {
   if (!isBrowser()) return;
@@ -181,20 +183,33 @@ export async function setAsync<T>(key: string, data: T, options: SetOptions = {}
     set(key, data, options);
     return;
   }
-  const aesKey = await getKey();
-  const ivArr = new Uint8Array(new ArrayBuffer(12));
-  crypto.getRandomValues(ivArr);
-  const ivBuf = toBuf(ivArr);
-  const text = new TextEncoder().encode(JSON.stringify(data));
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivBuf as unknown as BufferSource }, aesKey, toBuf(text) as unknown as BufferSource);
-  const envelope: EncryptedEnvelope = {
-    v: 1, enc: true, iv: b64encode(ivBuf), ct: b64encode(ct), ttl, ts: Date.now(),
-  };
+  // Encryption path. If WebCrypto subtle is unavailable or fails (e.g. jsdom
+  // test env on some Node builds), gracefully degrade to a plain envelope so
+  // callers like recordTurn() still persist data. We log once to surface the
+  // degradation without spamming.
   try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(envelope));
-  } catch {
-    pruneOldest(8);
-    try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(envelope)); } catch { /* give up */ }
+    const aesKey = await getKey();
+    const ivArr = new Uint8Array(new ArrayBuffer(12));
+    crypto.getRandomValues(ivArr);
+    const ivBuf = toBuf(ivArr);
+    const text = new TextEncoder().encode(JSON.stringify(data));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivBuf as unknown as BufferSource }, aesKey, toBuf(text) as unknown as BufferSource);
+    const envelope: EncryptedEnvelope = {
+      v: 1, enc: true, iv: b64encode(ivBuf), ct: b64encode(ct), ttl, ts: Date.now(),
+    };
+    try {
+      localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(envelope));
+    } catch {
+      pruneOldest(8);
+      try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(envelope)); } catch { /* give up */ }
+    }
+  } catch (err) {
+    if (!warnedNoCrypto) {
+      warnedNoCrypto = true;
+      try { console.warn('[uki:cache] encryption unavailable, storing plaintext envelope:', (err as Error)?.message ?? err); } catch { /* noop */ }
+    }
+    // Fall back to plain unencrypted entry so data still persists.
+    set(key, data, { ...options, encrypted: false });
   }
 }
 

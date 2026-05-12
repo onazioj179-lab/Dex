@@ -34,11 +34,9 @@ describe('UKI compressed memory', () => {
       await memory.recordTurn(`hello ${i}`, `reply ${i}`);
     }
     const archive = await maybeConsolidate();
+    expect(archive).toBeNull();
     const archives = await listArchives();
-    // In a jsdom env without crypto.subtle write-back, archive may be skipped entirely.
-    if (archive === null) {
-      expect(archives.length).toBe(0);
-    }
+    expect(archives.length).toBe(0);
   });
 
   it('produces an archive once turns exceed the threshold', async () => {
@@ -52,7 +50,7 @@ describe('UKI compressed memory', () => {
     // Force a consolidation pass in case lazy invocation skipped during writes.
     await maybeConsolidate();
     const archives = await listArchives();
-    if (archives.length === 0) return; // jsdom env without crypto.subtle write-back
+    expect(archives.length).toBeGreaterThan(0);
     const first = archives[0];
     expect(first.turnCount).toBe(OLDER_BATCH);
     expect(first.summary).toContain('Archive of');
@@ -65,9 +63,9 @@ describe('UKI compressed memory', () => {
       await memory.recordTurn(`q${i}`, `a${i}`);
     }
     const archives = await listArchives();
-    if (!archives.length) return; // jsdom without CompressionStream -- skip
+    expect(archives.length).toBeGreaterThan(0);
     const archive = archives[0];
-    if (!archive.payloadGz) return;
+    if (!archive.payloadGz) return; // CompressionStream not available in this runtime
     const restored = await expandArchive(archive);
     expect(restored.length).toBe(archive.turnCount);
     expect(restored[0].user).toBe('q0');
@@ -78,7 +76,7 @@ describe('UKI compressed memory', () => {
       await memory.recordTurn(`render gallery image ${i}`, `gallery reply ${i}`);
     }
     const hits = await searchArchives('gallery', 5);
-    expect(hits.length).toBeGreaterThanOrEqual(0); // env-dependent: archives may not have been produced
+    expect(hits.length).toBeGreaterThan(0);
   });
 
   it('reports compression stats with a sane ratio', async () => {
@@ -86,11 +84,9 @@ describe('UKI compressed memory', () => {
       await memory.recordTurn(`hello world ${i}`, `general response ${i}`);
     }
     const stats = await getCompressionStats();
-    expect(stats.archiveCount).toBeGreaterThanOrEqual(0);
-    expect(stats.rawBytes).toBeGreaterThanOrEqual(0);
-    if (stats.compressedBytes !== stats.rawBytes && stats.rawBytes > 0) {
-      expect(stats.ratio).toBeGreaterThan(0);
-      expect(stats.ratio).toBeLessThanOrEqual(1);
-    }
+    expect(stats.archiveCount).toBeGreaterThan(0);
+    expect(stats.rawBytes).toBeGreaterThan(0);
+    expect(stats.ratio).toBeGreaterThan(0);
+    expect(stats.ratio).toBeLessThanOrEqual(1);
   });
 });
