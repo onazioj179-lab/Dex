@@ -20,6 +20,10 @@ import './styles/print.css';
 import { injectContainmentCSS } from './utils/CSSContainment';
 injectContainmentCSS();
 
+// Memory pressure bridge: forward main-process pressure events to dexBus +
+// degrade animations + pause FrameGovernor on critical pressure.
+import './utils/MemoryPressureBridge';
+
 // Font sharpness: set DPI attribute once at startup for CSS rules
 (() => {
   const dpr = window.devicePixelRatio || 1;

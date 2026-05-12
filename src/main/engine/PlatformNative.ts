@@ -14,6 +14,7 @@
 import * as os from 'os';
 import * as path from 'path';
 import { execFile, ChildProcess, spawn } from 'child_process';
+import { BrowserWindow } from 'electron';
 import * as log from 'electron-log';
 
 // ---------------------------------------------------------------------------
@@ -828,6 +829,30 @@ class PlatformNative {
       } else if (level === 'critical' && global.gc) {
         global.gc();
         global.gc(); // Double GC for compaction
+      }
+    });
+
+    // Broadcast pressure events to all renderers so they can degrade animation
+    // quality (FrameGovernor pause, MotionController spring disable, etc.).
+    this.memoryPressure.onPressure((level, freeMemMB) => {
+      try {
+        const wins = BrowserWindow.getAllWindows();
+        const totalMB = Math.round(this.memoryPressure.getMemoryInfo().totalMB);
+        const freeMB = Math.round(freeMemMB);
+        const heapUsedMB = Math.max(0, totalMB - freeMB);
+        // Map main-process pressure level to renderer-side taxonomy.
+        const mapped: 'moderate' | 'high' | 'critical' =
+          level === 'critical' ? 'critical'
+          : level === 'moderate' ? 'high'
+          : 'moderate';
+        const payload = { level: mapped, heapUsedMB, freeMB, totalMB };
+        for (const win of wins) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('memory:pressure', payload);
+          }
+        }
+      } catch (err) {
+        log.warn('[MemoryPressure] Broadcast failed:', String(err));
       }
     });
 
