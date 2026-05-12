@@ -692,6 +692,91 @@ const VinxEditor: React.FC = () => {
         e.preventDefault();
         setCurrentFrame(useVinxStore.getState().currentFrame + 1);
       }
+      // Timeline zoom: '=' / '+' zoom in, '-' zoom out, Shift+Z reset
+      if ((e.key === '=' || e.key === '+') && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const z = useVinxStore.getState().timelineZoom;
+        useVinxStore.getState().setTimelineZoom(z * 1.25);
+      }
+      if (e.key === '-' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const z = useVinxStore.getState().timelineZoom;
+        useVinxStore.getState().setTimelineZoom(z / 1.25);
+      }
+      if (e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        useVinxStore.getState().setTimelineZoom(1);
+      }
+      // Nudge selected clips by 1 frame (Alt+Left/Right) or 10 frames (Alt+Shift)
+      if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        const state = useVinxStore.getState();
+        if (state.selectedClipIds.length > 0) {
+          const step = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1);
+          const seq = state.project.sequences.find(sq => sq.id === state.project.activeSequenceId);
+          if (seq) {
+            for (const id of state.selectedClipIds) {
+              for (const t of seq.tracks) {
+                const c = t.clips.find(cl => cl.id === id);
+                if (c) {
+                  const newStart = Math.max(0, c.startFrame + step);
+                  state._moveClip(id, t.id, newStart);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      // Jump to previous/next edit point on active sequence (Up/Down arrows)
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const state = useVinxStore.getState();
+        const seq = state.project.sequences.find(sq => sq.id === state.project.activeSequenceId);
+        if (seq) {
+          const edits = new Set<number>([0]);
+          for (const t of seq.tracks) {
+            for (const c of t.clips) {
+              edits.add(c.startFrame);
+              edits.add(c.endFrame);
+            }
+          }
+          const sorted = Array.from(edits).sort((a, b) => a - b);
+          const cur = state.currentFrame;
+          if (e.key === 'ArrowDown') {
+            const next = sorted.find(f => f > cur);
+            if (next != null) setCurrentFrame(next);
+          } else {
+            let prev = 0;
+            for (const f of sorted) { if (f < cur) prev = f; else break; }
+            setCurrentFrame(prev);
+          }
+        }
+      }
+      // Cut at playhead (Ctrl+K) — split all clips in active sequence intersecting currentFrame
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        const state = useVinxStore.getState();
+        const cur = state.currentFrame;
+        const seq = state.project.sequences.find(sq => sq.id === state.project.activeSequenceId);
+        if (seq) {
+          // If the user has selected clips, only split those; otherwise split all crossing the playhead.
+          const selectedSet = new Set(state.selectedClipIds);
+          const onlySelected = selectedSet.size > 0;
+          for (const t of seq.tracks) {
+            for (const c of [...t.clips]) {
+              if (cur <= c.startFrame || cur >= c.endFrame) continue;
+              if (onlySelected && !selectedSet.has(c.id)) continue;
+              const rel = cur - c.startFrame;
+              const left = { ...c, id: generateId('clip'), endFrame: cur, mediaOutFrame: c.mediaInFrame + rel };
+              const right = { ...c, id: generateId('clip'), startFrame: cur, mediaInFrame: c.mediaInFrame + rel };
+              state._removeClip(c.id);
+              state._addClip(left);
+              state._addClip(right);
+            }
+          }
+        }
+      }
       // Copy/Paste clip attributes
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         const state = useVinxStore.getState();
@@ -1973,10 +2058,10 @@ const VinxEditor: React.FC = () => {
             </div>
             <div style={{ padding: 16, overflowY: 'auto', maxHeight: '60vh' }}>
               {[
-                { cat: 'Transport', shortcuts: [['Space', 'Play/Pause'], ['J', 'Reverse'], ['K', 'Stop'], ['L', 'Forward'], ['I', 'Set In Point'], ['O', 'Set Out Point']] },
-                { cat: 'Editing', shortcuts: [['V', 'Select Tool'], ['B', 'Razor/Blade'], ['N', 'Ripple Delete'], ['A', 'Range Select'], ['S', 'Slip Tool'], ['H', 'Hand Tool']] },
+                { cat: 'Transport', shortcuts: [['Space', 'Play/Pause'], ['J', 'Reverse'], ['K', 'Stop'], ['L', 'Forward'], ['I', 'Set In Point'], ['O', 'Set Out Point'], [',', 'Step Back 1 Frame'], ['.', 'Step Forward 1 Frame'], ['Up', 'Previous Edit'], ['Down', 'Next Edit']] },
+                { cat: 'Editing', shortcuts: [['V', 'Select Tool'], ['B', 'Razor/Blade'], ['N', 'Ripple Delete'], ['A', 'Range Select'], ['S', 'Slip Tool'], ['H', 'Hand Tool'], ['Ctrl+K', 'Cut at Playhead'], ['Alt+Left', 'Nudge Clip -1'], ['Alt+Right', 'Nudge Clip +1'], ['Alt+Shift+Left/Right', 'Nudge Clip x10']] },
                 { cat: 'Timeline', shortcuts: [['Ctrl+Z', 'Undo'], ['Ctrl+Shift+Z', 'Redo'], ['Ctrl+C', 'Copy'], ['Ctrl+V', 'Paste'], ['Delete', 'Delete Clip'], ['M', 'Add Marker']] },
-                { cat: 'View', shortcuts: [['Ctrl+S', 'Save'], ['Ctrl+E', 'Export'], ['=', 'Zoom In'], ['-', 'Zoom Out'], ['\\', 'Fit Timeline'], ['F', 'Fullscreen Viewer']] },
+                { cat: 'View', shortcuts: [['Ctrl+S', 'Save'], ['Ctrl+E', 'Export'], ['=', 'Zoom In'], ['-', 'Zoom Out'], ['Shift+Z', 'Reset Zoom'], ['F', 'Fullscreen Viewer']] },
               ].map(group => (
                 <div key={group.cat} style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group.cat}</div>

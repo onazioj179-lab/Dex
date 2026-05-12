@@ -51,27 +51,20 @@ function b64decode(s: string): ArrayBuffer {
   return buf;
 }
 
-// Helper: copy any byte source into a fresh ArrayBuffer. We deliberately
-// build the destination via a numeric loop so the function never depends on
-// Uint8Array's generic ArrayBufferLike parameter, which TS 5.7+ refuses to
-// narrow to ArrayBuffer for WebCrypto BufferSource overloads.
+// Helper: copy any byte source into a fresh ArrayBuffer that is guaranteed
+// to be backed by ArrayBuffer (not SharedArrayBuffer). TS 5.7+'s strict
+// BufferSource typing refuses Uint8Array<ArrayBufferLike>, so we always
+// hand WebCrypto a plain ArrayBuffer obtained from `new ArrayBuffer(n)`.
 function toBuf(src: ArrayBufferLike | ArrayBufferView): ArrayBuffer {
-  let bytes: number[];
-  if (ArrayBuffer.isView(src)) {
-    const view = src as ArrayBufferView;
-    const tmp = new Uint8Array(view.byteLength);
-    // Read source bytes one at a time via DataView to avoid generic-buffer typing issues.
-    const dv = new DataView((view as { buffer: ArrayBufferLike }).buffer, view.byteOffset, view.byteLength);
-    for (let i = 0; i < view.byteLength; i++) tmp[i] = dv.getUint8(i);
-    bytes = Array.from(tmp);
-  } else {
-    const dv = new DataView(src as ArrayBufferLike);
-    bytes = new Array<number>(dv.byteLength);
-    for (let i = 0; i < dv.byteLength; i++) bytes[i] = dv.getUint8(i);
-  }
-  const out = new ArrayBuffer(bytes.length);
-  const dst = new Uint8Array(out);
-  for (let i = 0; i < bytes.length; i++) dst[i] = bytes[i];
+  const view: Uint8Array = ArrayBuffer.isView(src)
+    ? new Uint8Array(
+        (src as ArrayBufferView).buffer as ArrayBuffer,
+        (src as ArrayBufferView).byteOffset,
+        (src as ArrayBufferView).byteLength,
+      )
+    : new Uint8Array(src as ArrayBuffer);
+  const out = new ArrayBuffer(view.byteLength);
+  new Uint8Array(out).set(view);
   return out;
 }
 
