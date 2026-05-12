@@ -1180,7 +1180,7 @@ const AXL: React.FC = () => {
             <>
               <SendToMenu sourceApp="axl" assetKind="model" getAsset={() => ({ name: `${project.name}.axl`, data: JSON.stringify(project), mimeType: 'application/json' })} />
               {collab.canShare && (
-                <button onClick={collab.openShareDialog} style={collabButtonStyles} title="Share project">
+                <button onClick={collab.openShareDialog} aria-label="Share project" style={collabButtonStyles} title="Share project">
                   <DexIcon name="user-plus" size={14} /> Share
                 </button>
               )}
@@ -1528,7 +1528,7 @@ const AXL: React.FC = () => {
           <div style={{ position: 'absolute', top: 42, left: 'min(220px, 32%)', width: 'clamp(220px, calc(100% - 244px), 320px)', bottom: 0, background: 'var(--color-bg-elevated)', borderRight: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Standard Parts</span>
-              <button onClick={ui.togglePartsLibrary} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>&times;</button>
+              <button onClick={ui.togglePartsLibrary} aria-label="Close parts library" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>&times;</button>
             </div>
 
             <div style={{ display: 'flex', padding: '6px 8px', gap: 4, overflowX: 'auto', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -1576,7 +1576,7 @@ const AXL: React.FC = () => {
           <div style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>Add Feature</span>
-              <button onClick={ui.toggleFeatureCreate} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
+              <button onClick={ui.toggleFeatureCreate} aria-label="Close feature create" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
             </div>
             <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto' }}>
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
@@ -1650,7 +1650,7 @@ const AXL: React.FC = () => {
           <div style={{ position: 'absolute', top: 42, right: 12, width: 'min(260px, calc(100% - 24px))', maxHeight: 'calc(100% - 48px)', background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 500, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>GD&T Annotation</span>
-              <button onClick={ui.toggleGDTCreate} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
+              <button onClick={ui.toggleGDTCreate} aria-label="Close GD&T create" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
             </div>
             <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>SYMBOL</div>
@@ -1888,7 +1888,7 @@ const AXL: React.FC = () => {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0A84FF" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>AI Design Copilot</span>
               </div>
-              <button onClick={ui.toggleAI} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
+              <button onClick={ui.toggleAI} aria-label="Close AI panel" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}>\u00d7</button>
             </div>
 
             <div style={{ padding: '8px 10px', display: 'flex', gap: 4, flexWrap: 'wrap', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -1942,7 +1942,7 @@ const AXL: React.FC = () => {
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>Bill of Materials \u2014 {project.name}</div>
-              <button onClick={ui.toggleBOM} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
+              <button onClick={ui.toggleBOM} aria-label="Close bill of materials" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
