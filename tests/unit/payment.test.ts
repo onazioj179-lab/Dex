@@ -39,16 +39,16 @@ describe('payment plan builder', () => {
 
   describe('computeSubtotalCents', () => {
     it('uses the plan price for non-per-seat plans', () => {
-      // Pro yearly = 37900 cents in pricing.ts.
-      expect(computeSubtotalCents({ planId: 'pro', period: 'yearly' })).toBe(37900);
-      // Personal monthly = 2000 cents.
-      expect(computeSubtotalCents({ planId: 'personal', period: 'monthly' })).toBe(2000);
+      // Pro yearly = 49299 cents in pricing.ts.
+      expect(computeSubtotalCents({ planId: 'pro', period: 'yearly' })).toBe(49299);
+      // Personal monthly = 2599 cents.
+      expect(computeSubtotalCents({ planId: 'personal', period: 'monthly' })).toBe(2599);
     });
     it('multiplies by seats for studio', () => {
-      // Studio monthly = 6000 cents/seat.
-      expect(computeSubtotalCents({ planId: 'studio', period: 'monthly', seats: 5 })).toBe(30000);
+      // Studio monthly = 7799 cents/seat.
+      expect(computeSubtotalCents({ planId: 'studio', period: 'monthly', seats: 5 })).toBe(38995);
       // Seats are clamped before multiplication.
-      expect(computeSubtotalCents({ planId: 'studio', period: 'monthly', seats: 0 })).toBe(6000);
+      expect(computeSubtotalCents({ planId: 'studio', period: 'monthly', seats: 0 })).toBe(7799);
     });
     it('returns 0 for free viewer or missing price', () => {
       expect(computeSubtotalCents({ planId: 'free-viewer', period: 'monthly' })).toBe(0);
@@ -132,14 +132,14 @@ describe('payment plan builder', () => {
 
     it('produces a bitcoin: URI with exact amount when rate is supplied', () => {
       const plan = buildPaymentPlan(
-        { planId: 'personal', period: 'monthly' }, // 2000 cents = $20
+        { planId: 'personal', period: 'monthly' }, // 2599 cents = $25.99
         { btcAddress: BTC_ADDR, rates: { btc: 50000 } },
       );
       const btc = plan.methods.find(m => m.id === 'bitcoin')!;
       expect(btc.available).toBe(true);
       expect(btc.priceUnknown).toBeUndefined();
-      // $20 at $50000/BTC = 0.0004 BTC = 40_000 sats.
-      expect(btc.amountAtomic).toBe('40000');
+      // $25.99 at $50000/BTC = 0.0005198 BTC = 51_980 sats.
+      expect(btc.amountAtomic).toBe('51980');
       expect(btc.url).toContain('bitcoin:' + BTC_ADDR);
       expect(btc.url).toContain('amount=');
       expect(btc.url).toContain(`message=${encodeURIComponent(plan.memo)}`);
@@ -147,16 +147,16 @@ describe('payment plan builder', () => {
 
     it('produces an ethereum: URI with wei amount when rate is supplied', () => {
       const plan = buildPaymentPlan(
-        { planId: 'personal', period: 'monthly' }, // $20
+        { planId: 'personal', period: 'monthly' }, // $25.99
         { ethAddress: ETH_ADDR, rates: { eth: 2000 } },
       );
       const eth = plan.methods.find(m => m.id === 'ethereum')!;
       expect(eth.available).toBe(true);
       expect(eth.priceUnknown).toBeUndefined();
-      // $20 at $2000/ETH = 0.01 ETH = 1e16 wei.
-      expect(eth.amountAtomic).toBe('10000000000000000');
+      // $25.99 at $2000/ETH = 0.012995 ETH = 1.2995e16 wei.
+      expect(eth.amountAtomic).toBe('12995000000000000');
       expect(eth.url).toContain('ethereum:' + ETH_ADDR);
-      expect(eth.url).toContain('value=10000000000000000');
+      expect(eth.url).toContain('value=12995000000000000');
     });
 
     it('flags priceUnknown when crypto address is set but no rate is', () => {

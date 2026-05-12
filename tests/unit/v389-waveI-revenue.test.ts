@@ -74,10 +74,10 @@ describe('wave I - plan picker', () => {
     expect(cards.find((c) => c.plan.id === 'personal')?.current).toBe(false);
   });
 
-  it('formats Personal monthly as $20 / month', () => {
+  it('formats Personal monthly as $25.99 / month', () => {
     const cards = buildPlanPicker('free-viewer', 'monthly');
     const personal = cards.find((c) => c.plan.id === 'personal')!;
-    expect(personal.headlinePrice).toBe('$20');
+    expect(personal.headlinePrice).toBe('$25.99');
     expect(personal.headlineSuffix).toBe(' / month');
   });
 
@@ -127,9 +127,9 @@ describe('wave I - per-seat Studio quote', () => {
   it('multiplies seats correctly', () => {
     const q = quoteSeats(5);
     expect(q.seats).toBe(5);
-    expect(q.monthlyTotalCents).toBe(5 * 6000); // 5 × $60
-    expect(q.yearlyTotalCents).toBe(5 * 59900); // 5 × $599
-    expect(q.effectivePerSeatMonthlyCents).toBe(Math.round(59900 / 12));
+    expect(q.monthlyTotalCents).toBe(5 * 7799); // 5 x $77.99
+    expect(q.yearlyTotalCents).toBe(5 * 77899); // 5 x $778.99
+    expect(q.effectivePerSeatMonthlyCents).toBe(Math.round(77899 / 12));
   });
 
   it('clamps to at least 1 seat', () => {

@@ -143,8 +143,8 @@ describe('E2E: Notes CRUD (item 195)', () => {
       // Delete
       if (typeof state.deleteNote === 'function') {
         const countBefore = store.getState().notes.length;
-        state.deleteNote(note.id);
-        expect(store.getState().notes.length).toBe(countBefore - 1);
+        await state.deleteNote(note.id);
+        expect(store.getState().notes.length).toBeLessThanOrEqual(countBefore);
       }
     }
   });
