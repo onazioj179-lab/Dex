@@ -700,6 +700,7 @@ export const AppManager: React.FC = () => {
   const [dockCtx, setDockCtx] = useState<{ appId: string; x: number; y: number } | null>(null);
   const dockCtxRef = useRef<{ appId: string; x: number; y: number } | null>(null);
   dockCtxRef.current = dockCtx;
+  const dockLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Launchpad context menu (right-click on apps in grid)
   const [launchpadCtx, setLaunchpadCtx] = useState<{ appId: string; label: string; x: number; y: number } | null>(null);
 
@@ -780,6 +781,8 @@ export const AppManager: React.FC = () => {
   // -- Dock hover preview state -----------------------------------------------
   const [dockPreview, setDockPreview] = useState<{ id: string; x: number; y: number } | null>(null);
   const dockPreviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dockPreviewPinnedId, setDockPreviewPinnedId] = useState<string | null>(null);
+  const [dockPeekAnnouncement, setDockPeekAnnouncement] = useState('');
 
   // -- Stage Manager (macOS Tahoe) -- off by default, user activates in Settings ----
   const [stageManagerOn, setStageManagerOn] = useState(() => {
@@ -1972,6 +1975,17 @@ export const AppManager: React.FC = () => {
         }
         return;
       }
+      // T12-025: global DockPeek hotkey on currently focused dock item
+      if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        const focusedDockBtn = document.activeElement as HTMLButtonElement | null;
+        const appIdAttr = focusedDockBtn?.getAttribute('data-dock-app-id');
+        if (appIdAttr) {
+          e.preventDefault();
+          openDockPeek(appIdAttr as AppId, focusedDockBtn);
+          setDockPreviewPinnedId(appIdAttr);
+        }
+        return;
+      }
       // Item 147: Alt+D -- focus dock for keyboard navigation
       if (e.altKey && e.key.toLowerCase() === 'd') {
         e.preventDefault();
@@ -3104,6 +3118,15 @@ export const AppManager: React.FC = () => {
       });
   }, [dockPins]);
 
+  const openDockPeek = useCallback((appId: AppId, anchorEl?: HTMLElement | null) => {
+    const source = anchorEl || dockRef.current?.querySelector<HTMLElement>(`[data-dock-app-id="${appId}"]`);
+    if (!source) return;
+    const rect = source.getBoundingClientRect();
+    setDockPreview({ id: appId, x: rect.left + rect.width / 2, y: rect.top });
+    const appName = dockItems.find(d => d.id === appId)?.label || APP_DEFINITIONS[appId]?.name || appId;
+    setDockPeekAnnouncement(`Dock peek opened for ${appName}`);
+  }, [dockItems]);
+
   const dockMagRafRef = useRef(0);
   const handleDockMouseMove = useCallback((e: React.MouseEvent) => {
     dockMouseX.current = e.clientX;
@@ -3217,19 +3240,33 @@ export const AppManager: React.FC = () => {
             const rect = el.getBoundingClientRect();
             dockPreviewTimer.current = setTimeout(() => {
               setDockPreview({ id: item.id, x: rect.left + rect.width / 2, y: rect.top });
+              setDockPeekAnnouncement(`Dock peek opened for ${item.label}`);
             }, 400);
           }}
           onMouseLeave={() => {
             if (dockPreviewTimer.current) clearTimeout(dockPreviewTimer.current);
             dockPreviewTimer.current = null;
-            setDockPreview(null);
+            if (dockPreviewPinnedId !== item.id) setDockPreview(null);
           }}
         >
 
           <button
             type="button"
             onPointerDown={(e) => {
+              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
+              dockLongPressTimerRef.current = setTimeout(() => {
+                setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
+              }, 420);
+              if (e.pointerType === 'touch') return;
               openDockApp(item.id, e.currentTarget);
+            }}
+            onPointerUp={() => {
+              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
+              dockLongPressTimerRef.current = null;
+            }}
+            onPointerCancel={() => {
+              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
+              dockLongPressTimerRef.current = null;
             }}
             onClick={(e) => {
               if (e.detail !== 0) return;
@@ -4067,6 +4104,7 @@ export const AppManager: React.FC = () => {
         const isAppRunning = runningApps.some(a => a.id === previewApp.id);
         const isAppActive = currentApp === previewApp.id;
         const isAppMinimized = minimizedApps.has(previewApp.id);
+        const isPeekPinned = dockPreviewPinnedId === previewApp.id;
         const shortcut = dockShortcut[previewApp.id];
         return (
           <div style={{
@@ -4079,10 +4117,10 @@ export const AppManager: React.FC = () => {
             borderRadius: 10,
             border: '1px solid var(--color-border)',
             padding: '7px 14px',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
             boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
             display: 'flex', alignItems: 'center', gap: 8,
-            animation: 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
+            animation: isReduceMotion() ? 'none' : 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
           } as React.CSSProperties}>
             <div style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewApp.color, background: `${previewApp.color}18`, flexShrink: 0 }}>
               {AppIconPngs[previewApp.id]
@@ -4096,9 +4134,55 @@ export const AppManager: React.FC = () => {
                 {shortcut ? `${isAppRunning || isAppActive || isAppMinimized ? ' · ' : ''}${shortcut}` : ''}
               </span>
             </div>
+            <button
+              type="button"
+              aria-label={isPeekPinned ? `Unpin Dock peek for ${previewApp.label}` : `Pin Dock peek for ${previewApp.label}`}
+              onClick={() => {
+                if (isPeekPinned) {
+                  setDockPreviewPinnedId(null);
+                  setDockPreview(null);
+                } else {
+                  setDockPreviewPinnedId(previewApp.id);
+                }
+              }}
+              style={{
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                background: isPeekPinned ? 'var(--color-accent)' : 'var(--color-bg-surface)',
+                color: isPeekPinned ? '#fff' : 'var(--color-text-primary)',
+                fontSize: 10,
+                padding: '3px 7px',
+                cursor: 'pointer',
+              }}
+            >
+              {isPeekPinned ? 'Pinned' : 'Pin'}
+            </button>
+            <button
+              type="button"
+              aria-label={`Open ${previewApp.label} from Dock peek`}
+              onClick={() => {
+                openDockApp(previewApp.id as AppId, null);
+                setDockPreviewPinnedId(null);
+                setDockPreview(null);
+              }}
+              style={{
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                background: 'var(--color-bg-surface)',
+                color: 'var(--color-text-primary)',
+                fontSize: 10,
+                padding: '3px 7px',
+                cursor: 'pointer',
+              }}
+            >
+              Open
+            </button>
           </div>
         );
       })()}
+      <div aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>
+        {dockPeekAnnouncement}
+      </div>
       <div
         onMouseEnter={showDock}
         onMouseMove={handleDockMouseMove}
