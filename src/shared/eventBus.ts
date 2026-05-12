@@ -81,6 +81,7 @@ export interface DexRendererEvents {
   'auth:unlock': void;
   'heartbeat:freeze': { frozenMs: number };
   'diagnostics:snapshot': Record<string, unknown>;
+  'frame:budget-exceeded': { workMs: number; budgetMs: number; refreshHz: number };
 }
 
 /** Renderer-scoped event bus. Import this singleton across components. */
