@@ -82,3 +82,35 @@ export function getWindowsByDepth(): string[] {
     .sort((a, b) => a[1] - b[1])
     .map(e => e[0]);
 }
+
+// ---------------------------------------------------------------------------
+// SNAPSHOT API (for diagnostics, alt-tab, compositor health UI)
+// ---------------------------------------------------------------------------
+
+export interface WindowStackEntry {
+  id: string;
+  depth: number;
+  frontmost: boolean;
+}
+
+/**
+ * Returns a snapshot of every tracked window with its depth and a frontmost
+ * flag, ordered front-to-back. Cheap; safe to call from diagnostics polls or
+ * alt-tab overlays.
+ */
+export function getWindowStack(): WindowStackEntry[] {
+  if (_windowDepths.size === 0) return [];
+  const entries = Array.from(_windowDepths.entries())
+    .sort((a, b) => b[1] - a[1]); // front first
+  const topDepth = entries[0][1];
+  return entries.map(([id, depth]) => ({
+    id,
+    depth,
+    frontmost: depth === topDepth,
+  }));
+}
+
+/** Total number of tracked windows. */
+export function getWindowCount(): number {
+  return _windowDepths.size;
+}
