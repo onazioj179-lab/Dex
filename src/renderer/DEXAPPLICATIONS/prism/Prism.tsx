@@ -3128,9 +3128,9 @@ const Prism: React.FC = () => {
               <div style={{ marginTop: '16px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '12px' }}>
                 <div style={{ marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Tools</div>
                 <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  <button onClick={() => setShowCurves(v => !v)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid ' + (showCurves ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showCurves ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showCurves ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Curves</button>
-                  <button onClick={() => setShowLevels(v => !v)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid ' + (showLevels ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showLevels ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showLevels ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Levels</button>
-                  <button onClick={() => { setBrightness(0); setContrast(0); setSaturation(0); setExposure(0); setHighlights(0); setShadows(0); setTemperature(0); setTint(0); setVibrance(0); setHue(0); }} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Reset All</button>
+                  <button aria-label={showCurves ? 'Hide Curves panel' : 'Show Curves panel'} onClick={() => setShowCurves(v => !v)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid ' + (showCurves ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showCurves ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showCurves ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Curves</button>
+                  <button aria-label={showLevels ? 'Hide Levels panel' : 'Show Levels panel'} onClick={() => setShowLevels(v => !v)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid ' + (showLevels ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showLevels ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showLevels ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Levels</button>
+                  <button aria-label="Reset all quick adjustments" onClick={() => { setBrightness(0); setContrast(0); setSaturation(0); setExposure(0); setHighlights(0); setShadows(0); setTemperature(0); setTint(0); setVibrance(0); setHue(0); }} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Reset All</button>
                 </div>
                 <div style={{ marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Quick Adjustments</div>
                 {ADJUSTMENT_PRESETS.map((preset, idx) => (
@@ -4769,7 +4769,7 @@ const Prism: React.FC = () => {
               <input type="range" min="-180" max="180" value={arbitraryAngle} onChange={e => setArbitraryAngle(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 28, textAlign: 'right' }}>{arbitraryAngle}°</span>
             </div>
-            <button onClick={() => {
+            <button aria-label="Apply arbitrary rotation" onClick={() => {
               if (arbitraryAngle !== 0) {
                 setLayers(prev => prev.map(l => ({ ...l, rotation: ((l.rotation || 0) + arbitraryAngle) % 360 })));
                 pushHistory(`Rotate ${arbitraryAngle}°`);
