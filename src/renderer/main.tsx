@@ -24,6 +24,11 @@ injectContainmentCSS();
 // degrade animations + pause FrameGovernor on critical pressure.
 import './utils/MemoryPressureBridge';
 
+// Compositor health: watch FrameGovernor for sustained over-budget frames
+// and advertise pressure via data-compositor-pressure.
+import { initCompositorHealth } from './utils/CompositorHealth';
+initCompositorHealth();
+
 // Font sharpness: set DPI attribute once at startup for CSS rules
 (() => {
   const dpr = window.devicePixelRatio || 1;
