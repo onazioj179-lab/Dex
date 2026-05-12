@@ -702,6 +702,7 @@ export const AppManager: React.FC = () => {
   const dockCtxRef = useRef<{ appId: string; x: number; y: number } | null>(null);
   dockCtxRef.current = dockCtx;
   const dockLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dockTouchReorderRef = useRef<{ appId: AppId; startX: number; startY: number; dragging: boolean; lastToIndex: number } | null>(null);
   // Launchpad context menu (right-click on apps in grid)
   const [launchpadCtx, setLaunchpadCtx] = useState<{ appId: string; label: string; x: number; y: number } | null>(null);
 
@@ -3259,16 +3260,74 @@ export const AppManager: React.FC = () => {
               dockLongPressTimerRef.current = setTimeout(() => {
                 setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
               }, 420);
-              if (e.pointerType === 'touch') return;
+              if (e.pointerType === 'touch') {
+                dockTouchReorderRef.current = {
+                  appId: item.id,
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  dragging: false,
+                  lastToIndex: items.findIndex((d) => d.id === item.id),
+                };
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+                return;
+              }
               openDockApp(item.id, e.currentTarget);
             }}
-            onPointerUp={() => {
-              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
-              dockLongPressTimerRef.current = null;
+            onPointerMove={(e) => {
+              if (e.pointerType !== 'touch') return;
+              const gesture = dockTouchReorderRef.current;
+              if (!gesture || gesture.appId !== item.id) return;
+
+              const dx = e.clientX - gesture.startX;
+              const dy = e.clientY - gesture.startY;
+              const moved = Math.hypot(dx, dy);
+              if (moved > 6 && dockLongPressTimerRef.current) {
+                clearTimeout(dockLongPressTimerRef.current);
+                dockLongPressTimerRef.current = null;
+              }
+              if (!gesture.dragging && moved > 14) {
+                gesture.dragging = true;
+              }
+              if (!gesture.dragging || !dockRef.current) return;
+
+              const buttons = Array.from(dockRef.current.querySelectorAll<HTMLButtonElement>('[data-dock-app-id]'));
+              if (buttons.length < 2) return;
+              const isHorizontalDock = dockEdgePref === 'bottom' || dockEdgePref === 'top';
+              const pointerAxis = isHorizontalDock ? e.clientX : e.clientY;
+
+              let toIndex = 0;
+              let closest = Number.POSITIVE_INFINITY;
+              buttons.forEach((btn, idx) => {
+                const rect = btn.getBoundingClientRect();
+                const center = isHorizontalDock ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+                const dist = Math.abs(pointerAxis - center);
+                if (dist < closest) {
+                  closest = dist;
+                  toIndex = idx;
+                }
+              });
+
+              const fromIndex = items.findIndex((d) => d.id === gesture.appId);
+              if (fromIndex >= 0 && toIndex >= 0 && toIndex !== fromIndex && toIndex !== gesture.lastToIndex) {
+                reorderDockPins(fromIndex, toIndex);
+                gesture.lastToIndex = toIndex;
+              }
             }}
-            onPointerCancel={() => {
+            onPointerUp={(e) => {
               if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
               dockLongPressTimerRef.current = null;
+              if (e.pointerType === 'touch') {
+                const gesture = dockTouchReorderRef.current;
+                if (gesture && gesture.appId === item.id && !gesture.dragging) {
+                  openDockApp(item.id, e.currentTarget);
+                }
+                dockTouchReorderRef.current = null;
+              }
+            }}
+            onPointerCancel={(e) => {
+              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
+              dockLongPressTimerRef.current = null;
+              if (e.pointerType === 'touch') dockTouchReorderRef.current = null;
             }}
             onClick={(e) => {
               if (e.detail !== 0) return;
