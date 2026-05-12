@@ -100,6 +100,17 @@ export default function Store(): React.ReactElement {
       const r = (await ipc().invoke('store:install', id)) as InstallResult;
       setLast(r.ok ? `Installed ${r.packageId} ${r.version ?? ''}`.trim() : `Install failed: ${r.error}`);
       await refresh();
+      if (r.ok) {
+        // Tell UKI a new app is now part of her world. Lazy-imported so the
+        // Store page doesn't pay the cost when the user only browses.
+        try {
+          const mod = await import('../uki/knowledgeFeeder');
+          await mod.notifyAppInstalled({ packageId: r.packageId, version: r.version });
+        } catch { /* feeder is non-critical */ }
+        try {
+          window.dispatchEvent(new CustomEvent('dex:app-installed', { detail: { packageId: r.packageId, version: r.version } }));
+        } catch { /* ignore */ }
+      }
     } catch (e) {
       setLast(`Error: ${toMessage(e)}`);
     } finally {
@@ -114,6 +125,15 @@ export default function Store(): React.ReactElement {
       const ok = await ipc().invoke('store:uninstall', id);
       setLast(ok ? `Removed ${id}` : `Not installed: ${id}`);
       await refresh();
+      if (ok) {
+        try {
+          const mod = await import('../uki/knowledgeFeeder');
+          await mod.notifyAppUninstalled(id);
+        } catch { /* feeder is non-critical */ }
+        try {
+          window.dispatchEvent(new CustomEvent('dex:app-uninstalled', { detail: { packageId: id } }));
+        } catch { /* ignore */ }
+      }
     } catch (e) {
       setLast(`Error: ${toMessage(e)}`);
     } finally {

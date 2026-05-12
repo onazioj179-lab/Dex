@@ -251,75 +251,83 @@ export const useRecentlyUsedApps = () => useRunningApps(s => {
 });
 
 // App definitions with colors and shortcuts for UI
+// Platform release stamped onto every built-in app so dock, Launchpad,
+// Settings -> About, and UKI all report consistent versions. Per-app
+// `version`/`buildDate` overrides are still honoured (creative-suite apps
+// historically tracked independent versions but are now aligned to platform
+// release for the 4.4.0 wave to remove user confusion).
+const PLATFORM_VERSION = '4.4.0';
+const PLATFORM_BUILD_DATE = '2026-05-12';
+
 export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon: string; shortcut?: string; version?: string; buildDate?: string; description?: string; category?: 'creative' | 'system' | 'productivity' | 'utility' | 'media' }> = {
   // Core System Apps
-  home: { name: 'Home', color: '#EBEBEB', icon: 'home', shortcut: 'Ctrl+1', category: 'system' },
-  files: { name: 'Files', color: '#339AF0', icon: 'files', shortcut: 'Ctrl+3', category: 'system' },
-  browser: { name: 'Browser', color: '#5E5CE6', icon: 'browser', shortcut: 'Ctrl+6', category: 'system' },
-  transfers: { name: 'Share', color: '#32D74B', icon: 'share', shortcut: 'Alt+T', category: 'system' },
-  settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: 'Ctrl+2', category: 'system' },
-  taskmanager: { name: 'Task Manager', color: 'var(--color-accent)', icon: 'taskmanager', shortcut: 'Ctrl+Shift+Esc', category: 'system', description: 'Monitor open DEX apps, system load, and native processes' },
-  
+  home: { name: 'Home', color: '#EBEBEB', icon: 'home', shortcut: 'Ctrl+1', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  files: { name: 'Files', color: '#339AF0', icon: 'files', shortcut: 'Ctrl+3', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  browser: { name: 'Browser', color: '#5E5CE6', icon: 'browser', shortcut: 'Ctrl+6', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  transfers: { name: 'Share', color: '#32D74B', icon: 'share', shortcut: 'Alt+T', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: 'Ctrl+2', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  taskmanager: { name: 'Task Manager', color: 'var(--color-accent)', icon: 'taskmanager', shortcut: 'Ctrl+Shift+Esc', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Monitor open DEX apps, system load, and native processes' },
+
   // Productivity Apps
-  notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: 'Ctrl+4', category: 'productivity' },
-  tasks: { name: 'Tasks', color: 'var(--color-warning)', icon: 'tasks', shortcut: 'Ctrl+5', category: 'productivity' },
-  workflows: { name: 'Workflows', color: '#BF5AF2', icon: 'workflows', category: 'productivity' },
-  calendar: { name: 'Calendar', color: 'var(--color-error)', icon: 'calendar', shortcut: 'Ctrl+8', category: 'productivity' },
-  
+  notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: 'Ctrl+4', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  tasks: { name: 'Tasks', color: 'var(--color-warning)', icon: 'tasks', shortcut: 'Ctrl+5', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  workflows: { name: 'Workflows', color: '#BF5AF2', icon: 'workflows', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  calendar: { name: 'Calendar', color: 'var(--color-error)', icon: 'calendar', shortcut: 'Ctrl+8', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+
   // Media Apps
-  gallery: { name: 'Gallery', color: '#FF375F', icon: 'gallery', shortcut: 'Ctrl+7', category: 'media' },
-  audio: { name: 'Music', color: '#FC3D39', icon: 'audio', category: 'media' },
-  
+  gallery: { name: 'Gallery', color: '#FF375F', icon: 'gallery', shortcut: 'Ctrl+7', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
+  audio: { name: 'Music', color: '#FC3D39', icon: 'audio', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
+
   // Utility Apps
-  power: { name: 'Power', color: 'var(--color-error)', icon: 'power', shortcut: 'Alt+P', category: 'utility' },
-  calculator: { name: 'Calculator', color: 'var(--color-text-tertiary)', icon: 'calculator', shortcut: 'Alt+C', category: 'utility' },
-  passwordgenerator: { name: 'Password Gen', color: 'var(--color-success)', icon: 'lock', category: 'utility' },
-  
+  power: { name: 'Power', color: 'var(--color-error)', icon: 'power', shortcut: 'Alt+P', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  calculator: { name: 'Calculator', color: 'var(--color-text-tertiary)', icon: 'calculator', shortcut: 'Alt+C', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  passwordgenerator: { name: 'Password Gen', color: 'var(--color-success)', icon: 'lock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+
   // DEX Creative Suite
-  videoeditor: { name: 'VINX', color: '#BF5AF2', icon: 'videoeditor', shortcut: 'Alt+V', version: '1.0.0', buildDate: '2026-04-11', description: 'Professional video editing with multi-track timeline, effects, and color grading', category: 'creative' },
-  imosion: { name: 'Imosion', color: '#FF6B35', icon: 'imosion', shortcut: 'Alt+I', version: '1.0.0', buildDate: '2026-04-11', description: 'Professional audio workstation with mixer routing, MIDI, and 32-bit float processing', category: 'creative' },
-  prism: { name: 'PRISM', color: 'var(--color-success)', icon: 'prism', shortcut: 'Alt+R', version: '1.0.0', buildDate: '2026-04-11', description: 'Advanced image editing with layers, selections, filters, and non-destructive adjustments', category: 'creative' },
-  flux: { name: 'FLUX', color: '#64D2FF', icon: 'flux', shortcut: 'Alt+F', version: '1.0.0', buildDate: '2026-04-11', description: 'Motion graphics and visual effects with keyframe animation and particle systems', category: 'creative' },
-  forge: { name: 'FORGE', color: 'var(--color-warning)', icon: 'forge', shortcut: 'Alt+G', version: '1.0.0', buildDate: '2026-04-11', description: 'Batch media encoding and transcoding with GPU acceleration and format presets', category: 'creative' },
-  axl: { name: 'AXL', color: 'var(--color-accent)', icon: 'axl', shortcut: 'Alt+X', version: '1.0.0', buildDate: '2026-04-11', description: 'Engineering design studio with parametric modeling, simulation, and technical drawing', category: 'creative' },
+  videoeditor: { name: 'VINX', color: '#BF5AF2', icon: 'videoeditor', shortcut: 'Alt+V', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Professional video editing with multi-track timeline, effects, and color grading', category: 'creative' },
+  imosion: { name: 'Imosion', color: '#FF6B35', icon: 'imosion', shortcut: 'Alt+I', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Professional audio workstation with mixer routing, MIDI, and 32-bit float processing', category: 'creative' },
+  prism: { name: 'PRISM', color: 'var(--color-success)', icon: 'prism', shortcut: 'Alt+R', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Advanced image editing with layers, selections, filters, and non-destructive adjustments', category: 'creative' },
+  flux: { name: 'FLUX', color: '#64D2FF', icon: 'flux', shortcut: 'Alt+F', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Motion graphics and visual effects with keyframe animation and particle systems', category: 'creative' },
+  forge: { name: 'FORGE', color: 'var(--color-warning)', icon: 'forge', shortcut: 'Alt+G', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Batch media encoding and transcoding with GPU acceleration and format presets', category: 'creative' },
+  axl: { name: 'AXL', color: 'var(--color-accent)', icon: 'axl', shortcut: 'Alt+X', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Engineering design studio with parametric modeling, simulation, and technical drawing', category: 'creative' },
 
   // DEX Rewind
-  rewind: { name: 'Rewind', color: 'var(--color-accent)', icon: 'rewind', shortcut: 'Alt+W', category: 'utility' },
+  rewind: { name: 'Rewind', color: 'var(--color-accent)', icon: 'rewind', shortcut: 'Alt+W', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
 
   // Project Management
-  kanban: { name: 'Kanban', color: '#5E5CE6', icon: 'kanban', shortcut: 'Ctrl+9', category: 'productivity' },
+  kanban: { name: 'Kanban', color: '#5E5CE6', icon: 'kanban', shortcut: 'Ctrl+9', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
 
   // Achievements
-  achievements: { name: 'Trophies', color: 'var(--color-warning)', icon: 'achievements', category: 'utility' },
+  achievements: { name: 'Trophies', color: 'var(--color-warning)', icon: 'achievements', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
 
   // System - Recycle Bin
-  recyclebin: { name: 'Trash', color: 'var(--color-text-tertiary)', icon: 'recyclebin', category: 'system' },
+  recyclebin: { name: 'Trash', color: 'var(--color-text-tertiary)', icon: 'recyclebin', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
 
   // New Standalone Apps
-  weather: { name: 'Weather', color: '#64D2FF', icon: 'weather', category: 'utility' },
-  worldclock: { name: 'World Clock', color: 'var(--color-warning)', icon: 'worldclock', category: 'utility' },
-  noisegenerator: { name: 'Noise', color: 'var(--color-success)', icon: 'noisegenerator', category: 'media' },
-  dexcode: { name: 'DexCode', color: 'var(--color-text-primary)', icon: 'dexcode', category: 'productivity' },
-  nexus: { name: 'Nexus', color: 'var(--color-accent)', icon: 'nexus', category: 'productivity' },
+  weather: { name: 'Weather', color: '#64D2FF', icon: 'weather', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  worldclock: { name: 'World Clock', color: 'var(--color-warning)', icon: 'worldclock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  noisegenerator: { name: 'Noise', color: 'var(--color-success)', icon: 'noisegenerator', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
+  dexcode: { name: 'DexCode', color: 'var(--color-text-primary)', icon: 'dexcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  nexus: { name: 'Nexus', color: 'var(--color-accent)', icon: 'nexus', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
 
   // Utility Apps (standalone)
-  stopwatch: { name: 'Stopwatch', color: 'var(--color-warning)', icon: 'stopwatch', category: 'utility' },
-  unitconverter: { name: 'Converter', color: '#5E5CE6', icon: 'unitconverter', category: 'utility' },
-  pomodoro: { name: 'Pomodoro', color: 'var(--color-error)', icon: 'pomodoro', category: 'productivity' },
-  qrcode: { name: 'QR Code', color: 'var(--color-success)', icon: 'qrcode', category: 'utility' },
-  colorpicker: { name: 'Colors', color: '#BF5AF2', icon: 'colorpicker', category: 'creative' },
-  learn: { name: 'Learn', color: '#5E5CE6', icon: 'learn', category: 'system' },
-  collabhub: { name: 'Collab Hub', color: '#5E5CE6', icon: 'collabhub', shortcut: 'Alt+H', version: '1.0.0', buildDate: '2026-04-17', description: 'Real-time collaboration for creative projects with sharing, chat, and checkpoints', category: 'productivity' },
-  canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: '1.0.0', buildDate: '2026-04-18', description: 'Clean drawing canvas for freeform sketching and drawing', category: 'creative' },
-  timer: { name: 'Timer', color: '#30D158', icon: 'timer', shortcut: 'Alt+M', version: '1.0.0', buildDate: '2026-04-18', description: 'Simple countdown timer with presets', category: 'utility' },
+  stopwatch: { name: 'Stopwatch', color: 'var(--color-warning)', icon: 'stopwatch', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  unitconverter: { name: 'Converter', color: '#5E5CE6', icon: 'unitconverter', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  pomodoro: { name: 'Pomodoro', color: 'var(--color-error)', icon: 'pomodoro', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  qrcode: { name: 'QR Code', color: 'var(--color-success)', icon: 'qrcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
+  colorpicker: { name: 'Colors', color: '#BF5AF2', icon: 'colorpicker', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative' },
+  learn: { name: 'Learn', color: '#5E5CE6', icon: 'learn', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
+  collabhub: { name: 'Collab Hub', color: '#5E5CE6', icon: 'collabhub', shortcut: 'Alt+H', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Real-time collaboration for creative projects with sharing, chat, and checkpoints', category: 'productivity' },
+  canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Clean drawing canvas for freeform sketching and drawing', category: 'creative' },
+  timer: { name: 'Timer', color: '#30D158', icon: 'timer', shortcut: 'Alt+M', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Simple countdown timer with presets', category: 'utility' },
 
   // New Standalone Apps (Wave 15) -- unique icon keys (NOT generic file-type icons)
-  screenrecorder: { name: 'Screen Recorder', color: '#FF453A', icon: 'screenrecorder', category: 'media', description: 'Record desktop and windows to webm video' },
-  presentation: { name: 'Presentation', color: '#FF9F0A', icon: 'presentation', category: 'productivity', description: 'Build and present slide decks with transitions' },
-  pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'pdfviewer', category: 'productivity', description: 'Read and annotate PDF documents' },
-  pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'pixelart', category: 'creative', description: 'NES-style pixel grid editor with frames' },
+  screenrecorder: { name: 'Screen Recorder', color: '#FF453A', icon: 'screenrecorder', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media', description: 'Record desktop and windows to webm video' },
+  presentation: { name: 'Presentation', color: '#FF9F0A', icon: 'presentation', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Build and present slide decks with transitions' },
+  pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'pdfviewer', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Read and annotate PDF documents' },
+  pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'pixelart', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative', description: 'NES-style pixel grid editor with frames' },
 
   // Storefront and Games surfaces (registry-backed so dock, Launchpad, UKI resolve metadata)
-  store: { name: 'Store', color: '#0A84FF', icon: 'store', category: 'system', description: 'Discover and install DEX apps and plugins from the catalog' },
-  games: { name: 'Games', color: '#30D158', icon: 'games', category: 'media', description: 'Built-in casual games hub' },
+  store: { name: 'Store', color: '#0A84FF', icon: 'store', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Discover and install DEX apps and plugins from the catalog' },
+  games: { name: 'Games', color: '#30D158', icon: 'games', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media', description: 'Built-in casual games hub' },
 };

@@ -1646,7 +1646,8 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
   const fmt = (n: number) => {
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
   const utilPct = status ? Math.min(100, Math.round(status.utilization * 100)) : 0;

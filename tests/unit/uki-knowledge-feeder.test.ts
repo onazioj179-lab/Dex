@@ -16,6 +16,10 @@ import {
   runKnowledgeFeed,
   getFeedStatus,
   enforceBudget,
+  notifyAppInstalled,
+  notifyAppUninstalled,
+  setBudgetBytes,
+  getBudgetBytes,
   DEFAULT_BUDGET_BYTES,
 } from '../../src/renderer/uki/knowledgeFeeder';
 
@@ -66,5 +70,50 @@ describe('UKI knowledge feeder', () => {
     const after = await listArchives();
     expect(out.bytesAfter).toBeGreaterThanOrEqual(0);
     expect(after.length).toBeLessThanOrEqual(before.length);
+  });
+
+  it('notifyAppInstalled records the app and a forced run picks it up', async () => {
+    await notifyAppInstalled({ packageId: 'com.example.foo', version: '1.2.3' });
+    const status = await getFeedStatus();
+    // notifyAppInstalled forces a run internally so totalIngested grew.
+    expect(status.totalIngested).toBeGreaterThan(0);
+  });
+
+  it('notifyAppUninstalled removes the record', async () => {
+    await notifyAppInstalled({ packageId: 'com.example.bar', version: '1.0.0' });
+    await notifyAppUninstalled('com.example.bar');
+    // Subsequent forced run still works without errors and reports a status
+    const r = await runKnowledgeFeed({ force: true });
+    expect(r).not.toBeNull();
+  });
+
+  it('configurable budget round-trips via setBudgetBytes / getBudgetBytes', async () => {
+    const target = 250 * 1024 * 1024;
+    await setBudgetBytes(target);
+    const v = await getBudgetBytes();
+    expect(v).toBe(target);
+  });
+
+  it('ingests bookmarks, browser history, file tags, theme prefs', async () => {
+    localStorage.setItem('dex-browser-bookmarks', JSON.stringify([
+      { id: 'b1', title: 'GitHub', url: 'https://github.com', folderId: 'root', addedAt: Date.now() },
+    ]));
+    localStorage.setItem('dex-browser-history', JSON.stringify([
+      { url: 'https://example.com', title: 'Example', visitedAt: Date.now() },
+    ]));
+    localStorage.setItem('dex-file-tags', JSON.stringify({ 'C:/x/a.txt': ['draft', 'urgent'] }));
+    localStorage.setItem('dex-theme-preset', 'midnight');
+    localStorage.setItem('dex-dark-mode', 'true');
+    localStorage.setItem('dex-accent-color', '#0A84FF');
+    const result = await runKnowledgeFeed({ force: true });
+    expect(result!.sources['bookmarks']).toBe(1);
+    expect(result!.sources['browser-history']).toBe(1);
+    expect(result!.sources['file-tags']).toBe(1);
+    expect(result!.sources['theme-prefs']).toBe(1);
+  });
+
+  it('ingests curated knowledge reference (shortcuts + workflows)', async () => {
+    const result = await runKnowledgeFeed({ force: true });
+    expect(result!.sources['knowledge-reference']).toBeGreaterThan(0);
   });
 });

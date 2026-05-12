@@ -25,10 +25,12 @@ import {
   getCompressionStats,
   type UkiArchiveRecord,
 } from './compressedMemory';
-import { DEX_APP_CATALOG } from './knowledge';
+import { DEX_APP_CATALOG, DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS } from './knowledge';
 
 const ARCHIVE_KEY = 'uki:mem:archive';
 const FEED_STATE_KEY = 'uki:feed:state';
+const FEED_BUDGET_KEY = 'uki:feed:budget';
+const INSTALLED_APPS_KEY = 'uki:feed:installed-apps';
 
 export const DEFAULT_BUDGET_BYTES = 100 * 1024 * 1024; // 100 MB
 const MIN_FEED_INTERVAL_MS = 5 * 60 * 1000;            // 5 minutes between runs
@@ -39,6 +41,12 @@ interface FeedState {
   sources: Record<string, { lastTs: number; count: number }>;
 }
 
+interface InstalledAppRecord {
+  packageId: string;
+  version?: string;
+  installedAt: number;
+}
+
 async function readFeedState(): Promise<FeedState> {
   const v = await cache.getAsync<FeedState>(FEED_STATE_KEY);
   return v ?? { lastRunTs: 0, totalIngested: 0, sources: {} };
@@ -46,6 +54,17 @@ async function readFeedState(): Promise<FeedState> {
 
 async function writeFeedState(s: FeedState): Promise<void> {
   await cache.setAsync(FEED_STATE_KEY, s, { encrypted: false, ttl: 0 });
+}
+
+/** Configurable byte budget. Defaults to 100 MB. */
+export async function getBudgetBytes(): Promise<number> {
+  const v = await cache.getAsync<number>(FEED_BUDGET_KEY);
+  return typeof v === 'number' && v > 0 ? v : DEFAULT_BUDGET_BYTES;
+}
+
+export async function setBudgetBytes(bytes: number): Promise<void> {
+  if (!Number.isFinite(bytes) || bytes <= 0) return;
+  await cache.setAsync(FEED_BUDGET_KEY, bytes, { encrypted: false, ttl: 0 });
 }
 
 // ---------------------------------------------------------------------------
@@ -158,13 +177,229 @@ function collectCachedFacts(): SourceFact[] {
   return out;
 }
 
+function safeParseArray<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v as T[] : [];
+  } catch { return []; }
+}
+
+function collectBookmarks(): SourceFact[] {
+  type BM = { id?: string; title?: string; url?: string; folderId?: string; addedAt?: number };
+  const list = safeParseArray<BM>('dex-browser-bookmarks');
+  return list.slice(-MAX_FACTS_PER_SOURCE).map(b => ({
+    source: 'bookmarks',
+    user: `What is the bookmark "${b.title ?? b.url ?? ''}"?`,
+    response: clip(`Bookmark "${b.title ?? ''}" -> ${b.url ?? ''} (folder ${b.folderId ?? 'root'})`),
+    ts: b.addedAt ?? Date.now(),
+    appId: 'browser',
+  }));
+}
+
+function collectBrowserHistory(): SourceFact[] {
+  type H = { url?: string; title?: string; visitedAt?: number };
+  const list = safeParseArray<H>('dex-browser-history');
+  return list.slice(-MAX_FACTS_PER_SOURCE).map(h => ({
+    source: 'browser-history',
+    user: `Has the user visited ${h.url ?? h.title ?? 'this page'}?`,
+    response: clip(`Visited ${h.title ?? ''} (${h.url ?? ''}) at ${new Date(h.visitedAt ?? 0).toISOString()}.`),
+    ts: h.visitedAt ?? Date.now(),
+    appId: 'browser',
+  }));
+}
+
+function collectFileTags(): SourceFact[] {
+  try {
+    const raw = localStorage.getItem('dex-file-tags');
+    if (!raw) return [];
+    const obj = JSON.parse(raw) as Record<string, string[]>;
+    return Object.entries(obj).slice(0, MAX_FACTS_PER_SOURCE).map(([path, tags]) => ({
+      source: 'file-tags',
+      user: `Which tags did the user assign to ${path}?`,
+      response: clip(`File ${path} is tagged: ${(tags ?? []).join(', ') || 'none'}.`),
+      ts: Date.now(),
+      appId: 'files',
+    }));
+  } catch { return []; }
+}
+
+function collectSmartFolders(): SourceFact[] {
+  type SF = { id?: string; name?: string; query?: string; rules?: unknown };
+  const list = safeParseArray<SF>('dex-smart-folders');
+  return list.slice(0, MAX_FACTS_PER_SOURCE).map(f => ({
+    source: 'smart-folders',
+    user: `What is the smart folder "${f.name ?? ''}"?`,
+    response: clip(`Smart folder "${f.name ?? ''}" matches: ${f.query ?? JSON.stringify(f.rules ?? {})}.`),
+    ts: Date.now(),
+    appId: 'files',
+  }));
+}
+
+function collectGalleryFavorites(): SourceFact[] {
+  try {
+    const raw = localStorage.getItem('dex-gallery-favorites');
+    if (!raw) return [];
+    const list = JSON.parse(raw) as string[];
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, MAX_FACTS_PER_SOURCE).map(path => ({
+      source: 'gallery-favorites',
+      user: `Is ${path} a favourite image?`,
+      response: clip(`Image ${path} is starred in Gallery.`),
+      ts: Date.now(),
+      appId: 'gallery',
+    }));
+  } catch { return []; }
+}
+
+function collectAudioPlaylists(): SourceFact[] {
+  type P = { id?: string; name?: string; tracks?: Array<{ path?: string; title?: string }> };
+  const list = safeParseArray<P>('dex-audio-playlists');
+  return list.slice(0, MAX_FACTS_PER_SOURCE).map(p => ({
+    source: 'audio-playlists',
+    user: `What is in the playlist "${p.name ?? ''}"?`,
+    response: clip(`Playlist "${p.name ?? ''}" has ${p.tracks?.length ?? 0} tracks: ${(p.tracks ?? []).slice(0, 8).map(t => t.title ?? t.path).join(', ')}`),
+    ts: Date.now(),
+    appId: 'audio',
+  }));
+}
+
+function collectRecentSearches(): SourceFact[] {
+  type S = { query?: string; ts?: number; resultCount?: number };
+  const list = safeParseArray<S>('dex-recent-searches');
+  return list.slice(-MAX_FACTS_PER_SOURCE).map(s => ({
+    source: 'recent-searches',
+    user: `What did the user search for recently?`,
+    response: clip(`Search "${s.query ?? ''}" at ${new Date(s.ts ?? 0).toISOString()} returned ${s.resultCount ?? 0} results.`),
+    ts: s.ts ?? Date.now(),
+  }));
+}
+
+function collectClipboardPinned(): SourceFact[] {
+  try {
+    const raw = localStorage.getItem('dex-clipboard-pinned');
+    if (!raw) return [];
+    const list = JSON.parse(raw) as string[];
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, MAX_FACTS_PER_SOURCE).map(text => ({
+      source: 'clipboard-pinned',
+      user: `What is pinned on the clipboard?`,
+      response: clip(`Pinned clipboard entry: ${text}`),
+      ts: Date.now(),
+    }));
+  } catch { return []; }
+}
+
+function collectThemePrefs(): SourceFact[] {
+  try {
+    const out: SourceFact[] = [];
+    const preset = localStorage.getItem('dex-theme-preset');
+    const dark = localStorage.getItem('dex-dark-mode');
+    const accent = localStorage.getItem('dex-accent-color');
+    if (preset || dark || accent) {
+      out.push({
+        source: 'theme-prefs',
+        user: 'What theme does the user prefer?',
+        response: clip(`Theme preset: ${preset ?? 'default'}; dark mode: ${dark ?? 'auto'}; accent: ${accent ?? 'system'}.`),
+        ts: Date.now(),
+        appId: 'settings',
+      });
+    }
+    return out;
+  } catch { return []; }
+}
+
+function collectKnowledgeReference(): SourceFact[] {
+  // Bake the curated DEX_GLOBAL_SHORTCUTS and DEX_WORKFLOWS reference data
+  // into UKI's archive so she can answer "how do I X" offline.
+  const out: SourceFact[] = [];
+  try {
+    const shortcuts = Object.entries(DEX_GLOBAL_SHORTCUTS).slice(0, MAX_FACTS_PER_SOURCE / 2);
+    for (const [keys, action] of shortcuts) {
+      out.push({
+        source: 'knowledge-reference',
+        user: `What does the keyboard shortcut ${keys} do?`,
+        response: clip(`${keys}: ${action}`),
+        ts: Date.now(),
+      });
+    }
+    for (const wf of DEX_WORKFLOWS.slice(0, MAX_FACTS_PER_SOURCE / 2)) {
+      out.push({
+        source: 'knowledge-reference',
+        user: `How do I ${wf.title}?`,
+        response: clip(`${wf.title}: ${wf.steps.join(' -> ')}`),
+        ts: Date.now(),
+      });
+    }
+  } catch { /* knowledge module missing */ }
+  return out;
+}
+
 const COLLECTORS: Array<{ name: string; collect: () => SourceFact[] | Promise<SourceFact[]> }> = [
   { name: 'app-catalog', collect: collectAppCatalog },
+  { name: 'knowledge-reference', collect: collectKnowledgeReference },
   { name: 'recent-files', collect: collectRecentFiles },
   { name: 'notes', collect: collectNotes },
   { name: 'running-apps', collect: collectRunningApps },
   { name: 'cached-facts', collect: collectCachedFacts },
+  { name: 'installed-apps', collect: collectInstalledApps },
+  { name: 'bookmarks', collect: collectBookmarks },
+  { name: 'browser-history', collect: collectBrowserHistory },
+  { name: 'file-tags', collect: collectFileTags },
+  { name: 'smart-folders', collect: collectSmartFolders },
+  { name: 'gallery-favorites', collect: collectGalleryFavorites },
+  { name: 'audio-playlists', collect: collectAudioPlaylists },
+  { name: 'recent-searches', collect: collectRecentSearches },
+  { name: 'clipboard-pinned', collect: collectClipboardPinned },
+  { name: 'theme-prefs', collect: collectThemePrefs },
 ];
+
+// ---------------------------------------------------------------------------
+// Installed-apps registry -- third-party / store apps the user added after
+// initial install. Updated by `notifyAppInstalled` / `notifyAppUninstalled`
+// from the Store page so UKI immediately knows new apps exist.
+// ---------------------------------------------------------------------------
+
+async function readInstalledApps(): Promise<InstalledAppRecord[]> {
+  return (await cache.getAsync<InstalledAppRecord[]>(INSTALLED_APPS_KEY)) ?? [];
+}
+
+async function writeInstalledApps(list: InstalledAppRecord[]): Promise<void> {
+  await cache.setAsync(INSTALLED_APPS_KEY, list, { encrypted: false, ttl: 0 });
+}
+
+function collectInstalledApps(): SourceFact[] | Promise<SourceFact[]> {
+  return readInstalledApps().then(list =>
+    list.slice(-MAX_FACTS_PER_SOURCE).map(a => ({
+      source: 'installed-apps',
+      user: `What is the ${a.packageId} app?`,
+      response: clip(`The user installed ${a.packageId}${a.version ? ` v${a.version}` : ''} on ${new Date(a.installedAt).toISOString()}. It is now available from the dock and Launchpad.`),
+      ts: a.installedAt,
+      appId: a.packageId,
+    }))
+  );
+}
+
+/**
+ * Called by the Store after a successful install. Records the fact, kicks an
+ * immediate (forced) feed pass so UKI knows about the new app right now.
+ */
+export async function notifyAppInstalled(info: { packageId: string; version?: string }): Promise<void> {
+  const list = await readInstalledApps();
+  const filtered = list.filter(a => a.packageId !== info.packageId);
+  filtered.push({ packageId: info.packageId, version: info.version, installedAt: Date.now() });
+  await writeInstalledApps(filtered.slice(-200));
+  // Fire a forced feed so the new app fact lands in compressed memory now.
+  try { await runKnowledgeFeed({ force: true }); } catch { /* non-critical */ }
+}
+
+/** Called by the Store after a successful uninstall. */
+export async function notifyAppUninstalled(packageId: string): Promise<void> {
+  const list = await readInstalledApps();
+  const filtered = list.filter(a => a.packageId !== packageId);
+  await writeInstalledApps(filtered);
+}
 
 // ---------------------------------------------------------------------------
 // Budget enforcement -- prune oldest archives until total compressed bytes
@@ -215,7 +450,7 @@ export interface FeedOptions {
  * archives them), then enforces the byte budget.
  */
 export async function runKnowledgeFeed(opts: FeedOptions = {}): Promise<FeedResult | null> {
-  const budgetBytes = opts.budgetBytes ?? DEFAULT_BUDGET_BYTES;
+  const budgetBytes = opts.budgetBytes ?? (await getBudgetBytes());
   const state = await readFeedState();
   const now = Date.now();
   if (!opts.force && now - state.lastRunTs < MIN_FEED_INTERVAL_MS) return null;
@@ -258,7 +493,7 @@ export async function runKnowledgeFeed(opts: FeedOptions = {}): Promise<FeedResu
   };
 }
 
-export async function getFeedStatus(budgetBytes: number = DEFAULT_BUDGET_BYTES): Promise<{
+export async function getFeedStatus(budgetBytes?: number): Promise<{
   lastRunTs: number;
   totalIngested: number;
   archives: UkiArchiveRecord[];
@@ -266,6 +501,7 @@ export async function getFeedStatus(budgetBytes: number = DEFAULT_BUDGET_BYTES):
   budgetBytes: number;
   utilization: number;
 }> {
+  const budget = budgetBytes ?? (await getBudgetBytes());
   const state = await readFeedState();
   const archives = await listArchives();
   const bytesUsed = archives.reduce((s, a) => s + a.compressedBytes, 0);
@@ -274,7 +510,7 @@ export async function getFeedStatus(budgetBytes: number = DEFAULT_BUDGET_BYTES):
     totalIngested: state.totalIngested,
     archives,
     bytesUsed,
-    budgetBytes,
-    utilization: budgetBytes > 0 ? bytesUsed / budgetBytes : 0,
+    budgetBytes: budget,
+    utilization: budget > 0 ? bytesUsed / budget : 0,
   };
 }
