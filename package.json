@@ -40,7 +40,10 @@
     "generate-icons": "node scripts/generate-icons.js",
     "watermark": "node scripts/add-watermarks.js",
     "watermark:check": "node scripts/add-watermarks.js --check",
-    "lint": "tsc --noEmit && node scripts/add-watermarks.js --check"
+    "lint": "tsc --noEmit && node scripts/add-watermarks.js --check",
+    "release:prune": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prune-releases.ps1 -Repo onazioj179-lab/Dex -Keep 3",
+    "release:prune:updates": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prune-releases.ps1 -Repo onazioj179-lab/dex-updates -Keep 3",
+    "release:prune:all": "npm run release:prune && npm run release:prune:updates"
   },
   "engines": {
     "node": ">=18.0.0",

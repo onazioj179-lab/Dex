@@ -12,7 +12,9 @@ interface SystemProcess {
 interface SystemStatusInfo {
   cpu?: { usage: number; cores: number };
   memory?: { total: number; used: number; percent: number };
-  battery?: { percent: number; charging: boolean };
+  battery?: { percent: number; charging: boolean; hasBattery?: boolean; timeRemaining?: number | null };
+  network?: { connected: boolean; type?: string };
+  uptime?: number;
 }
 
 const HISTORY_LENGTH = 120;
@@ -25,7 +27,24 @@ const formatAge = (timestamp: number): string => {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 };
 
+const formatUptime = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'Just started';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+};
+
 const toneFor = (percent: number): string => (percent > 80 ? '#FF453A' : percent > 55 ? '#FF9F0A' : '#30D158');
+
+const batteryTone = (percent: number, charging: boolean): string => {
+  if (charging) return '#30D158';
+  if (percent < 15) return '#FF453A';
+  if (percent < 30) return '#FF9F0A';
+  return '#30D158';
+};
 
 interface SparklineProps {
   history: number[];
@@ -150,6 +169,7 @@ const TaskManager: React.FC = () => {
   const [memoryHistory, setMemoryHistory] = useState<number[]>([]);
   const [processHistory, setProcessHistory] = useState<number[]>([]);
   const [appHistory, setAppHistory] = useState<number[]>([]);
+  const [batteryHistory, setBatteryHistory] = useState<number[]>([]);
 
   const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
     setter(prev => {
@@ -171,6 +191,9 @@ const TaskManager: React.FC = () => {
         setStatus(systemStatus);
         pushSample(setCpuHistory, systemStatus?.cpu?.usage ?? 0);
         pushSample(setMemoryHistory, systemStatus?.memory?.percent ?? 0);
+        if (systemStatus?.battery?.hasBattery !== false) {
+          pushSample(setBatteryHistory, systemStatus?.battery?.percent ?? 0);
+        }
         setBridgeAvailable(true);
       }
     } catch {
@@ -234,6 +257,19 @@ const TaskManager: React.FC = () => {
   const processCount = processes.length;
   const appsTone = shellApps.length > 12 ? '#FF9F0A' : '#0A84FF';
 
+  const battery = status.battery;
+  const hasBattery = battery && battery.hasBattery !== false;
+  const batteryPercent = battery?.percent ?? 0;
+  const batteryDetail = !hasBattery
+    ? 'No battery detected'
+    : battery?.charging
+      ? 'Charging'
+      : (battery?.timeRemaining && battery.timeRemaining > 0)
+        ? `${Math.round(battery.timeRemaining)} min remaining`
+        : 'On battery';
+  const uptimeSeconds = status.uptime ?? 0;
+  const networkConnected = status.network?.connected ?? false;
+
   const handleManualRefresh = () => {
     refreshStatus();
     refreshProcesses();
@@ -285,6 +321,21 @@ const TaskManager: React.FC = () => {
           tone="#5E5CE6"
           max={Math.max(50, ...processHistory)}
         />
+        {hasBattery && (
+          <MetricCard
+            label="Battery"
+            value={`${batteryPercent}%`}
+            detail={batteryDetail}
+            history={batteryHistory}
+            tone={batteryTone(batteryPercent, !!battery?.charging)}
+          />
+        )}
+        <div style={styles.statCard}>
+          <div style={styles.statLabel}>Uptime</div>
+          <div style={{ ...styles.statValue, color: '#0A84FF', fontSize: 22 }}>{formatUptime(uptimeSeconds)}</div>
+          <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
+          <div style={styles.sparkWrap} />
+        </div>
       </div>
 
       <div style={styles.contentGrid}>
@@ -359,7 +410,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 14,
     padding: 18, color: 'var(--color-text-primary)', background: 'var(--pg-surface)',
-    backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+    backdropFilter: 'blur(32px) saturate(190%)', WebkitBackdropFilter: 'blur(32px) saturate(190%)',
     overflow: 'hidden',
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
@@ -369,13 +420,13 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: { fontSize: 12, color: 'var(--color-text-secondary)' },
   refreshButton: { display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', cursor: 'pointer' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  statCard: { padding: 12, borderRadius: 10, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 4 },
+  statCard: { padding: 14, borderRadius: 14, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 4 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   statValue: { fontSize: 24, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
   sparkWrap: { marginTop: 6, height: 46 },
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 12 },
-  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)' },
+  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.08)' },
   panelHeader: { height: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 12px', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 700 },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 },

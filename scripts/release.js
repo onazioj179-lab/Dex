@@ -323,6 +323,21 @@ function main() {
     }
     console.log(`\n  Push tag and upload artifacts to publish:`);
     console.log(`  git push origin v${VERSION}`);
+
+    // Retention rule: keep only the 3 newest GitHub releases per repo.
+    // Older releases (and their tags) are deleted automatically.
+    console.log(`\n  Pruning old GitHub releases (keep newest 3)...`);
+    try {
+      const pruneScript = path.join(ROOT, 'scripts', 'prune-releases.ps1');
+      if (fs.existsSync(pruneScript)) {
+        run(`pwsh -NoProfile -ExecutionPolicy Bypass -File "${pruneScript}" -Repo onazioj179-lab/Dex -Keep 3`, { allowFailure: true });
+        run(`pwsh -NoProfile -ExecutionPolicy Bypass -File "${pruneScript}" -Repo onazioj179-lab/dex-updates -Keep 3`, { allowFailure: true });
+      } else {
+        console.log('  prune-releases.ps1 not found -- skipping retention pass');
+      }
+    } catch (pruneErr) {
+      console.warn(`  WARNING: prune step failed: ${pruneErr.message || pruneErr}`);
+    }
   }
   console.log(`\n  Release pipeline complete.\n`);
 }
