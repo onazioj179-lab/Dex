@@ -1,0 +1,509 @@
+# IMPROVEMENTS Master Queue (500)
+
+All IMPROVEMENTS_500 items ranked for the same-version train.
+Target train: 4.3.x-same-train
+
+Total items: 500
+
+## Items
+
+- [ ] #1 `T12-020` (P2) [T12 - Dock & shell peek] - DockPeek for creative suite (VINX/Imosion/PRISM/FLUX/FORGE/AXL).
+- [ ] #2 `T11-021` (P2) [T11 - Touch / pen / 10-finger] - Pen pressure → FLUX brush stroke width.
+- [ ] #3 `T1-020` (P2) [T1 - Accessibility] - FLUX: aria-label timeline keyframe controls.
+- [ ] #4 `T11-013` (P2) [T11 - Touch / pen / 10-finger] - Pinch-to-zoom in FLUX viewport.
+- [ ] #5 `T11-018` (P2) [T11 - Touch / pen / 10-finger] - Pen pressure → PRISM brush size.
+- [ ] #6 `T11-019` (P2) [T11 - Touch / pen / 10-finger] - Pen pressure → PRISM brush opacity.
+- [ ] #7 `T11-020` (P2) [T11 - Touch / pen / 10-finger] - Pen tilt → PRISM brush angle.
+- [ ] #8 `T1-005` (P2) [T1 - Accessibility] - Imosion: aria-label export panel buttons.
+- [ ] #9 `T1-013` (P2) [T1 - Accessibility] - VINX: aria-label timeline tool palette.
+- [ ] #10 `T1-015` (P2) [T1 - Accessibility] - VINX: keyboard nav between timeline tracks.
+- [ ] #11 `T1-017` (P2) [T1 - Accessibility] - PRISM: aria-label brush/size/opacity controls.
+- [ ] #12 `T1-021` (P2) [T1 - Accessibility] - FLUX: aria-label effects panel.
+- [ ] #13 `T1-022` (P2) [T1 - Accessibility] - FLUX: aria-label property inspector fields.
+- [ ] #14 `T11-005` (P2) [T11 - Touch / pen / 10-finger] - Long-press dock icon = peek (DONE).
+- [ ] #15 `T11-006` (P2) [T11 - Touch / pen / 10-finger] - Short tap dock icon = launch (DONE).
+- [ ] #16 `T11-012` (P2) [T11 - Touch / pen / 10-finger] - Pinch-to-zoom in PRISM viewport.
+- [ ] #17 `T11-014` (P2) [T11 - Touch / pen / 10-finger] - Pinch-to-zoom in AXL viewport.
+- [ ] #18 `T11-022` (P2) [T11 - Touch / pen / 10-finger] - Pen pressure → AXL pen tool weight.
+- [ ] #19 `T11-025` (P2) [T11 - Touch / pen / 10-finger] - Imosion spectrum canvas: touch scrub.
+- [ ] #20 `T11-026` (P2) [T11 - Touch / pen / 10-finger] - Imosion waveform canvas: pinch-zoom + touch scrub.
+- [ ] #21 `T11-033` (P2) [T11 - Touch / pen / 10-finger] - Drag-to-reorder dock items with finger.
+- [ ] #22 `T12-006` (P2) [T12 - Dock & shell peek] - DockPeek action: Open recent.
+- [ ] #23 `T12-015` (P2) [T12 - Dock & shell peek] - DockPeek entrance/exit animation respects reduced-motion.
+- [ ] #24 `T12-017` (P2) [T12 - Dock & shell peek] - DockPeek pinning (keep open).
+- [ ] #25 `T12-022` (P2) [T12 - Dock & shell peek] - DockPeek a11y: announce on open.
+- [ ] #26 `T12-025` (P2) [T12 - Dock & shell peek] - DockPeek opens via global hotkey on focused dock item.
+- [ ] #27 `T3-037` (P2) [T3 - Creative-suite features] - Brush dynamics editor.
+- [ ] #28 `T3-048` (P2) [T3 - Creative-suite features] - Pen-pressure → brush size and opacity mapping.
+- [ ] #29 `T3-049` (P2) [T3 - Creative-suite features] - Pen-tilt → brush angle.
+- [ ] #30 `T5-009` (P2) [T5 - Knowledge / UKI] - UKI graph: export PNG / SVG.
+- [ ] #31 `T5-020` (P2) [T5 - Knowledge / UKI] - RAG: export conversation as note.
+- [ ] #32 `T5-036` (P2) [T5 - Knowledge / UKI] - Plugins: registry browser.
+- [ ] #33 `T5-037` (P2) [T5 - Knowledge / UKI] - Plugins: install / disable / uninstall actions.
+- [ ] #34 `T5-038` (P2) [T5 - Knowledge / UKI] - Plugins: permission diff on update.
+- [ ] #35 `T5-039` (P2) [T5 - Knowledge / UKI] - Plugins: developer mode console.
+- [ ] #36 `T5-040` (P2) [T5 - Knowledge / UKI] - Plugins: hot-reload during dev.
+- [ ] #37 `T5-043` (P2) [T5 - Knowledge / UKI] - Knowledge cards: share to collab.
+- [ ] #38 `T5-044` (P2) [T5 - Knowledge / UKI] - UKI: timeline view.
+- [ ] #39 `T5-055` (P2) [T5 - Knowledge / UKI] - UKI: data export bundle (zip).
+- [ ] #40 `T6-018` (P2) [T6 - Performance & stability] - Web workers for image processing in PRISM/FLUX.
+- [ ] #41 `T9-012` (P2) [T9 - UX & onboarding] - Drop-onto-dock-icon opens the file in that app.
+- [ ] #42 `T1-001` (P2) [T1 - Accessibility] - Imosion: aria-label every mute/solo/arm button. AC: axe-core reports 0 unlabeled buttons in mixer.
+- [ ] #43 `T1-002` (P2) [T1 - Accessibility] - Imosion: aria-label every track add/remove control.
+- [ ] #44 `T1-003` (P2) [T1 - Accessibility] - Imosion: aria-label transport controls (play/stop/record/loop/metronome).
+- [ ] #45 `T1-004` (P2) [T1 - Accessibility] - Imosion: aria-label file menu items.
+- [ ] #46 `T1-006` (P2) [T1 - Accessibility] - Imosion: aria-label split-clip and trim controls.
+- [ ] #47 `T1-007` (P2) [T1 - Accessibility] - Imosion: aria-label add-track menu items.
+- [ ] #48 `T1-008` (P2) [T1 - Accessibility] - Imosion: aria-label mastering panel knobs.
+- [ ] #49 `T1-009` (P2) [T1 - Accessibility] - Imosion: aria-label preset selector buttons.
+- [ ] #50 `T1-010` (P2) [T1 - Accessibility] - Imosion: keyboard nav between tracks (Up/Down arrows).
+- [ ] #51 `T1-011` (P2) [T1 - Accessibility] - Imosion: focus ring on every interactive surface.
+- [ ] #52 `T1-012` (P2) [T1 - Accessibility] - VINX: aria-label viewer transport buttons.
+- [ ] #53 `T1-014` (P2) [T1 - Accessibility] - VINX: aria-label clip context-menu items.
+- [ ] #54 `T1-016` (P2) [T1 - Accessibility] - PRISM: aria-label tool palette.
+- [ ] #55 `T1-018` (P2) [T1 - Accessibility] - PRISM: aria-label layer panel buttons.
+- [ ] #56 `T1-019` (P2) [T1 - Accessibility] - PRISM: keyboard shortcut hints in tooltips.
+- [ ] #57 `T1-023` (P2) [T1 - Accessibility] - FORGE: aria-label primitive palette.
+- [ ] #58 `T1-024` (P2) [T1 - Accessibility] - FORGE: aria-label transform gizmo modes.
+- [ ] #59 `T1-025` (P2) [T1 - Accessibility] - AXL: aria-label drawing tool palette.
+- [ ] #60 `T1-026` (P2) [T1 - Accessibility] - AXL: aria-label dimension and GD&T controls.
+- [ ] #61 `T1-037` (P2) [T1 - Accessibility] - Audio: aria-label playback controls.
+- [ ] #62 `T1-047` (P2) [T1 - Accessibility] - Dock: aria-current="true" on active app (done) — verify.
+- [ ] #63 `T1-055` (P2) [T1 - Accessibility] - Reduced-motion: every animation respects `prefers-reduced-motion`.
+- [ ] #64 `T1-057` (P2) [T1 - Accessibility] - Screen-reader announce when a window opens / closes.
+- [ ] #65 `T11-001` (P2) [T11 - Touch / pen / 10-finger] - Touch mode auto-detect on first touch event (DONE).
+- [ ] #66 `T11-002` (P2) [T11 - Touch / pen / 10-finger] - Touch mode pinned via Settings → Input.
+- [ ] #67 `T11-003` (P2) [T11 - Touch / pen / 10-finger] - Touch mode bumps hit-targets to 44px (DONE — verify).
+- [ ] #68 `T11-004` (P2) [T11 - Touch / pen / 10-finger] - Touch mode expands window edge handles to 12px (DONE — verify).
+- [ ] #69 `T11-007` (P2) [T11 - Touch / pen / 10-finger] - 2-finger swipe-down on titlebar = minimize.
+- [ ] #70 `T11-008` (P2) [T11 - Touch / pen / 10-finger] - 2-finger swipe-up on titlebar = maximize.
+- [ ] #71 `T11-009` (P2) [T11 - Touch / pen / 10-finger] - 3-finger swipe-left/right = cycle apps.
+- [ ] #72 `T11-010` (P2) [T11 - Touch / pen / 10-finger] - 4-finger swipe-up = mission control / overview.
+- [ ] #73 `T11-011` (P2) [T11 - Touch / pen / 10-finger] - 5-finger pinch = show desktop.
+- [ ] #74 `T11-015` (P2) [T11 - Touch / pen / 10-finger] - Pinch-to-zoom in Files thumbnails grid.
+- [ ] #75 `T11-016` (P2) [T11 - Touch / pen / 10-finger] - Pinch-to-zoom in Gallery grid.
+- [ ] #76 `T11-017` (P2) [T11 - Touch / pen / 10-finger] - 2-finger pan in scroll containers.
+- [ ] #77 `T11-023` (P2) [T11 - Touch / pen / 10-finger] - Pen barrel-button → eraser.
+- [ ] #78 `T11-024` (P2) [T11 - Touch / pen / 10-finger] - Palm rejection on canvases.
+- [ ] #79 `T11-027` (P2) [T11 - Touch / pen / 10-finger] - Soft-keyboard affordance for kiosk text inputs.
+- [ ] #80 `T11-028` (P2) [T11 - Touch / pen / 10-finger] - Auto-show OS soft keyboard on input focus in touch mode.
+- [ ] #81 `T11-029` (P2) [T11 - Touch / pen / 10-finger] - Numeric soft pad for number-only inputs.
+- [ ] #82 `T11-030` (P2) [T11 - Touch / pen / 10-finger] - Touch ripple feedback on tap.
+- [ ] #83 `T11-031` (P2) [T11 - Touch / pen / 10-finger] - Long-press menu = right-click menu.
+- [ ] #84 `T11-032` (P2) [T11 - Touch / pen / 10-finger] - Drag-to-select with finger in Files.
+- [ ] #85 `T11-034` (P2) [T11 - Touch / pen / 10-finger] - Touch e2e suite (Playwright iPad emulation).
+- [ ] #86 `T11-035` (P2) [T11 - Touch / pen / 10-finger] - Kiosk lock mode (single-app fullscreen).
+- [ ] #87 `T12-001` (P2) [T12 - Dock & shell peek] - DockPeek popover scaffolded (DONE — basic preview).
+- [ ] #88 `T12-002` (P2) [T12 - Dock & shell peek] - DockPeek shows status chip (Running / Minimized / Not running).
+- [ ] #89 `T12-003` (P2) [T12 - Dock & shell peek] - DockPeek shows last 3 recents from app's recent store.
+- [ ] #90 `T12-004` (P2) [T12 - Dock & shell peek] - DockPeek shows live miniature thumbnail when running.
+- [ ] #91 `T12-005` (P2) [T12 - Dock & shell peek] - DockPeek action: New.
+- [ ] #92 `T12-007` (P2) [T12 - Dock & shell peek] - DockPeek action: Reveal in launcher.
+- [ ] #93 `T12-008` (P2) [T12 - Dock & shell peek] - DockPeek action: Close all windows.
+- [ ] #94 `T12-009` (P2) [T12 - Dock & shell peek] - DockPeek dismiss on pointer leave with grace.
+- [ ] #95 `T12-010` (P2) [T12 - Dock & shell peek] - DockPeek dismiss on escape.
+- [ ] #96 `T12-011` (P2) [T12 - Dock & shell peek] - DockPeek dismiss on outside tap.
+- [ ] #97 `T12-012` (P2) [T12 - Dock & shell peek] - DockPeek keyboard accessible (focus + space/enter-hold).
+- [ ] #98 `T12-013` (P2) [T12 - Dock & shell peek] - DockPeek arrow-key nav between actions.
+- [ ] #99 `T12-014` (P2) [T12 - Dock & shell peek] - DockPeek share menu plumbing with right-click context menu.
+- [ ] #100 `T12-016` (P2) [T12 - Dock & shell peek] - DockPeek surface uses Premium Glass v1 tokens.
+- [ ] #101 `T12-018` (P2) [T12 - Dock & shell peek] - DockPeek drag a recent to a window snap target.
+- [ ] #102 `T12-019` (P2) [T12 - Dock & shell peek] - DockPeek for Home/Settings/Files prioritized first.
+- [ ] #103 `T12-021` (P2) [T12 - Dock & shell peek] - DockPeek for utility apps batch.
+- [ ] #104 `T12-023` (P2) [T12 - Dock & shell peek] - DockPeek thumbnail uses html2canvas-style snapshot, throttled.
+- [ ] #105 `T12-024` (P2) [T12 - Dock & shell peek] - DockPeek thumbnail caches per app (invalidate on focus loss).
+- [ ] #106 `T3-001` (P2) [T3 - Creative-suite features] - Timeline: ripple delete (option-drag).
+- [ ] #107 `T3-002` (P2) [T3 - Creative-suite features] - Timeline: slip / slide tools.
+- [ ] #108 `T3-003` (P2) [T3 - Creative-suite features] - Timeline: J/K/L shuttle.
+- [ ] #109 `T3-006` (P2) [T3 - Creative-suite features] - Audio: track-level EQ insert.
+- [ ] #110 `T3-008` (P2) [T3 - Creative-suite features] - Export: per-track stems toggle.
+- [ ] #111 `T3-009` (P2) [T3 - Creative-suite features] - Render queue panel.
+- [ ] #112 `T3-013` (P2) [T3 - Creative-suite features] - Speed-ramp curve editor.
+- [ ] #113 `T3-021` (P2) [T3 - Creative-suite features] - MIDI controller mapping panel.
+- [ ] #114 `T3-036` (P2) [T3 - Creative-suite features] - Render selection range.
+- [ ] #115 `T3-038` (P2) [T3 - Creative-suite features] - Custom brush import (.abr-like).
+- [ ] #116 `T3-041` (P2) [T3 - Creative-suite features] - Healing brush.
+- [ ] #117 `T3-050` (P2) [T3 - Creative-suite features] - Export-as panel with format presets.
+- [ ] #118 `T3-051` (P2) [T3 - Creative-suite features] - Bezier curve editor for keyframes.
+- [ ] #119 `T3-057` (P2) [T3 - Creative-suite features] - 3D layer mode + camera.
+- [ ] #120 `T3-060` (P2) [T3 - Creative-suite features] - Render queue presets.
+- [ ] #121 `T3-062` (P2) [T3 - Creative-suite features] - Motion-tracking attach to layer.
+- [ ] #122 `T3-069` (P2) [T3 - Creative-suite features] - Export glTF / OBJ / STL.
+- [ ] #123 `T3-070` (P2) [T3 - Creative-suite features] - Render-to-PNG button.
+- [ ] #124 `T4-010` (P2) [T4 - Collaboration & sync] - Nexus: session timeline.
+- [ ] #125 `T4-019` (P2) [T4 - Collaboration & sync] - Files: per-file permission editor.
+- [ ] #126 `T5-001` (P2) [T5 - Knowledge / UKI] - UKI graph: zoom + pan + minimap.
+- [ ] #127 `T5-002` (P2) [T5 - Knowledge / UKI] - UKI graph: node search.
+- [ ] #128 `T5-003` (P2) [T5 - Knowledge / UKI] - UKI graph: cluster collapse / expand.
+- [ ] #129 `T5-004` (P2) [T5 - Knowledge / UKI] - UKI graph: filter by source app.
+- [ ] #130 `T5-005` (P2) [T5 - Knowledge / UKI] - UKI graph: filter by date.
+- [ ] #131 `T5-006` (P2) [T5 - Knowledge / UKI] - UKI graph: filter by tag.
+- [ ] #132 `T5-007` (P2) [T5 - Knowledge / UKI] - UKI graph: pin nodes.
+- [ ] #133 `T5-008` (P2) [T5 - Knowledge / UKI] - UKI graph: shortest-path tool.
+- [ ] #134 `T5-010` (P2) [T5 - Knowledge / UKI] - RAG: streaming token output.
+- [ ] #135 `T5-011` (P2) [T5 - Knowledge / UKI] - RAG: citation chips beneath answers.
+- [ ] #136 `T5-012` (P2) [T5 - Knowledge / UKI] - RAG: source preview on chip hover.
+- [ ] #137 `T5-013` (P2) [T5 - Knowledge / UKI] - RAG: model picker (local / cloud).
+- [ ] #138 `T5-014` (P2) [T5 - Knowledge / UKI] - RAG: temperature / top-p sliders.
+- [ ] #139 `T5-015` (P2) [T5 - Knowledge / UKI] - RAG: function calling support.
+- [ ] #140 `T5-016` (P2) [T5 - Knowledge / UKI] - RAG: tool use trace panel.
+- [ ] #141 `T5-017` (P2) [T5 - Knowledge / UKI] - RAG: stop / regenerate.
+- [ ] #142 `T5-018` (P2) [T5 - Knowledge / UKI] - RAG: branch conversation.
+- [ ] #143 `T5-019` (P2) [T5 - Knowledge / UKI] - RAG: pin message.
+- [ ] #144 `T5-021` (P2) [T5 - Knowledge / UKI] - Indexing: per-folder enable / exclude.
+- [ ] #145 `T5-022` (P2) [T5 - Knowledge / UKI] - Indexing: progress + queue panel.
+- [ ] #146 `T5-023` (P2) [T5 - Knowledge / UKI] - Indexing: file-type filters.
+- [ ] #147 `T5-024` (P2) [T5 - Knowledge / UKI] - Indexing: re-index button.
+- [ ] #148 `T5-025` (P2) [T5 - Knowledge / UKI] - Indexing: redaction rules (PII).
+- [ ] #149 `T5-026` (P2) [T5 - Knowledge / UKI] - Memory: short-term vs long-term tabs.
+- [ ] #150 `T5-027` (P2) [T5 - Knowledge / UKI] - Memory: edit memory entry.
+- [ ] #151 `T5-028` (P2) [T5 - Knowledge / UKI] - Memory: delete memory entry.
+- [ ] #152 `T5-029` (P2) [T5 - Knowledge / UKI] - Memory: usage stats per memory.
+- [ ] #153 `T5-030` (P2) [T5 - Knowledge / UKI] - Memory: memory clusters tab.
+- [ ] #154 `T5-031` (P2) [T5 - Knowledge / UKI] - Voice: push-to-talk hotkey.
+- [ ] #155 `T5-032` (P2) [T5 - Knowledge / UKI] - Voice: continuous listening with wake word.
+- [ ] #156 `T5-033` (P2) [T5 - Knowledge / UKI] - Voice: transcript saved to notes.
+- [ ] #157 `T5-034` (P2) [T5 - Knowledge / UKI] - Voice: language picker.
+- [ ] #158 `T5-035` (P2) [T5 - Knowledge / UKI] - Voice: voice profile selector.
+- [ ] #159 `T5-041` (P2) [T5 - Knowledge / UKI] - Knowledge cards: hover tooltip with summary.
+- [ ] #160 `T5-042` (P2) [T5 - Knowledge / UKI] - Knowledge cards: pin to home.
+- [ ] #161 `T5-045` (P2) [T5 - Knowledge / UKI] - UKI: inbox of new captures awaiting tagging.
+- [ ] #162 `T5-046` (P2) [T5 - Knowledge / UKI] - UKI: bulk-tag operation.
+- [ ] #163 `T5-047` (P2) [T5 - Knowledge / UKI] - UKI: smart-collection rules.
+- [ ] #164 `T5-048` (P2) [T5 - Knowledge / UKI] - UKI: duplicate detection.
+- [ ] #165 `T5-049` (P2) [T5 - Knowledge / UKI] - UKI: missing-link suggestions.
+- [ ] #166 `T5-050` (P2) [T5 - Knowledge / UKI] - UKI: weekly digest email.
+- [ ] #167 `T5-051` (P2) [T5 - Knowledge / UKI] - Embeddings: model picker.
+- [ ] #168 `T5-052` (P2) [T5 - Knowledge / UKI] - Embeddings: dimension / cost display.
+- [ ] #169 `T5-053` (P2) [T5 - Knowledge / UKI] - Embeddings: re-embed all action.
+- [ ] #170 `T5-054` (P2) [T5 - Knowledge / UKI] - Embeddings: vector store backend selector.
+- [ ] #171 `T6-012` (P2) [T6 - Performance & stability] - Dock: avoid full re-render on hover (item-local state).
+- [ ] #172 `T6-021` (P2) [T6 - Performance & stability] - Off-screen canvas for VINX preview render.
+- [ ] #173 `T6-028` (P2) [T6 - Performance & stability] - Tear down audio nodes on Imosion close.
+- [ ] #174 `T8-009` (P2) [T8 - Testing & QA] - Playwright: long-press dock peek opens.
+- [ ] #175 `T8-011` (P2) [T8 - Testing & QA] - Playwright: PRISM brush stroke produces non-empty canvas.
+- [ ] #176 `T8-012` (P2) [T8 - Testing & QA] - Playwright: VINX timeline drag clip.
+- [ ] #177 `T9-011` (P2) [T9 - UX & onboarding] - Drag a file onto the dock launches its default app.
+- [ ] #178 `T9-017` (P2) [T9 - UX & onboarding] - In-app feedback button → opens compose with system info.
+- [ ] #179 `T9-018` (P2) [T9 - UX & onboarding] - Tutorial videos linked from each app's empty state.
+- [ ] #180 `T9-020` (P2) [T9 - UX & onboarding] - Per-user theme preset editor.
+- [ ] #181 `T1-027` (P2) [T1 - Accessibility] - Files: aria-label sidebar tree buttons.
+- [ ] #182 `T1-028` (P2) [T1 - Accessibility] - Files: aria-label item context menu.
+- [ ] #183 `T1-029` (P2) [T1 - Accessibility] - Files: keyboard rename (F2) wired everywhere.
+- [ ] #184 `T1-030` (P2) [T1 - Accessibility] - Browser: aria-label tab close, new-tab, address bar buttons.
+- [ ] #185 `T1-031` (P2) [T1 - Accessibility] - Settings: aria-label every panel toggle.
+- [ ] #186 `T1-032` (P2) [T1 - Accessibility] - Settings: keyboard nav between panels.
+- [ ] #187 `T1-033` (P2) [T1 - Accessibility] - Tasks: aria-label add/edit/delete buttons.
+- [ ] #188 `T1-034` (P2) [T1 - Accessibility] - Calendar: aria-label nav (prev month, today, view switcher).
+- [ ] #189 `T1-035` (P2) [T1 - Accessibility] - Notes: aria-label formatting toolbar.
+- [ ] #190 `T1-036` (P2) [T1 - Accessibility] - Gallery: aria-label sort/filter toolbar.
+- [ ] #191 `T1-038` (P2) [T1 - Accessibility] - Vault: aria-label entry actions.
+- [ ] #192 `T1-039` (P2) [T1 - Accessibility] - Calculator: aria-label every button.
+- [ ] #193 `T1-040` (P2) [T1 - Accessibility] - Terminal: aria-label session tabs.
+- [ ] #194 `T1-041` (P2) [T1 - Accessibility] - Code: aria-label tab close + file picker.
+- [ ] #195 `T1-042` (P2) [T1 - Accessibility] - Power: aria-label profile selector.
+- [ ] #196 `T1-043` (P2) [T1 - Accessibility] - Workflows: aria-label step controls.
+- [ ] #197 `T1-044` (P2) [T1 - Accessibility] - Transfers: aria-label transfer item actions.
+- [ ] #198 `T1-045` (P2) [T1 - Accessibility] - Weather: aria-label location and unit toggles (done) — verify.
+- [ ] #199 `T1-046` (P2) [T1 - Accessibility] - Recents: aria-label per recent item.
+- [ ] #200 `T1-048` (P2) [T1 - Accessibility] - Window header: aria-label minimize/maximize/close.
+- [ ] #201 `T1-049` (P2) [T1 - Accessibility] - Context menus: role="menu" + roving tabindex.
+- [ ] #202 `T1-050` (P2) [T1 - Accessibility] - Modals: focus trap + initial focus + ESC closes.
+- [ ] #203 `T1-051` (P2) [T1 - Accessibility] - Toasts: aria-live region.
+- [ ] #204 `T1-052` (P2) [T1 - Accessibility] - Form fields: every input has an associated label.
+- [ ] #205 `T1-053` (P2) [T1 - Accessibility] - Color contrast audit pass (target WCAG AA 4.5:1).
+- [ ] #206 `T1-054` (P2) [T1 - Accessibility] - Provide skip-link to main content.
+- [ ] #207 `T1-056` (P2) [T1 - Accessibility] - High-contrast preference: honor `prefers-contrast: more`.
+- [ ] #208 `T1-058` (P2) [T1 - Accessibility] - Tooltips reachable via keyboard focus, not only hover.
+- [ ] #209 `T1-059` (P2) [T1 - Accessibility] - Live region for download progress.
+- [ ] #210 `T1-060` (P2) [T1 - Accessibility] - Axe-core scan in CI; fail PR on new violations.
+- [ ] #211 `T10-004` (P2) [T10 - Docs & content] - Touch gesture cheat sheet.
+- [ ] #212 `T10-009` (P2) [T10 - Docs & content] - Plugin developer guide.
+- [ ] #213 `T10-010` (P2) [T10 - Docs & content] - Plugin API reference (auto-generated).
+- [ ] #214 `T2-033` (P2) [T2 - Iconography & visual polish] - Dock icon hover lift (4px) using transform, not margin.
+- [ ] #215 `T2-034` (P2) [T2 - Iconography & visual polish] - Dock icon press scale (0.94) on pointerdown.
+- [ ] #216 `T3-004` (P2) [T3 - Creative-suite features] - Viewer: scrubbing thumbnails on hover.
+- [ ] #217 `T3-005` (P2) [T3 - Creative-suite features] - Color: secondary color wheels.
+- [ ] #218 `T3-007` (P2) [T3 - Creative-suite features] - Effects: drag-and-drop preset application.
+- [ ] #219 `T3-010` (P2) [T3 - Creative-suite features] - Markers panel with shortcut M.
+- [ ] #220 `T3-011` (P2) [T3 - Creative-suite features] - Multi-cam edit angles UI.
+- [ ] #221 `T3-012` (P2) [T3 - Creative-suite features] - Stabilization preview.
+- [ ] #222 `T3-014` (P2) [T3 - Creative-suite features] - Title preset library.
+- [ ] #223 `T3-015` (P2) [T3 - Creative-suite features] - Captions auto-generate panel.
+- [ ] #224 `T3-016` (P2) [T3 - Creative-suite features] - Project autosave indicator.
+- [ ] #225 `T3-017` (P2) [T3 - Creative-suite features] - Source-monitor in/out points.
+- [ ] #226 `T3-018` (P2) [T3 - Creative-suite features] - Bin search with filters.
+- [ ] #227 `T3-019` (P2) [T3 - Creative-suite features] - Mixer scenes / snapshots.
+- [ ] #228 `T3-020` (P2) [T3 - Creative-suite features] - Step-sequencer pattern bank.
+- [ ] #229 `T3-022` (P2) [T3 - Creative-suite features] - Sidechain compression UI.
+- [ ] #230 `T3-023` (P2) [T3 - Creative-suite features] - Tempo / time-signature automation lane.
+- [ ] #231 `T3-024` (P2) [T3 - Creative-suite features] - Chord track preview.
+- [ ] #232 `T3-025` (P2) [T3 - Creative-suite features] - Vocal tuning preset menu.
+- [ ] #233 `T3-026` (P2) [T3 - Creative-suite features] - Bus routing matrix.
+- [ ] #234 `T3-027` (P2) [T3 - Creative-suite features] - Loop browser drag-to-track.
+- [ ] #235 `T3-028` (P2) [T3 - Creative-suite features] - Master limiter visualization (LUFS meter).
+- [ ] #236 `T3-029` (P2) [T3 - Creative-suite features] - Track freeze / bounce.
+- [ ] #237 `T3-030` (P2) [T3 - Creative-suite features] - Punch-in record markers.
+- [ ] #238 `T3-031` (P2) [T3 - Creative-suite features] - Take comping lanes.
+- [ ] #239 `T3-032` (P2) [T3 - Creative-suite features] - Mixer view density toggle.
+- [ ] #240 `T3-033` (P2) [T3 - Creative-suite features] - Project template library.
+- [ ] #241 `T3-034` (P2) [T3 - Creative-suite features] - Sample slicer pad view.
+- [ ] #242 `T3-035` (P2) [T3 - Creative-suite features] - Spectrum analyzer master insert.
+- [ ] #243 `T3-039` (P2) [T3 - Creative-suite features] - Symmetry guides.
+- [ ] #244 `T3-040` (P2) [T3 - Creative-suite features] - Smart selection (color range).
+- [ ] #245 `T3-042` (P2) [T3 - Creative-suite features] - Liquify panel.
+- [ ] #246 `T3-043` (P2) [T3 - Creative-suite features] - Adjustment layers (curves, levels).
+- [ ] #247 `T3-044` (P2) [T3 - Creative-suite features] - Smart object resize without quality loss.
+- [ ] #248 `T3-045` (P2) [T3 - Creative-suite features] - Clipping masks UI.
+- [ ] #249 `T3-046` (P2) [T3 - Creative-suite features] - Layer styles (drop shadow, glow).
+- [ ] #250 `T3-047` (P2) [T3 - Creative-suite features] - Color picker eyedropper from anywhere.
+- [ ] #251 `T3-052` (P2) [T3 - Creative-suite features] - Easing presets (in/out/elastic).
+- [ ] #252 `T3-053` (P2) [T3 - Creative-suite features] - Pre-comps (nested compositions).
+- [ ] #253 `T3-054` (P2) [T3 - Creative-suite features] - Track matte attachment.
+- [ ] #254 `T3-055` (P2) [T3 - Creative-suite features] - Expression scripting on properties.
+- [ ] #255 `T3-056` (P2) [T3 - Creative-suite features] - Effect masks per layer.
+- [ ] #256 `T3-058` (P2) [T3 - Creative-suite features] - Particles emitter built-in.
+- [ ] #257 `T3-059` (P2) [T3 - Creative-suite features] - Text animator presets.
+- [ ] #258 `T3-061` (P2) [T3 - Creative-suite features] - Time-remap tool.
+- [ ] #259 `T3-063` (P2) [T3 - Creative-suite features] - Boolean ops (union/subtract/intersect) UI.
+- [ ] #260 `T3-064` (P2) [T3 - Creative-suite features] - Material library panel.
+- [ ] #261 `T3-065` (P2) [T3 - Creative-suite features] - Lighting environment HDRI picker.
+- [ ] #262 `T3-066` (P2) [T3 - Creative-suite features] - Camera presets (top/front/side/persp).
+- [ ] #263 `T3-067` (P2) [T3 - Creative-suite features] - Snap-to-grid + edge snap.
+- [ ] #264 `T3-068` (P2) [T3 - Creative-suite features] - Subdivide / smooth shading.
+- [ ] #265 `T4-001` (P2) [T4 - Collaboration & sync] - Nexus: presence panel (avatar list with status dots).
+- [ ] #266 `T4-002` (P2) [T4 - Collaboration & sync] - Nexus: cursor sync stub for shared docs.
+- [ ] #267 `T4-003` (P2) [T4 - Collaboration & sync] - Nexus: comment threads pinned to canvas regions.
+- [ ] #268 `T4-004` (P2) [T4 - Collaboration & sync] - Nexus: notifications inbox.
+- [ ] #269 `T4-005` (P2) [T4 - Collaboration & sync] - Nexus: invite link generator.
+- [ ] #270 `T4-006` (P2) [T4 - Collaboration & sync] - Nexus: role permissions UI (view/comment/edit/admin).
+- [ ] #271 `T4-007` (P2) [T4 - Collaboration & sync] - Nexus: history panel (versions).
+- [ ] #272 `T4-008` (P2) [T4 - Collaboration & sync] - Nexus: diff view between versions.
+- [ ] #273 `T4-009` (P2) [T4 - Collaboration & sync] - Nexus: revert to version action.
+- [ ] #274 `T4-011` (P2) [T4 - Collaboration & sync] - Nexus: chat panel (text only).
+- [ ] #275 `T4-012` (P2) [T4 - Collaboration & sync] - Nexus: voice toggle (uses WebRTC, optional).
+- [ ] #276 `T4-013` (P2) [T4 - Collaboration & sync] - Nexus: screen-share toggle.
+- [ ] #277 `T4-014` (P2) [T4 - Collaboration & sync] - Collab Hub: combined activity feed.
+- [ ] #278 `T4-015` (P2) [T4 - Collaboration & sync] - Collab Hub: mention highlighting.
+- [ ] #279 `T4-016` (P2) [T4 - Collaboration & sync] - Collab Hub: search across comments.
+- [ ] #280 `T4-017` (P2) [T4 - Collaboration & sync] - Files: shared-with-me filter.
+- [ ] #281 `T4-018` (P2) [T4 - Collaboration & sync] - Files: link sharing dialog.
+- [ ] #282 `T4-020` (P2) [T4 - Collaboration & sync] - Files: conflict resolution UI on simultaneous edit.
+- [ ] #283 `T4-021` (P2) [T4 - Collaboration & sync] - Notes: collaborative cursors.
+- [ ] #284 `T4-022` (P2) [T4 - Collaboration & sync] - Notes: comment thread per paragraph.
+- [ ] #285 `T4-023` (P2) [T4 - Collaboration & sync] - Tasks: assign-to-user.
+- [ ] #286 `T4-024` (P2) [T4 - Collaboration & sync] - Tasks: comment thread per card.
+- [ ] #287 `T4-025` (P2) [T4 - Collaboration & sync] - Calendar: shared calendar overlay.
+- [ ] #288 `T4-026` (P2) [T4 - Collaboration & sync] - Calendar: meeting invite send.
+- [ ] #289 `T4-027` (P2) [T4 - Collaboration & sync] - Workflows: shared run history.
+- [ ] #290 `T4-028` (P2) [T4 - Collaboration & sync] - Sync engine: pause/resume button (visible).
+- [ ] #291 `T4-029` (P2) [T4 - Collaboration & sync] - Sync engine: per-folder enable.
+- [ ] #292 `T4-030` (P2) [T4 - Collaboration & sync] - Sync engine: bandwidth limit slider.
+- [ ] #293 `T4-031` (P2) [T4 - Collaboration & sync] - Sync engine: conflict log panel.
+- [ ] #294 `T4-032` (P2) [T4 - Collaboration & sync] - Sync engine: encryption indicator on every panel.
+- [ ] #295 `T4-033` (P2) [T4 - Collaboration & sync] - Activity feed: filter by app.
+- [ ] #296 `T4-034` (P2) [T4 - Collaboration & sync] - Activity feed: filter by user.
+- [ ] #297 `T4-035` (P2) [T4 - Collaboration & sync] - Activity feed: filter by date range.
+- [ ] #298 `T4-036` (P2) [T4 - Collaboration & sync] - Notifications: do-not-disturb toggle.
+- [ ] #299 `T4-037` (P2) [T4 - Collaboration & sync] - Notifications: per-app mute.
+- [ ] #300 `T4-038` (P2) [T4 - Collaboration & sync] - Notifications: snooze.
+- [ ] #301 `T4-039` (P2) [T4 - Collaboration & sync] - Presence: idle/away/busy detection.
+- [ ] #302 `T4-040` (P2) [T4 - Collaboration & sync] - Presence: custom status string.
+- [ ] #303 `T4-041` (P2) [T4 - Collaboration & sync] - Profile: avatar upload + crop.
+- [ ] #304 `T4-042` (P2) [T4 - Collaboration & sync] - Profile: bio + links.
+- [ ] #305 `T4-043` (P2) [T4 - Collaboration & sync] - Profile: timezone display on hover.
+- [ ] #306 `T4-044` (P2) [T4 - Collaboration & sync] - Org: workspace switcher.
+- [ ] #307 `T4-045` (P2) [T4 - Collaboration & sync] - Org: invite-by-email flow.
+- [ ] #308 `T6-019` (P2) [T6 - Performance & stability] - Web workers for FFT in Imosion visualizers.
+- [ ] #309 `T6-046` (P2) [T6 - Performance & stability] - Crash reporter integration (renderer + main).
+- [ ] #310 `T6-049` (P2) [T6 - Performance & stability] - Renderer process restart on white-screen detection.
+- [ ] #311 `T6-051` (P2) [T6 - Performance & stability] - Slow-render warning overlay (dev only).
+- [ ] #312 `T7-011` (P2) [T7 - Security & hardening] - Plugin sandbox: iframe with strict CSP.
+- [ ] #313 `T7-012` (P2) [T7 - Security & hardening] - Plugin sandbox: postMessage protocol with validated schema.
+- [ ] #314 `T7-013` (P2) [T7 - Security & hardening] - Plugin sandbox: per-plugin permission list.
+- [ ] #315 `T7-014` (P2) [T7 - Security & hardening] - Plugin sandbox: per-plugin storage quota.
+- [ ] #316 `T7-015` (P2) [T7 - Security & hardening] - Plugin sandbox: per-plugin network allowlist.
+- [ ] #317 `T7-016` (P2) [T7 - Security & hardening] - Plugin signing: signature verification on install.
+- [ ] #318 `T7-017` (P2) [T7 - Security & hardening] - Plugin signing: revocation list check.
+- [ ] #319 `T7-018` (P2) [T7 - Security & hardening] - Dependency scan in CI (npm audit + sca tool).
+- [ ] #320 `T7-021` (P2) [T7 - Security & hardening] - CSP header on renderer (no inline scripts allowed).
+- [ ] #321 `T7-035` (P2) [T7 - Security & hardening] - Pen-test checklist in `docs/SECURITY.md`.
+- [ ] #322 `T8-001` (P2) [T8 - Testing & QA] - data-testid on every dock button (DONE template — extend).
+- [ ] #323 `T8-006` (P2) [T8 - Testing & QA] - Playwright: dock launch each app (smoke).
+- [ ] #324 `T8-008` (P2) [T8 - Testing & QA] - Playwright: window drag with touch (iPad emulation).
+- [ ] #325 `T8-010` (P2) [T8 - Testing & QA] - Playwright: spotlight search opens app.
+- [ ] #326 `T8-013` (P2) [T8 - Testing & QA] - Playwright: Imosion add track.
+- [ ] #327 `T8-021` (P2) [T8 - Testing & QA] - Vitest: snapshot test for AppShell variants.
+- [ ] #328 `T8-023` (P2) [T8 - Testing & QA] - Visual regression: Playwright screenshot diff for dock.
+- [ ] #329 `T8-031` (P2) [T8 - Testing & QA] - Mock IPC layer for renderer tests.
+- [ ] #330 `T8-034` (P2) [T8 - Testing & QA] - Cross-platform CI matrix (win/mac/linux).
+- [ ] #331 `T9-001` (P2) [T9 - UX & onboarding] - First-run welcome tour (dismissible).
+- [ ] #332 `T9-002` (P2) [T9 - UX & onboarding] - Per-app one-time tooltip pointing to a key feature.
+- [ ] #333 `T9-003` (P2) [T9 - UX & onboarding] - Shortcut cheat-sheet overlay (Cmd/Ctrl+/).
+- [ ] #334 `T9-004` (P2) [T9 - UX & onboarding] - Command palette (Cmd/Ctrl+K) covers every action.
+- [ ] #335 `T9-005` (P2) [T9 - UX & onboarding] - "What's new" panel after update.
+- [ ] #336 `T9-006` (P2) [T9 - UX & onboarding] - Empty home → suggested actions list.
+- [ ] #337 `T9-007` (P2) [T9 - UX & onboarding] - Recovery banner if previous session crashed.
+- [ ] #338 `T9-008` (P2) [T9 - UX & onboarding] - Backup-now button in Settings.
+- [ ] #339 `T9-009` (P2) [T9 - UX & onboarding] - Restore-from-backup wizard.
+- [ ] #340 `T9-010` (P2) [T9 - UX & onboarding] - Quick switcher (Cmd/Ctrl+Tab) between running apps.
+- [ ] #341 `T9-013` (P2) [T9 - UX & onboarding] - Recents quick action: pin to home.
+- [ ] #342 `T9-014` (P2) [T9 - UX & onboarding] - Notification grouping by app.
+- [ ] #343 `T9-015` (P2) [T9 - UX & onboarding] - Tooltips show keyboard shortcut next to label.
+- [ ] #344 `T9-016` (P2) [T9 - UX & onboarding] - Inline help (?) in every settings panel.
+- [ ] #345 `T9-019` (P2) [T9 - UX & onboarding] - Hover guide overlay (press Alt) labels every visible control.
+- [ ] #346 `T9-021` (P2) [T9 - UX & onboarding] - Per-user shortcut remap UI.
+- [ ] #347 `T9-022` (P2) [T9 - UX & onboarding] - Multi-window layout presets (save/load).
+- [ ] #348 `T9-023` (P2) [T9 - UX & onboarding] - Workspace switcher (sets of windows).
+- [ ] #349 `T9-024` (P2) [T9 - UX & onboarding] - Focus mode (hide non-active windows).
+- [ ] #350 `T9-025` (P2) [T9 - UX & onboarding] - Quiet hours scheduler.
+- [ ] #351 `T10-001` (P2) [T10 - Docs & content] - Per-app user manual page in `docs/apps/<id>.md`.
+- [ ] #352 `T10-002` (P2) [T10 - Docs & content] - Quick-start guide.
+- [ ] #353 `T10-003` (P2) [T10 - Docs & content] - Keyboard shortcut sheet (printable).
+- [ ] #354 `T10-005` (P2) [T10 - Docs & content] - Troubleshooting top-10 page.
+- [ ] #355 `T10-006` (P2) [T10 - Docs & content] - Glossary page.
+- [ ] #356 `T10-007` (P2) [T10 - Docs & content] - Privacy policy reviewed.
+- [ ] #357 `T10-008` (P2) [T10 - Docs & content] - Terms reviewed.
+- [ ] #358 `T10-011` (P2) [T10 - Docs & content] - Architecture overview diagram.
+- [ ] #359 `T10-012` (P2) [T10 - Docs & content] - Threat model document.
+- [ ] #360 `T10-013` (P2) [T10 - Docs & content] - Release notes template.
+- [ ] #361 `T10-014` (P2) [T10 - Docs & content] - Contributing guide reviewed.
+- [ ] #362 `T10-015` (P2) [T10 - Docs & content] - Code of conduct reviewed.
+- [ ] #363 `T2-001` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #364 `T2-002` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #365 `T2-003` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #366 `T2-004` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #367 `T2-005` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #368 `T2-006` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #369 `T2-007` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #370 `T2-008` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #371 `T2-009` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #372 `T2-010` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #373 `T2-011` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #374 `T2-012` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #375 `T2-013` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #376 `T2-014` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #377 `T2-015` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #378 `T2-016` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #379 `T2-017` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #380 `T2-018` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #381 `T2-019` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #382 `T2-020` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #383 `T2-021` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #384 `T2-022` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #385 `T2-023` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #386 `T2-024` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #387 `T2-025` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #388 `T2-026` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #389 `T2-027` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #390 `T2-028` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #391 `T2-029` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #392 `T2-030` (P2) [T2 - Iconography & visual polish] - Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+- [ ] #393 `T2-031` (P2) [T2 - Iconography & visual polish] - DexIcon: add hover/active stroke-weight variants.
+- [ ] #394 `T2-032` (P2) [T2 - Iconography & visual polish] - DexIcon: light-theme color overrides where needed.
+- [ ] #395 `T2-035` (P2) [T2 - Iconography & visual polish] - Window header icon = AppIcon, not letter.
+- [ ] #396 `T2-036` (P2) [T2 - Iconography & visual polish] - Launcher tile icon = AppIcon at 32px.
+- [ ] #397 `T2-037` (P2) [T2 - Iconography & visual polish] - Recents icon = AppIcon at 16px.
+- [ ] #398 `T2-038` (P2) [T2 - Iconography & visual polish] - Search result icon = AppIcon at 18px.
+- [ ] #399 `T2-039` (P2) [T2 - Iconography & visual polish] - Notification icon = AppIcon at 18px.
+- [ ] #400 `T2-040` (P2) [T2 - Iconography & visual polish] - Splash screen wordmark uses real DEX logo, not placeholder.
+- [ ] #401 `T2-041` (P2) [T2 - Iconography & visual polish] - Settings sidebar icons reviewed for visual weight parity.
+- [ ] #402 `T2-042` (P2) [T2 - Iconography & visual polish] - Empty-state illustration set (glassy, monochrome) for each major app.
+- [ ] #403 `T2-043` (P2) [T2 - Iconography & visual polish] - Loading skeleton shapes match the layout they replace.
+- [ ] #404 `T2-044` (P2) [T2 - Iconography & visual polish] - Error-state icon set (cloud-off, plug, lock) standardized.
+- [ ] #405 `T2-045` (P2) [T2 - Iconography & visual polish] - Favicon + window taskbar icon match brand.
+- [ ] #406 `T6-001` (P2) [T6 - Performance & stability] - Virtualize Files list when items > 500.
+- [ ] #407 `T6-002` (P2) [T6 - Performance & stability] - Virtualize Notes list.
+- [ ] #408 `T6-003` (P2) [T6 - Performance & stability] - Virtualize Tasks list.
+- [ ] #409 `T6-004` (P2) [T6 - Performance & stability] - Virtualize Gallery grid.
+- [ ] #410 `T6-005` (P2) [T6 - Performance & stability] - Virtualize Recents list.
+- [ ] #411 `T6-006` (P2) [T6 - Performance & stability] - Virtualize Search results.
+- [ ] #412 `T6-007` (P2) [T6 - Performance & stability] - Lazy-load every standalone app via React.lazy.
+- [ ] #413 `T6-008` (P2) [T6 - Performance & stability] - Code-split per major surface (Settings panels).
+- [ ] #414 `T6-009` (P2) [T6 - Performance & stability] - Memoize selectors in zustand stores.
+- [ ] #415 `T6-010` (P2) [T6 - Performance & stability] - Audit and add React.memo on hot leaf components.
+- [ ] #416 `T6-011` (P2) [T6 - Performance & stability] - Replace inline styles with CSS classes on hot paths.
+- [ ] #417 `T6-013` (P2) [T6 - Performance & stability] - FloatingWindow: drag uses transform, not left/top.
+- [ ] #418 `T6-014` (P2) [T6 - Performance & stability] - FloatingWindow: resize uses CSS aspect-ratio where possible.
+- [ ] #419 `T6-015` (P2) [T6 - Performance & stability] - Cancel in-flight fetches on app close.
+- [ ] #420 `T6-016` (P2) [T6 - Performance & stability] - Throttle scroll listeners to rAF.
+- [ ] #421 `T6-017` (P2) [T6 - Performance & stability] - Debounce text-input → store updates.
+- [ ] #422 `T6-020` (P2) [T6 - Performance & stability] - Worker pool for thumbnail generation.
+- [ ] #423 `T6-022` (P2) [T6 - Performance & stability] - IndexedDB cache for thumbnails.
+- [ ] #424 `T6-023` (P2) [T6 - Performance & stability] - IndexedDB cache for embeddings.
+- [ ] #425 `T6-024` (P2) [T6 - Performance & stability] - LRU eviction for caches.
+- [ ] #426 `T6-025` (P2) [T6 - Performance & stability] - Detach unused canvases when window minimized.
+- [ ] #427 `T6-026` (P2) [T6 - Performance & stability] - Pause animations when window not visible.
+- [ ] #428 `T6-027` (P2) [T6 - Performance & stability] - Pause polling when document.hidden.
+- [ ] #429 `T6-029` (P2) [T6 - Performance & stability] - Leak audit: every useEffect cleans up timers.
+- [ ] #430 `T6-030` (P2) [T6 - Performance & stability] - Leak audit: every useEffect cleans up event listeners.
+- [ ] #431 `T6-031` (P2) [T6 - Performance & stability] - Leak audit: zustand subscriptions unsubscribed.
+- [ ] #432 `T6-032` (P2) [T6 - Performance & stability] - Leak audit: requestAnimationFrame cancelled.
+- [ ] #433 `T6-033` (P2) [T6 - Performance & stability] - Bundle analyzer in build pipeline.
+- [ ] #434 `T6-034` (P2) [T6 - Performance & stability] - Tree-shake icon library imports.
+- [ ] #435 `T6-035` (P2) [T6 - Performance & stability] - Replace moment-style date libs with native Intl.
+- [ ] #436 `T6-036` (P2) [T6 - Performance & stability] - Lazy-load wallpaper images by viewport.
+- [ ] #437 `T6-037` (P2) [T6 - Performance & stability] - Image srcset for high-DPI displays.
+- [ ] #438 `T6-038` (P2) [T6 - Performance & stability] - Webp conversion in build for static images.
+- [ ] #439 `T6-039` (P2) [T6 - Performance & stability] - Preload critical fonts.
+- [ ] #440 `T6-040` (P2) [T6 - Performance & stability] - Subset fonts to used glyphs.
+- [ ] #441 `T6-041` (P2) [T6 - Performance & stability] - Audit synchronous localStorage reads.
+- [ ] #442 `T6-042` (P2) [T6 - Performance & stability] - Audit synchronous JSON.parse on hot paths.
+- [ ] #443 `T6-043` (P2) [T6 - Performance & stability] - Heap snapshot baseline + regression check in CI.
+- [ ] #444 `T6-044` (P2) [T6 - Performance & stability] - Long-task tracker logs spans > 50ms.
+- [ ] #445 `T6-045` (P2) [T6 - Performance & stability] - INP / LCP perf budget per app.
+- [ ] #446 `T6-047` (P2) [T6 - Performance & stability] - Auto-recover unsaved state on crash.
+- [ ] #447 `T6-048` (P2) [T6 - Performance & stability] - Watchdog for runaway main-process workers.
+- [ ] #448 `T6-050` (P2) [T6 - Performance & stability] - Telemetry opt-in dashboard.
+- [ ] #449 `T6-052` (P2) [T6 - Performance & stability] - FPS overlay (dev only) toggle.
+- [ ] #450 `T6-053` (P2) [T6 - Performance & stability] - Memory pressure indicator (dev only).
+- [ ] #451 `T6-054` (P2) [T6 - Performance & stability] - IPC latency overlay (dev only).
+- [ ] #452 `T6-055` (P2) [T6 - Performance & stability] - Don't auto-downgrade perf-tier from heap usage (DONE this wave).
+- [ ] #453 `T7-001` (P2) [T7 - Security & hardening] - IPC: validate every channel payload with zod schema.
+- [ ] #454 `T7-002` (P2) [T7 - Security & hardening] - IPC: deny-by-default on unknown channels.
+- [ ] #455 `T7-003` (P2) [T7 - Security & hardening] - IPC: rate-limit per channel.
+- [ ] #456 `T7-004` (P2) [T7 - Security & hardening] - IPC: redact sensitive args from logs.
+- [ ] #457 `T7-005` (P2) [T7 - Security & hardening] - Vault: argon2id for key derivation.
+- [ ] #458 `T7-006` (P2) [T7 - Security & hardening] - Vault: AES-256-GCM for entry encryption.
+- [ ] #459 `T7-007` (P2) [T7 - Security & hardening] - Vault: master-key never stored.
+- [ ] #460 `T7-008` (P2) [T7 - Security & hardening] - Vault: clipboard auto-clear after 30s.
+- [ ] #461 `T7-009` (P2) [T7 - Security & hardening] - Vault: lock-on-idle.
+- [ ] #462 `T7-010` (P2) [T7 - Security & hardening] - Vault: audit log of access events.
+- [ ] #463 `T7-019` (P2) [T7 - Security & hardening] - License audit (no GPL leakage).
+- [ ] #464 `T7-020` (P2) [T7 - Security & hardening] - SBOM generation per release.
+- [ ] #465 `T7-022` (P2) [T7 - Security & hardening] - Disable Electron remote module verified.
+- [ ] #466 `T7-023` (P2) [T7 - Security & hardening] - contextIsolation=true verified.
+- [ ] #467 `T7-024` (P2) [T7 - Security & hardening] - nodeIntegration=false verified.
+- [ ] #468 `T7-025` (P2) [T7 - Security & hardening] - webSecurity=true verified.
+- [ ] #469 `T7-026` (P2) [T7 - Security & hardening] - Auto-update: signature pinning.
+- [ ] #470 `T7-027` (P2) [T7 - Security & hardening] - Auto-update: rollback on failed boot.
+- [ ] #471 `T7-028` (P2) [T7 - Security & hardening] - Settings: hide secrets in UI (mask + show-on-click).
+- [ ] #472 `T7-029` (P2) [T7 - Security & hardening] - Logs: redact secrets via regex pre-write.
+- [ ] #473 `T7-030` (P2) [T7 - Security & hardening] - Crash dumps: strip PII before submit.
+- [ ] #474 `T7-031` (P2) [T7 - Security & hardening] - File pickers: enforce extension allowlist.
+- [ ] #475 `T7-032` (P2) [T7 - Security & hardening] - Clipboard reads: explicit user gesture required.
+- [ ] #476 `T7-033` (P2) [T7 - Security & hardening] - Notification permission gated per app.
+- [ ] #477 `T7-034` (P2) [T7 - Security & hardening] - Camera/mic permission gated per app.
+- [ ] #478 `T8-002` (P2) [T8 - Testing & QA] - data-testid on every launcher tile.
+- [ ] #479 `T8-003` (P2) [T8 - Testing & QA] - data-testid on every window header button.
+- [ ] #480 `T8-004` (P2) [T8 - Testing & QA] - data-testid on every primary toolbar button per app.
+- [ ] #481 `T8-005` (P2) [T8 - Testing & QA] - data-testid on every modal close button.
+- [ ] #482 `T8-007` (P2) [T8 - Testing & QA] - Playwright: window drag with mouse.
+- [ ] #483 `T8-014` (P2) [T8 - Testing & QA] - Playwright: Files create/rename/delete folder.
+- [ ] #484 `T8-015` (P2) [T8 - Testing & QA] - Playwright: Notes create/edit/save.
+- [ ] #485 `T8-016` (P2) [T8 - Testing & QA] - Playwright: Tasks add/complete.
+- [ ] #486 `T8-017` (P2) [T8 - Testing & QA] - Playwright: Calendar add event.
+- [ ] #487 `T8-018` (P2) [T8 - Testing & QA] - Playwright: Settings change theme persists.
+- [ ] #488 `T8-019` (P2) [T8 - Testing & QA] - Vitest: every store has at least one unit test.
+- [ ] #489 `T8-020` (P2) [T8 - Testing & QA] - Vitest: every util has at least one unit test.
+- [ ] #490 `T8-022` (P2) [T8 - Testing & QA] - Vitest: snapshot test for AppEmptyState/Error/Loading.
+- [ ] #491 `T8-024` (P2) [T8 - Testing & QA] - Visual regression: each app first-paint screenshot.
+- [ ] #492 `T8-025` (P2) [T8 - Testing & QA] - Perf: vitest benchmark for hot stores.
+- [ ] #493 `T8-026` (P2) [T8 - Testing & QA] - Perf: bundle-size budget enforced in CI.
+- [ ] #494 `T8-027` (P2) [T8 - Testing & QA] - Perf: lighthouse run on dev build.
+- [ ] #495 `T8-028` (P2) [T8 - Testing & QA] - Coverage report uploaded per PR.
+- [ ] #496 `T8-029` (P2) [T8 - Testing & QA] - Flaky test quarantine label + report.
+- [ ] #497 `T8-030` (P2) [T8 - Testing & QA] - Test data factory module.
+- [ ] #498 `T8-032` (P2) [T8 - Testing & QA] - Mock filesystem for main-process tests.
+- [ ] #499 `T8-033` (P2) [T8 - Testing & QA] - E2E parallelization in CI.
+- [ ] #500 `T8-035` (P2) [T8 - Testing & QA] - Release smoke-test runbook.
