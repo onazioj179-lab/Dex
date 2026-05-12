@@ -38,7 +38,7 @@ interface DockPinState {
   setIconSize: (size: number) => void;
 }
 
-const PERMANENT_PINS = ['rewind', 'settings'];
+const PERMANENT_PINS = ['rewind', 'settings', 'taskmanager'];
 const STORAGE_KEY = 'dex-dock-pins';
 const SETTINGS_KEY = 'dex-dock-settings';
 const MAX_PINS = 100;
@@ -51,7 +51,8 @@ const DEFAULT_PINS: DockPin[] = [
   { id: 'calendar', position: 4 },
   { id: 'calculator', position: 5 },
   { id: 'settings', position: 6 },
-  { id: 'rewind', position: 7 },
+  { id: 'taskmanager', position: 7 },
+  { id: 'rewind', position: 8 },
 ];
 
 function loadPins(): DockPin[] {

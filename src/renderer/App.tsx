@@ -32,6 +32,8 @@ import {
   UnifiedSystemsProvider,
 } from './components/UnifiedSystems';
 import { initializeTier } from './services/TierManager';
+import { startAdaptivePerfMonitor } from './services/AdaptivePerfMonitor';
+import { startIdlePauseCoordinator } from './utils/idlePause';
 import { startPermissionAutoDisable, stopPermissionAutoDisable } from './store/permissionStore';
 import { 
   initAppSubsystemIPC 
@@ -67,7 +69,7 @@ import { initMotionController } from './utils/MotionController';
 import { GLOBAL_POLISH_CSS } from './utils/uiPolish';
 
 // UI Polish System -- dropdowns, menus, overlays, button responsiveness, black screen prevention
-import { initUIPolishSystem, screenGuard } from './services/UIPolishSystem';
+import { initUIPolishSystem } from './services/UIPolishSystem';
 
 // Screen Guard System -- comprehensive black screen prevention
 import { initScreenGuardSystems } from './services/ScreenGuardSystem';
@@ -140,6 +142,13 @@ const STARTUP_MARK = performance.now();
 // 5-tier system: lowest | low | mid | high | ultra — managed by TierManager
 (() => {
   const tier = initializeTier();
+  // Start adaptive perf monitor (silently downgrades tier on sustained jank or thermal heat)
+  try { startAdaptivePerfMonitor(); } catch { /* non-fatal */ }
+  // Apple-style idle pause coordinator: when the window is hidden, blurred,
+  // or the user has been inactive for a while, broadcast 'dex:idle-pause' so
+  // background app work (polling, animations, playback timers) can suspend.
+  // UI stays mounted and visible -- only in-app work pauses.
+  try { startIdlePauseCoordinator(); } catch { /* non-fatal */ }
   const screenH = Math.min(window.screen.height, window.screen.width);
   // Also store screen class for responsive layouts
   if (screenH <= 480) document.documentElement.setAttribute('data-screen-class', 'small');
@@ -246,13 +255,15 @@ export const App: React.FC = () => {
     return () => stopPermissionAutoDisable();
   }, []);
 
-  // Auto-lock on inactivity
+  // Auto-lock on inactivity. Disabled by default (0 = Never) so the desktop session
+  // stays visually persistent during idle. Only arms when the user has BOTH enabled an
+  // auth method AND set a non-zero auto-lock minutes value in Settings.
   useEffect(() => {
     if (!authIsEnabled || authIsLocked) return;
-    let raw = 5;
+    let raw = 0;
     try {
       const saved = localStorage.getItem('dex-settings');
-      if (saved) { raw = JSON.parse(saved).autoLockMinutes ?? 5; }
+      if (saved) { raw = JSON.parse(saved).autoLockMinutes ?? 0; }
     } catch { /* defaults */ }
     const minutes = Number(raw);
     if (!minutes || minutes <= 0) return;
@@ -274,11 +285,15 @@ export const App: React.FC = () => {
     };
   }, [authIsEnabled, authIsLocked, authLock]);
 
-  // Item 140: Unified memory pressure detection — downgrades perf tier and sets memory-pressure attribute
+  // Item 140: Unified memory pressure detection — sets memory-pressure attribute
+  // for selective CSS to hide decorative elements when heap is very high.
+  // Note: we no longer auto-downgrade `data-perf-tier` from this check —
+  // doing so caused the UI to silently revert to the "low" stylesheet
+  // (no backdrop-filter, no transitions, no shadows = "boxy black") after
+  // any prolonged session because heap usage naturally drifts upward.
+  // The hardware-detected tier is the source of truth.
   useEffect(() => {
     let stopped = false;
-    const initialTier = document.documentElement.getAttribute('data-perf-tier') || 'high';
-    const tierRank: Record<string, number> = { low: 0, mid: 1, high: 2, ultra: 3 };
 
     const check = async () => {
       if (stopped) return;
@@ -291,17 +306,12 @@ export const App: React.FC = () => {
           usedMB = (performance as any).memory.usedJSHeapSize / (1024 * 1024);
         }
         // Memory pressure attribute for CSS hiding of decorative elements
-        // Higher thresholds - modern apps easily use 500MB+
         const pressure = usedMB > 1200 ? 'high' : usedMB > 800 ? 'moderate' : '';
         if (pressure) {
           document.documentElement.setAttribute('data-memory-pressure', pressure);
         } else {
           document.documentElement.removeAttribute('data-memory-pressure');
         }
-        // Only downgrade if memory is EXTREMELY high (1GB+)
-        const memTier = usedMB > 1500 ? 'low' : usedMB > 1000 ? 'mid' : 'high';
-        const effectiveTier = (tierRank[memTier] ?? 3) < (tierRank[initialTier] ?? 3) ? memTier : initialTier;
-        document.documentElement.setAttribute('data-perf-tier', effectiveTier);
       } catch { /* not supported */ }
     };
 
@@ -550,7 +560,20 @@ export const App: React.FC = () => {
       }} />
 
       <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-        <Suspense fallback={null}>
+        <Suspense fallback={(
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(180deg, rgba(12,12,14,0.36), rgba(12,12,14,0.18))',
+            color: 'var(--color-text-secondary)',
+            fontSize: 14,
+            letterSpacing: '0.01em',
+          }}>
+            Restoring home...
+          </div>
+        )}>
           <AppManager />
         </Suspense>
       </div>

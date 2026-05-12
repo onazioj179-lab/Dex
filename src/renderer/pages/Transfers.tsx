@@ -656,7 +656,7 @@ const Transfers: React.FC = () => {
   ], [sendToDevice, trustedDevices, toggleTrusted, deviceNicknames, setNickname]);
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(28, 28, 32, 0.82)', backdropFilter: 'blur(40px) saturate(180%)', WebkitBackdropFilter: 'blur(40px) saturate(180%)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px' } as React.CSSProperties}
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1C1C20', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px' } as React.CSSProperties}
       onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
     >
       <style>{`

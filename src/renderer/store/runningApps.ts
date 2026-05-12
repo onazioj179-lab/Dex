@@ -258,6 +258,7 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   browser: { name: 'Browser', color: '#5E5CE6', icon: 'browser', shortcut: 'Ctrl+6', category: 'system' },
   transfers: { name: 'Share', color: '#32D74B', icon: 'share', shortcut: 'Alt+T', category: 'system' },
   settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: 'Ctrl+2', category: 'system' },
+  taskmanager: { name: 'Task Manager', color: 'var(--color-accent)', icon: 'taskmanager', shortcut: 'Ctrl+Shift+Esc', category: 'system', description: 'Monitor open DEX apps, system load, and native processes' },
   
   // Productivity Apps
   notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: 'Ctrl+4', category: 'productivity' },

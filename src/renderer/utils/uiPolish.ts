@@ -152,7 +152,7 @@ const TOOLTIP_STYLES = `
 [data-dock-item] [data-tip]::after {
   bottom: calc(100% + 8px);
 }
-[data-perf-tier="low"] [data-tip]::after {
+html[data-perf-tier="low"] [data-tip]::after {
   display: none !important;
 }
 `;

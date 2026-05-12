@@ -118,6 +118,14 @@ function startSpeechRecognition(ipc: any, dex: any): void {
       if (err !== 'no-speech') {
         store.getState().setError(`Microphone error: ${err}`);
       }
+      // Restart on transient errors rather than leaving the mic dead
+      if (shouldKeepListening && (err === 'aborted' || err === 'network' || err === 'audio-capture')) {
+        setTimeout(() => {
+          if (shouldKeepListening) {
+            try { sr.start(); } catch { /* onend will handle next retry */ }
+          }
+        }, 500);
+      }
     };
 
     sr.onend = () => {

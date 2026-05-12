@@ -23,6 +23,8 @@ import { useWidgetStore } from '../store/widgetStore';
 import DexIcon from '../components/DexIcon';
 import { Z_CONTEXT_MENU, Z_MODAL } from '../utils/zIndexTokens';
 import { useHomeAppsStore } from '../store/homeAppsStore';
+import { useHomePinnedFilesStore, type HomePinnedFile } from '../store/homePinnedFilesStore';
+import { useHomePinnedAppsStore, type HomePinnedApp } from '../store/homePinnedAppsStore';
 
 // App icon images
 import vinxIconPng from '../../../appicons/vinx.png';
@@ -51,65 +53,348 @@ const ACTIVITY_ICONS: Record<ActivityType, JSX.Element> = {
   build: <DexIcon name="zap" size={14} />,
 };
 
+function fileNameFromPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  return normalized.split('/').filter(Boolean).pop() || path || 'Pinned file';
+}
+
+const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) => {
+  const movePinnedFile = useHomePinnedFilesStore(s => s.movePinnedFile);
+  const unpinFile = useHomePinnedFilesStore(s => s.unpinFile);
+  const addRecent = useRecentFiles(s => s.addRecent);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+
+  const openFile = useCallback(async () => {
+    try {
+      addRecent({ path: file.path, name: file.name, appId: 'files' });
+      const result = await ((window as any).dex?.shell?.openPath?.(file.path)
+        ?? (window as any).electron?.invoke?.('shell:openPath', file.path));
+      if (result && typeof result === 'string') {
+        console.warn('[Home] Failed to open pinned file:', result);
+      }
+    } catch (error) {
+      console.warn('[Home] Failed to open pinned file:', error);
+    }
+  }, [addRecent, file.name, file.path]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: file.x, origY: file.y, moved: false };
+  }, [file.x, file.y]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
+    movePinnedFile(file.id, dragRef.current.origX + dx, dragRef.current.origY + dy);
+  }, [file.id, movePinnedFile]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const wasClick = !dragRef.current?.moved;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* pointer already released */ }
+    dragRef.current = null;
+    if (wasClick && e.detail >= 2) void openFile();
+  }, [openFile]);
+
+  return (
+    <button
+      type="button"
+      aria-label={`Pinned file ${file.name}`}
+      title={`${file.name}\n${file.path}\nDouble-click to open. Drag to move.`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); void openFile(); }}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); unpinFile(file.id); }}
+      style={{
+        position: 'absolute',
+        left: file.x,
+        top: file.y,
+        width: 88,
+        minHeight: 86,
+        zIndex: 9,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        padding: '8px 6px',
+        border: '1px solid transparent',
+        borderRadius: 12,
+        background: 'transparent',
+        color: '#fff',
+        cursor: 'grab',
+        textAlign: 'center',
+        userSelect: 'none',
+        touchAction: 'none',
+        transition: 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.28)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = ''; }}
+      onPointerDownCapture={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.96)'; }}
+      onPointerUpCapture={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+    >
+      <span style={{
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--color-accent)',
+        background: 'rgba(10,132,255,0.14)',
+      }}>
+        <DexIcon name="file-text" size={22} color="currentColor" />
+      </span>
+      <span style={{
+        width: '100%',
+        fontSize: 11,
+        lineHeight: 1.2,
+        color: 'rgba(255,255,255,0.92)',
+        textShadow: '0 1px 3px rgba(0,0,0,0.65)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+      }}>{file.name}</span>
+    </button>
+  );
+});
+
+PinnedFileShortcut.displayName = 'PinnedFileShortcut';
+
+// ======================================================================
+// PINNED APP SHORTCUT (mac-style desktop app icon, draggable anywhere)
+// ======================================================================
+const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
+  const movePinnedApp = useHomePinnedAppsStore(s => s.movePinnedApp);
+  const unpinApp = useHomePinnedAppsStore(s => s.unpinApp);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null);
+  const def = APP_DEFINITIONS[pin.appId];
+
+  const launchApp = useCallback(() => {
+    if (!def) return;
+    window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: pin.appId } }));
+  }, [def, pin.appId]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pin.x, origY: pin.y, moved: false };
+  }, [pin.x, pin.y]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
+    movePinnedApp(pin.id, dragRef.current.origX + dx, dragRef.current.origY + dy);
+  }, [pin.id, movePinnedApp]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const wasClick = !dragRef.current?.moved;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* released */ }
+    dragRef.current = null;
+    if (wasClick && e.detail >= 2) launchApp();
+  }, [launchApp]);
+
+  if (!def) return null;
+  const png = APP_ICON_PNGS[pin.appId];
+
+  return (
+    <button
+      type="button"
+      aria-label={`Pinned app ${def.name}`}
+      title={`${def.name}\nDouble-click to open. Drag to move. Right-click to unpin.`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); launchApp(); }}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); unpinApp(pin.id); }}
+      style={{
+        position: 'absolute',
+        left: pin.x,
+        top: pin.y,
+        width: 88,
+        minHeight: 86,
+        zIndex: 9,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        padding: '8px 6px',
+        border: '1px solid transparent',
+        borderRadius: 12,
+        background: 'transparent',
+        color: '#fff',
+        cursor: 'grab',
+        textAlign: 'center',
+        userSelect: 'none',
+        touchAction: 'none',
+        transition: 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.28)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = ''; }}
+      onPointerDownCapture={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.96)'; }}
+      onPointerUpCapture={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+    >
+      <span style={{
+        width: 46,
+        height: 46,
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        background: png ? 'transparent' : `linear-gradient(135deg, ${def.color}, ${def.color}cc)`,
+        boxShadow: png ? 'none' : '0 4px 12px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
+        overflow: 'hidden',
+      }}>
+        {png
+          ? <img src={png} alt="" draggable={false} style={{ width: 46, height: 46, borderRadius: 12, objectFit: 'cover' }} />
+          : <DexIcon name={def.icon as any} size={24} color="currentColor" />}
+      </span>
+      <span style={{
+        width: '100%',
+        fontSize: 11,
+        lineHeight: 1.2,
+        color: 'rgba(255,255,255,0.92)',
+        textShadow: '0 1px 3px rgba(0,0,0,0.65)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+      }}>{def.name}</span>
+    </button>
+  );
+});
+PinnedAppShortcut.displayName = 'PinnedAppShortcut';
+
+// ======================================================================
+// PIN APP PICKER (overlay)
+// ======================================================================
+const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClose: () => void }> = ({ position, onClose }) => {
+  const pinApp = useHomePinnedAppsStore(s => s.pinApp);
+  const isAppPinned = useHomePinnedAppsStore(s => s.isAppPinned);
+  const [query, setQuery] = useState('');
+  const apps = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return Object.entries(APP_DEFINITIONS)
+      .filter(([id]) => id !== 'home')
+      .filter(([id, def]) => !q || def.name.toLowerCase().includes(q) || id.toLowerCase().includes(q))
+      .sort((a, b) => a[1].name.localeCompare(b[1].name));
+  }, [query]);
+
+  const handlePin = useCallback((appId: string) => {
+    if (isAppPinned(appId)) { onClose(); return; }
+    pinApp(appId, position ?? undefined);
+    onClose();
+  }, [pinApp, isAppPinned, position, onClose]);
+
+  return (
+    <div style={{ ...glassOverlay, position: 'fixed', inset: 0, zIndex: Z_MODAL, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={onClose}>
+      <div onMouseDown={e => e.stopPropagation()} style={{
+        ...glassPanel,
+        width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(72vh, calc(100vh - 32px))',
+        overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ padding: '18px 22px 12px', borderBottom: '1px solid var(--color-bg-hover)' }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff' }}>Pin App to Home</h2>
+          <p style={{ margin: '3px 0 10px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose an app to drop on your desktop. Drag to move, right-click to unpin.</p>
+          <input
+            autoFocus
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search apps"
+            aria-label="Filter apps"
+            style={{
+              width: '100%', padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--color-border-subtle)',
+              color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
+            }}
+          />
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 8 }}>
+            {apps.map(([id, def]) => {
+              const pinned = isAppPinned(id);
+              const png = APP_ICON_PNGS[id];
+              return (
+                <button
+                  key={id}
+                  onClick={() => handlePin(id)}
+                  disabled={pinned}
+                  className="dex-hover-bg"
+                  aria-label={pinned ? `${def.name} already pinned` : `Pin ${def.name}`}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                    padding: '10px 6px', borderRadius: 10,
+                    background: 'transparent',
+                    border: '1px solid transparent',
+                    color: 'var(--color-text-primary)', fontSize: 11,
+                    cursor: pinned ? 'default' : 'pointer',
+                    opacity: pinned ? 0.4 : 1,
+                  }}
+                >
+                  <span style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: png ? 'transparent' : `linear-gradient(135deg, ${def.color}, ${def.color}cc)`,
+                    boxShadow: png ? 'none' : '0 3px 10px rgba(0,0,0,0.28)',
+                    color: '#fff', overflow: 'hidden',
+                  }}>
+                    {png
+                      ? <img src={png} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover' }} />
+                      : <DexIcon name={def.icon as any} size={22} color="currentColor" />}
+                  </span>
+                  <span style={{ width: '100%', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def.name}</span>
+                  {pinned && <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Pinned</span>}
+                </button>
+              );
+            })}
+            {apps.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 24, color: 'var(--color-text-tertiary)', fontSize: 12 }}>No apps match.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ======================================================================
 // COMPONENT
 // ======================================================================
 export const Home: React.FC = () => {
-  const [time, setTime] = useState(new Date());
   const { activities } = useLiveActivity();
+  const recentFiles = useRecentFiles(s => s.recentFiles);
   const wpMode = useWallpaperStore(s => s.mode);
   const wpValue = useWallpaperStore(s => s.value);
   const wpBlur = useWallpaperStore(s => s.blur);
   const wpOpacity = useWallpaperStore(s => s.opacity);
   const wpTint = useWallpaperStore(s => s.tint);
+  const pinnedFiles = useHomePinnedFilesStore(s => s.pinnedFiles);
+  const pinFile = useHomePinnedFilesStore(s => s.pinFile);
+  const pinnedApps = useHomePinnedAppsStore(s => s.pinnedApps);
 
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
+  const [appPickerPosition, setAppPickerPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showAppPicker, setShowAppPicker] = useState(false);
+  const desktopRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [searchSticky, setSearchSticky] = useState(false);
-  const [userName, setUserName] = useState<string>('');
-
-  // Fetch OS user name once on mount for personalised greeting
-  useEffect(() => {
-    (async () => {
-      try {
-        const info = await (window as any).electron?.invoke?.('system:getUserInfo');
-        if (info?.username) {
-          const name = info.displayName || info.username;
-          // Capitalise first letter, trim to first word only (first name feel)
-          setUserName(name.split(/[\s_]/)[0].replace(/^\w/, (c: string) => c.toUpperCase()));
-        }
-      } catch { /* silent — no name available */ }
-    })();
-  }, []);
-
-  // Time-based greeting text
-  const greetingText = useMemo(() => {
-    const h = time.getHours();
-    if (h >= 5 && h < 12) return 'Good Morning';
-    if (h >= 12 && h < 17) return 'Good Afternoon';
-    if (h >= 17 && h < 21) return 'Good Evening';
-    return 'Good Night';
-  }, [Math.floor(time.getTime() / 3600000)]);
-
-  // Full greeting — include user name if available
-  const greeting = userName ? `${greetingText}, ${userName}` : greetingText;
-
-  // Key changes when greeting text changes (new period of day) → triggers CSS re-animation
-  const greetingAnimKey = greetingText;
-
-  // Clock tick — poll every second but only re-render on minute boundary
-  // so the displayed HH:MM stays within 1s of wall-clock without wasted renders.
-  useEffect(() => {
-    let lastMinute = Math.floor(Date.now() / 60000);
-    sharedTick.subscribe('home-clock', () => {
-      const m = Math.floor(Date.now() / 60000);
-      if (m !== lastMinute) {
-        lastMinute = m;
-        setTime(new Date());
-      }
-    }, 1000);
-    return () => sharedTick.unsubscribe('home-clock');
-  }, []);
+  const [repaintNonce, setRepaintNonce] = useState(0);
+  const recents = useMemo(() => recentFiles.slice(0, 6), [recentFiles]);
 
   // Data state - backend hydration via centralized Zustand store
   const refreshData = useCallback(async () => {
@@ -135,6 +420,32 @@ export const Home: React.FC = () => {
     return () => sharedTick.unsubscribe('home-refresh');
   }, [refreshData]);
 
+  useEffect(() => {
+    const forceHomeRepaint = () => {
+      setRepaintNonce(n => (n + 1) % 1000);
+      requestAnimationFrame(() => {
+        const el = desktopRef.current;
+        if (!el) return;
+        el.style.willChange = 'transform, opacity';
+        el.style.transform = 'translateZ(0)';
+        void el.offsetHeight;
+        requestAnimationFrame(() => {
+          if (desktopRef.current) desktopRef.current.style.willChange = 'auto';
+        });
+      });
+    };
+    window.addEventListener('focus', forceHomeRepaint);
+    window.addEventListener('dex:idle-pause', forceHomeRepaint as EventListener);
+    window.addEventListener('dex:idle-resume', forceHomeRepaint as EventListener);
+    document.addEventListener('visibilitychange', forceHomeRepaint);
+    return () => {
+      window.removeEventListener('focus', forceHomeRepaint);
+      window.removeEventListener('dex:idle-pause', forceHomeRepaint as EventListener);
+      window.removeEventListener('dex:idle-resume', forceHomeRepaint as EventListener);
+      document.removeEventListener('visibilitychange', forceHomeRepaint);
+    };
+  }, []);
+
   // Sticky search on scroll
   const handleScroll = useCallback(() => {
     if (scrollRef.current) {
@@ -150,6 +461,25 @@ export const Home: React.FC = () => {
       detail: { appId },
     }));
   }, []);
+
+  const pinFileFromDialog = useCallback(async (position?: { x: number; y: number }) => {
+    try {
+      const result = await ((window as any).electron?.invoke?.('files:openDialog', {
+        properties: ['openFile'],
+      }) ?? (window as any).dex?.invoke?.('dialog:showOpenDialog', { properties: ['openFile'] }));
+      const filePath = result?.filePaths?.[0];
+      if (!filePath) return;
+      const rect = desktopRef.current?.getBoundingClientRect();
+      const x = Math.max(12, (position?.x ?? 72) - (rect?.left ?? 0) - 44);
+      const y = Math.max(68, (position?.y ?? 180) - (rect?.top ?? 0) - 24);
+      pinFile({ path: filePath, name: fileNameFromPath(filePath) }, { x, y });
+      useRecentFiles.getState().addRecent({ path: filePath, name: fileNameFromPath(filePath), appId: 'files' });
+    } catch (error) {
+      console.warn('[Home] Failed to pin file:', error);
+    } finally {
+      setCtxMenu(null);
+    }
+  }, [pinFile]);
 
   // Desktop right-click context menu
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -179,20 +509,12 @@ export const Home: React.FC = () => {
     return { backgroundColor: wpValue };
   }, [wpMode, wpValue]);
 
-  // Format time
-  const timeStr = useMemo(() => {
-    return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }, [Math.floor(time.getTime() / 60000)]); // only recompute on minute change
-
-  const dateStr = useMemo(() => {
-    return time.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-  }, [Math.floor(time.getTime() / 60000)]); // only recompute on minute change
-
   // ====================================================================
   // RENDER
   // ====================================================================
   return (
     <div
+      ref={desktopRef}
       role="region"
       aria-label="Home"
       aria-roledescription="Desktop home screen"
@@ -205,6 +527,7 @@ export const Home: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        transform: repaintNonce % 2 === 0 ? 'translateZ(0)' : 'translate3d(0,0,0)',
       }}
     >
       {/* Wallpaper Layer -- Item 151: GPU-accelerated with will-change */}
@@ -215,7 +538,7 @@ export const Home: React.FC = () => {
         transform: wpBlur > 0 ? 'scale(1.05)' : undefined,
         transition: 'all 0.4s ease',
         willChange: 'transform, filter',
-        contain: 'strict',
+        contain: 'layout style paint',
       }} />
 
       {/* Removed dark overlay per user request - full wallpaper visibility */}
@@ -265,8 +588,10 @@ export const Home: React.FC = () => {
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
           padding: '10px 24px',
-          background: 'rgba(18, 18, 20, 0.96)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(12, 12, 14, 0.34)',
+          backdropFilter: 'blur(34px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex', justifyContent: 'center',
           animation: 'fadeIn 0.15s ease-out',
         }}>
@@ -287,56 +612,9 @@ export const Home: React.FC = () => {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {/* ROW 1: Greeting + Time + Date */}
+        {/* ROW 1: Spotlight Search */}
         <div style={{
           marginTop: 36,
-          marginInline: 'auto',
-          width: 'fit-content',
-          padding: '14px 26px 12px',
-          textAlign: 'center',
-          background: 'rgba(18, 18, 22, 0.78)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: 18,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
-          animation: 'fadeIn 0.2s ease-out',
-        }}>
-          <div
-            key={greetingAnimKey}
-            style={{
-              fontSize: 14, fontWeight: 500,
-              color: 'rgba(255,255,255,0.9)',
-              letterSpacing: '0.02em',
-              marginBottom: 4,
-              textShadow: '0 1px 6px rgba(0,0,0,0.4)',
-              animation: 'greetingFadeIn 0.6s cubic-bezier(0.23,1,0.32,1)',
-            }}>
-            {greeting}
-          </div>
-          <div style={{
-            fontSize: 52, fontWeight: 500,
-            color: '#ffffff',
-            letterSpacing: 0, lineHeight: 1,
-            fontVariantNumeric: 'tabular-nums',
-            textShadow: '0 2px 14px rgba(0,0,0,0.45)',
-          }}
-            role="timer"
-            aria-label={`Current time: ${timeStr}`}
-          >
-            {timeStr}
-          </div>
-          <div style={{
-            fontSize: 15, fontWeight: 500,
-            color: 'rgba(255,255,255,0.85)',
-            marginTop: 6, letterSpacing: 0,
-            textShadow: '0 1px 8px rgba(0,0,0,0.4)',
-          }}>
-            {dateStr}
-          </div>
-        </div>
-
-        {/* ROW 2: Spotlight Search */}
-        <div style={{
-          marginTop: 14,
           display: 'flex', justifyContent: 'center',
           padding: '0 24px',
           animation: 'fadeIn 0.25s ease-out 0.03s both',
@@ -365,57 +643,54 @@ export const Home: React.FC = () => {
           </div>
         )}
 
-        {/* Quick Access Apps */}
-        <QuickAccessApps onLaunch={handleLaunchApp} />
+        {/* Quick Access Apps removed -- launch apps from dock or apps menu (Ctrl+Space). */}
 
         {/* Recents */}
-        {(() => {
-          const recents = useRecentFiles.getState().recentFiles.slice(0, 6);
-          if (recents.length === 0) return null;
-          return (
+        {recents.length > 0 && (
+          <div style={{
+            marginTop: 18,
+            padding: '0 24px',
+            animation: 'fadeIn 0.35s ease-out 0.1s both',
+          }}>
             <div style={{
-              marginTop: 18,
-              padding: '0 24px',
-              animation: 'fadeIn 0.35s ease-out 0.1s both',
+              fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)',
+              marginBottom: 8, letterSpacing: '0.03em', textTransform: 'uppercase',
             }}>
-              <div style={{
-                fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                marginBottom: 8, letterSpacing: '0.03em', textTransform: 'uppercase',
-              }}>
-                Recent Files
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {recents.map((f, i) => (
-                  <button
-                    key={f.path + i}
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'files' } }));
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '8px 12px',
-                      background: 'var(--color-bg-surface)',
-                      border: '1px solid var(--color-border-subtle)',
-                      borderRadius: 8, cursor: 'pointer',
-                      color: 'var(--color-text-primary)', fontSize: 12,
-                      textAlign: 'left',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                      transition: 'background 0.12s, box-shadow 0.12s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-surface)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)'; }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', opacity: 0.5 }}><DexIcon name="file-text" size={14} /></span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                      {new Date(f.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              Recent Files
             </div>
-          );
-        })()}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {recents.map((f, i) => (
+                <button
+                  key={f.path + i}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'files' } }));
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px',
+                    background: 'rgba(255,255,255,0.06)',
+                    backdropFilter: 'blur(34px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    borderRadius: 16, cursor: 'pointer',
+                    color: 'var(--color-text-primary)', fontSize: 12,
+                    textAlign: 'left',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
+                    transition: 'background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = '0 12px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.10)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', opacity: 0.5 }}><DexIcon name="file-text" size={14} /></span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                    {new Date(f.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bottom spacing */}
         <div style={{ height: 80 }} />
@@ -423,6 +698,27 @@ export const Home: React.FC = () => {
 
       {/* Widget layer -- draggable widgets on home screen */}
       <HomeWidgets />
+
+      {/* User-pinned file shortcuts -- draggable anywhere on the Home desktop */}
+      {pinnedFiles.map(file => (
+        <PinnedFileShortcut key={file.id} file={file} />
+      ))}
+
+      {/* User-pinned app shortcuts -- mac-style draggable app icons */}
+      {pinnedApps.map(pin => (
+        <PinnedAppShortcut key={pin.id} pin={pin} />
+      ))}
+
+      {/* Pin App picker modal */}
+      {showAppPicker && (
+        <PinAppPicker
+          position={appPickerPosition ? {
+            x: Math.max(12, appPickerPosition.x - (desktopRef.current?.getBoundingClientRect().left ?? 0) - 44),
+            y: Math.max(68, appPickerPosition.y - (desktopRef.current?.getBoundingClientRect().top ?? 0) - 24),
+          } : null}
+          onClose={() => { setShowAppPicker(false); setAppPickerPosition(null); }}
+        />
+      )}
 
       {/* Desktop Right-Click Context Menu -- Item 156: keyboard accessible */}
       {ctxMenu && (
@@ -452,16 +748,11 @@ export const Home: React.FC = () => {
           >
             {[
               { label: 'Change Wallpaper', icon: <DexIcon name="palette" size={14} />, action: () => { setShowWallpaperPicker(true); setCtxMenu(null); } },
+              { label: 'Pin File Here...', icon: <DexIcon name="file-plus" size={14} />, action: () => { void pinFileFromDialog(ctxMenu); } },
+              { label: 'Pin App Here...', icon: <DexIcon name="plus" size={14} />, action: () => { setAppPickerPosition(ctxMenu); setShowAppPicker(true); setCtxMenu(null); } },
               null,
               { label: useWidgetStore.getState().editMode ? 'Done Editing Widgets' : 'Edit Widgets', icon: <DexIcon name="puzzle" size={14} />, action: () => { useWidgetStore.getState().toggleEditMode(); setCtxMenu(null); } },
               { label: 'Add Widget', icon: <DexIcon name="plus" size={14} />, action: () => { useWidgetStore.getState().setEditMode(true); setCtxMenu(null); } },
-              null,
-              { label: 'Open Files', icon: <DexIcon name="folder" size={14} />, action: () => { handleLaunchApp('files'); setCtxMenu(null); } },
-              { label: 'Open Browser', icon: <DexIcon name="globe" size={14} />, action: () => { handleLaunchApp('browser'); setCtxMenu(null); } },
-              { label: 'Open Notes', icon: <DexIcon name="edit" size={14} />, action: () => { handleLaunchApp('notes'); setCtxMenu(null); } },
-              { label: 'Open Imosion', icon: <DexIcon name="music" size={14} />, action: () => { handleLaunchApp('imosion'); setCtxMenu(null); } },
-              { label: 'Open VINX', icon: <DexIcon name="film" size={14} />, action: () => { handleLaunchApp('videoeditor'); setCtxMenu(null); } },
-              { label: 'Open Calculator', icon: <DexIcon name="calculator" size={14} />, action: () => { handleLaunchApp('calculator'); setCtxMenu(null); } },
               null,
               { label: 'Settings', icon: <DexIcon name="settings" size={14} />, action: () => { handleLaunchApp('settings'); setCtxMenu(null); } },
               { label: 'Refresh', icon: <DexIcon name="refresh" size={14} />, action: () => { refreshData(); setCtxMenu(null); } },
@@ -474,16 +765,20 @@ export const Home: React.FC = () => {
                   role="menuitem"
                   className="dex-hover-bg"
                   onClick={item.action}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  onPointerDown={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.16)'; }}
+                  onPointerUp={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 14px',
+                    display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 8px)', margin: '0 4px', padding: '7px 12px',
                     background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13,
                     textAlign: 'left', cursor: 'pointer',
-                    borderRadius: 6,
-                    transition: 'background 0.08s',
+                    borderRadius: 8,
+                    transition: 'background 0.12s ease',
                   }}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18 }}>{item.icon}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, color: 'var(--color-text-secondary)' }}>{item.icon}</span>
                   {item.label}
                 </button>
               )
@@ -696,12 +991,15 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
       <style>{`
         .home-app-btn {
           display: flex; flex-direction: column; align-items: center; gap: 6px;
-          width: 76px; min-width: 76px; height: 78px;
-          padding: 8px 6px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 8px;
+          width: 76px; min-width: 76px; height: 80px;
+          padding: 10px 6px 8px;
+          background: rgba(255,255,255,0.06);
+          backdrop-filter: blur(34px) saturate(180%);
+          -webkit-backdrop-filter: blur(34px) saturate(180%);
+          border: 1px solid rgba(255,255,255,0.10);
+          border-radius: 18px;
           cursor: pointer;
+          box-shadow: 0 8px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.10);
           transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
           position: relative;
           overflow: hidden;
@@ -710,15 +1008,16 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
           content: '';
           position: absolute;
           inset: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(10,132,255,0.15), transparent 70%);
+          background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.14), transparent 70%);
           opacity: 0;
           transition: opacity 0.2s ease;
+          pointer-events: none;
         }
         .home-app-btn:hover {
           transform: translateY(-2px);
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(10,132,255,0.3);
-          box-shadow: 0 10px 24px rgba(0,0,0,0.24), 0 0 16px rgba(10,132,255,0.12);
+          background: rgba(255,255,255,0.11);
+          border-color: rgba(255,255,255,0.18);
+          box-shadow: 0 14px 34px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.14);
         }
         .home-app-btn:hover::before { opacity: 1; }
         .home-app-btn:active { transform: translateY(0); }
@@ -829,9 +1128,12 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
   return (
     <div className="dex-hover-card" style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 14px', borderRadius: 12,
-      background: 'var(--color-bg-elevated)',
-      border: '1px solid var(--color-border)',
+      padding: '10px 14px', borderRadius: 16,
+      background: 'rgba(255,255,255,0.06)',
+      backdropFilter: 'blur(34px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+      border: '1px solid rgba(255,255,255,0.10)',
+      boxShadow: '0 8px 22px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.08)',
       opacity: done ? 0.6 : 1,
       cursor: 'default',
       transition: 'opacity 0.5s ease, transform 0.4s ease, background 0.15s ease, box-shadow 0.15s ease',

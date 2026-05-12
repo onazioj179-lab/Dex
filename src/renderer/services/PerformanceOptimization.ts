@@ -175,7 +175,18 @@ export const usePerformanceOptimization = create<PerformanceOptimizationState & 
     isIdle: false,
     notifications: [],
 
-    setTier: (tier, tierNumeric) => set({ tier, tierNumeric }),
+    setTier: (tier, tierNumeric) => set(state => {
+      // User directive: never let runtime power/thermal changes downgrade
+      // the renderer tier. Allow the initial bootstrap (when tierNumeric is
+      // still at the default 2/'high' or below the incoming value) to lift
+      // us up, but reject any later downgrades from the main process.
+      if (tierNumeric < state.tierNumeric) {
+        // eslint-disable-next-line no-console
+        console.debug(`[DEX] Ignoring tier downgrade ${state.tier} -> ${tier} (locked at max per user setting)`);
+        return state;
+      }
+      return { tier, tierNumeric };
+    }),
     setDirective: (directive) => set({ directive }),
     setGameSettings: (gameSettings) => set({ gameSettings }),
     setThermalState: (thermalState) => set({ thermalState }),
@@ -211,6 +222,10 @@ export const usePerformanceOptimization = create<PerformanceOptimizationState & 
 
       ipcOn('dex:thermal-state', (_: any, state: ThermalState) => {
         get().setThermalState(state);
+        // Re-broadcast to AdaptivePerfMonitor (avoids circular import)
+        try {
+          window.dispatchEvent(new CustomEvent('dex:thermal-hint', { detail: { state: state.state } }));
+        } catch { /* non-fatal */ }
       });
 
       ipcOn('dex:power-state', (_: any, state: PowerState) => {

@@ -40,6 +40,12 @@ class ScreenGuardSystem {
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private recoveryInProgress = false;
   private listeners: Set<(event: string) => void> = new Set();
+  // Track focus / visibility so we don't false-positive on idle.
+  // The browser/OS legitimately throttles rAF when the window is hidden or
+  // unfocused; treating those gaps as "blank frames" was causing destructive
+  // recovery flicker (display:none toggles, opacity scrubs) on resume.
+  private windowFocused = true;
+  private suppressUntil = 0;
 
   /**
    * Initialize the screen guard system
@@ -75,24 +81,28 @@ class ScreenGuardSystem {
    */
   private handleVisibilityChange = (): void => {
     this.metrics.lastVisibilityChange = Date.now();
-
-    if (!document.hidden) {
-      // Coming back to visible
-      this.scheduleRepaint('visibility-change');
-    }
+    // On any visibility transition, reset the blank-frame counter and
+    // suppress recovery for a short grace window. The browser will repaint
+    // naturally; firing our own opacity/reflow at the same moment is what
+    // produced the visual overlap users saw when returning from idle.
+    this.metrics.consecutiveBlankFrames = 0;
+    this.suppressUntil = Date.now() + 1500;
   };
 
   /**
    * Handle window focus
    */
   private handleWindowFocus = (): void => {
-    this.scheduleRepaint('window-focus');
+    this.windowFocused = true;
+    this.metrics.consecutiveBlankFrames = 0;
+    this.suppressUntil = Date.now() + 1500;
   };
 
   /**
    * Handle window blur
    */
   private handleWindowBlur = (): void => {
+    this.windowFocused = false;
     // Reset blank frame counter on blur (expected behavior)
     this.metrics.consecutiveBlankFrames = 0;
   };
@@ -102,8 +112,10 @@ class ScreenGuardSystem {
    */
   private handlePageShow = (e: PageTransitionEvent): void => {
     if (e.persisted) {
-      // Page was restored from bfcache
-      this.scheduleRepaint('bfcache-restore');
+      // Page was restored from bfcache; let the browser repaint and just
+      // suppress our own intervention briefly.
+      this.suppressUntil = Date.now() + 1500;
+      this.metrics.consecutiveBlankFrames = 0;
     }
   };
 
@@ -116,7 +128,12 @@ class ScreenGuardSystem {
 
     const events = ['dex:resume', 'dex:wake', 'dex:unlock'];
     for (const event of events) {
-      ipc.on?.(event, () => this.scheduleRepaint(event));
+      ipc.on?.(event, () => {
+        // Just suppress our own intervention; resume already triggers a
+        // natural compositor repaint and our flicker only adds visual jank.
+        this.suppressUntil = Date.now() + 1500;
+        this.metrics.consecutiveBlankFrames = 0;
+      });
     }
   }
 
@@ -150,10 +167,15 @@ class ScreenGuardSystem {
       lastFrameTime = timestamp;
       frameCount++;
 
-      // Check for long gaps (> 500ms indicates potential issue)
-      if (delta > 500 && document.visibilityState === 'visible') {
+      // Only count gaps as suspicious when the page is BOTH visible AND
+      // focused AND outside the post-resume grace window. The OS legitimately
+      // throttles rAF when DEX is hidden / unfocused / coming back from idle
+      // and previously this fired "recovery" routines that visually broke
+      // the home UI on return.
+      const inGrace = Date.now() < this.suppressUntil;
+      const eligible = document.visibilityState === 'visible' && this.windowFocused && !inGrace;
+      if (delta > 500 && eligible) {
         this.metrics.consecutiveBlankFrames++;
-        
         if (this.metrics.consecutiveBlankFrames >= 3) {
           console.warn('[ScreenGuard] Detected potential blank screen');
           this.attemptRecovery();
@@ -174,6 +196,8 @@ class ScreenGuardSystem {
    */
   private performHealthCheck(): void {
     if (document.visibilityState !== 'visible') return;
+    if (!this.windowFocused) return;
+    if (Date.now() < this.suppressUntil) return;
 
     // Check if root element has content
     const root = document.getElementById('root');
@@ -186,136 +210,60 @@ class ScreenGuardSystem {
         this.attemptRecovery();
       }
     }
-
-    // Check for white/black body
-    const bodyStyle = getComputedStyle(document.body);
-    const bgColor = bodyStyle.backgroundColor;
-    
-    // Very simplistic check - in production, this would be more sophisticated
-    if (bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') {
-      // Transparent body might indicate rendering issue
-      this.scheduleRepaint('transparent-body');
-    }
+    // The previous transparent-body check was a no-op false-positive in dark
+    // themes (computed background can resolve transparent legitimately) and
+    // only triggered cosmetic opacity scrubs. Removed.
   }
 
   /**
-   * Schedule a repaint
-   */
-  private scheduleRepaint(reason: string): void {
-    if (this.recoveryInProgress) return;
-
-    console.log(`[ScreenGuard] Scheduling repaint: ${reason}`);
-    
-    requestAnimationFrame(() => {
-      this.forceRepaint('opacity');
-    });
-  }
-
-  /**
-   * Attempt recovery with escalating strategies
+   * Attempt recovery — fully transparent to the user.
+   * Only performs invisible GPU-layer nudge (willChange toggle) and a
+   * silent layout read. No opacity, transform, contain, or display writes
+   * that could produce a visible flash or overlap.
    */
   private attemptRecovery(): void {
     if (this.recoveryInProgress) return;
     this.recoveryInProgress = true;
     this.metrics.recoveryAttempts++;
 
-    const strategies: RecoveryStrategy[] = ['opacity', 'reflow', 'containment', 'force'];
-    
-    const tryStrategy = (index: number): void => {
-      if (index >= strategies.length) {
-        console.error('[ScreenGuard] All recovery strategies exhausted');
+    this.forceRepaint('reflow');
+
+    setTimeout(() => {
+      const root = document.getElementById('root');
+      const recovered = root && root.children.length > 0 &&
+        root.getBoundingClientRect().height > 0;
+
+      if (recovered) {
         this.recoveryInProgress = false;
-        this.notifyListeners('recovery-failed');
-        return;
+        this.metrics.consecutiveBlankFrames = 0;
+        this.notifyListeners('recovery-success');
+      } else if (this.metrics.recoveryAttempts >= 5) {
+        // Only reload as absolute last resort after 5 failed silent attempts
+        window.location.reload();
+      } else {
+        this.recoveryInProgress = false;
       }
-
-      const strategy = strategies[index];
-      console.log(`[ScreenGuard] Attempting recovery: ${strategy}`);
-      
-      this.forceRepaint(strategy);
-
-      // Check if recovery worked after a short delay
-      setTimeout(() => {
-        const root = document.getElementById('root');
-        const recovered = root && root.children.length > 0 && 
-          root.getBoundingClientRect().height > 0;
-
-        if (recovered) {
-          console.log(`[ScreenGuard] Recovery successful: ${strategy}`);
-          this.recoveryInProgress = false;
-          this.metrics.consecutiveBlankFrames = 0;
-          this.notifyListeners('recovery-success');
-        } else {
-          // Try next strategy
-          tryStrategy(index + 1);
-        }
-      }, 100);
-    };
-
-    tryStrategy(0);
+    }, 150);
   }
 
   /**
-   * Force a repaint using the specified strategy
+   * Nudge the compositor without any visible change to the user.
+   * All strategies perform only invisible operations:
+   *  - A silent layout read (void offsetHeight) to unstick the render pipeline
+   *  - A willChange toggle to promote/demote a compositing layer off-screen
+   * No opacity, transform, contain, or display writes are made.
    */
-  forceRepaint(strategy: RecoveryStrategy = 'opacity'): void {
-    switch (strategy) {
-      case 'opacity':
-        // Quick opacity flicker
-        document.body.style.opacity = '0.9999';
-        requestAnimationFrame(() => {
-          document.body.style.opacity = '1';
-        });
-        break;
+  forceRepaint(_strategy: RecoveryStrategy = 'reflow'): void {
+    // Silent layout read — forces the engine to flush any pending layout work
+    // without writing any visible CSS property.
+    void document.body.offsetHeight;
 
-      case 'reflow':
-        // Force layout reflow
-        void document.body.offsetHeight;
-        document.body.style.display = 'none';
-        void document.body.offsetHeight;
-        document.body.style.display = '';
-        break;
-
-      case 'containment':
-        // Reset CSS containment
-        const root = document.getElementById('root');
-        if (root) {
-          const originalContain = root.style.contain;
-          root.style.contain = 'none';
-          requestAnimationFrame(() => {
-            root.style.contain = originalContain || 'layout style';
-          });
-        }
-        break;
-
-      case 'force':
-        // Nuclear option - multiple techniques
-        document.body.style.display = 'none';
-        void document.body.offsetHeight;
-        document.body.style.display = '';
-        
-        document.body.style.opacity = '0.99';
-        requestAnimationFrame(() => {
-          document.body.style.opacity = '1';
-          
-          // Also reset transforms
-          const allElements = document.querySelectorAll('[style*="transform"]');
-          allElements.forEach(el => {
-            const htmlEl = el as HTMLElement;
-            const transform = htmlEl.style.transform;
-            htmlEl.style.transform = 'translateZ(0)';
-            requestAnimationFrame(() => {
-              htmlEl.style.transform = transform;
-            });
-          });
-        });
-        break;
-
-      case 'reload':
-        // Last resort - reload the page
-        window.location.reload();
-        break;
-    }
+    // willChange promote → next frame demote: signals the compositor to
+    // rebuild the layer tree without touching any painted pixel value.
+    document.body.style.willChange = 'transform';
+    requestAnimationFrame(() => {
+      document.body.style.willChange = '';
+    });
   }
 
   /**

@@ -95,8 +95,11 @@ let _authStateCleanup: (() => void) | null = null;
 
 export const useAuthStore = create<AuthStore>()(devtools(
   (set, get) => ({
-  // Initial state
-  isLocked: true,
+  // Initial state -- desktop must always be visible by default. Locking is opt-in:
+  // it only happens after `initialize()` reports an enabled auth method, or after the
+  // user explicitly invokes `lock()`. Defaulting to `isLocked: true` previously caused
+  // a blank full-screen overlay before/while auth was being initialized.
+  isLocked: false,
   isEnabled: false,
   method: 'none',
   hasPassword: false,

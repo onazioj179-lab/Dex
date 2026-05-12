@@ -35,6 +35,7 @@ import {
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
 import PolicyViewer from '../components/PolicyViewer';
+import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
@@ -108,6 +109,14 @@ const Icons = {
       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
     </svg>
   ),
+  systemMonitor: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="12" rx="2"/>
+      <line x1="8" y1="20" x2="16" y2="20"/>
+      <line x1="12" y1="16" x2="12" y2="20"/>
+      <path d="M7 11l2.5-3 2 4 2.5-5 3 4"/>
+    </svg>
+  ),
   accessibility: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="12" cy="4" r="2"/>
@@ -173,7 +182,7 @@ const Icons = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="12" cy="8" r="4"/>
       <path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>
-      <path d="M9 8a3 3 0 0 1 6 0" stroke-dasharray="2 2"/>
+      <path d="M9 8a3 3 0 0 1 6 0" strokeDasharray="2 2"/>
     </svg>
   ),
   account: (
@@ -194,6 +203,7 @@ const SECTIONS: SettingSection[] = [
   { id: 'privacy', name: 'Privacy & Security', icon: Icons.privacy },
   { id: 'network', name: 'Network', icon: Icons.network },
   { id: 'performance', name: 'Performance', icon: Icons.performance },
+  { id: 'systemMonitor', name: 'System Monitor', icon: Icons.systemMonitor },
   { id: 'accessibility', name: 'Accessibility', icon: Icons.accessibility },
   { id: 'window', name: 'Window Management', icon: Icons.window },
   { id: 'snap', name: 'Frame Snapping', icon: Icons.window },
@@ -216,7 +226,7 @@ const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
   { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
-  { label: 'Advanced', ids: ['performance', 'accessibility', 'storage', 'browser'] },
+  { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
   { label: 'Intelligence', ids: ['uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
   { label: 'Extensions', ids: ['plugins', 'nexus'] },
@@ -253,7 +263,268 @@ interface UpdateHistoryEntry {
   success: boolean;
 }
 
+// ===========================================================================
+// SYSTEM MONITOR (Task Manager)
+// View live system processes, CPU/memory usage, and terminate processes.
+// ===========================================================================
+interface SystemProcess {
+  pid: number;
+  name: string;
+  cpu: number;
+  memory: number;
+  path?: string;
+}
+
+interface SystemStatusInfo {
+  cpu?: { usage: number; cores: number };
+  memory?: { total: number; used: number; percent: number };
+  battery?: { percent: number; charging: boolean };
+  uptime?: number;
+}
+
+const SystemMonitorPanel: React.FC = () => {
+  const { confirm, ConfirmHost } = useConfirm();
+  const [processes, setProcesses] = React.useState<SystemProcess[]>([]);
+  const [status, setStatus] = React.useState<SystemStatusInfo>({});
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [filter, setFilter] = React.useState('');
+  const [sortBy, setSortBy] = React.useState<'cpu' | 'memory' | 'name' | 'pid'>('cpu');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+  const [busyPid, setBusyPid] = React.useState<number | null>(null);
+
+  const dexApi = (window as any).dex;
+
+  const refresh = React.useCallback(async () => {
+    if (!dexApi?.system?.getProcesses) {
+      setError('System monitor unavailable in this build (no dex.system bridge).');
+      setLoading(false);
+      return;
+    }
+    try {
+      const [procs, stat] = await Promise.all([
+        dexApi.system.getProcesses().catch(() => []),
+        dexApi.system.getStatus?.().catch(() => null),
+      ]);
+      setProcesses(Array.isArray(procs) ? procs : []);
+      if (stat) setStatus(stat);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load processes');
+    } finally {
+      setLoading(false);
+    }
+  }, [dexApi]);
+
+  React.useEffect(() => {
+    refresh();
+    const id = window.setInterval(refresh, 3000);
+    return () => window.clearInterval(id);
+  }, [refresh]);
+
+  const handleEndProcess = React.useCallback(async (pid: number, name: string) => {
+    if (!dexApi?.power?.closeProcess) {
+      alert('Process termination is not available in this build.');
+      return;
+    }
+    const ok = await confirm({
+      title: 'End process?',
+      message: `End process "${name}" (PID ${pid})? Unsaved data may be lost.`,
+      confirmLabel: 'End process',
+      tone: 'destructive',
+    });
+    if (!ok) return;
+    setBusyPid(pid);
+    try {
+      const result = await dexApi.power.closeProcess(pid, false);
+      if (!result?.ok && !result?.success) {
+        alert(`Failed to end process: ${result?.error || 'unknown error'}`);
+      } else {
+        setProcesses(prev => prev.filter(p => p.pid !== pid));
+      }
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : 'failed'}`);
+    } finally {
+      setBusyPid(null);
+    }
+  }, [dexApi]);
+
+  const filtered = React.useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    let list = q ? processes.filter(p => p.name.toLowerCase().includes(q) || String(p.pid).includes(q)) : [...processes];
+    list.sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      switch (sortBy) {
+        case 'name': return a.name.localeCompare(b.name) * dir;
+        case 'pid': return (a.pid - b.pid) * dir;
+        case 'memory': return ((a.memory || 0) - (b.memory || 0)) * dir;
+        case 'cpu':
+        default: return ((a.cpu || 0) - (b.cpu || 0)) * dir;
+      }
+    });
+    return list;
+  }, [processes, filter, sortBy, sortDir]);
+
+  const totalCpu = status.cpu?.usage ?? 0;
+  const totalMem = status.memory?.percent ?? 0;
+  const memUsedGB = status.memory ? (status.memory.used / 1024 ** 3).toFixed(1) : '0.0';
+  const memTotalGB = status.memory ? (status.memory.total / 1024 ** 3).toFixed(1) : '0.0';
+
+  const setSort = (col: 'cpu' | 'memory' | 'name' | 'pid') => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir(col === 'name' ? 'asc' : 'desc'); }
+  };
+
+  const headerCellStyle: React.CSSProperties = {
+    textAlign: 'left', padding: '8px 10px', fontSize: 11, fontWeight: 600,
+    color: 'var(--color-text-secondary)', cursor: 'pointer', userSelect: 'none',
+    borderBottom: '1px solid var(--color-border-subtle)',
+    background: 'var(--color-bg-elevated, #1a1a1e)',
+    position: 'sticky', top: 0, zIndex: 1,
+  };
+  const cellStyle: React.CSSProperties = {
+    padding: '6px 10px', fontSize: 12, color: 'var(--color-text-primary)',
+    borderBottom: '1px solid var(--color-border-subtle)',
+    fontVariantNumeric: 'tabular-nums',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', maxWidth: 980 }}>
+      <div>
+        <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--color-text-primary)' }}>System Monitor</h3>
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
+          Live view of all processes running on this computer. End unresponsive processes or check resource usage.
+        </p>
+      </div>
+
+      {/* Live stats cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>CPU</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: totalCpu > 80 ? '#FF453A' : totalCpu > 50 ? '#FF9F0A' : '#30D158', fontVariantNumeric: 'tabular-nums' }}>{totalCpu}%</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.cpu?.cores || '?'} cores</div>
+        </div>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Memory</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: totalMem > 80 ? '#FF453A' : totalMem > 50 ? '#FF9F0A' : '#30D158', fontVariantNumeric: 'tabular-nums' }}>{totalMem}%</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{memUsedGB} / {memTotalGB} GB</div>
+        </div>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Processes</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{processes.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{filtered.length} shown</div>
+        </div>
+        {status.battery && (
+          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Battery</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{status.battery.percent}%</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.battery.charging ? 'Charging' : 'On battery'}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Filter by name or PID..."
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          style={{
+            flex: 1, height: 32, padding: '0 12px', borderRadius: 8,
+            background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)',
+            color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit', outline: 'none',
+          }}
+        />
+        <button
+          onClick={refresh}
+          style={{
+            height: 32, padding: '0 14px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+            background: 'var(--color-bg-elevated, #1a1a1e)', color: 'var(--color-text-primary)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}
+        >Refresh</button>
+      </div>
+
+      {error && (
+        <div style={{ padding: '10px 14px', background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 8, color: '#FF6961', fontSize: 12 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Process table */}
+      <div style={{
+        border: '1px solid var(--color-border-subtle)', borderRadius: 10, overflow: 'hidden',
+        background: 'var(--color-bg-base, #0e0e11)',
+      }}>
+        <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th style={headerCellStyle} onClick={() => setSort('name')}>
+                  Name {sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{ ...headerCellStyle, width: 80, textAlign: 'right' }} onClick={() => setSort('pid')}>
+                  PID {sortBy === 'pid' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{ ...headerCellStyle, width: 80, textAlign: 'right' }} onClick={() => setSort('cpu')}>
+                  CPU {sortBy === 'cpu' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{ ...headerCellStyle, width: 90, textAlign: 'right' }} onClick={() => setSort('memory')}>
+                  Memory {sortBy === 'memory' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{ ...headerCellStyle, width: 80, textAlign: 'center' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 24, color: 'var(--color-text-secondary)' }}>Loading processes...</td></tr>
+              )}
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 24, color: 'var(--color-text-secondary)' }}>
+                  {filter ? 'No processes match filter.' : 'No process data available.'}
+                </td></tr>
+              )}
+              {filtered.map(p => (
+                <tr key={p.pid} style={{ transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <td style={{ ...cellStyle, fontWeight: 500, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.path || p.name}>
+                    {p.name}
+                  </td>
+                  <td style={{ ...cellStyle, textAlign: 'right', color: 'var(--color-text-secondary)' }}>{p.pid}</td>
+                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.cpu || 0) > 50 ? '#FF9F0A' : 'var(--color-text-primary)' }}>{(p.cpu || 0).toFixed(1)}%</td>
+                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.memory || 0) > 10 ? '#FF9F0A' : 'var(--color-text-primary)' }}>{(p.memory || 0).toFixed(1)}%</td>
+                  <td style={{ ...cellStyle, textAlign: 'center' }}>
+                    <button
+                      onClick={() => handleEndProcess(p.pid, p.name)}
+                      disabled={busyPid === p.pid}
+                      aria-label={busyPid === p.pid ? `Ending ${p.name}` : `End process ${p.name} (PID ${p.pid})`}
+                      style={{
+                        padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(255,69,58,0.4)',
+                        background: busyPid === p.pid ? 'rgba(255,69,58,0.1)' : 'transparent',
+                        color: '#FF6961', fontSize: 11, fontWeight: 600,
+                        cursor: busyPid === p.pid ? 'wait' : 'pointer',
+                      }}
+                    >{busyPid === p.pid ? '...' : 'End'}</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: 0 }}>
+        Auto-refreshes every 3 seconds. Ending system processes may cause instability.
+      </p>
+      <ConfirmHost />
+    </div>
+  );
+};
+
 const UpdateManagerSection: React.FC = () => {
+  const { confirm, ConfirmHost } = useConfirm();
   const dexUpdates = (window as any).dex?.updates;
   const [info, setInfo] = React.useState<UpdateInfo>({
     currentVersion: '—',
@@ -367,7 +638,13 @@ const UpdateManagerSection: React.FC = () => {
   };
 
   const rollback = async (backupId: string) => {
-    if (!window.confirm('Rollback to this version? The app will restart.')) return;
+    const ok = await confirm({
+      title: 'Rollback?',
+      message: 'Rollback to this version? The app will restart.',
+      confirmLabel: 'Rollback',
+      tone: 'destructive',
+    });
+    if (!ok) return;
     try { await dexUpdates?.rollback?.(backupId); } catch { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: 'Rollback failed', type: 'error' } })); }
   };
 
@@ -545,6 +822,7 @@ const UpdateManagerSection: React.FC = () => {
         </>
       )}
     </div>
+    <ConfirmHost />
     </div>
   );
 };
@@ -1041,6 +1319,7 @@ const TextDensityControls: React.FC<{
 };
 
 export const Settings: React.FC = () => {
+  const { confirm: confirmReset, ConfirmHost: ConfirmResetHost } = useConfirm();
   const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
   const [settingsSearch, setSettingsSearch] = useState('');
@@ -1050,6 +1329,10 @@ export const Settings: React.FC = () => {
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
   const [policyAcceptance, setPolicyAcceptance] = useState(() => readPolicyAcceptance());
   const [optionalAnalytics, setOptionalAnalytics] = useState(() => isOptionalAnalyticsEnabled());
+  // Hoist shell-prefs hook to component top-level so the hook count stays
+  // stable across category switches (renderShellSettings used to call this
+  // conditionally which violated the Rules of Hooks).
+  const shellPrefs = useShellPreferences();
 
   const openPolicyViewer = useCallback((slug: PolicySlug) => {
     setPolicyViewerInitial(slug);
@@ -1395,7 +1678,7 @@ export const Settings: React.FC = () => {
   // honor, on-device AI policy + system capabilities readout.
   // -------------------------------------------------------------------------
   const renderShellSettings = () => {
-    const prefs = useShellPreferences();
+    const prefs = shellPrefs;
     const dockEdges: DockEdge[] = ['bottom', 'left', 'right', 'top'];
     const dockPresets: DockSizePreset[] = ['compact', 'regular', 'large', 'floating'];
     return (
@@ -1410,6 +1693,8 @@ export const Settings: React.FC = () => {
             {dockEdges.map((edge) => (
               <button
                 key={edge}
+                aria-label={`Dock on ${edge}`}
+                aria-pressed={prefs.dockEdge === edge}
                 style={{
                   ...styles.button,
                   background: prefs.dockEdge === edge ? 'var(--color-accent)' : 'var(--color-bg-hover)',
@@ -1432,6 +1717,8 @@ export const Settings: React.FC = () => {
             {dockPresets.map((preset) => (
               <button
                 key={preset}
+                aria-label={`Dock size ${preset}`}
+                aria-pressed={prefs.dockPreset === preset}
                 style={{
                   ...styles.button,
                   background: prefs.dockPreset === preset ? 'var(--color-accent)' : 'var(--color-bg-hover)',
@@ -1445,6 +1732,32 @@ export const Settings: React.FC = () => {
         </div>
 
         <h3 style={styles.sectionTitle}>Liquid Glass</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Mode</span>
+            <span style={styles.settingDesc}>Choose how transparent shell windows and overlays should be.</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {([
+              { id: 'off', label: 'Off' },
+              { id: 'reduced', label: 'Reduced' },
+              { id: 'normal', label: 'Normal' },
+              { id: 'liquid', label: 'Liquid' },
+            ] as const).map((mode) => (
+              <button
+                key={mode.id}
+                aria-label={`Glass mode ${mode.label}`}
+                aria-pressed={prefs.glassMode === mode.id}
+                style={{
+                  ...styles.button,
+                  background: prefs.glassMode === mode.id ? 'var(--color-accent)' : 'var(--color-bg-hover)',
+                  color: prefs.glassMode === mode.id ? '#fff' : 'var(--color-text-primary)',
+                }}
+                onClick={() => prefs.setGlassMode(mode.id)}
+              >{mode.label}</button>
+            ))}
+          </div>
+        </div>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Tint</span>
@@ -1571,10 +1884,14 @@ export const Settings: React.FC = () => {
           </div>
           <button
             style={styles.button}
-            onClick={() => {
-              if (window.confirm('Reset all shell preferences to defaults?')) {
-                prefs.reset();
-              }
+            onClick={async () => {
+              const ok = await confirmReset({
+                title: 'Reset shell preferences?',
+                message: 'Restore dock, glass, night-shift, and update prefs to defaults.',
+                confirmLabel: 'Reset',
+                tone: 'destructive',
+              });
+              if (ok) prefs.reset();
             }}
           >Reset</button>
         </div>
@@ -1835,6 +2152,7 @@ export const Settings: React.FC = () => {
         <button
           role="switch"
           aria-checked={settings.stageManager}
+          aria-label="Toggle Stage Manager"
           onClick={() => {
             const next = !settings.stageManager;
             setSettings(prev => ({ ...prev, stageManager: next }));
@@ -2643,6 +2961,11 @@ export const Settings: React.FC = () => {
   );
 
   // =========================================================================
+  // SYSTEM MONITOR (Task Manager)
+  // =========================================================================
+  const renderSystemMonitor = () => <SystemMonitorPanel />;
+
+  // =========================================================================
   // PERFORMANCE SETTINGS
   // =========================================================================
   const renderPerformanceSettings = () => (
@@ -3419,6 +3742,7 @@ export const Settings: React.FC = () => {
       case 'privacy': return renderPrivacySettings();
       case 'network': return renderNetworkSettings();
       case 'performance': return renderPerformanceSettings();
+      case 'systemMonitor': return renderSystemMonitor();
       case 'accessibility': return renderAccessibilitySettings();
       case 'window': return renderWindowSettings();
       case 'snap': return <SnapLayoutsPanel />;
@@ -3440,7 +3764,7 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="settings-shell" style={styles.container}>
       <style>{`
         .settings-nav:hover { background: var(--pg-row-hover) !important; color: var(--color-text-primary) !important; }
         .settings-nav:active { transform: scale(0.98); }
@@ -3456,10 +3780,18 @@ export const Settings: React.FC = () => {
         .settings-action:hover { background: var(--color-bg-hover) !important; }
         .settings-danger:hover { background: rgba(255,69,58,0.18) !important; }
         .settings-color:hover { transform: scale(1.15); }
+        .settings-shell input[type="range"] { accent-color: var(--color-accent); }
+        .settings-shell input[type="checkbox"] { accent-color: var(--color-accent); }
+        .settings-shell input[type="color"] { border-radius: 8px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
+        .settings-shell button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14), 0 6px 18px rgba(10,132,255,0.18); }
+        .settings-shell button, .settings-shell input, .settings-shell select { transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.12s ease; }
         .settings-content::-webkit-scrollbar { width: 6px; }
         .settings-content::-webkit-scrollbar-track { background: transparent; }
         .settings-content::-webkit-scrollbar-thumb { background: var(--pg-border-strong); border-radius: 3px; }
         .settings-content::-webkit-scrollbar-thumb:hover { background: var(--pg-border-active); }
+        @container (max-width: 760px) {
+          .settings-shell { --pg-sidebar-width: 196px; }
+        }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
@@ -3607,6 +3939,7 @@ export const Settings: React.FC = () => {
         initialPolicy={policyViewerInitial}
         onClose={() => setPolicyViewerOpen(false)}
       />
+      <ConfirmResetHost />
     </div>
   );
 };
@@ -3620,6 +3953,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     height: '100%',
     display: 'flex',
+    containerType: 'inline-size',
     background: 'var(--pg-surface)',
     backdropFilter: 'blur(28px) saturate(180%)',
     WebkitBackdropFilter: 'blur(28px) saturate(180%)',
@@ -3686,6 +4020,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Main
   main: {
     flex: 1,
+    minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -3736,6 +4071,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     padding: '13px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
   },

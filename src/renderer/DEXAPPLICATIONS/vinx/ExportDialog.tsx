@@ -13,6 +13,7 @@ import React, { useCallback, useState, memo, useMemo, useRef, useEffect } from '
 import { useVinxStore } from './VinxStore';
 import type { ExportSettings, ExportJob, ExportPreset } from './VinxTypes';
 import { EXPORT_PRESETS, generateId, formatTimecode } from './VinxTypes';
+import { getDiskInfo } from '../../utils/nativeBridge';
 
 // Track active export intervals for cleanup
 interface ActiveExport {
@@ -107,6 +108,7 @@ export const ExportDialog: React.FC = memo(() => {
   const frameRate = useVinxStore(s => s.project.frameRate);
   const projectWidth = useVinxStore(s => s.project.width);
   const projectHeight = useVinxStore(s => s.project.height);
+  const projectMarkers = useVinxStore(s => s.project.markers);
   const duration = useVinxStore(s => s.getSequenceDuration());
 
   // Track active exports for cleanup on unmount
@@ -132,6 +134,30 @@ export const ExportDialog: React.FC = memo(() => {
     ...EXPORT_PRESETS[0].settings,
   }));
   const [outputName, setOutputName] = useState('export');
+  const [diskFreeGB, setDiskFreeGB] = useState<number | null>(null);
+  const [emitCaptions, setEmitCaptions] = useState(false);
+
+  // Refresh free disk space whenever the dialog is opened so users can spot a
+  // tight target before queuing a render. Falls back silently if native is unavailable.
+  useEffect(() => {
+    if (!showExportDialog) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const disks = await getDiskInfo();
+        if (cancelled || !Array.isArray(disks) || disks.length === 0) return;
+        // Pick the disk with the most free space (typically the user's primary working drive).
+        const largest = disks.reduce((best: any, d: any) => {
+          const free = Number(d?.available ?? d?.free ?? 0);
+          const bestFree = Number(best?.available ?? best?.free ?? 0);
+          return free > bestFree ? d : best;
+        }, disks[0]);
+        const freeBytes = Number(largest?.available ?? largest?.free ?? 0);
+        if (freeBytes > 0) setDiskFreeGB(freeBytes / (1024 ** 3));
+      } catch { /* native unavailable -- hide indicator */ }
+    })();
+    return () => { cancelled = true; };
+  }, [showExportDialog]);
 
   const selectedPreset = useMemo(() =>
     EXPORT_PRESETS.find(p => p.id === selectedPresetId),
@@ -164,6 +190,46 @@ export const ExportDialog: React.FC = memo(() => {
     addExportJob(job);
     if (isVideoFormat) {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Note: ${settings.format.toUpperCase()} requested (exported as WebM — browser-native codec)`, type: 'info' } }));
+    }
+
+    // Optional WebVTT sidecar from chapter/standard markers
+    if (emitCaptions && projectMarkers.length > 0) {
+      try {
+        const fps = settings.frameRate || frameRate || 30;
+        const totalFr = duration || 1;
+        const fmt = (frame: number) => {
+          const s = Math.max(0, frame) / fps;
+          const hh = Math.floor(s / 3600);
+          const mm = Math.floor((s % 3600) / 60);
+          const ss = s % 60;
+          const sec = Math.floor(ss);
+          const ms = Math.round((ss - sec) * 1000);
+          return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+        };
+        const sorted = [...projectMarkers].sort((a, b) => a.frame - b.frame);
+        const lines: string[] = ['WEBVTT', ''];
+        sorted.forEach((m, i) => {
+          const startFr = m.frame;
+          const endFr = m.duration && m.duration > 0
+            ? m.frame + m.duration
+            : (sorted[i + 1]?.frame ?? totalFr);
+          const label = (m.name || `Marker ${i + 1}`).replace(/-->/g, '--&gt;');
+          lines.push(`${i + 1}`);
+          lines.push(`${fmt(startFr)} --> ${fmt(Math.max(endFr, startFr + 1))}`);
+          lines.push(label);
+          lines.push('');
+        });
+        const vtt = lines.join('\n');
+        const vttBlob = new Blob([vtt], { type: 'text/vtt' });
+        const vttUrl = URL.createObjectURL(vttBlob);
+        const vttLink = document.createElement('a');
+        vttLink.href = vttUrl;
+        vttLink.download = `${outputName}.vtt`;
+        vttLink.click();
+        URL.revokeObjectURL(vttUrl);
+      } catch (err) {
+        console.warn('[Vinx] VTT sidecar emit failed:', err);
+      }
     }
 
     // Real export: capture the program viewer canvas via MediaRecorder
@@ -241,7 +307,7 @@ export const ExportDialog: React.FC = memo(() => {
 
     // Track this export for cleanup on unmount
     activeExportsRef.current.set(job.id, { intervalId: renderInterval, recorder, stream });
-  }, [settings, outputName, addExportJob, updateExportJob, frameRate, duration, projectWidth, projectHeight]);
+  }, [settings, outputName, addExportJob, updateExportJob, frameRate, duration, projectWidth, projectHeight, emitCaptions, projectMarkers]);
 
   if (!showExportDialog) return null;
 
@@ -362,8 +428,25 @@ export const ExportDialog: React.FC = memo(() => {
             <span style={labelStyle}>Filename</span>
             <input style={inputStyle} value={outputName} onChange={e => setOutputName(e.target.value)} />
           </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Captions sidecar</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={emitCaptions}
+                onChange={e => setEmitCaptions(e.target.checked)}
+                aria-label="Export captions sidecar as WebVTT"
+              />
+              Export markers as .vtt {projectMarkers.length === 0 && <span style={{ color: 'var(--color-text-tertiary)' }}>(no markers)</span>}
+            </label>
+          </div>
           <div style={{ padding: '0 16px', fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
             Duration: {formatTimecode(duration, frameRate)} / {duration} frames
+            {diskFreeGB != null && (
+              <span style={{ marginLeft: 12, color: diskFreeGB < 2 ? 'var(--color-error)' : 'var(--color-text-tertiary)' }}>
+                &middot; Free disk: {diskFreeGB.toFixed(1)} GB
+              </span>
+            )}
           </div>
 
           {/* Queue */}

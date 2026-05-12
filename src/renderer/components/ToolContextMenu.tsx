@@ -176,7 +176,7 @@ export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({
         width,
         maxHeight: 'calc(100vh - 32px)',
         overflowY: 'auto',
-        background: 'rgba(28, 28, 32, 0.98)',
+        background: 'var(--color-bg-glass-strong, rgba(28, 28, 32, 0.98))',
         backdropFilter: 'blur(24px) saturate(180%)',
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         border: `1px solid ${colors.border.default}`,

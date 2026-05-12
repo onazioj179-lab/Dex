@@ -5,6 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 import { useEffect, useRef } from 'react';
+import { sharedTick } from '../services/SharedTick';
 
 const invoke = (window as any).electron?.invoke;
 
@@ -17,8 +18,7 @@ export function useAutoSave(
   isDirty: boolean,
   intervalMs = 30_000,
 ): void {
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const versionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const instanceIdRef = useRef(`autosave-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const lastVersionSave = useRef(0);
 
   useEffect(() => {
@@ -29,11 +29,21 @@ export function useAutoSave(
         localStorage.setItem(`dex-autosave-${key}`, JSON.stringify(data));
       } catch { /* storage full or serialization error */ }
     };
-    timerRef.current = setInterval(save, intervalMs);
+    const autosaveId = `${instanceIdRef.current}-${key}`;
+    const versionId = `${autosaveId}-version`;
+    sharedTick.subscribe(autosaveId, save, intervalMs);
+
+    const flushContinuity = (event?: Event) => {
+      const current = (event as CustomEvent<{ current?: string }> | undefined)?.detail?.current;
+      if (!current || current !== 'active') save();
+    };
+    const flushOnHidden = () => { if (document.hidden) save(); };
+    window.addEventListener('dex-idle-continuity-change', flushContinuity as EventListener);
+    document.addEventListener('visibilitychange', flushOnHidden);
 
     // Durable version-history snapshot (less frequent, survives localStorage wipe)
     if (invoke) {
-      versionTimerRef.current = setInterval(() => {
+      sharedTick.subscribe(versionId, () => {
         try {
           const now = Date.now();
           if (now - lastVersionSave.current < VERSION_SNAPSHOT_INTERVAL) return;
@@ -45,8 +55,11 @@ export function useAutoSave(
     }
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (versionTimerRef.current) clearInterval(versionTimerRef.current);
+      save();
+      sharedTick.unsubscribe(autosaveId);
+      sharedTick.unsubscribe(versionId);
+      window.removeEventListener('dex-idle-continuity-change', flushContinuity as EventListener);
+      document.removeEventListener('visibilitychange', flushOnHidden);
     };
   }, [key, getData, isDirty, intervalMs]);
 }

@@ -31,6 +31,27 @@ injectContainmentCSS();
   document.documentElement.setAttribute('data-dpi', dpi);
 })();
 
+// Touch mode auto-detect -- flip data-touch-mode="on" the first time we see
+// a touch or pen pointer event. User can pin via Settings -> Input
+// (localStorage key: dex-touch-mode = 'on' | 'off' | 'auto').
+(() => {
+  try {
+    const pinned = localStorage.getItem('dex-touch-mode');
+    if (pinned === 'on') {
+      document.documentElement.setAttribute('data-touch-mode', 'on');
+      return;
+    }
+    if (pinned === 'off') return;
+    const onFirstTouch = (e: PointerEvent) => {
+      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+        document.documentElement.setAttribute('data-touch-mode', 'on');
+        window.removeEventListener('pointerdown', onFirstTouch, true);
+      }
+    };
+    window.addEventListener('pointerdown', onFirstTouch, true);
+  } catch { /* localStorage may be unavailable */ }
+})();
+
 // User text-size + density preferences -- apply before first paint
 (() => {
   try {
@@ -46,6 +67,31 @@ injectContainmentCSS();
   } catch { /* ignore */ }
 })();
 
+// Theme: respect user choice or follow OS prefers-color-scheme live
+import { initTheme } from './utils/theme';
+initTheme();
+
+import { initIdleContinuity } from './services/IdleContinuity';
+initIdleContinuity();
+
+// Reduced-motion: mirror OS preference + user override into a data-attribute
+// so any component (or CSS rule) can read the *effective* setting in one place.
+(() => {
+  try {
+    const root = document.documentElement;
+    const apply = () => {
+      const userPref = localStorage.getItem('dex-reduced-motion'); // 'on' | 'off' | null (auto)
+      const sysReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const effective = userPref === 'on' ? true : userPref === 'off' ? false : sysReduce;
+      root.setAttribute('data-reduced-motion', effective ? 'on' : 'off');
+    };
+    apply();
+    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', apply);
+    window.addEventListener('storage', e => { if (e.key === 'dex-reduced-motion') apply(); });
+    window.addEventListener('dex-reduced-motion-changed', apply);
+  } catch { /* ignore */ }
+})();
+
 // RC8: Heap Monitor -- start memory pressure tracking
 import { startHeapMonitor } from './utils/HeapMonitor';
 startHeapMonitor();
@@ -57,6 +103,14 @@ const _cleanupPerf = initPerformanceSystems();
 // Wave 1: register UKI AutoPilot ActionBus handlers as soon as renderer boots
 import { registerUkiActionHandlers } from './services/UkiActionHandlers';
 registerUkiActionHandlers();
+
+// Phase 6: install global precision-slider behavior (wheel = step, shift = fine)
+import { installPrecisionSliders } from './utils/precisionSliders';
+installPrecisionSliders();
+
+// Phase 6: install gaming-mode fullscreen listeners (Escape / OS exit teardown)
+import { installGamingListeners } from './utils/gamingMode';
+installGamingListeners();
 
 // Window focus tracking -- pause animations & hide decorative elements when DEX is background
 (() => {
@@ -133,6 +187,10 @@ initTransferNotifications();
 // UKI: Voice assistant renderer bridge
 import { initUkiRendererBridge } from './services/ukiBridge';
 initUkiRendererBridge();
+
+// THERMAL: Adaptive performance monitor (rAF jank + main thermal signals)
+import { startThermalAdaptiveMonitor } from './services/ThermalAdaptiveMonitor';
+startThermalAdaptiveMonitor();
 
 // Cleanup on window close — stop SharedTick, performance systems
 import { sharedTick } from './services/SharedTick';

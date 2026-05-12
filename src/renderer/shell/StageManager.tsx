@@ -20,6 +20,7 @@ import type { RunningApp } from '../store/runningApps';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { usePerfTier } from '../utils/perfAware';
 import { useShellPreferences } from '../store/shellPreferencesStore';
+import DexIcon from '../components/DexIcon';
 
 /** Width of the expanded strip */
 export const STAGE_STRIP_WIDTH = 96;
@@ -132,9 +133,11 @@ const StageTile = memo<TileProps>(({ app, isActive, isHovered, icon, isWeak, red
           transform: isActive && !isWeak ? 'scale(1.05)' : 'scale(1)',
         }}>
           {icon ? (
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.6)', color: '#fff' }}>{icon}</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'scale(0.72)', color: '#fff' }}>{icon}</span>
           ) : (
-            <span style={{ fontSize: 15, fontWeight: 700 }}>{name.charAt(0).toUpperCase()}</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <DexIcon name={def?.icon || app.id} size={18} color="#fff" />
+            </span>
           )}
         </div>
 

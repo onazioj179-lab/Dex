@@ -137,4 +137,7 @@ export type {
   KernelStartupStats,
   KernelPerfStats,
   DexNativeModule,
+  LoudnessResult,
+  WaveformPeaksFlat,
+  ExportProgressSnapshot,
 } from './types';

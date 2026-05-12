@@ -618,3 +618,110 @@ export function quickHealthCheck(): { healthy: boolean; issues: string[] } {
     issues,
   };
 }
+
+// -----------------------------------------------------------------------------
+// STRESS TESTING (renderer-side)
+// -----------------------------------------------------------------------------
+
+export interface StressResult {
+  name: string;
+  durationMs: number;
+  ok: boolean;
+  detail?: string;
+}
+
+export interface StressReport {
+  startedAt: number;
+  finishedAt: number;
+  results: StressResult[];
+}
+
+/**
+ * Run a battery of renderer stress scenarios and return timing/diagnostic data.
+ * Safe to invoke from the dev console: `await window.dex.diag.stress()`.
+ */
+export async function runStressBattery(opts: {
+  rapidSwitch?: boolean;
+  memoryPressure?: boolean;
+  rafChurn?: boolean;
+  domChurn?: boolean;
+} = {}): Promise<StressReport> {
+  const startedAt = Date.now();
+  const results: StressResult[] = [];
+  const time = async (name: string, fn: () => Promise<void> | void) => {
+    const t0 = performance.now();
+    try {
+      await fn();
+      results.push({ name, durationMs: +(performance.now() - t0).toFixed(1), ok: true });
+    } catch (e: any) {
+      results.push({ name, durationMs: +(performance.now() - t0).toFixed(1), ok: false, detail: e?.message ?? String(e) });
+    }
+  };
+
+  if (opts.rapidSwitch !== false) {
+    await time('rapid-app-switch x50', async () => {
+      // Dispatch synthetic focus/visibility events to flush listeners
+      for (let i = 0; i < 50; i++) {
+        document.dispatchEvent(new Event('visibilitychange'));
+        window.dispatchEvent(new Event('focus'));
+        window.dispatchEvent(new Event('blur'));
+      }
+    });
+  }
+
+  if (opts.memoryPressure !== false) {
+    await time('memory-pressure 32MB alloc/release', async () => {
+      const buf: Uint8Array[] = [];
+      for (let i = 0; i < 32; i++) buf.push(new Uint8Array(1024 * 1024));
+      // touch each page so the allocator commits
+      for (const b of buf) b[0] = 1;
+      await new Promise(r => setTimeout(r, 0));
+      buf.length = 0;
+    });
+  }
+
+  if (opts.rafChurn !== false) {
+    await time('raf-churn 240 frames', async () => {
+      let n = 0;
+      await new Promise<void>(resolve => {
+        const tick = () => {
+          if (++n >= 240) return resolve();
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    });
+  }
+
+  if (opts.domChurn !== false) {
+    await time('dom-churn 1000 nodes', async () => {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:absolute;left:-9999px;top:-9999px';
+      document.body.appendChild(host);
+      try {
+        for (let i = 0; i < 1000; i++) {
+          const n = document.createElement('span');
+          n.textContent = String(i);
+          host.appendChild(n);
+        }
+        host.getBoundingClientRect(); // force layout
+      } finally {
+        host.remove();
+      }
+    });
+  }
+
+  return { startedAt, finishedAt: Date.now(), results };
+}
+
+// Expose to dev console under window.dex.diag (additive; does not clobber).
+if (typeof window !== 'undefined') {
+  const w = window as any;
+  w.dex = w.dex ?? {};
+  w.dex.diag = {
+    ...(w.dex.diag ?? {}),
+    health: quickHealthCheck,
+    audit: runSystemAudit,
+    stress: runStressBattery,
+  };
+}

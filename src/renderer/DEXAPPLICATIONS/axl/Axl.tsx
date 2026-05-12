@@ -1171,30 +1171,34 @@ const AXL: React.FC = () => {
       `}</style>
 
       {/* ─── Top Toolbar ─────────────────────────────────────────────── */}
-      <AXLToolbar
-        onExport={handleExport}
-        onRunSimulation={runSimulation}
-        onAddFeature={addFeatureToSelected}
-        sendToMenu={
-          <>
-            <SendToMenu sourceApp="axl" assetKind="model" getAsset={() => ({ name: `${project.name}.axl`, data: JSON.stringify(project), mimeType: 'application/json' })} />
-            {collab.canShare && (
-              <button onClick={collab.openShareDialog} style={collabButtonStyles} title="Share project">
-                <DexIcon name="user-plus" size={14} /> Share
-              </button>
-            )}
-          </>
-        }
-      />
+      <div data-testid="axl-tools">
+        <AXLToolbar
+          onExport={handleExport}
+          onRunSimulation={runSimulation}
+          onAddFeature={addFeatureToSelected}
+          sendToMenu={
+            <>
+              <SendToMenu sourceApp="axl" assetKind="model" getAsset={() => ({ name: `${project.name}.axl`, data: JSON.stringify(project), mimeType: 'application/json' })} />
+              {collab.canShare && (
+                <button onClick={collab.openShareDialog} style={collabButtonStyles} title="Share project">
+                  <DexIcon name="user-plus" size={14} /> Share
+                </button>
+              )}
+            </>
+          }
+        />
+      </div>
 
       {/* ─── Main Content ────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* ─── Left Panel: Feature Tree ──────────────────────────────── */}
-        <FeatureTree />
+        <div data-testid="axl-hierarchy">
+          <FeatureTree />
+        </div>
 
         {/* ─── 3D Viewport ───────────────────────────────────────────── */}
-        <div style={{ flex: 1, position: 'relative', cursor: tool === 'move' ? 'grab' : tool === 'measure' ? 'crosshair' : tool === 'rotate' ? 'alias' : tool === 'scale' ? 'nwse-resize' : 'default' }}
+        <div data-testid="axl-viewport" style={{ flex: 1, position: 'relative', cursor: tool === 'move' ? 'grab' : tool === 'measure' ? 'crosshair' : tool === 'rotate' ? 'alias' : tool === 'scale' ? 'nwse-resize' : 'default' }}
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
           onDrop={(e) => {
             e.preventDefault();
@@ -1450,7 +1454,7 @@ const AXL: React.FC = () => {
                       {(['X', 'Y', 'Z'] as const).map(axis => {
                         const colors = { X: 'var(--color-error)', Y: 'var(--color-success)', Z: 'var(--color-accent)' };
                         return (
-                          <button key={axis} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 700, borderRadius: 6, cursor: 'pointer', border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: colors[axis] }}>
+                          <button key={axis} aria-label={`Apply load along ${axis} axis`} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 700, borderRadius: 6, cursor: 'pointer', border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: colors[axis] }}>
                             {axis} <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
                           </button>
                         );

@@ -101,6 +101,8 @@ const MEMORY_AGGRESSIVE = 0.90;
 
 // Sampling
 const SAMPLE_INTERVAL_MS = 30_000;  // 30s (reduced from 10s to lower IPC+CPU overhead)
+const SAMPLE_INTERVAL_MIN_MS = 10_000;  // floor under pressure (memory >= moderate or on-AC + busy)
+const SAMPLE_INTERVAL_MAX_MS = 60_000;  // ceiling when idle + on-battery
 const MAX_SAMPLES = 60;             // 10min rolling window
 
 // Pattern learning
@@ -170,8 +172,8 @@ class XenonEngine {
     this.setupPowerTracking();
     this.integrateResourceGovernor();
 
-    // Start sampling loop
-    this.sampleTimer = setInterval(() => this.sampleSystem(), SAMPLE_INTERVAL_MS);
+    // Start adaptive sampling loop -- interval flexes 10s..60s based on pressure
+    this.scheduleNextSample(SAMPLE_INTERVAL_MS);
 
     // Start priority evaluation loop (every 5s)
     this.priorityTimer = setInterval(() => this.evaluatePriorities(), 5_000);
@@ -190,7 +192,7 @@ class XenonEngine {
     if (!this.isRunning) return;
     this.isRunning = false;
 
-    if (this.sampleTimer) { clearInterval(this.sampleTimer); this.sampleTimer = null; }
+    if (this.sampleTimer) { clearTimeout(this.sampleTimer as any); this.sampleTimer = null; }
     if (this.priorityTimer) { clearInterval(this.priorityTimer); this.priorityTimer = null; }
     if (this.nativeScanTimer) { clearInterval(this.nativeScanTimer); this.nativeScanTimer = null; }
     if (this.governorUnsubscribe) { this.governorUnsubscribe(); this.governorUnsubscribe = null; }
@@ -357,6 +359,35 @@ class XenonEngine {
   // -----------------------------------------------------------------------
   // SYSTEM SAMPLING
   // -----------------------------------------------------------------------
+
+  /**
+   * Adaptive sampler: re-arms itself with an interval that shrinks under
+   * memory/CPU pressure and expands when the system is idle or on battery.
+   * Cheaper than a fixed setInterval at the busy end and more responsive at
+   * the pressure end.
+   */
+  private scheduleNextSample(delayMs: number): void {
+    if (!this.isRunning) return;
+    if (this.sampleTimer) { clearTimeout(this.sampleTimer as any); this.sampleTimer = null; }
+    this.sampleTimer = setTimeout(() => {
+      try { this.sampleSystem(); } catch (err) { log.warn('[Xenon] sample failed', err); }
+      // Pick next interval from latest sample
+      const last = this.samples[this.samples.length - 1];
+      let next = SAMPLE_INTERVAL_MS;
+      if (last) {
+        const memFraction = last.memoryPercent / 100;
+        const cpuBusy = last.cpuPercent >= 60;
+        if (memFraction >= MEMORY_AGGRESSIVE || cpuBusy) {
+          next = SAMPLE_INTERVAL_MIN_MS;
+        } else if (memFraction >= MEMORY_MODERATE) {
+          next = Math.round((SAMPLE_INTERVAL_MIN_MS + SAMPLE_INTERVAL_MS) / 2);
+        } else if (this.onBattery && last.cpuPercent < 15) {
+          next = SAMPLE_INTERVAL_MAX_MS;
+        }
+      }
+      this.scheduleNextSample(next);
+    }, Math.max(SAMPLE_INTERVAL_MIN_MS, Math.min(SAMPLE_INTERVAL_MAX_MS, delayMs)));
+  }
 
   private sampleSystem(): void {
     const sample: XenonSystemSample = {

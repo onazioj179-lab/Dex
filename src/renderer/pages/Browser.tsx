@@ -336,6 +336,11 @@ export const Browser: React.FC = () => {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const tabContainerRef = useRef<HTMLDivElement>(null);
+  // Refs that point at the latest createTab / refresh callbacks. The keyboard
+  // handler is registered before those callbacks are defined, so we go through
+  // a ref to avoid a stale closure or a re-binding cascade on every render.
+  const createTabRef = useRef<((background?: boolean) => void) | null>(null);
+  const refreshRef = useRef<(() => void) | null>(null);
 
   // Keep the active and pinned tabs resident; unload older background tabs once
   // the tab count exceeds the memory budget so the browser stays responsive.
@@ -390,6 +395,7 @@ export const Browser: React.FC = () => {
   const [findQuery, setFindQuery] = useState('');
   const [findResults, setFindResults] = useState({ active: 0, total: 0 });
   const findInputRef = useRef<HTMLInputElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const bookmarkSaveRef = useRef<ReturnType<typeof setTimeout>>();
@@ -595,6 +601,42 @@ export const Browser: React.FC = () => {
           setTabErrors(prev => { const next = { ...prev }; delete next[currentId]; return next; });
           setCrashedTabs(prev => { const next = new Set(prev); next.delete(currentId); return next; });
         }
+      }
+      // Ctrl+T -- new tab. Stop propagation so the global "open command palette"
+      // shortcut doesn't fire on top of it.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        e.stopPropagation();
+        try { (createTabRef.current ?? (() => {}))(); } catch (err) { console.warn('[Browser] new tab', err); }
+        focusTimerRef.current = setTimeout(() => urlInputRef.current?.focus(), 60);
+      }
+      // Ctrl+L -- jump focus to the URL bar (Chrome/Firefox parity).
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        e.stopPropagation();
+        urlInputRef.current?.focus();
+        urlInputRef.current?.select();
+      }
+      // Ctrl+R -- reload current tab.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        e.stopPropagation();
+        try { (refreshRef.current ?? (() => {}))(); } catch (err) { console.warn('[Browser] reload', err); }
+      }
+      // Ctrl+Tab / Ctrl+Shift+Tab -- cycle through tabs without leaving the browser.
+      if (e.ctrlKey && e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        setTabs(prev => {
+          if (prev.length <= 1) return prev;
+          const idx = prev.findIndex(t => t.id === activeTabRef.current);
+          const dir = e.shiftKey ? -1 : 1;
+          const nextIdx = (idx + dir + prev.length) % prev.length;
+          const next = prev[nextIdx];
+          setActiveTab(next.id);
+          setUrlInput(next.url);
+          return prev;
+        });
       }
     };
     window.addEventListener('keydown', handler);
@@ -1001,6 +1043,7 @@ export const Browser: React.FC = () => {
       setUrlInput('');
     }
   }, []);
+  createTabRef.current = createTab;
 
   // Pin/unpin tab
   const pinTab = useCallback((id: string) => {
@@ -1338,6 +1381,7 @@ export const Browser: React.FC = () => {
       }
     }
   }, []);
+  refreshRef.current = refresh;
 
   const addBookmark = (folderId?: string) => {
     if (!currentTab?.url) return;
@@ -1562,6 +1606,7 @@ export const Browser: React.FC = () => {
                 onBlur={() => { setTimeout(() => { setUrlFocused(false); setShowSuggestions(false); }, 50); }}
                 placeholder="Search or enter address"
                 style={styles.urlInput}
+                ref={urlInputRef}
               />
             </div>
             {showSuggestions && suggestions.length > 0 && (

@@ -16,7 +16,8 @@ import {
   launchDEX,
   closeDEX,
   DEXTestContext,
-  waitForAppLoad,
+  waitForDexShellReady,
+  launchAppFromDock,
 } from './helpers';
 
 let context: DEXTestContext;
@@ -26,6 +27,7 @@ test.describe('Creative Suite Apps', () => {
   test.beforeAll(async () => {
     context = await launchDEX();
     page = context.mainWindow;
+    await waitForDexShellReady(page);
   });
 
   test.afterAll(async () => {
@@ -34,12 +36,8 @@ test.describe('Creative Suite Apps', () => {
 
   test.describe('VINX Video Editor', () => {
     test('should launch from dock', async () => {
-      // Click the video editor icon in the dock
-      const vinxIcon = page.locator('[data-app-id="videoeditor"], [aria-label*="VINX"], [aria-label*="Video"]').first();
-      await vinxIcon.click();
-      
-      // Wait for the app to load
-      await expect(page.locator('[data-testid="vinx-app"], .vinx-container')).toBeVisible({ timeout: 10000 });
+      await launchAppFromDock(page, 'videoeditor');
+      await expect(page.locator('[data-testid="app-instance-videoeditor"][data-app-state="foreground"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('should display timeline panel', async () => {
@@ -73,10 +71,8 @@ test.describe('Creative Suite Apps', () => {
 
   test.describe('Imosion DAW', () => {
     test('should launch from dock', async () => {
-      const imosionIcon = page.locator('[data-app-id="imosion"], [aria-label*="Imosion"], [aria-label*="DAW"]').first();
-      await imosionIcon.click();
-      
-      await expect(page.locator('[data-testid="imosion-app"], .imosion-container')).toBeVisible({ timeout: 10000 });
+      await launchAppFromDock(page, 'imosion');
+      await expect(page.locator('[data-testid="app-instance-imosion"][data-app-state="foreground"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('should display track list', async () => {
@@ -112,10 +108,8 @@ test.describe('Creative Suite Apps', () => {
 
   test.describe('Prism Image Editor', () => {
     test('should launch from dock', async () => {
-      const prismIcon = page.locator('[data-app-id="prism"], [aria-label*="Prism"], [aria-label*="Image"]').first();
-      await prismIcon.click();
-      
-      await expect(page.locator('[data-testid="prism-app"], .prism-container')).toBeVisible({ timeout: 10000 });
+      await launchAppFromDock(page, 'prism');
+      await expect(page.locator('[data-testid="app-instance-prism"][data-app-state="foreground"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('should display canvas area', async () => {
@@ -143,10 +137,8 @@ test.describe('Creative Suite Apps', () => {
 
   test.describe('Flux Motion Graphics', () => {
     test('should launch from dock', async () => {
-      const fluxIcon = page.locator('[data-app-id="flux"], [aria-label*="Flux"], [aria-label*="Motion"]').first();
-      await fluxIcon.click();
-      
-      await expect(page.locator('[data-testid="flux-app"], .flux-container')).toBeVisible({ timeout: 10000 });
+      await launchAppFromDock(page, 'flux');
+      await expect(page.locator('[data-testid="app-instance-flux"][data-app-state="foreground"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('should display composition viewer', async () => {
@@ -174,10 +166,8 @@ test.describe('Creative Suite Apps', () => {
 
   test.describe('Forge Encoder', () => {
     test('should launch from dock', async () => {
-      const forgeIcon = page.locator('[data-app-id="forge"], [aria-label*="Forge"], [aria-label*="Encoder"]').first();
-      await forgeIcon.click();
-      
-      await expect(page.locator('[data-testid="forge-app"], .forge-container')).toBeVisible({ timeout: 10000 });
+      await launchAppFromDock(page, 'forge');
+      await expect(page.locator('[data-testid="app-instance-forge"][data-app-state="foreground"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('should display queue panel', async () => {
@@ -200,10 +190,8 @@ test.describe('Creative Suite Apps', () => {
 
   test.describe('AXL CAD', () => {
     test('should launch from dock', async () => {
-      const axlIcon = page.locator('[data-app-id="axl"], [aria-label*="AXL"], [aria-label*="CAD"]').first();
-      await axlIcon.click();
-      
-      await expect(page.locator('[data-testid="axl-app"], .axl-container')).toBeVisible({ timeout: 10000 });
+      await launchAppFromDock(page, 'axl');
+      await expect(page.locator('[data-testid="app-instance-axl"][data-app-state="foreground"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('should display 3D viewport', async () => {
@@ -234,6 +222,7 @@ test.describe('Creative Suite Integration', () => {
   test.beforeAll(async () => {
     context = await launchDEX();
     page = context.mainWindow;
+    await waitForDexShellReady(page);
   });
 
   test.afterAll(async () => {
@@ -241,18 +230,10 @@ test.describe('Creative Suite Integration', () => {
   });
 
   test('should support opening multiple creative apps simultaneously', async () => {
-    // Open VINX
-    const vinxIcon = page.locator('[data-app-id="videoeditor"], [aria-label*="VINX"]').first();
-    await vinxIcon.click();
-    await page.waitForTimeout(2000);
-    
-    // Open Prism
-    const prismIcon = page.locator('[data-app-id="prism"], [aria-label*="Prism"]').first();
-    await prismIcon.click();
-    await page.waitForTimeout(2000);
-    
-    // Both should be running
-    const runningApps = await page.locator('[data-running-app]').count();
+    await launchAppFromDock(page, 'videoeditor');
+    await launchAppFromDock(page, 'prism');
+
+    const runningApps = await page.locator('[data-testid^="app-instance-"][data-app-state="foreground"]').count();
     expect(runningApps).toBeGreaterThanOrEqual(2);
   });
 

@@ -11,6 +11,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useCollaborationStore, CollaboratorRole, Collaborator } from '../services/CollaborationSystem';
+import { useFocusTrap } from '../utils/useFocusTrap';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -25,7 +26,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 8000,
+    zIndex: 5500,
     animation: 'fadeIn 0.15s ease',
   },
   dialog: {
@@ -309,6 +310,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
 
   const {
     projects,
@@ -392,7 +394,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
 
   return (
     <div style={styles.overlay} onClick={onClose} onKeyDown={handleKeyDown}>
-      <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+      <div ref={trapRef} style={styles.dialog} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Share ${projectName}`}>
         {/* Header */}
         <div style={styles.header}>
           <h2 style={styles.title}>Share "{projectName}"</h2>

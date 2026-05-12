@@ -68,8 +68,8 @@ export interface FloatingWindowProps {
 const SNAP_EDGE_PX = 24;
 const SNAP_TOP_PX = 40;
 const SNAP_CORNER_PX = 52;
-const SAFE_TOP = 34;
-const SAFE_GUTTER = 6;
+const SAFE_TOP = 0;
+const SAFE_GUTTER = 0;
 
 function detectSnapZone(x: number, y: number, windowWidth: number, windowHeight: number): SnapZone | null {
   const nearLeft = x < SNAP_EDGE_PX;

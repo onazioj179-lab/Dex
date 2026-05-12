@@ -76,7 +76,7 @@ const TIER_PRESETS: Record<DeviceTier, TierPresets> = {
     blurIntensity: 0,
     glassOpacity: 100,
     animationDurationScale: 0,
-    maxConcurrentApps: 2,
+    maxConcurrentApps: 6,
     undoHistoryDepth: 5,
     thumbnailCacheSize: 30,
     previewResolution: '480p',
@@ -92,7 +92,7 @@ const TIER_PRESETS: Record<DeviceTier, TierPresets> = {
     blurIntensity: 8,
     glassOpacity: 80,
     animationDurationScale: 1,
-    maxConcurrentApps: 5,
+    maxConcurrentApps: 10,
     undoHistoryDepth: 30,
     thumbnailCacheSize: 200,
     previewResolution: '720p',
@@ -308,9 +308,20 @@ export function runDailyOptimizeCheck(): boolean {
     const today = new Date().toDateString();
     if (lastDate === today) return false;
 
+    const rank: Record<DeviceTier, number> = { low: 0, mid: 1, high: 2, ultra: 3 };
+    const current = getStoredTier();
     const detected = detectDeviceTier();
-    applyTierPresets(detected);
-    return true;
+
+    // Never auto-downgrade a user's visual tier on daily checks. This avoids
+    // surprise fallback into low-tier "boxy" styling after idle/resume cycles.
+    if (!current || rank[detected] > rank[current]) {
+      applyTierPresets(detected);
+      return true;
+    }
+
+    // Mark check complete for the day even when we keep the existing tier.
+    localStorage.setItem(STORAGE_KEY_LAST_OPTIMIZE, today);
+    return false;
   } catch { return false; }
 }
 

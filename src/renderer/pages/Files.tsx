@@ -18,6 +18,7 @@ import { getAppsForFile } from '../services/FileTypeRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
+import { useConfirm } from '../components/ConfirmDialog';
 
 // ===========================================================================
 // TYPES
@@ -250,6 +251,7 @@ const Icons: Record<string, React.FC<{ size?: number }>> = {
 // ===========================================================================
 
 export const Files: React.FC = () => {
+  const { confirm, ConfirmHost } = useConfirm();
   // ===== PATTERN LEARNING =====
   useAppTracking('files');
   const { trackFileOpen } = useFileTracking('files');
@@ -458,6 +460,9 @@ export const Files: React.FC = () => {
   // Quick Look – spacebar preview (macOS style)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      // Don't hijack typing in inputs (rename, search, etc.)
+      const inEditable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
       if (e.key === ' ' && !quickLookFile && selectedFile) {
         e.preventDefault();
         const file = files.find(f => f.path === selectedFile);
@@ -470,11 +475,18 @@ export const Files: React.FC = () => {
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
         handleSelectAll();
+      } else if (!inEditable && e.key === 'Backspace' && historyIndex > 0) {
+        // Mac/Windows Explorer parity: Backspace navigates up one level.
+        e.preventDefault();
+        goBack();
+      } else if (e.key === 'F5') {
+        e.preventDefault();
+        loadFiles(currentPath);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [quickLookFile, selectedFile, files]);
+  }, [quickLookFile, selectedFile, files, historyIndex, currentPath]);
 
   const navigateTo = (path: string) => {
     const newHistory = [...history.slice(0, historyIndex + 1), path];
@@ -596,7 +608,12 @@ export const Files: React.FC = () => {
 
   const handleDeleteFile = async (file: FileItem) => {
     setContextMenu(null);
-    const confirmed = window.confirm(`Move "${file.name}" to Trash?`);
+    const confirmed = await confirm({
+      title: 'Move to Trash?',
+      message: `"${file.name}" will be moved to the recycle bin.`,
+      confirmLabel: 'Move to Trash',
+      tone: 'destructive',
+    });
     if (!confirmed) return;
     try {
       // Send to recycle bin first
@@ -628,7 +645,12 @@ export const Files: React.FC = () => {
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedFiles.size === 0) return;
-    const confirmed = window.confirm(`Delete ${selectedFiles.size} selected items?`);
+    const confirmed = await confirm({
+      title: 'Delete selected items?',
+      message: `${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'} will be deleted.`,
+      confirmLabel: 'Delete',
+      tone: 'destructive',
+    });
     if (!confirmed) return;
     for (const path of selectedFiles) {
       try {
@@ -1104,7 +1126,7 @@ export const Files: React.FC = () => {
               style={styles.navBtn}
               onClick={async () => {
                 if (!currentPath) return;
-                const ok = confirm('Organize files in this folder into Audio, Video, Images, Documents, Archives, and Other subfolders?');
+                const ok = await confirm({ title: 'Organize folder?', message: 'Organize files in this folder into Audio, Video, Images, Documents, Archives, and Other subfolders?', confirmLabel: 'Organize' });
                 if (!ok) return;
                 try {
                   if (window.electron?.invoke) {
@@ -1635,6 +1657,7 @@ export const Files: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmHost />
     </div>
   );
 };

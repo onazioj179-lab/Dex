@@ -518,11 +518,14 @@ const TimelineToolbar: React.FC = memo(() => {
   ];
 
   return (
-    <div style={{
+    <div
+      data-testid="timeline-tools"
+      style={{
       height: 28, display: 'flex', alignItems: 'center', gap: 2, padding: '0 6px',
       borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0, background: 'var(--color-bg-base)',
       minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
-    }}>
+      }}
+    >
       {tools.map(t => (
         <button
           key={t.tool}
@@ -835,7 +838,7 @@ export const Timeline: React.FC<{
   }, [executeCommand]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div data-testid="vinx-timeline" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Toolbar */}
       <TimelineToolbar />
 

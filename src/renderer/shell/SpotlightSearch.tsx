@@ -313,13 +313,17 @@ interface SpotlightProps {
   isOpen?: boolean;
   onClose?: () => void;
   onNavigate?: (appId: string) => void;
+  /** Fires when the results dropdown opens or closes (variant=home). */
+  onResultsOpenChange?: (open: boolean) => void;
 }
 
-export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen, onClose, onNavigate }) => {
+export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen, onClose, onNavigate, onResultsOpenChange }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SpotlightResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  // Notify parent whenever the results panel toggles.
+  React.useEffect(() => { onResultsOpenChange?.(showResults); }, [showResults, onResultsOpenChange]);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -393,6 +397,17 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
       setResults(spotlightEngine.search(''));
     }
   }, [variant]);
+
+  useEffect(() => {
+    if (variant !== 'home') return;
+    const focusHomeSearch = () => {
+      inputRef.current?.focus();
+      setShowResults(true);
+      setResults(spotlightEngine.search(query));
+    };
+    window.addEventListener('dex:open-spotlight', focusHomeSearch);
+    return () => window.removeEventListener('dex:open-spotlight', focusHomeSearch);
+  }, [variant, query]);
 
   // Search handler with debounce — 150ms delay prevents regenerating 100+ items on every keystroke
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -514,18 +529,20 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   // -----------------------------------------------------------------------
   if (variant === 'home') {
     return (
-      <div style={{ width: '100%', maxWidth: 680, position: 'relative' }}>
-        {/* Search Bar — iOS Tahoe pill, soft focus, embedded mic */}
+      <div data-dex-spotlight style={{ width: '100%', maxWidth: 560, position: 'relative' }}>
+        {/* Search Bar — macOS Tahoe glass pill, soft focus, embedded mic */}
         <div className="dex-home-search-pill" style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          height: 46, padding: '0 16px',
-          background: 'rgba(28, 28, 30, 0.94)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', gap: 12,
+          height: 50, padding: '0 20px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 9999,
-          transition: 'border-color 0.18s ease, box-shadow 0.18s ease',
+          transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
           boxShadow: showResults
-            ? '0 6px 24px rgba(0,0,0,0.35)'
-            : '0 1px 6px rgba(0,0,0,0.18)',
+            ? '0 16px 40px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.10)'
+            : '0 8px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)',
         }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(235,235,245,0.6)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -596,10 +613,12 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               position: 'absolute', top: 58, left: 0, right: 0,
               maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
-              background: 'var(--color-bg-elevated)',
-              border: '1px solid var(--color-border-subtle)',
+              background: 'rgba(24,24,28,0.64)',
+              backdropFilter: 'blur(42px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(42px) saturate(180%)',
+              border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: 18,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--color-border-subtle)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.08)',
               padding: '4px',
               animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
             }}

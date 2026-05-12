@@ -513,6 +513,14 @@ let cachedProfile: HardwareProfile | null = null;
 export function detectPerformanceTier(): PerformanceTier {
   if (cachedTier) return cachedTier;
 
+  // TierManager owns the root perf-tier attribute and may apply a persisted
+  // user/manual tier before this module runs. Never overwrite it.
+  const rootTier = document.documentElement.getAttribute('data-perf-tier');
+  if (rootTier === 'low' || rootTier === 'mid' || rootTier === 'high' || rootTier === 'ultra') {
+    cachedTier = rootTier;
+    return cachedTier;
+  }
+
   const cores = navigator.hardwareConcurrency || 2;
   const memory = (navigator as any).deviceMemory || 4; // GB, Chrome-only
   const canvas = document.createElement('canvas');
@@ -543,8 +551,11 @@ export function detectPerformanceTier(): PerformanceTier {
   cachedProfile = { cores, memory, gpu, tier };
   cachedTier = tier;
 
-  // Apply tier-based CSS class to document root
-  document.documentElement.dataset.perfTier = tier;
+  // Only set the attribute as a fallback for environments that did not run
+  // TierManager. In the normal app path, TierManager already set this.
+  if (!document.documentElement.hasAttribute('data-perf-tier')) {
+    document.documentElement.dataset.perfTier = tier;
+  }
 
   return tier;
 }

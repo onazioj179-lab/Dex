@@ -10,6 +10,7 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import { RewindViewErrorBoundary } from './RewindViewErrorBoundary';
 import { getBundledAppVersion } from '../../utils/appVersion';
 import DexIcon from '../../components/DexIcon';
+import { useConfirm } from '../../components/ConfirmDialog';
 
 // ===========================================================================
 // TYPES
@@ -236,6 +237,7 @@ const NAV_ITEMS: { id: View; label: string }[] = [
 // ===========================================================================
 
 const Rewind: React.FC = () => {
+  const { confirm, ConfirmHost } = useConfirm();
   useAppTracking('rewind');
 
   // -- State --
@@ -811,7 +813,13 @@ const timer = setInterval(check, 15000);
 
   const deleteAllData = async () => {
     if (!dex?.rewind) return;
-    if (!window.confirm('Are you sure you want to delete ALL Rewind data? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete all Rewind data?',
+      message: 'This will permanently remove every captured screenshot, transcript, and journal entry. This cannot be undone.',
+      confirmLabel: 'Delete everything',
+      tone: 'destructive',
+    });
+    if (!ok) return;
     await dex.rewind.deleteAllData();
     setTimeline([]);
     setSearchResults([]);
@@ -1380,6 +1388,7 @@ const timer = setInterval(check, 15000);
           50% { opacity: 0.3; }
         }
       `}</style>
+      <ConfirmHost />
     </div>
   );
 

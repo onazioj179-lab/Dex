@@ -73,11 +73,14 @@ button,
   contain: layout style paint;
 }
 
-/* Disable backdrop-filter on low-tier machines globally */
+/* Low-tier: keep glass style, but use a lighter blur for stability */
 html[data-perf-tier="low"] * {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+}
+html[data-perf-tier="low"] [style*="backdrop-filter"],
+html[data-perf-tier="low"] [style*="backdropFilter"] {
+  backdrop-filter: blur(10px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(140%) !important;
 }
 
 /* Mid-tier: reduce blur radius globally for all elements */
@@ -103,6 +106,49 @@ html[data-perf-tier="low"] .notification-dot,
 html[data-perf-tier="low"] .dex-skeleton {
   animation: none !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   THERMAL ADAPTIVE GUARDRAILS  (set by ThermalAdaptiveMonitor.ts)
+   "warm"     -> reduce blur radius + slow non-essential animations
+   "hot"      -> drop blur to 4px, kill background animations + particles
+   "critical" -> kill all blur + freeze decorative animations
+   ───────────────────────────────────────────────────────────────────────── */
+html[data-thermal-state="warm"] [style*="backdrop-filter"],
+html[data-thermal-state="warm"] [style*="backdropFilter"] {
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+}
+html[data-thermal-state="warm"] .animate-float,
+html[data-thermal-state="warm"] .animate-pulse {
+  animation-duration: 3s !important;
+}
+
+html[data-thermal-state="hot"] [style*="backdrop-filter"],
+html[data-thermal-state="hot"] [style*="backdropFilter"] {
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+html[data-thermal-state="hot"] .animate-pulse,
+html[data-thermal-state="hot"] .animate-spin,
+html[data-thermal-state="hot"] .animate-float,
+html[data-thermal-state="hot"] .badge-live,
+html[data-thermal-state="hot"] .notification-dot,
+html[data-thermal-state="hot"] .dex-skeleton {
+  animation: none !important;
+}
+html[data-thermal-state="hot"] [data-decorative="true"] { display: none !important; }
+
+html[data-thermal-state="critical"] *,
+html[data-thermal-state="critical"] *::before,
+html[data-thermal-state="critical"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation: none !important;
+  transition: none !important;
+  filter: none !important;
+}
+html[data-thermal-state="critical"] [data-decorative="true"] { display: none !important; }
+
 
 /* ── Focus-Visible Ring (Tahoe a11y) ──────────────────────────────────────── */
 /* CRITICAL: Use !important to override inline `outline: none` styles scattered
@@ -132,6 +178,19 @@ a:focus-visible {
 input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible {
   outline-offset: 3px !important;
+}
+
+/* Range slider focus ring (a11y #423) — visible on dark theme via accent halo on the thumb */
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--color-accent, #4a9eff) !important;
+  outline-offset: 4px !important;
+  border-radius: 999px;
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.45), 0 0 0 5px rgba(74, 158, 255, 0.18) !important;
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.45), 0 0 0 5px rgba(74, 158, 255, 0.18) !important;
 }
 
 /* iOS-style home spotlight pill — soft inset focus instead of hard outline ring */
@@ -285,7 +344,7 @@ img {
   content-visibility: auto;
   image-rendering: auto;
 }
-[data-perf-tier="low"] img {
+html[data-perf-tier="low"] img {
   image-rendering: optimizeSpeed;
 }
 
@@ -394,42 +453,35 @@ img {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* LOW (budget hardware, weak GPU) — maximum savings */
-[data-perf-tier="low"] *, [data-perf-tier="low"] *::before, [data-perf-tier="low"] *::after {
-  animation: none !important;
-  transition: none !important;
+html[data-perf-tier="low"] *, html[data-perf-tier="low"] *::before, html[data-perf-tier="low"] *::after {
   scroll-behavior: auto !important;
 }
-[data-perf-tier="low"] * {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  text-shadow: none !important;
-  box-shadow: none !important;
+html[data-perf-tier="low"] * {
   filter: none !important;
-  border-radius: 4px !important;
   will-change: auto !important;
   contain: layout style !important;
 }
-[data-perf-tier="low"] [style*="backdrop"],
-[data-perf-tier="low"] [style*="blur"] {
-  background: rgba(20,20,22,0.99) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+html[data-perf-tier="low"] [style*="backdrop"],
+html[data-perf-tier="low"] [style*="blur"] {
+  background: rgba(20,20,22,0.72) !important;
+  backdrop-filter: blur(10px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(140%) !important;
 }
-[data-perf-tier="low"] img, [data-perf-tier="low"] video {
+html[data-perf-tier="low"] img, html[data-perf-tier="low"] video {
   image-rendering: optimizeSpeed;
   will-change: auto !important;
 }
-[data-perf-tier="low"] canvas { image-rendering: pixelated; }
-[data-perf-tier="low"] .decorative, [data-perf-tier="low"] .particle-bg,
-[data-perf-tier="low"] .ambient-glow, [data-perf-tier="low"] [class*="gradient-bg"] {
+html[data-perf-tier="low"] canvas { image-rendering: pixelated; }
+html[data-perf-tier="low"] .decorative, html[data-perf-tier="low"] .particle-bg,
+html[data-perf-tier="low"] .ambient-glow, html[data-perf-tier="low"] [class*="gradient-bg"] {
   display: none !important;
 }
-[data-perf-tier="low"] ::-webkit-scrollbar { width: 4px; background: transparent; }
-[data-perf-tier="low"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-/* Low: limit font rendering overhead */
-[data-perf-tier="low"] { -webkit-font-smoothing: auto !important; font-smooth: auto !important; }
+html[data-perf-tier="low"] ::-webkit-scrollbar { width: 4px; background: transparent; }
+html[data-perf-tier="low"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+/* Low: keep text crisp */
+html[data-perf-tier="low"] { -webkit-font-smoothing: antialiased !important; -moz-osx-font-smoothing: grayscale !important; text-rendering: optimizeLegibility !important; }
 /* Low: flat borders instead of shadows */
-[data-perf-tier="low"] .card, [data-perf-tier="low"] .panel {
+html[data-perf-tier="low"] .card, html[data-perf-tier="low"] .panel {
   border: 1px solid rgba(255,255,255,0.08) !important;
 }
 
@@ -714,12 +766,13 @@ button, a, input, select, textarea,
   will-change: transform, opacity;
   pointer-events: none;
 }
-/* -- Paused apps: suspended state to prevent black screen ----------------- */
+/* -- Paused apps: continuity-preserving low-power state ------------------- */
 .dex-app-paused {
-  visibility: hidden !important;
+  visibility: visible !important;
   animation-play-state: paused !important;
   pointer-events: none !important;
-  content-visibility: hidden !important;
+  content-visibility: auto !important;
+  contain-intrinsic-size: 100vh 100vw;
 }
 .dex-app-paused *,
 .dex-app-paused *::before,
@@ -727,13 +780,29 @@ button, a, input, select, textarea,
   animation-play-state: paused !important;
   transition: none !important;
 }
-/* Stop requestAnimationFrame, video, audio when paused via data attribute */
-[data-app-state="paused"] video,
-[data-app-state="paused"] audio {
-  /* Will be paused via JS, but ensure no playback */
+
+html[data-dex-session-persistent="true"] body,
+html[data-dex-session-persistent="true"] #root {
+  background: transparent;
 }
+
+html[data-dex-idle-state="low-power-active"] [data-app-state="background"],
+html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
+  animation-play-state: paused;
+}
+
+[data-app-container][data-continuity-class="semi-active"] {
+  --dex-background-refresh-ms: 900000;
+}
+
+[data-app-container][data-continuity-class="inactive"] {
+  --dex-background-refresh-ms: 1800000;
+}
+
+[data-app-state="paused"] video,
+[data-app-state="paused"] audio,
 [data-app-state="paused"] canvas {
-  /* Canvas rendering should be paused by the app */
+  content-visibility: auto;
 }
 
 /* -- Menu/panel slide: smooth spring pop from source ---------------------- */
@@ -3510,13 +3579,15 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'kern' 1, 'liga' 1;
-  background-color: var(--color-bg-base, #0C0C0E) !important;
   color: var(--color-text-primary, #F2F2F2);
   margin: 0;
   padding: 0;
   min-height: 100vh;
   overflow: hidden;
 }
+
+html { background-color: var(--color-bg-base, #0C0C0E) !important; }
+body, #root { background-color: transparent !important; }
 
 /* Native-like text selection -- subtle tint, not a heavy highlight */
 ::selection {
@@ -4255,10 +4326,19 @@ textarea {
    Smooth Modal / Overlay Entrance Animations
    ================================================================ */
 
-/* Fixed modal backdrop with gentle fade */
-[style*="position: fixed"][style*="inset: 0"],
-[style*="position:fixed"][style*="inset:0"] {
+/* Fixed modal backdrop with gentle fade -- restricted to actual dialog/modal
+   elements. The previous rule applied to every position:fixed; inset:0 element
+   including the global wallpaper layer and full-screen app containers, which
+   caused them to re-trigger the opacity-from-0 animation when Chromium
+   restarted paint after the renderer was idle, producing a blank screen on
+   return. */
+[role="dialog"][style*="position: fixed"][style*="inset: 0"],
+[role="dialog"][style*="position:fixed"][style*="inset:0"],
+.modal-overlay[style*="position: fixed"][style*="inset: 0"],
+.modal-overlay[style*="position:fixed"][style*="inset:0"] {
   animation: modalBackdropIn 0.18s ease-out both;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 @keyframes modalBackdropIn {

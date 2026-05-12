@@ -17,17 +17,17 @@ import * as path from 'path';
 async function globalSetup() {
   console.log('\nDEX E2E Test Setup Starting...\n');
   
-  // Ensure build is up to date
-  const distPath = path.join(__dirname, '../../dist');
-  if (!fs.existsSync(distPath)) {
-    console.log('Building DEX for E2E tests...');
+  // Ensure the renderer build is up to date (must have dist/renderer/index.html)
+  const rendererIndexPath = path.join(__dirname, '../../dist/renderer/index.html');
+  if (!fs.existsSync(rendererIndexPath)) {
+    console.log('Renderer build missing — building renderer for E2E tests...');
     try {
-      execSync('npm run build', { 
+      execSync('npm run build:renderer', { 
         cwd: path.join(__dirname, '../..'),
         stdio: 'inherit',
       });
     } catch (error) {
-      console.error('Build failed');
+      console.error('Renderer build failed');
       throw error;
     }
   }

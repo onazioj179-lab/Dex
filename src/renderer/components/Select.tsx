@@ -350,7 +350,7 @@ export const Select: React.FC<SelectProps> = ({
 
         {loading && <span>Loading...</span>}
         {clearable && currentValue && !loading && (
-          <button style={styles.clearButton} onClick={handleClear}>
+          <button style={styles.clearButton} onClick={handleClear} aria-label="Clear selection">
             <DexIcon name="close" size={12} />
           </button>
         )}

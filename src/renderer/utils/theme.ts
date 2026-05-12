@@ -31,10 +31,53 @@ export const T = {
 export function toggleTheme(): void {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const next = isDark ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  document.body.classList.toggle('dark-mode', !isDark);
-  document.body.classList.toggle('light-mode', isDark);
-  document.documentElement.classList.toggle('dark-mode', !isDark);
-  document.documentElement.classList.toggle('light-mode', isDark);
+  applyTheme(next);
+  // User explicitly toggled — pin and stop following OS
   localStorage.setItem('darkMode', (!isDark).toString());
+  localStorage.setItem('dex-theme-source', 'user');
+}
+
+/** Apply a theme (dark|light) to root + body without persisting. */
+export function applyTheme(theme: 'dark' | 'light'): void {
+  const isDark = theme === 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  document.body.classList.toggle('dark-mode', isDark);
+  document.body.classList.toggle('light-mode', !isDark);
+  document.documentElement.classList.toggle('dark-mode', isDark);
+  document.documentElement.classList.toggle('light-mode', !isDark);
+}
+
+/**
+ * Initialize theme on boot: if user has explicitly chosen one, honor it.
+ * Otherwise follow OS prefers-color-scheme and update live as it changes.
+ */
+export function initTheme(): void {
+  try {
+    const source = localStorage.getItem('dex-theme-source');
+    const stored = localStorage.getItem('darkMode');
+    if (source === 'user' && stored !== null) {
+      applyTheme(stored === 'true' ? 'dark' : 'light');
+      return;
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    applyTheme(mq.matches ? 'dark' : 'light');
+    mq.addEventListener('change', e => {
+      // Only follow OS if the user hasn't pinned a choice
+      if (localStorage.getItem('dex-theme-source') !== 'user') {
+        applyTheme(e.matches ? 'dark' : 'light');
+      }
+    });
+  } catch {
+    applyTheme('dark');
+  }
+}
+
+/** Reset theme to follow OS again. */
+export function followSystemTheme(): void {
+  try {
+    localStorage.removeItem('dex-theme-source');
+    localStorage.removeItem('darkMode');
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    applyTheme(mq.matches ? 'dark' : 'light');
+  } catch { /* ignore */ }
 }

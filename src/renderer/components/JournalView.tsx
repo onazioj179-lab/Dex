@@ -654,6 +654,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>Manage History</span>
         <button
+          aria-label="Close history manager"
           style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }}
           onClick={onClose}
         >

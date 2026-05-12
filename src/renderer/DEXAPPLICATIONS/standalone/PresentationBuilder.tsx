@@ -283,7 +283,7 @@ const PresentationBuilder: React.FC = () => {
   if (presenting) {
     return (
       <div ref={presentRef} style={{
-        position: 'fixed', inset: 0, background: '#000', zIndex: 999999,
+        position: 'fixed', inset: 0, background: '#000', zIndex: 20000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {renderSlide(currentSlide)}

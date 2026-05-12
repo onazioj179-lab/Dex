@@ -14,6 +14,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import { glassPanel, glassButton, glassMenu } from '../styles/glassMenu';
 import { useRunningApps } from '../store/runningApps';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   BalanceIcon, RocketIcon, BatteryIcon, MuteIcon, SettingsIcon,
   BarChartIcon, GaugeIcon, MemoryIcon, BoltIcon, ThermometerIcon,
@@ -137,6 +138,7 @@ const PROFILE_INFO: Record<PerformanceProfile, { name: string; desc: string; col
 // ===========================================================================
 
 export const Power: React.FC = () => {
+  const { confirm, ConfirmHost } = useConfirm();
   const [tab, setTab] = useState<PowerTab>('processes');
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [sortBy, setSortBy] = useState<'cpu' | 'memory' | 'name' | 'pid' | 'disk' | 'status' | 'threads'>('cpu');
@@ -274,8 +276,14 @@ export const Power: React.FC = () => {
     setSelectedPid(null);
   }, []);
 
-  const handlePanicStop = useCallback(() => {
-    if (window.confirm('Stop all automations and background tasks?')) {
+  const handlePanicStop = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Stop everything?',
+      message: 'Stop all automations and background tasks?',
+      confirmLabel: 'Stop all',
+      tone: 'destructive',
+    });
+    if (ok) {
       setPanicStopped(true);
       setAutomationsEnabled(false);
     }
@@ -777,6 +785,7 @@ export const Power: React.FC = () => {
           <ShieldPanel processes={processes} />
         )}
       </div>
+      <ConfirmHost />
     </div>
   );
 };

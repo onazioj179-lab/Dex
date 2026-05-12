@@ -103,6 +103,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const [error, setError] = useState<string | null>(null);
   const lineIdRef = useRef(0);
   const bufferRef = useRef('');
+  const pendingLinesRef = useRef<Line[]>([]);
+  const flushRafRef = useRef<number | null>(null);
   const colorStateRef = useRef<{ color?: string; bold?: boolean }>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -115,15 +117,21 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     const parts = bufferRef.current.split(/\r?\n/);
     bufferRef.current = parts.pop() ?? '';
     if (parts.length === 0) return;
-    setLines(prev => {
-      const next = prev.slice();
-      for (const raw of parts) {
-        const { spans, color, bold } = parseAnsi(raw, colorStateRef.current.color, colorStateRef.current.bold);
-        colorStateRef.current = { color, bold };
-        next.push({ id: ++lineIdRef.current, spans: spans.length ? spans : [{ text: '' }] });
-      }
-      // Cap at 5000 lines to bound memory
-      return next.length > 5000 ? next.slice(next.length - 5000) : next;
+    for (const raw of parts) {
+      const { spans, color, bold } = parseAnsi(raw, colorStateRef.current.color, colorStateRef.current.bold);
+      colorStateRef.current = { color, bold };
+      pendingLinesRef.current.push({ id: ++lineIdRef.current, spans: spans.length ? spans : [{ text: '' }] });
+    }
+    if (flushRafRef.current !== null) return;
+    flushRafRef.current = requestAnimationFrame(() => {
+      flushRafRef.current = null;
+      const pending = pendingLinesRef.current;
+      pendingLinesRef.current = [];
+      if (pending.length === 0) return;
+      setLines(prev => {
+        const next = prev.concat(pending);
+        return next.length > 8000 ? next.slice(next.length - 8000) : next;
+      });
     });
   }, []);
 
@@ -172,6 +180,10 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     }
 
     return () => {
+      if (flushRafRef.current !== null) {
+        cancelAnimationFrame(flushRafRef.current);
+        flushRafRef.current = null;
+      }
       mounted = false;
       if (dataOff) dataOff();
       if (exitOff) exitOff();

@@ -205,6 +205,28 @@ export interface NormalizeResult {
   durationMs: number;
 }
 
+export interface LoudnessResult {
+  integratedLufs: number;
+  truePeakDbfs: number;
+  loudnessRangeLu: number;
+  shortTermLufsMax: number;
+  durationMs: number;
+}
+
+export interface WaveformPeaksFlat {
+  /** Flat interleaved [peak_pos_0, peak_neg_0, peak_pos_1, peak_neg_1, ...] */
+  peaks: number[];
+  numBins: number;
+  durationSecs: number;
+  sampleRate: number;
+  durationMs: number;
+}
+
+export interface ExportProgressSnapshot {
+  progress: number;
+  fps: number;
+}
+
 // -------------------------------------------------------------------------
 // Video Metadata
 // -------------------------------------------------------------------------
@@ -412,6 +434,15 @@ export interface DexNativeModule {
   extractWaveformPeaksAsync(filePath: string, numBins: number): Promise<WaveformData>;
   normalizeAudioAsync(inputPath: string, outputPath: string, targetDb?: number): Promise<NormalizeResult>;
   clearWaveformCache(): number;
+  // LUFS loudness measurement (ITU-R BS.1770-4)
+  measureLoudness(filePath: string): LoudnessResult;
+  measureLoudnessAsync(filePath: string): Promise<LoudnessResult>;
+  // Multi-format waveform decode (MP3/OGG/FLAC/AAC via Symphonia)
+  decodeWaveformAnyFormat(filePath: string, numBins: number): WaveformPeaksFlat;
+  decodeWaveformAnyFormatAsync(filePath: string, numBins: number): Promise<WaveformPeaksFlat>;
+  // Background export progress tracker
+  setExportProgress(progress: number, fps: number): void;
+  getExportProgress(): ExportProgressSnapshot;
 
   // Video Metadata
   getVideoMetadata(filePath: string): VideoMetadata;

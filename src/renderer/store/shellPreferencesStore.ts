@@ -24,6 +24,8 @@ import { normalizeDockEdge, normalizeDockPreset, type DockEdge, type DockSizePre
 
 export const DEX_SHELL_PREFS_KEY = 'dex-shell-preferences-v1';
 
+export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
+
 export interface ShellPreferences {
   /** Edge of the screen the dock attaches to. */
   dockEdge: DockEdge;
@@ -33,6 +35,8 @@ export interface ShellPreferences {
   glassOpacity: number;
   /** Liquid-Glass tint hex (e.g. "#0a0a0a"). Mixed into surfaces. */
   glassTint: string;
+  /** Global transparency mode for shell glass surfaces. */
+  glassMode: GlassMode;
   /** Night Shift enabled (warmer color filter). */
   nightShift: boolean;
   /** Night Shift intensity 0–1. */
@@ -54,6 +58,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockPreset: 'regular',
   glassOpacity: 0.85,
   glassTint: '#0a0a0a',
+  glassMode: 'normal',
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -68,6 +73,7 @@ interface ShellPreferencesActions {
   setDockPreset: (preset: DockSizePreset) => void;
   setGlassOpacity: (value: number) => void;
   setGlassTint: (hex: string) => void;
+  setGlassMode: (mode: GlassMode) => void;
   setNightShift: (enabled: boolean) => void;
   setNightShiftIntensity: (value: number) => void;
   setLowEndMode: (enabled: boolean) => void;
@@ -107,6 +113,9 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.glassTint = typeof o.glassTint === 'string' && /^#[0-9a-f]{6}$/i.test(o.glassTint)
     ? o.glassTint
     : base.glassTint;
+  base.glassMode = o.glassMode === 'off' || o.glassMode === 'reduced' || o.glassMode === 'liquid'
+    ? o.glassMode
+    : 'normal';
   base.nightShift = o.nightShift === true;
   base.nightShiftIntensity = clamp01(o.nightShiftIntensity, base.nightShiftIntensity, 0, 1);
   base.lowEndMode = o.lowEndMode === true;
@@ -139,18 +148,64 @@ function persist(prefs: ShellPreferences): void {
 // Side-effect appliers (exported for explicit re-apply after hydration)
 // ---------------------------------------------------------------------------
 
-export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'glassTint'>): void {
+export function getEffectiveGlassMode(prefs: Pick<ShellPreferences, 'glassMode' | 'lowEndMode'>): GlassMode {
+  if (prefs.lowEndMode) return 'reduced';
+  if (typeof window !== 'undefined') {
+    try {
+      // OS-level accessibility hint: prefers-reduced-transparency is the
+      // canonical signal; prefers-reduced-motion is a reasonable fallback for
+      // browsers that do not yet expose the transparency query.
+      const reducedTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if ((reducedTransparency || reducedMotion) && prefs.glassMode !== 'off') {
+        return 'reduced';
+      }
+    } catch {
+      // no-op (older WebViews / sandboxed contexts)
+    }
+  }
+  return prefs.glassMode;
+}
+
+export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'glassTint' | 'glassMode' | 'lowEndMode'>): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  root.style.setProperty('--dex-glass-opacity', String(prefs.glassOpacity));
+  const effectiveMode = getEffectiveGlassMode({ glassMode: prefs.glassMode, lowEndMode: prefs.lowEndMode });
+  const requestedOpacity = Math.max(0.4, Math.min(1, prefs.glassOpacity));
+  root.style.setProperty('--dex-glass-opacity', String(requestedOpacity));
+  root.style.setProperty('--dex-glass-mode', prefs.glassMode);
+  root.style.setProperty('--dex-glass-effective-mode', effectiveMode);
+  root.setAttribute('data-glass-mode', prefs.glassMode);
+  root.setAttribute('data-glass-effective-mode', effectiveMode);
   const { r, g, b } = hexToRgb(prefs.glassTint) ?? { r: 10, g: 10, b: 10 };
   root.style.setProperty('--dex-glass-tint-r', String(r));
   root.style.setProperty('--dex-glass-tint-g', String(g));
   root.style.setProperty('--dex-glass-tint-b', String(b));
-  root.style.setProperty(
-    '--dex-glass-bg',
-    `rgba(${r}, ${g}, ${b}, ${prefs.glassOpacity})`
-  );
+
+  if (effectiveMode === 'off') {
+    root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, 1)`);
+    root.style.setProperty('--color-bg-glass', 'var(--color-bg-surface-solid)');
+    root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface-solid)');
+    root.style.setProperty('--dex-glass-blur', '0px');
+    return;
+  }
+
+  if (effectiveMode === 'reduced') {
+    const reducedAlpha = Math.max(0.92, requestedOpacity);
+    root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, ${reducedAlpha.toFixed(2)})`);
+    root.style.setProperty('--color-bg-glass', `rgba(${r}, ${g}, ${b}, 0.90)`);
+    root.style.setProperty('--color-bg-glass-strong', `rgba(${r}, ${g}, ${b}, 0.94)`);
+    root.style.setProperty('--dex-glass-blur', '8px');
+    return;
+  }
+
+  const isLiquid = effectiveMode === 'liquid';
+  const baseAlpha = isLiquid ? Math.max(0.62, Math.min(0.86, requestedOpacity - 0.08)) : Math.max(0.72, Math.min(0.92, requestedOpacity - 0.02));
+  const strongAlpha = isLiquid ? Math.max(0.78, Math.min(0.92, requestedOpacity + 0.02)) : Math.max(0.82, Math.min(0.96, requestedOpacity + 0.04));
+  root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, ${baseAlpha.toFixed(2)})`);
+  root.style.setProperty('--color-bg-glass', `rgba(${r}, ${g}, ${b}, ${baseAlpha.toFixed(2)})`);
+  root.style.setProperty('--color-bg-glass-strong', `rgba(${r}, ${g}, ${b}, ${strongAlpha.toFixed(2)})`);
+  root.style.setProperty('--dex-glass-blur', isLiquid ? '30px' : '22px');
 }
 
 export function applyNightShift(prefs: Pick<ShellPreferences, 'nightShift' | 'nightShiftIntensity'>): void {
@@ -171,13 +226,14 @@ export function applyNightShift(prefs: Pick<ShellPreferences, 'nightShift' | 'ni
 export function applyLowEndMode(prefs: Pick<ShellPreferences, 'lowEndMode'>): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
+
   if (prefs.lowEndMode) {
-    // Pin perf-tier so glass helpers (adaptiveBlur / adaptiveShadow) drop to no-op.
-    root.setAttribute('data-perf-tier', 'low');
+    // Low-end mode is now isolated from device perf-tier. Forcing the tier to
+    // "low" caused surprise fallback to flat "boxy black" visuals after long
+    // sessions when prefs were re-applied.
     root.setAttribute('data-low-end-mode', 'on');
   } else {
     root.removeAttribute('data-low-end-mode');
-    // Don't clobber data-perf-tier — it may be set by the perf monitor.
   }
 }
 
@@ -199,6 +255,21 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
   applyGlassVars(initial);
   applyNightShift(initial);
   applyLowEndMode(initial);
+
+  // Re-apply glass vars when the user's reduced-motion / reduced-transparency
+  // preference changes at the OS level. This keeps the effective glass mode
+  // honest without requiring a reload.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    try {
+      const mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const mqTransparency = window.matchMedia('(prefers-reduced-transparency: reduce)');
+      const handler = () => {
+        try { applyGlassVars(get()); } catch { /* noop */ }
+      };
+      mqMotion.addEventListener?.('change', handler);
+      mqTransparency.addEventListener?.('change', handler);
+    } catch { /* noop */ }
+  }
 
   // Late-hydrate from main-process storage in case localStorage was wiped but
   // the IPC mirror still has the prefs.
@@ -239,6 +310,11 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
       const safe = /^#[0-9a-f]{6}$/i.test(hex) ? hex : DEFAULT_SHELL_PREFERENCES.glassTint;
       update({ glassTint: safe });
       applyGlassVars({ ...get(), glassTint: safe });
+    },
+    setGlassMode: (mode) => {
+      const safe: GlassMode = mode === 'off' || mode === 'reduced' || mode === 'liquid' ? mode : 'normal';
+      update({ glassMode: safe });
+      applyGlassVars({ ...get(), glassMode: safe });
     },
 
     setNightShift: (enabled) => {

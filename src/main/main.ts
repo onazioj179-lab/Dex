@@ -293,6 +293,7 @@ import { registerCreatorAccessIpc } from './services/CreatorAccessService';
 import { registerAppStoreIpc } from './services/AppStoreService';
 import { registerGamesIpc } from './services/GamesService';
 import { registerCapabilityBrokerIpc } from './services/CapabilityBrokerService';
+import { registerAudioNativeHandlers } from './services/AudioNativeService';
 import { registerSnapshotIpc } from './services/SnapshotService';
 import { registerWorkflowIpc } from './services/WorkflowService';
 import { registerSyncIpc } from './services/SyncService';
@@ -455,8 +456,9 @@ class DexApp {
       }
     }
     
-    // Single instance lock
-    const gotTheLock = app.requestSingleInstanceLock();
+    // Single instance lock (disabled for Playwright E2E runs)
+    const isE2ETest = process.env.DEX_E2E_TEST === 'true';
+    const gotTheLock = isE2ETest ? true : app.requestSingleInstanceLock();
     if (!gotTheLock) {
       log.info('[DEX] Another instance running, quitting');
       app.quit();
@@ -2755,12 +2757,16 @@ class DexApp {
       return { success: true };
     });
 
-    // Auto-lock on OS suspend / lock-screen events
+    // OS suspend / lock-screen forwarders.
+    // We deliberately do NOT auto-lock the renderer here -- the renderer decides whether
+    // to lock based on the user's `lockOnSleep` / `requireAuthOnWake` preferences. Sending
+    // a generic system event lets it react (pause heavy work, save session) without
+    // forcing a blank full-screen lock overlay every time the host OS dims the display.
     powerMonitor.on('suspend', () => {
-      this.mainWindow?.webContents.send('dex:lock-screen');
+      this.mainWindow?.webContents.send('dex:system-suspend');
     });
     powerMonitor.on('lock-screen', () => {
-      this.mainWindow?.webContents.send('dex:lock-screen');
+      this.mainWindow?.webContents.send('dex:system-lock');
     });
     powerMonitor.on('resume', () => {
       this.mainWindow?.webContents.send('dex:resume');
@@ -2794,7 +2800,10 @@ class DexApp {
     });
 
     ipcMain.handle('os:sleep', () => {
-      this.mainWindow?.webContents.send('dex:lock-screen');
+      // Notify the renderer that we're about to sleep so it can flush autosave and
+      // park heavy work, but don't force the lock overlay -- that's a renderer-side
+      // policy decision driven by the user's lockOnSleep preference.
+      this.mainWindow?.webContents.send('dex:system-suspend');
       if (process.platform === 'win32') {
         require('child_process').exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0');
       } else if (process.platform === 'darwin') {
@@ -3521,6 +3530,12 @@ class DexApp {
       log.info('[DEX] Archive service IPC registered');
     } catch (err) {
       log.error('[DEX] Archive service IPC failed:', err);
+    }
+    try {
+      registerAudioNativeHandlers();
+      log.info('[DEX] Audio native IPC handlers registered');
+    } catch (err) {
+      log.warn('[DEX] Audio native IPC registration failed:', err);
     }
     try {
       registerSpeedTestIpc();

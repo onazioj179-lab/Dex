@@ -12,6 +12,7 @@
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
@@ -24,6 +25,7 @@ import {
   type LicenseTier,
 } from '../../shared/update/downgradeWindow';
 import { licensingManager } from './LicensingManager';
+import { createCodeSigningService } from '../signing/CodeSigning';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -97,6 +99,10 @@ export class ReleaseManager {
   private postUpdateMarkerPath: string;
   private installHistoryPath: string;
   private installHistory: InstallRecord[] = [];
+  private downloadedArtifactPath: string | null = null;
+  private downloadedArtifactSha256: string | null = null;
+  private expectedArtifactSha256: string | null = null;
+  private codeSigning = createCodeSigningService();
 
   constructor() {
     const userDataPath = app.getPath('userData');
@@ -346,12 +352,19 @@ export class ReleaseManager {
       this.notifyRenderer('update:progress', progress);
     });
 
-    autoUpdater.on('update-downloaded', () => {
+    autoUpdater.on('update-downloaded', (event: any) => {
       log.info('[ReleaseManager] Update downloaded');
+      this.downloadedArtifactPath = this.resolveDownloadedArtifactPath(event);
+      this.expectedArtifactSha256 = this.extractExpectedSha256(event);
+      this.downloadedArtifactSha256 = null;
       this.status.downloading = false;
       this.status.downloaded = true;
       this.status.progress = 100;
-      this.recordHistory('downloaded', this.status.updateInfo);
+      this.recordHistory('downloaded', {
+        ...this.status.updateInfo,
+        artifactPath: this.downloadedArtifactPath,
+        expectedSha256: this.expectedArtifactSha256,
+      });
       this.notifyRenderer('update:downloaded', this.status.updateInfo);
     });
 
@@ -385,6 +398,89 @@ export class ReleaseManager {
 
   private isSkippedVersion(version: string): boolean {
     return this.config.skipVersion === version;
+  }
+
+  private resolveDownloadedArtifactPath(event: any): string | null {
+    const candidates = [
+      event?.downloadedFile,
+      event?.file,
+      event?.path,
+      event?.files?.[0]?.downloadedFile,
+      event?.files?.[0]?.path,
+    ].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0);
+
+    const existing = candidates.find(candidate => {
+      try {
+        return fs.existsSync(candidate) && fs.statSync(candidate).isFile();
+      } catch {
+        return false;
+      }
+    });
+
+    return existing || null;
+  }
+
+  private extractExpectedSha256(event: any): string | null {
+    const candidates = [
+      event?.sha256,
+      event?.checksum,
+      event?.files?.[0]?.sha256,
+      event?.releaseInfo?.sha256,
+      event?.updateInfo?.sha256,
+      event?.updateInfo?.files?.[0]?.sha256,
+    ].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0);
+    const normalized = candidates.map(candidate => candidate.trim().toLowerCase()).find(candidate => /^[a-f0-9]{64}$/.test(candidate));
+    return normalized || null;
+  }
+
+  private async sha256File(filePath: string): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', chunk => hash.update(chunk));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(hash.digest('hex')));
+    });
+  }
+
+  private async verifyDownloadedArtifact(): Promise<void> {
+    if (!this.downloadedArtifactPath) {
+      throw new Error('Downloaded update artifact path unavailable; refusing to install without verification');
+    }
+
+    const artifactPath = this.downloadedArtifactPath;
+    if (!fs.existsSync(artifactPath) || !fs.statSync(artifactPath).isFile()) {
+      throw new Error('Downloaded update artifact is missing; refusing to install');
+    }
+
+    const sha256 = await this.sha256File(artifactPath);
+    this.downloadedArtifactSha256 = sha256;
+
+    if (this.expectedArtifactSha256 && sha256 !== this.expectedArtifactSha256) {
+      this.recordHistory('integrity-failed', {
+        artifactPath,
+        expectedSha256: this.expectedArtifactSha256,
+        actualSha256: sha256,
+      });
+      throw new Error('Downloaded update failed SHA-256 integrity verification');
+    }
+
+    const signature = await this.codeSigning.verifySignature(artifactPath);
+    if (!signature.valid) {
+      this.recordHistory('signature-failed', {
+        artifactPath,
+        sha256,
+        error: signature.error || 'Invalid signature',
+      });
+      throw new Error(`Downloaded update signature verification failed: ${signature.error || 'Invalid signature'}`);
+    }
+
+    this.recordHistory('artifact-verified', {
+      artifactPath,
+      sha256,
+      signer: signature.signer || null,
+      expectedSha256: this.expectedArtifactSha256,
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -486,10 +582,12 @@ export class ReleaseManager {
 
     if (result.response === 0) {
       log.info('[ReleaseManager] Installing update...');
+      await this.verifyDownloadedArtifact();
       try {
         fs.writeFileSync(this.postUpdateMarkerPath, JSON.stringify({
           targetVersion: this.status.updateInfo?.version || 'unknown',
           backupPath,
+          artifactSha256: this.downloadedArtifactSha256,
           timestamp: Date.now(),
         }, null, 2), 'utf-8');
       } catch {

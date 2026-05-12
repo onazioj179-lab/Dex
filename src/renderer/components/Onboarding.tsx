@@ -854,7 +854,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shortcuts</span>
-          <button onClick={onClose} style={{
+          <button onClick={onClose} aria-label="Close shortcuts" style={{
             background: 'none', border: 'none', padding: 4,
             color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex',
           }}>
@@ -910,7 +910,7 @@ export const BeginnerTip: React.FC<{
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{tip.title}</div>
         <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>{tip.content}</div>
       </div>
-      <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
+      <button onClick={onDismiss} aria-label="Dismiss tip" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>

@@ -54,6 +54,8 @@ temp_*
 full_test*.txt
 renderer_test*.txt
 vitest_*.txt
+vitest_out.txt
+audit-*.txt
 r[0-9].txt
 rp[0-9].txt
 

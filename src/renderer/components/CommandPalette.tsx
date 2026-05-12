@@ -475,6 +475,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                       id={`cmd-${cmd.id}`}
                       role="option"
                       aria-selected={isSelected}
+                      aria-keyshortcuts={cmd.shortcut || undefined}
+                      aria-label={cmd.subtitle ? `${cmd.title} — ${cmd.subtitle}` : cmd.title}
                       style={{
                         ...styles.item,
                         ...(isSelected ? styles.itemSelected : {}),

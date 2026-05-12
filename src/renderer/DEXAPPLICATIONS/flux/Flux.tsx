@@ -655,11 +655,16 @@ const Flux: React.FC = () => {
     })();
   }, []);
 
-  // Close features menu on outside click
+  // Close features menu on outside click or Escape key
   useEffect(() => {
     const handleClick = () => setShowFeaturesMenu(false);
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFeaturesMenu(false); };
     window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   // ===== RETENTIVE MEMORY - Load/Save Workspace State =====
@@ -1677,8 +1682,15 @@ const Flux: React.FC = () => {
         setOpenToolGroup(null);
       }
     };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenToolGroup(null);
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [openToolGroup]);
 
   // ===== TIMELINE FUNCTIONS =====
@@ -2468,7 +2480,7 @@ const Flux: React.FC = () => {
 
         {/* Main Canvas Area */}
         <div style={styles.mainArea}>
-          <div style={styles.canvasArea}
+          <div data-testid="flux-viewer" style={styles.canvasArea}
             onDragOver={handleDragOverCanvas}
             onDragLeave={handleDragLeaveCanvas}
             onDrop={handleDropCanvas}
@@ -2548,7 +2560,7 @@ const Flux: React.FC = () => {
                 </button>
               </div>
 
-              <div style={styles.panelContent}>
+              <div data-testid="flux-effects" style={styles.panelContent}>
                 {/* Presets Panel */}
                 {activeTab === 'presets' && (
                   <div>
@@ -2878,7 +2890,7 @@ const Flux: React.FC = () => {
           </div>
 
           {/* Timeline */}
-          <div style={styles.timeline}>
+          <div data-testid="flux-timeline" style={styles.timeline}>
             <div style={styles.timelineHeader}>
               <button style={styles.iconBtn} onClick={() => setShowTimeline(!showTimeline)} aria-label="Toggle timeline">
                 {showTimeline ? Icons.chevronDown : Icons.chevronRight}
@@ -4104,11 +4116,15 @@ const Flux: React.FC = () => {
                   // Mark first queued as rendering, then export
                   setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: 'rendering' as const, progress: 0 } : j));
                   exportVideo();
-                  // After export completes, mark done
+                  // After export completes, mark done. Safety cap prevents
+                  // an unbounded poll if the recorder never enters 'inactive'.
+                  const startedAt = Date.now();
+                  const MAX_POLL_MS = 10 * 60 * 1000; // 10 minutes
                   const checkDone = setInterval(() => {
-                    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+                    const expired = Date.now() - startedAt > MAX_POLL_MS;
+                    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive' || expired) {
                       clearInterval(checkDone);
-                      setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: 'done' as const, progress: 100 } : j));
+                      setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: expired ? 'error' as const : 'done' as const, progress: expired ? 0 : 100 } : j));
                     }
                   }, 500);
                 }} style={{ flex: 1, padding: '7px', borderRadius: 6, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Render All</button>

@@ -86,6 +86,7 @@ export default defineConfig({
     exclude: ['dex-native'],
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
     // Item 138: strict port to avoid silent port conflicts
     strictPort: true,

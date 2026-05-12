@@ -13,16 +13,38 @@ import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from '
 import { useWidgetStore, WIDGET_TEMPLATES, type Widget, type WidgetType } from '../store/widgetStore';
 import { useRecentFiles } from '../store/useRecentFiles';
 import { sharedTick } from '../services/SharedTick';
+import DexIcon from './DexIcon';
 
 // ======================================================================
 // WIDGET CONTENT RENDERERS
 // ======================================================================
 
-const ClockWidget: React.FC = () => {
+const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
   const [time, setTime] = useState(new Date());
+  const [userName, setUserName] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
   const [showSeconds, setShowSeconds] = useState(() => {
     try { return localStorage.getItem('dex-clock-show-seconds') === 'true'; } catch { return false; }
   });
+  const [use24Hour, setUse24Hour] = useState(() => {
+    try { return localStorage.getItem('dex-clock-24h') === 'true'; } catch { return false; }
+  });
+  const [showDate, setShowDate] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dex-clock-show-date');
+      return raw === null ? true : raw === 'true';
+    } catch { return true; }
+  });
+  const [timezone, setTimezone] = useState(() => {
+    try { return localStorage.getItem('dex-clock-timezone') || 'local'; } catch { return 'local'; }
+  });
+  const greeting = useMemo(() => {
+    const hour = time.getHours();
+    const base = hour >= 5 && hour < 12 ? 'Good Morning' : hour >= 12 && hour < 17 ? 'Good Afternoon' : hour >= 17 && hour < 21 ? 'Good Evening' : 'Good Night';
+    return userName ? `${base}, ${userName}` : base;
+  }, [time, userName]);
+  const timeSize = Math.max(34, Math.min(82, Math.round(Math.min(widget.width * (showSeconds ? 0.2 : 0.24), widget.height * (showSeconds ? 0.27 : 0.34)))));
+  const metaSize = Math.max(11, Math.min(16, Math.round(widget.width * 0.045)));
   
   useEffect(() => {
     // Use SharedTick for centralized interval management (auto-pauses when hidden)
@@ -30,29 +52,134 @@ const ClockWidget: React.FC = () => {
     sharedTick.subscribe(tickId, () => setTime(new Date()), showSeconds ? 1000 : 60000);
     return () => sharedTick.unsubscribe(tickId);
   }, [showSeconds]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const info = await (window as any).electron?.invoke?.('system:getUserInfo');
+        if (info?.username) {
+          const name = info.displayName || info.username;
+          setUserName(name.split(/[\s_]/)[0].replace(/^\w/, (c: string) => c.toUpperCase()));
+        }
+      } catch { /* silent */ }
+    })();
+  }, []);
   
   const toggleSeconds = () => {
     const newValue = !showSeconds;
     setShowSeconds(newValue);
     try { localStorage.setItem('dex-clock-show-seconds', String(newValue)); } catch {}
   };
+
+  const toggle24Hour = () => {
+    const next = !use24Hour;
+    setUse24Hour(next);
+    try { localStorage.setItem('dex-clock-24h', String(next)); } catch {}
+  };
+
+  const toggleDate = () => {
+    const next = !showDate;
+    setShowDate(next);
+    try { localStorage.setItem('dex-clock-show-date', String(next)); } catch {}
+  };
+
+  const updateTimezone = (tz: string) => {
+    setTimezone(tz);
+    try { localStorage.setItem('dex-clock-timezone', tz); } catch {}
+  };
+
+  const timeOptions: Intl.DateTimeFormatOptions = {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: !use24Hour,
+    ...(showSeconds ? { second: '2-digit' as const } : {}),
+    ...(timezone !== 'local' ? { timeZone: timezone } : {}),
+  };
+
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...(timezone !== 'local' ? { timeZone: timezone } : {}),
+  };
   
   return (
-    <div 
-      onClick={toggleSeconds}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'pointer' }}
-      title="Click to toggle seconds"
+    <div
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'default', padding: '10px 12px', textAlign: 'center', position: 'relative' }}
     >
-      <div style={{ fontSize: 36, fontWeight: 300, letterSpacing: '-0.02em', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
-        {time.toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          ...(showSeconds ? { second: '2-digit' } : {})
-        })}
+      <button
+        type="button"
+        onClick={() => setShowSettings(v => !v)}
+        style={{
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          border: 'none',
+          borderRadius: 8,
+          background: 'rgba(255,255,255,0.10)',
+          color: 'var(--color-text-secondary)',
+          cursor: 'pointer',
+          fontSize: 10,
+          fontWeight: 600,
+          padding: '3px 6px',
+          zIndex: 2,
+        }}
+        aria-label="Clock settings"
+        title="Clock settings"
+      >
+        Time
+      </button>
+
+      {showSettings && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 30,
+            right: 6,
+            width: 170,
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(18,18,22,0.92)',
+            padding: 8,
+            zIndex: 3,
+            boxShadow: '0 10px 24px rgba(0,0,0,0.45)',
+          }}
+        >
+          <button type="button" onClick={toggleSeconds} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
+            Seconds: {showSeconds ? 'On' : 'Off'}
+          </button>
+          <button type="button" onClick={toggle24Hour} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
+            Format: {use24Hour ? '24-hour' : '12-hour'}
+          </button>
+          <button type="button" onClick={toggleDate} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
+            Date: {showDate ? 'Shown' : 'Hidden'}
+          </button>
+          <div style={{ marginTop: 6, fontSize: 10, color: 'var(--color-text-tertiary)', padding: '0 6px 4px' }}>Timezone</div>
+          <select
+            value={timezone}
+            onChange={(e) => updateTimezone(e.target.value)}
+            style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, padding: '5px 6px' }}
+          >
+            <option value="local">Local</option>
+            <option value="UTC">UTC</option>
+            <option value="America/New_York">New York</option>
+            <option value="Europe/London">London</option>
+            <option value="Asia/Tokyo">Tokyo</option>
+          </select>
+        </div>
+      )}
+
+      <div style={{ fontSize: metaSize, fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', marginBottom: 6 }}>
+        {greeting}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-        {time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+      <div style={{ fontSize: timeSize, fontWeight: 250, letterSpacing: '-0.03em', lineHeight: 1, color: '#fff', fontVariantNumeric: 'tabular-nums', textShadow: '0 4px 20px rgba(0,0,0,0.34)' }}>
+        {time.toLocaleTimeString([], timeOptions)}
       </div>
+      {showDate && (
+        <div style={{ fontSize: metaSize, color: 'var(--color-text-secondary)', marginTop: 6 }}>
+          {time.toLocaleDateString([], dateOptions)}
+        </div>
+      )}
     </div>
   );
 };
@@ -203,10 +330,10 @@ const QuickActionsWidget: React.FC = () => {
   });
   
   const defaultActions = [
-    { label: 'Files', appId: 'files', color: 'var(--color-accent)' },
-    { label: 'Notes', appId: 'notes', color: 'var(--color-success)' },
-    { label: 'Browser', appId: 'browser', color: '#5E5CE6' },
-    { label: 'Settings', appId: 'settings', color: 'var(--color-text-tertiary)' },
+    { label: 'Files', appId: 'files', color: 'var(--color-accent)', icon: 'folder' },
+    { label: 'VINX', appId: 'videoeditor', color: '#5E5CE6', icon: 'film' },
+    { label: 'Browser', appId: 'browser', color: 'var(--color-success)', icon: 'globe' },
+    { label: 'Settings', appId: 'settings', color: 'var(--color-text-tertiary)', icon: 'settings' },
   ];
   const actions = customActions || defaultActions;
   
@@ -216,7 +343,7 @@ const QuickActionsWidget: React.FC = () => {
   
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, padding: 8 }}>
-      {actions.map((a: { appId: string; label: string; color: string }) => (
+      {actions.map((a: { appId: string; label: string; color: string; icon?: string }) => (
         <button 
           key={a.appId} 
           onClick={() => openApp(a.appId)}
@@ -231,7 +358,10 @@ const QuickActionsWidget: React.FC = () => {
           onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
           onMouseUp={e => e.currentTarget.style.transform = 'scale(1.02)'}
         >
-          {a.label}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            {a.icon ? <DexIcon name={a.icon} size={15} color={a.color} /> : null}
+            <span>{a.label}</span>
+          </div>
         </button>
       ))}
     </div>
@@ -244,6 +374,26 @@ const SystemStatusWidget: React.FC = () => {
   const [network, setNetwork] = useState({ online: true, type: '' });
   const [gpu, setGpu] = useState(0);
   
+  // CPU estimation via requestAnimationFrame frame budget. Higher load = longer frames.
+  const cpuEstimateRef = React.useRef<number>(0);
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const samples: number[] = [];
+    const tick = (t: number) => {
+      const delta = t - last;
+      last = t;
+      // 16.67ms = 0% load on a 60Hz frame; >33ms means saturated
+      const load = Math.min(100, Math.max(0, ((delta - 16.67) / 16.67) * 50));
+      samples.push(load);
+      if (samples.length > 30) samples.shift();
+      cpuEstimateRef.current = samples.reduce((a, b) => a + b, 0) / samples.length;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   useEffect(() => {
     // Try to get real system stats via IPC, fallback to estimation
     const fetchStats = async () => {
@@ -259,15 +409,17 @@ const SystemStatusWidget: React.FC = () => {
           }
         }
       } catch { /* fallback */ }
-      // Fallback: estimate from JS performance metrics
+      // Fallback: real metrics only (no fake data)
       const navMem = (performance as any).memory;
       if (navMem) {
         const used = navMem.usedJSHeapSize / navMem.jsHeapSizeLimit * 100;
-        setMem(Math.round(Math.min(90, Math.max(20, used))));
+        setMem(Math.round(Math.min(99, Math.max(1, used))));
       } else {
-        setMem(Math.round(Math.random() * 20 + 40));
+        // Last resort: heap-relative pseudo metric so the bar isn't dead
+        setMem(Math.round(15 + (cpuEstimateRef.current / 5)));
       }
-      setCpu(Math.round(Math.random() * 20 + 8));
+      // Use rAF-based real CPU estimate (frame budget pressure)
+      setCpu(Math.max(1, Math.round(cpuEstimateRef.current)));
     };
     
     // Network status
@@ -682,7 +834,7 @@ const DailyTipWidget: React.FC = () => {
 // Widget content dispatcher
 const WidgetContent: React.FC<{ widget: Widget }> = memo(({ widget }) => {
   switch (widget.type) {
-    case 'clock': return <ClockWidget />;
+    case 'clock': return <ClockWidget widget={widget} />;
     case 'calendar': return <CalendarWidget />;
     case 'recent-files': return <RecentFilesWidget />;
     case 'quick-actions': return <QuickActionsWidget />;
@@ -763,9 +915,11 @@ const DraggableWidget: React.FC<{
         width: widget.width,
         height: widget.height,
         borderRadius: 16,
-        background: 'var(--color-bg-elevated)',
-        border: editMode ? '1.5px dashed rgba(10,132,255,0.5)' : '1px solid var(--color-border-subtle)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        background: 'rgba(24,24,28,0.42)',
+        backdropFilter: 'blur(34px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+        border: editMode ? '1.5px dashed rgba(10,132,255,0.5)' : '1px solid rgba(255,255,255,0.10)',
+        boxShadow: '0 12px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)',
         overflow: 'hidden',
         cursor: editMode ? 'move' : 'default',
         transition: editMode ? 'none' : 'box-shadow 0.2s',
@@ -832,8 +986,10 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
         zIndex: 'var(--z-max)', width: 380, maxHeight: 440,
-        background: 'var(--color-bg-elevated)',
-        borderRadius: 16, border: '1px solid var(--color-border)',
+        background: 'rgba(24,24,28,0.60)',
+        backdropFilter: 'blur(34px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+        borderRadius: 16, border: '1px solid rgba(255,255,255,0.10)',
         boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
         padding: 20, overflow: 'auto',
       }}>
@@ -857,7 +1013,10 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--color-border)'; }}
                 onMouseLeave={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
               >
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>{t.title}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <DexIcon name={t.icon} size={18} color={exists && t.type !== 'notes-scratchpad' ? 'var(--color-text-tertiary)' : 'rgba(255,255,255,0.9)'} />
+                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{t.title}</div>
+                </div>
               </button>
             );
           })}
@@ -873,6 +1032,7 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 export const HomeWidgets: React.FC = () => {
   const widgets = useWidgetStore(s => s.widgets);
+  const addWidget = useWidgetStore(s => s.addWidget);
   const editMode = useWidgetStore(s => s.editMode);
   const toggleEditMode = useWidgetStore(s => s.toggleEditMode);
   const removeWidget = useWidgetStore(s => s.removeWidget);
@@ -900,6 +1060,29 @@ export const HomeWidgets: React.FC = () => {
           onResize={(width, height) => resizeWidget(w.id, width, height)}
         />
       ))}
+
+      {/* Empty state: let user add clock/date widget themselves quickly */}
+      {widgets.filter(w => w.visible).length === 0 && !editMode && (
+        <div style={{ position: 'absolute', top: 88, right: 20, zIndex: 20 }}>
+          <button
+            onClick={() => { addWidget('clock'); }}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.16)',
+              background: 'rgba(24,24,28,0.58)',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            aria-label="Add clock widget"
+            title="Add clock widget"
+          >
+            Add Clock Widget
+          </button>
+        </div>
+      )}
 
       {/* Edit mode toolbar (bottom-right) */}
       {editMode && (

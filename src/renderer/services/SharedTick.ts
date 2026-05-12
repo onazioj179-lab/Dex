@@ -6,7 +6,8 @@
 // =============================================================================
 // ===========================================================================
 // SharedTick — Single interval that replaces 100+ independent setIntervals
-// Subscribe/unsubscribe pattern. Auto-pauses when document is hidden.
+// Subscribe/unsubscribe pattern. Keeps continuity work alive at a reduced
+// cadence when the window is hidden instead of fully pausing all subscribers.
 // Enhanced: per-subscriber pause, fireImmediately, window blur/focus,
 //           getStats(), fireNow(), overdue catch-up on window focus.
 // ===========================================================================
@@ -46,13 +47,16 @@ class SharedTickService {
   private timer: ReturnType<typeof setInterval> | null = null;
   private paused = false;
   private readonly TICK_MS = 1000; // 1s base tick
+  private readonly HIDDEN_MIN_INTERVAL_MS = 30_000;
   private manualPause = false;
   private windowFocused = true;
+  private documentHidden = false;
 
   constructor() {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
-        this.paused = document.hidden || this.manualPause;
+        this.documentHidden = document.hidden;
+        this.paused = this.manualPause;
       });
     }
     if (typeof window !== 'undefined') {
@@ -80,7 +84,7 @@ class SharedTickService {
    */
   resume(): void {
     this.manualPause = false;
-    this.paused = typeof document !== 'undefined' ? document.hidden : false;
+    this.paused = false;
   }
 
   /**
@@ -173,7 +177,10 @@ class SharedTickService {
     const now = Date.now();
     for (const [id, sub] of this.subscribers) {
       if (sub.paused) continue;
-      if (now - sub.lastFired >= sub.intervalMs) {
+      const intervalMs = this.documentHidden
+        ? Math.max(sub.intervalMs, this.HIDDEN_MIN_INTERVAL_MS)
+        : sub.intervalMs;
+      if (now - sub.lastFired >= intervalMs) {
         sub.lastFired = now;
         sub.fireCount++;
         try { sub.callback(now); } catch (err) {
@@ -189,7 +196,10 @@ class SharedTickService {
     const now = Date.now();
     for (const [id, sub] of this.subscribers) {
       if (sub.paused) continue;
-      if (now - sub.lastFired >= sub.intervalMs) {
+      const intervalMs = this.documentHidden
+        ? Math.max(sub.intervalMs, this.HIDDEN_MIN_INTERVAL_MS)
+        : sub.intervalMs;
+      if (now - sub.lastFired >= intervalMs) {
         sub.lastFired = now;
         sub.fireCount++;
         try { sub.callback(now); } catch (err) {

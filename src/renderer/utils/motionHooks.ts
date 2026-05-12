@@ -1905,6 +1905,76 @@ export function useClickOutside<T extends HTMLElement>(
 }
 
 // ---------------------------------------------------------------------------
+// useDismissableMenu -- shared dismissal behavior for inline app menus.
+// Combines escape-key, outside-click, and viewport edge-flip auto-positioning
+// so per-app menus get unified UX without migrating to UnifiedDropdown.
+// Usage:
+//   const ref = useRef<HTMLDivElement>(null);
+//   useDismissableMenu(ref, isOpen, () => setOpen(false));
+//   return <div ref={ref} ...>...</div>;
+// ---------------------------------------------------------------------------
+
+export function useDismissableMenu<T extends HTMLElement>(
+  ref: React.RefObject<T | null>,
+  isOpen: boolean,
+  onClose: () => void,
+  options: { autoFlip?: boolean; ignoreRefs?: React.RefObject<HTMLElement | null>[] } = {}
+) {
+  const { autoFlip = true, ignoreRefs = [] } = options;
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+
+  // Escape + outside-click
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeRef.current(); }
+    };
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      for (const ig of ignoreRefs) {
+        if (ig.current?.contains(target)) return;
+      }
+      closeRef.current();
+    };
+    // Defer mousedown registration so the click that opened the menu doesn't immediately close it
+    const t = setTimeout(() => document.addEventListener('mousedown', onMouseDown), 0);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onMouseDown);
+    };
+  }, [isOpen, ref, ignoreRefs]);
+
+  // Viewport edge-flip: nudge menu inward if it overflows right/bottom edges
+  useEffect(() => {
+    if (!isOpen || !autoFlip) return;
+    const el = ref.current;
+    if (!el) return;
+    let raf = requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const margin = 8;
+      let dx = 0;
+      let dy = 0;
+      if (rect.right > vw - margin) dx = (vw - margin) - rect.right;
+      if (rect.left + dx < margin) dx = margin - rect.left;
+      if (rect.bottom > vh - margin) dy = (vh - margin) - rect.bottom;
+      if (rect.top + dy < margin) dy = margin - rect.top;
+      if (dx !== 0 || dy !== 0) {
+        const prev = el.style.transform || '';
+        // Apply a single corrective translate; do not stack across renders
+        el.style.transform = `translate(${dx}px, ${dy}px)` + (prev.includes('translate') ? '' : '');
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, autoFlip, ref]);
+}
+
+// ---------------------------------------------------------------------------
 // useMediaQuery -- respond to media queries
 // ---------------------------------------------------------------------------
 

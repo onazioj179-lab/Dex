@@ -14,9 +14,11 @@
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
-import { APP_DEFINITIONS } from '../store/runningApps';
+import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
+import { UKIPatternStore } from '../services/UKIPatternStore';
+import { buildSystemPrompt } from '../uki';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -270,11 +272,12 @@ async function getScreenContext(): Promise<ScreenContext> {
   try {
     // Get active app from running apps store
     const store = window.__dexRunningApps;
-    const state = store?.getState?.() as { focusedAppId?: string; runningApps?: Array<{ id: string; name: string }> } | undefined;
-    if (state?.focusedAppId) {
-      context.activeApp = state.focusedAppId;
-      const app = state.runningApps?.find(a => a.id === state.focusedAppId);
-      context.windowTitle = app?.name || state.focusedAppId;
+    const state = store?.getState?.() as { currentAppId?: string; focusedAppId?: string; runningApps?: Array<{ id: string; name: string }> } | undefined;
+    const activeId = state?.currentAppId || state?.focusedAppId || null;
+    if (activeId) {
+      context.activeApp = activeId;
+      const app = state?.runningApps?.find(a => a.id === activeId);
+      context.windowTitle = app?.name || activeId;
     }
     
     // Try to get visible text from the DOM (accessibility-friendly)
@@ -411,6 +414,76 @@ function speakWithVoice(text: string, onEnd?: () => void): void {
   utterance.onerror = () => onEnd?.();
   
   window.speechSynthesis.speak(utterance);
+}
+
+// ===========================================================================
+// EMOTION DETECTION — empathy-first responses
+// ===========================================================================
+
+type EmotionType = 'frustration' | 'happiness' | 'sadness' | 'confusion' | 'neutral';
+
+function detectEmotion(text: string): EmotionType {
+  const lower = text.toLowerCase();
+  if (/\b(ugh|argh|wtf|damn|hate|broken|stupid|useless|not working|doesn't work|doesnt work|fuck|sucks|terrible|awful)\b/.test(lower)) return 'frustration';
+  if (/\b(thank|thanks|great|awesome|amazing|love|perfect|yay|cool|nice|brilliant|excellent|wonderful)\b/.test(lower)) return 'happiness';
+  if (/\b(sad|upset|crying|depressed|lonely|miss|hate my|worried|anxious|stress)\b/.test(lower)) return 'sadness';
+  if (/^(huh|what|i don.?t understand|not sure|confused|help me|explain|what do you mean|how do i|how does)\b/.test(lower)) return 'confusion';
+  return 'neutral';
+}
+
+function getEmpathyPrefix(emotion: EmotionType): string {
+  switch (emotion) {
+    case 'frustration': return "I hear you, that's frustrating. ";
+    case 'happiness': return "Glad to hear that! ";
+    case 'sadness': return "I'm sorry you're feeling that way. ";
+    case 'confusion': return "No worries, let me explain. ";
+    default: return '';
+  }
+}
+
+// ===========================================================================
+// FREE AI FALLBACK — HuggingFace Inference API (no API key needed for public models)
+// ===========================================================================
+
+async function queryHuggingFaceFallback(userText: string): Promise<string | null> {
+  try {
+    let foregroundAppId: string | null = null;
+    let openAppIds: string[] = [];
+    let online = true;
+    try {
+      const ra = useRunningApps.getState();
+      foregroundAppId = ra.currentAppId ?? null;
+      openAppIds = (ra.runningApps ?? []).map(a => a.id);
+      online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+    } catch { /* best-effort context */ }
+    const systemContext = buildSystemPrompt({
+      foregroundAppId,
+      openAppIds,
+      online,
+      localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+    const prompt = `${systemContext}\n\nUser: ${userText}\nUKI:`;
+    
+    const res = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inputs: prompt, parameters: { max_new_tokens: 120, temperature: 0.7 } }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const generated: string = data?.[0]?.generated_text || '';
+    // Extract just the UKI response after the prompt
+    const ukiMarker = 'UKI:';
+    const idx = generated.lastIndexOf(ukiMarker);
+    if (idx !== -1) {
+      const reply = generated.slice(idx + ukiMarker.length).trim().split('\n')[0].trim();
+      if (reply.length > 4) return reply;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // ===========================================================================
@@ -560,13 +633,12 @@ function loadA11yPreferences(): void {
 }
 
 // Initialize on load
+// NOTE: voiceschanged listener is registered/cleaned per-mount inside the
+// UkiOverlay component to avoid module-level listener leaks across HMR/reloads.
 if (typeof window !== 'undefined') {
   loadA11yPreferences();
-  // Pre-load voices
+  // Pre-load voices (idempotent, no listener attached at module scope)
   window.speechSynthesis?.getVoices();
-  window.speechSynthesis?.addEventListener?.('voiceschanged', () => {
-    findBestVoice();
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -958,6 +1030,39 @@ function trySystemTool(text: string): ToolResult {
     return { handled: true, response: `DEX is running smoothly. For full hardware details, open Settings → System.` };
   }
 
+  // Top processes / what's using CPU or memory (uses real native bridge)
+  if (/(?:top|biggest|heaviest|hungry|hungri[ey]st)\s*(?:process(?:es)?|apps?|programs?)|what(?:'s| is) (?:using|hogging|eating)\s*(?:the |my |all the )?(?:cpu|memory|ram|resources)|(?:cpu|memory|ram)\s*hog/.test(lower)) {
+    const wantsMem = /(?:memory|ram|mem)/.test(lower);
+    const dexB = (window as any).dex;
+    if (dexB?.system?.getProcesses) {
+      dexB.system.getProcesses().then((procs: any[]) => {
+        if (!Array.isArray(procs) || procs.length === 0) {
+          window.dispatchEvent(new CustomEvent('dex-uki-async-response', { detail: { response: 'No process data available right now.' } }));
+          return;
+        }
+        const sorted = [...procs].sort((a, b) => (wantsMem ? (b.memory || 0) - (a.memory || 0) : (b.cpu || 0) - (a.cpu || 0)));
+        const top5 = sorted.slice(0, 5);
+        const lines = top5.map((p, i) => `${i + 1}. ${p.name} — ${(p.cpu || 0).toFixed(1)}% CPU, ${(p.memory || 0).toFixed(1)}% mem`);
+        window.dispatchEvent(new CustomEvent('dex-uki-async-response', {
+          detail: { response: `Top ${wantsMem ? 'memory' : 'CPU'} consumers:\n${lines.join('\n')}\n\nOpen Settings → System Monitor for full list.` }
+        }));
+      }).catch(() => {
+        window.dispatchEvent(new CustomEvent('dex-uki-async-response', { detail: { response: 'Could not query process list.' } }));
+      });
+      return { handled: true, response: 'Checking processes...' };
+    }
+    return { handled: true, response: 'Process monitoring unavailable. Open Settings → System Monitor.' };
+  }
+
+  // Open task manager / system monitor
+  if (/(?:open|show|launch|start)\s*(?:the\s*)?(?:task\s*manager|system\s*monitor|process(?:es)?|activity\s*monitor)/.test(lower)) {
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appName: 'Settings' } }));
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('dex-settings-navigate', { detail: { section: 'systemMonitor' } }));
+    }, 350);
+    return { handled: true, response: 'Opening System Monitor in Settings...' };
+  }
+
   // Battery
   if (/(?:battery|power|charge|batt)\s*(?:level|status|life|%)?|how much (?:battery|power|charge)/.test(lower)) {
     if (typeof navigator.getBattery === 'function') {
@@ -1127,7 +1232,7 @@ const UkiOverlay: React.FC = () => {
   const hoveredRef = useRef(false);
   const [showHelp, setShowHelp] = useState(false);
   const [inputText, setInputText] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const draggingRef = useRef(false);
@@ -1207,6 +1312,10 @@ const UkiOverlay: React.FC = () => {
   const [streamingResponse, setStreamingResponse] = useState('');
   const streamTarget = useRef('');
   const streamTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [isThinking, setIsThinking] = useState(false);
+  const [thoughtSteps, setThoughtSteps] = useState<string[]>([]);
+  const thoughtStepsRef = useRef<string[]>([]);
+  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [speakResponses, setSpeakResponses] = useState(() => {
     try { return localStorage.getItem('dex-uki-speak-responses') !== 'false'; } catch { return true; }
   });
@@ -1219,8 +1328,27 @@ const UkiOverlay: React.FC = () => {
     }
   }, [speakResponses]);
 
+  // Per-mount voiceschanged listener (replaces previous module-level leak)
+  // and unmount cleanup for in-flight streaming timer.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const handler = () => { try { findBestVoice(); } catch { /* noop */ } };
+    window.speechSynthesis.addEventListener?.('voiceschanged', handler);
+    return () => {
+      window.speechSynthesis?.removeEventListener?.('voiceschanged', handler);
+      if (streamTimerRef.current) {
+        clearTimeout(streamTimerRef.current);
+        streamTimerRef.current = undefined;
+      }
+      // Cancel any in-flight TTS so it doesn't outlive the overlay
+      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+    };
+  }, []);
+
   /** Stream response with typewriter effect and optional TTS */
   const streamResponse = useCallback((reply: string, intent: string, userText: string, speakIt = true) => {
+    setIsThinking(false);
+    const finalSteps = [...thoughtStepsRef.current];
     useUkiStore.getState().setTranscript(userText);
     streamTarget.current = reply;
     setStreamingResponse('');
@@ -1233,14 +1361,48 @@ const UkiOverlay: React.FC = () => {
         streamTimerRef.current = setTimeout(tick, speed);
       } else {
         useUkiStore.getState().setResponse(reply);
-        useUkiStore.getState().addConversationTurn({ 
-          id: `${intent}-${Date.now()}`, 
-          userText, 
-          response: reply, 
-          intent, 
-          success: true, 
-          timestamp: Date.now() 
+        useUkiStore.getState().addConversationTurn({
+          id: `${intent}-${Date.now()}`,
+          userText,
+          response: reply,
+          intent,
+          success: true,
+          timestamp: Date.now(),
+          thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
         });
+        // Persist to UKI memory layer (encrypted at rest, capped at MAX_TURNS).
+        // Fire-and-forget: failure here must never break the chat UI.
+        import('../uki').then((u) => u.ukiMemory.recordTurn(userText, reply, {
+          intent,
+          thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
+        })).catch(() => { /* memory write failed, non-fatal */ });
+        // Clear the live transcript + streaming buffer once the turn is
+        // committed to history, otherwise the same You/UKI pair renders
+        // twice (once in history, once as the live row).
+        useUkiStore.getState().setTranscript('');
+        useUkiStore.getState().setResponse('');
+        setStreamingResponse('');
+
+        // Rapid learning: record pattern so future inputs benefit
+        try {
+          UKIPatternStore.record(intent, [userText.slice(0, 80).toLowerCase()]);
+        } catch { /* non-fatal */ }
+
+        // Feed Nexus knowledge graph from each conversation turn
+        try {
+          const storeState = useUkiStore.getState();
+          const nodes = storeState.knowledgeNodes ?? [];
+          const newNode: UkiKnowledgeNode = {
+            id: `uki-${Date.now()}`,
+            label: userText.slice(0, 48),
+            weight: 1,
+            color: '#0A84FF',
+            category: intent,
+            timestamp: Date.now(),
+          };
+          storeState.setKnowledgeNodes([...nodes.slice(-49), newNode]);
+        } catch { /* non-fatal */ }
+
         // Speak response if enabled and not too long
         if (speakIt && speakResponses && reply.length < 300) {
           speakWithVoice(reply);
@@ -1255,62 +1417,112 @@ const UkiOverlay: React.FC = () => {
     if (!text) return;
     setInputText('');
     useUkiStore.getState().setError(null);
+    // Reset thought trace and start a new reasoning chain.
+    thoughtStepsRef.current = [];
+    setThoughtSteps([]);
+    const pushStep = (step: string) => {
+      thoughtStepsRef.current = [...thoughtStepsRef.current, step];
+      setThoughtSteps(thoughtStepsRef.current);
+    };
+
+    // Capture current DEX context so UKI "knows the room" -- running apps,
+    // foreground app, time of day. This is the awareness the user asked for:
+    // UKI should not feel bounded to the chat box.
+    try {
+      const runningAppsState = useRunningApps.getState();
+      const fg = runningAppsState.runningApps.find(a => a.id === runningAppsState.currentAppId);
+      const fgName = fg ? (APP_DEFINITIONS[fg.id]?.name ?? fg.id) : 'Home';
+      const openCount = runningAppsState.runningApps.filter(a => a.id !== 'home').length;
+      pushStep(`Context: foreground=${fgName}, open apps=${openCount}, time=${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    } catch { /* non-fatal */ }
+
+    setIsThinking(true);
     // Cancel any in-progress streaming animation
     if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
 
+    // Emotion detection -- prepend empathy prefix to any reply
+    const emotion = detectEmotion(text);
+    const empathyPrefix = getEmpathyPrefix(emotion);
+    if (emotion && emotion !== 'neutral') {
+      pushStep(`Detected tone: ${emotion}`);
+    }
+
     // Slash commands take priority (no AI round-trip required)
+    pushStep('Checking slash commands');
     const slash = handleSlashCommand(text);
     if (slash) {
-      streamResponse(slash.reply, slash.intent, text, false);
+      pushStep(`Matched slash command: ${slash.intent}`);
+      streamResponse(empathyPrefix + slash.reply, slash.intent, text, false);
       return;
     }
 
     // Wave 1 AutoPilot slash commands (parsed into typed PlanGraphs)
+    pushStep('Checking AutoPilot plans');
     const autopilot = await runUkiSlashIfApplicable(text);
     if (autopilot.handled) {
-      streamResponse(autopilot.reply || 'Running…', 'autopilot', text, false);
+      pushStep('Matched AutoPilot plan');
+      streamResponse(empathyPrefix + (autopilot.reply || 'Running\u2026'), 'autopilot', text, false);
       return;
     }
 
     if (text.startsWith('/')) {
+      pushStep('Unknown slash -- falling back to help message');
       streamResponse('Unknown slash command. Type /help to list commands.', 'slash-unknown', text, false);
       return;
     }
 
     // Normalize text for better understanding
     const normalized = normalizeText(text);
+    if (normalized !== text) pushStep('Normalized phrasing');
+
+    // UKIPatternStore: surface learned suggestions before dispatch
+    try {
+      const suggestions = await UKIPatternStore.suggest([normalized.slice(0, 60)], 1);
+      if (suggestions.length > 0 && suggestions[0].confidence > 0.6) {
+        pushStep(`Learned pattern hint: ${suggestions[0].action} (${Math.round(suggestions[0].confidence * 100)}%)`);
+      }
+    } catch { /* non-fatal */ }
 
     // Check for screen reading commands (async)
+    pushStep('Probing screen-read intent');
     const screenResponse = await tryScreenQuestion(text);
     if (screenResponse) {
-      streamResponse(screenResponse, 'screen-read', text);
+      pushStep('Resolved by reading active screen');
+      streamResponse(empathyPrefix + screenResponse, 'screen-read', text);
       return;
     }
 
     // Check for app control commands
+    pushStep('Probing app control intent');
     const appCmd = tryAppCommand(text);
     if (appCmd) {
+      pushStep('Routing to app command');
       const reply = dispatchAppCommand(appCmd);
-      streamResponse(reply, 'app-command', text);
+      streamResponse(empathyPrefix + reply, 'app-command', text);
       return;
     }
 
     // Check for internal system tool queries
+    pushStep('Probing internal system tools');
     const toolResult = trySystemTool(text);
     if (toolResult.handled) {
-      streamResponse(toolResult.response, 'system-tool', text);
+      pushStep('Answered from internal system tool');
+      streamResponse(empathyPrefix + toolResult.response, 'system-tool', text);
       return;
     }
 
     // Check for web search commands
+    pushStep('Probing web-search intent');
     const searchQuery = trySearchCommand(text);
     if (searchQuery) {
+      pushStep('Routing to web search');
       const reply = dispatchWebSearch(searchQuery);
-      streamResponse(reply, 'web-search', text);
+      streamResponse(empathyPrefix + reply, 'web-search', text);
       return;
     }
 
     // Fallback to AI query if available
+    pushStep('No structured route matched -- escalating to local AI');
     useUkiStore.getState().setTranscript(text);
     setStreamingResponse('');
     const dex = (window as any).dex;
@@ -1319,20 +1531,34 @@ const UkiOverlay: React.FC = () => {
         const result = await dex.uki.query(normalized);
         const finalResp = result?.response ?? '';
         if (finalResp) {
-          setStreamingResponse(finalResp);
-          useUkiStore.getState().setResponse(finalResp);
+          pushStep('Local AI returned a response');
+          const withEmpathy = empathyPrefix + finalResp;
+          streamResponse(withEmpathy, 'ai', text, false);
         } else {
-          // Fallback response if no AI response
-          const fallback = "I'm not sure about that. Try asking differently, or say 'help' to see what I can do!";
+          pushStep('Local AI empty -- trying remote inference');
+          const hfReply = await queryHuggingFaceFallback(normalized);
+          const fallback = hfReply ? empathyPrefix + hfReply : empathyPrefix + "I'm not sure about that. Try asking differently, or use /help to see commands!";
+          if (hfReply) pushStep('Remote inference returned a response');
+          else pushStep('Remote inference empty -- using safe fallback');
           streamResponse(fallback, 'fallback', text, false);
         }
       } catch {
+        pushStep('Local AI threw -- surfacing error');
+        setIsThinking(false);
         useUkiStore.getState().setError('Failed to process query');
       }
     } else {
-      // No AI backend available - give helpful fallback
-      const fallback = "I understood you, but I need more context. Try commands like 'open notes', 'what time is it', or 'tell me a joke'!";
-      streamResponse(fallback, 'fallback', text, false);
+      // No Electron AI backend -- try HuggingFace free inference, then contextual fallback
+      pushStep('No AI bridge -- trying remote inference directly');
+      const hfReply = await queryHuggingFaceFallback(normalized);
+      if (hfReply) {
+        pushStep('Remote inference returned a response');
+        streamResponse(empathyPrefix + hfReply, 'hf-fallback', text, false);
+      } else {
+        pushStep('Remote empty -- using safe fallback');
+        const fallback = empathyPrefix + "I can hear you! Try 'open notes', 'what time is it', math like '5 + 3', or /help for all commands.";
+        streamResponse(fallback, 'fallback', text, false);
+      }
     }
   }, [inputText, streamResponse]);
 
@@ -1399,10 +1625,12 @@ const UkiOverlay: React.FC = () => {
       `}</style>
 
       <div onMouseDown={handleDragStart} style={{
-        background: 'var(--color-bg-surface-solid)',
-        border: '1px solid var(--color-border)',
+        background: 'rgba(255,255,255,0.06)',
+        backdropFilter: 'blur(34px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+        border: '1px solid rgba(255,255,255,0.10)',
         borderRadius: 16,
-        boxShadow: '0 16px 48px rgba(0,0,0,0.5), 0 0 0 0.5px var(--color-bg-hover)',
+        boxShadow: '0 8px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.10)',
         overflow: 'hidden',
         cursor: draggingRef.current ? 'grabbing' : 'grab',
       }}>
@@ -1511,7 +1739,9 @@ const UkiOverlay: React.FC = () => {
           {/* AutoPilot pending-approval cards */}
           <UkiAutoPilotBridge />
           {/* Previous conversation turns */}
-          {conversationHistory.slice(-6).map((turn) => (
+          {conversationHistory.slice(-6).map((turn) => {
+            const isOpen = expandedThinking.has(turn.id);
+            return (
             <div key={turn.id} style={{ marginBottom: 10, opacity: 0.85 }}>
               <div style={{ marginBottom: 4 }}>
                 <div style={{
@@ -1532,10 +1762,52 @@ const UkiOverlay: React.FC = () => {
                     <span style={{ fontSize: 8, color: 'var(--color-error)', fontWeight: 400 }}>failed</span>
                   )}
                 </div>
+                {/* Claude-style thought process (collapsible) */}
+                {turn.intent && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedThinking(prev => {
+                      const next = new Set(prev);
+                      if (next.has(turn.id)) next.delete(turn.id); else next.add(turn.id);
+                      return next;
+                    })}
+                    aria-expanded={isOpen}
+                    style={{
+                      background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                      fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4,
+                      display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'inherit',
+                    }}
+                  >
+                    <span style={{ display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }}>{'\u25B8'}</span>
+                    <span>{isOpen ? 'Hide thinking' : 'Show thinking'}</span>
+                  </button>
+                )}
+                {isOpen && (
+                  <div style={{
+                    fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
+                    lineHeight: 1.5, padding: '6px 8px', marginBottom: 6,
+                    background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(10,132,255,0.4)',
+                    borderRadius: 4,
+                  }}>
+                    {turn.thoughtSteps && turn.thoughtSteps.length > 0 ? (
+                      <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {turn.thoughtSteps.map((step, idx) => (
+                          <li key={idx} style={{ fontStyle: 'normal', color: 'var(--color-text-secondary)' }}>{step}</li>
+                        ))}
+                        <li style={{ marginTop: 4, color: 'var(--color-text-tertiary)' }}>
+                          Final intent: <strong style={{ color: 'var(--color-text-secondary)' }}>{turn.intent}</strong>
+                        </li>
+                      </ol>
+                    ) : (
+                      <>Interpreted intent: <strong style={{ color: 'var(--color-text-secondary)' }}>{turn.intent}</strong>. Matched user input to this category and produced a direct response without external lookup.</>
+                    )}
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>{turn.response}</div>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           {/* Current transcript (live) */}
           {displayText && (
@@ -1552,6 +1824,39 @@ const UkiOverlay: React.FC = () => {
               }}>
                 {displayText}
               </div>
+            </div>
+          )}
+
+          {/* Thinking indicator (Claude-style) -- visible while waiting for first stream tick */}
+          {isThinking && !streamingResponse && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 4,
+              padding: '6px 8px', marginBottom: 8,
+              background: 'rgba(10,132,255,0.06)',
+              borderLeft: '2px solid rgba(10,132,255,0.5)',
+              borderRadius: 4,
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600,
+              }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'rgba(10,132,255,0.85)',
+                  animation: 'ukiPulse 0.9s ease-in-out infinite',
+                }} />
+                <span>Thinking{thoughtSteps.length > 0 ? ` -- step ${thoughtSteps.length}` : ''}</span>
+              </div>
+              {thoughtSteps.length > 0 && (
+                <ol style={{
+                  margin: '4px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 1,
+                  fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.4,
+                }}>
+                  {thoughtSteps.slice(-6).map((step, idx) => (
+                    <li key={idx}>{step}</li>
+                  ))}
+                </ol>
+              )}
             </div>
           )}
 
@@ -1703,38 +2008,75 @@ const UkiOverlay: React.FC = () => {
               </div>
             );
           })()}
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
             value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSendText(); }}
-            placeholder="Ask UKI anything..."
+            onChange={e => {
+              setInputText(e.target.value);
+              // Auto-grow up to 6 lines, then scroll inside the textarea.
+              const el = e.currentTarget;
+              el.style.height = 'auto';
+              const max = 6 * 18 + 12; // ~6 lines at 18px line-height
+              el.style.height = Math.min(el.scrollHeight, max) + 'px';
+            }}
+            onKeyDown={e => {
+              // Enter sends, Shift+Enter inserts newline. This matches the
+              // pattern users expect from modern AI prompt boxes (Claude,
+              // ChatGPT, Cursor) without surprising typists.
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSendText();
+              }
+              if (e.key === 'Escape') {
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder={isThinking ? 'UKI is thinking...' : 'Ask UKI anything   (Enter to send, Shift+Enter for newline)'}
+            rows={1}
             style={{
               flex: 1, background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 8, padding: '6px 10px',
-              fontSize: 12, color: 'var(--color-text-primary)',
+              borderRadius: 10, padding: '8px 12px',
+              fontSize: 13, color: 'var(--color-text-primary)',
               outline: 'none',
+              resize: 'none',
+              minHeight: 32,
+              maxHeight: 120,
+              lineHeight: '18px',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              transition: 'border-color 0.15s ease, background 0.15s ease',
             }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(10,132,255,0.55)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'var(--color-border-subtle)'; e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
             disabled={state === 'processing' || state === 'thinking'}
+            aria-label="Ask UKI"
           />
           <button
             onClick={handleSendText}
-            disabled={!inputText.trim() || state === 'processing' || state === 'thinking'}
+            disabled={!inputText.trim() || isThinking || state === 'processing' || state === 'thinking'}
             style={{
-              width: 28, height: 28, borderRadius: 8,
+              width: 32, height: 32, borderRadius: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: inputText.trim() ? 'rgba(10,132,255,0.25)' : 'transparent',
-              border: 'none', cursor: inputText.trim() ? 'pointer' : 'default',
-              transition: 'background 0.15s ease',
+              background: (inputText.trim() && !isThinking) ? 'rgba(10,132,255,0.28)' : 'transparent',
+              border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'rgba(10,132,255,0.4)' : 'transparent'),
+              cursor: (inputText.trim() && !isThinking) ? 'pointer' : 'default',
+              transition: 'background 0.15s ease, border-color 0.15s ease, transform 0.1s ease',
+              flexShrink: 0,
             }}
-            aria-label="Send to UKI"
+            aria-label={isThinking ? 'UKI is thinking' : 'Send to UKI'}
+            title={isThinking ? 'Thinking...' : 'Send (Enter)'}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={inputText.trim() ? 'var(--color-accent)' : 'var(--color-text-tertiary)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
+            {isThinking ? (
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: 'rgba(10,132,255,0.85)',
+                animation: 'ukiPulse 0.9s ease-in-out infinite',
+              }} />
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={inputText.trim() ? 'var(--color-accent)' : 'var(--color-text-tertiary)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            )}
           </button>
         </div>
       </div>

@@ -83,7 +83,7 @@ export function clampWindowToWorkspace(bounds: WindowBounds, workspace: WindowBo
  * can extend partly off-screen (Windows/macOS behaviour). Only requires that
  * a slice of the title bar remains reachable so the user can drag it back.
  */
-export function clampWindowForDrag(bounds: WindowBounds, workspace: WindowBounds, edgeReveal = 80, topReveal = 0): WindowBounds {
+export function clampWindowForDrag(bounds: WindowBounds, workspace: WindowBounds, edgeReveal = 80, topReveal = 24): WindowBounds {
   const w = Math.max(260, Math.floor(bounds.w));
   const h = Math.max(220, Math.floor(bounds.h));
   const minX = workspace.x - (w - edgeReveal);
@@ -96,6 +96,45 @@ export function clampWindowForDrag(bounds: WindowBounds, workspace: WindowBounds
     w,
     h,
   };
+}
+
+/**
+ * Strict in-frame clamp — never lets any part of the window leave the
+ * workspace. Use when the user has opted into "Keep windows in frame" or
+ * during shell-driven layout (tile, snap-back, restore).
+ */
+export function clampWindowStrict(bounds: WindowBounds, workspace: WindowBounds): WindowBounds {
+  return clampWindowToWorkspace(bounds, workspace);
+}
+
+/**
+ * Cascade a new window position so it does not exactly overlap any existing
+ * window. Steps 28px down/right per occupied slot, wraps when it would leave
+ * the workspace.
+ */
+export function cascadeWindow(
+  base: WindowBounds,
+  occupied: Iterable<{ x: number; y: number }>,
+  workspace: WindowBounds,
+  step = 28,
+): WindowBounds {
+  const taken = new Set<string>();
+  for (const o of occupied) {
+    taken.add(`${Math.round(o.x)}:${Math.round(o.y)}`);
+  }
+  let { x, y } = base;
+  let attempts = 0;
+  while (taken.has(`${Math.round(x)}:${Math.round(y)}`) && attempts < 24) {
+    x += step;
+    y += step;
+    if (x + base.w > workspace.x + workspace.w || y + base.h > workspace.y + workspace.h) {
+      // Wrap back near the top-left of the workspace
+      x = workspace.x + step;
+      y = workspace.y + step;
+    }
+    attempts++;
+  }
+  return clampWindowToWorkspace({ ...base, x, y }, workspace);
 }
 
 export function isSameWindowBounds(a: WindowBounds, b: WindowBounds, tolerance = 0): boolean {

@@ -683,6 +683,15 @@ const VinxEditor: React.FC = () => {
       if (e.key === 'o' && !e.ctrlKey) { setOutPoint(); }
       // Add marker at current frame
       if (e.key === 'm' && !e.ctrlKey) { addMarker(currentFrame, ''); }
+      // Frame step: ',' = back one frame, '.' = forward one frame (Premiere/Resolve parity)
+      if (e.key === ',' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setCurrentFrame(Math.max(0, useVinxStore.getState().currentFrame - 1));
+      }
+      if (e.key === '.' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setCurrentFrame(useVinxStore.getState().currentFrame + 1);
+      }
       // Copy/Paste clip attributes
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         const state = useVinxStore.getState();

@@ -30,6 +30,7 @@ import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionC
 import { setSoundEnabled, isSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
 import UkiOverlay from './UkiOverlay';
+import { DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS } from '../uki';
 import { AppErrorBoundary as CanonicalErrorBoundary } from '../services/ErrorBoundary';
 import { getStoredTier, shouldKeepAlive, getMaxConcurrentApps, type DeviceTier } from '../services/TierManager';
 
@@ -43,12 +44,12 @@ import { getDockReflectionStyle } from '../shell/WallpaperAccent';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
 import StageManager, { STAGE_STRIP_WIDTH } from '../shell/StageManager';
 import AppSwitcher from '../shell/AppSwitcher';
-import { StaggeredContent } from '../shell/UIComponents';
 import { loadEngagement, saveEngagement, incrementStat, checkAchievements } from '../services/engagement';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
-import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds } from '../../shared/shell/windowLayout';
+import { idleContinuity } from '../services/IdleContinuity';
+import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
 
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
 function lazyRetry<T extends React.ComponentType<any>>(
@@ -104,6 +105,7 @@ const Home = lazyRetry(() => import('../pages/Home'));
 const Files = lazyRetry(() => import('../pages/Files'));
 const Browser = lazyRetry(() => import('../pages/Browser'));
 const Settings = lazyRetry(() => import('../pages/Settings'));
+const TaskManager = lazyRetry(() => import('../pages/TaskManager'));
 const Transfers = lazyRetry(() => import('../pages/Transfers'));
 const Notes = lazyRetry(() => import('../DEXAPPLICATIONS/notes/DexNotes'));
 const Tasks = lazyRetry(() => import('../pages/Tasks'));
@@ -148,7 +150,7 @@ const PDFViewer = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PDFViewe
 const PixelArt = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PixelArt'));
 
 // -- App ID type (all 22) --------------------------------------------------
-type AppId = 'home' | 'files' | 'browser' | 'settings' | 'transfers'
+type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
   | 'notes' | 'tasks' | 'power' | 'workflows' | 'gallery' | 'audio' | 'store' | 'games'
   | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl'
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
@@ -162,7 +164,8 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   browser: { w: 900, h: 600 },
   files: { w: 800, h: 550 },
   gallery: { w: 800, h: 550 },
-  settings: { w: 720, h: 500 },
+  settings: { w: 920, h: 620 },
+  taskmanager: { w: 880, h: 600 },
   notes: { w: 700, h: 500 },
   videoeditor: { w: 900, h: 600, maximized: true },
   imosion: { w: 850, h: 580, maximized: true },
@@ -204,15 +207,54 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   pixelart: { w: 900, h: 640, maximized: true },
 };
 
+const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
+  browser: { w: 720, h: 460 },
+  files: { w: 700, h: 460 },
+  gallery: { w: 700, h: 460 },
+  settings: { w: 820, h: 560 },
+  taskmanager: { w: 760, h: 520 },
+  notes: { w: 560, h: 420 },
+  workflows: { w: 640, h: 440 },
+  store: { w: 760, h: 520 },
+  games: { w: 760, h: 520 },
+  dexcode: { w: 760, h: 500 },
+  collabhub: { w: 760, h: 520 },
+};
+
+const getUsableFloatingBounds = (
+  appId: string,
+  bounds: { x: number; y: number; w: number; h: number },
+  workspace: { x: number; y: number; w: number; h: number },
+) => {
+  const min = APP_WINDOW_MIN_SIZES[appId] ?? { w: 360, h: 280 };
+  return clampWindowToWorkspace(
+    {
+      ...bounds,
+      w: Math.min(workspace.w, Math.max(bounds.w, min.w)),
+      h: Math.min(workspace.h, Math.max(bounds.h, min.h)),
+    },
+    workspace,
+  );
+};
+
 // Creative/pro apps that open maximized by default
 const CREATIVE_APPS: ReadonlySet<string> = new Set(['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl']);
 
 // Platform detection for title bar overlay handling
 const IS_WINDOWS = navigator.platform.includes('Win');
 
+// Heavy creative apps render their own canvas / GPU surfaces and should
+// never pay the backdrop-filter cost of the global glass system. Their
+// floating windows stay opaque so timelines, viewports, and editors render
+// at full performance.
+const HEAVY_APP_IDS: ReadonlySet<AppId> = new Set<AppId>([
+  'videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl', 'nexus', 'dexcode',
+  'canvas', 'pixelart', 'screenrecorder',
+]);
+
 // Map AppId to lazy component
 const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
-  home: Home, files: Files, browser: Browser, settings: Settings, transfers: Transfers,
+  home: Home, files: Files, browser: Browser, settings: Settings, taskmanager: TaskManager, transfers: Transfers,
   notes: Notes, tasks: Tasks, power: Power, workflows: Workflows,
   gallery: Gallery, audio: AudioPage, store: Store, games: Games,
   videoeditor: VideoEditor, imosion: Imosion, prism: Prism, flux: Flux, forge: Forge,
@@ -282,6 +324,7 @@ const Icons: Record<string, JSX.Element> = {
   unitconverter: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>,
   pomodoro: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><path d="M10 1h4"/></svg>,
   qrcode: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="2" y="2" width="8" height="8" rx="1"/><rect x="14" y="2" width="8" height="8" rx="1"/><rect x="2" y="14" width="8" height="8" rx="1"/><rect x="14" y="14" width="4" height="4"/><rect x="20" y="20" width="2" height="2"/><rect x="14" y="20" width="2" height="2"/><rect x="20" y="14" width="2" height="2"/></svg>,
+  taskmanager: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/><path d="M4 20h16"/></svg>,
   colorpicker: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>,
   nexus: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(30 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(-30 12 12)"/><circle cx="12" cy="12" r="2"/></svg>,
   learn: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
@@ -315,6 +358,7 @@ interface DockItem { id: AppId; label: string; color: string }
 const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
   // System
   { id: 'settings', label: 'Settings', color: 'var(--color-text-tertiary)' },
+  { id: 'taskmanager', label: 'Task Manager', color: 'var(--color-accent)' },
   { id: 'power', label: 'Power', color: 'var(--color-error)' },
   { id: 'recyclebin', label: 'Trash', color: 'var(--color-text-tertiary)' },
   // Productivity
@@ -502,6 +546,7 @@ const Loading: React.FC<{ appId?: string }> = ({ appId }) => {
       role="status"
       aria-busy="true"
       aria-label={`Loading ${appDef?.name || 'application'}`}
+      data-app-loading={appId || 'true'}
     >
       <div style={loadingToolbar} aria-hidden="true">
         <div style={loadingSkel(80)} />
@@ -598,19 +643,34 @@ export const AppManager: React.FC = () => {
     const onLock = () => {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Session locked' } }));
     };
+    // System suspend/OS-lock events: do not force a Dex lock overlay. Only lock when
+    // the user has explicitly enabled `lockOnSleep`. Always flush autosave + park work.
+    const onSystemSuspend = () => {
+      window.dispatchEvent(new CustomEvent('dex-system-suspend'));
+      try {
+        const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
+        if (cfg?.lockOnSleep) {
+          (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.lock?.();
+        }
+      } catch { /* ignore */ }
+    };
+    const onSystemLock = () => {
+      window.dispatchEvent(new CustomEvent('dex-system-lock'));
+      try {
+        const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
+        if (cfg?.lockOnSleep) {
+          (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.lock?.();
+        }
+      } catch { /* ignore */ }
+    };
     ipcRenderer.on?.('dex:resume', onResume);
     ipcRenderer.on?.('dex:lock-screen', onLock);
+    ipcRenderer.on?.('dex:system-suspend', onSystemSuspend);
+    ipcRenderer.on?.('dex:system-lock', onSystemLock);
 
-    // Fix blank screen when returning from sleep/lid close — force repaint on visibility change
-    const handleVisibilityResume = () => {
-      if (!document.hidden) {
-        requestAnimationFrame(() => {
-          document.body.style.opacity = '0.999';
-          requestAnimationFrame(() => { document.body.style.opacity = '1'; });
-        });
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityResume);
+    // Repaint on idle/sleep return is handled by ScreenGuardSystem (single source
+    // of truth). AppManager no longer flickers body opacity on visibility change
+    // — that caused the wallpaper to flash when returning from idle.
 
     // Check for crash recovery state
     (window as any).electron?.invoke?.('recovery:savedState').then((state: any) => {
@@ -623,11 +683,17 @@ export const AppManager: React.FC = () => {
     return () => {
       ipcRenderer.removeListener?.('dex:resume', onResume);
       ipcRenderer.removeListener?.('dex:lock-screen', onLock);
-      document.removeEventListener('visibilitychange', handleVisibilityResume);
+      ipcRenderer.removeListener?.('dex:system-suspend', onSystemSuspend);
+      ipcRenderer.removeListener?.('dex:system-lock', onSystemLock);
     };
   }, []);
   const dockRef = useRef<HTMLDivElement>(null);
   const dockHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Hover-intent for the bottom trigger zone — defers showDock() until cursor
+  // dwells with low velocity, preventing accidental popups when the user just
+  // sweeps past the bottom edge on the way to something else.
+  const dockIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dockIntentSampleRef = useRef<{ t: number; x: number; y: number } | null>(null);
   const dockMouseX = useRef<number | null>(null);
   const lastMenuCloseRef = useRef<number>(0);
   // Dock context menu
@@ -752,7 +818,7 @@ export const AppManager: React.FC = () => {
   const getShellWorkspace = useCallback((padding = 0) => getWorkspaceBounds(
     { width: window.innerWidth, height: window.innerHeight },
     {
-      topReserve: 34 + (showAppTabBar && runningApps.filter(a => a.id !== 'home').length > 0 ? 32 : 0),
+      topReserve: 0,
       dockReserve: 0,
       leftReserve: stageOffset,
       padding,
@@ -767,6 +833,30 @@ export const AppManager: React.FC = () => {
     w: Math.max(320, window.innerWidth),
     h: Math.max(260, window.innerHeight),
   }), []);
+
+  // Migrate legacy detached-window top offsets from older shell reserve logic.
+  useEffect(() => {
+    if (detachedApps.size === 0) return;
+    const workspace = getShellWorkspace(0);
+    setDetachedApps(prev => {
+      let changed = false;
+      const next = new Map(prev);
+      next.forEach((bounds, appId) => {
+        if (CREATIVE_APPS.has(appId) || isSameWindowBounds(bounds, getMaximizedWindowBounds(), 1)) return;
+        const legacyShift = bounds.y >= 64 ? 66 : (bounds.y >= 32 ? 34 : 0);
+        if (!legacyShift) return;
+        const migrated = clampWindowForDrag(
+          { x: bounds.x, y: bounds.y - legacyShift, w: bounds.w, h: bounds.h },
+          workspace,
+        );
+        if (!isSameWindowBounds(bounds, migrated, 1)) {
+          next.set(appId, { ...migrated, z: bounds.z });
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [detachedApps.size, getMaximizedWindowBounds, getShellWorkspace]);
 
   // -- Global stat-bump handler (sourced from all creative apps) -----------
   useEffect(() => {
@@ -784,6 +874,7 @@ export const AppManager: React.FC = () => {
   // -- App Switcher HUD (Ctrl+Tab visual overlay) --------------------------
   const [switcherVisible, setSwitcherVisible] = useState(false);
   const [switcherIndex, setSwitcherIndex] = useState(0);
+  const recentExternalOpenRef = useRef<Map<AppId, number>>(new Map());
 
   // -- Splash screen (first install only) ---------------------------------
   const [splashVisible, setSplashVisible] = useState(() => {
@@ -902,6 +993,47 @@ export const AppManager: React.FC = () => {
     if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
     setTaskbarVisible(true);
   }, [anyWindowMaximized]);
+
+  // Hover-intent gate for bottom trigger zone. Requires cursor to dwell ~140ms
+  // with average velocity below 0.45 px/ms before revealing the dock. This
+  // kills accidental popups when the cursor merely passes through the strip
+  // (e.g. while reaching for an app's bottom-edge control or scrollbar).
+  const cancelDockIntent = useCallback(() => {
+    if (dockIntentTimerRef.current) { clearTimeout(dockIntentTimerRef.current); dockIntentTimerRef.current = null; }
+    dockIntentSampleRef.current = null;
+  }, []);
+  const beginDockIntent = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    // Always honor pen/touch immediately — those are intentional.
+    const isPen = 'pointerType' in e && (e as React.PointerEvent).pointerType !== 'mouse';
+    if (isPen || taskbarVisible) { showDock(); return; }
+    dockIntentSampleRef.current = { t: performance.now(), x: e.clientX, y: e.clientY };
+    if (dockIntentTimerRef.current) clearTimeout(dockIntentTimerRef.current);
+    dockIntentTimerRef.current = setTimeout(() => {
+      dockIntentTimerRef.current = null;
+      // Velocity check happens in trackDockIntent on every move; if no move
+      // arrived (cursor is resting), velocity is 0 — definitely intentional.
+      showDock();
+    }, 140);
+  }, [taskbarVisible, showDock]);
+  const trackDockIntent = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    const sample = dockIntentSampleRef.current;
+    if (!sample || !dockIntentTimerRef.current) return;
+    const dt = performance.now() - sample.t;
+    if (dt < 1) return;
+    const dx = e.clientX - sample.x;
+    const dy = e.clientY - sample.y;
+    const v = Math.sqrt(dx * dx + dy * dy) / dt;
+    // Refresh sample baseline so velocity is computed over the last hop.
+    dockIntentSampleRef.current = { t: performance.now(), x: e.clientX, y: e.clientY };
+    // If still moving fast, restart the dwell window to require a fresh pause.
+    if (v > 0.45) {
+      clearTimeout(dockIntentTimerRef.current);
+      dockIntentTimerRef.current = setTimeout(() => {
+        dockIntentTimerRef.current = null;
+        showDock();
+      }, 140);
+    }
+  }, [showDock]);
   const scheduleDockHide = useCallback(() => {
     if (dockMode === 'always-visible' && !anyWindowMaximized) return;
     if (dockHideTimerRef.current) clearTimeout(dockHideTimerRef.current);
@@ -913,7 +1045,7 @@ export const AppManager: React.FC = () => {
       // Don't hide if a menu just closed (200ms grace period)
       if (Date.now() - lastMenuCloseRef.current < 200) return;
       setTaskbarVisible(false);
-    }, 300); // 300ms delay before auto-hide
+    }, 450); // 450ms — gentle delay so a brief overshoot does not hide the dock
   }, [dockMode, anyWindowMaximized, isAnyMenuOpen]);
 
   // Keep dock visible when mode is always-visible and no maximized window
@@ -945,8 +1077,81 @@ export const AppManager: React.FC = () => {
     }
     return () => {
       if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
+      if (dockIntentTimerRef.current) { clearTimeout(dockIntentTimerRef.current); dockIntentTimerRef.current = null; }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Self-heal on window focus / visibility return.
+  // If the user "left DEX" (alt-tab / sleep / minimize) and came back to a
+  // wallpaper-only screen, force-restore home and briefly show the dock so
+  // they always land somewhere useful.
+  useEffect(() => {
+    const heal = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState !== 'visible') return;
+      // Always re-show the dock on return so user has anchor controls.
+      if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
+      setTaskbarVisible(true);
+      // If the store points to an app that is not mounted anymore, fail-safe to home.
+      if (currentAppId !== 'home' && !mountedAppsRef.current.has(currentAppId as AppId)) {
+        mountedAppsRef.current.add('home');
+        setCurrentRunningApp('home');
+        forceUpdate(n => n + 1);
+      }
+      // Defer DOM probe to allow React commits + Suspense to settle.
+      requestAnimationFrame(() => {
+        try {
+          const fg = document.querySelector('[data-app-state="foreground"]');
+          // If no foreground container is present, reset to home.
+          const hasContent = fg instanceof HTMLElement && fg.childElementCount > 0;
+          if (!hasContent) {
+            mountedAppsRef.current.add('home');
+            setCurrentRunningApp('home');
+            forceUpdate(n => n + 1);
+          }
+        } catch { /* best effort */ }
+      });
+    };
+    const onVis = () => heal();
+    const onFocus = () => heal();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [currentAppId, setCurrentRunningApp]);
+
+  // Idle fallback policy: when DEX enters idle/background modes and later
+  // resumes, always land on Home instead of risking a wallpaper-only state.
+  // This keeps user context stable even after long idle / sleep transitions.
+  useEffect(() => {
+    const snapHome = () => {
+      if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
+      mountedAppsRef.current.add('home');
+      setCurrentRunningApp('home');
+      setTaskbarVisible(true);
+      forceUpdate(n => n + 1);
+    };
+
+    const onIdlePause = (event: Event) => {
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
+      if (reason === 'hidden' || reason === 'blur') {
+        snapHome();
+      }
+    };
+
+    const onIdleResume = () => {
+      snapHome();
+    };
+
+    window.addEventListener('dex:idle-pause', onIdlePause as EventListener);
+    window.addEventListener('dex:idle-resume', onIdleResume as EventListener);
+    return () => {
+      window.removeEventListener('dex:idle-pause', onIdlePause as EventListener);
+      window.removeEventListener('dex:idle-resume', onIdleResume as EventListener);
+    };
+  }, [setCurrentRunningApp]);
 
   // Global mouse position tracking for dock hide fallback
   // Ensures dock hides when mouse moves away from bottom edge region
@@ -959,17 +1164,43 @@ export const AppManager: React.FC = () => {
       return !!document.querySelector('[role="menu"], [role="listbox"], .dropdown:not([hidden]), .context-menu:not([hidden]), [data-state="open"]');
     };
     
+    // Magnetic retention zone — when dock is visible, use the dock's actual
+    // bounding box plus generous padding instead of a fixed center band so the
+    // user can move freely along the entire dock without losing it.
+    const RETAIN_PAD_TOP = 48;     // grace zone above the dock
+    const RETAIN_PAD_SIDES = 80;   // grace zone left/right (covers magnification overflow)
+    const RETAIN_PAD_BOTTOM = 24;  // grace below in case of edge overscroll
+
     const handleGlobalMove = (e: MouseEvent) => {
       // Only check when dock is visible
       if (!taskbarVisible) return;
       // Don't hide if menu is open (dock menu or any app menu)
       if (showAppMenuRef.current || dockCtxRef.current || isAnyMenuOpen()) return;
-      // Check if mouse is in dock zone (bottom 100px of screen)
-      const dockZoneTop = window.innerHeight - 100;
-      if (e.clientY < dockZoneTop) {
-        // Mouse is above dock zone - schedule hide
+
+      const dockEl = dockRef.current;
+      let inRetainZone = false;
+      if (dockEl) {
+        const r = dockEl.getBoundingClientRect();
+        inRetainZone =
+          e.clientX >= r.left - RETAIN_PAD_SIDES &&
+          e.clientX <= r.right + RETAIN_PAD_SIDES &&
+          e.clientY >= r.top - RETAIN_PAD_TOP &&
+          e.clientY <= r.bottom + RETAIN_PAD_BOTTOM;
+      } else {
+        // Fallback: bottom 96px strip when ref not yet bound.
+        inRetainZone = e.clientY >= window.innerHeight - 96;
+      }
+
+      if (!inRetainZone) {
+        // Cursor left the retention zone — schedule hide.
         if (!dockHideTimerRef.current) {
           scheduleDockHide();
+        }
+      } else {
+        // Cursor came back inside — cancel any pending hide.
+        if (dockHideTimerRef.current) {
+          clearTimeout(dockHideTimerRef.current);
+          dockHideTimerRef.current = null;
         }
       }
     };
@@ -1085,8 +1316,23 @@ export const AppManager: React.FC = () => {
 
   // Update last-active timestamp when switching apps
   useEffect(() => {
-    if (currentApp) lastActiveRef.current.set(currentApp, Date.now());
+    if (currentApp) {
+      lastActiveRef.current.set(currentApp, Date.now());
+      idleContinuity.setForegroundApp(currentApp);
+    }
   }, [currentApp]);
+
+  useEffect(() => {
+    const refresh = () => forceUpdate(n => n + 1);
+    window.addEventListener('dex-idle-continuity-change', refresh);
+    window.addEventListener('dex-app-background-refresh', refresh);
+    window.addEventListener('dex-continuity-resume', refresh);
+    return () => {
+      window.removeEventListener('dex-idle-continuity-change', refresh);
+      window.removeEventListener('dex-app-background-refresh', refresh);
+      window.removeEventListener('dex-continuity-resume', refresh);
+    };
+  }, []);
 
   // Background tab DOM unloading: only suspend apps the user has closed (not in runningApps)
   // Running apps stay mounted forever — user must close them explicitly or use shortcut to hide
@@ -1153,6 +1399,8 @@ export const AppManager: React.FC = () => {
   }, [currentApp, runningApps]);
 
   const handleCloseApp = useCallback((appId: string) => {
+    // Home is the desktop shell baseline and must never be closed.
+    if (appId === 'home') return;
     // Play exit animation before removing
     const el = contentRef.current?.querySelector(`[data-app-id="${appId}"]`) as HTMLElement | null;
     const doRemove = () => {
@@ -1215,6 +1463,36 @@ export const AppManager: React.FC = () => {
     return () => { if (menuAutoCloseRef.current) clearTimeout(menuAutoCloseRef.current); };
   }, [showAppMenu, showOverview, dockCtx]);
 
+  // Memory pressure -- reduce background footprint without closing user apps.
+  // Running apps remain mounted and resumable; only closed/non-running warm mounts
+  // are evicted under pressure.
+  useEffect(() => {
+    let mounted = true;
+    let importPromise: Promise<typeof import('../utils/MemorySentinel')> | null = null;
+    importPromise = import('../utils/MemorySentinel').catch(() => null as any);
+    const offs: Array<() => void> = [];
+    importPromise.then(mod => {
+      if (!mounted || !mod?.memorySentinel) return;
+      const shedWarmMounts = (limit: number) => {
+        const { runningApps: liveApps, currentAppId: focused } = useRunningApps.getState();
+        const liveIds = new Set(liveApps.map(a => a.id));
+        const candidates = Array.from(mountedAppsRef.current)
+          .filter(id => id !== 'home' && id !== focused && !liveIds.has(id))
+          .sort((a, b) => (lastActiveRef.current.get(a) ?? 0) - (lastActiveRef.current.get(b) ?? 0));
+        for (let i = 0; i < Math.min(limit, candidates.length); i++) {
+          mountedAppsRef.current.delete(candidates[i] as AppId);
+        }
+        if (candidates.length > 0) forceUpdate(n => n + 1);
+        window.dispatchEvent(new CustomEvent('dex-continuity-memory-pressure', {
+          detail: { level: limit > 1 ? 'critical' : 'high', evictedWarmMounts: Math.min(limit, candidates.length) },
+        }));
+      };
+      offs.push(mod.memorySentinel.on('high', () => shedWarmMounts(1)));
+      offs.push(mod.memorySentinel.on('critical', () => shedWarmMounts(6)));
+    });
+    return () => { mounted = false; offs.forEach(off => { try { off(); } catch { /* ignore */ } }); };
+  }, []);
+
   // Close app menu when clicking outside (robust click-outside pattern)
   useEffect(() => {
     if (!showAppMenu) { setAppMenuSearch(''); return; }
@@ -1254,6 +1532,11 @@ export const AppManager: React.FC = () => {
     setNavIndex(curIdx + 1);
     // All apps auto-detach as floating windows on desktop (macOS Tahoe)
     if (appId !== 'home') {
+      const isRunningAfterLaunch = useRunningApps.getState().isAppRunning(appId);
+      if (!isRunningAfterLaunch && !detachedApps.has(appId)) {
+        // Launch may be rejected (e.g., app limit on low-tier devices) — avoid ghost windows.
+        return;
+      }
       // Mount synchronously so renderKeepAlive sees it on the first render pass
       if (!mountedAppsRef.current.has(appId)) {
         mountedAppsRef.current.add(appId);
@@ -1280,22 +1563,26 @@ export const AppManager: React.FC = () => {
             next.set(appId, { ...workspace, z });
           } else if (def) {
             const fitted = fitWindowToWorkspace({ w: def.w, h: def.h }, workspace);
-            const x = Math.max(workspace.x, workspace.x + Math.round((workspace.w - fitted.w) / 2));
-            const y = Math.max(workspace.y, workspace.y + Math.round((workspace.h - fitted.h) / 2));
-            next.set(appId, { x, y, w: fitted.w, h: fitted.h, z });
+            const baseX = Math.max(workspace.x, workspace.x + Math.round((workspace.w - fitted.w) / 2));
+            const baseY = workspace.y + 8;
+            const occupied = Array.from(prev.values()).map(b => ({ x: b.x, y: b.y }));
+            const placed = cascadeWindow({ x: baseX, y: baseY, w: fitted.w, h: fitted.h }, occupied, workspace);
+            next.set(appId, { ...placed, z });
           } else {
-            // Unknown app: fall back to a reasonable default size, centered.
+            // Unknown app: fall back to a reasonable default size, centered, cascaded.
             const w = Math.min(900, Math.max(480, Math.round(workspace.w * 0.6)));
             const h = Math.min(640, Math.max(380, Math.round(workspace.h * 0.7)));
-            const x = workspace.x + Math.round((workspace.w - w) / 2);
-            const y = workspace.y + Math.round((workspace.h - h) / 2);
-            next.set(appId, { x, y, w, h, z });
+            const baseX = workspace.x + Math.round((workspace.w - w) / 2);
+            const baseY = workspace.y + 8;
+            const occupied = Array.from(prev.values()).map(b => ({ x: b.x, y: b.y }));
+            const placed = cascadeWindow({ x: baseX, y: baseY, w, h }, occupied, workspace);
+            next.set(appId, { ...placed, z });
           }
           return next;
         });
       });
     }
-  }, [getMaximizedWindowBounds, getShellWorkspace, launchApp, setCurrentRunningApp]);
+  }, [detachedApps, getMaximizedWindowBounds, getShellWorkspace, launchApp, setCurrentRunningApp]);
 
   const resolveRequestedAppId = useCallback((request: unknown): AppId | null => {
     if (!request || typeof request !== 'object' || Array.isArray(request)) return null;
@@ -1315,6 +1602,10 @@ export const AppManager: React.FC = () => {
     const onOpen = (event: Event) => {
       const appId = resolveRequestedAppId((event as CustomEvent).detail);
       if (!appId || appId === 'home') return;
+      const now = Date.now();
+      const last = recentExternalOpenRef.current.get(appId) ?? 0;
+      if (now - last < 300) return;
+      recentExternalOpenRef.current.set(appId, now);
       setCurrentApp(appId);
       setShowAppMenu(false);
       setAppMenuSearch('');
@@ -1792,6 +2083,34 @@ export const AppManager: React.FC = () => {
         action: () => setCurrentApp(id as AppId),
       });
     }
+    // UKI knowledge actions: shortcuts and workflows surface in Spotlight so
+    // users can discover capabilities by typing what they want, not the name.
+    for (const [label, keys] of Object.entries(DEX_GLOBAL_SHORTCUTS)) {
+      actions.push({
+        id: `uki-shortcut-${label}`,
+        label: `${label}  ${keys}`,
+        keywords: [label, keys, 'shortcut', 'hotkey', 'keyboard', 'uki'],
+        icon: 'keyboard',
+        action: () => {
+          window.dispatchEvent(new CustomEvent('dex-notification', {
+            detail: { title: 'Shortcut', body: `${label}: ${keys}`, type: 'info' },
+          }));
+        },
+      });
+    }
+    for (const wf of DEX_WORKFLOWS) {
+      actions.push({
+        id: `uki-workflow-${wf.id}`,
+        label: wf.title,
+        keywords: [wf.title, 'workflow', 'how to', 'guide', 'uki', ...wf.steps.flatMap(s => s.split(/\s+/))],
+        icon: 'sparkles',
+        action: () => {
+          window.dispatchEvent(new CustomEvent('dex-notification', {
+            detail: { title: wf.title, body: wf.steps.join(' -> '), type: 'info' },
+          }));
+        },
+      });
+    }
     spotlightEngine.registerActions(actions);
 
     const handleNavigate = (e: Event) => {
@@ -1980,8 +2299,14 @@ export const AppManager: React.FC = () => {
 
   // -- Keep-alive renderer -------------------------------------------------
   const mountedAppsSnapshot = Array.from(mountedAppsRef.current);
+  // Hard safety net: home must always be in the mounted snapshot.
+  // This prevents wallpaper-only states if any background eviction path ever
+  // drops home unexpectedly during idle/sleep transitions.
+  const mountedAppsSafeSnapshot = mountedAppsSnapshot.includes('home')
+    ? mountedAppsSnapshot
+    : ['home' as AppId, ...mountedAppsSnapshot];
   const keepAliveElements = useMemo(() => {
-    return mountedAppsSnapshot.map(appId => {
+    return mountedAppsSafeSnapshot.map(appId => {
       const Comp = APP_COMPONENTS[appId];
       if (!Comp) return null;
       const isCurrent = appId === currentApp;
@@ -1997,21 +2322,38 @@ export const AppManager: React.FC = () => {
         // Exact match for maximized state (no tolerance gaps)
         const maximizedBounds = getMaximizedWindowBounds();
         const isMaximized = isSameWindowBounds(detBounds, maximizedBounds, 1);
+        const workspaceBounds = getShellWorkspace(0);
+        const visibleBounds = isMaximized
+          ? maximizedBounds
+          : getUsableFloatingBounds(appId, detBounds, workspaceBounds);
+        // Heavy creative apps keep an opaque rendering surface (their canvas /
+        // GPU compositors should not pay the backdrop-filter cost). Shell-class
+        // apps use the unified glass token so the desktop and Home wallpaper
+        // remain visible underneath, restoring desktop continuity.
+        const isHeavyApp = HEAVY_APP_IDS.has(appId);
+        const useGlass = !isMaximized && !isHeavyApp;
         return (
           <div
             key={appId}
             data-floating-window={appId}
+            data-testid={`app-instance-${appId}`}
+            data-app-state="foreground"
+            data-window-glass={useGlass ? 'on' : 'off'}
             style={{
               position: 'fixed',
-              left: isMaximized ? maximizedBounds.x : detBounds.x,
-              top: isMaximized ? maximizedBounds.y : detBounds.y,
-              width: isMaximized ? maximizedBounds.w : detBounds.w,
-              height: isMaximized ? maximizedBounds.h : detBounds.h,
+              left: visibleBounds.x,
+              top: visibleBounds.y,
+              width: visibleBounds.w,
+              height: visibleBounds.h,
               zIndex: detBounds.z,
               display: isMinimized ? 'none' : 'flex', flexDirection: 'column',
               borderRadius: isMaximized ? 0 : 14, overflow: 'hidden',
-              background: 'var(--color-bg-base, #0C0C0E)',
-              border: isMaximized ? 'none' : '1px solid rgba(255,255,255,0.12)',
+              background: useGlass
+                ? 'var(--color-bg-glass-strong, rgba(26,26,30,0.85))'
+                : 'var(--color-bg-base, #0C0C0E)',
+              backdropFilter: useGlass ? 'blur(28px) saturate(160%)' : undefined,
+              WebkitBackdropFilter: useGlass ? 'blur(28px) saturate(160%)' : undefined,
+              border: isMaximized ? 'none' : '1px solid rgba(255,255,255,0.10)',
               ...adaptiveShadow(isMaximized ? 'none' : '0 20px 60px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08)'),
               contain: 'layout style paint',
               willChange: 'auto',
@@ -2025,8 +2367,8 @@ export const AppManager: React.FC = () => {
               style={{
                 height: 38, display: 'flex', alignItems: 'center', gap: 8,
                 padding: '0 14px', cursor: 'grab', userSelect: 'none',
-                background: '#1C1C20',
-                borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.12))', flexShrink: 0,
+                background: useGlass ? 'rgba(28,28,32,0.55)' : '#1C1C20',
+                borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
                 justifyContent: 'center',
                 touchAction: 'none',
                 WebkitAppRegion: 'drag',
@@ -2040,7 +2382,7 @@ export const AppManager: React.FC = () => {
                 titleBar.style.cursor = 'grabbing';
                 const startX = e.clientX;
                 const startY = e.clientY;
-                let dragBounds = detBounds;
+                let dragBounds = { ...visibleBounds, z: detBounds.z };
                 if (isMaximized) {
                   const workspace = getMaximizedWindowBounds();
                   const restored = restoredWindowBoundsRef.current.get(appId)
@@ -2137,8 +2479,8 @@ export const AppManager: React.FC = () => {
                       const b = prev.get(appId);
                       if (!b) return prev;
                       const next = new Map(prev);
-                      // Allow free drag (window may extend off-edge) — keep loose clamp
-                      const clamped = clampWindowForDrag({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
+                      // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
+                      const clamped = clampWindowToWorkspace({ x: finalX, y: finalY, w: dragBounds.w, h: dragBounds.h }, workspace);
                       next.set(appId, { ...b, ...clamped });
                       return next;
                     });
@@ -2155,7 +2497,9 @@ export const AppManager: React.FC = () => {
                 const appColor = appDef?.color || LAUNCHPAD_APPS.find(a => a.id === appId)?.color || '#8E8E93';
                 return (
                   <div style={{ width: 22, height: 22, borderRadius: 6, background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                    {AppIconPngs[appId] ? <AppIconImg appId={appId} size={22} /> : <span style={{ color: '#fff', display: 'flex', transform: 'scale(0.65)' }}>{Icons[appId] || Icons.home}</span>}
+                    {AppIconPngs[appId]
+                      ? <AppIconImg appId={appId} size={22} />
+                      : <span style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[appId] || <DexIcon name={APP_DEFINITIONS[appId]?.icon || appId} size={16} color="#fff" />}</span>}
                   </div>
                 );
               })()}
@@ -2534,6 +2878,158 @@ export const AppManager: React.FC = () => {
                 <path d="M8 8L8 8" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
             </div>
+            {/* Bottom-left corner (SW) */}
+            <div
+              data-resize-handle="sw"
+              style={{ position: 'absolute', left: 0, bottom: 0, width: 18, height: 18, cursor: 'nesw-resize', zIndex: 3 }}
+              onPointerDown={(e) => {
+                e.stopPropagation(); e.preventDefault();
+                const startX = e.clientX; const startY = e.clientY;
+                const startW = detBounds.w; const startH = detBounds.h; const startLeft = detBounds.x;
+                let rafId = 0;
+                const el = e.currentTarget.parentElement as HTMLElement;
+                if (el) el.setAttribute('data-dragging', 'true');
+                const onMove = (ev: PointerEvent) => {
+                  cancelAnimationFrame(rafId);
+                  rafId = requestAnimationFrame(() => {
+                    const workspace = getShellWorkspace(0);
+                    const dx = ev.clientX - startX;
+                    const desiredW = Math.max(360, startW - dx);
+                    const desiredLeft = startLeft + (startW - desiredW);
+                    const nl = Math.max(workspace.x, desiredLeft);
+                    const nw = startLeft + startW - nl;
+                    const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
+                    if (el) { el.style.width = nw + 'px'; el.style.left = nl + 'px'; el.style.height = nh + 'px'; }
+                  });
+                };
+                const onUp = (ev: PointerEvent) => {
+                  cancelAnimationFrame(rafId);
+                  document.removeEventListener('pointermove', onMove);
+                  document.removeEventListener('pointerup', onUp);
+                  if (el) el.removeAttribute('data-dragging');
+                  const workspace = getShellWorkspace(0);
+                  const dx = ev.clientX - startX;
+                  const desiredW = Math.max(360, startW - dx);
+                  const desiredLeft = startLeft + (startW - desiredW);
+                  const nl = Math.max(workspace.x, desiredLeft);
+                  const nw = startLeft + startW - nl;
+                  const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
+                  setDetachedApps(prev => {
+                    const b = prev.get(appId);
+                    if (!b) return prev;
+                    const next = new Map(prev);
+                    const clamped = clampWindowToWorkspace({ x: nl, y: b.y, w: nw, h: nh }, workspace);
+                    next.set(appId, { ...b, ...clamped });
+                    return next;
+                  });
+                };
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+              }}
+            />
+            {/* Top-right corner (NE) */}
+            <div
+              data-resize-handle="ne"
+              style={{ position: 'absolute', right: 0, top: 0, width: 18, height: 18, cursor: 'nesw-resize', zIndex: 3 }}
+              onPointerDown={(e) => {
+                e.stopPropagation(); e.preventDefault();
+                const startX = e.clientX; const startY = e.clientY;
+                const startW = detBounds.w; const startH = detBounds.h; const startTop = detBounds.y;
+                let rafId = 0;
+                const el = e.currentTarget.parentElement as HTMLElement;
+                if (el) el.setAttribute('data-dragging', 'true');
+                const onMove = (ev: PointerEvent) => {
+                  cancelAnimationFrame(rafId);
+                  rafId = requestAnimationFrame(() => {
+                    const workspace = getShellWorkspace(0);
+                    const dy = ev.clientY - startY;
+                    const desiredH = Math.max(280, startH - dy);
+                    const desiredTop = startTop + (startH - desiredH);
+                    const nt = Math.max(workspace.y, desiredTop);
+                    const nh = startTop + startH - nt;
+                    const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
+                    if (el) { el.style.width = nw + 'px'; el.style.height = nh + 'px'; el.style.top = nt + 'px'; }
+                  });
+                };
+                const onUp = (ev: PointerEvent) => {
+                  cancelAnimationFrame(rafId);
+                  document.removeEventListener('pointermove', onMove);
+                  document.removeEventListener('pointerup', onUp);
+                  if (el) el.removeAttribute('data-dragging');
+                  const workspace = getShellWorkspace(0);
+                  const dy = ev.clientY - startY;
+                  const desiredH = Math.max(280, startH - dy);
+                  const desiredTop = startTop + (startH - desiredH);
+                  const nt = Math.max(workspace.y, desiredTop);
+                  const nh = startTop + startH - nt;
+                  const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
+                  setDetachedApps(prev => {
+                    const b = prev.get(appId);
+                    if (!b) return prev;
+                    const next = new Map(prev);
+                    const clamped = clampWindowToWorkspace({ x: b.x, y: nt, w: nw, h: nh }, workspace);
+                    next.set(appId, { ...b, ...clamped });
+                    return next;
+                  });
+                };
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+              }}
+            />
+            {/* Top-left corner (NW) */}
+            <div
+              data-resize-handle="nw"
+              style={{ position: 'absolute', left: 0, top: 0, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 3 }}
+              onPointerDown={(e) => {
+                e.stopPropagation(); e.preventDefault();
+                const startX = e.clientX; const startY = e.clientY;
+                const startW = detBounds.w; const startH = detBounds.h;
+                const startLeft = detBounds.x; const startTop = detBounds.y;
+                let rafId = 0;
+                const el = e.currentTarget.parentElement as HTMLElement;
+                if (el) el.setAttribute('data-dragging', 'true');
+                const onMove = (ev: PointerEvent) => {
+                  cancelAnimationFrame(rafId);
+                  rafId = requestAnimationFrame(() => {
+                    const workspace = getShellWorkspace(0);
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+                    const desiredW = Math.max(360, startW - dx);
+                    const desiredH = Math.max(280, startH - dy);
+                    const nl = Math.max(workspace.x, startLeft + (startW - desiredW));
+                    const nt = Math.max(workspace.y, startTop + (startH - desiredH));
+                    const nw = startLeft + startW - nl;
+                    const nh = startTop + startH - nt;
+                    if (el) { el.style.width = nw + 'px'; el.style.height = nh + 'px'; el.style.left = nl + 'px'; el.style.top = nt + 'px'; }
+                  });
+                };
+                const onUp = (ev: PointerEvent) => {
+                  cancelAnimationFrame(rafId);
+                  document.removeEventListener('pointermove', onMove);
+                  document.removeEventListener('pointerup', onUp);
+                  if (el) el.removeAttribute('data-dragging');
+                  const workspace = getShellWorkspace(0);
+                  const dx = ev.clientX - startX;
+                  const dy = ev.clientY - startY;
+                  const desiredW = Math.max(360, startW - dx);
+                  const desiredH = Math.max(280, startH - dy);
+                  const nl = Math.max(workspace.x, startLeft + (startW - desiredW));
+                  const nt = Math.max(workspace.y, startTop + (startH - desiredH));
+                  const nw = startLeft + startW - nl;
+                  const nh = startTop + startH - nt;
+                  setDetachedApps(prev => {
+                    const b = prev.get(appId);
+                    if (!b) return prev;
+                    const next = new Map(prev);
+                    const clamped = clampWindowToWorkspace({ x: nl, y: nt, w: nw, h: nh }, workspace);
+                    next.set(appId, { ...b, ...clamped });
+                    return next;
+                  });
+                };
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+              }}
+            />
           </>
           )}
           </div>
@@ -2543,6 +3039,8 @@ export const AppManager: React.FC = () => {
       // -- Normal (non-detached) rendering ----------------------------------
       // Home is always visible as the desktop background behind floating windows
       const showInline = isVisible || appId === 'home';
+      const continuityClass = idleContinuity.getAppClass(appId);
+      const refreshIntervalMs = idleContinuity.getRefreshInterval(appId);
 
       // Deferred mounting: on low tiers, heavy background apps are unmounted
       // to free memory — they re-mount when switched back to foreground
@@ -2554,19 +3052,26 @@ export const AppManager: React.FC = () => {
         <div
           key={appId}
           data-app-id={appId}
+          data-testid={`app-instance-${appId}`}
           data-app-container=""
           data-app-state={isVisible ? 'foreground' : 'background'}
+          data-continuity-class={continuityClass}
+          data-refresh-interval-ms={refreshIntervalMs || undefined}
           aria-hidden={!showInline}
           style={{
             position: 'absolute',
             inset: 0,
-            display: showInline ? 'flex' : 'none',
+            display: 'flex',
+            opacity: showInline ? 1 : 0,
+            pointerEvents: showInline ? 'auto' : 'none',
             zIndex: appId === 'home' ? 0 : 1,
             flexDirection: 'column',
             willChange: showInline ? 'opacity, transform' : 'auto',
-            contain: showInline ? 'layout style' as any : 'layout style paint' as any,
-            contentVisibility: showInline ? 'auto' as any : 'hidden' as any,
-            containIntrinsicSize: '0 500px' as any,
+            // Use only layout/style containment regardless of visibility.
+            // 'paint' containment combined with content-visibility:auto caused
+            // background apps to lose their painted layer during OS idle and
+            // come back blank. Layout/style containment alone is safe.
+            contain: 'layout style' as any,
           }}
           className={`dex-app-container ${showInline ? 'dex-app-opening' : ''}`}
         >
@@ -2581,7 +3086,7 @@ export const AppManager: React.FC = () => {
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, mountedAppsSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, mountedAppsSafeSnapshot.join(',')]);
 
   // -- Dock rendering ------------------------------------------------------
   // Build dock items from pinned store
@@ -2609,13 +3114,14 @@ export const AppManager: React.FC = () => {
       dockMagRafRef.current = requestAnimationFrame(() => {
         if (!dockRef.current) return;
         const items = dockRef.current.querySelectorAll<HTMLElement>('[data-dock-item]');
+        const dockRect = dockRef.current.getBoundingClientRect();
         const sigma = 40;
         const influence = 80;
-        // Batch-read all rects first to avoid layout thrashing
+        // Use layout offsets instead of transformed DOMRects. Reading transformed
+        // rects feeds the previous scale back into the next frame and makes icons jitter.
         const centers: number[] = [];
         for (let i = 0; i < items.length; i++) {
-          const rect = items[i].getBoundingClientRect();
-          centers[i] = rect.left + rect.width / 2;
+          centers[i] = dockRect.left + items[i].offsetLeft + items[i].offsetWidth / 2;
         }
         // Then batch-write transforms
         for (let i = 0; i < items.length; i++) {
@@ -2623,8 +3129,11 @@ export const AppManager: React.FC = () => {
           const scale = dist <= influence
             ? 1 + (magnificationScale - 1) * 0.25 * Math.exp(-(dist * dist) / (2 * sigma * sigma))
             : 1;
+          const roundedScale = Math.round(scale * 1000) / 1000;
+          if (items[i].dataset.dockScale === String(roundedScale)) continue;
+          items[i].dataset.dockScale = String(roundedScale);
           items[i].style.transition = 'none';
-          items[i].style.transform = `scale(${scale})`;
+          items[i].style.transform = `scale(${roundedScale})`;
         }
       });
     }
@@ -2637,6 +3146,7 @@ export const AppManager: React.FC = () => {
       items.forEach(el => {
         el.style.transition = 'transform 0.22s cubic-bezier(0.23,1,0.32,1)';
         el.style.transform = 'scale(1)';
+        el.dataset.dockScale = '1';
       });
     }
     scheduleDockHide();
@@ -2689,14 +3199,15 @@ export const AppManager: React.FC = () => {
         const shortcut = dockShortcut[item.id];
         const tooltip = shortcut ? `${item.label}  (${shortcut})` : item.label;
 
-        // Continuity ring color: active = app color, minimized = amber, detached = cyan, running = dim white
-        const ringColor = isActive ? item.color : isMinimized ? '#f59e0b' : isDetached ? '#06b6d4' : isRunning ? 'var(--color-text-tertiary)' : 'transparent';
-        const showRing = isActive || isRunning || isMinimized || isDetached;
+        // No continuity ring or running indicator — users discover app state on their own.
 
         return (
         <div key={item.id} data-dock-item style={{
           position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-          transition: 'transform 0.18s cubic-bezier(0.34,1.56,0.64,1)',
+          // Smooth ease-out (no overshoot) — overshoot easing on a transform
+          // that's also being driven by mousemove magnification produced
+          // visible jitter. This easing only applies on hover-leave reset.
+          transition: 'transform 0.2s cubic-bezier(0.23,1,0.32,1)',
           transformOrigin: 'bottom center',
           willChange: dockMagnification ? 'transform' : 'auto',
         }}
@@ -2714,17 +3225,7 @@ export const AppManager: React.FC = () => {
             setDockPreview(null);
           }}
         >
-          {/* Continuity indicator ring */}
-          {showRing && (
-            <div style={{
-              position: 'absolute', inset: -3, borderRadius: 9999,
-              border: `1.5px solid ${ringColor}`,
-              boxShadow: isActive ? `0 0 8px ${item.color}44` : 'none',
-              opacity: isMinimized ? 0.6 : 1,
-              transition: 'border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease',
-              pointerEvents: 'none',
-            }} />
-          )}
+
           <button
             type="button"
             onPointerDown={(e) => {
@@ -2741,6 +3242,8 @@ export const AppManager: React.FC = () => {
             }}
             onKeyDown={(e) => handleDockKeyDown(e, items)}
             data-dock-app-id={item.id}
+            data-dock-icon={item.id}
+            data-running-app={isRunning ? 'true' : undefined}
             title={tooltip}
             aria-label={`Open ${item.label}${isRunning ? ' (running)' : ''}${isMinimized ? ' (minimized)' : ''}${shortcut ? ` - ${shortcut}` : ''}`}
             aria-current={isActive ? 'true' : undefined}
@@ -2755,26 +3258,18 @@ export const AppManager: React.FC = () => {
               opacity: isMinimized ? 0.5 : 1,
               transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), background 0.15s ease, opacity 0.25s ease',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-border)'; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
             {AppIconPngs[item.id] ? (
               <AppIconImg appId={item.id} size={size - 8} />
             ) : (
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color }}>
-                {Icons[item.id] || Icons.home}
+                {Icons[item.id] || <DexIcon name={APP_DEFINITIONS[item.id]?.icon || item.id} size={18} color={item.color} />}
               </span>
             )}
           </button>
-          <div style={{
-            width: isActive ? 4 : isRunning ? 3 : 0,
-            height: isActive ? 4 : isRunning ? 3 : 0,
-            borderRadius: '50%',
-            background: isActive ? item.color : 'var(--color-text-secondary)',
-            boxShadow: isActive ? `0 0 6px ${item.color}66` : 'none',
-            transition: 'width 0.3s cubic-bezier(0.23,1,0.32,1), height 0.3s cubic-bezier(0.23,1,0.32,1), opacity 0.3s cubic-bezier(0.23,1,0.32,1), background 0.3s cubic-bezier(0.23,1,0.32,1)',
-            opacity: (isRunning || isActive) ? 1 : 0,
-          }} />
+
         </div>
       );
       } catch (err) {
@@ -2964,8 +3459,10 @@ export const AppManager: React.FC = () => {
         style={{
           height: 32, display: 'flex', alignItems: 'center',
           padding: '0 8px', gap: 2,
-          background: 'var(--color-bg-surface-solid, #161618)',
-          borderBottom: '1px solid var(--color-bg-hover)',
+          background: 'var(--color-bg-glass, rgba(22,22,24,0.72))',
+          backdropFilter: 'blur(18px) saturate(170%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(170%)',
+          borderBottom: '1px solid var(--color-border-subtle)',
           flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
           scrollbarWidth: 'none',
         }}
@@ -2997,7 +3494,7 @@ export const AppManager: React.FC = () => {
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0 10px 0 8px', height: 26, borderRadius: 6,
-                background: isActive ? 'var(--color-border)' : isDragging ? 'var(--color-bg-elevated)' : 'transparent',
+                background: isActive ? 'rgba(74,158,255,0.16)' : isDragging ? 'var(--color-bg-glass-strong)' : 'transparent',
                 border: isActive ? '1px solid var(--color-border-subtle)' : isDragging ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
                 transform: isDragging ? `translateX(${dragOffset}px) scale(1.04)` : 'translateX(0) scale(1)',
@@ -3012,11 +3509,11 @@ export const AppManager: React.FC = () => {
               onMouseEnter={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              {(icon || AppIconPngs[app.id]) && (
-                <span style={{ display: 'flex', color, transform: AppIconPngs[app.id] ? 'none' : 'scale(0.55)', transformOrigin: 'center', flexShrink: 0, pointerEvents: 'none' }}>
-                  {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={14} /> : icon}
-                </span>
-              )}
+              <span style={{ display: 'flex', color, alignItems: 'center', justifyContent: 'center', flexShrink: 0, pointerEvents: 'none' }}>
+                {AppIconPngs[app.id]
+                  ? <AppIconImg appId={app.id} size={14} />
+                  : (icon || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={14} color={color} />)}
+              </span>
               <span style={{
                 fontSize: 11, fontWeight: isActive ? 600 : 500,
                 color: isActive ? '#fff' : 'var(--color-text-secondary)',
@@ -3054,9 +3551,11 @@ export const AppManager: React.FC = () => {
     <div style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      background: 'var(--color-bg-surface-solid)',
-      borderBottom: '1px solid var(--color-border)',
-      boxShadow: 'inset 0 0.5px 0 var(--color-border), inset 0 -0.5px 0 var(--color-border-subtle), 0 1px 6px rgba(74,158,255,0.08)',
+      background: 'rgba(14,14,17,0.46)',
+      backdropFilter: 'blur(30px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.08), 0 1px 10px rgba(0,0,0,0.22)',
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -3083,7 +3582,7 @@ export const AppManager: React.FC = () => {
         <button style={{...navBtnStyle, opacity: navIndex < navHistoryRef.current.length - 1 ? 1 : 0.4, cursor: navIndex < navHistoryRef.current.length - 1 ? 'pointer' : 'not-allowed'}} onClick={goForward} disabled={navIndex >= navHistoryRef.current.length - 1} data-tip="Forward" aria-label="Navigate forward" aria-disabled={navIndex >= navHistoryRef.current.length - 1}>
           {Icons.chevronRight}
         </button>
-        <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} data-tip="Home" aria-label="Go to Home">
+        <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
         <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--color-accent)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip="Browser (Ctrl+6)" aria-label="Open Browser">
@@ -3092,12 +3591,12 @@ export const AppManager: React.FC = () => {
       </div>
       <span style={{
         fontSize: 13, fontWeight: 500, color: 'var(--color-text-tertiary)',
-        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+        position: 'absolute', left: 280,
         letterSpacing: '-0.01em',
         display: currentApp === 'home' ? 'none' : 'flex', alignItems: 'center', gap: 6,
         WebkitAppRegion: 'no-drag',
         cursor: 'pointer',
-        maxWidth: 'calc(100% - 560px)',
+        maxWidth: 'calc(50% - 320px)',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -3113,8 +3612,10 @@ export const AppManager: React.FC = () => {
           return (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              background: 'var(--color-bg-hover)',
-              border: '1px solid var(--color-border-subtle)',
+              background: 'rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(20px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+              border: '1px solid rgba(255,255,255,0.09)',
               borderRadius: 20, padding: '2px 10px 2px 6px',
               height: 24, overflow: 'hidden',
             }}>
@@ -3142,10 +3643,8 @@ export const AppManager: React.FC = () => {
         })()}
       </span>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        {/* Clock - always visible, date + time clearly separated */}
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff', letterSpacing: '0.01em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.5)', opacity: 0.95 }}>
-          {clockStr}
-        </span>
+        {/* Date + time live in the draggable Clock widget on Home (user-placed).
+            Keeping the topbar minimal -- only system status indicators here. */}
         {/* Battery - always visible */}
         <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2.5, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
           <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1.5, background: batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
@@ -3189,18 +3688,19 @@ export const AppManager: React.FC = () => {
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => setTitlebarMenuOpen(v => !v)}
+            onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }}
             title="Controls"
             aria-label="Open control center"
             aria-expanded={titlebarMenuOpen}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 22, height: 18, borderRadius: 5,
-              background: titlebarMenuOpen ? 'var(--color-border)' : 'var(--color-bg-hover)',
-              border: '1px solid var(--color-border-subtle)',
+              background: titlebarMenuOpen ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.10)',
               cursor: 'pointer', padding: 0, transition: 'background 0.15s ease',
             }}
-            onMouseEnter={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'var(--color-border)'; }}
-            onMouseLeave={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+            onMouseEnter={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.14)'; }}
+            onMouseLeave={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round">
               <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
@@ -3216,11 +3716,11 @@ export const AppManager: React.FC = () => {
                 style={{
                   position: 'absolute', top: 24, right: 0, zIndex: 'var(--z-max)',
                   minWidth: 220, padding: '6px 0',
-                  background: 'var(--color-bg-surface-solid)',
-                  backdropFilter: 'none',
-                  WebkitBackdropFilter: 'none',
-                  borderRadius: 12, border: '1px solid var(--color-border)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                  background: 'rgba(24,24,28,0.70)',
+                  backdropFilter: 'blur(42px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(42px) saturate(180%)',
+                  borderRadius: 14, border: '1px solid rgba(255,255,255,0.10)',
+                  boxShadow: '0 18px 58px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.08)',
                   animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
                   transformOrigin: 'top right',
                 }}
@@ -3585,7 +4085,9 @@ export const AppManager: React.FC = () => {
             animation: 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
           } as React.CSSProperties}>
             <div style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewApp.color, background: `${previewApp.color}18`, flexShrink: 0 }}>
-              {AppIconPngs[previewApp.id] ? <AppIconImg appId={previewApp.id} size={20} /> : <span style={{ display: 'flex', transform: 'scale(0.65)' }}>{Icons[previewApp.id] || Icons.home}</span>}
+              {AppIconPngs[previewApp.id]
+                ? <AppIconImg appId={previewApp.id} size={20} />
+                : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[previewApp.id] || <DexIcon name={APP_DEFINITIONS[previewApp.id]?.icon || previewApp.id} size={18} color={previewApp.color} />}</span>}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>{previewApp.label}</span>
@@ -3746,16 +4248,19 @@ export const AppManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom hover trigger zone -- always active so dock pops on hover */}
+      {/* Bottom hover trigger zone -- center-only with hover-intent (velocity + dwell) to prevent accidental popups */}
       <div
-        onMouseEnter={() => { showDock(); }}
-        onMouseLeave={() => { scheduleDockHide(); }}
+        onMouseEnter={(e) => beginDockIntent(e)}
+        onMouseMove={(e) => trackDockIntent(e)}
+        onMouseLeave={() => { cancelDockIntent(); scheduleDockHide(); }}
         onTouchStart={showDock}
-        onPointerEnter={() => { showDock(); }}
-        onPointerLeave={() => { scheduleDockHide(); }}
+        onPointerEnter={(e) => beginDockIntent(e)}
+        onPointerMove={(e) => trackDockIntent(e)}
+        onPointerLeave={() => { cancelDockIntent(); scheduleDockHide(); }}
         style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          height: 36,
+          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: 320,
+          height: 32,
           zIndex: 5001, cursor: 'default', background: 'transparent',
           pointerEvents: anyWindowMaximized ? 'none' : 'auto',
         }}
@@ -3771,15 +4276,15 @@ export const AppManager: React.FC = () => {
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') showDock(); }}
             style={{
               position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
-              width: 48, height: 4, borderRadius: 2,
+              width: 44, height: 4, borderRadius: 2,
               background: 'rgba(255,255,255,0.15)',
               boxShadow: 'none',
               cursor: 'pointer',
               transition: 'opacity 0.25s cubic-bezier(0.23,1,0.32,1), width 0.25s cubic-bezier(0.23,1,0.32,1), transform 0.25s cubic-bezier(0.23,1,0.32,1)',
               pointerEvents: 'auto',
             }}
-            onMouseEnter={e => { e.currentTarget.style.width = '80px'; e.currentTarget.style.transform = 'translateX(-50%) scaleY(1.2)'; }}
-            onMouseLeave={e => { e.currentTarget.style.width = '64px'; e.currentTarget.style.transform = 'translateX(-50%)'; }}
+            onMouseEnter={e => { e.currentTarget.style.width = '64px'; e.currentTarget.style.transform = 'translateX(-50%) scaleY(1.15)'; }}
+            onMouseLeave={e => { e.currentTarget.style.width = '44px'; e.currentTarget.style.transform = 'translateX(-50%)'; }}
           />
         )}
       </div>
@@ -3822,14 +4327,13 @@ export const AppManager: React.FC = () => {
               borderRadius: 22,
               padding: '20px 20px 16px',
               boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)',
-              animation: 'appMenuSlideUp 0.28s cubic-bezier(0.23,1,0.32,1)',
+              animation: 'appMenuSlideUp 0.22s cubic-bezier(0.23,1,0.32,1)',
             } as React.CSSProperties}
           >
             <style>{`
               @keyframes appMenuSlideUp { 
-                0%   { opacity: 0; transform: translateX(-50%) translateY(16px) scale(0.95); } 
-                60%  { opacity: 1; transform: translateX(-50%) translateY(-3px) scale(1.01); }
-                100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } 
+                from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
+                to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
               }
             `}</style>
             {/* Search bar — pill style matching Home search */}
@@ -3869,8 +4373,10 @@ export const AppManager: React.FC = () => {
                 <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No apps or settings found</div>
               )}
               {searchResults.map(result => {
-                const resultIcon = (result.icon && (Icons as Record<string, JSX.Element>)[result.icon]) || Icons.settings;
+                const resultIcon = result.icon ? (Icons as Record<string, JSX.Element>)[result.icon] : null;
                 const categoryLabel = result.category === 'settings' ? 'Setting' : result.category === 'actions' ? 'Action' : 'App';
+                const appDef = APP_DEFINITIONS[result.id as AppId];
+                const iconName = result.icon || appDef?.icon || result.id || 'settings';
                 return (
                   <button
                     key={result.id}
@@ -3890,7 +4396,7 @@ export const AppManager: React.FC = () => {
                       background: `${result.color || '#8E8E93'}18`,
                       flexShrink: 0,
                     }}>
-                      {resultIcon}
+                      {resultIcon || <DexIcon name={iconName} size={16} color={result.color || '#8E8E93'} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{result.title}</div>
@@ -3903,10 +4409,11 @@ export const AppManager: React.FC = () => {
             </div>
                 );
               }
-              const filtered = LAUNCHPAD_APPS;
+              const filtered = Array.from(new Map(LAUNCHPAD_APPS.map(app => [app.id, app])).values());
               return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 6, justifyItems: 'center' }}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 4, justifyItems: 'center' }}
               aria-label="All applications"
+              data-launchpad-grid=""
               onKeyDown={(e) => {
                 // Item 150: Grid arrow key navigation in app menu
                 const btns = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
@@ -3928,14 +4435,14 @@ export const AppManager: React.FC = () => {
               {filtered.length === 0 && (
                 <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No apps found</div>
               )}
-              <StaggeredContent stagger={18} maxStagger={12}>
               {filtered.map(app => {
-                const icon = Icons[app.id] || Icons.home;
+                const icon = Icons[app.id] || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={24} color={app.color} />;
                 const isActive = currentApp === app.id;
                 const isRunning = runningApps.some(a => a.id === app.id);
                 return (
                   <button
                     key={app.id}
+                    data-launchpad-app-id={app.id}
                     onClick={() => { setCurrentApp(app.id as AppId); setShowAppMenu(false); }}
                     onContextMenu={(e) => {
                       e.preventDefault();
@@ -3944,8 +4451,8 @@ export const AppManager: React.FC = () => {
                     }}
                     className="dex-hover-lift"
                     style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                      padding: '10px 4px', borderRadius: 14, width: '100%',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                      padding: '7px 4px', borderRadius: 12, width: '100%',
                       background: 'transparent',
                       border: 'none', cursor: 'pointer',
                       transition: 'transform 0.3s cubic-bezier(0.23,1,0.32,1)',
@@ -3954,17 +4461,16 @@ export const AppManager: React.FC = () => {
                     <div style={{
                       color: app.color,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: 52, height: 52,
-                      borderRadius: 14,
-                      background: AppIconPngs[app.id] ? 'transparent' : `linear-gradient(145deg, ${app.color}28 0%, ${app.color}10 100%)`,
-                      border: `1px solid ${app.color}20`,
-                      boxShadow: isActive
-                        ? `0 4px 16px ${app.color}44, 0 2px 4px rgba(0,0,0,0.3)`
-                        : `0 2px 8px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.06)`,
+                      width: 42, height: 42,
+                      borderRadius: 12,
+                      // No glass tile behind the icon — the icon stands on its own.
+                      background: 'transparent',
+                      border: 'none',
+                      boxShadow: isActive ? `0 0 0 1.5px ${app.color}66` : 'none',
                       transition: 'box-shadow 0.25s cubic-bezier(0.23,1,0.32,1), transform 0.25s ease',
                       overflow: 'hidden',
                     }}>
-                      {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={48} /> : icon}
+                      {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={38} /> : icon}
                     </div>
                     <span style={{ fontSize: 10, color: isActive ? '#fff' : 'var(--color-text-secondary)', fontWeight: isActive ? 600 : 400, textAlign: 'center', lineHeight: 1.2, letterSpacing: '-0.01em' }}>{app.label}</span>
                     {isRunning && (
@@ -3973,7 +4479,6 @@ export const AppManager: React.FC = () => {
                   </button>
                 );
               })}
-              </StaggeredContent>
             </div>
               );
             })()}
@@ -4270,7 +4775,7 @@ const trafficBtn = (color: string): React.CSSProperties => ({
 
 const navBtnStyle: React.CSSProperties = {
   width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'transparent', border: 'none', color: 'var(--color-text-primary)',
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--color-text-primary)',
   cursor: 'pointer', borderRadius: 6, touchAction: 'manipulation',
   transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), background 0.15s ease',
 };

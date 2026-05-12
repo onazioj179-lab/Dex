@@ -1194,9 +1194,7 @@ export const Workflows: React.FC = () => {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%', height: '100%', display: 'flex',
-    background: 'rgba(28, 28, 32, 0.82)',
-    backdropFilter: 'blur(40px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+    background: '#1C1C20',
     color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px', overflow: 'hidden',
   },
   sidebar: {

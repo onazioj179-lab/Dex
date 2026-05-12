@@ -234,6 +234,7 @@ interface VinxState {
   addMedia: (item: MediaItem) => void;
   removeMedia: (id: string) => void;
   addBin: (parentId: string | null) => void;
+  updateMediaItem: (id: string, patch: Partial<MediaItem>) => void;
   removeBin: (id: string) => void;
   toggleBin: (id: string) => void;
   setMediaBin: (mediaId: string, binId: string | null) => void;
@@ -556,9 +557,14 @@ function checkRecovery(): { show: boolean; time: string } | null {
       if (parsed && parsed.modifiedAt) {
         const lastMod = parsed.modifiedAt;
         const age = Date.now() - lastMod;
-        if (age > 60000 && age < 86400000) {
+        // Widened window: any recovery <= 7 days old is offered.
+        // Previously age > 60s && age < 24h missed both immediate-crash and
+        // multi-day-old sessions, leaving valid recovery data hidden from the user.
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+        if (age >= 0 && age < SEVEN_DAYS) {
           const d = new Date(lastMod);
-          return { show: true, time: d.toLocaleTimeString() };
+          const sameDay = (Date.now() - age) > Date.now() - 24 * 60 * 60 * 1000;
+          return { show: true, time: sameDay ? d.toLocaleTimeString() : d.toLocaleString() };
         }
       }
     }
@@ -759,6 +765,12 @@ export const useVinxStore = create<VinxState>((set, get) => {
     removeMedia: (id) => set(s => ({
       project: { ...s.project, mediaBin: s.project.mediaBin.filter(m => m.id !== id) },
       isDirty: true,
+    })),
+    updateMediaItem: (id, patch) => set(s => ({
+      project: {
+        ...s.project,
+        mediaBin: s.project.mediaBin.map(m => m.id === id ? { ...m, ...patch } : m),
+      },
     })),
     addBin: (parentId) => set(s => {
       const bin: MediaBin = { id: generateId('bin'), name: 'New Bin', parentId, expanded: true };

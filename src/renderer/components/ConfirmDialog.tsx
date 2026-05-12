@@ -104,7 +104,7 @@ const backdropStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 9000,
+  zIndex: 6000,
   padding: space[4],
 };
 const dialogStyle: React.CSSProperties = {
@@ -122,3 +122,48 @@ const dialogStyle: React.CSSProperties = {
 const titleStyle: React.CSSProperties = { margin: 0, fontSize: fontSize.lg, fontWeight: fontWeight.semibold };
 const messageStyle: React.CSSProperties = { margin: 0, fontSize: fontSize.sm, color: 'var(--color-text-secondary, rgba(255,255,255,0.72))', lineHeight: 1.55 };
 const buttonRow: React.CSSProperties = { display: 'flex', gap: space[2], justifyContent: 'flex-end' };
+
+// =============================================================================
+// useConfirm — async helper that returns a Promise<boolean>.
+// Drop-in replacement for window.confirm() with proper focus/Esc/Enter handling.
+// Usage:
+//   const { confirm, ConfirmHost } = useConfirm();
+//   const ok = await confirm({ title: 'Delete?', tone: 'destructive' });
+//   ...render <ConfirmHost /> somewhere in your tree.
+// =============================================================================
+type ConfirmOptions = Omit<ConfirmDialogProps, 'open' | 'onConfirm' | 'onCancel'>;
+
+export function useConfirm() {
+  const [state, setState] = React.useState<{
+    opts: ConfirmOptions;
+    resolve: (v: boolean) => void;
+  } | null>(null);
+
+  const confirm = React.useCallback((opts: ConfirmOptions): Promise<boolean> => {
+    return new Promise<boolean>((resolve) => {
+      setState({ opts, resolve });
+    });
+  }, []);
+
+  const close = React.useCallback((value: boolean) => {
+    setState((curr) => {
+      if (curr) curr.resolve(value);
+      return null;
+    });
+  }, []);
+
+  const ConfirmHost = React.useCallback(() => {
+    if (!state) return null;
+    return (
+      <ConfirmDialog
+        {...state.opts}
+        open
+        onConfirm={() => close(true)}
+        onCancel={() => close(false)}
+      />
+    );
+  }, [state, close]);
+
+  return { confirm, ConfirmHost };
+}
+

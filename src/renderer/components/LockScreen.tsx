@@ -309,8 +309,12 @@ export const LockScreen: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [isWelcomeMode, dismissed, handleWelcomeDismiss]);
 
-  // Don't render welcome/lock screen if auth is not enabled — go straight to desktop
+  // Don't render welcome/lock screen if auth is not enabled — go straight to desktop.
+  // Critical: also bail when auth is disabled so a stray `isLocked: true` (e.g. initial
+  // store default or a stale persisted flag) can never paint a blank full-screen overlay
+  // over the live workspace.
   if (isWelcomeMode) return null;
+  if (!isEnabled) return null;
   if (!isLocked && !unlocking) return null;
 
   // Format time

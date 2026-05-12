@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { AppErrorState, AppLoadingState } from '../../ui/AppStates';
 
 interface WeatherDay {
   day: string;
@@ -118,6 +119,7 @@ const Weather: React.FC = () => {
   const [newLocation, setNewLocation] = useState('');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // Fetch real weather data when location changes
   useEffect(() => {
@@ -138,7 +140,7 @@ const Weather: React.FC = () => {
     })();
 
     return () => { cancelled = true; };
-  }, [location]);
+  }, [location, retryNonce]);
 
   const toF = (c: number) => Math.round(c * 9 / 5 + 32);
   const displayTemp = (c: number) => unit === 'F' ? toF(c) : c;
@@ -204,13 +206,18 @@ const Weather: React.FC = () => {
 
       {/* Loading / Error states */}
       {loading && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', fontSize: 14 }}>
-          Loading weather...
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <AppLoadingState rows={3} label="Loading weather" />
         </div>
       )}
       {error && !loading && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-error)', fontSize: 14 }}>
-          {error}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <AppErrorState
+            title="Weather unavailable"
+            description={error}
+            icon="cloud-off"
+            onRetry={() => setRetryNonce(n => n + 1)}
+          />
         </div>
       )}
 

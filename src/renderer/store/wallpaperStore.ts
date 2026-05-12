@@ -14,8 +14,9 @@
 
 import { create } from 'zustand';
 
-const ISLAND_DARK_WALLPAPER = new URL('../../../imagewallpapers/island-dark.jpg', import.meta.url).href;
-const SAND_DUNES_WALLPAPER = new URL('../../../imagewallpapers/sand-dunes-tower-tranquil-black-white-generative-ai.jpg', import.meta.url).href;
+// AVIF builds: ~85-90% smaller than the original JPGs (~15 MB install size win)
+const ISLAND_DARK_WALLPAPER = new URL('../../../imagewallpapers/island-dark.avif', import.meta.url).href;
+const SAND_DUNES_WALLPAPER = new URL('../../../imagewallpapers/sand-dunes-tower-tranquil-black-white-generative-ai.avif', import.meta.url).href;
 
 // ===========================================================================
 // TYPES

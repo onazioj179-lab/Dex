@@ -622,7 +622,7 @@ export const HelpTooltip: React.FC<TooltipProps> = memo(({
             color: '#fff',
             whiteSpace: 'nowrap',
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-            zIndex: 10001,
+            zIndex: 10000,
             animation: 'fadeInScale 150ms ease-out',
             pointerEvents: 'none',
           }}

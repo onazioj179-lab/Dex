@@ -422,11 +422,16 @@ const Forge: React.FC = () => {
     if (newJobs.length > 0) setSelectedJobId(newJobs[0].id);
   }, [selectedPreset, presets, customOutputDir]);
 
-  // Close tools menu on outside click
+  // Close tools menu on outside click or Escape key
   useEffect(() => {
     const handleClick = () => setShowToolsMenu(false);
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowToolsMenu(false); };
     window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   useEffect(() => {
@@ -1438,7 +1443,7 @@ const Forge: React.FC = () => {
             )}
           </div>
 
-          <div style={styles.sidebarContent}>
+          <div data-testid="forge-presets" style={styles.sidebarContent}>
             {activeTab === 'presets' && (
               <div>
                 <select style={{ ...styles.select, marginBottom: '12px' }} value={presetCategory} onChange={(e) => setPresetCategory(e.target.value)}>
@@ -1573,7 +1578,7 @@ const Forge: React.FC = () => {
         </div>
 
         {/* Main Queue Area */}
-        <div style={styles.mainArea} onDragOver={handleMainDragOver} onDragLeave={handleMainDragLeave} onDrop={handleMainDrop}>
+        <div data-testid="forge-queue" style={styles.mainArea} onDragOver={handleMainDragOver} onDragLeave={handleMainDragLeave} onDrop={handleMainDrop}>
           {dragOverMain && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 'var(--z-modal)',

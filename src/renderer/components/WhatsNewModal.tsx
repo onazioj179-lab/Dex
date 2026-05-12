@@ -12,6 +12,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusTrap } from '../utils/useFocusTrap';
 
 // Pulled from package.json at build time via vite.config.ts ('define' block).
 const WHATSNEW_VERSION = (import.meta.env.VITE_APP_VERSION as string) || 'current';
@@ -39,6 +40,7 @@ const ENTRIES: ChangelogEntry[] = [
 
 const WhatsNewModal: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {
     let lastSeen: string | null = null;
@@ -79,6 +81,7 @@ const WhatsNewModal: React.FC = () => {
       }}
     >
       <div
+        ref={trapRef}
         onClick={e => e.stopPropagation()}
         style={{
           width: 480, maxWidth: 'calc(100vw - 40px)',

@@ -55,7 +55,7 @@ export function usePerformance() {
     motionState: 'full',
     isResponsive: true,
     throttleLevel: 'none',
-    isIdle: true,
+    isIdle: false,
     memoryMB: 0,
     cpuUsage: 0,
     backgroundTasksRunning: 0,
@@ -246,7 +246,7 @@ export function usePerformance() {
         setState(prev => ({ ...prev, isIdle: true }));
         window.dex?.render?.reportStateChange('idle');
         window.dex?.stability?.reportIdle();
-      }, 100);
+      }, 60_000);
     };
     
     // Passive listeners for performance

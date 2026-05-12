@@ -200,7 +200,7 @@ export function AppLoading({ appName, isCreativeApp }: AppLoadingProps): JSX.Ele
 
     if (isCreativeApp) {
       const progressInterval = setInterval(() => {
-        setProgress(p => Math.min(p + Math.random() * 12, 90));
+        setProgress(p => Math.min(p + 10, 90));
       }, 450);
       return () => {
         clearInterval(dotInterval);

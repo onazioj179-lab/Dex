@@ -64,6 +64,19 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
 
 const STORAGE_KEY = 'dex-home-widgets';
 
+const DEFAULT_WIDGETS: Widget[] = [
+  {
+    id: 'default-clock',
+    type: 'clock',
+    title: 'Clock',
+    x: 32,
+    y: 110,
+    width: 280,
+    height: 150,
+    visible: true,
+  },
+];
+
 function loadWidgets(): Widget[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -72,7 +85,7 @@ function loadWidgets(): Widget[] {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch { /* ignore */ }
-  return [];
+  return DEFAULT_WIDGETS;
 }
 
 function saveWidgets(widgets: Widget[]) {

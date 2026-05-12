@@ -669,7 +669,7 @@ export const Viewer: React.FC<{
 
   if (viewerMode === 'dual') {
     return (
-      <div style={viewerContainerStyle}>
+      <div data-testid="vinx-viewer" style={viewerContainerStyle}>
         <div style={viewerTabBarStyle}>
           <div style={viewerTabStyle(activeViewer === 'source')} onClick={() => setActiveViewer('source')}>Source</div>
           <div style={viewerTabStyle(activeViewer === 'program')} onClick={() => setActiveViewer('program')}>Program</div>
@@ -727,7 +727,7 @@ export const Viewer: React.FC<{
 
   // Single viewer (program only)
   return (
-    <div style={viewerContainerStyle}>
+    <div data-testid="vinx-viewer" style={viewerContainerStyle}>
       <ViewerPanel
         label="Program"
         currentFrame={currentFrame}

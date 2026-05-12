@@ -30,10 +30,24 @@ const _tier = (): 'low' | 'mid' | 'high' | 'ultra' => {
 
 /** Returns a scaled backdrop-filter value based on device capability */
 export const adaptiveBlur = (highBlur: number, highSaturate = 200): { backdropFilter: string; WebkitBackdropFilter: string } => {
+  const glassMode = (() => {
+    try {
+      return document.documentElement.getAttribute('data-glass-effective-mode');
+    } catch {
+      return null;
+    }
+  })();
+  if (glassMode === 'off') {
+    return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
+  }
+
   const tier = _tier();
   if (tier === 'low') return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
-  const blur = tier === 'mid' ? Math.round(highBlur * 0.3) : highBlur;
-  const sat = tier === 'mid' ? Math.round(highSaturate * 0.6) : highSaturate;
+  const reducedScale = glassMode === 'reduced' ? 0.45 : 1;
+  const liquidScale = glassMode === 'liquid' ? 1.15 : 1;
+  const perfScale = tier === 'mid' ? 0.3 : 1;
+  const blur = Math.max(0, Math.round(highBlur * perfScale * reducedScale * liquidScale));
+  const sat = Math.max(100, Math.round(highSaturate * (tier === 'mid' ? 0.6 : 1) * (glassMode === 'reduced' ? 0.8 : 1)));
   const v = `blur(${blur}px) saturate(${sat}%)`;
   return { backdropFilter: v, WebkitBackdropFilter: v };
 };
@@ -48,7 +62,7 @@ export const adaptiveShadow = (highValue: string, midValue?: string): { boxShado
 
 /** Standard glass menu/dropdown: frosted glass with border */
 export const glassMenu: React.CSSProperties = {
-  background: 'rgba(28, 28, 32, 0.72)',
+  background: 'var(--color-bg-glass, rgba(28, 28, 32, 0.72))',
   ...adaptiveBlur(20, 180),
   border: '1px solid rgba(255, 255, 255, 0.12)',
   borderRadius: 6,
@@ -112,11 +126,11 @@ export const glassButtonHover: React.CSSProperties = {
  * runtime CSS variable `--dex-glass-bg` (set by shellPreferencesStore) so the
  * user can tune Liquid-Glass tint and opacity from Settings. */
 export const liquidGlassDock: React.CSSProperties = {
-  background: 'var(--dex-glass-bg, rgba(30, 30, 34, 0.65))',
-  ...adaptiveBlur(32, 180),
-  border: '1px solid rgba(255, 255, 255, 0.12)',
+  background: 'var(--dex-glass-bg, rgba(26, 26, 30, 0.46))',
+  ...adaptiveBlur(38, 190),
+  border: '1px solid rgba(255, 255, 255, 0.10)',
   borderRadius: 9999,
-  boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
+  boxShadow: '0 14px 48px rgba(0,0,0,0.42), 0 4px 14px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.10)',
 };
 
 /** Liquid glass for interactive buttons */
@@ -158,7 +172,7 @@ export const liquidGlassCard: React.CSSProperties = {
 
 /** Liquid glass app menu */
 export const liquidGlassAppMenu: React.CSSProperties = {
-  background: 'rgba(20, 20, 22, 0.85)',
+  background: 'var(--color-bg-glass-strong, rgba(20, 20, 22, 0.85))',
   ...adaptiveBlur(24, 190),
   border: '1px solid var(--color-border)',
   borderRadius: 22,
@@ -167,7 +181,7 @@ export const liquidGlassAppMenu: React.CSSProperties = {
 
 /** Glass notification banner -- for toasts, alerts */
 export const glassNotification: React.CSSProperties = {
-  background: 'rgba(22, 22, 24, 0.88)',
+  background: 'var(--color-bg-glass-strong, rgba(22, 22, 24, 0.88))',
   ...adaptiveBlur(20, 180),
   border: '1px solid var(--color-border)',
   borderRadius: 16,
@@ -177,7 +191,7 @@ export const glassNotification: React.CSSProperties = {
 
 /** Glass tooltip -- compact, sharp */
 export const glassTooltip: React.CSSProperties = {
-  background: 'rgba(22, 22, 24, 0.92)',
+  background: 'var(--color-bg-glass-strong, rgba(22, 22, 24, 0.92))',
   ...adaptiveBlur(16, 160),
   border: '1px solid var(--color-border)',
   borderRadius: 8,
@@ -189,7 +203,7 @@ export const glassTooltip: React.CSSProperties = {
 
 /** Glass sidebar -- for app sidebars, navigation panels */
 export const glassSidebar: React.CSSProperties = {
-  background: 'rgba(22, 22, 22, 0.80)',
+  background: 'var(--color-bg-glass, rgba(22, 22, 22, 0.80))',
   ...adaptiveBlur(20, 180),
   borderRight: '1px solid var(--color-border)',
   boxShadow: 'inset -0.5px 0 0 var(--color-bg-hover)',
@@ -197,7 +211,7 @@ export const glassSidebar: React.CSSProperties = {
 
 /** Glass modal -- strong glass for dialogs, confirmation panels */
 export const glassModal: React.CSSProperties = {
-  background: 'rgba(20, 20, 22, 0.92)',
+  background: 'var(--color-bg-glass-strong, rgba(20, 20, 22, 0.92))',
   ...adaptiveBlur(28, 200),
   border: '1px solid rgba(255,255,255,0.10)',
   borderRadius: 16,
@@ -281,7 +295,7 @@ export const premiumGlassOverlay: React.CSSProperties = {
 
 /** Glass tab bar -- for tab navigation containers */
 export const glassTabBar: React.CSSProperties = {
-  background: 'rgba(22, 22, 24, 0.80)',
+  background: 'var(--color-bg-glass, rgba(22, 22, 24, 0.80))',
   ...adaptiveBlur(16, 180),
   border: '1px solid var(--color-border)',
   borderRadius: 12,

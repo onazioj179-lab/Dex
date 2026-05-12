@@ -39,6 +39,13 @@ export interface UkiConversationTurn {
   success: boolean;
   timestamp: number;
   data?: unknown;
+  /**
+   * Ordered chain-of-thought trace. Each string is a brief reasoning step
+   * UKI took to reach the final response (e.g. "Checked slash commands",
+   * "Looked up running app: Notes", "Routed to local AI"). Surfaces in the
+   * "Show thinking" panel so the user sees real reasoning, not a stub.
+   */
+  thoughtSteps?: string[];
 }
 
 export interface UkiKnowledgeNode {

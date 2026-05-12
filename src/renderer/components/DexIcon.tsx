@@ -12,14 +12,15 @@
  */
 
 import React from 'react';
-import DOMPurify from 'dompurify';
 
-// Cache sanitized SVG paths — ICON_PATHS is static so sanitize once per icon
+// Cache static SVG fragments. ICON_PATHS is a local, trusted literal table;
+// sanitizing these path-only fragments outside an <svg> root strips valid
+// elements like <polyline>, leaving blank icons.
 const sanitizedCache = new Map<string, string>();
 function getSanitizedPath(pathData: string): string {
   let cached = sanitizedCache.get(pathData);
   if (!cached) {
-    cached = DOMPurify.sanitize(pathData, { USE_PROFILES: { svg: true } });
+    cached = pathData;
     sanitizedCache.set(pathData, cached);
   }
   return cached;
@@ -528,6 +529,20 @@ const ICON_PATHS: Record<string, string> = {
   'emoji-trophy': '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" fill="currentColor"/>',
   'emoji-medal': '<circle cx="12" cy="8" r="6" fill="currentColor"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
   'emoji-crown': '<path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" fill="currentColor"/><path d="M5 16h14v3H5z" fill="currentColor"/>',
+
+  // App-id glyphs (one per registered app — fallback letter glyph should never appear in normal use)
+  'note': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>',
+  'workflow': '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h3a3 3 0 0 1 3 3v6"/>',
+  'videoeditor': '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20M2 14h20M6 6v12M18 6v12"/>',
+  'imosion': '<path d="M3 12h3l2-7 4 14 2-7h7"/>',
+  'prism': '<path d="M12 2 L3 20 L21 20 Z"/><path d="M12 2 L7 20"/><path d="M12 2 L17 20"/>',
+  'flux': '<path d="M3 17c4-8 8-8 12 0M3 12c4-8 8-8 12 0M3 7c4-8 8-8 12 0"/><circle cx="19" cy="17" r="1.5" fill="currentColor"/>',
+  'forge': '<path d="M14 4l6 6-9 9-6-6z"/><path d="M9 9l-6 6 4 4 6-6"/><path d="M3 21l3-3"/>',
+  'axl': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/><circle cx="15" cy="15" r="2"/>',
+  'nexus': '<circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="7" x2="10" y2="10"/><line x1="17" y1="7" x2="14" y2="10"/><line x1="7" y1="17" x2="10" y2="14"/><line x1="17" y1="17" x2="14" y2="14"/>',
+  'vault': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/><line x1="6" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="18" y2="12"/>',
+  'powerapp': '<path d="M13 2 L4 14h7l-2 8 9-12h-7z" fill="currentColor"/>',
+  'cloud-off': '<line x1="2" y1="2" x2="22" y2="22"/><path d="M5.78 5.78A7 7 0 0 0 9 19h11a4.5 4.5 0 0 0 1.78-8.5"/><path d="M9 4.06A7 7 0 0 1 19.5 11"/>',
 };
 
 
@@ -550,14 +565,15 @@ const DexIcon: React.FC<DexIconProps> & {
   render: (name: string, size?: number, color?: string) => JSX.Element;
   has: (name: string) => boolean;
 } = ({ name, size = 16, color = 'currentColor', strokeWidth = 1.5, className, style, onClick, title }) => {
-  const pathData = ICON_PATHS[name];
+  const resolvedName = resolveIconName(name);
+  const pathData = ICON_PATHS[resolvedName] || ICON_PATHS[name];
   if (!pathData) {
     // Dev-time visibility for missing icons (warn once per name)
     if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
       if (!warnedMissing.has(name)) {
         warnedMissing.add(name);
         // eslint-disable-next-line no-console
-        console.warn(`[DexIcon] missing icon: "${name}"`);
+        console.warn(`[DexIcon] missing icon: "${name}" (resolved: "${resolvedName}")`);
       }
     }
     // Fallback: render a simple square with first letter
@@ -642,6 +658,37 @@ export const ICON_NAME_MAP: Record<string, string> = {
   'scan': 'qr-code', 'barcode': 'qr-code',
   'picker': 'color-picker', 'eyedropper': 'pipette',
   'white-noise': 'noise-generator', 'ambient': 'noise-generator',
+  'dexcode': 'code',
+  'screenrecorder': 'video',
+  'presentation': 'projector',
+  'pdfviewer': 'file-text',
+  'pixelart': 'grid',
+  'passwordgenerator': 'lock',
+  'taskmanager': 'activity',
+  'transfers': 'share',
+  'files': 'folder',
+  'browser': 'globe',
+  'notes': 'note',
+  'tasks': 'check-square',
+  'workflows': 'workflow',
+  'gallery': 'image',
+  'audio': 'music',
+  'games': 'gamepad',
+  'store': 'shopping-bag',
+  'kanban': 'layout-dashboard',
+  'achievements': 'trophy',
+  'recyclebin': 'trash',
+  'weather': 'cloud',
+  'worldclock': 'clock',
+  'noisegenerator': 'volume-2',
+  'learn': 'book-open',
+  'collabhub': 'users',
+  'canvas': 'pen-tool',
+  'timer': 'hourglass',
+  'unitconverter': 'calculator',
+  'pomodoro': 'clock',
+  'qrcode': 'grid',
+  'colorpicker': 'palette',
   
   // Text aliases for common use
   'star': 'emoji-star', 'sparkle': 'emoji-sparkle',
