@@ -18,6 +18,7 @@ import * as os from 'os';
 import log from 'electron-log';
 import si from 'systeminformation';
 import { NativeSystem, isNativeAvailable } from '../native/bridge';
+import { concurrencyEngine } from '../engine/ConcurrencyEngine';
 
 interface LogEntry {
   timestamp: string;
@@ -190,6 +191,16 @@ class DiagnosticsController {
     // Get system info
     ipcMain.handle('diagnostics:getSystemInfo', async () => {
       return await this.getSystemInfo();
+    });
+
+    // Scheduler / concurrency engine metrics. Used by the renderer dev panel
+    // to surface queue depth, fiber load, core affinity, and reclamation lag.
+    ipcMain.handle('system:schedulerMetrics', () => {
+      try {
+        return { ok: true, ts: Date.now(), data: concurrencyEngine.getStatus() };
+      } catch (err) {
+        return { ok: false, error: String(err) };
+      }
     });
 
     // Export diagnostics
