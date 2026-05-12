@@ -19,6 +19,7 @@ import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
+import { usePinRegistry } from '../store/pinRegistry';
 
 // ===========================================================================
 // TYPES
@@ -278,6 +279,17 @@ export const Files: React.FC = () => {
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [quickLookFile, setQuickLookFile] = useState<FileItem | null>(null);
   const [columnPath, setColumnPath] = useState<string[]>(['']); // For column view breadcrumb navigation
+
+  // Inline rename state (v2): when set, the matching row renders an <input>
+  // instead of the static filename span. Replaces the legacy window.prompt UX.
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<string>('');
+
+  // Pin Registry (v2): unified cross-shell pinning. Used here for folder pinning
+  // from the Quick Actions row. Live list is read for the "Pinned" indicator.
+  const pinFolder = usePinRegistry(s => s.pinFolder);
+  const unpinRegistry = usePinRegistry(s => s.unpin);
+  const pinnedFolders = usePinRegistry(s => s.listByKind('folder'));
   
   // Smart Search & Filter state
   const [filters, setFilters] = useState<SearchFilters>({
@@ -664,18 +676,30 @@ export const Files: React.FC = () => {
 
   const handleRenameFile = async (file: FileItem) => {
     setContextMenu(null);
-    const newName = window.prompt('Rename to:', file.name);
-    if (!newName?.trim() || newName === file.name) return;
+    // v2: enter inline rename mode instead of using window.prompt.
+    setRenamingPath(file.path);
+    setRenameDraft(file.name);
+  };
+
+  const commitInlineRename = useCallback(async (file: FileItem) => {
+    const next = renameDraft.trim();
+    setRenamingPath(null);
+    if (!next || next === file.name) return;
     try {
       if (window.electron?.invoke) {
-        await window.electron.invoke('files:rename', file.path, newName.trim());
+        await window.electron.invoke('files:rename', file.path, next);
         loadFiles(currentPath);
       }
     } catch (err) {
       console.error('Rename failed:', err);
       toast.error('Failed to rename file');
     }
-  };
+  }, [renameDraft, currentPath, loadFiles, toast]);
+
+  const cancelInlineRename = useCallback(() => {
+    setRenamingPath(null);
+    setRenameDraft('');
+  }, []);
 
   const handleShowInExplorer = async (file: FileItem) => {
     setContextMenu(null);
@@ -1257,6 +1281,53 @@ export const Files: React.FC = () => {
           </div>
         )}
 
+        {/* Quick Actions row (v2): Pin current folder + new folder + paste, always visible. */}
+        {currentPath && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px', background: 'var(--pg-toolbar, var(--color-bg-secondary))', borderBottom: '1px solid var(--pg-border, var(--color-border-subtle))', fontSize: 11 }}>
+            <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 600, marginRight: 4 }}>Quick Actions</span>
+            {(() => {
+              const folderName = currentPath.split(/[\\/]/).filter(Boolean).pop() || currentPath;
+              const matchingPin = pinnedFolders.find(p => (p as any).path === currentPath);
+              const isPinned = !!matchingPin;
+              return (
+                <button
+                  onClick={() => {
+                    if (isPinned && matchingPin) {
+                      unpinRegistry(matchingPin.id);
+                      toast.info(`Unpinned ${folderName}`);
+                    } else {
+                      pinFolder(currentPath, folderName);
+                      toast.success(`Pinned ${folderName}`);
+                    }
+                  }}
+                  aria-label={isPinned ? `Unpin folder ${folderName}` : `Pin folder ${folderName}`}
+                  style={{ padding: '3px 10px', borderRadius: 6, background: isPinned ? 'var(--color-accent-soft)' : 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: isPinned ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
+                >
+                  {isPinned ? 'Unpin folder' : 'Pin folder'}
+                </button>
+              );
+            })()}
+            <button
+              onClick={() => handleCreateFolder()}
+              style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
+              aria-label="New folder"
+            >
+              New folder
+            </button>
+            {clipboard && (
+              <button
+                onClick={() => handlePasteFile()}
+                style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
+                aria-label={`Paste ${clipboard.file.name}`}
+              >
+                Paste "{clipboard.file.name}"
+              </button>
+            )}
+            <div style={{ flex: 1 }} />
+            <span style={{ color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{filteredFiles.length} item{filteredFiles.length === 1 ? '' : 's'}</span>
+          </div>
+        )}
+
         {/* Batch Action Bar */}
         {selectedFiles.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)' }}>
@@ -1336,7 +1407,24 @@ export const Files: React.FC = () => {
                 >
                   <div style={styles.fileName}>
                     {getFileIcon(file)}
-                    <span>{file.name}</span>
+                    {renamingPath === file.path ? (
+                      <input
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        onBlur={() => commitInlineRename(file)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); commitInlineRename(file); }
+                          else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
+                        }}
+                        aria-label={`Rename ${file.name}`}
+                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
+                      />
+                    ) : (
+                      <span>{file.name}</span>
+                    )}
                     {fileTags[file.path] && (
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: TAG_COLORS[fileTags[file.path]], flexShrink: 0 }} />
                     )}
@@ -1414,7 +1502,24 @@ export const Files: React.FC = () => {
                   <div style={styles.gridIcon}>
                     {file.isDirectory ? getFileIcon(file, 48) : getFileIcon(file)}
                   </div>
-                  <span style={styles.gridLabel}>{file.name}</span>
+                  {renamingPath === file.path ? (
+                    <input
+                      autoFocus
+                      value={renameDraft}
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      onBlur={() => commitInlineRename(file)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commitInlineRename(file); }
+                        else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
+                      }}
+                      aria-label={`Rename ${file.name}`}
+                      style={{ width: '90%', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
+                    />
+                  ) : (
+                    <span style={styles.gridLabel}>{file.name}</span>
+                  )}
                   {!file.isDirectory && (
                     <span style={{ fontSize: 9, color: 'var(--color-text-tertiary, #666)', marginTop: -2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: '100%' }}>
                       {file.extension.replace('.', '').toUpperCase()}{file.size > 0 ? ` · ${formatSize(file.size)}` : ''}

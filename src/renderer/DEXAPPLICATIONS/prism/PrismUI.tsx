@@ -11,6 +11,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
+import { ContextBus } from '../../services/ContextBus';
 import {
   IconLayers as LayersIcon,
   IconBrush as BrushIcon,
@@ -695,6 +696,16 @@ export const AdvancedColorPicker = memo(function AdvancedColorPicker({
   const [hue, setHue] = useState(hsv.h);
   const [saturation, setSaturation] = useState(hsv.s);
   const [value, setValue] = useState(hsv.v);
+
+  // Cross-app continuity: announce stabilized color picks on the ContextBus so
+  // peer apps (Vinx, Imosion, Forge) can mirror without tight coupling.
+  useEffect(() => {
+    if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(color)) return;
+    const handle = window.setTimeout(() => {
+      ContextBus.emit('continuity:color', { source: 'prism', hex: color.toLowerCase() });
+    }, 120);
+    return () => window.clearTimeout(handle);
+  }, [color]);
   
   // Draw saturation/value gradient
   useEffect(() => {

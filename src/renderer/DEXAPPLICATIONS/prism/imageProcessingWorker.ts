@@ -22,7 +22,12 @@ const handlers: Record<string, Handler> = {
     Number(p.contrast ?? 0),
     Boolean(p.useLegacy ?? false),
   ),
-  exposure: (img, p) => Adj.adjustExposure(img, Number(p.stops ?? 0)),
+  exposure: (img, p) => Adj.adjustExposure(
+    img,
+    Number(p.stops ?? p.exposure ?? 0),
+    Number(p.offset ?? 0),
+    Number(p.gamma ?? 1),
+  ),
   vibrance: (img, p) => Adj.adjustVibrance(
     img,
     Number(p.vibrance ?? 0),

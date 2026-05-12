@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
+import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
+
+// Pulse v2: per-app process governance class. The renderer treats this as a hint;
+// downstream RenderGovernor / native scheduler can act on it as backends mature.
+type GovernanceClass = 'realtime' | 'foreground' | 'background' | 'frozen';
+const GOVERNANCE_LABEL: Record<GovernanceClass, string> = {
+  realtime: 'Realtime',
+  foreground: 'Foreground',
+  background: 'Background',
+  frozen: 'Frozen',
+};
 
 interface SystemProcess {
   pid: number;
@@ -184,6 +195,11 @@ const TaskManager: React.FC = () => {
   const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
   const [compactMode, setCompactMode] = useState(false);
   const [killing, setKilling] = useState<number | null>(null);
+
+  // Pulse v2: workspace grouping + governance state.
+  const stages = useStageStore(s => s.stages);
+  const activeStageId = useStageStore(s => s.activeStageId);
+  const [governance, setGovernance] = useState<Record<string, GovernanceClass>>({});
 
   const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
     setter(prev => {
@@ -413,6 +429,55 @@ const TaskManager: React.FC = () => {
       </div>
 
       <div style={styles.contentGrid}>
+        {!compactMode && stages.length > 0 && (
+        <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+          <div style={styles.panelHeader}>
+            <span>Workspaces</span>
+            <span style={styles.countPill}>{stages.length}</span>
+          </div>
+          <div style={{ ...styles.list, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {stages.map(stage => {
+              const stageApps = stage.windows.map(w => w.appId);
+              const isActive = stage.id === activeStageId;
+              return (
+                <div
+                  key={stage.id}
+                  style={{
+                    flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 10,
+                    border: '1px solid ' + (isActive ? 'rgba(74,158,255,0.42)' : 'var(--color-border-subtle)'),
+                    background: isActive ? 'rgba(74,158,255,0.06)' : 'rgba(255,255,255,0.03)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}>{stage.name}</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stage.posture}</span>
+                    {isActive && <span style={{ fontSize: 10, color: 'var(--color-accent)', marginLeft: 'auto' }}>active</span>}
+                  </div>
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {stageApps.length === 0 ? (
+                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>No windows captured</span>
+                    ) : stageApps.map(appId => {
+                      const def = APP_DEFINITIONS[appId];
+                      return (
+                        <span key={appId} title={def?.name || appId} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', fontSize: 11 }}>
+                          <DexIcon name={def?.icon || appId} size={11} color="#fff" strokeWidth={2.2} />
+                          {def?.name || appId}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            {stages.length === 1 && stages[0].id === STAGE_DEFAULT_ID && (
+              <div style={{ flex: '0 0 100%', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                Tip: create additional Stages to group windows by context (Edit, Focus, Music, Play).
+              </div>
+            )}
+          </div>
+        </section>
+        )}
+
         {!compactMode && (
         <section style={styles.panel}>
           <div style={styles.panelHeader}>
@@ -433,6 +498,17 @@ const TaskManager: React.FC = () => {
                     <div style={styles.appDetail}>{active ? 'Focused' : 'Background'} - open {formatAge(app.launchedAt)}</div>
                   </div>
                   <button style={styles.ghostButton} onClick={() => setCurrentApp(app.id)} aria-label={`Focus ${definition?.name || app.name}`}>Focus</button>
+                  <select
+                    value={governance[app.id] || 'foreground'}
+                    onChange={(e) => setGovernance(prev => ({ ...prev, [app.id]: e.target.value as GovernanceClass }))}
+                    aria-label={`Set governance for ${definition?.name || app.name}`}
+                    title="Process governance class"
+                    style={{ height: 28, borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', fontSize: 11, padding: '0 6px' }}
+                  >
+                    {(Object.keys(GOVERNANCE_LABEL) as GovernanceClass[]).map(g => (
+                      <option key={g} value={g}>{GOVERNANCE_LABEL[g]}</option>
+                    ))}
+                  </select>
                   <button style={styles.endButton} onClick={() => closeApp(app.id)} aria-label={`End ${definition?.name || app.name}`}>End</button>
                 </div>
               );

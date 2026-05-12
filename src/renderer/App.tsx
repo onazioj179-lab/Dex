@@ -44,6 +44,9 @@ import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
 import { SystemFeatures, useSessionAutoSave } from './components/SystemFeatures';
 import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
+import MiniPulse from './components/MiniPulse';
+import { useShellPreferences } from './store/shellPreferencesStore';
+import { loadManifest as loadWindowManifest, flush as flushWindowManifest } from './shell/WindowManifest';
 
 // Progressive loading (item 153): Shell + nav immediate, overlays deferred
 const AppManager = lazy(() => import('./components/AppManager').then(m => ({ default: m.AppManager })));
@@ -215,6 +218,7 @@ export const App: React.FC = () => {
 
   // System Diagnostics overlay (Ctrl+Shift+D)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const miniPulseEnabled = useShellPreferences(s => s.miniPulseEnabled);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
@@ -400,6 +404,26 @@ export const App: React.FC = () => {
     // Start user session
     useSessionService.getState().startSession();
 
+    // Restore previous session's window manifest (best-effort, ignored if missing)
+    try {
+      const restored = loadWindowManifest();
+      if (restored) {
+        useSystemEvents.getState().emit({
+          type: 'service_status',
+          data: { message: `Window manifest restored (${restored.windows.length} windows)`, ts: restored.capturedAt },
+          severity: 'info',
+        });
+      }
+    } catch {
+      // non-fatal
+    }
+
+    // Flush window manifest synchronously before the renderer is torn down.
+    const onBeforeUnload = () => {
+      try { flushWindowManifest(); } catch { /* non-fatal */ }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+
     // === DEFERRED: non-critical init via requestIdleCallback (item 144) ===
     const idleInit = () => {
       // Initialize shortcut conflict detection
@@ -436,6 +460,8 @@ export const App: React.FC = () => {
     // Cleanup on unmount
     return () => {
       document.removeEventListener('contextmenu', suppressNativeContext);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      try { flushWindowManifest(); } catch { /* non-fatal */ }
       cleanupXenon();
       usePerformanceMonitor.getState().stopMonitoring();
       useIntegrityMonitor.getState().stopMonitoring();
@@ -542,6 +568,14 @@ export const App: React.FC = () => {
         <Suspense fallback={null}>
           <DiagnosticsPanel open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
         </Suspense>
+      )}
+
+      {/* Mini Pulse -- always-on-top system monitor pill (opt-in via shell prefs) */}
+      {miniPulseEnabled && (
+        <MiniPulse
+          hidden={diagnosticsOpen}
+          onExpand={() => setDiagnosticsOpen(true)}
+        />
       )}
 
       {/* What's New modal (shown once per version) */}

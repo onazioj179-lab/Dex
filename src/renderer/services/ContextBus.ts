@@ -34,6 +34,23 @@ export interface ContextEventMap {
   'idle:enter':       { afterMs: number };
   'idle:exit':        { idleMs: number };
   'ambient:hint':     { id: string; text: string; severity?: 'info' | 'warn' };
+
+  // ----- Cross-app continuity channels -----------------------------------
+  /** Active color in any creative app -- shared palette focus. OKLCH preferred. */
+  'continuity:color':       { source: string; hex: string; oklch?: [number, number, number]; alpha?: number };
+  /** Timecode focus shared across DAW / video / motion apps. Seconds, fractional. */
+  'continuity:timecode':    { source: string; projectId?: string; seconds: number; fps?: number };
+  /** "Send to app" handoff -- routes payload + intent. Receivers ack via continuity:handoffAck. */
+  'continuity:handoff':     { id: string; from: string; to: string; kind: 'file' | 'asset' | 'selection' | 'clip' | 'layer'; payload: unknown };
+  'continuity:handoffAck':  { id: string; accepted: boolean; reason?: string };
+  /** A creative asset (brush, sample, LUT, palette) became active. */
+  'continuity:assetFocus':  { source: string; assetId: string; kind: 'brush' | 'palette' | 'sample' | 'lut' | 'font' | 'preset' };
+  /** Project context switched in any app -- enables shared project memory. */
+  'continuity:project':     { projectId: string; manifestPath?: string; source: string };
+  /** Stage / workspace switched. */
+  'continuity:stage':       { stageId: string; previousStageId?: string };
+  /** A live preview pipe started/ended between apps. */
+  'continuity:previewPipe': { pipeId: string; from: string; to: string; active: boolean };
 }
 
 export type ContextChannel = keyof ContextEventMap;

@@ -2246,6 +2246,18 @@ export const Settings: React.FC = () => {
             aria-label="Pin Stage Manager open"
           />
         </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Mini Pulse monitor</span>
+            <span style={styles.settingDesc}>Always-on-top pill showing CPU, memory, and FPS sparklines. Double-click to expand.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.miniPulseEnabled}
+            onChange={(e) => prefs.setMiniPulseEnabled(e.target.checked)}
+            aria-label="Enable Mini Pulse monitor"
+          />
+        </div>
 
         <h3 style={styles.sectionTitle}>Diagnostics</h3>
         <div style={styles.settingRow}>

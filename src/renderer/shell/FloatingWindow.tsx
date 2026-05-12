@@ -15,6 +15,7 @@ import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionC
 import * as Depth from './WindowDepthManager';
 import { playLift } from './SpatialAudio';
 import { isOperationActive, deferDuringOperation } from '../services/FluidOperations';
+import { detectZone as snapDetectZone, rectForZone as snapRectForZone, makeEnv as snapMakeEnv, type SnapZone as EngineSnapZone } from './snapEngine';
 
 // Throttle interval for snap zone detection (ms) - increased for better perf under memory pressure
 const SNAP_DETECT_THROTTLE_MS = 64;
@@ -64,45 +65,44 @@ export interface FloatingWindowProps {
 // ---------------------------------------------------------------------------
 // SNAP ZONE CONSTANTS
 // ---------------------------------------------------------------------------
+// Geometry is delegated to src/renderer/shell/snapEngine.ts so this component,
+// StageManager, and a future tiling overlay all share one source of truth.
 
-const SNAP_EDGE_PX = 24;
-const SNAP_TOP_PX = 40;
-const SNAP_CORNER_PX = 52;
 const SAFE_TOP = 0;
 const SAFE_GUTTER = 0;
 
-function detectSnapZone(x: number, y: number, windowWidth: number, windowHeight: number): SnapZone | null {
-  const nearLeft = x < SNAP_EDGE_PX;
-  const nearRight = x > windowWidth - SNAP_EDGE_PX;
-  const nearTop = y < SNAP_TOP_PX;
-  const nearTopCorner = y < SNAP_CORNER_PX;
+/** Map snapEngine's 13-zone vocabulary back onto FloatingWindow's 7-zone API. */
+function normalizeZone(z: EngineSnapZone | null): SnapZone | null {
+  if (!z) return null;
+  switch (z) {
+    case 'left':
+    case 'right':
+    case 'full':
+    case 'top-left':
+    case 'top-right':
+    case 'bottom-left':
+    case 'bottom-right':
+      return z;
+    // Thirds: collapse to halves so the existing FloatingWindow behavior is preserved.
+    case 'left-third':   return 'left';
+    case 'right-third':  return 'right';
+    case 'center-third': return null;
+    // Stash variants are not yet wired in FloatingWindow; treat as no-snap.
+    case 'stash-left':
+    case 'stash-right':
+    case 'stash-bottom':
+      return null;
+  }
+}
 
-  if (nearTop && !nearLeft && !nearRight) return 'full';
-  if (nearLeft && nearTopCorner) return 'top-left';
-  if (nearRight && nearTopCorner) return 'top-right';
-  if (nearLeft && y > windowHeight - SNAP_CORNER_PX) return 'bottom-left';
-  if (nearRight && y > windowHeight - SNAP_CORNER_PX) return 'bottom-right';
-  if (nearLeft) return 'left';
-  if (nearRight) return 'right';
-  return null;
+function detectSnapZone(x: number, y: number, windowWidth: number, windowHeight: number): SnapZone | null {
+  const env = snapMakeEnv(windowWidth, windowHeight, { top: SAFE_TOP, left: SAFE_GUTTER, right: SAFE_GUTTER, bottom: SAFE_GUTTER });
+  return normalizeZone(snapDetectZone(x, y, env));
 }
 
 function getSnapBounds(zone: SnapZone): { x: number; y: number; width: number; height: number } {
-  const sw = window.innerWidth;
-  const sh = window.innerHeight;
-  const safeX = SAFE_GUTTER;
-  const safeY = SAFE_TOP + SAFE_GUTTER;
-  const safeW = Math.max(320, sw - SAFE_GUTTER * 2);
-  const safeH = Math.max(260, sh - SAFE_TOP - SAFE_GUTTER * 2);
-  switch (zone) {
-    case 'full':         return { x: safeX, y: safeY, width: safeW, height: safeH };
-    case 'left':         return { x: safeX, y: safeY, width: safeW / 2, height: safeH };
-    case 'right':        return { x: safeX + safeW / 2, y: safeY, width: safeW / 2, height: safeH };
-    case 'top-left':     return { x: safeX, y: safeY, width: safeW / 2, height: safeH / 2 };
-    case 'top-right':    return { x: safeX + safeW / 2, y: safeY, width: safeW / 2, height: safeH / 2 };
-    case 'bottom-left':  return { x: safeX, y: safeY + safeH / 2, width: safeW / 2, height: safeH / 2 };
-    case 'bottom-right': return { x: safeX + safeW / 2, y: safeY + safeH / 2, width: safeW / 2, height: safeH / 2 };
-  }
+  const env = snapMakeEnv(window.innerWidth, window.innerHeight, { top: SAFE_TOP, left: SAFE_GUTTER, right: SAFE_GUTTER, bottom: SAFE_GUTTER });
+  return snapRectForZone(zone, env);
 }
 
 // ---------------------------------------------------------------------------
