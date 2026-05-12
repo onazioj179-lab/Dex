@@ -9,7 +9,7 @@
  * Clean settings panel with sections
  */
 
-import React, { useState, memo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
 import { useToastHelpers } from '../components/Toast';
 import { Select } from '../components/Select';
@@ -1239,6 +1239,16 @@ const DEFAULT_SETTINGS = {
   ukiAutoCleanup: true,
   ukiShowTranscript: true,
   ukiPersonality: 'casual' as 'formal' | 'casual',
+
+  // UKI Voice (TTS) preferences -- default to a female voice when available
+  ukiVoiceGender: 'female' as 'female' | 'male' | 'auto',
+  ukiVoiceURI: '' as string,
+  ukiVoiceRate: 1.0,
+  ukiVoicePitch: 1.0,
+  ukiVoiceVolume: 1.0,
+
+  // Language & Region
+  ukiLocale: 'auto' as string,
 };
 
 // ===============================================================================
@@ -1313,6 +1323,193 @@ const TextDensityControls: React.FC<{
             style={{ accentColor: 'var(--color-accent)', width: 18, height: 18, cursor: 'pointer' }}
           />
         </label>
+      </div>
+    </>
+  );
+};
+
+// =============================================================================
+// UKI VOICE SECTION -- gender preference, voice picker, rate/pitch/volume,
+// language locale and a preview button. Defaults to a female system voice
+// when one is available; falls back to the platform default with explanation.
+// =============================================================================
+type UkiVoiceSectionProps = {
+  styles: any;
+  settings: any;
+  setSettings: React.Dispatch<React.SetStateAction<any>>;
+  renderSelect: (key: any, label: string, description: string, options: { value: string; label: string }[]) => React.ReactElement;
+};
+
+const FEMALE_VOICE_HINTS = ['female', 'woman', 'samantha', 'victoria', 'karen', 'tessa', 'fiona', 'moira', 'serena', 'allison', 'ava', 'susan', 'zira', 'aria', 'jenny', 'libby', 'sonia', 'amber', 'ashley', 'michelle', 'monica', 'paulina', 'sara'];
+const MALE_VOICE_HINTS = ['male', 'man', 'daniel', 'alex', 'fred', 'oliver', 'tom', 'david', 'mark', 'george', 'james', 'guy', 'ryan', 'brian', 'aaron'];
+
+function classifyVoiceGender(v: SpeechSynthesisVoice): 'female' | 'male' | 'unknown' {
+  const hay = `${v.name} ${v.voiceURI}`.toLowerCase();
+  if (FEMALE_VOICE_HINTS.some(h => hay.includes(h))) return 'female';
+  if (MALE_VOICE_HINTS.some(h => hay.includes(h))) return 'male';
+  return 'unknown';
+}
+
+export function pickPreferredVoice(
+  voices: SpeechSynthesisVoice[],
+  prefs: { gender?: 'female' | 'male' | 'auto'; voiceURI?: string; locale?: string },
+): SpeechSynthesisVoice | null {
+  if (!voices.length) return null;
+  if (prefs.voiceURI) {
+    const exact = voices.find(v => v.voiceURI === prefs.voiceURI);
+    if (exact) return exact;
+  }
+  const localePrefix = (prefs.locale && prefs.locale !== 'auto')
+    ? prefs.locale.toLowerCase()
+    : (typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : 'en');
+  const localeMatches = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(localePrefix.slice(0, 2)));
+  const pool = localeMatches.length ? localeMatches : voices;
+  if (prefs.gender && prefs.gender !== 'auto') {
+    const hit = pool.find(v => classifyVoiceGender(v) === prefs.gender);
+    if (hit) return hit;
+  }
+  // Default preference: female voice if available
+  const female = pool.find(v => classifyVoiceGender(v) === 'female');
+  if (female) return female;
+  return pool[0] ?? null;
+}
+
+const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, setSettings, renderSelect }) => {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [previewing, setPreviewing] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const load = () => setVoices(window.speechSynthesis.getVoices());
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const gender = (settings.ukiVoiceGender || 'female') as 'female' | 'male' | 'auto';
+    if (gender === 'auto') return voices;
+    return voices.filter(v => {
+      const g = classifyVoiceGender(v);
+      return g === gender || g === 'unknown';
+    });
+  }, [voices, settings.ukiVoiceGender]);
+
+  const voiceOptions: { value: string; label: string }[] = useMemo(() => ([
+    { value: '', label: filtered.length ? 'Auto (best match)' : 'No system voices detected' },
+    ...filtered.map(v => ({
+      value: v.voiceURI,
+      label: `${v.name} -- ${v.lang}${classifyVoiceGender(v) !== 'unknown' ? ` (${classifyVoiceGender(v)})` : ''}`,
+    })),
+  ]), [filtered]);
+
+  const localeOptions: { value: string; label: string }[] = [
+    { value: 'auto', label: 'Auto (system)' },
+    { value: 'en', label: 'English' },
+    { value: 'en-US', label: 'English (United States)' },
+    { value: 'en-GB', label: 'English (United Kingdom)' },
+    { value: 'es', label: 'Espanol' },
+    { value: 'fr', label: 'Francais' },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'it', label: 'Italiano' },
+    { value: 'pt', label: 'Portugues' },
+    { value: 'ja', label: 'Japanese' },
+    { value: 'ko', label: 'Korean' },
+    { value: 'zh', label: 'Chinese' },
+    { value: 'ar', label: 'Arabic (RTL)' },
+    { value: 'he', label: 'Hebrew (RTL)' },
+    { value: 'ru', label: 'Russian' },
+    { value: 'hi', label: 'Hindi' },
+    { value: 'tr', label: 'Turkish' },
+  ];
+
+  const handlePreview = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance('Hello, this is your DEX voice. How can I help you today?');
+      const v = pickPreferredVoice(voices, {
+        gender: settings.ukiVoiceGender,
+        voiceURI: settings.ukiVoiceURI,
+        locale: settings.ukiLocale,
+      });
+      if (v) utterance.voice = v;
+      utterance.rate = Number(settings.ukiVoiceRate ?? 1);
+      utterance.pitch = Number(settings.ukiVoicePitch ?? 1);
+      utterance.volume = Number(settings.ukiVoiceVolume ?? 1);
+      utterance.onend = () => setPreviewing(false);
+      utterance.onerror = () => setPreviewing(false);
+      setPreviewing(true);
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setPreviewing(false);
+    }
+  };
+
+  const renderFloatSlider = (key: 'ukiVoiceRate' | 'ukiVoicePitch' | 'ukiVoiceVolume', label: string, description: string, min: number, max: number, step: number) => (
+    <div style={styles.settingRow}>
+      <div style={styles.settingInfo}>
+        <span style={styles.settingLabel}>{label}</span>
+        <span style={styles.settingDesc}>{description}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={Number(settings[key] ?? 1)}
+          onChange={e => setSettings((prev: any) => ({ ...prev, [key]: Number(e.target.value) }))}
+          style={{ width: 140, accentColor: 'var(--color-accent, #0a84ff)' }}
+          aria-label={label}
+        />
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>
+          {Number(settings[key] ?? 1).toFixed(2)}
+        </span>
+      </div>
+    </div>
+  );
+
+  const ttsAvailable = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+  return (
+    <>
+      <h3 style={styles.sectionTitle}>Voice & Language</h3>
+      {!ttsAvailable && (
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 0' }}>
+          Speech synthesis is not available in this runtime.
+        </div>
+      )}
+      {renderSelect('ukiVoiceGender', 'Voice gender', 'Prefer a female or male voice when available', [
+        { value: 'female', label: 'Female (recommended)' },
+        { value: 'male', label: 'Male' },
+        { value: 'auto', label: 'Auto (system default)' },
+      ])}
+      {renderSelect('ukiVoiceURI', 'Voice', voices.length ? 'Pick a specific voice or leave on Auto' : 'Voices load asynchronously -- reopen Settings if empty', voiceOptions)}
+      {renderSelect('ukiLocale', 'Language', 'UI and voice language preference', localeOptions)}
+      {renderFloatSlider('ukiVoiceRate', 'Speech rate', 'How fast UKI speaks', 0.5, 2.0, 0.05)}
+      {renderFloatSlider('ukiVoicePitch', 'Pitch', 'Voice pitch', 0.5, 2.0, 0.05)}
+      {renderFloatSlider('ukiVoiceVolume', 'Volume', 'Speech volume', 0, 1, 0.05)}
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Preview</span>
+          <span style={styles.settingDesc}>Hear the current voice settings</span>
+        </div>
+        <button
+          type="button"
+          onClick={handlePreview}
+          disabled={!ttsAvailable || previewing}
+          aria-label="Preview UKI voice"
+          style={{
+            padding: '6px 14px', borderRadius: 8, fontSize: 12,
+            border: '1px solid var(--color-border)',
+            background: previewing ? 'var(--color-bg-active)' : 'var(--color-bg-hover)',
+            color: 'var(--color-text-primary)', cursor: ttsAvailable ? 'pointer' : 'not-allowed',
+            opacity: ttsAvailable ? 1 : 0.5,
+          }}
+        >
+          {previewing ? 'Speaking...' : 'Preview voice'}
+        </button>
       </div>
     </>
   );
@@ -3412,6 +3609,13 @@ export const Settings: React.FC = () => {
         { value: 'casual', label: 'Casual' },
         { value: 'formal', label: 'Formal' },
       ])}
+
+      <UkiVoiceSection
+        styles={styles}
+        settings={settings}
+        setSettings={setSettings}
+        renderSelect={renderSelect}
+      />
 
       <h3 style={styles.sectionTitle}>Wake Word</h3>
       {renderToggle('ukiWakeWordEnabled', 'Wake Word Detection', 'Activate UKI by saying the wake phrase')}

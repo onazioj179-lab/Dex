@@ -225,9 +225,38 @@ export function initUkiRendererBridge(): void {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.8;
+      // Apply user voice preferences from Settings (gender, voice, rate, pitch, volume, locale).
+      let prefs: { ukiVoiceGender?: 'female' | 'male' | 'auto'; ukiVoiceURI?: string; ukiVoiceRate?: number; ukiVoicePitch?: number; ukiVoiceVolume?: number; ukiLocale?: string } = {};
+      try {
+        const raw = localStorage.getItem('dex-settings');
+        if (raw) prefs = JSON.parse(raw) ?? {};
+      } catch { /* ignore */ }
+      utterance.rate = typeof prefs.ukiVoiceRate === 'number' ? prefs.ukiVoiceRate : 1.0;
+      utterance.pitch = typeof prefs.ukiVoicePitch === 'number' ? prefs.ukiVoicePitch : 1.0;
+      utterance.volume = typeof prefs.ukiVoiceVolume === 'number' ? prefs.ukiVoiceVolume : 0.8;
+      try {
+        const voices = window.speechSynthesis.getVoices() || [];
+        if (voices.length) {
+          const gender = prefs.ukiVoiceGender || 'female';
+          const localePrefix = (prefs.ukiLocale && prefs.ukiLocale !== 'auto')
+            ? prefs.ukiLocale.toLowerCase().slice(0, 2)
+            : (typeof navigator !== 'undefined' ? navigator.language.toLowerCase().slice(0, 2) : 'en');
+          const localeMatches = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(localePrefix));
+          const pool = localeMatches.length ? localeMatches : voices;
+          const FEMALE = ['female', 'woman', 'samantha', 'victoria', 'karen', 'tessa', 'fiona', 'moira', 'serena', 'allison', 'ava', 'susan', 'zira', 'aria', 'jenny', 'libby', 'sonia', 'amber', 'ashley', 'michelle', 'monica', 'paulina', 'sara'];
+          const MALE = ['male', 'man', 'daniel', 'alex', 'fred', 'oliver', 'tom', 'david', 'mark', 'george', 'james', 'guy', 'ryan', 'brian', 'aaron'];
+          const matches = (v: SpeechSynthesisVoice, hints: string[]) => {
+            const hay = `${v.name} ${v.voiceURI}`.toLowerCase();
+            return hints.some(h => hay.includes(h));
+          };
+          let chosen: SpeechSynthesisVoice | undefined;
+          if (prefs.ukiVoiceURI) chosen = voices.find(v => v.voiceURI === prefs.ukiVoiceURI);
+          if (!chosen && gender === 'female') chosen = pool.find(v => matches(v, FEMALE));
+          if (!chosen && gender === 'male') chosen = pool.find(v => matches(v, MALE));
+          if (!chosen) chosen = pool.find(v => matches(v, FEMALE)) || pool[0];
+          if (chosen) utterance.voice = chosen;
+        }
+      } catch { /* ignore voice selection failures */ }
       utterance.onend = () => {
         ipc.send?.('uki:tts:ended');
       };
