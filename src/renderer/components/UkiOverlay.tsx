@@ -1277,6 +1277,23 @@ const UkiOverlay: React.FC = () => {
     }
   }, [showPanel]);
 
+  // Lazy knowledge feed: when the panel opens, opportunistically ingest fresh
+  // local data (recent files, notes, app catalog, cached facts) into UKI's
+  // compressed memory so retrieval has substantive context. Throttled to once
+  // every 5 minutes inside runKnowledgeFeed; runs in the background.
+  useEffect(() => {
+    if (!showPanel) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import('../uki/knowledgeFeeder');
+        if (cancelled) return;
+        await mod.runKnowledgeFeed();
+      } catch { /* feeder is non-critical */ }
+    })();
+    return () => { cancelled = true; };
+  }, [showPanel]);
+
   useEffect(() => {
     if (panelPos) return;
     setPanelPos({

@@ -1592,6 +1592,102 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
   );
 };
 
+// =============================================================================
+// UKI KNOWLEDGE FEED -- shows local data ingestion status and lets the user
+// trigger a feed pass on demand. Uses the 100 MB default budget.
+// =============================================================================
+const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
+  const [status, setStatus] = useState<{
+    lastRunTs: number; totalIngested: number; bytesUsed: number;
+    budgetBytes: number; utilization: number; archives: number;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const mod = await import('../uki/knowledgeFeeder');
+      const s = await mod.getFeedStatus();
+      setStatus({
+        lastRunTs: s.lastRunTs,
+        totalIngested: s.totalIngested,
+        bytesUsed: s.bytesUsed,
+        budgetBytes: s.budgetBytes,
+        utilization: s.utilization,
+        archives: s.archives.length,
+      });
+    } catch {
+      setStatus(null);
+    }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const handleRun = async () => {
+    setBusy(true);
+    setLastResult(null);
+    try {
+      const mod = await import('../uki/knowledgeFeeder');
+      const result = await mod.runKnowledgeFeed({ force: true });
+      if (result) {
+        const sources = Object.entries(result.sources).map(([k, v]) => `${k}:${v}`).join(', ') || 'no new data';
+        setLastResult(`Ingested ${result.ingestedTurns} turns (${sources}). Pruned ${result.pruned} archives.`);
+      } else {
+        setLastResult('Cooldown active. No run.');
+      }
+      await refresh();
+    } catch (err) {
+      setLastResult(`Feed failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmt = (n: number) => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const utilPct = status ? Math.min(100, Math.round(status.utilization * 100)) : 0;
+  const lastRun = status && status.lastRunTs > 0 ? new Date(status.lastRunTs).toLocaleString() : 'never';
+
+  return (
+    <div style={{ padding: '6px 0 12px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <span>
+          {status
+            ? `Knowledge feed: ${status.archives} archives, ${fmt(status.bytesUsed)} of ${fmt(status.budgetBytes)} (${utilPct}%) -- ${status.totalIngested} facts ingested -- last run ${lastRun}`
+            : 'Knowledge feed: --'}
+        </span>
+        <button
+          type="button"
+          onClick={handleRun}
+          disabled={busy}
+          style={{
+            padding: '4px 10px', borderRadius: 6, fontSize: 11,
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-hover)',
+            color: 'var(--color-text-secondary)',
+            cursor: busy ? 'wait' : 'pointer',
+          }}
+          aria-label="Run UKI knowledge feed now"
+        >
+          {busy ? 'Feeding...' : 'Feed now'}
+        </button>
+      </div>
+      {status && (
+        <div style={{ marginTop: 6, height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }} aria-hidden>
+          <div style={{ width: `${utilPct}%`, height: '100%', background: 'var(--color-accent, #0A84FF)', transition: 'width 0.3s ease' }} />
+        </div>
+      )}
+      {lastResult && (
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-secondary)' }}>{lastResult}</div>
+      )}
+    </div>
+  );
+};
+
 export const Settings: React.FC = () => {
   const { confirm: confirmReset, ConfirmHost: ConfirmResetHost } = useConfirm();
   const toast = useToastHelpers();
@@ -3724,6 +3820,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Memory Management</h3>
       <UkiArchiveStats styles={styles} />
+      <UkiKnowledgeFeed styles={styles} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           style={{ ...styles.secondaryBtn, flex: 1 }}
