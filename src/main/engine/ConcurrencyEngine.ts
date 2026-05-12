@@ -584,6 +584,12 @@ class PriorityTaskScheduler {
   private processing = false;
   private completedTasks = 0;
   private droppedTasks = 0;
+  // Starvation telemetry: rolling samples of waitMs (createdAt -> dequeue).
+  private waitSamples: number[] = [];
+  private maxObservedWaitMs = 0;
+  private starvationEvents = 0; // tasks that waited >= STARVATION_THRESHOLD_MS
+  private static readonly STARVATION_THRESHOLD_MS = 500;
+  private static readonly WAIT_SAMPLE_WINDOW = 200;
 
   constructor() {
     this.queues.set(0, []);
@@ -624,6 +630,12 @@ class PriorityTaskScheduler {
 
         if (queue.length > 0) {
           const task = queue.shift()!;
+          // Starvation telemetry -- record wait time before running.
+          const waitMs = Date.now() - task.createdAt;
+          if (waitMs > this.maxObservedWaitMs) this.maxObservedWaitMs = waitMs;
+          if (waitMs >= PriorityTaskScheduler.STARVATION_THRESHOLD_MS) this.starvationEvents++;
+          if (this.waitSamples.length >= PriorityTaskScheduler.WAIT_SAMPLE_WINDOW) this.waitSamples.shift();
+          this.waitSamples.push(waitMs);
           try {
             await task.fn();
             this.completedTasks++;
@@ -662,6 +674,21 @@ class PriorityTaskScheduler {
       completed: this.completedTasks,
       dropped: this.droppedTasks,
       pending: this.getPendingCount(),
+    };
+  }
+
+  /** Wait-time stats (createdAt -> dequeue). p95 + max + starvation count. */
+  getWaitStats(): { samples: number; avgMs: number; p95Ms: number; maxMs: number; starvationEvents: number } {
+    const n = this.waitSamples.length;
+    if (n === 0) return { samples: 0, avgMs: 0, p95Ms: 0, maxMs: 0, starvationEvents: this.starvationEvents };
+    const sum = this.waitSamples.reduce((a, b) => a + b, 0);
+    const sorted = this.waitSamples.slice().sort((a, b) => a - b);
+    return {
+      samples: n,
+      avgMs: sum / n,
+      p95Ms: sorted[Math.min(n - 1, Math.floor(0.95 * n))],
+      maxMs: this.maxObservedWaitMs,
+      starvationEvents: this.starvationEvents,
     };
   }
 }
@@ -803,6 +830,7 @@ class ConcurrencyEngine {
   getStatus(): Record<string, unknown> {
     return {
       tasks: this.taskScheduler.getStats(),
+      taskWait: this.taskScheduler.getWaitStats(),
       activeFibers: this.fiberScheduler.getActiveFiberCount(),
       completedFibers: this.fiberScheduler.getCompletedCount(),
       activeTimers: this.timerWheel.getActiveTimerCount(),
