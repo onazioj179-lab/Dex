@@ -23,6 +23,7 @@ export class EventMonitor {
   private cachedStatus: SystemStatus | null = null;
   private cachedProcesses: ProcessInfo[] = [];
   private previousProcesses: Set<string> = new Set();
+  private prevNetTotals: { rx: number; tx: number; ts: number } | null = null;
 
   constructor(ruleEngine: RuleEngine, logger: Logger) {
     this.ruleEngine = ruleEngine;
@@ -56,10 +57,11 @@ export class EventMonitor {
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
-    if (this.cachedStatus) {
-      return this.cachedStatus;
-    }
-    return this.fetchSystemStatus();
+    // Always fetch fresh: native getStats is internally cached (5s) and
+    // network rx/tx Bps must be sampled at the IPC cadence (~1s) to be useful.
+    const fresh = await this.fetchSystemStatus();
+    this.cachedStatus = fresh;
+    return fresh;
   }
 
   async getRunningProcesses(): Promise<ProcessInfo[]> {
@@ -97,6 +99,26 @@ export class EventMonitor {
         const nativeNetworks = NativeSystem.getNetworks();
         const hasConnection = nativeNetworks.some(n => n.rxBytes > 0 || n.txBytes > 0);
 
+        // Compute rx/tx bytes-per-second from cumulative totals.
+        let rxBps = 0;
+        let txBps = 0;
+        const totalRx = nativeNetworks.reduce((s, n) => s + (n.totalRx ?? 0), 0);
+        const totalTx = nativeNetworks.reduce((s, n) => s + (n.totalTx ?? 0), 0);
+        const now = Date.now();
+        if (this.prevNetTotals) {
+          const dt = Math.max(0.001, (now - this.prevNetTotals.ts) / 1000);
+          rxBps = Math.max(0, (totalRx - this.prevNetTotals.rx) / dt);
+          txBps = Math.max(0, (totalTx - this.prevNetTotals.tx) / dt);
+        }
+        this.prevNetTotals = { rx: totalRx, tx: totalTx, ts: now };
+
+        // Aggregate disk usage across mounted volumes.
+        const disks = NativeSystem.getDisks();
+        let diskUsed = 0;
+        let diskTotal = 0;
+        for (const d of disks) { diskUsed += d.used ?? 0; diskTotal += d.total ?? 0; }
+        const diskPercent = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0;
+
         return {
           cpu: {
             usage: Math.round(nativeStats.cpuPercent),
@@ -116,7 +138,10 @@ export class EventMonitor {
           network: {
             connected: hasConnection,
             type: hasConnection ? 'connected' : 'disconnected',
+            rxBps: Math.round(rxBps),
+            txBps: Math.round(txBps),
           },
+          disk: diskTotal > 0 ? { used: diskUsed, total: diskTotal, percent: diskPercent } : undefined,
           uptime: nativeStats.uptime,
           platform: nativeStats.platform,
         };

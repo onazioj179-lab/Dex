@@ -13,7 +13,8 @@ interface SystemStatusInfo {
   cpu?: { usage: number; cores: number };
   memory?: { total: number; used: number; percent: number };
   battery?: { percent: number; charging: boolean; hasBattery?: boolean; timeRemaining?: number | null };
-  network?: { connected: boolean; type?: string };
+  network?: { connected: boolean; type?: string; rxBps?: number; txBps?: number };
+  disk?: { used: number; total: number; percent: number };
   uptime?: number;
 }
 
@@ -44,6 +45,15 @@ const batteryTone = (percent: number, charging: boolean): string => {
   if (percent < 15) return '#FF453A';
   if (percent < 30) return '#FF9F0A';
   return '#30D158';
+};
+
+const formatBps = (bps: number): string => {
+  if (!Number.isFinite(bps) || bps <= 0) return '0 B/s';
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  let value = bps;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+  return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[i]}`;
 };
 
 interface SparklineProps {
@@ -170,6 +180,10 @@ const TaskManager: React.FC = () => {
   const [processHistory, setProcessHistory] = useState<number[]>([]);
   const [appHistory, setAppHistory] = useState<number[]>([]);
   const [batteryHistory, setBatteryHistory] = useState<number[]>([]);
+  const [netRxHistory, setNetRxHistory] = useState<number[]>([]);
+  const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
+  const [compactMode, setCompactMode] = useState(false);
+  const [killing, setKilling] = useState<number | null>(null);
 
   const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
     setter(prev => {
@@ -194,6 +208,8 @@ const TaskManager: React.FC = () => {
         if (systemStatus?.battery?.hasBattery !== false) {
           pushSample(setBatteryHistory, systemStatus?.battery?.percent ?? 0);
         }
+        pushSample(setNetRxHistory, systemStatus?.network?.rxBps ?? 0);
+        pushSample(setNetTxHistory, systemStatus?.network?.txBps ?? 0);
         setBridgeAvailable(true);
       }
     } catch {
@@ -269,11 +285,37 @@ const TaskManager: React.FC = () => {
         : 'On battery';
   const uptimeSeconds = status.uptime ?? 0;
   const networkConnected = status.network?.connected ?? false;
+  const rxBps = status.network?.rxBps ?? 0;
+  const txBps = status.network?.txBps ?? 0;
+  const diskPercent = status.disk?.percent ?? 0;
+  const diskDetail = status.disk
+    ? `${(status.disk.used / 1024 ** 3).toFixed(0)} / ${(status.disk.total / 1024 ** 3).toFixed(0)} GB`
+    : 'No disk data';
 
   const handleManualRefresh = () => {
     refreshStatus();
     refreshProcesses();
   };
+
+  const handleEndProcess = useCallback(async (pid: number, name: string) => {
+    if (typeof pid !== 'number' || pid <= 0) return;
+    const dexApi = (window as any).dex;
+    if (!dexApi?.system?.killProcess) return;
+    if (!window.confirm(`End process "${name}" (PID ${pid})? Unsaved work in this process may be lost.`)) return;
+    setKilling(pid);
+    try {
+      const result = await dexApi.system.killProcess(pid, false);
+      if (result && result.success === false) {
+        const retry = window.confirm(`Could not end "${name}": ${result.message}. Force kill?`);
+        if (retry) await dexApi.system.killProcess(pid, true);
+      }
+      await refreshProcesses();
+    } catch (e) {
+      console.warn('[TaskManager] killProcess failed', e);
+    } finally {
+      setKilling(null);
+    }
+  }, [refreshProcesses]);
 
   return (
     <div style={styles.container}>
@@ -287,6 +329,14 @@ const TaskManager: React.FC = () => {
         </div>
         <button style={styles.refreshButton} onClick={handleManualRefresh} aria-label="Refresh Task Manager">
           <DexIcon name="refresh" size={14} /> Refresh
+        </button>
+        <button
+          style={{ ...styles.refreshButton, marginLeft: 8 }}
+          onClick={() => setCompactMode(value => !value)}
+          aria-label={compactMode ? 'Exit compact mode' : 'Enter compact mode'}
+          title={compactMode ? 'Exit compact mode' : 'Compact monitor mode'}
+        >
+          <DexIcon name={compactMode ? 'maximize' : 'minimize'} size={14} /> {compactMode ? 'Expand' : 'Compact'}
         </button>
       </div>
 
@@ -336,9 +386,34 @@ const TaskManager: React.FC = () => {
           <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
           <div style={styles.sparkWrap} />
         </div>
+        <MetricCard
+          label="Network Rx"
+          value={formatBps(rxBps)}
+          detail={networkConnected ? 'Receiving' : 'Offline'}
+          history={netRxHistory}
+          tone="#5AC8FA"
+          max={Math.max(1024, ...netRxHistory)}
+        />
+        <MetricCard
+          label="Network Tx"
+          value={formatBps(txBps)}
+          detail={networkConnected ? 'Sending' : 'Offline'}
+          history={netTxHistory}
+          tone="#FF9F0A"
+          max={Math.max(1024, ...netTxHistory)}
+        />
+        {status.disk && (
+          <div style={styles.statCard}>
+            <div style={styles.statLabel}>Disk</div>
+            <div style={{ ...styles.statValue, color: toneFor(diskPercent), fontSize: 22 }}>{diskPercent}%</div>
+            <div style={styles.statDetail}>{diskDetail}</div>
+            <div style={styles.sparkWrap} />
+          </div>
+        )}
       </div>
 
       <div style={styles.contentGrid}>
+        {!compactMode && (
         <section style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>Open Apps</span>
@@ -364,7 +439,9 @@ const TaskManager: React.FC = () => {
             })}
           </div>
         </section>
+        )}
 
+        {!compactMode && (
         <section style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>System Processes</span>
@@ -381,6 +458,7 @@ const TaskManager: React.FC = () => {
             <span style={{ textAlign: 'right' }}>PID</span>
             <span style={{ textAlign: 'right' }}>CPU</span>
             <span style={{ textAlign: 'right' }}>Memory</span>
+            <span style={{ textAlign: 'right' }}>Action</span>
           </div>
           <div style={styles.processTable}>
             {!bridgeAvailable ? (
@@ -390,17 +468,28 @@ const TaskManager: React.FC = () => {
             ) : visibleProcesses.map(process => {
               const cpuValue = process.cpu || 0;
               const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
+              const isKilling = killing === process.pid;
               return (
                 <div key={`${process.pid}-${process.name}`} style={styles.processRow}>
-                  <span style={styles.processName}>{process.name}</span>
+                  <span style={styles.processName} title={process.name}>{process.name}</span>
                   <span style={styles.processPid}>{process.pid}</span>
                   <span style={{ ...styles.processMetric, color: cpuColor }}>{cpuValue.toFixed(1)}%</span>
                   <span style={styles.processMetric}>{Math.round(process.memory || 0)} MB</span>
+                  <button
+                    style={{ ...styles.endButton, height: 22, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
+                    onClick={() => handleEndProcess(process.pid, process.name)}
+                    disabled={isKilling}
+                    aria-label={`End process ${process.name}`}
+                    title={`End ${process.name}`}
+                  >
+                    {isKilling ? '...' : 'End'}
+                  </button>
                 </div>
               );
             })}
           </div>
         </section>
+        )}
       </div>
     </div>
   );
@@ -438,9 +527,9 @@ const styles: Record<string, React.CSSProperties> = {
   ghostButton: { height: 28, padding: '0 9px', borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
   endButton: { height: 28, padding: '0 9px', borderRadius: 7, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: '#FF8A82', cursor: 'pointer' },
   filterInput: { width: 150, height: 28, borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
-  processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },
-  processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12 },
+  processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12 },
   processName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   processPid: { color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
   processMetric: { color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },

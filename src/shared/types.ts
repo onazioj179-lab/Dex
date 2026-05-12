@@ -133,6 +133,16 @@ export interface SystemStatus {
   network: {
     connected: boolean;
     type: string;
+    /** Bytes per second received across all interfaces, current sample. */
+    rxBps?: number;
+    /** Bytes per second transmitted across all interfaces, current sample. */
+    txBps?: number;
+  };
+  /** Aggregated disk usage across all mounted volumes (used / total in bytes). */
+  disk?: {
+    used: number;
+    total: number;
+    percent: number;
   };
   uptime: number;
   platform: string;

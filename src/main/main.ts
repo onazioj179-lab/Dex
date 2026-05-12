@@ -2968,6 +2968,19 @@ class DexApp {
       return this.eventMonitor.getRunningProcesses();
     });
 
+    ipcMain.handle('system:killProcess', async (_evt, pid: number, force?: boolean) => {
+      try {
+        if (typeof pid !== 'number' || !Number.isFinite(pid) || pid <= 0) {
+          return { success: false, message: 'Invalid PID' };
+        }
+        const { NativeProcesses } = await import('./native/bridge');
+        const result = NativeProcesses.close(pid, !!force);
+        return result || { success: false, message: 'Native bridge unavailable' };
+      } catch (e: any) {
+        return { success: false, message: e?.message || String(e) };
+      }
+    });
+
     // -------------------------------------------------------------------------
     // Logs
     // -------------------------------------------------------------------------

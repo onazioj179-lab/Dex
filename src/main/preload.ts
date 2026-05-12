@@ -97,6 +97,7 @@ export interface DexAPI {
   system: {
     getStatus: () => Promise<any>;
     getProcesses: () => Promise<any[]>;
+    killProcess: (pid: number, force?: boolean) => Promise<{ success: boolean; message: string }>;
     claimResources: (enable: boolean) => Promise<any>;
     reservationStatus: () => Promise<any>;
     releasePid: (pid: number) => Promise<any>;
@@ -1967,6 +1968,7 @@ const api: DexAPI = {
   system: {
     getStatus: () => ipcRenderer.invoke('system:getStatus'),
     getProcesses: () => ipcRenderer.invoke('system:getProcesses'),
+    killProcess: (pid: number, force?: boolean) => ipcRenderer.invoke('system:killProcess', pid, !!force),
     // Performance Reservation (lower priority of background processes)
     claimResources: (enable: boolean, options?: Record<string, unknown>) =>
       ipcRenderer.invoke('system:claimResources', enable, options),

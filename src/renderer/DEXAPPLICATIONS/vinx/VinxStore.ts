@@ -421,45 +421,19 @@ interface VinxState {
 // ---------------------------------------------------------------------------
 
 function createDefaultProject(): VinxProject {
-  // Helper to create a demo clip with all required fields
-  const demoClip = (id: string, trackId: string, type: 'video' | 'audio' | 'title', name: string, startFrame: number, endFrame: number, color: string): Clip => ({
-    id, mediaId: null, trackId, type, startFrame, endFrame,
-    mediaInFrame: 0, mediaOutFrame: endFrame - startFrame, name, color,
-    speed: 1, reverse: false, opacity: 1, volume: 1, pan: 0, muted: false,
-    transform: { positionX: 0, positionY: 0, scaleX: 1, scaleY: 1, scaleLinked: true, rotation: 0, anchorX: 0.5, anchorY: 0.5 },
-    effects: [], transitionIn: null, transitionOut: null, keyframes: [],
-    titleData: type === 'title' ? { text: name, fontSize: 48, fontFamily: 'system-ui', fontWeight: 700, color: 'var(--color-text-primary)', backgroundColor: 'transparent', backgroundOpacity: 0, positionX: 0.5, positionY: 0.5, alignment: 'center' as const, presetId: null } : null,
-    linkedClipId: null, speedRamp: null, masks: [], compoundClipId: null,
-    noiseReduction: null, stabilization: null, isFreezeFrame: false, freezeFrameSource: 0,
-    colorGrading: null, multicamClipId: null,
-  });
-
-  const v1: Track = { id: 'v1', name: 'V1', type: 'video', height: DEFAULT_TRACK_HEIGHTS.video, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [
-    demoClip('cv1-1', 'v1', 'video', 'Interview A-Roll', 0, 150, 'var(--color-accent)'),
-    demoClip('cv1-2', 'v1', 'video', 'B-Roll Montage', 155, 280, 'var(--color-success)'),
-    demoClip('cv1-3', 'v1', 'video', 'Closing Shot', 285, 360, 'var(--color-warning)'),
-  ] };
-  const v2: Track = { id: 'v2', name: 'V2', type: 'video', height: DEFAULT_TRACK_HEIGHTS.video, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [
-    demoClip('cv2-1', 'v2', 'video', 'Lower Third GFX', 20, 120, '#bf5af2'),
-    demoClip('cv2-2', 'v2', 'video', 'Logo Bumper', 290, 350, '#ff375f'),
-  ] };
-  const a1: Track = { id: 'a1', name: 'A1', type: 'audio', height: DEFAULT_TRACK_HEIGHTS.audio, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [
-    demoClip('ca1-1', 'a1', 'audio', 'Dialogue Mix', 0, 280, '#64d2ff'),
-    demoClip('ca1-2', 'a1', 'audio', 'Voiceover', 285, 360, '#64d2ff'),
-  ] };
-  const a2: Track = { id: 'a2', name: 'A2', type: 'audio', height: DEFAULT_TRACK_HEIGHTS.audio, muted: false, locked: false, visible: true, solo: false, volume: 0.6, clips: [
-    demoClip('ca2-1', 'a2', 'audio', 'Background Music', 0, 360, 'var(--color-warning)'),
-  ] };
-  const t1: Track = { id: 't1', name: 'T1', type: 'title', height: DEFAULT_TRACK_HEIGHTS.title, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [
-    demoClip('ct1-1', 't1', 'title', 'Project Title', 0, 90, 'var(--color-warning)'),
-    demoClip('ct1-2', 't1', 'title', 'End Credits', 300, 360, 'var(--color-warning)'),
-  ] };
+  // Empty professional starting layout: V2/V1 video tracks, A1/A2 audio,
+  // T1 title. No demo clips, no fake markers -- ready to drop media into.
+  const v1: Track = { id: 'v1', name: 'V1', type: 'video', height: DEFAULT_TRACK_HEIGHTS.video, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [] };
+  const v2: Track = { id: 'v2', name: 'V2', type: 'video', height: DEFAULT_TRACK_HEIGHTS.video, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [] };
+  const a1: Track = { id: 'a1', name: 'A1', type: 'audio', height: DEFAULT_TRACK_HEIGHTS.audio, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [] };
+  const a2: Track = { id: 'a2', name: 'A2', type: 'audio', height: DEFAULT_TRACK_HEIGHTS.audio, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [] };
+  const t1: Track = { id: 't1', name: 'T1', type: 'title', height: DEFAULT_TRACK_HEIGHTS.title, muted: false, locked: false, visible: true, solo: false, volume: 1, clips: [] };
 
   const seq: VinxSequence = {
     id: generateId('seq'),
     name: 'Sequence 1',
     tracks: [t1, v2, v1, a1, a2],
-    duration: 360,
+    duration: 0,
     inPoint: null,
     outPoint: null,
   };
@@ -512,7 +486,27 @@ function loadProject(): VinxProject {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.id && parsed.sequences) return parsed;
+      if (parsed && parsed.id && parsed.sequences) {
+        // Migration: clear stale demo clips ('cv1-1', 'cv2-1', 'ca1-1', 'ct1-1', etc.)
+        // shipped before v4.2.1. If the persisted project still contains them and
+        // user has not added any non-demo clips, reset to a clean empty project.
+        const DEMO_IDS = new Set(['cv1-1','cv1-2','cv1-3','cv2-1','cv2-2','ca1-1','ca1-2','ca2-1','ct1-1','ct1-2']);
+        let demoCount = 0;
+        let userCount = 0;
+        for (const s of parsed.sequences) {
+          for (const t of (s.tracks || [])) {
+            for (const c of (t.clips || [])) {
+              if (DEMO_IDS.has(c.id)) demoCount++;
+              else userCount++;
+            }
+          }
+        }
+        if (demoCount > 0 && userCount === 0) {
+          console.info('[VINX] Migrating: removing demo clips from default project');
+          return createDefaultProject();
+        }
+        return parsed;
+      }
     }
   } catch (e) { console.warn('[VINX] Failed to load project:', e); }
   return createDefaultProject();
