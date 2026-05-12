@@ -109,6 +109,16 @@ class UkiEngine extends EventEmitter {
   private knowledgeGraph: any = null;
   private knowledgePushTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Reliability state -- exposed via getStatus(). Updated when route() times
+  // out, throws, or recovers. Renderer can show a "degraded" badge so the
+  // user knows replies may use cached / offline fallbacks.
+  private degraded = false;
+  private consecutiveFailures = 0;
+  private lastFailureMs = 0;
+  private static readonly ROUTER_TIMEOUT_MS = 8000;
+  private static readonly DEGRADE_AFTER_FAILURES = 2;
+  private static readonly RECOVER_AFTER_OK = 1;
+
   private constructor() {
     super();
     this.setMaxListeners(20);
@@ -323,7 +333,7 @@ class UkiEngine extends EventEmitter {
       }
 
       // Router: dispatch to domain handler
-      const result: UkiResult = await this.router.route(intent);
+      const result: UkiResult = await this.routeWithTimeout(intent);
 
       // Knowledge: record interaction (Rust native or JS fallback)
       if (nativeUki) {
@@ -391,7 +401,7 @@ class UkiEngine extends EventEmitter {
     this.dialog.clearPendingConfirmation();
 
     if (confirmed) {
-      const result = await this.router.route(pending);
+      const result = await this.routeWithTimeout(pending);
       if (nativeUki) {
         try {
           nativeUki.ukiKnowledgeRecord(
@@ -505,12 +515,58 @@ class UkiEngine extends EventEmitter {
     }, 120);
   }
 
-  getStatus(): { state: UkiState; initialized: boolean; sessionTurns: number } {
+  getStatus(): { state: UkiState; initialized: boolean; sessionTurns: number; degraded: boolean; consecutiveFailures: number } {
     return {
       state: this._state,
       initialized: this.initialized,
       sessionTurns: this.session?.turns.length ?? 0,
+      degraded: this.degraded,
+      consecutiveFailures: this.consecutiveFailures,
     };
+  }
+
+  /**
+   * Wrap router.route() with a hard timeout + reliability accounting. On
+   * timeout or rejection we surface a graceful UkiResult so the rest of the
+   * pipeline (knowledge record, TTS, history) keeps working in degraded mode.
+   */
+  private async routeWithTimeout(intent: UkiIntent): Promise<UkiResult> {
+    const timeoutMs = UkiEngine.ROUTER_TIMEOUT_MS;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<UkiResult>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`router-timeout-${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    });
+    try {
+      const result = await Promise.race([this.router.route(intent), timeoutPromise]) as UkiResult;
+      if (timer) clearTimeout(timer);
+      // Recovery: one successful route after at least 1 failure -> clear flag.
+      if (this.degraded || this.consecutiveFailures > 0) {
+        this.consecutiveFailures = 0;
+        if (this.degraded) {
+          this.degraded = false;
+          this.sendToRenderer('uki:degraded', { degraded: false });
+        }
+      }
+      return result;
+    } catch (err) {
+      if (timer) clearTimeout(timer);
+      this.consecutiveFailures++;
+      this.lastFailureMs = Date.now();
+      if (!this.degraded && this.consecutiveFailures >= UkiEngine.DEGRADE_AFTER_FAILURES) {
+        this.degraded = true;
+        this.sendToRenderer('uki:degraded', { degraded: true, reason: String(err) });
+      }
+      // Synthesize a graceful fallback result so the rest of the pipeline runs.
+      return {
+        success: false,
+        message: this.degraded
+          ? 'Working offline -- I could not reach the router. Try again in a moment.'
+          : 'I had trouble with that. Please try again.',
+      } as unknown as UkiResult;
+    }
   }
 
   // -----------------------------------------------------------------------

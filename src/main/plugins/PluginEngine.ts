@@ -680,13 +680,72 @@ export class PluginEngine extends EventEmitter {
   // ==========================================================================
   // COMMANDS
   // ==========================================================================
-  
+
+  /** Default per-command execution envelope. Plugins that need longer can
+   *  pass a custom timeout via executeCommandWithOptions. */
+  private static readonly DEFAULT_COMMAND_TIMEOUT_MS = 10_000;
+  private static readonly MAX_COMMAND_TIMEOUT_MS = 120_000;
+  private commandFailures = new Map<string, { count: number; lastErrorMs: number }>();
+
   async executeCommand(commandId: string, ...args: unknown[]): Promise<unknown> {
+    return this.executeCommandWithOptions(commandId, { args });
+  }
+
+  /**
+   * Bounded command execution: hard timeout + per-command failure accounting.
+   * Sync throws, async rejections, and timeouts all funnel through the same
+   * error path so a single misbehaving plugin command cannot wedge the host.
+   */
+  async executeCommandWithOptions(
+    commandId: string,
+    opts: { args?: unknown[]; timeoutMs?: number } = {},
+  ): Promise<unknown> {
     const handler = this.commands.get(commandId);
     if (!handler) throw new Error(`Command ${commandId} not found`);
-    return handler(...args);
+
+    const args = opts.args ?? [];
+    const timeoutMs = Math.min(
+      opts.timeoutMs ?? PluginEngine.DEFAULT_COMMAND_TIMEOUT_MS,
+      PluginEngine.MAX_COMMAND_TIMEOUT_MS,
+    );
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Plugin command "${commandId}" exceeded ${timeoutMs}ms envelope`)),
+        timeoutMs,
+      );
+    });
+
+    try {
+      // Wrap the handler call so synchronous throws turn into rejections.
+      const handlerPromise = (async () => handler(...args))();
+      const result = await Promise.race([handlerPromise, timeoutPromise]);
+      if (timer) clearTimeout(timer);
+      return result;
+    } catch (err) {
+      if (timer) clearTimeout(timer);
+      const rec = this.commandFailures.get(commandId) ?? { count: 0, lastErrorMs: 0 };
+      rec.count++;
+      rec.lastErrorMs = Date.now();
+      this.commandFailures.set(commandId, rec);
+      this.emit('error', {
+        type: 'command',
+        commandId,
+        error: err instanceof Error ? err.message : String(err),
+        failures: rec.count,
+      });
+      throw err;
+    }
   }
-  
+
+  /** Snapshot of per-command failure counters for diagnostics. */
+  getCommandFailureStats(): Record<string, { count: number; lastErrorMs: number }> {
+    const out: Record<string, { count: number; lastErrorMs: number }> = {};
+    for (const [k, v] of this.commandFailures) out[k] = { ...v };
+    return out;
+  }
+
   getCommands(): string[] {
     return Array.from(this.commands.keys());
   }
