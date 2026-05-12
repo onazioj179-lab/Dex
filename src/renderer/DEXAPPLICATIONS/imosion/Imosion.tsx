@@ -3057,6 +3057,7 @@ const Imosion: React.FC = () => {
 
       // Decode and schedule each clip
       let clipsProcessed = 0;
+      let clipsAudible = 0;
       const totalClips = tracks.reduce((n, t) => n + t.clips.length, 0);
 
       for (const track of tracks) {
@@ -3065,24 +3066,63 @@ const Imosion: React.FC = () => {
         trackGain.gain.value = track.volume;
         const trackPan = offlineCtx.createStereoPanner();
         trackPan.pan.value = track.pan;
-        trackGain.connect(trackPan);
+
+        // Build the full track plugin chain BEFORE wiring clips so we don't have
+        // to disconnect/reconnect later (the previous code rewired trackGain on
+        // every plugin which orphaned earlier plugins and risked silence).
+        let chainTail: AudioNode = trackGain;
+        for (const plugin of track.plugins) {
+          if (!plugin.enabled) continue;
+          try {
+            if (plugin.type === 'eq' && plugin.params) {
+              const low = offlineCtx.createBiquadFilter();
+              low.type = 'lowshelf'; low.frequency.value = 200; low.gain.value = (plugin.params.lowGain || 0);
+              const mid = offlineCtx.createBiquadFilter();
+              mid.type = 'peaking'; mid.frequency.value = 1000; mid.gain.value = (plugin.params.midGain || 0);
+              const high = offlineCtx.createBiquadFilter();
+              high.type = 'highshelf'; high.frequency.value = 4000; high.gain.value = (plugin.params.highGain || 0);
+              chainTail.connect(low); low.connect(mid); mid.connect(high);
+              chainTail = high;
+            } else if (plugin.type === 'compressor' && plugin.params) {
+              const comp = offlineCtx.createDynamicsCompressor();
+              comp.threshold.value = plugin.params.threshold ?? -24;
+              comp.ratio.value = plugin.params.ratio ?? 4;
+              comp.attack.value = plugin.params.attack ?? 0.003;
+              comp.release.value = plugin.params.release ?? 0.25;
+              chainTail.connect(comp);
+              chainTail = comp;
+            }
+          } catch (e) { console.warn('[Export] plugin error', plugin.type, e); }
+        }
+        chainTail.connect(trackPan);
         trackPan.connect(masterGain);
 
         for (const clip of track.clips) {
           try {
-            let buffer: AudioBuffer;
+            let buffer: AudioBuffer | null = null;
             if (clip.url) {
               const response = await fetch(clip.url);
               const arrayBuf = await response.arrayBuffer();
-              buffer = await offlineCtx.decodeAudioData(arrayBuf);
-            } else {
-              // Generate silence for clips with no audio data
-              buffer = offlineCtx.createBuffer(2, Math.ceil(clip.duration * sr), sr);
+              if (arrayBuf.byteLength > 0) {
+                buffer = await offlineCtx.decodeAudioData(arrayBuf);
+              }
+            }
+
+            if (!buffer) {
+              // Clip has no audio source -- skip rather than silently writing zeros.
+              console.warn('[Export] Clip has no audio source, skipping:', clip.name);
+              clipsProcessed++;
+              setExportProgress(5 + (clipsProcessed / Math.max(totalClips, 1)) * 70);
+              continue;
             }
 
             // Apply clip processing (gain, fades)
             const source = offlineCtx.createBufferSource();
             source.buffer = buffer;
+            // Apply pitch / playback rate. clip.pitch is semitones.
+            if (typeof clip.pitch === 'number' && clip.pitch !== 0) {
+              source.playbackRate.value = Math.pow(2, clip.pitch / 12);
+            }
             const clipGain = offlineCtx.createGain();
             clipGain.gain.value = clip.gain;
 
@@ -3099,31 +3139,20 @@ const Imosion: React.FC = () => {
 
             source.connect(clipGain);
             clipGain.connect(trackGain);
-            source.start(clip.startTime, clip.trimStart, clip.duration);
+            // Clamp the play duration to the actual buffer length so we never
+            // request more audio than the buffer holds.
+            const bufDur = buffer.duration;
+            const offset = Math.max(0, Math.min(clip.trimStart || 0, bufDur));
+            const playDur = Math.max(0, Math.min(clip.duration, bufDur - offset));
+            if (playDur > 0) {
+              source.start(clip.startTime, offset, playDur);
+              clipsAudible++;
+            }
           } catch (clipErr) {
             console.warn('[Export] Skipping clip:', clip.name, clipErr);
           }
           clipsProcessed++;
           setExportProgress(5 + (clipsProcessed / Math.max(totalClips, 1)) * 70);
-        }
-
-        // Recreate plugin chains in offline context for export
-        for (const plugin of track.plugins) {
-          try {
-            if (plugin.type === 'eq' && plugin.params) {
-              const low = offlineCtx.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 200; low.gain.value = (plugin.params.lowGain || 0);
-              const mid = offlineCtx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1000; mid.gain.value = (plugin.params.midGain || 0);
-              const high = offlineCtx.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 4000; high.gain.value = (plugin.params.highGain || 0);
-              trackGain.disconnect(); trackGain.connect(low); low.connect(mid); mid.connect(high); high.connect(trackPan);
-            } else if (plugin.type === 'compressor' && plugin.params) {
-              const comp = offlineCtx.createDynamicsCompressor();
-              comp.threshold.value = plugin.params.threshold ?? -24;
-              comp.ratio.value = plugin.params.ratio ?? 4;
-              comp.attack.value = plugin.params.attack ?? 0.003;
-              comp.release.value = plugin.params.release ?? 0.25;
-              trackGain.disconnect(); trackGain.connect(comp); comp.connect(trackPan);
-            }
-          } catch (e) { console.warn('[DEX]', e); }
         }
       }
 
@@ -3156,6 +3185,30 @@ const Imosion: React.FC = () => {
       // Render the audio
       const renderedBuffer = await offlineCtx.startRendering();
       setExportProgress(90);
+
+      // Verify the render actually contains audio. If every sample on every
+      // channel is below -120dBFS we treat the export as silent and warn the
+      // user instead of writing a zero-byte WAV they won't notice until later.
+      {
+        const SILENCE_THRESHOLD = 1e-6; // ~ -120 dBFS
+        let peak = 0;
+        const chCount = renderedBuffer.numberOfChannels;
+        // Sample every Nth frame -- 200ms windows are plenty to detect signal.
+        const stride = Math.max(1, Math.floor(renderedBuffer.sampleRate * 0.2));
+        for (let ch = 0; ch < chCount && peak <= SILENCE_THRESHOLD; ch++) {
+          const data = renderedBuffer.getChannelData(ch);
+          for (let i = 0; i < data.length; i += stride) {
+            const v = Math.abs(data[i]);
+            if (v > peak) { peak = v; if (peak > SILENCE_THRESHOLD) break; }
+          }
+        }
+        if (peak <= SILENCE_THRESHOLD) {
+          const reason = clipsAudible === 0
+            ? 'no audible clips were scheduled'
+            : 'rendered output was silent (check master/track gain or limiter ceiling)';
+          throw new Error(`Export produced silence -- ${reason}.`);
+        }
+      }
 
       let exportBlob: Blob;
       let ext: string;
