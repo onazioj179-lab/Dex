@@ -159,6 +159,75 @@ const DEFAULT_FEATURES: FeatureFlag[] = [
     defaultValue: false,
     stable: false,
     minVersion: '2.0.0'
+  },
+
+  // ===========================================================================
+  // Roadmap flags (DEX_OS_PRODUCTION_ROADMAP.md). Off by default; flipped on
+  // as each phase graduates. Keeping them declared lets phase work land behind
+  // a stable id without coordinating two PRs.
+  // ===========================================================================
+  {
+    id: 'uki_native_store',
+    name: 'UKI Native Store (SQLite + FTS5)',
+    description: 'Cold-tier UKI storage backed by the Rust native module.',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.5.0'
+  },
+  {
+    id: 'uki_semantic_search',
+    name: 'UKI Semantic Search',
+    description: 'On-device embeddings + vector recall for UKI queries.',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.6.0'
+  },
+  {
+    id: 'service_host',
+    name: 'Service Host Lifecycle',
+    description: 'Unified lifecycle for new backend services (start/stop/health).',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.4.1'
+  },
+  {
+    id: 'snap_layouts_v2',
+    name: 'Snap Layouts V2',
+    description: 'Hover-based snap zone selector inspired by Windows 11.',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.7.0'
+  },
+  {
+    id: 'tiling_mode',
+    name: 'Tiling Window Mode',
+    description: 'i3-style keyboard-first tiling layout.',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.7.0'
+  },
+  {
+    id: 'dexctl_cli',
+    name: 'dexctl CLI Bridge',
+    description: 'Local CLI for scripting DEX from a terminal.',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.7.0'
+  },
+  {
+    id: 'cross_app_refs',
+    name: 'Cross-App References',
+    description: 'application/x-dex-ref MIME for cross-app drag/drop and pasting.',
+    enabled: false,
+    defaultValue: false,
+    stable: false,
+    minVersion: '4.6.0'
   }
 ];
 
