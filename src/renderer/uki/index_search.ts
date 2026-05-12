@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 /**
  * UKI Local Index — tiny, dependency-free lexical search over the knowledge
  * base + saved workflows + recent turns. Not a vector store; a fast inverted

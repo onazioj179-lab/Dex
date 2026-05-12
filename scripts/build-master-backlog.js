@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 #!/usr/bin/env node
 /*
  Builds unified backlog artifacts from docs/IDEAS_500.md and docs/IMPROVEMENTS_500.md.
