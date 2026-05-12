@@ -602,7 +602,7 @@ export const AppManager: React.FC = () => {
   } = useRunningApps();
 
   // Dock pinning store
-  const { pins: dockPins, pinApp, unpinApp, isPinned: isDockPinned, mode: dockMode, magnification: dockMagnification, magnificationScale, iconSize: dockIconSize } = useDockPins();
+  const { pins: dockPins, pinApp, unpinApp, reorder: reorderDockPins, isPinned: isDockPinned, mode: dockMode, magnification: dockMagnification, magnificationScale, iconSize: dockIconSize } = useDockPins();
 
   // Shell preferences (movable + compact taskbar) — read reactively so edge /
   // preset changes from Settings re-render the dock immediately.
@@ -4698,6 +4698,7 @@ export const AppManager: React.FC = () => {
               const label = getLabel(appId);
               const pinned = isDockPinned(appId);
               const isPermanent = PERMANENT_PINS.includes(appId);
+              const dockIndex = dockItems.findIndex((d) => d.id === appId);
               const items: { label: string; action: () => void; danger?: boolean; separator?: boolean }[] = [];
               if (appId !== 'home') {
                 items.push({ label: detachedApps.has(appId) ? 'Focus Window' : 'Open in Window', action: () => { openAppInWindow(appId as AppId); setDockCtx(null); } });
@@ -4720,6 +4721,18 @@ export const AppManager: React.FC = () => {
               }
               if (detachedApps.size >= 2) {
                 items.push({ label: 'Auto-Tile All Windows', action: () => { autoTileAll(); setDockCtx(null); }, separator: true });
+              }
+              if (dockIndex > 0) {
+                items.push({
+                  label: 'Move Left in Dock',
+                  action: () => { reorderDockPins(dockIndex, dockIndex - 1); setDockCtx(null); },
+                });
+              }
+              if (dockIndex >= 0 && dockIndex < dockItems.length - 1) {
+                items.push({
+                  label: 'Move Right in Dock',
+                  action: () => { reorderDockPins(dockIndex, dockIndex + 1); setDockCtx(null); },
+                });
               }
               if (pinned && !isPermanent) {
                 items.push({ label: 'Unpin from Dock', action: () => { unpinApp(appId); setDockCtx(null); } });
