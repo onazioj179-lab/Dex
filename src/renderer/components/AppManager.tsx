@@ -15,6 +15,7 @@
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 // UnifiedSearch retired -- Ctrl+K is owned by CommandPalette (mounted in App.tsx).
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useRecentFiles } from '../store/useRecentFiles';
 
 import { useAppTransition } from '../utils/motionHooks';
 import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
@@ -719,6 +720,7 @@ export const AppManager: React.FC = () => {
   const isUkiActive = isUkiListening || ukiShowPanel;
   const [splitApp, setSplitApp] = useState<AppId | null>(null);
   const [splitRatio, setSplitRatio] = useState(50);
+  const recentFiles = useRecentFiles(s => s.recentFiles);
   const splitDragging = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -4105,6 +4107,7 @@ export const AppManager: React.FC = () => {
         const isAppActive = currentApp === previewApp.id;
         const isAppMinimized = minimizedApps.has(previewApp.id);
         const isPeekPinned = dockPreviewPinnedId === previewApp.id;
+        const recentForApp = recentFiles.find((f) => f.appId === previewApp.id);
         const shortcut = dockShortcut[previewApp.id];
         return (
           <div style={{
@@ -4177,6 +4180,36 @@ export const AppManager: React.FC = () => {
             >
               Open
             </button>
+            {recentForApp && (
+              <button
+                type="button"
+                aria-label={`Open recent file ${recentForApp.name} for ${previewApp.label}`}
+                onClick={async () => {
+                  try {
+                    await window.electron?.invoke?.('shell:openPath', recentForApp.path);
+                    window.dispatchEvent(new CustomEvent('dex-toast', {
+                      detail: { type: 'success', message: `Opened recent: ${recentForApp.name}` },
+                    }));
+                  } catch {
+                    window.dispatchEvent(new CustomEvent('dex-toast', {
+                      detail: { type: 'error', message: `Could not open recent file: ${recentForApp.name}` },
+                    }));
+                  }
+                }}
+                style={{
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 8,
+                  background: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-primary)',
+                  fontSize: 10,
+                  padding: '3px 7px',
+                  cursor: 'pointer',
+                  maxWidth: 140,
+                }}
+              >
+                Open Recent
+              </button>
+            )}
           </div>
         );
       })()}
