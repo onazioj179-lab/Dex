@@ -519,6 +519,8 @@ export const Timeline: React.FC<TimelineProps> = ({
             >
               <button
                 style={{ background: 'none', border: 'none', color: layer.expanded ? '#fff' : '#666', cursor: 'pointer', padding: 2 }}
+                aria-label={layer.expanded ? `Collapse layer ${layer.name}` : `Expand layer ${layer.name}`}
+                aria-expanded={layer.expanded}
               >
                 {layer.expanded ? Icons.expand : Icons.collapse}
               </button>
@@ -529,18 +531,24 @@ export const Timeline: React.FC<TimelineProps> = ({
               <button
                 style={{ background: 'none', border: 'none', color: layer.visible ? '#fff' : '#666', cursor: 'pointer', padding: 2 }}
                 onClick={(e) => { e.stopPropagation(); onLayerToggle?.(layer.id, 'visible'); }}
+                aria-label={layer.visible ? `Hide layer ${layer.name}` : `Show layer ${layer.name}`}
+                aria-pressed={layer.visible}
               >
                 {layer.visible ? Icons.visible : Icons.hidden}
               </button>
               <button
                 style={{ background: 'none', border: 'none', color: layer.solo ? '#f9a825' : '#666', cursor: 'pointer', padding: 2 }}
                 onClick={(e) => { e.stopPropagation(); onLayerToggle?.(layer.id, 'solo'); }}
+                aria-label={layer.solo ? `Unsolo layer ${layer.name}` : `Solo layer ${layer.name}`}
+                aria-pressed={layer.solo}
               >
                 {Icons.solo}
               </button>
               <button
                 style={{ background: 'none', border: 'none', color: layer.locked ? '#f44' : '#666', cursor: 'pointer', padding: 2 }}
                 onClick={(e) => { e.stopPropagation(); onLayerToggle?.(layer.id, 'locked'); }}
+                aria-label={layer.locked ? `Unlock layer ${layer.name}` : `Lock layer ${layer.name}`}
+                aria-pressed={layer.locked}
               >
                 {Icons.lock}
               </button>
@@ -668,6 +676,7 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
           borderRadius: 4
         }}
         title="Go to Start (Home)"
+        aria-label="Go to start"
       >
         {Icons.skipBack}
       </button>
@@ -683,6 +692,7 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
           borderRadius: 4
         }}
         title="Previous Frame (Page Up)"
+        aria-label="Previous frame"
       >
         {Icons.stepBack}
       </button>
@@ -698,6 +708,8 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
           borderRadius: 4
         }}
         title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+        aria-label={isPlaying ? 'Pause playback' : 'Start playback'}
+        aria-pressed={isPlaying}
       >
         {isPlaying ? Icons.pause : Icons.play}
       </button>
@@ -713,6 +725,7 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
           borderRadius: 4
         }}
         title="Stop"
+        aria-label="Stop playback"
       >
         {Icons.stop}
       </button>
@@ -728,6 +741,7 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
           borderRadius: 4
         }}
         title="Next Frame (Page Down)"
+        aria-label="Next frame"
       >
         {Icons.stepForward}
       </button>
@@ -743,6 +757,7 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
           borderRadius: 4
         }}
         title="Go to End (End)"
+        aria-label="Go to end"
       >
         {Icons.skipForward}
       </button>
@@ -943,6 +958,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 >
                   <button
                     onClick={() => onToggleKeyframe?.(group.name, prop.name)}
+                    aria-label={prop.value.hasKeyframes ? `Remove keyframes from ${prop.name}` : `Add keyframe to ${prop.name}`}
+                    aria-pressed={prop.value.hasKeyframes}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -1010,6 +1027,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           key={tool.id}
           onClick={() => onToolChange(tool.id)}
           title={`${tool.label} (${tool.shortcut})`}
+          aria-label={tool.label}
+          aria-pressed={activeTool === tool.id}
           style={{
             background: activeTool === tool.id ? '#37373d' : 'transparent',
             border: 'none',
@@ -1063,6 +1082,7 @@ export const LayerCreator: React.FC<LayerCreatorProps> = ({ onCreateLayer }) => 
           key={type.id}
           onClick={() => onCreateLayer(type.id)}
           title={`New ${type.label}`}
+          aria-label={`New ${type.label} layer`}
           style={{
             background: 'transparent',
             border: '1px solid #3c3c3c',

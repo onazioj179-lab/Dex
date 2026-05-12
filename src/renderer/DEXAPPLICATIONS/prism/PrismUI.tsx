@@ -132,6 +132,7 @@ export const AdaptiveToolbar = memo(function AdaptiveToolbar({
             `}
             onClick={() => handleToolClick(tool)}
             title={`${tool.name} (${tool.shortcut})`}
+            aria-label={tool.name}
             aria-pressed={currentTool === tool.id}
           >
             <tool.icon className="w-5 h-5" />
@@ -166,6 +167,7 @@ export const AdaptiveToolbar = memo(function AdaptiveToolbar({
                     setExpandedTool(null);
                   }}
                   title={`${subTool.name} (${subTool.shortcut})`}
+                  aria-label={subTool.name}
                 >
                   <subTool.icon className="w-5 h-5" />
                 </button>
@@ -367,6 +369,7 @@ export const DockablePanel = memo(function DockablePanel({
             className="w-6 h-6 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={() => onDock('left')}
             title="Dock Left"
+            aria-label="Dock panel left"
           >
             <svg className="w-3 h-3" viewBox="0 0 12 12">
               <rect x="1" y="1" width="4" height="10" fill="currentColor" opacity="0.5" />
@@ -377,6 +380,7 @@ export const DockablePanel = memo(function DockablePanel({
             className="w-6 h-6 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={() => onDock('right')}
             title="Dock Right"
+            aria-label="Dock panel right"
           >
             <svg className="w-3 h-3" viewBox="0 0 12 12">
               <rect x="1" y="1" width="5" height="10" stroke="currentColor" strokeWidth="1" fill="none" />
@@ -387,6 +391,7 @@ export const DockablePanel = memo(function DockablePanel({
             className="w-6 h-6 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={onToggle}
             title="Close"
+            aria-label="Close panel"
           >
             <svg className="w-3 h-3" viewBox="0 0 12 12">
               <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" strokeWidth="1.5" />
@@ -528,6 +533,8 @@ export const LayersPanel = memo(function LayersPanel({
             <button
               className="w-6 h-6 flex items-center justify-center"
               onClick={e => { e.stopPropagation(); onVisibilityToggle(layer.id); }}
+              aria-label={layer.visible ? `Hide layer ${layer.name}` : `Show layer ${layer.name}`}
+              aria-pressed={layer.visible}
             >
               {layer.visible ? (
                 <svg className="w-4 h-4 text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -577,6 +584,8 @@ export const LayersPanel = memo(function LayersPanel({
             <button
               className="w-6 h-6 flex items-center justify-center"
               onClick={e => { e.stopPropagation(); onLockToggle(layer.id); }}
+              aria-label={layer.locked ? `Unlock layer ${layer.name}` : `Lock layer ${layer.name}`}
+              aria-pressed={layer.locked}
             >
               {layer.locked ? (
                 <svg className="w-3 h-3 text-neutral-300" viewBox="0 0 24 24" fill="currentColor">
@@ -599,6 +608,7 @@ export const LayersPanel = memo(function LayersPanel({
             className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={() => onAddLayer('image')}
             title="New Layer"
+            aria-label="New layer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -609,6 +619,7 @@ export const LayersPanel = memo(function LayersPanel({
             className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={() => onGroup(selectedLayers)}
             title="Group Layers"
+            aria-label="Group selected layers"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z" />
@@ -620,6 +631,7 @@ export const LayersPanel = memo(function LayersPanel({
             className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={() => onDuplicate(selectedLayers)}
             title="Duplicate Layer"
+            aria-label="Duplicate selected layers"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -630,6 +642,7 @@ export const LayersPanel = memo(function LayersPanel({
             className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white rounded hover:bg-neutral-700"
             onClick={() => onDelete(selectedLayers)}
             title="Delete Layer"
+            aria-label="Delete selected layers"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
