@@ -17,10 +17,10 @@ that keeps your data accessible.
 | Plan | Monthly | Yearly | Best for |
 |---|---|---|---|
 | **Free Viewer** | $0 | $0 | Browsing existing projects after trial ends |
-| **DEX Personal** | $25.99 | $232.99 (save 25%) | One person, one or two devices |
-| **DEX Family** | $38.99 | $389.99 / year | Up to 5 people in one household |
-| **DEX Pro** | $51.99 | $492.99 (save 21%) | Solo creators, freelancers, commercial use |
-| **DEX Studio** | $77.99 / seat | $778.99 / seat | Teams of 2+, includes admin console + SLA |
+| **DEX Personal** | $33.99 | $302.99 (save 26%) | One person, one or two devices |
+| **DEX Family** | $50.99 | $506.99 / year | Up to 5 people in one household |
+| **DEX Pro** | $67.99 | $640.99 (save 21%) | Solo creators, freelancers, commercial use |
+| **DEX Studio** | $101.99 / seat | $1,012.99 / seat | Teams of 2+, includes admin console + SLA |
 
 ### What is in every paid plan
 

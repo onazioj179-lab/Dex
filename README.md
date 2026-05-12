@@ -1,11 +1,11 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 4.0.0 - Copyright (c) 2026 - DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 4.2.0 - Copyright (c) 2026 - DEX Software License Agreement v1.0
 
-DEX is your personal command bar for the desktop. One key, one bar, anything done.
-Take notes, run timers, open files, snap a screenshot, focus your screen, mute the
-room, jump between apps -- without ever leaving the keyboard. Everything happens on
-your machine.
+DEX is a calm, fast, local-first desktop workspace. One launcher, one assistant,
+one home for the apps you use every day. Take notes, run timers, open files,
+snap a screenshot, focus your screen, mute the room, draw, write, plan, ship --
+without ever leaving the keyboard. Everything happens on your machine.
 
 ## Why people use DEX
 
@@ -32,15 +32,17 @@ reading your data forever.
 | Plan | Monthly | Yearly | Best for |
 |---|---|---|---|
 | **Free Viewer** | $0 | $0 | Keep access to your work, forever |
-| **DEX Personal** | $20 | $179 (save 25%) | One person, one or two devices |
-| **DEX Family** | $30 | $300 / year | Up to 5 people in one household |
-| **DEX Pro** | $40 | $379 (save 21%) | Solo creators, freelancers, commercial use |
-| **DEX Studio** | $60 / seat | $599 / seat | Teams of 2+, admin console + 99.5% SLA |
+| **DEX Personal** | $33.99 | $302.99 (save 26%) | One person, one or two devices |
+| **DEX Family** | $50.99 | $506.99 / year | Up to 5 people in one household |
+| **DEX Pro** | $67.99 | $640.99 (save 21%) | Solo creators, freelancers, commercial use |
+| **DEX Studio** | $101.99 / seat | $1,012.99 / seat | Teams of 2+, admin console + 99.5% SLA |
 
 - **50% off** for students, educators, and registered non-profits.
 - **Free DEX Pro** for open-source maintainers.
 - **One free year of Personal** if you switch from a paid competitor.
 - **No ads. No data resale. 14-day no-questions refund.**
+- **Active subscribers keep their current price for at least 12 months** -- price
+  changes only apply to new orders.
 
 Full breakdown: [docs/PRICING.md](docs/PRICING.md).
 
