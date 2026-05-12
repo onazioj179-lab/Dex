@@ -503,19 +503,10 @@ fn save_knowledge_encrypted(store: &KnowledgeStore) -> Result<(), String> {
 
     let key_bytes = derive_key();
     let cipher = Aes256Gcm::new_from_slice(&key_bytes).map_err(|e| e.to_string())?;
-    let nonce_bytes: [u8; 12] = {
-        let mut n = [0u8; 12];
-        // Deterministic nonce from content hash (safe because key is unique per save)
-        for (i, b) in compressed.iter().enumerate().take(12) {
-            n[i % 12] ^= b;
-        }
-        // Add randomness
-        let r: [u8; 12] = rand::random();
-        for i in 0..12 {
-            n[i] ^= r[i];
-        }
-        n
-    };
+    // SECURITY: Fully random 96-bit nonce per AES-GCM spec (NIST SP 800-38D §8.2.2).
+    // Previous implementation mixed a content-derived XOR with randomness; collapsing
+    // any deterministic component eliminates nonce-reuse risk entirely.
+    let nonce_bytes: [u8; 12] = rand::random();
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher.encrypt(nonce, compressed.as_ref()).map_err(|e| e.to_string())?;
 
