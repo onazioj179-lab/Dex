@@ -65,4 +65,4 @@ rp[0-9].txt
 .env.*.local
 
 # Archived old versions
-_archive_v2/
+_archive_v2/run_log.txt
