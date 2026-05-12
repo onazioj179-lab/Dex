@@ -7,8 +7,6 @@
 // DEX Core -- Spring physics engine with SIMD-accelerated batch ticking.
 // All springs run in Rust with zero GC pressure.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-
 /// Per-spring simulation state packed in a cache-friendly struct.
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -25,7 +23,7 @@ pub struct SpringState {
 impl SpringState {
     /// Advance the spring by dt seconds using semi-implicit Euler integration.
     /// Returns the new position.
-    #[inline]
+    #[inline(always)]
     pub fn tick(&mut self, dt: f32) -> f32 {
         if self.settled {
             return self.position;
@@ -94,21 +92,42 @@ impl PhysicsEngine {
     }
 
     /// Tick all unsettled springs. Returns (index, position, settled) triples.
+    /// Pre-sizes the result vector to the active spring count to avoid
+    /// reallocations on the hot path.
     pub fn tick_all(&mut self, dt: f32) -> Vec<(usize, f32, bool)> {
-        // Use SIMD batch path on x86_64 when available at runtime
-        #[cfg(target_arch = "x86_64")]
-        {
-            if is_x86_feature_detected!("avx2") {
-                return self.tick_all_scalar(dt);
-                // AVX2 batch path would go here for 8-wide processing.
-                // Using scalar path for correctness -- SIMD can be enabled
-                // once cross-platform output parity is verified in CI.
+        // Clamp dt once to keep the per-spring math branchless on dt.
+        let dt = dt.min(0.064);
+        let active_estimate = self.springs.len().saturating_sub(self.free_indices.len());
+        let mut results: Vec<(usize, f32, bool)> = Vec::with_capacity(active_estimate);
+
+        // Auto-vectorizable scalar loop. Each spring is independent so
+        // LLVM emits SSE/AVX with -O3 + LTO when the slice is contiguous.
+        for (i, spring) in self.springs.iter_mut().enumerate() {
+            if spring.settled {
+                continue;
             }
+            // Inline the tick body so the compiler can keep state in registers
+            // across the loop iteration (cheaper than a function call here).
+            let spring_force = -spring.stiffness * (spring.position - spring.target);
+            let damping_force = -spring.damping * spring.velocity;
+            let acceleration = (spring_force + damping_force) / spring.mass;
+            spring.velocity += acceleration * dt;
+            spring.position += spring.velocity * dt;
+
+            let distance = (spring.position - spring.target).abs();
+            if distance < 0.001 && spring.velocity.abs() < 0.001 {
+                spring.position = spring.target;
+                spring.velocity = 0.0;
+                spring.settled = true;
+            }
+            results.push((i, spring.position, spring.settled));
         }
-        self.tick_all_scalar(dt)
+        results
     }
 
     /// Scalar fallback path that works on all architectures.
+    /// Retained for tests that compare against the inlined fast path.
+    #[allow(dead_code)]
     fn tick_all_scalar(&mut self, dt: f32) -> Vec<(usize, f32, bool)> {
         let mut results = Vec::new();
         for (i, spring) in self.springs.iter_mut().enumerate() {
