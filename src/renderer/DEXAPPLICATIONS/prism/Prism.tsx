@@ -4407,9 +4407,9 @@ const Prism: React.FC = () => {
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Input Levels</span>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input type="number" value={levelsInput[0]} onChange={e => setLevelsInput([Number(e.target.value), levelsInput[1]])} style={{ width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: '#ccc', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
-                <input type="range" min="0.1" max="5" step="0.01" value={levelsGamma} onChange={e => setLevelsGamma(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
-                <input type="number" value={levelsInput[1]} onChange={e => setLevelsInput([levelsInput[0], Number(e.target.value)])} style={{ width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: '#ccc', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
+                <input aria-label="Levels input black point" type="number" value={levelsInput[0]} onChange={e => setLevelsInput([Number(e.target.value), levelsInput[1]])} style={{ width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: '#ccc', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
+                <input aria-label="Levels gamma" type="range" min="0.1" max="5" step="0.01" value={levelsGamma} onChange={e => setLevelsGamma(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
+                <input aria-label="Levels input white point" type="number" value={levelsInput[1]} onChange={e => setLevelsInput([levelsInput[0], Number(e.target.value)])} style={{ width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: '#ccc', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', marginTop: 2 }}>Gamma: {levelsGamma.toFixed(2)}</div>
             </div>
@@ -4463,7 +4463,7 @@ const Prism: React.FC = () => {
             {(['r', 'g', 'b'] as const).map(src => (
               <div key={src} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 9, color: src === 'r' ? 'var(--color-error)' : src === 'g' ? 'var(--color-success)' : 'var(--color-accent)', width: 14, textAlign: 'right', fontWeight: 600 }}>{src.toUpperCase()}</span>
-                <input type="range" min="-200" max="200" value={channelMixerValues[channelMixerOutput][src]} onChange={e => setChannelMixerValues(prev => ({ ...prev, [channelMixerOutput]: { ...prev[channelMixerOutput], [src]: Number(e.target.value) } }))} style={{ flex: 1, accentColor: src === 'r' ? 'var(--color-error)' : src === 'g' ? 'var(--color-success)' : 'var(--color-accent)' }} />
+                <input aria-label={`${channelMixerOutput.toUpperCase()} output ${src.toUpperCase()} channel mix`} type="range" min="-200" max="200" value={channelMixerValues[channelMixerOutput][src]} onChange={e => setChannelMixerValues(prev => ({ ...prev, [channelMixerOutput]: { ...prev[channelMixerOutput], [src]: Number(e.target.value) } }))} style={{ flex: 1, accentColor: src === 'r' ? 'var(--color-error)' : src === 'g' ? 'var(--color-success)' : 'var(--color-accent)' }} />
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{channelMixerValues[channelMixerOutput][src]}%</span>
               </div>
             ))}
