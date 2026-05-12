@@ -35,6 +35,12 @@ export async function recordTurn(
   const turn = freshTurn(user, ukiResponse, extras);
   const list = (await readTurns()).concat(turn).slice(-MAX_TURNS);
   await cache.setAsync(TURNS_KEY, list, { encrypted: true });
+  // Lazy compression: consolidate older warm turns into compressed archives
+  // once the rolling window is full enough. Failures are non-fatal.
+  try {
+    const mod = await import('./compressedMemory');
+    await mod.maybeConsolidate();
+  } catch { /* compression unavailable -- keep raw window */ }
   return turn;
 }
 

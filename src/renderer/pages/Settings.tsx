@@ -1515,6 +1515,71 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
   );
 };
 
+// =============================================================================
+// UKI ARCHIVE STATS -- shows compression ratio and lets the user export/clear
+// the local UKI memory archive.
+// =============================================================================
+const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
+  const [stats, setStats] = useState<{ archiveCount: number; rawBytes: number; compressedBytes: number; ratio: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const mod = await import('../uki/compressedMemory');
+      const s = await mod.getCompressionStats();
+      setStats({ archiveCount: s.archiveCount, rawBytes: s.rawBytes, compressedBytes: s.compressedBytes, ratio: s.ratio });
+    } catch {
+      setStats(null);
+    }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const handleClear = async () => {
+    if (!confirm('Clear all compressed memory archives? This removes the warm/cold history but keeps the rolling window.')) return;
+    setBusy(true);
+    try {
+      const mod = await import('../uki/compressedMemory');
+      await mod.clearArchives();
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmt = (n: number) => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0 10px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+      <span>
+        {stats
+          ? `Compressed archives: ${stats.archiveCount} -- ${fmt(stats.compressedBytes)} of ${fmt(stats.rawBytes)} (${stats.rawBytes ? Math.round((1 - stats.ratio) * 100) : 0}% saved)`
+          : 'Compressed archives: --'}
+      </span>
+      <button
+        type="button"
+        onClick={handleClear}
+        disabled={busy || !stats || stats.archiveCount === 0}
+        style={{
+          padding: '4px 10px', borderRadius: 6, fontSize: 11,
+          border: '1px solid var(--color-border)',
+          background: 'var(--color-bg-hover)',
+          color: 'var(--color-text-secondary)',
+          cursor: busy ? 'wait' : 'pointer',
+          opacity: stats && stats.archiveCount > 0 ? 1 : 0.5,
+        }}
+        aria-label="Clear UKI compressed archives"
+      >
+        {busy ? 'Clearing...' : 'Clear archives'}
+      </button>
+    </div>
+  );
+};
+
 export const Settings: React.FC = () => {
   const { confirm: confirmReset, ConfirmHost: ConfirmResetHost } = useConfirm();
   const toast = useToastHelpers();
@@ -3646,6 +3711,7 @@ export const Settings: React.FC = () => {
       {renderToggle('ukiAutoCleanup', 'Auto Cleanup', 'Automatically remove expired memory records')}
 
       <h3 style={styles.sectionTitle}>Memory Management</h3>
+      <UkiArchiveStats styles={styles} />
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           style={{ ...styles.secondaryBtn, flex: 1 }}
