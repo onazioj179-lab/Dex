@@ -756,6 +756,7 @@ const CurvesEditor: React.FC<{
         <button
           style={{ padding: '1px 6px', fontSize: 9, border: '1px solid var(--color-border)', borderRadius: 3, background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}
           onClick={resetCurve}
+          aria-label="Reset curve"
         >
           Reset
         </button>
@@ -765,6 +766,8 @@ const CurvesEditor: React.FC<{
           {CURVE_CHANNELS.map(ch => (
             <button
               key={ch.key}
+              aria-label={`Curve channel: ${ch.label}`}
+              aria-pressed={activeChannel === ch.key}
               style={{
                 padding: '2px 8px', fontSize: 9, fontWeight: 600,
                 border: '1px solid var(--color-border)', borderRadius: 3,

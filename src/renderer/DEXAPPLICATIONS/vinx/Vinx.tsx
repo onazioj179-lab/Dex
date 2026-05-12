@@ -960,6 +960,7 @@ const VinxEditor: React.FC = () => {
               style={collabButtonStyles.collabButton}
               onClick={collab.openShareDialog}
               title="Share & Collaborate"
+              aria-label={collab.activeCollaboratorCount > 0 ? `Share project (${collab.activeCollaboratorCount} active collaborators)` : 'Share and collaborate on project'}
             >
               <DexIcon name="users" size={12} />
               {collab.activeCollaboratorCount > 0 && (
@@ -1544,7 +1545,7 @@ const VinxEditor: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
               {['Side-by-Side', 'Overlay', 'Split', 'Difference'].map(mode => (
-                <button key={mode} onClick={() => setCompareMode(mode)} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
+                <button key={mode} onClick={() => setCompareMode(mode)} aria-label={`Compare mode: ${mode}`} aria-pressed={compareMode === mode} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
               ))}
             </div>
           </div>
@@ -1708,7 +1709,7 @@ const VinxEditor: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Method</span>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {['Warp', 'Position', 'Pos+Scale+Rot'].map(m => (
-                      <button key={m} onClick={() => setStabMethod(m)} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                      <button key={m} onClick={() => setStabMethod(m)} aria-label={`Stabilization method: ${m}`} aria-pressed={stabMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
                     ))}
                   </div>
                 </div>
@@ -1716,7 +1717,7 @@ const VinxEditor: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Crop Mode</span>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {['Auto', 'Stabilize Only', 'Smooth'].map(m => (
-                      <button key={m} onClick={() => setStabCropMode(m)} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabCropMode === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                      <button key={m} onClick={() => setStabCropMode(m)} aria-label={`Stabilization crop mode: ${m}`} aria-pressed={stabCropMode === m} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabCropMode === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
                     ))}
                   </div>
                 </div>
@@ -1750,7 +1751,7 @@ const VinxEditor: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Method</span>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {['Temporal', 'Spatial', 'Combined'].map(m => (
-                      <button key={m} onClick={() => setNrMethod(m)} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: nrMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                      <button key={m} onClick={() => setNrMethod(m)} aria-label={`Noise reduction method: ${m}`} aria-pressed={nrMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: nrMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
                     ))}
                   </div>
                 </div>
@@ -1842,7 +1843,7 @@ const VinxEditor: React.FC = () => {
                 { name: 'Bass Boost', bands: [6,4,0,-1,-2,0] },
                 { name: 'High Cut', bands: [0,0,0,-4,-8,0] },
               ].map(preset => (
-                <button key={preset.name} onClick={() => { setEqPreset(preset.name); setEqBands(preset.bands); }} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === preset.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{preset.name}</button>
+                <button key={preset.name} onClick={() => { setEqPreset(preset.name); setEqBands(preset.bands); }} aria-label={`EQ preset: ${preset.name}`} aria-pressed={eqPreset === preset.name} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === preset.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{preset.name}</button>
               ))}
             </div>
           </div>

@@ -190,6 +190,7 @@ const EasingCurveEditor: React.FC<EasingCurveEditorProps> = ({ value, onChange, 
           <button
             key={p.name}
             type="button"
+            aria-label={`Easing preset: ${p.name}`}
             onClick={() => {
               onChange(p.value);
               if (onPickPreset) onPickPreset(p.name);

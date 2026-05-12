@@ -398,6 +398,7 @@ const MediaTab: React.FC = memo(() => {
           <button
             role="menuitem"
             onClick={() => { handleDelete(ctxMenu.mediaId); setCtxMenu(null); }}
+            aria-label="Delete media item"
             style={{
               display: 'block', width: '100%', textAlign: 'left',
               background: 'transparent', border: 'none', padding: '8px 14px',

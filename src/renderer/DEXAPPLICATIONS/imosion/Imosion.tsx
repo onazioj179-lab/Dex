@@ -5503,7 +5503,7 @@ const Imosion: React.FC = () => {
                       <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 5px', borderRadius: '4px', marginBottom: '2px', background: p.enabled ? `${PLUGIN_LIBRARY[p.type].color}15` : '#111113', opacity: p.enabled ? 1 : 0.4 }}>
                         <span style={{ color: PLUGIN_LIBRARY[p.type].color, display: 'flex', flexShrink: 0 }}>{PLUGIN_ICON[p.type]}</span>
                         <span style={{ fontSize: '8px', color: PLUGIN_LIBRARY[p.type].color, fontWeight: 600, flex: 1 }}>{PLUGIN_LIBRARY[p.type].abbr}</span>
-                        <button onClick={(e) => { e.stopPropagation(); togglePlugin(track.id, p.id); }} style={{ width: '14px', height: '14px', borderRadius: '3px', border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="2.5" fill={p.enabled ? '#000' : 'var(--color-text-tertiary)'}/></svg></button>
+                        <button onClick={(e) => { e.stopPropagation(); togglePlugin(track.id, p.id); }} aria-label={p.enabled ? `Disable ${PLUGIN_LIBRARY[p.type].abbr} plugin on ${track.name}` : `Enable ${PLUGIN_LIBRARY[p.type].abbr} plugin on ${track.name}`} aria-pressed={p.enabled} style={{ width: '14px', height: '14px', borderRadius: '3px', border: 'none', background: p.enabled ? PLUGIN_LIBRARY[p.type].color : 'var(--color-bg-hover)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="2.5" fill={p.enabled ? '#000' : 'var(--color-text-tertiary)'}/></svg></button>
                       </div>
                     )) : (
                       <div style={{ fontSize: '7px', color: 'var(--color-text-disabled)', textAlign: 'center', padding: '2px 0' }}>No FX</div>
@@ -6337,7 +6337,7 @@ const Imosion: React.FC = () => {
                   }} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid #27272a', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', fontSize: 9 }}>
                     {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
                   </select>
-                  <button onClick={() => setShowInstrumentEditor(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }}><DexIcon name="close" size={14} /></button>
+                  <button onClick={() => setShowInstrumentEditor(false)} aria-label="Close instrument editor" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }}><DexIcon name="close" size={14} /></button>
                 </div>
               </div>
 
@@ -8281,7 +8281,7 @@ const Imosion: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                     {tracks.map(t => (
-                      <button key={t.id} onClick={() => setTrackFolders(prev => prev.map(pf => pf.id === f.id ? { ...pf, trackIds: pf.trackIds.includes(t.id) ? pf.trackIds.filter(id => id !== t.id) : [...pf.trackIds, t.id] } : pf))} style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: f.trackIds.includes(t.id) ? `${f.color}22` : 'var(--color-border-subtle)', color: f.trackIds.includes(t.id) ? f.color : 'var(--color-text-tertiary)', fontSize: 8, cursor: 'pointer' }}>{t.name}</button>
+                      <button key={t.id} onClick={() => setTrackFolders(prev => prev.map(pf => pf.id === f.id ? { ...pf, trackIds: pf.trackIds.includes(t.id) ? pf.trackIds.filter(id => id !== t.id) : [...pf.trackIds, t.id] } : pf))} aria-label={f.trackIds.includes(t.id) ? `Remove ${t.name} from folder ${f.name}` : `Add ${t.name} to folder ${f.name}`} aria-pressed={f.trackIds.includes(t.id)} style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: f.trackIds.includes(t.id) ? `${f.color}22` : 'var(--color-border-subtle)', color: f.trackIds.includes(t.id) ? f.color : 'var(--color-text-tertiary)', fontSize: 8, cursor: 'pointer' }}>{t.name}</button>
                     ))}
                   </div>
                 </div>
