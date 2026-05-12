@@ -1,0 +1,551 @@
+rank,itemId,source,sourceId,areaCode,area,tag,priority,status,targetVersion,creativeScore,title
+1,T12-020,IMPROVEMENTS,20,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,14,DockPeek for creative suite (VINX/Imosion/PRISM/FLUX/FORGE/AXL).
+2,T11-021,IMPROVEMENTS,21,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,9,Pen pressure → FLUX brush stroke width.
+3,T1-020,IMPROVEMENTS,20,T1,Accessibility,U,P2,open,4.3.x-same-train,8,FLUX: aria-label timeline keyframe controls.
+4,T11-013,IMPROVEMENTS,13,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,8,Pinch-to-zoom in FLUX viewport.
+5,T11-018,IMPROVEMENTS,18,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,8,Pen pressure → PRISM brush size.
+6,T11-019,IMPROVEMENTS,19,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,8,Pen pressure → PRISM brush opacity.
+7,T11-020,IMPROVEMENTS,20,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,8,Pen tilt → PRISM brush angle.
+8,T1-005,IMPROVEMENTS,5,T1,Accessibility,U,P2,open,4.3.x-same-train,7,Imosion: aria-label export panel buttons.
+9,T1-013,IMPROVEMENTS,13,T1,Accessibility,U,P2,open,4.3.x-same-train,7,VINX: aria-label timeline tool palette.
+10,T1-015,IMPROVEMENTS,15,T1,Accessibility,U,P2,open,4.3.x-same-train,7,VINX: keyboard nav between timeline tracks.
+11,T1-017,IMPROVEMENTS,17,T1,Accessibility,U,P2,open,4.3.x-same-train,7,PRISM: aria-label brush/size/opacity controls.
+12,T1-021,IMPROVEMENTS,21,T1,Accessibility,U,P2,open,4.3.x-same-train,7,FLUX: aria-label effects panel.
+13,T1-022,IMPROVEMENTS,22,T1,Accessibility,U,P2,open,4.3.x-same-train,7,FLUX: aria-label property inspector fields.
+14,T11-005,IMPROVEMENTS,5,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Long-press dock icon = peek (DONE).
+15,T11-006,IMPROVEMENTS,6,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Short tap dock icon = launch (DONE).
+16,T11-012,IMPROVEMENTS,12,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Pinch-to-zoom in PRISM viewport.
+17,T11-014,IMPROVEMENTS,14,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Pinch-to-zoom in AXL viewport.
+18,T11-022,IMPROVEMENTS,22,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Pen pressure → AXL pen tool weight.
+19,T11-025,IMPROVEMENTS,25,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Imosion spectrum canvas: touch scrub.
+20,T11-026,IMPROVEMENTS,26,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Imosion waveform canvas: pinch-zoom + touch scrub.
+21,T11-033,IMPROVEMENTS,33,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,7,Drag-to-reorder dock items with finger.
+22,T12-006,IMPROVEMENTS,6,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,7,DockPeek action: Open recent.
+23,T12-015,IMPROVEMENTS,15,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,7,DockPeek entrance/exit animation respects reduced-motion.
+24,T12-017,IMPROVEMENTS,17,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,7,DockPeek pinning (keep open).
+25,T12-022,IMPROVEMENTS,22,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,7,DockPeek a11y: announce on open.
+26,T12-025,IMPROVEMENTS,25,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,7,DockPeek opens via global hotkey on focused dock item.
+27,T3-037,IMPROVEMENTS,37,T3,Creative-suite features,U,P2,open,4.3.x-same-train,7,Brush dynamics editor.
+28,T3-048,IMPROVEMENTS,48,T3,Creative-suite features,U,P2,open,4.3.x-same-train,7,Pen-pressure → brush size and opacity mapping.
+29,T3-049,IMPROVEMENTS,49,T3,Creative-suite features,U,P2,open,4.3.x-same-train,7,Pen-tilt → brush angle.
+30,T5-009,IMPROVEMENTS,9,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,UKI graph: export PNG / SVG.
+31,T5-020,IMPROVEMENTS,20,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,RAG: export conversation as note.
+32,T5-036,IMPROVEMENTS,36,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,Plugins: registry browser.
+33,T5-037,IMPROVEMENTS,37,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,Plugins: install / disable / uninstall actions.
+34,T5-038,IMPROVEMENTS,38,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,Plugins: permission diff on update.
+35,T5-039,IMPROVEMENTS,39,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,Plugins: developer mode console.
+36,T5-040,IMPROVEMENTS,40,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,Plugins: hot-reload during dev.
+37,T5-043,IMPROVEMENTS,43,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,Knowledge cards: share to collab.
+38,T5-044,IMPROVEMENTS,44,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,UKI: timeline view.
+39,T5-055,IMPROVEMENTS,55,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,7,UKI: data export bundle (zip).
+40,T6-018,IMPROVEMENTS,18,T6,Performance & stability,U,P2,open,4.3.x-same-train,7,Web workers for image processing in PRISM/FLUX.
+41,T9-012,IMPROVEMENTS,12,T9,UX & onboarding,U,P2,open,4.3.x-same-train,7,Drop-onto-dock-icon opens the file in that app.
+42,T1-001,IMPROVEMENTS,1,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label every mute/solo/arm button. AC: axe-core reports 0 unlabeled buttons in mixer.
+43,T1-002,IMPROVEMENTS,2,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label every track add/remove control.
+44,T1-003,IMPROVEMENTS,3,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label transport controls (play/stop/record/loop/metronome).
+45,T1-004,IMPROVEMENTS,4,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label file menu items.
+46,T1-006,IMPROVEMENTS,6,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label split-clip and trim controls.
+47,T1-007,IMPROVEMENTS,7,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label add-track menu items.
+48,T1-008,IMPROVEMENTS,8,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label mastering panel knobs.
+49,T1-009,IMPROVEMENTS,9,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: aria-label preset selector buttons.
+50,T1-010,IMPROVEMENTS,10,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: keyboard nav between tracks (Up/Down arrows).
+51,T1-011,IMPROVEMENTS,11,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Imosion: focus ring on every interactive surface.
+52,T1-012,IMPROVEMENTS,12,T1,Accessibility,U,P2,open,4.3.x-same-train,6,VINX: aria-label viewer transport buttons.
+53,T1-014,IMPROVEMENTS,14,T1,Accessibility,U,P2,open,4.3.x-same-train,6,VINX: aria-label clip context-menu items.
+54,T1-016,IMPROVEMENTS,16,T1,Accessibility,U,P2,open,4.3.x-same-train,6,PRISM: aria-label tool palette.
+55,T1-018,IMPROVEMENTS,18,T1,Accessibility,U,P2,open,4.3.x-same-train,6,PRISM: aria-label layer panel buttons.
+56,T1-019,IMPROVEMENTS,19,T1,Accessibility,U,P2,open,4.3.x-same-train,6,PRISM: keyboard shortcut hints in tooltips.
+57,T1-023,IMPROVEMENTS,23,T1,Accessibility,U,P2,open,4.3.x-same-train,6,FORGE: aria-label primitive palette.
+58,T1-024,IMPROVEMENTS,24,T1,Accessibility,U,P2,open,4.3.x-same-train,6,FORGE: aria-label transform gizmo modes.
+59,T1-025,IMPROVEMENTS,25,T1,Accessibility,U,P2,open,4.3.x-same-train,6,AXL: aria-label drawing tool palette.
+60,T1-026,IMPROVEMENTS,26,T1,Accessibility,U,P2,open,4.3.x-same-train,6,AXL: aria-label dimension and GD&T controls.
+61,T1-037,IMPROVEMENTS,37,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Audio: aria-label playback controls.
+62,T1-047,IMPROVEMENTS,47,T1,Accessibility,U,P2,open,4.3.x-same-train,6,"Dock: aria-current=""true"" on active app (done) — verify."
+63,T1-055,IMPROVEMENTS,55,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Reduced-motion: every animation respects `prefers-reduced-motion`.
+64,T1-057,IMPROVEMENTS,57,T1,Accessibility,U,P2,open,4.3.x-same-train,6,Screen-reader announce when a window opens / closes.
+65,T11-001,IMPROVEMENTS,1,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Touch mode auto-detect on first touch event (DONE).
+66,T11-002,IMPROVEMENTS,2,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Touch mode pinned via Settings → Input.
+67,T11-003,IMPROVEMENTS,3,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Touch mode bumps hit-targets to 44px (DONE — verify).
+68,T11-004,IMPROVEMENTS,4,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Touch mode expands window edge handles to 12px (DONE — verify).
+69,T11-007,IMPROVEMENTS,7,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,2-finger swipe-down on titlebar = minimize.
+70,T11-008,IMPROVEMENTS,8,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,2-finger swipe-up on titlebar = maximize.
+71,T11-009,IMPROVEMENTS,9,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,3-finger swipe-left/right = cycle apps.
+72,T11-010,IMPROVEMENTS,10,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,4-finger swipe-up = mission control / overview.
+73,T11-011,IMPROVEMENTS,11,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,5-finger pinch = show desktop.
+74,T11-015,IMPROVEMENTS,15,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Pinch-to-zoom in Files thumbnails grid.
+75,T11-016,IMPROVEMENTS,16,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Pinch-to-zoom in Gallery grid.
+76,T11-017,IMPROVEMENTS,17,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,2-finger pan in scroll containers.
+77,T11-023,IMPROVEMENTS,23,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Pen barrel-button → eraser.
+78,T11-024,IMPROVEMENTS,24,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Palm rejection on canvases.
+79,T11-027,IMPROVEMENTS,27,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Soft-keyboard affordance for kiosk text inputs.
+80,T11-028,IMPROVEMENTS,28,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Auto-show OS soft keyboard on input focus in touch mode.
+81,T11-029,IMPROVEMENTS,29,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Numeric soft pad for number-only inputs.
+82,T11-030,IMPROVEMENTS,30,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Touch ripple feedback on tap.
+83,T11-031,IMPROVEMENTS,31,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Long-press menu = right-click menu.
+84,T11-032,IMPROVEMENTS,32,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Drag-to-select with finger in Files.
+85,T11-034,IMPROVEMENTS,34,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Touch e2e suite (Playwright iPad emulation).
+86,T11-035,IMPROVEMENTS,35,T11,Touch / pen / 10-finger,U,P2,open,4.3.x-same-train,6,Kiosk lock mode (single-app fullscreen).
+87,T12-001,IMPROVEMENTS,1,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek popover scaffolded (DONE — basic preview).
+88,T12-002,IMPROVEMENTS,2,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek shows status chip (Running / Minimized / Not running).
+89,T12-003,IMPROVEMENTS,3,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek shows last 3 recents from app's recent store.
+90,T12-004,IMPROVEMENTS,4,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek shows live miniature thumbnail when running.
+91,T12-005,IMPROVEMENTS,5,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek action: New.
+92,T12-007,IMPROVEMENTS,7,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek action: Reveal in launcher.
+93,T12-008,IMPROVEMENTS,8,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek action: Close all windows.
+94,T12-009,IMPROVEMENTS,9,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek dismiss on pointer leave with grace.
+95,T12-010,IMPROVEMENTS,10,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek dismiss on escape.
+96,T12-011,IMPROVEMENTS,11,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek dismiss on outside tap.
+97,T12-012,IMPROVEMENTS,12,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek keyboard accessible (focus + space/enter-hold).
+98,T12-013,IMPROVEMENTS,13,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek arrow-key nav between actions.
+99,T12-014,IMPROVEMENTS,14,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek share menu plumbing with right-click context menu.
+100,T12-016,IMPROVEMENTS,16,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek surface uses Premium Glass v1 tokens.
+101,T12-018,IMPROVEMENTS,18,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek drag a recent to a window snap target.
+102,T12-019,IMPROVEMENTS,19,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek for Home/Settings/Files prioritized first.
+103,T12-021,IMPROVEMENTS,21,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek for utility apps batch.
+104,T12-023,IMPROVEMENTS,23,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,"DockPeek thumbnail uses html2canvas-style snapshot, throttled."
+105,T12-024,IMPROVEMENTS,24,T12,Dock & shell peek,U,P2,open,4.3.x-same-train,6,DockPeek thumbnail caches per app (invalidate on focus loss).
+106,T3-001,IMPROVEMENTS,1,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Timeline: ripple delete (option-drag).
+107,T3-002,IMPROVEMENTS,2,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Timeline: slip / slide tools.
+108,T3-003,IMPROVEMENTS,3,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Timeline: J/K/L shuttle.
+109,T3-006,IMPROVEMENTS,6,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Audio: track-level EQ insert.
+110,T3-008,IMPROVEMENTS,8,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Export: per-track stems toggle.
+111,T3-009,IMPROVEMENTS,9,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Render queue panel.
+112,T3-013,IMPROVEMENTS,13,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Speed-ramp curve editor.
+113,T3-021,IMPROVEMENTS,21,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,MIDI controller mapping panel.
+114,T3-036,IMPROVEMENTS,36,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Render selection range.
+115,T3-038,IMPROVEMENTS,38,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Custom brush import (.abr-like).
+116,T3-041,IMPROVEMENTS,41,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Healing brush.
+117,T3-050,IMPROVEMENTS,50,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Export-as panel with format presets.
+118,T3-051,IMPROVEMENTS,51,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Bezier curve editor for keyframes.
+119,T3-057,IMPROVEMENTS,57,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,3D layer mode + camera.
+120,T3-060,IMPROVEMENTS,60,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Render queue presets.
+121,T3-062,IMPROVEMENTS,62,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Motion-tracking attach to layer.
+122,T3-069,IMPROVEMENTS,69,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Export glTF / OBJ / STL.
+123,T3-070,IMPROVEMENTS,70,T3,Creative-suite features,U,P2,open,4.3.x-same-train,6,Render-to-PNG button.
+124,T4-010,IMPROVEMENTS,10,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,6,Nexus: session timeline.
+125,T4-019,IMPROVEMENTS,19,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,6,Files: per-file permission editor.
+126,T5-001,IMPROVEMENTS,1,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: zoom + pan + minimap.
+127,T5-002,IMPROVEMENTS,2,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: node search.
+128,T5-003,IMPROVEMENTS,3,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: cluster collapse / expand.
+129,T5-004,IMPROVEMENTS,4,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: filter by source app.
+130,T5-005,IMPROVEMENTS,5,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: filter by date.
+131,T5-006,IMPROVEMENTS,6,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: filter by tag.
+132,T5-007,IMPROVEMENTS,7,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: pin nodes.
+133,T5-008,IMPROVEMENTS,8,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI graph: shortest-path tool.
+134,T5-010,IMPROVEMENTS,10,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: streaming token output.
+135,T5-011,IMPROVEMENTS,11,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: citation chips beneath answers.
+136,T5-012,IMPROVEMENTS,12,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: source preview on chip hover.
+137,T5-013,IMPROVEMENTS,13,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: model picker (local / cloud).
+138,T5-014,IMPROVEMENTS,14,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: temperature / top-p sliders.
+139,T5-015,IMPROVEMENTS,15,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: function calling support.
+140,T5-016,IMPROVEMENTS,16,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: tool use trace panel.
+141,T5-017,IMPROVEMENTS,17,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: stop / regenerate.
+142,T5-018,IMPROVEMENTS,18,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: branch conversation.
+143,T5-019,IMPROVEMENTS,19,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,RAG: pin message.
+144,T5-021,IMPROVEMENTS,21,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Indexing: per-folder enable / exclude.
+145,T5-022,IMPROVEMENTS,22,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Indexing: progress + queue panel.
+146,T5-023,IMPROVEMENTS,23,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Indexing: file-type filters.
+147,T5-024,IMPROVEMENTS,24,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Indexing: re-index button.
+148,T5-025,IMPROVEMENTS,25,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Indexing: redaction rules (PII).
+149,T5-026,IMPROVEMENTS,26,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Memory: short-term vs long-term tabs.
+150,T5-027,IMPROVEMENTS,27,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Memory: edit memory entry.
+151,T5-028,IMPROVEMENTS,28,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Memory: delete memory entry.
+152,T5-029,IMPROVEMENTS,29,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Memory: usage stats per memory.
+153,T5-030,IMPROVEMENTS,30,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Memory: memory clusters tab.
+154,T5-031,IMPROVEMENTS,31,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Voice: push-to-talk hotkey.
+155,T5-032,IMPROVEMENTS,32,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Voice: continuous listening with wake word.
+156,T5-033,IMPROVEMENTS,33,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Voice: transcript saved to notes.
+157,T5-034,IMPROVEMENTS,34,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Voice: language picker.
+158,T5-035,IMPROVEMENTS,35,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Voice: voice profile selector.
+159,T5-041,IMPROVEMENTS,41,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Knowledge cards: hover tooltip with summary.
+160,T5-042,IMPROVEMENTS,42,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Knowledge cards: pin to home.
+161,T5-045,IMPROVEMENTS,45,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI: inbox of new captures awaiting tagging.
+162,T5-046,IMPROVEMENTS,46,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI: bulk-tag operation.
+163,T5-047,IMPROVEMENTS,47,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI: smart-collection rules.
+164,T5-048,IMPROVEMENTS,48,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI: duplicate detection.
+165,T5-049,IMPROVEMENTS,49,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI: missing-link suggestions.
+166,T5-050,IMPROVEMENTS,50,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,UKI: weekly digest email.
+167,T5-051,IMPROVEMENTS,51,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Embeddings: model picker.
+168,T5-052,IMPROVEMENTS,52,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Embeddings: dimension / cost display.
+169,T5-053,IMPROVEMENTS,53,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Embeddings: re-embed all action.
+170,T5-054,IMPROVEMENTS,54,T5,Knowledge / UKI,U,P2,open,4.3.x-same-train,6,Embeddings: vector store backend selector.
+171,T6-012,IMPROVEMENTS,12,T6,Performance & stability,U,P2,open,4.3.x-same-train,6,Dock: avoid full re-render on hover (item-local state).
+172,T6-021,IMPROVEMENTS,21,T6,Performance & stability,U,P2,open,4.3.x-same-train,6,Off-screen canvas for VINX preview render.
+173,T6-028,IMPROVEMENTS,28,T6,Performance & stability,U,P2,open,4.3.x-same-train,6,Tear down audio nodes on Imosion close.
+174,T8-009,IMPROVEMENTS,9,T8,Testing & QA,U,P2,open,4.3.x-same-train,6,Playwright: long-press dock peek opens.
+175,T8-011,IMPROVEMENTS,11,T8,Testing & QA,U,P2,open,4.3.x-same-train,6,Playwright: PRISM brush stroke produces non-empty canvas.
+176,T8-012,IMPROVEMENTS,12,T8,Testing & QA,U,P2,open,4.3.x-same-train,6,Playwright: VINX timeline drag clip.
+177,T9-011,IMPROVEMENTS,11,T9,UX & onboarding,U,P2,open,4.3.x-same-train,6,Drag a file onto the dock launches its default app.
+178,T9-017,IMPROVEMENTS,17,T9,UX & onboarding,U,P2,open,4.3.x-same-train,6,In-app feedback button → opens compose with system info.
+179,T9-018,IMPROVEMENTS,18,T9,UX & onboarding,U,P2,open,4.3.x-same-train,6,Tutorial videos linked from each app's empty state.
+180,T9-020,IMPROVEMENTS,20,T9,UX & onboarding,U,P2,open,4.3.x-same-train,6,Per-user theme preset editor.
+181,IDEAS-134,IDEAS,134,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,5,App: Audio waveform editor with non-destructive edits.
+182,T1-027,IMPROVEMENTS,27,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Files: aria-label sidebar tree buttons.
+183,T1-028,IMPROVEMENTS,28,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Files: aria-label item context menu.
+184,T1-029,IMPROVEMENTS,29,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Files: keyboard rename (F2) wired everywhere.
+185,T1-030,IMPROVEMENTS,30,T1,Accessibility,U,P2,open,4.3.x-same-train,5,"Browser: aria-label tab close, new-tab, address bar buttons."
+186,T1-031,IMPROVEMENTS,31,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Settings: aria-label every panel toggle.
+187,T1-032,IMPROVEMENTS,32,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Settings: keyboard nav between panels.
+188,T1-033,IMPROVEMENTS,33,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Tasks: aria-label add/edit/delete buttons.
+189,T1-034,IMPROVEMENTS,34,T1,Accessibility,U,P2,open,4.3.x-same-train,5,"Calendar: aria-label nav (prev month, today, view switcher)."
+190,T1-035,IMPROVEMENTS,35,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Notes: aria-label formatting toolbar.
+191,T1-036,IMPROVEMENTS,36,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Gallery: aria-label sort/filter toolbar.
+192,T1-038,IMPROVEMENTS,38,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Vault: aria-label entry actions.
+193,T1-039,IMPROVEMENTS,39,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Calculator: aria-label every button.
+194,T1-040,IMPROVEMENTS,40,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Terminal: aria-label session tabs.
+195,T1-041,IMPROVEMENTS,41,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Code: aria-label tab close + file picker.
+196,T1-042,IMPROVEMENTS,42,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Power: aria-label profile selector.
+197,T1-043,IMPROVEMENTS,43,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Workflows: aria-label step controls.
+198,T1-044,IMPROVEMENTS,44,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Transfers: aria-label transfer item actions.
+199,T1-045,IMPROVEMENTS,45,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Weather: aria-label location and unit toggles (done) — verify.
+200,T1-046,IMPROVEMENTS,46,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Recents: aria-label per recent item.
+201,T1-048,IMPROVEMENTS,48,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Window header: aria-label minimize/maximize/close.
+202,T1-049,IMPROVEMENTS,49,T1,Accessibility,U,P2,open,4.3.x-same-train,5,"Context menus: role=""menu"" + roving tabindex."
+203,T1-050,IMPROVEMENTS,50,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Modals: focus trap + initial focus + ESC closes.
+204,T1-051,IMPROVEMENTS,51,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Toasts: aria-live region.
+205,T1-052,IMPROVEMENTS,52,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Form fields: every input has an associated label.
+206,T1-053,IMPROVEMENTS,53,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Color contrast audit pass (target WCAG AA 4.5:1).
+207,T1-054,IMPROVEMENTS,54,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Provide skip-link to main content.
+208,T1-056,IMPROVEMENTS,56,T1,Accessibility,U,P2,open,4.3.x-same-train,5,High-contrast preference: honor `prefers-contrast: more`.
+209,T1-058,IMPROVEMENTS,58,T1,Accessibility,U,P2,open,4.3.x-same-train,5,"Tooltips reachable via keyboard focus, not only hover."
+210,T1-059,IMPROVEMENTS,59,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Live region for download progress.
+211,T1-060,IMPROVEMENTS,60,T1,Accessibility,U,P2,open,4.3.x-same-train,5,Axe-core scan in CI; fail PR on new violations.
+212,T10-004,IMPROVEMENTS,4,T10,Docs & content,U,P2,open,4.3.x-same-train,5,Touch gesture cheat sheet.
+213,T10-009,IMPROVEMENTS,9,T10,Docs & content,U,P2,open,4.3.x-same-train,5,Plugin developer guide.
+214,T10-010,IMPROVEMENTS,10,T10,Docs & content,U,P2,open,4.3.x-same-train,5,Plugin API reference (auto-generated).
+215,T2-033,IMPROVEMENTS,33,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,5,"Dock icon hover lift (4px) using transform, not margin."
+216,T2-034,IMPROVEMENTS,34,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,5,Dock icon press scale (0.94) on pointerdown.
+217,T3-004,IMPROVEMENTS,4,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Viewer: scrubbing thumbnails on hover.
+218,T3-005,IMPROVEMENTS,5,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Color: secondary color wheels.
+219,T3-007,IMPROVEMENTS,7,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Effects: drag-and-drop preset application.
+220,T3-010,IMPROVEMENTS,10,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Markers panel with shortcut M.
+221,T3-011,IMPROVEMENTS,11,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Multi-cam edit angles UI.
+222,T3-012,IMPROVEMENTS,12,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Stabilization preview.
+223,T3-014,IMPROVEMENTS,14,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Title preset library.
+224,T3-015,IMPROVEMENTS,15,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Captions auto-generate panel.
+225,T3-016,IMPROVEMENTS,16,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Project autosave indicator.
+226,T3-017,IMPROVEMENTS,17,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Source-monitor in/out points.
+227,T3-018,IMPROVEMENTS,18,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Bin search with filters.
+228,T3-019,IMPROVEMENTS,19,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Mixer scenes / snapshots.
+229,T3-020,IMPROVEMENTS,20,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Step-sequencer pattern bank.
+230,T3-022,IMPROVEMENTS,22,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Sidechain compression UI.
+231,T3-023,IMPROVEMENTS,23,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Tempo / time-signature automation lane.
+232,T3-024,IMPROVEMENTS,24,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Chord track preview.
+233,T3-025,IMPROVEMENTS,25,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Vocal tuning preset menu.
+234,T3-026,IMPROVEMENTS,26,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Bus routing matrix.
+235,T3-027,IMPROVEMENTS,27,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Loop browser drag-to-track.
+236,T3-028,IMPROVEMENTS,28,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Master limiter visualization (LUFS meter).
+237,T3-029,IMPROVEMENTS,29,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Track freeze / bounce.
+238,T3-030,IMPROVEMENTS,30,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Punch-in record markers.
+239,T3-031,IMPROVEMENTS,31,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Take comping lanes.
+240,T3-032,IMPROVEMENTS,32,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Mixer view density toggle.
+241,T3-033,IMPROVEMENTS,33,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Project template library.
+242,T3-034,IMPROVEMENTS,34,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Sample slicer pad view.
+243,T3-035,IMPROVEMENTS,35,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Spectrum analyzer master insert.
+244,T3-039,IMPROVEMENTS,39,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Symmetry guides.
+245,T3-040,IMPROVEMENTS,40,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Smart selection (color range).
+246,T3-042,IMPROVEMENTS,42,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Liquify panel.
+247,T3-043,IMPROVEMENTS,43,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,"Adjustment layers (curves, levels)."
+248,T3-044,IMPROVEMENTS,44,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Smart object resize without quality loss.
+249,T3-045,IMPROVEMENTS,45,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Clipping masks UI.
+250,T3-046,IMPROVEMENTS,46,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,"Layer styles (drop shadow, glow)."
+251,T3-047,IMPROVEMENTS,47,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Color picker eyedropper from anywhere.
+252,T3-052,IMPROVEMENTS,52,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Easing presets (in/out/elastic).
+253,T3-053,IMPROVEMENTS,53,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Pre-comps (nested compositions).
+254,T3-054,IMPROVEMENTS,54,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Track matte attachment.
+255,T3-055,IMPROVEMENTS,55,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Expression scripting on properties.
+256,T3-056,IMPROVEMENTS,56,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Effect masks per layer.
+257,T3-058,IMPROVEMENTS,58,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Particles emitter built-in.
+258,T3-059,IMPROVEMENTS,59,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Text animator presets.
+259,T3-061,IMPROVEMENTS,61,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Time-remap tool.
+260,T3-063,IMPROVEMENTS,63,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Boolean ops (union/subtract/intersect) UI.
+261,T3-064,IMPROVEMENTS,64,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Material library panel.
+262,T3-065,IMPROVEMENTS,65,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Lighting environment HDRI picker.
+263,T3-066,IMPROVEMENTS,66,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Camera presets (top/front/side/persp).
+264,T3-067,IMPROVEMENTS,67,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Snap-to-grid + edge snap.
+265,T3-068,IMPROVEMENTS,68,T3,Creative-suite features,U,P2,open,4.3.x-same-train,5,Subdivide / smooth shading.
+266,T4-001,IMPROVEMENTS,1,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: presence panel (avatar list with status dots).
+267,T4-002,IMPROVEMENTS,2,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: cursor sync stub for shared docs.
+268,T4-003,IMPROVEMENTS,3,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: comment threads pinned to canvas regions.
+269,T4-004,IMPROVEMENTS,4,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: notifications inbox.
+270,T4-005,IMPROVEMENTS,5,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: invite link generator.
+271,T4-006,IMPROVEMENTS,6,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: role permissions UI (view/comment/edit/admin).
+272,T4-007,IMPROVEMENTS,7,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: history panel (versions).
+273,T4-008,IMPROVEMENTS,8,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: diff view between versions.
+274,T4-009,IMPROVEMENTS,9,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: revert to version action.
+275,T4-011,IMPROVEMENTS,11,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: chat panel (text only).
+276,T4-012,IMPROVEMENTS,12,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,"Nexus: voice toggle (uses WebRTC, optional)."
+277,T4-013,IMPROVEMENTS,13,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Nexus: screen-share toggle.
+278,T4-014,IMPROVEMENTS,14,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Collab Hub: combined activity feed.
+279,T4-015,IMPROVEMENTS,15,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Collab Hub: mention highlighting.
+280,T4-016,IMPROVEMENTS,16,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Collab Hub: search across comments.
+281,T4-017,IMPROVEMENTS,17,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Files: shared-with-me filter.
+282,T4-018,IMPROVEMENTS,18,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Files: link sharing dialog.
+283,T4-020,IMPROVEMENTS,20,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Files: conflict resolution UI on simultaneous edit.
+284,T4-021,IMPROVEMENTS,21,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Notes: collaborative cursors.
+285,T4-022,IMPROVEMENTS,22,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Notes: comment thread per paragraph.
+286,T4-023,IMPROVEMENTS,23,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Tasks: assign-to-user.
+287,T4-024,IMPROVEMENTS,24,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Tasks: comment thread per card.
+288,T4-025,IMPROVEMENTS,25,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Calendar: shared calendar overlay.
+289,T4-026,IMPROVEMENTS,26,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Calendar: meeting invite send.
+290,T4-027,IMPROVEMENTS,27,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Workflows: shared run history.
+291,T4-028,IMPROVEMENTS,28,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Sync engine: pause/resume button (visible).
+292,T4-029,IMPROVEMENTS,29,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Sync engine: per-folder enable.
+293,T4-030,IMPROVEMENTS,30,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Sync engine: bandwidth limit slider.
+294,T4-031,IMPROVEMENTS,31,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Sync engine: conflict log panel.
+295,T4-032,IMPROVEMENTS,32,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Sync engine: encryption indicator on every panel.
+296,T4-033,IMPROVEMENTS,33,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Activity feed: filter by app.
+297,T4-034,IMPROVEMENTS,34,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Activity feed: filter by user.
+298,T4-035,IMPROVEMENTS,35,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Activity feed: filter by date range.
+299,T4-036,IMPROVEMENTS,36,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Notifications: do-not-disturb toggle.
+300,T4-037,IMPROVEMENTS,37,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Notifications: per-app mute.
+301,T4-038,IMPROVEMENTS,38,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Notifications: snooze.
+302,T4-039,IMPROVEMENTS,39,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Presence: idle/away/busy detection.
+303,T4-040,IMPROVEMENTS,40,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Presence: custom status string.
+304,T4-041,IMPROVEMENTS,41,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Profile: avatar upload + crop.
+305,T4-042,IMPROVEMENTS,42,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Profile: bio + links.
+306,T4-043,IMPROVEMENTS,43,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Profile: timezone display on hover.
+307,T4-044,IMPROVEMENTS,44,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Org: workspace switcher.
+308,T4-045,IMPROVEMENTS,45,T4,Collaboration & sync,U,P2,open,4.3.x-same-train,5,Org: invite-by-email flow.
+309,T6-019,IMPROVEMENTS,19,T6,Performance & stability,U,P2,open,4.3.x-same-train,5,Web workers for FFT in Imosion visualizers.
+310,T6-046,IMPROVEMENTS,46,T6,Performance & stability,U,P2,open,4.3.x-same-train,5,Crash reporter integration (renderer + main).
+311,T6-049,IMPROVEMENTS,49,T6,Performance & stability,U,P2,open,4.3.x-same-train,5,Renderer process restart on white-screen detection.
+312,T6-051,IMPROVEMENTS,51,T6,Performance & stability,U,P2,open,4.3.x-same-train,5,Slow-render warning overlay (dev only).
+313,T7-011,IMPROVEMENTS,11,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin sandbox: iframe with strict CSP.
+314,T7-012,IMPROVEMENTS,12,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin sandbox: postMessage protocol with validated schema.
+315,T7-013,IMPROVEMENTS,13,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin sandbox: per-plugin permission list.
+316,T7-014,IMPROVEMENTS,14,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin sandbox: per-plugin storage quota.
+317,T7-015,IMPROVEMENTS,15,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin sandbox: per-plugin network allowlist.
+318,T7-016,IMPROVEMENTS,16,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin signing: signature verification on install.
+319,T7-017,IMPROVEMENTS,17,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Plugin signing: revocation list check.
+320,T7-018,IMPROVEMENTS,18,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Dependency scan in CI (npm audit + sca tool).
+321,T7-021,IMPROVEMENTS,21,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,CSP header on renderer (no inline scripts allowed).
+322,T7-035,IMPROVEMENTS,35,T7,Security & hardening,U,P2,open,4.3.x-same-train,5,Pen-test checklist in `docs/SECURITY.md`.
+323,T8-001,IMPROVEMENTS,1,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,data-testid on every dock button (DONE template — extend).
+324,T8-006,IMPROVEMENTS,6,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Playwright: dock launch each app (smoke).
+325,T8-008,IMPROVEMENTS,8,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Playwright: window drag with touch (iPad emulation).
+326,T8-010,IMPROVEMENTS,10,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Playwright: spotlight search opens app.
+327,T8-013,IMPROVEMENTS,13,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Playwright: Imosion add track.
+328,T8-021,IMPROVEMENTS,21,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Vitest: snapshot test for AppShell variants.
+329,T8-023,IMPROVEMENTS,23,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Visual regression: Playwright screenshot diff for dock.
+330,T8-031,IMPROVEMENTS,31,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Mock IPC layer for renderer tests.
+331,T8-034,IMPROVEMENTS,34,T8,Testing & QA,U,P2,open,4.3.x-same-train,5,Cross-platform CI matrix (win/mac/linux).
+332,T9-001,IMPROVEMENTS,1,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,First-run welcome tour (dismissible).
+333,T9-002,IMPROVEMENTS,2,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Per-app one-time tooltip pointing to a key feature.
+334,T9-003,IMPROVEMENTS,3,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Shortcut cheat-sheet overlay (Cmd/Ctrl+/).
+335,T9-004,IMPROVEMENTS,4,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Command palette (Cmd/Ctrl+K) covers every action.
+336,T9-005,IMPROVEMENTS,5,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,"""What's new"" panel after update."
+337,T9-006,IMPROVEMENTS,6,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Empty home → suggested actions list.
+338,T9-007,IMPROVEMENTS,7,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Recovery banner if previous session crashed.
+339,T9-008,IMPROVEMENTS,8,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Backup-now button in Settings.
+340,T9-009,IMPROVEMENTS,9,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Restore-from-backup wizard.
+341,T9-010,IMPROVEMENTS,10,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Quick switcher (Cmd/Ctrl+Tab) between running apps.
+342,T9-013,IMPROVEMENTS,13,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Recents quick action: pin to home.
+343,T9-014,IMPROVEMENTS,14,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Notification grouping by app.
+344,T9-015,IMPROVEMENTS,15,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Tooltips show keyboard shortcut next to label.
+345,T9-016,IMPROVEMENTS,16,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Inline help (?) in every settings panel.
+346,T9-019,IMPROVEMENTS,19,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Hover guide overlay (press Alt) labels every visible control.
+347,T9-021,IMPROVEMENTS,21,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Per-user shortcut remap UI.
+348,T9-022,IMPROVEMENTS,22,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Multi-window layout presets (save/load).
+349,T9-023,IMPROVEMENTS,23,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Workspace switcher (sets of windows).
+350,T9-024,IMPROVEMENTS,24,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Focus mode (hide non-active windows).
+351,T9-025,IMPROVEMENTS,25,T9,UX & onboarding,U,P2,open,4.3.x-same-train,5,Quiet hours scheduler.
+352,IDEAS-131,IDEAS,131,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,App: Mind-map (Nexus boards) with timeline scrubbing.
+353,IDEAS-132,IDEAS,132,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,"App: Vector drawing (path tools, boolean ops, SVG export)."
+354,IDEAS-135,IDEAS,135,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,"App: Multitrack DAW lite (8 tracks, MIDI in)."
+355,IDEAS-136,IDEAS,136,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,App: Video trim + simple cuts + transitions.
+356,IDEAS-137,IDEAS,137,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,App: 3D viewer for OBJ / GLTF.
+357,IDEAS-143,IDEAS,143,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,App: Whiteboard with pressure / pen support.
+358,IDEAS-160,IDEAS,160,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,4,App: Hex viewer / binary editor.
+359,IDEAS-201,IDEAS,201,E,Collaboration,P,P1,open,4.3.x-same-train,4,Read-only board export to static HTML.
+360,IDEAS-203,IDEAS,203,E,Collaboration,P,P1,open,4.3.x-same-train,4,"Time-boxed editor link (""editable for 1 hour"")."
+361,IDEAS-204,IDEAS,204,E,Collaboration,P,P1,open,4.3.x-same-train,4,Per-workspace knowledge base (intranet-lite).
+362,IDEAS-208,IDEAS,208,E,Collaboration,P,P1,open,4.3.x-same-train,4,"Roles: viewer, commenter, editor, manager, admin."
+363,IDEAS-338,IDEAS,338,I,Accessibility,U,P2,open,4.3.x-same-train,4,Reduced-motion respected end-to-end.
+364,IDEAS-340,IDEAS,340,I,Accessibility,U,P2,open,4.3.x-same-train,4,Dyslexia-friendly font option (OpenDyslexic).
+365,IDEAS-345,IDEAS,345,I,Accessibility,U,P2,open,4.3.x-same-train,4,Captions for any in-app video.
+366,IDEAS-361,IDEAS,361,J,"UX, Visual, and Polish",U,P2,open,4.3.x-same-train,4,AppShell-based standardized chrome on every page.
+367,IDEAS-393,IDEAS,393,J,"UX, Visual, and Polish",U,P2,open,4.3.x-same-train,4,Picture-in-picture for video / chat.
+368,IDEAS-394,IDEAS,394,J,"UX, Visual, and Polish",U,P2,open,4.3.x-same-train,4,Theme editor with live preview.
+369,IDEAS-410,IDEAS,410,K,Plugin / Extension Ecosystem,P,P1,open,4.3.x-same-train,4,Plugin slash-command registration for UKI.
+370,IDEAS-487,IDEAS,487,O,Long-Term Bets,P,P1,open,4.3.x-same-train,4,WASM plugin runtime (sandbox by design).
+371,IDEAS-494,IDEAS,494,O,Long-Term Bets,P,P1,open,4.3.x-same-train,4,Open-source SDK for third-party Creative apps.
+372,T10-001,IMPROVEMENTS,1,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Per-app user manual page in `docs/apps/<id>.md`.
+373,T10-002,IMPROVEMENTS,2,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Quick-start guide.
+374,T10-003,IMPROVEMENTS,3,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Keyboard shortcut sheet (printable).
+375,T10-005,IMPROVEMENTS,5,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Troubleshooting top-10 page.
+376,T10-006,IMPROVEMENTS,6,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Glossary page.
+377,T10-007,IMPROVEMENTS,7,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Privacy policy reviewed.
+378,T10-008,IMPROVEMENTS,8,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Terms reviewed.
+379,T10-011,IMPROVEMENTS,11,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Architecture overview diagram.
+380,T10-012,IMPROVEMENTS,12,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Threat model document.
+381,T10-013,IMPROVEMENTS,13,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Release notes template.
+382,T10-014,IMPROVEMENTS,14,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Contributing guide reviewed.
+383,T10-015,IMPROVEMENTS,15,T10,Docs & content,U,P2,open,4.3.x-same-train,4,Code of conduct reviewed.
+384,T2-001,IMPROVEMENTS,1,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+385,T2-002,IMPROVEMENTS,2,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+386,T2-003,IMPROVEMENTS,3,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+387,T2-004,IMPROVEMENTS,4,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+388,T2-005,IMPROVEMENTS,5,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+389,T2-006,IMPROVEMENTS,6,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+390,T2-007,IMPROVEMENTS,7,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+391,T2-008,IMPROVEMENTS,8,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+392,T2-009,IMPROVEMENTS,9,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+393,T2-010,IMPROVEMENTS,10,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+394,T2-011,IMPROVEMENTS,11,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+395,T2-012,IMPROVEMENTS,12,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+396,T2-013,IMPROVEMENTS,13,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+397,T2-014,IMPROVEMENTS,14,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+398,T2-015,IMPROVEMENTS,15,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+399,T2-016,IMPROVEMENTS,16,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+400,T2-017,IMPROVEMENTS,17,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+401,T2-018,IMPROVEMENTS,18,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+402,T2-019,IMPROVEMENTS,19,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+403,T2-020,IMPROVEMENTS,20,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+404,T2-021,IMPROVEMENTS,21,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+405,T2-022,IMPROVEMENTS,22,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+406,T2-023,IMPROVEMENTS,23,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+407,T2-024,IMPROVEMENTS,24,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+408,T2-025,IMPROVEMENTS,25,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+409,T2-026,IMPROVEMENTS,26,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+410,T2-027,IMPROVEMENTS,27,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+411,T2-028,IMPROVEMENTS,28,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+412,T2-029,IMPROVEMENTS,29,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+413,T2-030,IMPROVEMENTS,30,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Add a 256px PNG for each remaining app id (30 apps). Generate from DexIcon SVG via build script. AC: `appicons/<id>.png` exists and AppIcon resolves it.
+414,T2-031,IMPROVEMENTS,31,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,DexIcon: add hover/active stroke-weight variants.
+415,T2-032,IMPROVEMENTS,32,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,DexIcon: light-theme color overrides where needed.
+416,T2-035,IMPROVEMENTS,35,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,"Window header icon = AppIcon, not letter."
+417,T2-036,IMPROVEMENTS,36,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Launcher tile icon = AppIcon at 32px.
+418,T2-037,IMPROVEMENTS,37,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Recents icon = AppIcon at 16px.
+419,T2-038,IMPROVEMENTS,38,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Search result icon = AppIcon at 18px.
+420,T2-039,IMPROVEMENTS,39,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Notification icon = AppIcon at 18px.
+421,T2-040,IMPROVEMENTS,40,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,"Splash screen wordmark uses real DEX logo, not placeholder."
+422,T2-041,IMPROVEMENTS,41,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Settings sidebar icons reviewed for visual weight parity.
+423,T2-042,IMPROVEMENTS,42,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,"Empty-state illustration set (glassy, monochrome) for each major app."
+424,T2-043,IMPROVEMENTS,43,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Loading skeleton shapes match the layout they replace.
+425,T2-044,IMPROVEMENTS,44,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,"Error-state icon set (cloud-off, plug, lock) standardized."
+426,T2-045,IMPROVEMENTS,45,T2,Iconography & visual polish,U,P2,open,4.3.x-same-train,4,Favicon + window taskbar icon match brand.
+427,T6-001,IMPROVEMENTS,1,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Virtualize Files list when items > 500.
+428,T6-002,IMPROVEMENTS,2,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Virtualize Notes list.
+429,T6-003,IMPROVEMENTS,3,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Virtualize Tasks list.
+430,T6-004,IMPROVEMENTS,4,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Virtualize Gallery grid.
+431,T6-005,IMPROVEMENTS,5,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Virtualize Recents list.
+432,T6-006,IMPROVEMENTS,6,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Virtualize Search results.
+433,T6-007,IMPROVEMENTS,7,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Lazy-load every standalone app via React.lazy.
+434,T6-008,IMPROVEMENTS,8,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Code-split per major surface (Settings panels).
+435,T6-009,IMPROVEMENTS,9,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Memoize selectors in zustand stores.
+436,T6-010,IMPROVEMENTS,10,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Audit and add React.memo on hot leaf components.
+437,T6-011,IMPROVEMENTS,11,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Replace inline styles with CSS classes on hot paths.
+438,T6-013,IMPROVEMENTS,13,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,"FloatingWindow: drag uses transform, not left/top."
+439,T6-014,IMPROVEMENTS,14,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,FloatingWindow: resize uses CSS aspect-ratio where possible.
+440,T6-015,IMPROVEMENTS,15,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Cancel in-flight fetches on app close.
+441,T6-016,IMPROVEMENTS,16,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Throttle scroll listeners to rAF.
+442,T6-017,IMPROVEMENTS,17,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Debounce text-input → store updates.
+443,T6-020,IMPROVEMENTS,20,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Worker pool for thumbnail generation.
+444,T6-022,IMPROVEMENTS,22,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,IndexedDB cache for thumbnails.
+445,T6-023,IMPROVEMENTS,23,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,IndexedDB cache for embeddings.
+446,T6-024,IMPROVEMENTS,24,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,LRU eviction for caches.
+447,T6-025,IMPROVEMENTS,25,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Detach unused canvases when window minimized.
+448,T6-026,IMPROVEMENTS,26,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Pause animations when window not visible.
+449,T6-027,IMPROVEMENTS,27,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Pause polling when document.hidden.
+450,T6-029,IMPROVEMENTS,29,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Leak audit: every useEffect cleans up timers.
+451,T6-030,IMPROVEMENTS,30,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Leak audit: every useEffect cleans up event listeners.
+452,T6-031,IMPROVEMENTS,31,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Leak audit: zustand subscriptions unsubscribed.
+453,T6-032,IMPROVEMENTS,32,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Leak audit: requestAnimationFrame cancelled.
+454,T6-033,IMPROVEMENTS,33,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Bundle analyzer in build pipeline.
+455,T6-034,IMPROVEMENTS,34,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Tree-shake icon library imports.
+456,T6-035,IMPROVEMENTS,35,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Replace moment-style date libs with native Intl.
+457,T6-036,IMPROVEMENTS,36,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Lazy-load wallpaper images by viewport.
+458,T6-037,IMPROVEMENTS,37,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Image srcset for high-DPI displays.
+459,T6-038,IMPROVEMENTS,38,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Webp conversion in build for static images.
+460,T6-039,IMPROVEMENTS,39,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Preload critical fonts.
+461,T6-040,IMPROVEMENTS,40,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Subset fonts to used glyphs.
+462,T6-041,IMPROVEMENTS,41,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Audit synchronous localStorage reads.
+463,T6-042,IMPROVEMENTS,42,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Audit synchronous JSON.parse on hot paths.
+464,T6-043,IMPROVEMENTS,43,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Heap snapshot baseline + regression check in CI.
+465,T6-044,IMPROVEMENTS,44,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Long-task tracker logs spans > 50ms.
+466,T6-045,IMPROVEMENTS,45,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,INP / LCP perf budget per app.
+467,T6-047,IMPROVEMENTS,47,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Auto-recover unsaved state on crash.
+468,T6-048,IMPROVEMENTS,48,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Watchdog for runaway main-process workers.
+469,T6-050,IMPROVEMENTS,50,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Telemetry opt-in dashboard.
+470,T6-052,IMPROVEMENTS,52,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,FPS overlay (dev only) toggle.
+471,T6-053,IMPROVEMENTS,53,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Memory pressure indicator (dev only).
+472,T6-054,IMPROVEMENTS,54,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,IPC latency overlay (dev only).
+473,T6-055,IMPROVEMENTS,55,T6,Performance & stability,U,P2,open,4.3.x-same-train,4,Don't auto-downgrade perf-tier from heap usage (DONE this wave).
+474,T7-001,IMPROVEMENTS,1,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,IPC: validate every channel payload with zod schema.
+475,T7-002,IMPROVEMENTS,2,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,IPC: deny-by-default on unknown channels.
+476,T7-003,IMPROVEMENTS,3,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,IPC: rate-limit per channel.
+477,T7-004,IMPROVEMENTS,4,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,IPC: redact sensitive args from logs.
+478,T7-005,IMPROVEMENTS,5,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Vault: argon2id for key derivation.
+479,T7-006,IMPROVEMENTS,6,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Vault: AES-256-GCM for entry encryption.
+480,T7-007,IMPROVEMENTS,7,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Vault: master-key never stored.
+481,T7-008,IMPROVEMENTS,8,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Vault: clipboard auto-clear after 30s.
+482,T7-009,IMPROVEMENTS,9,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Vault: lock-on-idle.
+483,T7-010,IMPROVEMENTS,10,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Vault: audit log of access events.
+484,T7-019,IMPROVEMENTS,19,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,License audit (no GPL leakage).
+485,T7-020,IMPROVEMENTS,20,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,SBOM generation per release.
+486,T7-022,IMPROVEMENTS,22,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Disable Electron remote module verified.
+487,T7-023,IMPROVEMENTS,23,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,contextIsolation=true verified.
+488,T7-024,IMPROVEMENTS,24,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,nodeIntegration=false verified.
+489,T7-025,IMPROVEMENTS,25,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,webSecurity=true verified.
+490,T7-026,IMPROVEMENTS,26,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Auto-update: signature pinning.
+491,T7-027,IMPROVEMENTS,27,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Auto-update: rollback on failed boot.
+492,T7-028,IMPROVEMENTS,28,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Settings: hide secrets in UI (mask + show-on-click).
+493,T7-029,IMPROVEMENTS,29,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Logs: redact secrets via regex pre-write.
+494,T7-030,IMPROVEMENTS,30,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Crash dumps: strip PII before submit.
+495,T7-031,IMPROVEMENTS,31,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,File pickers: enforce extension allowlist.
+496,T7-032,IMPROVEMENTS,32,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Clipboard reads: explicit user gesture required.
+497,T7-033,IMPROVEMENTS,33,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Notification permission gated per app.
+498,T7-034,IMPROVEMENTS,34,T7,Security & hardening,U,P2,open,4.3.x-same-train,4,Camera/mic permission gated per app.
+499,T8-002,IMPROVEMENTS,2,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,data-testid on every launcher tile.
+500,T8-003,IMPROVEMENTS,3,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,data-testid on every window header button.
+501,T8-004,IMPROVEMENTS,4,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,data-testid on every primary toolbar button per app.
+502,T8-005,IMPROVEMENTS,5,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,data-testid on every modal close button.
+503,T8-007,IMPROVEMENTS,7,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Playwright: window drag with mouse.
+504,T8-014,IMPROVEMENTS,14,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Playwright: Files create/rename/delete folder.
+505,T8-015,IMPROVEMENTS,15,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Playwright: Notes create/edit/save.
+506,T8-016,IMPROVEMENTS,16,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Playwright: Tasks add/complete.
+507,T8-017,IMPROVEMENTS,17,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Playwright: Calendar add event.
+508,T8-018,IMPROVEMENTS,18,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Playwright: Settings change theme persists.
+509,T8-019,IMPROVEMENTS,19,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Vitest: every store has at least one unit test.
+510,T8-020,IMPROVEMENTS,20,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Vitest: every util has at least one unit test.
+511,T8-022,IMPROVEMENTS,22,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Vitest: snapshot test for AppEmptyState/Error/Loading.
+512,T8-024,IMPROVEMENTS,24,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Visual regression: each app first-paint screenshot.
+513,T8-025,IMPROVEMENTS,25,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Perf: vitest benchmark for hot stores.
+514,T8-026,IMPROVEMENTS,26,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Perf: bundle-size budget enforced in CI.
+515,T8-027,IMPROVEMENTS,27,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Perf: lighthouse run on dev build.
+516,T8-028,IMPROVEMENTS,28,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Coverage report uploaded per PR.
+517,T8-029,IMPROVEMENTS,29,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Flaky test quarantine label + report.
+518,T8-030,IMPROVEMENTS,30,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Test data factory module.
+519,T8-032,IMPROVEMENTS,32,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Mock filesystem for main-process tests.
+520,T8-033,IMPROVEMENTS,33,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,E2E parallelization in CI.
+521,T8-035,IMPROVEMENTS,35,T8,Testing & QA,U,P2,open,4.3.x-same-train,4,Release smoke-test runbook.
+522,IDEAS-097,IDEAS,97,C,UKI (Unified Knowledge Interface),P,P1,open,4.3.x-same-train,3,"Multi-modal input: paste image, drop PDF, attach audio."
+523,IDEAS-115,IDEAS,115,C,UKI (Unified Knowledge Interface),P,P1,open,4.3.x-same-train,3,Inline math rendering (KaTeX) in answers.
+524,IDEAS-116,IDEAS,116,C,UKI (Unified Knowledge Interface),P,P1,open,4.3.x-same-train,3,Inline diagram rendering (mermaid / graphviz).
+525,IDEAS-117,IDEAS,117,C,UKI (Unified Knowledge Interface),P,P1,open,4.3.x-same-train,3,Inline table editor for tabular answers.
+526,IDEAS-127,IDEAS,127,C,UKI (Unified Knowledge Interface),P,P1,open,4.3.x-same-train,3,Skill marketplace inside the Plugin store.
+527,IDEAS-133,IDEAS,133,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,"App: Pixel art (8/16-bit palettes, animation frames)."
+528,IDEAS-138,IDEAS,138,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Blueprint / wireframe sketcher.
+529,IDEAS-139,IDEAS,139,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Stock-photo browser (Unsplash-style API).
+530,IDEAS-140,IDEAS,140,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Color picker + palette generator + WCAG checker.
+531,IDEAS-141,IDEAS,141,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Font book (system fonts + variable axes).
+532,IDEAS-142,IDEAS,142,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Icon set browser + sprite generator.
+533,IDEAS-144,IDEAS,144,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Slide / presentation builder.
+534,IDEAS-145,IDEAS,145,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Calendar / agenda app.
+535,IDEAS-146,IDEAS,146,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Habit tracker with weekly review.
+536,IDEAS-147,IDEAS,147,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Pomodoro timer + focus stats.
+537,IDEAS-148,IDEAS,148,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Flashcards with spaced repetition.
+538,IDEAS-149,IDEAS,149,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Reading list with web archiver.
+539,IDEAS-150,IDEAS,150,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: RSS / feed reader.
+540,IDEAS-151,IDEAS,151,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Markdown blog publisher with draft sync.
+541,IDEAS-152,IDEAS,152,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Code playground (JS / TS / Python / Rust).
+542,IDEAS-153,IDEAS,153,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: REST client (Postman-lite).
+543,IDEAS-154,IDEAS,154,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: GraphQL explorer.
+544,IDEAS-155,IDEAS,155,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Local-only LLM playground.
+545,IDEAS-156,IDEAS,156,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,"App: Database browser (SQLite, Postgres read-only)."
+546,IDEAS-157,IDEAS,157,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: JSON / YAML / TOML formatter + viewer.
+547,IDEAS-158,IDEAS,158,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Regex tester with named groups.
+548,IDEAS-159,IDEAS,159,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: Diff / merge tool with three-way merge.
+549,IDEAS-161,IDEAS,161,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: ZIP / TAR archive extractor.
+550,IDEAS-162,IDEAS,162,D,Creative Suite Apps,U,P2,open,4.3.x-same-train,3,App: PDF viewer with annotations.
