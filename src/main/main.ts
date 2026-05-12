@@ -358,6 +358,8 @@ import { systemOptimizationWiring } from './core/SystemOptimizationWiring';
 
 // System Health Orchestrator (Rules 98-100)
 import { systemHealth } from './core/SystemHealthOrchestrator';
+// PlatformHealth: thin facade over SystemHealth + Diagnostics + Reliability
+import { initializePlatformHealth } from './core/PlatformHealth';
 
 // Platform detection
 const isMac = process.platform === 'darwin';
@@ -973,6 +975,9 @@ class DexApp {
       try { return systemHealth.getHealthReport(); }
       catch (err: any) { return { error: err.message }; }
     });
+
+    // PlatformHealth facade — single combined snapshot via system:platformHealth
+    initializePlatformHealth();
 
     // Runtime Services
     resourceManager.start();
