@@ -973,6 +973,18 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.classList.remove('dark-mode');
     }
     localStorage.setItem('darkMode', String(settings.darkMode !== false));
+
+    // Apply locale to document.lang and dir (RTL for Arabic/Hebrew/Persian/Urdu)
+    try {
+      const rawLocale = String(settings.ukiLocale || 'auto');
+      const lang = rawLocale === 'auto'
+        ? (typeof navigator !== 'undefined' ? navigator.language : 'en')
+        : rawLocale;
+      root.lang = lang;
+      const rtlPrefixes = ['ar', 'he', 'fa', 'ur'];
+      const isRtl = rtlPrefixes.some(p => lang.toLowerCase().startsWith(p));
+      root.dir = isRtl ? 'rtl' : 'ltr';
+    } catch { /* ignore */ }
     
     // Apply accent color
     const accentColor = String(settings.accentColor || 'var(--color-accent)');

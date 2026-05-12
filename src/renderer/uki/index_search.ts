@@ -88,6 +88,21 @@ async function buildCorpus(): Promise<UkiDoc[]> {
       });
     }
   } catch { /* memory not ready */ }
+  try {
+    // Surface compressed long-term archives as searchable summaries so older
+    // context is reachable without expanding the gzip payload.
+    const mod = await import('./compressedMemory');
+    const archives = await mod.listArchives();
+    for (const a of archives) {
+      docs.push({
+        id: `arc:${a.id}`,
+        kind: 'turn',
+        title: a.summary.slice(0, 80),
+        body: `${a.summary} ${a.topics.join(' ')} ${a.apps.join(' ')}`.slice(0, 600),
+        tags: ['archive'],
+      });
+    }
+  } catch { /* compressed memory not available */ }
   return docs;
 }
 
