@@ -19,6 +19,7 @@ import log from 'electron-log';
 import si from 'systeminformation';
 import { NativeSystem, isNativeAvailable } from '../native/bridge';
 import { concurrencyEngine } from '../engine/ConcurrencyEngine';
+import { ipcValidator } from '../security/IPCValidator';
 
 interface LogEntry {
   timestamp: string;
@@ -81,6 +82,13 @@ class DiagnosticsController {
 
     this.init();
     this.registerHandlers();
+
+    // Coalesced near-limit IPC warnings -- one log line per channel per 5s
+    // (the validator already coalesces) so chatty renderer subscribers
+    // surface in dex.log without spamming.
+    ipcValidator.onChannelNearLimit((channel, percent) => {
+      log.warn(`[IPC] channel ${channel} near rate limit: ${percent}% of window`);
+    });
   }
 
   private async init(): Promise<void> {
@@ -198,6 +206,16 @@ class DiagnosticsController {
     ipcMain.handle('system:schedulerMetrics', () => {
       try {
         return { ok: true, ts: Date.now(), data: concurrencyEngine.getStatus() };
+      } catch (err) {
+        return { ok: false, error: String(err) };
+      }
+    });
+
+    // IPC rate-limit metrics. Used by the dev panel to surface chatty
+    // channels, denied calls, and high-water-mark utilization.
+    ipcMain.handle('system:ipcMetrics', () => {
+      try {
+        return { ok: true, ts: Date.now(), data: ipcValidator.getRateLimitStats() };
       } catch (err) {
         return { ok: false, error: String(err) };
       }

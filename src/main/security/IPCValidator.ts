@@ -44,8 +44,27 @@ interface ChannelSchema {
 // Rate Limiter
 // -----------------------------------------------------------------------------
 
+interface ChannelMetrics {
+  totalCalls: number;
+  totalDenied: number;
+  highWaterPercent: number;  // peak window utilization (0..1)
+  lastDeniedTs: number;
+  lastNearLimitTs: number;   // last time a >=80% utilization warning fired
+}
+
 class RateLimiter {
   private calls: Map<string, number[]> = new Map();
+  private metrics: Map<string, ChannelMetrics> = new Map();
+  private nearLimitListeners: Set<(channel: string, percent: number) => void> = new Set();
+
+  private getMetrics(channel: string): ChannelMetrics {
+    let m = this.metrics.get(channel);
+    if (!m) {
+      m = { totalCalls: 0, totalDenied: 0, highWaterPercent: 0, lastDeniedTs: 0, lastNearLimitTs: 0 };
+      this.metrics.set(channel, m);
+    }
+    return m;
+  }
 
   /**
    * @param senderId  Optional webContents ID — when provided the limit is
@@ -56,7 +75,8 @@ class RateLimiter {
     const now = Date.now();
     // Scope the key per-sender when available, fall back to global channel
     const key = senderId !== undefined ? `${channel}:${senderId}` : channel;
-    
+    const m = this.getMetrics(channel);
+
     if (!this.calls.has(key)) {
       this.calls.set(key, []);
     }
@@ -68,19 +88,50 @@ class RateLimiter {
     this.calls.set(key, validTimestamps);
     
     if (validTimestamps.length >= maxCalls) {
+      m.totalDenied += 1;
+      m.lastDeniedTs = now;
+      m.highWaterPercent = 1;
       return false; // Rate limited
     }
     
     validTimestamps.push(now);
+    m.totalCalls += 1;
+    const utilization = validTimestamps.length / maxCalls;
+    if (utilization > m.highWaterPercent) m.highWaterPercent = utilization;
+
+    // Coalesced near-limit warning -- once per 5s per channel.
+    if (utilization >= 0.8 && now - m.lastNearLimitTs > 5000) {
+      m.lastNearLimitTs = now;
+      const percent = Math.round(utilization * 100);
+      for (const fn of this.nearLimitListeners) {
+        try { fn(channel, percent); } catch { /* listener should not throw */ }
+      }
+    }
+
     return true;
   }
   
   reset(channel?: string): void {
     if (channel) {
       this.calls.delete(channel);
+      this.metrics.delete(channel);
     } else {
       this.calls.clear();
+      this.metrics.clear();
     }
+  }
+
+  snapshot(): Record<string, ChannelMetrics> {
+    const out: Record<string, ChannelMetrics> = {};
+    for (const [ch, m] of this.metrics) {
+      out[ch] = { ...m };
+    }
+    return out;
+  }
+
+  onNearLimit(fn: (channel: string, percent: number) => void): () => void {
+    this.nearLimitListeners.add(fn);
+    return () => { this.nearLimitListeners.delete(fn); };
   }
 }
 
@@ -473,6 +524,36 @@ export class IPCValidator {
   // Reset rate limits (for testing)
   resetRateLimits(): void {
     this.rateLimiter.reset();
+  }
+
+  /** Snapshot of per-channel rate-limit metrics for diagnostics. */
+  getRateLimitStats(): Record<string, {
+    totalCalls: number;
+    totalDenied: number;
+    highWaterPercent: number;
+    lastDeniedTs: number;
+  }> {
+    const snap = this.rateLimiter.snapshot();
+    const out: Record<string, {
+      totalCalls: number;
+      totalDenied: number;
+      highWaterPercent: number;
+      lastDeniedTs: number;
+    }> = {};
+    for (const [ch, m] of Object.entries(snap)) {
+      out[ch] = {
+        totalCalls: m.totalCalls,
+        totalDenied: m.totalDenied,
+        highWaterPercent: m.highWaterPercent,
+        lastDeniedTs: m.lastDeniedTs,
+      };
+    }
+    return out;
+  }
+
+  /** Subscribe to near-limit events (>=80% window utilization). */
+  onChannelNearLimit(fn: (channel: string, percent: number) => void): () => void {
+    return this.rateLimiter.onNearLimit(fn);
   }
 }
 
