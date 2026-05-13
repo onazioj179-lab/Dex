@@ -4,6 +4,21 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.15.0 -- 500-Improvement Wave 11
+
+Wave 11 adds ten infrastructure modules: a `Trie<V>` prefix tree with
+lex-sorted `prefixSearch`, `lazy` and `lazyAsync` memoized one-shot
+values, an `AsyncMutex` with FIFO fairness and `runExclusive`, a `PubSub`
+topic bus with `*` and `**` wildcard matching, a POSIX `pathParse`
+module (`joinPath`, `dirname`, `basename`, `extname`, `normalizePath`,
+`relativePath`), a typed `CodedError<C>` with `cause` and `details` plus
+`isCodedError` / `hasCode` / `wrapError` helpers, a sliding-window
+`RetryBudget`, an `IdleQueue` backed by `requestIdleCallback` with a
+`setTimeout` fallback, in-place `heapSort` + `partialHeapSort`, and
+RFC 4648 base32 encode/decode. 26 new unit tests.
+
+---
+
 ## Version 4.14.0 -- 500-Improvement Wave 10
 
 Wave 10 adds ten more shared modules: a keyboard-chord parser/matcher

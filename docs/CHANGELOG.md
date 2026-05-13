@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.15.0 - 500-Improvement Wave 11: Trie, lazy, mutex, paths, errors
+
+Eleventh wave. 10 more shared modules, 26 new tests pass.
+
+### Added
+- `Trie<V>` prefix tree with `prefixSearch` (lex-sorted, optional limit).
+- `lazy` and `lazyAsync` memoized one-shot value producers (with reset).
+- `AsyncMutex` cooperative async lock with FIFO fairness and `runExclusive`.
+- `PubSub` topic bus with `*` and `**` wildcard matching.
+- `pathParse` POSIX path utils: `joinPath`, `dirname`, `basename`, `extname`, `normalizePath`, `relativePath`.
+- `CodedError<C>` typed error with `code`, `cause`, `details`, plus `isCodedError`, `hasCode`, `wrapError`.
+- `RetryBudget` sliding-window retry quota.
+- `IdleQueue` requestIdleCallback-backed work queue with setTimeout fallback.
+- `heapSort` + `partialHeapSort` in-place comparator-aware sorters.
+- `encodeBase32` / `decodeBase32` (RFC 4648 alphabet).
+
+### Changed
+- Barrel re-exports all 10 new Wave 11 modules.
+- `package.json` bumped to 4.15.0.
+
 ## v4.14.0 - 500-Improvement Wave 10: Chords, focus, perf, fuzzy, intervals
 
 Tenth wave. 10 more shared modules. 28 new tests pass.
