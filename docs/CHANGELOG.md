@@ -10,6 +10,66 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.39.0 - 500-Improvement Wave 35: MST, alignment, clustering, DSP
+
+Thirty-fifth wave. 10 more shared modules, 10 new tests pass.
+
+- `boruvkaMst` — Borůvka's MST.
+- `needlemanWunsch` — global sequence alignment with traceback.
+- `smithWaterman` — local sequence alignment.
+- `dbscan` — density-based clustering.
+- `kMeans` — Lloyd's k-means with seedable PRNG.
+- `agglomerativeCluster` — single-linkage hierarchical clustering.
+- `dspWindows` — Hann, Hamming, Blackman, Blackman-Harris.
+- `biquadFilter` + `biquadLowpass`/`biquadHighpass` — RBJ biquad TDF II.
+- `adsrEnvelope` — ADSR envelope generator.
+- `oneEuroFilter` — 1€ filter for noisy real-time signals.
+
+## v4.38.0 - 500-Improvement Wave 34: 2D segtree, number theory, NTT
+
+Thirty-fourth wave. 10 more shared modules, 10 new tests pass.
+
+- `SegTree2D` — 2D segment tree, point update + rectangle sum.
+- `crt` — generalized Chinese remainder theorem (BigInt).
+- `extendedEuclidean` — Bézout coefficients.
+- `tonelliShanks` — square root mod p.
+- `babyStepGiantStep` — discrete logarithm.
+- `nttMultiply` — NTT polynomial multiplication mod 998244353.
+- `PointQuadtree` — point quadtree with range query.
+- `lagrangeInterpolate` — polynomial interpolation.
+- `fwht` — Fast Walsh-Hadamard transform.
+- `modPowBig` — BigInt modular exponentiation.
+
+## v4.37.0 - 500-Improvement Wave 33: All-pairs, BST, heap, betweenness
+
+Thirty-third wave. 10 more shared modules, 10 new tests pass.
+
+- `johnsonAllPairs` — Johnson's reweighted all-pairs shortest paths.
+- `MergeSortTree` — range count of values <= x.
+- `SplayTree` — splay tree with insert/contains.
+- `FibonacciHeap` — amortized O(1) push, O(log n) pop.
+- `FastBitVector` — succinct bit vector with rank/select.
+- `chuLiuEdmonds` — directed minimum spanning arborescence cost.
+- `brandesBetweenness` — Brandes' betweenness centrality.
+- `heavyLightDecomposition` — HLD position arrays.
+- `tspNearestNeighbor` + `tsp2Opt` — TSP heuristics.
+- `stoerWagnerMinCut` — global minimum cut.
+
+## v4.36.0 - 500-Improvement Wave 32: Flow, ranking, hashing, heaps
+
+Thirty-second wave. 10 more shared modules, 10 new tests pass.
+
+- `Dinic` — Dinic's max-flow.
+- `pageRank` — PageRank with dangling-mass correction.
+- `hits` — HITS algorithm (hubs/authorities).
+- `RollingHash` — polynomial rolling hash with Mersenne prime.
+- `Fenwick2D` — 2D Fenwick tree.
+- `SuffixAutomaton` — Ukkonen-style SAM with distinct substring count.
+- `PersistentArray` — 16-way persistent array.
+- `LeftistHeap` — leftist tree.
+- `PairingHeap` — pairing heap.
+- `yenKShortest` — Yen's k-shortest paths.
+
 ## v4.35.0 - 500-Improvement Wave 31: Bit ops, Gray code, SPF, knapsack, graph algos
 
 Thirty-first wave. 10 more shared modules, 10 new tests pass.
