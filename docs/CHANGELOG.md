@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.23.0 - 500-Improvement Wave 19: Graphs, trees, number theory
+
+Nineteenth wave. 10 more shared modules, 18 new tests pass.
+
+### Added
+- `UnionFind` disjoint-set union with path compression and union by rank.
+- `SegmentTree<T>` arbitrary-combiner range queries with point updates.
+- `FenwickTree` binary indexed tree for prefix sums.
+- `topologicalSort` Kahn's algorithm with cycle detection.
+- `dijkstra` / `reconstructPath` shortest paths with binary-heap PQ.
+- `tarjanSCC` iterative Tarjan strongly-connected components.
+- `primeSieve` / `isPrimeTrial` Sieve of Eratosthenes + trial division.
+- `millerRabin` deterministic Miller-Rabin primality (n < 2^64).
+- `extendedGcd` / `modInverse` BigInt extended Euclidean + modular inverse.
+- `mat2Multiply` / `mat2Determinant` / `mat2Inverse` and `mat3*` matrix utilities.
+
+### Changed
+- Barrel re-exports all 10 new Wave 19 modules.
+- `package.json` bumped to 4.23.0.
+
 ## v4.22.0 - 500-Improvement Wave 18: Probabilistic, geometry, scheduling, formats
 
 Eighteenth wave. 10 more shared modules, 17 new tests pass.

@@ -4,6 +4,32 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.23.0 -- 500-Improvement Wave 19
+
+Wave 19 ships ten classic algorithm utilities for graphs, trees, and
+number theory. `UnionFind` is the disjoint-set union with path
+compression and union by rank, exposing `find`, `union`, `connected`,
+and a live `components` count; `SegmentTree<T>` answers range queries
+over an arbitrary associative combiner with O(log n) point updates;
+`FenwickTree` (binary indexed tree) handles prefix-sum range queries
+in half the constant factor when only sums are needed;
+`topologicalSort` is Kahn's algorithm and returns null when a cycle is
+detected; `dijkstra` finds shortest paths from a source on weighted
+non-negative graphs using a binary-heap priority queue, paired with
+`reconstructPath` for source-to-target path extraction; `tarjanSCC`
+is the iterative (call-stack-emulated) Tarjan strongly-connected
+components algorithm safe for deep graphs; `primeSieve` is the
+classic Sieve of Eratosthenes and `isPrimeTrial` covers small inputs
+via trial division; `millerRabin` provides deterministic primality
+testing for n < 2^64 using the standard 12-witness BigInt set;
+`extendedGcd` and `modInverse` deliver the extended Euclidean
+algorithm and modular inverse on BigInt operands; and the matrix2D
+family (`mat2Multiply`, `mat2Determinant`, `mat2Inverse`,
+`mat3Multiply`, `mat3Determinant`, `mat3Inverse`) covers the small-
+matrix linear algebra routines used by the renderer's transform code.
+
+---
+
 ## Version 4.22.0 -- 500-Improvement Wave 18
 
 Wave 18 ships ten more shared utilities. `CuckooFilter` complements
