@@ -29,7 +29,8 @@ export function parseRgba(input: string, fallbackAlpha = 1): RGBA {
     const a = parts[3] !== undefined ? Number(parts[3]) : fallbackAlpha;
     return { r, g, b, a };
   }
-  const rgb: RGB = parseColor(input);
+  const rgb: RGB | null = parseColor(input);
+  if (rgb === null) return { r: 0, g: 0, b: 0, a: fallbackAlpha };
   return { r: rgb.r, g: rgb.g, b: rgb.b, a: fallbackAlpha };
 }
 
