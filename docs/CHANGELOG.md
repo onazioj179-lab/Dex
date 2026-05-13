@@ -10,6 +10,51 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.35.0 - 500-Improvement Wave 31: Bit ops, Gray code, SPF, knapsack, graph algos
+
+Thirty-first wave. 10 more shared modules, 10 new tests pass.
+
+- `bitOps32` — popcount32, leadingZeros32, trailingZeros32, reverseBits32.
+- `grayCode` — binaryToGray, grayToBinary, grayCodeSequence.
+- `smallestPrimeFactorSieve` + `factorizeWithSpf` — O(log n) factorization.
+- `subsetSum` — bitset DP, O(n*target/32).
+- `knapsackUnbounded` — unbounded 0/1 knapsack, `UnboundedKnapsackItem`.
+- `matrixChainOrder` — DP with `parenthesize()` reconstruction.
+- `bipartiteCheck` — BFS 2-coloring, returns Int8Array | null.
+- `treeDiameter` — two-pass BFS, diameter + endpoints + centers.
+- `LcaBinaryLifting` — binary lifting LCA class with O(log n) queries.
+- `combinations` / `powerset` — generators.
+
+## v4.34.0 - 500-Improvement Wave 30: Combinatorics, strings, sequences
+
+Thirtieth wave. 10 more shared modules, 10 new tests pass.
+
+- `josephus` — classic recurrence.
+- `catalan` / `catalanList` — Catalan numbers.
+- `stirling2` — Stirling numbers of the second kind.
+- `bernoulliNumbers` — Akiyama-Tanigawa, B_1=+1/2 convention, BigInt rationals.
+- `hammingDistance` / `hammingDistanceBytes` — string and Uint8Array variants.
+- `soundex` — classic Soundex coding.
+- `cosineSimilarity` — dense vector cosine.
+- `nGramTokenize` / `nGramArray` — character/array n-grams.
+- `nextPermutation` / `prevPermutation` — in-place lex perms.
+- `partitionInteger` — descending lex iterative partition generation.
+
+## v4.33.0 - 500-Improvement Wave 29: Number theory, linear algebra, flow
+
+Twenty-ninth wave. 10 more shared modules, 10 new tests pass.
+
+- `eulerTotient` — Euler's totient via trial division.
+- `pollardRho` — BigInt Pollard rho with internal gcdBig.
+- `quickSelect` — median-of-three pivot.
+- `medianOfMediansSelect` — deterministic O(n) selection.
+- `matrixInverse` — Gauss-Jordan with partial pivoting (null on singular).
+- `gaussJordanSolve` — linear system solver.
+- `jacobiEigen` — Jacobi eigendecomposition, eigenvalues sorted desc.
+- `hungarianAssign` — Jonker-Volgenant style O(n^3) assignment.
+- `edmondsKarp` — Edmonds-Karp max-flow with flow matrix.
+- `jaroSimilarity` / `jaroWinklerSimilarity` — string similarity.
+
 ## v4.32.0 - 500-Improvement Wave 28: Geometry, polynomials, codecs, Kalman
 
 Twenty-eighth wave. 10 more shared modules, 10 new tests pass.
