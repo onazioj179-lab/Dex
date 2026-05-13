@@ -10,6 +10,38 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.42.0 - 500-Improvement Wave 38: crypto, codec, image, geometry
+
+Thirty-eighth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+- `sha1/sha1Hex` - FIPS 180-4 SHA-1 (legacy interop only).
+- `pbkdf2Sha256` - PBKDF2-HMAC-SHA256 key derivation.
+- `arithmeticEncode/arithmeticDecode` - order-0 binary arithmetic coding.
+- `parseIso` - permissive ISO 8601 date/time parser.
+- `easterDate` - Anonymous Gregorian Easter Sunday algorithm.
+- `sobelEdges` - 2D Sobel edge magnitude on grayscale Float32Array.
+- `lanczosResample` - 1D Lanczos resampling with configurable kernel size.
+- `paletteQuantize` - median-cut color palette quantization.
+- `ditherFloydSteinberg` - Floyd-Steinberg error-diffusion dither.
+- `raycastSphere` - ray-sphere intersection with near/far roots.
+
+## v4.41.0 - 500-Improvement Wave 37: codec, hashing, ranking, geometry
+
+Thirty-seventh wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+- `base91Encode/base91Decode` - basE91 binary-to-text codec.
+- `sha256/sha256Hex` - FIPS 180-4 SHA-256 hash.
+- `hmacSha256` - HMAC-SHA256 message authentication.
+- `lzssCompress/lzssDecompress` - LZSS sliding-window compression.
+- `KdTree` - kd-tree for k-nearest-neighbour queries.
+- `Bm25` - Okapi BM25 document ranking.
+- `ordinalSuffix/ordinal` - English ordinal suffix helper.
+- `businessDaysBetween/addBusinessDays` - workday arithmetic with holidays.
+- `longestCommonSubstring` - contiguous LCS via DP.
+- `gaussianBlur1D/gaussianKernel1D` - separable Gaussian blur kernel.
+
 ## v4.40.0 - 500-Improvement Wave 36: encoding, color, stats, numerics
 
 Thirty-sixth wave. 10 more shared modules, 10 new tests pass.
