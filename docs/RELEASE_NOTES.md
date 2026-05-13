@@ -4,6 +4,31 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.22.0 -- 500-Improvement Wave 18
+
+Wave 18 ships ten more shared utilities. `CuckooFilter` complements
+the earlier `BloomFilter` by supporting deletion via fingerprint
+kicking, useful for set membership where items churn out;
+`CountMinSketch` is a sub-linear-memory frequency estimator that
+gives upper-bound counts for any key; `HyperLogLog` estimates the
+cardinality of large multisets with bias correction in the small
+range; `splitmix64` is a seedable 64-bit BigInt PRNG often used to
+seed other generators (companion to `pcg32`); the `interval1D`
+family (`mergeIntervals`, `subtractIntervals`, `intersectIntervals`)
+performs standard 1D interval set operations on disjoint output;
+the `polygonArea` family (`polygonSignedArea`, `polygonCentroid`,
+`isClockwise`) implements the shoelace formula, area-weighted
+centroid, and winding test for simple polygons; `convexHull` is
+Andrew's monotone-chain O(n log n) algorithm returning a CCW hull;
+`RoundRobin<T>` is a cycling iterator that supports predicate-based
+skipping for scheduling; `parseTsv` and `writeTsv` round-trip
+tab-separated values with RFC4180-style quoting for fields that
+contain delimiters or newlines; and `code128Checksum` /
+`code128Encode` produce the Code-128 subset B checksum and binary
+bar-pattern string suitable for downstream SVG or canvas drawing.
+
+---
+
 ## Version 4.21.0 -- 500-Improvement Wave 17
 
 Wave 17 ships ten more shared utilities focused on multi-pattern

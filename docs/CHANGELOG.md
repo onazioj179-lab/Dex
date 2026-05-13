@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.22.0 - 500-Improvement Wave 18: Probabilistic, geometry, scheduling, formats
+
+Eighteenth wave. 10 more shared modules, 17 new tests pass.
+
+### Added
+- `CuckooFilter` probabilistic membership with deletion.
+- `CountMinSketch` sub-linear-memory frequency estimator.
+- `HyperLogLog` cardinality estimator with bias correction.
+- `splitmix64` seedable BigInt PRNG with uint32 + nextFloat helpers.
+- `mergeIntervals` / `subtractIntervals` / `intersectIntervals` 1D interval set ops.
+- `polygonArea` / `polygonSignedArea` / `polygonCentroid` / `isClockwise` polygon utilities.
+- `convexHull` Andrew's monotone-chain hull.
+- `RoundRobin<T>` cycling iterator with predicate-skip.
+- `parseTsv` / `writeTsv` RFC4180-style tab-separated values.
+- `code128Checksum` / `code128Encode` Code-128 subset B bar-pattern encoder.
+
+### Changed
+- Barrel re-exports all 10 new Wave 18 modules.
+- `package.json` bumped to 4.22.0.
+
 ## v4.21.0 - 500-Improvement Wave 17: Multi-pattern, hashing, geometry
 
 Seventeenth wave. 10 more shared modules, 23 new tests pass.
