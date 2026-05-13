@@ -246,8 +246,8 @@ FORGE (8):
 - [ ] T5-007 — UKI graph: pin nodes.
 - [ ] T5-008 — UKI graph: shortest-path tool.
 - [ ] T5-009 — UKI graph: export PNG / SVG.
-- [ ] T5-010 — RAG: streaming token output.
-- [ ] T5-011 — RAG: citation chips beneath answers.
+- [~] T5-010 — RAG: streaming token output. [v4.11.0 tokenStream chunked tokenizer.]
+- [~] T5-011 — RAG: citation chips beneath answers. [v4.11.0 citation parser foundation.]
 - [ ] T5-012 — RAG: source preview on chip hover.
 - [ ] T5-013 — RAG: model picker (local / cloud).
 - [ ] T5-014 — RAG: temperature / top-p sliders.
@@ -317,7 +317,7 @@ FORGE (8):
 - [~] T6-020 — Worker pool for thumbnail generation. (WorkerPool shipped v4.8.0)
 - [ ] T6-021 — Off-screen canvas for VINX preview render.
 - [~] T6-022 — IndexedDB cache for thumbnails. (AsyncCache TTL+LRU shipped v4.8.0)
-- [ ] T6-023 — IndexedDB cache for embeddings.
+- [~] T6-023 — IndexedDB cache for embeddings. [v4.11.0 idbCache KV layer w/ memory fallback.]
 - [~] T6-024 — LRU eviction for caches. (LRU class shipped v4.6.0)
 - [ ] T6-025 — Detach unused canvases when window minimized.
 - [~] T6-026 — Pause animations when window not visible. (useDocumentVisible shipped v4.6.0)
@@ -336,14 +336,14 @@ FORGE (8):
 - [ ] T6-039 — Preload critical fonts.
 - [ ] T6-040 — Subset fonts to used glyphs.
 - [ ] T6-041 — Audit synchronous localStorage reads.
-- [ ] T6-042 — Audit synchronous JSON.parse on hot paths.
+- [~] T6-042 — Audit synchronous JSON.parse on hot paths. [v4.11.0 ChunkedJsonParser for streaming/NDJSON.]
 - [ ] T6-043 — Heap snapshot baseline + regression check in CI.
 - [~] T6-044 — Long-task tracker logs spans > 50ms. (longTask + measureSpan shipped v4.7.0)
 - [ ] T6-045 — INP / LCP perf budget per app.
 - [ ] T6-046 — Crash reporter integration (renderer + main).
 - [~] T6-047 — Auto-recover unsaved state on crash. (crashRecovery save/load + autoSave shipped v4.7.0)
 - [ ] T6-048 — Watchdog for runaway main-process workers.
-- [~] T6-049 — Renderer process restart on white-screen detection. (downloadBlob exports + EventBus pub/sub infra shipped v4.8.0)
+- [~] T6-049 — Renderer process restart on white-screen detection. (downloadBlob exports + EventBus pub/sub infra shipped v4.8.0; v4.11.0 detectWhiteScreen heuristic added.)
 - [ ] T6-050 — Telemetry opt-in dashboard.
 - [ ] T6-051 — Slow-render warning overlay (dev only).
 - [ ] T6-052 — FPS overlay (dev only) toggle.
@@ -422,7 +422,7 @@ FORGE (8):
 - [ ] T8-029 — Flaky test quarantine label + report.
 - [x] T8-030 — Test data factory module. (testFactory shipped v4.8.0)
 - [x] T8-031 — Mock IPC layer for renderer tests. (MockIpc shipped v4.8.0)
-- [ ] T8-032 — Mock filesystem for main-process tests.
+- [~] T8-032 — Mock filesystem for main-process tests. [v4.11.0 fsAdapter interface + InMemoryFsAdapter.]
 - [ ] T8-033 — E2E parallelization in CI.
 - [ ] T8-034 — Cross-platform CI matrix (win/mac/linux).
 - [ ] T8-035 — Release smoke-test runbook.

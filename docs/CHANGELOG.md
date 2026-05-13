@@ -10,6 +10,27 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.11.0 - 500-Improvement Wave 7: Streaming, gestures, fs, detection
+
+Seventh wave. 10 more shared modules. 24 new tests, default reporter only
+(vitest 4 `--reporter=basic` is broken in this repo).
+
+### Added
+- `tokenStream` module: SSE/RAG-friendly chunked tokenizer with custom global delimiter regex.
+- `citation` module: parses numeric `[1]`, footnote `[^x]`, and citekey `[@key]` markers; strip + dedupe helpers.
+- `chunkedJsonParse` module: NDJSON parser that tolerates split chunks, with bounded buffer and onError callback.
+- `ringBuffer` module: fixed-capacity circular buffer with O(1) push/shift and overwrite semantics.
+- `palmRejection` module: stylus-first input filter; rejects touches concurrent with or near a recent pen contact.
+- `zoomInertia` module: exponential-decay momentum integrator with closed-form position update; clamp helper.
+- `gestureRecognizer` module: single-pointer state machine for tap, double-tap, long-press, swipe, cancel.
+- `fsAdapter` module: filesystem interface plus an in-memory implementation for tests; renderer never touches `fs` directly.
+- `whiteScreenDetect` module: heuristic blank-canvas detector for boot/render-failure telemetry.
+- `idbCache` module: async key-value cache backed by IndexedDB when available, in-memory fallback otherwise.
+
+### Changed
+- Barrel `src/renderer/improvements500/index.ts` re-exports all 10 new modules.
+- `package.json` bumped to 4.11.0.
+
 ## v4.10.0 - 500-Improvement Wave 6: Random, encode, pack, math primitives
 
 Sixth wave. 10 more shared modules. Two backlog items advanced.

@@ -4,6 +4,20 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.11.0 -- 500-Improvement Wave 7
+
+Wave 7 adds ten more shared infrastructure modules: a streaming tokenizer
+for SSE / RAG output, a citation marker parser, an NDJSON chunked parser, a
+fixed-capacity ring buffer, a stylus palm-rejection filter, an exponential
+zoom inertia integrator, a single-pointer gesture recognizer (tap, double
+tap, long press, swipe), an `fsAdapter` interface so the renderer never
+touches `fs` directly, a heuristic white-screen detector for boot
+telemetry, and an IndexedDB-backed key-value cache with an in-memory
+fallback for tests. 24 new unit tests; full suite still uses the default
+vitest reporter (the basic reporter is broken in this repo's vitest 4).
+
+---
+
 ## Version 4.10.0 -- 500-Improvement Wave 6
 
 Wave 6 lands ten more shared modules covering randomness, encoding,
