@@ -237,8 +237,8 @@ FORGE (8):
 
 ## T5 — Knowledge / UKI (55)
 
-- [ ] T5-001 — UKI graph: zoom + pan + minimap.
-- [ ] T5-002 — UKI graph: node search.
+- [~] T5-001 — UKI graph: zoom + pan + minimap. (zoomPan transform helpers shipped v4.8.0)
+- [~] T5-002 — UKI graph: node search. (fuzzySearch scorer + filter shipped v4.8.0)
 - [ ] T5-003 — UKI graph: cluster collapse / expand.
 - [ ] T5-004 — UKI graph: filter by source app.
 - [ ] T5-005 — UKI graph: filter by date.
@@ -310,13 +310,13 @@ FORGE (8):
 - [ ] T6-013 — FloatingWindow: drag uses transform, not left/top.
 - [ ] T6-014 — FloatingWindow: resize uses CSS aspect-ratio where possible.
 - [~] T6-015 — Cancel in-flight fetches on app close. (useFetchJson AbortController shipped v4.6.0)
-- [ ] T6-016 — Throttle scroll listeners to rAF.
+- [~] T6-016 — Throttle scroll listeners to rAF. (rafThrottle helper shipped v4.8.0)
 - [~] T6-017 — Debounce text-input → store updates. (useDebounced shipped v4.6.0)
 - [ ] T6-018 — Web workers for image processing in PRISM/FLUX.
 - [ ] T6-019 — Web workers for FFT in Imosion visualizers.
-- [ ] T6-020 — Worker pool for thumbnail generation.
+- [~] T6-020 — Worker pool for thumbnail generation. (WorkerPool shipped v4.8.0)
 - [ ] T6-021 — Off-screen canvas for VINX preview render.
-- [ ] T6-022 — IndexedDB cache for thumbnails.
+- [~] T6-022 — IndexedDB cache for thumbnails. (AsyncCache TTL+LRU shipped v4.8.0)
 - [ ] T6-023 — IndexedDB cache for embeddings.
 - [~] T6-024 — LRU eviction for caches. (LRU class shipped v4.6.0)
 - [ ] T6-025 — Detach unused canvases when window minimized.
@@ -343,7 +343,7 @@ FORGE (8):
 - [ ] T6-046 — Crash reporter integration (renderer + main).
 - [~] T6-047 — Auto-recover unsaved state on crash. (crashRecovery save/load + autoSave shipped v4.7.0)
 - [ ] T6-048 — Watchdog for runaway main-process workers.
-- [ ] T6-049 — Renderer process restart on white-screen detection.
+- [~] T6-049 — Renderer process restart on white-screen detection. (downloadBlob exports + EventBus pub/sub infra shipped v4.8.0)
 - [ ] T6-050 — Telemetry opt-in dashboard.
 - [ ] T6-051 — Slow-render warning overlay (dev only).
 - [ ] T6-052 — FPS overlay (dev only) toggle.
@@ -420,8 +420,8 @@ FORGE (8):
 - [ ] T8-027 — Perf: lighthouse run on dev build.
 - [ ] T8-028 — Coverage report uploaded per PR.
 - [ ] T8-029 — Flaky test quarantine label + report.
-- [ ] T8-030 — Test data factory module.
-- [ ] T8-031 — Mock IPC layer for renderer tests.
+- [x] T8-030 — Test data factory module. (testFactory shipped v4.8.0)
+- [x] T8-031 — Mock IPC layer for renderer tests. (MockIpc shipped v4.8.0)
 - [ ] T8-032 — Mock filesystem for main-process tests.
 - [ ] T8-033 — E2E parallelization in CI.
 - [ ] T8-034 — Cross-platform CI matrix (win/mac/linux).

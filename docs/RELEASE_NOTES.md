@@ -4,6 +4,26 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.8.0 -- 500-Improvement Wave 4
+
+Wave 4 lands ten more shared modules covering search, performance, graph
+math, and test infrastructure.
+
+What's now in the kit: a fuzzy substring matcher (used by command palette
+and graph search), a bounded worker pool for offloading heavy compute, an
+async cache with TTL plus LRU eviction plus request coalescing, an
+in-memory mock IPC harness for renderer tests, a test data factory module
+for shared fixtures, anchor-stable zoom and pan transform math, a
+requestAnimationFrame throttle that coalesces rapid input into one call
+per frame, browser download helpers (blob, text, JSON, CSV), a
+force-directed graph layout step, and a typed event bus.
+
+Eight more backlog items advanced this wave. Two completed outright (test
+data factory and mock IPC). Cumulative across waves 1-4: thirty-eight
+modules and one hundred and twenty-eight backlog items moved.
+
+---
+
 ## Version 4.7.0 -- 500-Improvement Wave 3
 
 Wave 3 lands ten more shared modules that cover creative-suite math,

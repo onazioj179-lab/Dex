@@ -10,7 +10,40 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
-## v4.7.0 - 500-Improvement Wave 3: Creative + security infra
+## v4.8.0 - 500-Improvement Wave 4: Search, perf, graph, test infra
+
+Fourth wave. 10 more shared modules. Eight backlog items advanced.
+
+### Added — `src/renderer/improvements500/`
+
+- **Fuzzy search** (`fuzzySearch.ts`): subsequence scorer + `fuzzyFilter`
+  with consecutive / word-start / camel-case bonuses. *(T5-002)*
+- **Worker pool** (`workerPool.ts`): bounded-concurrency promise pool with
+  FIFO queue + drain. *(T6-020)*
+- **Async cache** (`asyncCache.ts`): TTL + LRU bound + in-flight
+  coalescing. *(T6-022)*
+- **Mock IPC** (`mockIpc.ts`): in-memory renderer-IPC harness for tests
+  with invocation history. *(T8-031, complete)*
+- **Test data factory** (`testFactory.ts`): deterministic id sequence and
+  default-shaped fixtures (user/doc/notification). *(T8-030, complete)*
+- **Zoom / pan transforms** (`zoomPan.ts`): `worldToScreen`,
+  `screenToWorld`, `zoomAt` (anchor-stable), `panBy`, `fitToView`.
+  *(T5-001)*
+- **rAF throttle** (`rafThrottle.ts`): coalesces high-frequency callers
+  into one call per frame. *(T6-016)*
+- **Download helpers** (`downloadBlob.ts`): `downloadBlob`, `downloadText`,
+  `downloadJson`, `downloadCsv`. *(T6-049)*
+- **Force-directed graph layout** (`graphLayout.ts`): repulsion + spring +
+  damping, pure simulation tick. *(T5-001 supporting)*
+- **Typed event bus** (`eventBus.ts`): `EventBus<TMap>` with `on`, `once`,
+  `emit`, `clear`. *(T6-031 supporting)*
+
+### Tests
+
+- New [tests/unit/improvements500-wave4.test.ts](../tests/unit/improvements500-wave4.test.ts)
+  (23 tests). All 116 cumulative wave tests pass.
+
+
 
 Third wave. 10 more force-multiplier modules covering creative-suite math,
 security hardening, and crash-resilience. Advances 16 backlog items.
