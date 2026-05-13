@@ -4,6 +4,21 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.12.0 -- 500-Improvement Wave 8
+
+Wave 8 adds ten more shared modules: time-based `throttle` plus a
+`debounceFn` (companion to the React `useDebounced` hook), an argument-
+keyed `memoize`, a SemVer 2.0.0 parser/comparator, a `queryString` codec
+with repeated-key array semantics, a `urlSafe` parser that blocks
+`javascript:`/`data:`/`vbscript:`/`file:` by default, descriptive stats
+(`mean`, `median`, sample variance, stddev, percentile, minMax), a
+histogram binner with Sturges auto-bin-count, linear and log chart scales
+with Wilkinson "nice" tick generation, an offscreen-canvas text-metrics
+helper with `truncateToWidth` ellipsis, and a Typewriter animator. 28 new
+unit tests; full wave5-8 regression at 106 passing.
+
+---
+
 ## Version 4.11.0 -- 500-Improvement Wave 7
 
 Wave 7 adds ten more shared infrastructure modules: a streaming tokenizer

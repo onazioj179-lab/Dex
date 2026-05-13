@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.12.0 - 500-Improvement Wave 8: Throttle, memoize, semver, charts
+
+Eighth wave. 10 more shared modules. 28 new tests; full wave5-8 suite is 106 passing.
+
+### Added
+- `throttle` module: time-based `throttle` (leading + trailing edges) and `debounceFn` with cancel/flush.
+- `memoize` module: argument-keyed cache with optional `max` FIFO eviction.
+- `semver` module: `parseSemver`, `compareSemver`, `compareSemverStrings`, `semverSatisfiesGte`. Pre-release ordering per spec.
+- `queryString` module: `stringifyQuery` and `parseQuery` with repeated-key array semantics.
+- `urlSafe` module: `parseSafeUrl` blocks javascript:/data:/vbscript:/file: by default; `isHttpUrl`.
+- `statsBasic` module: `mean`, `median`, sample `variance`, `stddev`, linear-interpolation `percentile`, `minMax`.
+- `dataBinning` module: `histogram` with optional bin count; `sturgesBinCount` helper.
+- `chartScale` module: `linearScale`, `logScale`, Wilkinson-style `niceTicks`.
+- `textMetrics` module: shared offscreen-canvas `measureText` plus `truncateToWidth` ellipsis helper.
+- `Typewriter` class: progressive-prefix text animator with `start`, `append`, `finish`, `stop`.
+
+### Changed
+- Barrel `src/renderer/improvements500/index.ts` re-exports all 10 new modules.
+- `package.json` bumped to 4.12.0.
+
 ## v4.11.0 - 500-Improvement Wave 7: Streaming, gestures, fs, detection
 
 Seventh wave. 10 more shared modules. 24 new tests, default reporter only

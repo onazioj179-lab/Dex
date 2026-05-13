@@ -303,15 +303,15 @@ FORGE (8):
 - [~] T6-006 — Virtualize Search results. (useVirtualList shipped v4.6.0)
 - [ ] T6-007 — Lazy-load every standalone app via React.lazy.
 - [ ] T6-008 — Code-split per major surface (Settings panels).
-- [ ] T6-009 — Memoize selectors in zustand stores.
+- [~] T6-009 — Memoize selectors in zustand stores. [v4.12.0 generic memoize() w/ FIFO max.]
 - [ ] T6-010 — Audit and add React.memo on hot leaf components.
 - [ ] T6-011 — Replace inline styles with CSS classes on hot paths.
 - [ ] T6-012 — Dock: avoid full re-render on hover (item-local state).
 - [ ] T6-013 — FloatingWindow: drag uses transform, not left/top.
 - [ ] T6-014 — FloatingWindow: resize uses CSS aspect-ratio where possible.
 - [~] T6-015 — Cancel in-flight fetches on app close. (useFetchJson AbortController shipped v4.6.0)
-- [~] T6-016 — Throttle scroll listeners to rAF. (rafThrottle helper shipped v4.8.0)
-- [~] T6-017 — Debounce text-input → store updates. (useDebounced shipped v4.6.0)
+- [~] T6-016 — Throttle scroll listeners to rAF. (rafThrottle helper shipped v4.8.0; v4.12.0 time-based throttle() + debounceFn.)
+- [~] T6-017 — Debounce text-input → store updates. (useDebounced shipped v4.6.0; v4.12.0 debounceFn for non-React paths.)
 - [ ] T6-018 — Web workers for image processing in PRISM/FLUX.
 - [~] T6-019 — Web workers for FFT in Imosion visualizers. [v4.9.0 retry helper + workerPool already shipped — FFT migration pending.]
 - [~] T6-020 — Worker pool for thumbnail generation. (WorkerPool shipped v4.8.0)
