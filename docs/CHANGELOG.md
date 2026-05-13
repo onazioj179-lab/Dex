@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.19.0 - 500-Improvement Wave 15: Radix, A*, ULID, color, scheduling
+
+Fifteenth wave. 10 more shared modules, 22 new tests pass.
+
+### Added
+- `radixSort` LSD radix sort for uint32 arrays.
+- `LruWeak` object-keyed cache backed by `WeakRef`.
+- `aStar` A* shortest-path with caller-supplied neighbors/cost/heuristic.
+- `simplifyPolyline` Ramer-Douglas-Peucker polyline simplification.
+- `ulid` ULID generator (Crockford base32, 26-char, sortable).
+- `shannonEntropy` bits-per-symbol entropy measurement.
+- `MarkovChain` order-N Markov chain trainer/sampler.
+- `rgbToHsv` / `hsvToRgb` RGB <-> HSV color conversions.
+- `PriorityScheduler` cooperative priority job runner.
+- `BitSet` packed Uint32-backed fixed-capacity bit set.
+
+### Changed
+- Barrel re-exports all 10 new Wave 15 modules.
+- `package.json` bumped to 4.19.0.
+
 ## v4.18.0 - 500-Improvement Wave 14: Stable sort, spatial, weighted, schedule
 
 Fourteenth wave. 10 more shared modules, 27 new tests pass.

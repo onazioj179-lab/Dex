@@ -4,6 +4,26 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.19.0 -- 500-Improvement Wave 15
+
+Wave 15 ships ten more building blocks: `radixSort`, an LSD radix sort
+for 32-bit non-negative integers that beats comparison sorts on large
+uniformly-distributed data; `LruWeak`, an object-keyed cache backed by
+`WeakRef` so cached values can be reclaimed under memory pressure;
+`aStar`, a fully generic A* shortest-path implementation that takes
+user-supplied neighbor expansion, edge cost, and admissible heuristic;
+`simplifyPolyline`, Ramer-Douglas-Peucker polyline simplification for
+stroke and trace data; `ulid`, a ULID generator producing 26-char
+Crockford-base32 IDs that sort lexicographically by time; `shannonEntropy`
+for bits-per-symbol entropy of strings or byte buffers; `MarkovChain`,
+an order-N Markov trainer and generator; `rgbToHsv` and `hsvToRgb`
+color space conversions; `PriorityScheduler`, a cooperative priority
+job runner where higher-priority jobs preempt lower ones in queue;
+and `BitSet`, a packed Uint32-backed fixed-capacity bit set with O(1)
+set/clear/has and a hardware-friendly popcount.
+
+---
+
 ## Version 4.18.0 -- 500-Improvement Wave 14
 
 Wave 14 ships ten data-structure and scheduling primitives: `mergeSort`,
