@@ -10,7 +10,42 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
-## v4.6.0 - 500-Improvement Wave 2: Perf, a11y, shell infrastructure
+## v4.7.0 - 500-Improvement Wave 3: Creative + security infra
+
+Third wave. 10 more force-multiplier modules covering creative-suite math,
+security hardening, and crash-resilience. Advances 16 backlog items.
+
+### Added — `src/renderer/improvements500/`
+
+- **Snap-to-grid + edge snap** (`snap.ts`): `snapToGrid`, `snapToGuides`,
+  `snapBoxToBoxes` for canvas alignment. *(T3-067)*
+- **WCAG contrast** (`contrast.ts`): `parseColor`, `contrastRatio`,
+  `evaluateContrast` (AA / AAA / large). *(T1-053)*
+- **PII redaction** (`redact.ts`): regex scrub for emails, JWTs, bearer
+  tokens, credit-card / SSN / IP; deep object redaction with cycle guard.
+  *(T7-004, T7-029, T7-030)*
+- **Crash recovery** (`crashRecovery.ts`): `saveRecovery`, `loadRecovery`,
+  `previousSessionCrashed`, debounced `autoSave`. *(T6-047, T9-007)*
+- **Audit log** (`audit.ts`): append-only ring buffer per channel.
+  *(T7-010)*
+- **Long-task tracker** (`longTask.ts`): PerformanceObserver longtask + a
+  `measureSpan` helper. *(T6-044)*
+- **MIDI mapping** (`midiMapping.ts`): bindings store + CC value scaling.
+  *(T3-021)*
+- **LUFS meter** (`lufs.ts`): momentary (400ms) + short-term (3s) loudness
+  with K-weighting approximation. *(T3-028)*
+- **Particle emitter** (`particles.ts`): pure simulation tick + spawn /
+  drag / gravity. *(T3-058)*
+- **Plugin sandbox protocol** (`pluginSandbox.ts`): permission gates,
+  storage quota enforcement, network allowlist with `*.host` wildcards.
+  *(T7-012, T7-013, T7-014, T7-015)*
+
+### Tests
+
+- New [tests/unit/improvements500-wave3.test.ts](../tests/unit/improvements500-wave3.test.ts)
+  (23 tests). All 93 cumulative wave tests pass.
+
+
 
 Second shipping wave. Adds 10 more force-multiplier modules under
 `src/renderer/improvements500/`, advancing 29 backlog items.

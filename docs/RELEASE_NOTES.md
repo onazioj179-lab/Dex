@@ -4,6 +4,25 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.7.0 -- 500-Improvement Wave 3
+
+Wave 3 lands ten more shared modules that cover creative-suite math,
+security hardening, and crash resilience.
+
+What's now in the kit: snap-to-grid + smart edge snapping for canvases,
+WCAG color-contrast checking with AA / AAA verdicts, deep PII redaction
+for log lines and crash reports, automatic crash recovery (so unsaved work
+is restored after a hard crash), an append-only audit log per subsystem,
+a long-task perf tracker, MIDI controller mapping, an LUFS loudness meter
+for the audio master bus, a pure particle-emitter simulation for FLUX
+effects, and a plugin sandbox protocol with per-plugin permissions, storage
+quotas, and network allowlists.
+
+Sixteen more backlog items advanced this wave. Cumulative across waves 1-3:
+twenty-eight modules and one hundred and twenty backlog items moved.
+
+---
+
 ## Version 4.6.0 -- 500-Improvement Wave 2
 
 Continues the foundation pass. Wave 2 adds ten more shared modules that the

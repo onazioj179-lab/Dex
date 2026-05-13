@@ -77,7 +77,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done.
 - [~] T1-050 — Modals: focus trap + initial focus + ESC closes. (useFocusTrap shipped v4.6.0)
 - [~] T1-051 — Toasts: aria-live region. (liveRegion.announce shipped v4.6.0)
 - [ ] T1-052 — Form fields: every input has an associated label.
-- [ ] T1-053 — Color contrast audit pass (target WCAG AA 4.5:1).
+- [~] T1-053 — Color contrast audit pass (target WCAG AA 4.5:1). (evaluateContrast / contrastRatio shipped v4.7.0)
 - [ ] T1-054 — Provide skip-link to main content.
 - [~] T1-055 — Reduced-motion: every animation respects `prefers-reduced-motion`. (useReducedMotion / a11yPrefs shipped v4.6.0)
 - [~] T1-056 — High-contrast preference: honor `prefers-contrast: more`. (useHighContrast shipped v4.6.0)
@@ -130,14 +130,14 @@ VINX (18):
 Imosion (18):
 - [ ] T3-019 — Mixer scenes / snapshots.
 - [ ] T3-020 — Step-sequencer pattern bank.
-- [ ] T3-021 — MIDI controller mapping panel.
+- [~] T3-021 — MIDI controller mapping panel. (midiMapping registry + mapCcValue shipped v4.7.0)
 - [ ] T3-022 — Sidechain compression UI.
 - [ ] T3-023 — Tempo / time-signature automation lane.
 - [ ] T3-024 — Chord track preview.
 - [ ] T3-025 — Vocal tuning preset menu.
 - [ ] T3-026 — Bus routing matrix.
 - [ ] T3-027 — Loop browser drag-to-track.
-- [ ] T3-028 — Master limiter visualization (LUFS meter).
+- [~] T3-028 — Master limiter visualization (LUFS meter). (LufsMeter momentary/short-term shipped v4.7.0)
 - [ ] T3-029 — Track freeze / bounce.
 - [ ] T3-030 — Punch-in record markers.
 - [ ] T3-031 — Take comping lanes.
@@ -171,7 +171,7 @@ FLUX (12):
 - [ ] T3-055 — Expression scripting on properties.
 - [ ] T3-056 — Effect masks per layer.
 - [ ] T3-057 — 3D layer mode + camera.
-- [ ] T3-058 — Particles emitter built-in.
+- [~] T3-058 — Particles emitter built-in. (ParticleEmitter simulation shipped v4.7.0)
 - [ ] T3-059 — Text animator presets.
 - [ ] T3-060 — Render queue presets.
 - [ ] T3-061 — Time-remap tool.
@@ -182,7 +182,7 @@ FORGE (8):
 - [ ] T3-064 — Material library panel.
 - [ ] T3-065 — Lighting environment HDRI picker.
 - [ ] T3-066 — Camera presets (top/front/side/persp).
-- [ ] T3-067 — Snap-to-grid + edge snap.
+- [~] T3-067 — Snap-to-grid + edge snap. (snapToGrid / snapBoxToBoxes shipped v4.7.0)
 - [ ] T3-068 — Subdivide / smooth shading.
 - [ ] T3-069 — Export glTF / OBJ / STL.
 - [ ] T3-070 — Render-to-PNG button.
@@ -338,10 +338,10 @@ FORGE (8):
 - [ ] T6-041 — Audit synchronous localStorage reads.
 - [ ] T6-042 — Audit synchronous JSON.parse on hot paths.
 - [ ] T6-043 — Heap snapshot baseline + regression check in CI.
-- [ ] T6-044 — Long-task tracker logs spans > 50ms.
+- [~] T6-044 — Long-task tracker logs spans > 50ms. (longTask + measureSpan shipped v4.7.0)
 - [ ] T6-045 — INP / LCP perf budget per app.
 - [ ] T6-046 — Crash reporter integration (renderer + main).
-- [ ] T6-047 — Auto-recover unsaved state on crash.
+- [~] T6-047 — Auto-recover unsaved state on crash. (crashRecovery save/load + autoSave shipped v4.7.0)
 - [ ] T6-048 — Watchdog for runaway main-process workers.
 - [ ] T6-049 — Renderer process restart on white-screen detection.
 - [ ] T6-050 — Telemetry opt-in dashboard.
@@ -356,18 +356,18 @@ FORGE (8):
 - [ ] T7-001 — IPC: validate every channel payload with zod schema.
 - [ ] T7-002 — IPC: deny-by-default on unknown channels.
 - [ ] T7-003 — IPC: rate-limit per channel.
-- [ ] T7-004 — IPC: redact sensitive args from logs.
+- [~] T7-004 — IPC: redact sensitive args from logs. (redactString / redactDeep shipped v4.7.0)
 - [ ] T7-005 — Vault: argon2id for key derivation.
 - [ ] T7-006 — Vault: AES-256-GCM for entry encryption.
 - [ ] T7-007 — Vault: master-key never stored.
 - [~] T7-008 — Vault: clipboard auto-clear after 30s. (secureClipboard.copySecret shipped v4.6.0)
 - [~] T7-009 — Vault: lock-on-idle. (IdleDetector shipped v4.6.0)
-- [ ] T7-010 — Vault: audit log of access events.
+- [~] T7-010 — Vault: audit log of access events. (audit append-only ring buffer shipped v4.7.0)
 - [ ] T7-011 — Plugin sandbox: iframe with strict CSP.
-- [ ] T7-012 — Plugin sandbox: postMessage protocol with validated schema.
-- [ ] T7-013 — Plugin sandbox: per-plugin permission list.
-- [ ] T7-014 — Plugin sandbox: per-plugin storage quota.
-- [ ] T7-015 — Plugin sandbox: per-plugin network allowlist.
+- [~] T7-012 — Plugin sandbox: postMessage protocol with validated schema. (PluginSandbox.handleMessage shipped v4.7.0)
+- [~] T7-013 — Plugin sandbox: per-plugin permission list. (PluginSandbox.has shipped v4.7.0)
+- [~] T7-014 — Plugin sandbox: per-plugin storage quota. (PluginSandbox.storageSet quota check shipped v4.7.0)
+- [~] T7-015 — Plugin sandbox: per-plugin network allowlist. (PluginSandbox.isHostAllowed shipped v4.7.0)
 - [ ] T7-016 — Plugin signing: signature verification on install.
 - [ ] T7-017 — Plugin signing: revocation list check.
 - [ ] T7-018 — Dependency scan in CI (npm audit + sca tool).
@@ -381,8 +381,8 @@ FORGE (8):
 - [ ] T7-026 — Auto-update: signature pinning.
 - [ ] T7-027 — Auto-update: rollback on failed boot.
 - [ ] T7-028 — Settings: hide secrets in UI (mask + show-on-click).
-- [ ] T7-029 — Logs: redact secrets via regex pre-write.
-- [ ] T7-030 — Crash dumps: strip PII before submit.
+- [~] T7-029 — Logs: redact secrets via regex pre-write. (redactString / redactDeep shipped v4.7.0)
+- [~] T7-030 — Crash dumps: strip PII before submit. (redactCrashDump shipped v4.7.0)
 - [ ] T7-031 — File pickers: enforce extension allowlist.
 - [~] T7-032 — Clipboard reads: explicit user gesture required. (recordUserGesture/readClipboard shipped v4.6.0)
 - [ ] T7-033 — Notification permission gated per app.
@@ -435,7 +435,7 @@ FORGE (8):
 - [~] T9-004 — Command palette (Cmd/Ctrl+K) covers every action. (commandPalette registry + fuzzy search shipped v4.6.0)
 - [ ] T9-005 — "What's new" panel after update.
 - [ ] T9-006 — Empty home → suggested actions list.
-- [ ] T9-007 — Recovery banner if previous session crashed.
+- [~] T9-007 — Recovery banner if previous session crashed. (crashRecovery.previousSessionCrashed shipped v4.7.0)
 - [ ] T9-008 — Backup-now button in Settings.
 - [ ] T9-009 — Restore-from-backup wizard.
 - [ ] T9-010 — Quick switcher (Cmd/Ctrl+Tab) between running apps.
