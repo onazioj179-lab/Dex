@@ -4,6 +4,46 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.29.0 -- 500-Improvement Wave 25
+
+Wave 25 batch adds monotone-stack/deque utilities, Kosaraju SCC,
+K-way merge with a binary heap, a wavelet tree for rank/quantile
+queries, Andrew's monotone-chain convex hull, ray-casting
+point-in-polygon, segment-intersection, Huffman coding round-trip,
+and an RLE byte codec. Twelve unit tests green.
+
+---
+
+## Version 4.28.0 -- 500-Improvement Wave 24
+
+Wave 24 ships exact TSP via Held-Karp DP, bitmask N-Queens, a 9x9
+Sudoku solver, CRC-16/CCITT, Adler-32, MurmurHash3, Fletcher-16,
+Jenkins one-at-a-time, DJB2 hash, and the Z-algorithm with pattern
+search. Eleven unit tests green.
+
+---
+
+## Version 4.27.0 -- 500-Improvement Wave 23
+
+Wave 23 brings classic graph algorithms: Bellman-Ford with
+negative-cycle detection, Floyd-Warshall all-pairs with path
+reconstruction, both Prim and Kruskal MST variants, articulation-point
+and bridge detection, Hopcroft-Karp bipartite matching, Gale-Shapley
+stable marriage, a generalized BigInt CRT solver, and gcd/lcm helpers.
+Fourteen unit tests green.
+
+---
+
+## Version 4.26.0 -- 500-Improvement Wave 22
+
+Wave 22 adds sparse-table O(1) range queries, LIS/LCS with
+reconstruction, a 2-SAT solver, Hierholzer Eulerian path, BFS layer
+extraction, iterative-deepening DFS, three-color cycle detection,
+coin-change DP, and 0/1 knapsack DP with item recovery. Sixteen unit
+tests green.
+
+---
+
 ## Version 4.25.0 -- 500-Improvement Wave 21
 
 Wave 21 adds ten more shared utilities focused on signals, geometry,

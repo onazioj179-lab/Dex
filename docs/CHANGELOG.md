@@ -10,6 +10,66 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.29.0 - 500-Improvement Wave 25: Monotone, SCC, geometry, compression
+
+Twenty-fifth wave. 10 more shared modules, 12 new tests pass.
+
+- `nextGreaterElements` / `largestRectangleHistogram` monotone-stack helpers.
+- `slidingWindowMax` / `slidingWindowMin` monotone-deque sliding window.
+- `kosarajuScc` strongly connected components via two-pass DFS.
+- `mergeKSortedLists` heap-based K-way merge.
+- `WaveletTree` rank/quantile queries over integer sequences.
+- `grahamScan` convex hull (Andrew's monotone chain).
+- `polygonContains` ray-casting point-in-polygon.
+- `segmentsIntersect` segment-segment intersection.
+- `huffmanEncode` / `huffmanDecode` prefix-free coding round-trip.
+- `rleEncode` / `rleDecode` byte run-length codec.
+
+## v4.28.0 - 500-Improvement Wave 24: Backtracking, hashes, Z-algorithm
+
+Twenty-fourth wave. 10 more shared modules, 11 new tests pass.
+
+- `tspBitmask` Held-Karp exact TSP DP for up to ~24 cities.
+- `nQueens` bitmask backtracking with solution count + first board.
+- `sudokuSolver` 9x9 backtracking with bitmask constraint propagation.
+- `crc16` CRC-16/CCITT-FALSE checksum (poly 0x1021).
+- `adler32` Adler-32 checksum (RFC 1950).
+- `murmurHash3` x86 32-bit MurmurHash3 with seed.
+- `fletcher16` Fletcher-16 position-sensitive checksum.
+- `jenkinsHash` one-at-a-time hash.
+- `djb2Hash` Bernstein DJB2 string hash.
+- `zArray` / `zSearch` Z-algorithm prefix function and pattern search.
+
+## v4.27.0 - 500-Improvement Wave 23: Shortest paths, MST, matching
+
+Twenty-third wave. 10 more shared modules, 14 new tests pass.
+
+- `bellmanFord` single-source shortest paths with negative-cycle detection.
+- `floydWarshall` + `floydPath` all-pairs shortest paths and reconstruction.
+- `primMst` minimum spanning tree (binary-heap Prim).
+- `kruskalMst` minimum spanning tree (union-find Kruskal).
+- `articulationPoints` cut-vertex detection (Tarjan lowlink).
+- `graphBridges` cut-edge detection (Tarjan lowlink).
+- `hopcroftKarp` O(E sqrt V) maximum bipartite matching.
+- `stableMarriage` Gale-Shapley stable matching.
+- `chineseRemainder` generalized CRT solver over BigInt.
+- `gcd` / `lcm` / `gcdMany` / `lcmMany` / `gcdBig` / `lcmBig` helpers.
+
+## v4.26.0 - 500-Improvement Wave 22: Range queries, DP, graph traversal
+
+Twenty-second wave. 10 more shared modules, 16 new tests pass.
+
+- `SparseTable` O(1) idempotent range queries (min/max/gcd) after O(n log n) build.
+- `longestIncreasingSubsequence` patience-sort LIS with reconstruction.
+- `longestCommonSubsequence` / `longestCommonSubsequenceString` Wagner-Fischer LCS.
+- `twoSat` 2-SAT solver via implication graph + Kosaraju SCC.
+- `eulerianPath` Hierholzer Eulerian path/circuit on undirected multigraphs.
+- `bfsLevels` / `bfsLayers` graph BFS distance and layer extraction.
+- `iddfs` iterative-deepening depth-first search for goal queries.
+- `findDirectedCycle` / `hasDirectedCycle` three-color iterative cycle detection.
+- `coinChangeMin` minimum-coins DP with reconstruction.
+- `knapsack01` 0/1 knapsack DP with selected items.
+
 ## v4.25.0 - 500-Improvement Wave 21: Signals, geometry, flow networks
 
 Twenty-first wave. 10 more shared modules, 12 new tests pass.
