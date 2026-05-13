@@ -325,7 +325,7 @@ FORGE (8):
 - [ ] T6-028 — Tear down audio nodes on Imosion close.
 - [~] T6-029 — Leak audit: every useEffect cleans up timers. (useTimeout/useInterval shipped v4.6.0)
 - [~] T6-030 — Leak audit: every useEffect cleans up event listeners. (useEventListener shipped v4.6.0)
-- [ ] T6-031 — Leak audit: zustand subscriptions unsubscribed.
+- [~] T6-031 — Leak audit: zustand subscriptions unsubscribed. [v4.10.0 deepEqual + EventBus.clear primitives.]
 - [~] T6-032 — Leak audit: requestAnimationFrame cancelled. (useRaf shipped v4.6.0)
 - [ ] T6-033 — Bundle analyzer in build pipeline.
 - [ ] T6-034 — Tree-shake icon library imports.
@@ -354,7 +354,7 @@ FORGE (8):
 ## T7 — Security & hardening (35)
 
 - [ ] T7-001 — IPC: validate every channel payload with zod schema.
-- [ ] T7-002 — IPC: deny-by-default on unknown channels.
+- [~] T7-002 — IPC: deny-by-default on unknown channels. [v4.10.0 base64 + uuid + deepMerge feed permissioned IPC envelope work.]
 - [ ] T7-003 — IPC: rate-limit per channel.
 - [~] T7-004 — IPC: redact sensitive args from logs. (redactString / redactDeep shipped v4.7.0)
 - [ ] T7-005 — Vault: argon2id for key derivation.

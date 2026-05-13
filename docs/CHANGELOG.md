@@ -10,6 +10,32 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.10.0 - 500-Improvement Wave 6: Random, encode, pack, math primitives
+
+Sixth wave. 10 more shared modules. Two backlog items advanced.
+
+### Added
+- `prng` module: seedable mulberry32 RNG plus `randomInt`, `randomChoice`, `shuffleInPlace` for deterministic test fixtures.
+- `base64` module: dependency-free encode/decode with URL-safe variant and UTF-8 helpers.
+- `uuid` module: RFC 4122 v4 generator with `crypto.randomUUID` fallback chain plus `isUuid` validator.
+- `rectPacking` module: best-short-side-fit + guillotine bin packing for sprite atlases and icon caches.
+- `velocityTracker` module: pointer fling/momentum velocity sampling.
+- `clipboardHistory` module: bounded in-memory ring buffer with consecutive de-dupe.
+- `deepEqual` module: structural compare with cycle protection, Date/RegExp value compare, NaN-equal-NaN.
+- `deepMerge` module: recursive plain-object merge with `replace` or `concat` array strategy.
+- `priorityQueue` module: binary-heap min-priority queue.
+- `math` module: `clamp`, `lerp`, `inverseLerp`, `smoothstep`, `modulo`, `wrap`, `approxEqual`.
+
+### Backlog
+- T6-031 [~] zustand leak audit primitives (deepEqual + bus clear).
+- T7-002 [~] IPC envelope groundwork (uuid + base64 + deepMerge).
+
+### Tests
+- 28 new tests in `tests/unit/improvements500-wave6.test.ts`. Total wave coverage now 170 tests across 7 files.
+
+### Internal
+- Cleaned up stray debug artifacts `ci-out.txt` and `runs.json` accidentally committed in v4.9.0.
+
 ## v4.9.0 - 500-Improvement Wave 5: Diff, parsing, geometry, color, motion
 
 Fifth wave. 10 more shared modules. Four backlog items advanced.

@@ -4,6 +4,32 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.10.0 -- 500-Improvement Wave 6
+
+Wave 6 lands ten more shared modules covering randomness, encoding,
+packing, gestures, and core data primitives.
+
+What's now in the kit: a seeded random generator that gives
+reproducible test runs, dependency-free base64 (with URL-safe variant)
+that works the same in renderer and tests, an RFC 4122 v4 UUID
+generator with a sensible fallback chain, a guillotine rectangle
+packer for sprite atlases and icon caches, a pointer velocity tracker
+for fling and momentum gestures, an in-memory clipboard history with
+de-dupe, a deep-equality compare that handles cycles and NaN
+correctly, a deep-merge helper for layered settings, a binary-heap
+priority queue for schedulers, and a small numeric utility module
+(clamp, lerp, smoothstep, wrap).
+
+What you'll feel: nothing immediately user visible -- this wave is
+internal plumbing. The benefit shows up as more reliable tests, fewer
+runtime allocations in hot paths, and faster iteration on Settings,
+plugin sandboxing, and gesture features in upcoming releases.
+
+What's next: Wave 7 will continue the program with more focused
+modules.
+
+---
+
 ## Version 4.9.0 -- 500-Improvement Wave 5
 
 Wave 5 adds ten more shared modules covering text, geometry, motion, and

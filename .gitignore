@@ -66,3 +66,6 @@ rp[0-9].txt
 
 # Archived old versions
 _archive_v2/run_log.txt
+
+ci-out.txt
+runs.json
