@@ -10,6 +10,40 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.56.0 - Master Evolution Plan Phase 1: IPC contracts, unified search, canonical error boundary
+
+Phase 1 of the Master Evolution Plan (per ADR 0002 and ADR 0004) lands three
+additive foundation layers under `src/shared/`. Existing implementations
+(200+ legacy IPC handlers, 6 search surfaces, 4 divergent error boundaries)
+are unchanged in this release; they migrate incrementally on top of the new
+layers in subsequent waves. No user-facing behavior changes.
+
+New shared platform layers:
+
+- `src/shared/ipc/contracts/registry.ts` - typed `IpcContractRegistry` with
+  channel-name validation, schema combinators (`string`, `number`, `boolean`,
+  `optional`, `array`, `object`), request/response validators, deprecation
+  tracking, and rate-category linkage to `src/shared/governance`.
+- `src/shared/ipc/contracts/canonical.ts` - first canonical contract set:
+  `files:read`, `files:write`, `dir:read`, `window:minimize`, plus
+  `createCanonicalRegistry()` for main + renderer startup.
+- `src/shared/search/SearchOrchestrator.ts` - single facade that the existing
+  search surfaces register with as `SearchProvider`s. Per-provider timeouts,
+  weighted score normalization, kind filtering, accept callbacks, throwing-
+  provider isolation, and `kind:id` deduplication.
+- `src/shared/errors/CanonicalErrorBoundary.ts` - one canonical React error
+  boundary that supersedes the four divergent boundaries. Composable
+  telemetry sinks (`composeTelemetry`), pluggable recovery policies
+  (`boundedRetryPolicy`), pluggable fallback UI, scope-aware crash records.
+
+Tests:
+
+- `tests/unit/ipc-contracts.test.ts`
+- `tests/unit/search-orchestrator.test.ts`
+- `tests/unit/canonical-error-boundary.test.tsx`
+
+All tests, `tsc --noEmit`, and the production build are green.
+
 ## v4.55.0 - Master Evolution Plan Phase 0: governance, ADRs, KPI baselines
 
 First release after the 500-improvement backlog closed. Begins the Master
