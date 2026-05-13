@@ -4,6 +4,24 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.17.0 -- 500-Improvement Wave 13
+
+Wave 13 ships ten algorithmic and async building blocks: an in-place
+`quickSort` with median-of-three pivot and insertion-sort cutoff;
+`binarySearch`, `lowerBound`, and `upperBound` over sorted arrays;
+`shuffleSeeded`, a deterministic Fisher-Yates shuffle using mulberry32;
+`zip` / `zipLongest` / `unzip` for parallel iteration; `groupBy`,
+`keyBy`, and `countBy` collection groupers; `rangeIter`, `rangeArray`,
+and `enumerate` Python-style iteration helpers; `debouncePromise`, a
+latest-wins async debounce that coalesces concurrent callers; a
+`BatchScheduler` that buffers items inside a time window and flushes
+them as one batch (or sooner at `maxBatch`); `expoBackoff`, a pure
+exponential backoff calculator with full / equal / decorrelated jitter
+strategies; and `uuidV7`, a time-ordered RFC 9562 UUID generator with
+injectable clock and RNG. 28 new unit tests.
+
+---
+
 ## Version 4.16.0 -- 500-Improvement Wave 12
 
 Wave 12 ships ten data-and-IO infrastructure modules: RFC 6265 cookie

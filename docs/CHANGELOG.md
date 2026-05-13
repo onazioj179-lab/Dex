@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.17.0 - 500-Improvement Wave 13: Sort, search, batching, IDs
+
+Thirteenth wave. 10 more shared modules, 28 new tests pass.
+
+### Added
+- `quickSort` in-place sort with median-of-three pivot and insertion-sort cutoff.
+- `binarySearch`, `lowerBound`, `upperBound` for sorted arrays.
+- `shuffleSeeded` deterministic Fisher-Yates using mulberry32.
+- `zip` / `zipLongest` / `unzip` parallel iteration helpers.
+- `groupBy` / `keyBy` / `countBy` collection groupers.
+- `rangeIter` / `rangeArray` / `enumerate` Python-style iteration.
+- `debouncePromise` latest-wins async debounce that coalesces concurrent callers.
+- `BatchScheduler` window-based batch flusher with `maxBatch` cap.
+- `expoBackoff` pure exponential backoff calculator (none/full/equal/decorrelated jitter).
+- `uuidV7` time-ordered UUIDs (RFC 9562) with injectable `now` and `random`.
+
+### Changed
+- Barrel re-exports all 10 new Wave 13 modules.
+- `package.json` bumped to 4.17.0.
+
 ## v4.16.0 - 500-Improvement Wave 12: Cookies, IPs, JWT, CSV, tables
 
 Twelfth wave. 10 more shared modules, 24 new tests pass.
