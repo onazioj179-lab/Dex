@@ -10,6 +10,121 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.53.0 - 500-Improvement Wave 49: dsp, easing, motion smoothing, audio codecs
+
+Forty-ninth wave. 11 more shared modules, 11 new tests pass.
+
+### Added
+
+- `OnePoleLowPass` / `OnePoleHighPass` - one-pole IIR filters for streaming numeric signals.
+- `springStep` - second-order spring-damper one-dimensional smoothing toward a target.
+- `criticallyDampedSmooth` - critically-damped spring (Game Programming Gems 4).
+- `tukeyWindow` - cosine-tapered rectangular window with alpha parameter.
+- `easeInQuad`/`easeOutQuad`/`easeInOutQuad`/`easeInCubic`/`easeOutCubic`/`easeInOutCubic`/`easeOutBack`/`easeOutElastic`/`easeOutBounce` - UI animation easing curves.
+- `dbToLinear` / `linearToDb` / `clipDb` - decibel <-> linear amplitude conversion.
+- `midiToFrequency` / `frequencyToMidi` / `midiToNoteName` - MIDI-Hz conversion (A4 = 440).
+- `linearResample` - simple linear sample-rate conversion for visualization use.
+- `quaternionSlerp` - spherical linear interpolation between unit quaternions.
+- `int16ToFloat32` / `float32ToInt16` - PCM bit-depth conversion between Int16 and Float32.
+- `muLawEncode` / `muLawDecode` - mu-law nonlinear companding for telephony-style audio.
+
+## v4.52.0 - 500-Improvement Wave 48: color, perception, dsp, audio analysis
+
+Forty-eighth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `simulateColorBlind` - color-blindness simulation (protanopia/deuteranopia/tritanopia).
+- `deltaE76` - CIE76 delta-E distance between two Lab colors.
+- `colorTemperatureToRgb` - Tanner Helland color-temperature-to-RGB approximation.
+- `whiteBalanceGray` - gray-world automatic white balance for image buffers.
+- `rgbToXyz` / `xyzToRgb` - sRGB <-> CIE XYZ (D65) conversion.
+- `dct2` / `idct2` - 2-D discrete cosine transform pair.
+- `autocorrelate` - signal autocorrelation function.
+- `detectPeaks` - local-maximum peak detection with min-distance and min-height filters.
+- `hzToMel` / `melToHz` / `melFilterbankCenters` - mel-scale conversion and filterbank centers.
+
+## v4.51.0 - 500-Improvement Wave 47: image processing, edge detection, filters
+
+Forty-seventh wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `boxBlur` - separable box blur for grayscale image buffers.
+- `gaussianBlurImage` - separable 2-D Gaussian blur over image buffers.
+- `prewittEdges` / `scharrEdges` / `robertsCross` / `laplacianEdges` - edge-detection filters.
+- `unsharpMask` - sharpening via subtraction of a blurred copy.
+- `medianBlur` - square-neighborhood median filter for salt-and-pepper noise.
+- `bilateralFilter` - edge-preserving bilateral smoothing.
+- `histogramEqualize` - 8-bit grayscale histogram equalization.
+
+## v4.50.0 - 500-Improvement Wave 46: ML primitives, optimizers, normalization
+
+Forty-sixth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `softmax` - numerically-stable softmax over a numeric array.
+- `logSumExp` - numerically-stable log-sum-exp.
+- `crossEntropy` - cross-entropy loss between predicted and target distributions.
+- `sigmoid`/`relu`/`leakyRelu`/`elu`/`gelu`/`softplus`/`swish`/`mish` - common activation functions.
+- `layerNormalize` - layer-normalization over a single feature vector.
+- `adamStep` / `createAdamState` - Adam optimizer step with state.
+- `sgdMomentumStep` / `createMomentumState` - SGD with momentum (optional Nesterov).
+- `rmspropStep` / `createRmspropState` - RMSProp optimizer step.
+- `adagradStep` / `createAdagradState` - AdaGrad optimizer step.
+- `batchNormalize` - batch normalization over a 1-D batch.
+
+## v4.49.0 - 500-Improvement Wave 45: special functions, polynomials, normalization
+
+Forty-fifth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `erf` / `erfc` - error function and complementary error function (A&S 7.1.26).
+- `lambertW0` - principal branch Lambert W via Halley iteration.
+- `besselJ0` - Bessel function of the first kind, order zero.
+- `gammaLanczos` / `lnGamma` - Lanczos gamma approximation (g=7).
+- `digamma` - digamma function via shift and asymptotic series.
+- `polyGcd` - polynomial GCD via Euclidean algorithm with monic result.
+- `polyDivide` - polynomial long division producing quotient and remainder.
+- `zScoreNormalize` - zero-mean unit-variance standardization.
+- `minMaxNormalize` - linear rescaling into a target range.
+- `robustScale` - median/MAD-based robust scaling.
+
+## v4.48.0 - 500-Improvement Wave 44: HMM, graph, sampling, sieves
+
+Forty-fourth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `viterbi` - Viterbi most-likely-state-sequence decoding for an HMM.
+- `floodFill4` - 4-connected flood fill on a grid.
+- `connectedComponents4` - 4-connected component labelling on a binary image.
+- `beamSearch` - generic beam-search expansion over a state space.
+- `sieveOfAtkin` - Sieve of Atkin prime enumeration.
+- `ReservoirSamplerK` - k-reservoir sampling for streaming data.
+- `WeightedUnionFind` - weighted union-find with union-by-size and path compression.
+- `euclideanRhythm` - Bjorklund evenly-distributed rhythm pattern generator.
+- `forwardBackward` - HMM forward-backward smoothing returning alpha/beta/gamma and log-likelihood.
+
+## v4.47.0 - 500-Improvement Wave 43: numerical methods, geometry, polynomials
+
+Forty-third wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `brentRoot` - Brent root-finding on a bracketed scalar function.
+- `goldenSectionMin` - golden-section minimization of a unimodal function.
+- `rombergIntegrate` - Romberg numerical integration with Richardson extrapolation.
+- `gaussLegendreIntegrate` - 2/3/4/5-point Gauss-Legendre quadrature on [a, b].
+- `chebyshevT` / `clenshawChebyshev` - Chebyshev T_n evaluation and Clenshaw recurrence.
+- `legendreP` - Legendre polynomial evaluation via Bonnet recursion.
+- `rayTriangleIntersect` - Moller-Trumbore ray/triangle intersection.
+- `minimumEnclosingCircle` - Welzl smallest enclosing circle.
+- `rodriguesRotate` - Rodrigues' rotation of a 3-D vector around an axis.
+- `bernsteinBasis` / `bernsteinEval` - Bernstein basis polynomial evaluation.
+
 ## v4.46.0 - 500-Improvement Wave 42: bigint, image, search, optimization
 
 Forty-second wave. 10 more shared modules, 10 new tests pass.
