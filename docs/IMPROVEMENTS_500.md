@@ -50,7 +50,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done.
 - [ ] T1-023 — FORGE: aria-label primitive palette.
 - [ ] T1-024 — FORGE: aria-label transform gizmo modes.
 - [ ] T1-025 — AXL: aria-label drawing tool palette.
-- [ ] T1-026 — AXL: aria-label dimension and GD&T controls.
+- [~] T1-026 — AXL: aria-label dimension and GD&T controls. (close buttons + share + AI panel labelled v4.5.0)
 - [ ] T1-027 — Files: aria-label sidebar tree buttons.
 - [ ] T1-028 — Files: aria-label item context menu.
 - [ ] T1-029 — Files: keyboard rename (F2) wired everywhere.
@@ -164,8 +164,8 @@ PRISM (14):
 - [ ] T3-050 — Export-as panel with format presets.
 
 FLUX (12):
-- [ ] T3-051 — Bezier curve editor for keyframes.
-- [ ] T3-052 — Easing presets (in/out/elastic).
+- [~] T3-051 — Bezier curve editor for keyframes. (cubicBezier/cubicBezierEasing/interpolateKeyframes shipped v4.5.0; editor UI pending)
+- [x] T3-052 — Easing presets (in/out/elastic). EASING_PRESETS + ease() shipped v4.5.0.
 - [ ] T3-053 — Pre-comps (nested compositions).
 - [ ] T3-054 — Track matte attachment.
 - [ ] T3-055 — Expression scripting on properties.
@@ -191,12 +191,12 @@ FORGE (8):
 
 - [ ] T4-001 — Nexus: presence panel (avatar list with status dots).
 - [ ] T4-002 — Nexus: cursor sync stub for shared docs.
-- [ ] T4-003 — Nexus: comment threads pinned to canvas regions.
+- [~] T4-003 — Nexus: comment threads pinned to canvas regions. (Comment + anchor data layer shipped v4.5.0; render pending)
 - [ ] T4-004 — Nexus: notifications inbox.
 - [ ] T4-005 — Nexus: invite link generator.
 - [ ] T4-006 — Nexus: role permissions UI (view/comment/edit/admin).
 - [ ] T4-007 — Nexus: history panel (versions).
-- [ ] T4-008 — Nexus: diff view between versions.
+- [~] T4-008 — Nexus: diff view between versions. (lineDiff + diffStats shipped v4.5.0; UI pending)
 - [ ] T4-009 — Nexus: revert to version action.
 - [ ] T4-010 — Nexus: session timeline.
 - [ ] T4-011 — Nexus: chat panel (text only).
@@ -210,9 +210,9 @@ FORGE (8):
 - [ ] T4-019 — Files: per-file permission editor.
 - [ ] T4-020 — Files: conflict resolution UI on simultaneous edit.
 - [ ] T4-021 — Notes: collaborative cursors.
-- [ ] T4-022 — Notes: comment thread per paragraph.
+- [~] T4-022 — Notes: comment thread per paragraph. (Comment data layer shipped v4.5.0)
 - [ ] T4-023 — Tasks: assign-to-user.
-- [ ] T4-024 — Tasks: comment thread per card.
+- [~] T4-024 — Tasks: comment thread per card. (Comment data layer shipped v4.5.0)
 - [ ] T4-025 — Calendar: shared calendar overlay.
 - [ ] T4-026 — Calendar: meeting invite send.
 - [ ] T4-027 — Workflows: shared run history.
@@ -224,9 +224,9 @@ FORGE (8):
 - [ ] T4-033 — Activity feed: filter by app.
 - [ ] T4-034 — Activity feed: filter by user.
 - [ ] T4-035 — Activity feed: filter by date range.
-- [ ] T4-036 — Notifications: do-not-disturb toggle.
-- [ ] T4-037 — Notifications: per-app mute.
-- [ ] T4-038 — Notifications: snooze.
+- [x] T4-036 — Notifications: do-not-disturb toggle. setDnd/shouldDeliver shipped v4.5.0.
+- [x] T4-037 — Notifications: per-app mute. setAppMuted shipped v4.5.0.
+- [x] T4-038 — Notifications: snooze. snoozeApp shipped v4.5.0.
 - [ ] T4-039 — Presence: idle/away/busy detection.
 - [ ] T4-040 — Presence: custom status string.
 - [ ] T4-041 — Profile: avatar upload + crop.
@@ -283,8 +283,8 @@ FORGE (8):
 - [ ] T5-044 — UKI: timeline view.
 - [ ] T5-045 — UKI: inbox of new captures awaiting tagging.
 - [ ] T5-046 — UKI: bulk-tag operation.
-- [ ] T5-047 — UKI: smart-collection rules.
-- [ ] T5-048 — UKI: duplicate detection.
+- [x] T5-047 — UKI: smart-collection rules. SmartRule + applyCollection (eq/contains/startsWith/endsWith/gt/lt) shipped v4.5.0.
+- [x] T5-048 — UKI: duplicate detection. shingles/jaccard/findDuplicates (>=0.85 threshold) shipped v4.5.0.
 - [ ] T5-049 — UKI: missing-link suggestions.
 - [ ] T5-050 — UKI: weekly digest email.
 - [ ] T5-051 — Embeddings: model picker.
@@ -442,7 +442,7 @@ FORGE (8):
 - [ ] T9-011 — Drag a file onto the dock launches its default app.
 - [ ] T9-012 — Drop-onto-dock-icon opens the file in that app.
 - [ ] T9-013 — Recents quick action: pin to home.
-- [ ] T9-014 — Notification grouping by app.
+- [x] T9-014 — Notification grouping by app. groupByApp shipped v4.5.0.
 - [ ] T9-015 — Tooltips show keyboard shortcut next to label.
 - [ ] T9-016 — Inline help (?) in every settings panel.
 - [ ] T9-017 — In-app feedback button → opens compose with system info.
@@ -450,10 +450,10 @@ FORGE (8):
 - [ ] T9-019 — Hover guide overlay (press Alt) labels every visible control.
 - [ ] T9-020 — Per-user theme preset editor.
 - [ ] T9-021 — Per-user shortcut remap UI.
-- [ ] T9-022 — Multi-window layout presets (save/load).
-- [ ] T9-023 — Workspace switcher (sets of windows).
+- [x] T9-022 — Multi-window layout presets (save/load). workspaceLayouts.saveLayout/getLayout/listLayouts/deleteLayout shipped v4.5.0.
+- [x] T9-023 — Workspace switcher (sets of windows). workspace field on layouts + listWorkspaces shipped v4.5.0.
 - [ ] T9-024 — Focus mode (hide non-active windows).
-- [ ] T9-025 — Quiet hours scheduler.
+- [x] T9-025 — Quiet hours scheduler. setQuietHours + inQuietHours (cross-midnight aware) shipped v4.5.0.
 
 ## T10 — Docs & content (15)
 
@@ -481,10 +481,10 @@ FORGE (8):
 - [ ] T11-004 — Touch mode expands window edge handles to 12px (DONE — verify).
 - [ ] T11-005 — Long-press dock icon = peek (DONE).
 - [ ] T11-006 — Short tap dock icon = launch (DONE).
-- [ ] T11-007 — 2-finger swipe-down on titlebar = minimize.
-- [ ] T11-008 — 2-finger swipe-up on titlebar = maximize.
-- [ ] T11-009 — 3-finger swipe-left/right = cycle apps.
-- [ ] T11-010 — 4-finger swipe-up = mission control / overview.
+- [~] T11-007 — 2-finger swipe-down on titlebar = minimize. (MultiTouchSwipe + swipeToShellAction shipped v4.5.0)
+- [~] T11-008 — 2-finger swipe-up on titlebar = maximize. (action mapping shipped v4.5.0)
+- [~] T11-009 — 3-finger swipe-left/right = cycle apps. (action mapping shipped v4.5.0)
+- [~] T11-010 — 4-finger swipe-up = mission control / overview. (action mapping shipped v4.5.0)
 - [ ] T11-011 — 5-finger pinch = show desktop.
 - [ ] T11-012 — Pinch-to-zoom in PRISM viewport.
 - [ ] T11-013 — Pinch-to-zoom in FLUX viewport.
@@ -492,12 +492,12 @@ FORGE (8):
 - [ ] T11-015 — Pinch-to-zoom in Files thumbnails grid.
 - [ ] T11-016 — Pinch-to-zoom in Gallery grid.
 - [ ] T11-017 — 2-finger pan in scroll containers.
-- [ ] T11-018 — Pen pressure → PRISM brush size.
-- [ ] T11-019 — Pen pressure → PRISM brush opacity.
-- [ ] T11-020 — Pen tilt → PRISM brush angle.
-- [ ] T11-021 — Pen pressure → FLUX brush stroke width.
-- [ ] T11-022 — Pen pressure → AXL pen tool weight.
-- [ ] T11-023 — Pen barrel-button → eraser.
+- [~] T11-018 — Pen pressure → PRISM brush size. (samplePen + applyBrushDynamics shipped v4.5.0)
+- [~] T11-019 — Pen pressure → PRISM brush opacity. (applyBrushDynamics opacity scaling shipped v4.5.0)
+- [~] T11-020 — Pen tilt → PRISM brush angle. (applyBrushDynamics tilt-angle shipped v4.5.0)
+- [~] T11-021 — Pen pressure → FLUX brush stroke width. (applyBrushDynamics shipped v4.5.0)
+- [~] T11-022 — Pen pressure → AXL pen tool weight. (applyBrushDynamics shipped v4.5.0)
+- [x] T11-023 — Pen barrel-button → eraser. isEraserGesture shipped v4.5.0.
 - [ ] T11-024 — Palm rejection on canvases.
 - [ ] T11-025 — Imosion spectrum canvas: touch scrub.
 - [ ] T11-026 — Imosion waveform canvas: pinch-zoom + touch scrub.

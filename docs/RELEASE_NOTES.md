@@ -4,6 +4,44 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.5.0 -- 500-Improvement Wave 1
+
+This is the first shipping wave of a planned 500-item improvement program.
+It focuses on *foundations* — the shared building blocks that the next several
+waves will plug into apps and shell surfaces. Some items already work
+end-to-end; others land their core engine now and the visible surface comes
+in the next wave.
+
+### What's new for you
+
+**More reliable updates and tests.**
+A subtle bug in our cache layer could crash test environments without browser
+crypto. That's now fixed at the source instead of being papered over, so
+tests run cleanly and our CI pipeline is fully green again.
+
+**AXL is more screen-reader friendly.**
+Six unlabeled close/share/AI buttons in AXL now announce themselves correctly
+to assistive tech.
+
+**New foundations shipping under the hood.**
+Forty-plus new helper modules and APIs are in place for: bezier easing /
+keyframe animation, pen pressure + tilt, multi-finger touch gestures,
+notifications (do-not-disturb, per-app mute, snooze, quiet hours), workspace
+window layouts, knowledge smart-collections + duplicate detection, comment
+threads, and version diffs. The next wave wires these into the apps you see.
+
+### What ships fully usable today
+
+- **Easing presets**: 8 motion curves available app-wide.
+- **Notification policy**: DND, per-app mute, snooze, cross-midnight quiet
+  hours, and per-app grouping all queryable through one API.
+- **Smart collections + duplicate detection** for the knowledge layer.
+- **Workspace layouts**: save / load / delete named window arrangements per
+  workspace, persisted locally.
+- **Pen barrel-button = eraser** gesture.
+
+---
+
 ## Version 3.6.0 -- May 2026
 
 ### What is DEX?

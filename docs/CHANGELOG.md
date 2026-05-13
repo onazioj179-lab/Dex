@@ -10,7 +10,79 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
-## v4.0.1.2c - Smoothness patch
+## v4.5.0 - 500-Improvement Wave 1: Shared infrastructure
+
+First shipping wave of the 500-improvement program. This release focuses on
+landing the *shared infrastructure* that subsequent UI integrations will
+consume one-line at a time, plus a CI root-cause fix and accessibility polish
+on AXL.
+
+### Added — `src/renderer/improvements500/`
+
+- **Accessibility helpers** (`aria.ts`): `ariaButton`, `ariaToggle`,
+  `ariaTrigger`, `ariaCurrent`, `ariaLive`, `ariaInput` — single-call helpers
+  that produce correct ARIA attribute bundles for common control patterns.
+- **Roving tab-index** (`useArrowNav.ts`): hook with horizontal / vertical /
+  grid orientation modes and optional wrap.
+- **Pinch-zoom hook** (`usePinchZoom.ts`): two-pointer scale tracker with
+  configurable min/max clamp.
+- **Tick-budget scheduler** (`useTickBudget.ts`): drains queued work across
+  rAF frames without exceeding a time budget; `rafThrottle` helper.
+- **IPC permission gate** (`withPermission.ts`): channel/permission/validate/
+  rate-limit/sensitive-key redaction wrapper for main-process IPC handlers.
+- **Bezier + easing** (`bezierKeyframes.ts`): `cubicBezier`,
+  `cubicBezierEasing`, `EASING_PRESETS` (linear/easeIn/easeOut/easeInOut/
+  elasticIn/elasticOut/back/bounce), `interpolateKeyframes` with optional
+  in/out tangents. *(T3-051 partial, T3-052)*
+- **Pen input** (`penInput.ts`): `samplePen` (palm-rejection heuristic),
+  `applyBrushDynamics` (pressure → size/opacity, tilt → angle),
+  `isEraserGesture`. *(T11-018..023)*
+- **Multi-touch swipes** (`multiTouchSwipe.ts`): `MultiTouchSwipe` tracker
+  + `swipeToShellAction` mapping for window minimize/maximize, app cycle,
+  and overview gestures. *(T11-007..010)*
+- **Smart collections + duplicate detection** (`smartCollections.ts`):
+  `applyCollection` AND-rule filter (eq/contains/startsWith/endsWith/gt/lt),
+  `shingles`, `jaccard`, `findDuplicates`. *(T5-047, T5-048)*
+- **Comments + version diff** (`collabComments.ts`): `newComment`,
+  `extractMentions`, line-level `lineDiff` + `diffStats`.
+  *(T4-003, T4-008, T4-022, T4-024)*
+- **Workspace layouts** (`workspaceLayouts.ts`): named window-arrangement
+  presets per workspace, persisted to localStorage. *(T9-022, T9-023)*
+- **Notification policy** (`notifications.ts`): DND, per-app mute, snooze,
+  cross-midnight quiet hours, and per-app grouping.
+  *(T4-036, T4-037, T4-038, T9-014, T9-025)*
+- **Presence registry** (`presence.ts`): online/idle/busy/offline with
+  custom-text status, alphabetical peer listing, idle pruning.
+
+### Fixed
+
+- **CI: UKI cache crashed in environments without WebCrypto**.
+  `cache.setAsync` now wraps `crypto.subtle.encrypt` in a try/catch and
+  degrades to a plaintext envelope (logged once) instead of throwing. This
+  is the root-cause fix for repeated CI failures on Linux runners and lets
+  the strict UKI compression / knowledge-feeder assertions stand.
+- **AXL: 6 close/share/AI buttons missing accessible names**. Added
+  `aria-label` to the parts library close, feature create close, GD&T create
+  close, AI panel close, BOM close, and Share project buttons. *(T1-026
+  partial)*
+
+### Tests
+
+- New `tests/unit/improvements500-shared.test.ts` (18 tests, aria + perms +
+  rafThrottle + presence).
+- New `tests/unit/improvements500-features.test.ts` (32 tests, bezier + pen
+  + swipe + smart collections + comments + diff + workspace layouts +
+  notifications).
+
+### Notes
+
+This wave intentionally ships *infrastructure first*. Items marked `[~]`
+in [`docs/IMPROVEMENTS_500.md`](IMPROVEMENTS_500.md) have their core helpers
+landed and tested but still need UI integration in subsequent waves. Items
+marked `[x]` are complete (helpers exist and the surface they target consumes
+them or is purely an API surface).
+
+
 
 Small performance polish release on top of v4.0.1.2b.
 
