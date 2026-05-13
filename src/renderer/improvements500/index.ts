@@ -490,6 +490,17 @@ export * from './linearResample';
 export * from './quaternionSlerp';
 export * from './pcmConvert';
 export * from './muLawCodec';
+// Wave 50 - master-plan operational primitives (final wave to 500)
+export * from './focusModeController';
+export * from './workspaceLayoutSnapshot';
+export * from './healthScore';
+export * from './memoryPressureMonitor';
+export * from './semanticChunker';
+export * from './confidenceMeter';
+export * from './ipcCallTracer';
+export * from './crashTaxonomy';
+export * from './autosaveCoordinator';
+export * from './attentionBudget';
 export { rafThrottle as rafCoalesce } from './rafThrottle';
 export * as presence from './presence';
 export * as workspaceLayouts from './workspaceLayouts';

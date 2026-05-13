@@ -10,6 +10,40 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.54.0 - 500-Improvement Wave 50 (final): operational and master-plan primitives
+
+Fiftieth and final wave. 10 modules close out the 500-improvement backlog (501 total
+shared primitives shipped across waves 1-50). All 10 unit tests pass; full type-check
+and production build green.
+
+Wave 50 modules map to the DEX Master Evolution Plan operational pillars:
+
+- `FocusModeController` - subscribe/notify state machine for deep-work mode (manual,
+  app-context, idle, schedule reasons) used by the shell to dim non-pinned dock items
+  and throttle non-critical notifications.
+- `takeWorkspaceLayoutSnapshot` / `diffWorkspaceLayoutSnapshots` - JSON-safe save and
+  restore for window arrangement plus added/removed/moved diff for continuity.
+- `computeHealthScore` - blends crash-free ratio, memory headroom, frame-budget pass,
+  and IPC success ratio into a 0..100 score with `healthy`/`degraded`/`critical` bands
+  for the rollback-by-health-score policy.
+- `MemoryPressureMonitor` - threshold-based level transitions (`nominal`/`elevated`/
+  `critical`) with hysteresis so subscribers do not flap.
+- `semanticChunker` - sentence-aware text chunker with target size, overlap, and
+  minimum size for embedding pipelines.
+- `confidenceMeter` - blends similarity, model probability, prior, and evidence count
+  into a normalized score plus `low`/`medium`/`high` band for AI suggestion UI.
+- `IpcCallTracer` - correlation-ID span tracker for IPC end-to-end latency.
+- `classifyCrash` / `summarizeCrashes` - taxonomy mapping crash records into
+  renderer/main/native/gpu/memory/worker/unhandled-rejection categories for dashboards.
+- `AutosaveCoordinator` - per-source debounced flush queue that serializes overlapping
+  flushes so a destination is never written twice in parallel.
+- `AttentionBudget` - rolling-window interruption budget the shell consults before
+  surfacing notifications.
+
+Backlog status: 491 modules shipped through Wave 49 + 10 Wave 50 = 501 modules. The
+500-improvement pipeline is complete. Subsequent work shifts to Master Evolution Plan
+phases.
+
 ## v4.53.0 - 500-Improvement Wave 49: dsp, easing, motion smoothing, audio codecs
 
 Forty-ninth wave. 11 more shared modules, 11 new tests pass.
