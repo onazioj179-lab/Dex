@@ -4,6 +4,25 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.18.0 -- 500-Improvement Wave 14
+
+Wave 14 ships ten data-structure and scheduling primitives: `mergeSort`,
+a stable, non-mutating sort suitable for sorts where preserving original
+order of equal keys matters; `KdTree2`, a 2D k-d tree with nearest
+neighbor and rectangular range queries; `WeightedRandom`, an O(log n)
+weighted sampler backed by a cumulative-weight table; `dateRangeDays`,
+`dateRangeMonths`, and `daysBetween` UTC date utilities; `parseCron`
+and `nextCronAfter`, a 5-field cron expression parser and next-run
+calculator with `*\/n` step support; `cidrMatch` for IPv4/IPv6 subnet
+membership; `chunkArray` for fixed-size splitting; `flattenObject` and
+`unflatten` for dot-key conversion (arrays included); `htmlDecode`,
+the entity-decode counterpart to `xmlEscape`; and `structClone`, a
+safe deep clone that prefers `structuredClone` and falls back to a
+recursive cloner for plain values, Date, RegExp, Map, Set, and typed
+arrays. 27 new unit tests.
+
+---
+
 ## Version 4.17.0 -- 500-Improvement Wave 13
 
 Wave 13 ships ten algorithmic and async building blocks: an in-place

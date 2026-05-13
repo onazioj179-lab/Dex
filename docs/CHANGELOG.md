@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.18.0 - 500-Improvement Wave 14: Stable sort, spatial, weighted, schedule
+
+Fourteenth wave. 10 more shared modules, 27 new tests pass.
+
+### Added
+- `mergeSort` stable sort (does not mutate input).
+- `KdTree2` 2D k-d tree with `nearest` and `rangeQuery`.
+- `WeightedRandom` cumulative-table weighted sampling.
+- `dateRangeDays`, `dateRangeMonths`, `daysBetween` UTC date iteration.
+- `parseCron` / `nextCronAfter` 5-field cron parser and next-run calculator.
+- `cidrMatch` IPv4/IPv6 subnet membership testing.
+- `chunkArray` fixed-size array splitter.
+- `flattenObject` / `unflatten` dot-key conversion.
+- `htmlDecode` HTML entity decoder (counterpart to `xmlEscape`).
+- `structClone` safe deep clone with structuredClone-or-fallback.
+
+### Changed
+- Barrel re-exports all 10 new Wave 14 modules.
+- `package.json` bumped to 4.18.0.
+
 ## v4.17.0 - 500-Improvement Wave 13: Sort, search, batching, IDs
 
 Thirteenth wave. 10 more shared modules, 28 new tests pass.
