@@ -10,6 +10,40 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.44.0 - 500-Improvement Wave 40: clipping, PRNG, sampling, control
+
+Fortieth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `liangBarskyClip` - Liang-Barsky line clipping against AA rectangles.
+- `Xorshift32` - Marsaglia's 32-bit xorshift PRNG.
+- `Xoshiro128pp` - xoshiro128++ PRNG (Blackman & Vigna).
+- `crc8` / `crc8Hex` - CRC-8 (poly 0x07) for SMBus / 1-Wire.
+- `AliasSampler` - Vose's alias method for O(1) weighted sampling.
+- `buildNaturalCubicSpline` / `evalCubicSpline` - natural cubic spline via Thomas algorithm.
+- `theilSen` - robust median-of-slopes regression.
+- `verletSolve` / `verletStep` - velocity Verlet integrator.
+- `PidController` - PID with output clamp and conditional anti-windup.
+- `gradientDescent1d` - fixed-step 1D gradient descent.
+
+## v4.43.0 - 500-Improvement Wave 39: image, PRNG, signal, ODE
+
+Thirty-ninth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `bilinearResample` - bilinear resampling with center-pixel sampling.
+- `ditherBayer` - 8x8 ordered Bayer dithering.
+- `sweptAabb` - swept AABB collision returning entry time and normal.
+- `MersenneTwister` - MT19937 PRNG.
+- `cohenSutherlandClip` - Cohen-Sutherland line clipping.
+- `kelvinToRgb` - Tanner Helland Kelvin to RGB approximation.
+- `savitzkyGolay` - Savitzky-Golay smoothing for windows 5/7/9/11.
+- `ExponentialMovingAverage` / `emaSeries` - EMA filter.
+- `linearRegression` - least squares with R^2.
+- `rk4Step` / `rk4Solve` - classical 4th-order Runge-Kutta integrator.
+
 ## v4.42.0 - 500-Improvement Wave 38: crypto, codec, image, geometry
 
 Thirty-eighth wave. 10 more shared modules, 10 new tests pass.
