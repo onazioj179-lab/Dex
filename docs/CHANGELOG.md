@@ -10,6 +10,40 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.46.0 - 500-Improvement Wave 42: bigint, image, search, optimization
+
+Forty-second wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+
+- `karatsubaMul` - Karatsuba big-integer multiplication on base-2^15 digits.
+- `Welford` - online numerically stable mean and variance.
+- `medianFilter1d` - 1D sliding-window median filter with mirror edges.
+- `otsuThreshold` / `applyThreshold` - Otsu adaptive grayscale thresholding.
+- `erodeBinary` / `dilateBinary` - 3x3 binary morphology.
+- `marchingSquares` - iso-contour line extraction.
+- `worleyNoise2d` - cellular noise distance to nearest feature point.
+- `fbm2d` - fractional Brownian motion over a noise function.
+- `boyerMooreHorspool` / `boyerMooreHorspoolAll` - Horspool string search.
+- `simulatedAnnealing` - generic SA optimizer with geometric cooling.
+
+## v4.45.0 - 500-Improvement Wave 41: spatial, numeric, fusion
+
+Forty-first wave. 11 new tests pass across 10 shared modules.
+
+### Added
+
+- `Quadtree` - point quadtree with rectangle range queries.
+- `Octree` - point octree with box range queries.
+- `earClipTriangulate` - ear-clipping polygon triangulation.
+- `durandKernerRoots` - Durand-Kerner all-roots polynomial solver.
+- `conjugateGradient` - matrix-free CG solver for SPD systems.
+- `gaussSeidel` - Gauss-Seidel iterative solver.
+- `circumcircle` / `incircle` - triangle circles.
+- `fisherYatesShuffle` / `fisherYatesShuffled` - Knuth shuffle.
+- `ComplementaryFilter` - gyro/accel angle fusion.
+- `Kalman2d` - constant-velocity 2D position tracker.
+
 ## v4.44.0 - 500-Improvement Wave 40: clipping, PRNG, sampling, control
 
 Fortieth wave. 10 more shared modules, 10 new tests pass.
