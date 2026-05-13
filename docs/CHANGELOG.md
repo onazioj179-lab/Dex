@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.21.0 - 500-Improvement Wave 17: Multi-pattern, hashing, geometry
+
+Seventeenth wave. 10 more shared modules, 23 new tests pass.
+
+### Added
+- `AhoCorasick` multi-pattern string matcher.
+- `boyerMooreSearch` / `boyerMooreAll` Boyer-Moore-Horspool single-pattern search.
+- `crc32` / `crc32Hex` IEEE 802.3 CRC-32 (renderer-side pure JS).
+- `RadixTree<V>` compressed trie with prefix listing.
+- `rectsOverlap` / `rectIntersection` / `rectsBoundingBox` / `rectContains` axis-aligned rectangle helpers.
+- `hilbertXYToIndex` / `hilbertIndexToXY` Hilbert space-filling curve mapping.
+- `mortonEncode` / `mortonDecode` Morton (Z-order) 2D <-> 1D mapping.
+- `quatFromAxisAngle` / `quatMul` / `quatRotateVec` / `quatSlerp` quaternion math.
+- `simhash64` / `simhashHamming` similarity hashing.
+- `xxhash32` / `xxhash32Hex` non-cryptographic xxHash32.
+
+### Changed
+- Barrel re-exports all 10 new Wave 17 modules.
+- `package.json` bumped to 4.21.0.
+
 ## v4.20.0 - 500-Improvement Wave 16: Fuzzy match, hashing, sampling, varint
 
 Sixteenth wave. 10 more shared modules, 25 new tests pass.

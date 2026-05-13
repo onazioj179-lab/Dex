@@ -4,6 +4,31 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.21.0 -- 500-Improvement Wave 17
+
+Wave 17 ships ten more shared utilities focused on multi-pattern
+search, hashing, and computational geometry: `AhoCorasick`, the
+classic multi-pattern string matcher built on a trie with failure
+links; `boyerMooreSearch` and `boyerMooreAll`, Boyer-Moore-Horspool
+single-pattern search using the bad-character heuristic for fast skip
+on long patterns; `crc32` and `crc32Hex`, the renderer-side pure-JS
+IEEE 802.3 CRC-32 verified against the canonical `123456789` checksum
+0xCBF43926; `RadixTree<V>`, a compressed trie that splits edges on
+insert and supports `keysWithPrefix` listings; the `interval2D`
+rectangle helpers (`rectsOverlap`, `rectIntersection`,
+`rectsBoundingBox`, `rectContains`); `hilbertXYToIndex` and
+`hilbertIndexToXY`, the iterative Hilbert space-filling curve mapping
+for spatial hashing on power-of-two grids; `mortonEncode` and
+`mortonDecode`, Z-order interleaving for fast 2D <-> 1D conversion;
+the `quaternion` rotation suite (`quatFromAxisAngle`, `quatMul`,
+`quatRotateVec`, `quatSlerp` with double-cover and small-angle lerp
+fallback); `simhash64` and `simhashHamming`, 64-bit similarity hashing
+for near-duplicate detection over tokenized text; and `xxhash32` /
+`xxhash32Hex`, the canonical xxHash32 non-cryptographic hash with
+seed support.
+
+---
+
 ## Version 4.20.0 -- 500-Improvement Wave 16
 
 Wave 16 ships ten more shared utilities: `damerauDistance`, the
