@@ -93,7 +93,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done.
 - [ ] T2-032 — DexIcon: light-theme color overrides where needed.
 - [ ] T2-033 — Dock icon hover lift (4px) using transform, not margin.
 - [ ] T2-034 — Dock icon press scale (0.94) on pointerdown.
-- [ ] T2-035 — Window header icon = AppIcon, not letter.
+- [~] T2-035 — Window header icon = AppIcon, not letter. [v4.9.0 palette helpers (lighten/darken/mix) for icon tinting.]
 - [ ] T2-036 — Launcher tile icon = AppIcon at 32px.
 - [ ] T2-037 — Recents icon = AppIcon at 16px.
 - [ ] T2-038 — Search result icon = AppIcon at 18px.
@@ -135,7 +135,7 @@ Imosion (18):
 - [ ] T3-023 — Tempo / time-signature automation lane.
 - [ ] T3-024 — Chord track preview.
 - [ ] T3-025 — Vocal tuning preset menu.
-- [ ] T3-026 — Bus routing matrix.
+- [~] T3-026 — Bus routing matrix. [v4.9.0 stateMachine helper for matrix transitions.]
 - [ ] T3-027 — Loop browser drag-to-track.
 - [~] T3-028 — Master limiter visualization (LUFS meter). (LufsMeter momentary/short-term shipped v4.7.0)
 - [ ] T3-029 — Track freeze / bounce.
@@ -313,7 +313,7 @@ FORGE (8):
 - [~] T6-016 — Throttle scroll listeners to rAF. (rafThrottle helper shipped v4.8.0)
 - [~] T6-017 — Debounce text-input → store updates. (useDebounced shipped v4.6.0)
 - [ ] T6-018 — Web workers for image processing in PRISM/FLUX.
-- [ ] T6-019 — Web workers for FFT in Imosion visualizers.
+- [~] T6-019 — Web workers for FFT in Imosion visualizers. [v4.9.0 retry helper + workerPool already shipped — FFT migration pending.]
 - [~] T6-020 — Worker pool for thumbnail generation. (WorkerPool shipped v4.8.0)
 - [ ] T6-021 — Off-screen canvas for VINX preview render.
 - [~] T6-022 — IndexedDB cache for thumbnails. (AsyncCache TTL+LRU shipped v4.8.0)
@@ -329,7 +329,7 @@ FORGE (8):
 - [~] T6-032 — Leak audit: requestAnimationFrame cancelled. (useRaf shipped v4.6.0)
 - [ ] T6-033 — Bundle analyzer in build pipeline.
 - [ ] T6-034 — Tree-shake icon library imports.
-- [ ] T6-035 — Replace moment-style date libs with native Intl.
+- [~] T6-035 — Replace moment-style date libs with native Intl. [v4.9.0 timeFormat module — formatDuration/formatRelative without deps.]
 - [ ] T6-036 — Lazy-load wallpaper images by viewport.
 - [ ] T6-037 — Image srcset for high-DPI displays.
 - [ ] T6-038 — Webp conversion in build for static images.

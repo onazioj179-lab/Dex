@@ -4,6 +4,30 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.9.0 -- 500-Improvement Wave 5
+
+Wave 5 adds ten more shared modules covering text, geometry, motion, and
+resilience.
+
+What's now in the kit: a line-by-line diff for collaborative comments and
+version compare, a quote-aware CSV parser for Files imports, a safe-by-
+default markdown renderer that blocks dangerous URL schemes, a 2D
+geometry helper set for selection and hit-testing, ten curated easing
+curves for motion, an HSL-aware color palette helper for themes, a tiny
+typed state machine for tool gestures, an exponential-backoff retry with
+jitter for network resilience, lightweight time formatting that replaces
+moment-style libraries, and a cross-platform filename sanitizer that
+respects Windows reserved names.
+
+What you'll feel: faster Notes preview render, safer pasted content,
+smoother motion in dialogs and panels, and more reliable network calls
+that recover from transient failures without a full retry loop.
+
+What's next: Wave 6 will continue chipping away at the 500-improvement
+backlog with similar small, focused modules.
+
+---
+
 ## Version 4.8.0 -- 500-Improvement Wave 4
 
 Wave 4 lands ten more shared modules covering search, performance, graph

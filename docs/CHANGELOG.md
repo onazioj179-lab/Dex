@@ -10,6 +10,31 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.9.0 - 500-Improvement Wave 5: Diff, parsing, geometry, color, motion
+
+Fifth wave. 10 more shared modules. Four backlog items advanced.
+
+### Added
+- `diff` module: line-based diff via LCS, used by collab comments and version compare.
+- `csvParse` module: RFC 4180 quote-aware parser (`parseCsv`, `parseCsvObjects`).
+- `markdownLite` module: safe-by-default markdown to HTML (escapes raw HTML, blocks `javascript:` and `data:` URLs).
+- `geometry` module: `pointInRect`, `pointInPolygon`, `bboxOfPoints`, `rectsIntersect`, `distanceToSegment`.
+- `easings` module: 10 curated curves (linear, quad, cubic, back, elastic, bounce).
+- `palette` module: `rgbToHsl`/`hslToRgb`/`toHex`/`lighten`/`darken`/`mix`.
+- `stateMachine` module: typed FSM with `can`/`send`/`reset` and per-state `onEnter` callbacks.
+- `retry` module: async retry with exponential backoff, jitter, and `shouldRetry` predicate.
+- `timeFormat` module: `formatDuration` (M:SS / H:MM:SS), `formatDurationCompact`, `formatRelative`.
+- `stringSlugify` module: `slugify`, `sanitizeFilename` (Windows reserved-name aware), `ensureUniqueName`.
+
+### Backlog
+- T2-035 [~] window header AppIcon tinting helpers (palette).
+- T3-026 [~] bus routing matrix transitions (stateMachine).
+- T6-019 [~] FFT off-main-thread (workerPool already shipped).
+- T6-035 [~] Intl-only date formatting (timeFormat).
+
+### Tests
+- 24 new tests in `tests/unit/improvements500-wave5.test.ts`. Total wave coverage now 142 tests across 6 files.
+
 ## v4.8.0 - 500-Improvement Wave 4: Search, perf, graph, test infra
 
 Fourth wave. 10 more shared modules. Eight backlog items advanced.
