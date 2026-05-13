@@ -10,6 +10,51 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.32.0 - 500-Improvement Wave 28: Geometry, polynomials, codecs, Kalman
+
+Twenty-eighth wave. 10 more shared modules, 10 new tests pass.
+
+- `circleCircleIntersect` two-circle intersection points.
+- `polynomialDiv` polynomial long division (quotient + remainder).
+- `hornerEval` fast polynomial evaluation via Horner's method.
+- `continuedFraction` real-to-rational continued fraction + convergents.
+- `sternBrocotPath` / `sternBrocotFromPath` Stern-Brocot tree navigation.
+- `lz77Encode` / `lz77Decode` sliding-window LZ77 codec.
+- `toRoman` / `fromRoman` Roman numeral round-trip (1..3999).
+- `parseDuration` / `formatDurationShort` "1h30m" duration helpers.
+- `Kalman1D` scalar Kalman filter for noisy 1-D measurements.
+- `deCasteljauCubic` / `sampleCubicBezier` numerically stable Bezier eval.
+
+## v4.31.0 - 500-Improvement Wave 27: CORDIC, fixed-point, color, geometry
+
+Twenty-seventh wave. 10 more shared modules, 10 new tests pass.
+
+- `cordicSinCos` CORDIC sin/cos (24 iterations, no Math.sin dependency).
+- `atan2Approx` fast atan2 approximation (~0.004 rad max error).
+- `sinTable` / `cosTable` lookup-table sin/cos with linear interpolation.
+- `toQ15` / `q15Add` / `q15Mul` Q15 fixed-point arithmetic.
+- `midiNoteToFreq` / `freqToMidiNote` / `midiNoteName` MIDI helpers.
+- `rgbToCmyk` / `cmykToRgb` RGB <-> CMYK color conversion.
+- `rgbToLab` / `labToRgb` sRGB <-> CIE Lab via D65 illuminant.
+- `gammaEncode` / `gammaDecode` gamma correction for byte channels.
+- `simplifyDouglasPeucker` Ramer-Douglas-Peucker polyline simplification.
+- `greedyColoring` Welsh-Powell greedy graph coloring.
+
+## v4.30.0 - 500-Improvement Wave 26: Bidirectional A*, advanced trees
+
+Twenty-sixth wave. 10 more shared modules, 11 new tests pass.
+
+- `aStarBidirectional` meet-in-the-middle A* with two heap frontiers.
+- `SegmentTreeLazy` lazy-propagation range-add range-sum tree.
+- `LiChaoTree` lower-envelope minimum query over [xLo, xHi].
+- `mosAlgorithm` offline range-query reordering with snake hi.
+- `SqrtDecomposition` sqrt-bucket point-update range-sum.
+- `PersistentSegmentTree` versioned segment tree with rangeSum lookup.
+- `ImplicitTreap` rank-indexed treap (insertAt/removeAt/at).
+- `jacobiSymbol` BigInt Jacobi symbol with quadratic reciprocity.
+- `polyMul` polynomial multiplication (schoolbook + FFT path).
+- `deBruijnSequence` classic recursive de Bruijn B(k, n) generator.
+
 ## v4.29.0 - 500-Improvement Wave 25: Monotone, SCC, geometry, compression
 
 Twenty-fifth wave. 10 more shared modules, 12 new tests pass.
