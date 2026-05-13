@@ -43,7 +43,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done.
 - [ ] T1-016 — PRISM: aria-label tool palette.
 - [ ] T1-017 — PRISM: aria-label brush/size/opacity controls.
 - [ ] T1-018 — PRISM: aria-label layer panel buttons.
-- [ ] T1-019 — PRISM: keyboard shortcut hints in tooltips.
+- [~] T1-019 — PRISM: keyboard shortcut hints in tooltips. [v4.14.0 parseChord/chordToString primitives.]
 - [ ] T1-020 — FLUX: aria-label timeline keyframe controls.
 - [ ] T1-021 — FLUX: aria-label effects panel.
 - [ ] T1-022 — FLUX: aria-label property inspector fields.
@@ -443,7 +443,7 @@ FORGE (8):
 - [ ] T9-012 — Drop-onto-dock-icon opens the file in that app.
 - [ ] T9-013 — Recents quick action: pin to home.
 - [x] T9-014 — Notification grouping by app. groupByApp shipped v4.5.0.
-- [ ] T9-015 — Tooltips show keyboard shortcut next to label.
+- [~] T9-015 — Tooltips show keyboard shortcut next to label. [v4.14.0 chordToString helper.]
 - [ ] T9-016 — Inline help (?) in every settings panel.
 - [ ] T9-017 — In-app feedback button → opens compose with system info.
 - [ ] T9-018 — Tutorial videos linked from each app's empty state.

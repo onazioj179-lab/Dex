@@ -4,6 +4,22 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.14.0 -- 500-Improvement Wave 10
+
+Wave 10 adds ten more shared modules: a keyboard-chord parser/matcher
+with aliases (Cmd/Option/Win/Super), a `createFocusVisible` controller
+that toggles a class only on keyboard interaction, a `perfMark` /
+`perfMeasure` User Timing wrapper with a recent-measures ring, a
+`BloomFilter` for cheap dedupe with a `recommendBloomParams` sizing
+helper, a `caseConvert` module covering kebab / snake / camel / pascal /
+title / constant, Levenshtein distance plus a `bestMatch` fuzzy
+selector, an unbalanced `IntervalTree<T>` with point and range queries,
+a strongly typed `TypedEventEmitter<E>`, an IntersectionObserver-based
+`createLazyImageLoader` with a no-IO fallback, and a `parseRetryAfter`
++ `retryAfterDelay` HTTP Retry-After helper. 28 new unit tests.
+
+---
+
 ## Version 4.13.0 -- 500-Improvement Wave 9
 
 Wave 9 adds ten infrastructure modules focused on concurrency, resilience,

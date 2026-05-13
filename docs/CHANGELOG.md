@@ -10,6 +10,29 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.14.0 - 500-Improvement Wave 10: Chords, focus, perf, fuzzy, intervals
+
+Tenth wave. 10 more shared modules. 28 new tests pass.
+
+### Added
+- `parseChord`/`matchChord`/`chordToString` keyboard-shortcut helpers.
+- `createFocusVisible` controller that toggles a focus-visible class only on keyboard interaction.
+- `perfMark`/`perfMeasure`/`perfTime`/`perfTimeAsync` User Timing wrapper with safe fallback and a recent-measures ring.
+- `BloomFilter` + `recommendBloomParams` probabilistic set membership.
+- `caseConvert` module: `kebabCase`, `snakeCase`, `camelCase`, `pascalCase`, `titleCase`, `constantCase`.
+- `levenshtein` distance + `similarity` + `bestMatch` fuzzy selector.
+- `IntervalTree<T>` half-open interval container with point and range queries.
+- `TypedEventEmitter<E>` strongly typed pub/sub with `on`/`once`/`off`/`emit`/`listenerCount`.
+- `createLazyImageLoader` IntersectionObserver-based image loader with no-IO fallback.
+- `parseRetryAfter` + `retryAfterDelay` HTTP Retry-After parser with jitter and cap.
+
+### Fixed
+- `colorBlend.parseRgba`: handle `parseColor` returning `null` under `strictNullChecks` (CI typecheck regression in v4.13.0 fixed in 9baf70c).
+
+### Changed
+- Barrel `src/renderer/improvements500/index.ts` re-exports all 10 new modules.
+- `package.json` bumped to 4.14.0.
+
 ## v4.13.0 - 500-Improvement Wave 9: Concurrency, breakers, signal, paths
 
 Ninth wave. 10 more shared modules. 25 new tests; full wave5-9 suite passes.
