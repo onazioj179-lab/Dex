@@ -309,7 +309,7 @@ FORGE (8):
 - [ ] T6-012 — Dock: avoid full re-render on hover (item-local state).
 - [ ] T6-013 — FloatingWindow: drag uses transform, not left/top.
 - [ ] T6-014 — FloatingWindow: resize uses CSS aspect-ratio where possible.
-- [~] T6-015 — Cancel in-flight fetches on app close. (useFetchJson AbortController shipped v4.6.0)
+- [~] T6-015 — Cancel in-flight fetches on app close. (useFetchJson AbortController shipped v4.6.0; v4.13.0 combineAbortSignals + abortPromise combinator.)
 - [~] T6-016 — Throttle scroll listeners to rAF. (rafThrottle helper shipped v4.8.0; v4.12.0 time-based throttle() + debounceFn.)
 - [~] T6-017 — Debounce text-input → store updates. (useDebounced shipped v4.6.0; v4.12.0 debounceFn for non-React paths.)
 - [ ] T6-018 — Web workers for image processing in PRISM/FLUX.
@@ -355,7 +355,7 @@ FORGE (8):
 
 - [ ] T7-001 — IPC: validate every channel payload with zod schema.
 - [~] T7-002 — IPC: deny-by-default on unknown channels. [v4.10.0 base64 + uuid + deepMerge feed permissioned IPC envelope work.]
-- [ ] T7-003 — IPC: rate-limit per channel.
+- [~] T7-003 — IPC: rate-limit per channel. [v4.13.0 TokenBucket + CircuitBreaker primitives.]
 - [~] T7-004 — IPC: redact sensitive args from logs. (redactString / redactDeep shipped v4.7.0)
 - [ ] T7-005 — Vault: argon2id for key derivation.
 - [ ] T7-006 — Vault: AES-256-GCM for entry encryption.

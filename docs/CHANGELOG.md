@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.13.0 - 500-Improvement Wave 9: Concurrency, breakers, signal, paths
+
+Ninth wave. 10 more shared modules. 25 new tests; full wave5-9 suite passes.
+
+### Added
+- `AsyncQueue` class: FIFO sequential async work queue. One rejection does not break subsequent tasks.
+- `createLimiter`: p-limit-style concurrency cap with `active` and `pending` accessors.
+- `CircuitBreaker` + `CircuitBreakerOpenError`: closed/open/half-open state machine with cooldown and injectable clock.
+- `TokenBucket`: rate limiter with `tryConsume`, `msUntilAvailable`, `consumeAsync`.
+- `MovingAverage` and `ExponentialMovingAverage` rolling-window helpers.
+- `combineAbortSignals` + `abortPromise` AbortSignal combinator.
+- `SvgPathBuilder` + `roundedRectPath` fluent SVG path d-attribute builder.
+- `xmlEscape`/`escapeHtmlAttr`/`unescapeHtml` public XML escapers.
+- `unitConvert` module: length (px/in/cm/mm/pt), time, byte conversions with binary or decimal base.
+- `colorBlend` module: `parseRgba`, `compositeOver`, premultiplied conversions, `screenBlend`, `toRgbaString`.
+
+### Changed
+- Barrel `src/renderer/improvements500/index.ts` re-exports all 10 new modules.
+- `package.json` bumped to 4.13.0.
+
 ## v4.12.0 - 500-Improvement Wave 8: Throttle, memoize, semver, charts
 
 Eighth wave. 10 more shared modules. 28 new tests; full wave5-8 suite is 106 passing.

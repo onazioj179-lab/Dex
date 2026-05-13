@@ -4,6 +4,22 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.13.0 -- 500-Improvement Wave 9
+
+Wave 9 adds ten infrastructure modules focused on concurrency, resilience,
+and low-level rendering: a sequential `AsyncQueue` that survives task
+rejections, a `createLimiter` p-limit-style concurrency cap, a
+`CircuitBreaker` with closed / open / half-open transitions and
+injectable clock, a `TokenBucket` rate limiter with both sync
+`tryConsume` and async `consumeAsync` paths, simple and exponential
+moving-average classes, a `combineAbortSignals` combinator, a fluent
+`SvgPathBuilder` plus `roundedRectPath`, public `xmlEscape` /
+`unescapeHtml` helpers, a `unitConvert` module covering length, time, and
+byte units, and a `colorBlend` module with source-over compositing,
+premultiplied alpha conversions, and screen blend. 25 new unit tests.
+
+---
+
 ## Version 4.12.0 -- 500-Improvement Wave 8
 
 Wave 8 adds ten more shared modules: time-based `throttle` plus a
