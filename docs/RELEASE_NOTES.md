@@ -4,6 +4,21 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.16.0 -- 500-Improvement Wave 12
+
+Wave 12 ships ten data-and-IO infrastructure modules: RFC 6265 cookie
+parsing and serialization, a stricter cross-platform filename sanitizer
+that handles Windows reserved names and length-aware extension trimming,
+base16 hex encode/decode, strict IPv4 and IPv6 parsers with `::`
+compression on output, a parser-only `jwtDecodeNoVerify` (header +
+payload, never trust for auth), an extended URL parser/builder pair with
+multi-value query support, form-encoded helpers with `[]` array
+convention, an RFC 4180 CSV writer that neutralizes spreadsheet formula
+injection, an ASCII table renderer with per-column alignment, and a
+deterministic Markdown serializer suitable for diffs. 24 new unit tests.
+
+---
+
 ## Version 4.15.0 -- 500-Improvement Wave 11
 
 Wave 11 adds ten infrastructure modules: a `Trie<V>` prefix tree with

@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.16.0 - 500-Improvement Wave 12: Cookies, IPs, JWT, CSV, tables
+
+Twelfth wave. 10 more shared modules, 24 new tests pass.
+
+### Added
+- `parseCookies` / `serializeCookie` (RFC 6265 with quoted-value handling).
+- `sanitizeFilenameStrict` cross-platform filename hardening (Windows reserved names, control chars, trailing dots, length-aware extension preservation).
+- `encodeHex` / `decodeHex` base16 codec.
+- `parseIPv4` / `parseIPv6` strict numeric parsers with `formatIPv4` / `formatIPv6` (`::` compression).
+- `jwtDecodeNoVerify` parser-only JWT decoder. Never use for authorization.
+- `parseUrlExtended` / `buildUrlExtended` structured URL split with multi-value query support.
+- `objectToFormData` / `formDataToObject` form-encoded helpers with `[]` array convention.
+- `csvWrite` RFC 4180 writer with formula-injection neutralization.
+- `asciiTable` fixed-width log/CLI table renderer with per-column alignment.
+- `mdSerialize` deterministic Markdown serializer for diffs.
+
+### Changed
+- Barrel re-exports all 10 new Wave 12 modules.
+- `package.json` bumped to 4.16.0.
+
 ## v4.15.0 - 500-Improvement Wave 11: Trie, lazy, mutex, paths, errors
 
 Eleventh wave. 10 more shared modules, 26 new tests pass.
