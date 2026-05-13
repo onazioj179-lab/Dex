@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 /*
  * DEX - CRC-32 (IEEE 802.3 / ISO 3309) for renderer (Wave 16).
  * Copyright (c) 2025 onazioj179-lab. Licensed under DEX terms.
