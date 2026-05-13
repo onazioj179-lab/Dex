@@ -4,6 +4,28 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.20.0 -- 500-Improvement Wave 16
+
+Wave 16 ships ten more shared utilities: `damerauDistance`, the
+Damerau-Levenshtein edit distance that counts an adjacent transposition
+as a single edit (better for typo correction than plain Levenshtein);
+`wildcardMatch`, a glob matcher with `*` (within segment), `?` (single
+char), and `**` (across segments); `arc4Stream` and `arc4Encrypt`, an
+RC4 keystream and XOR cipher for educational and reproducible test
+fixture use only (RC4 is broken; never use for new security code);
+`fnv1a32` and `fnv1a32Hex`, fast non-cryptographic FNV-1a hashing for
+hash-table keys; `ReservoirSampler` and `reservoirSample`, Algorithm R
+for uniform k-of-n sampling from streams of unknown length;
+`TopKHeap`, a streaming top-K tracker via min-heap;
+`bitapSearch`, the Bitap (shift-or, Wu-Manber) approximate-match
+algorithm for patterns up to 31 chars; `zigZagEncode`/`zigZagDecode`,
+the varint-friendly signed-to-unsigned mapping; `base58Encode` and
+`base58Decode`, the Bitcoin-alphabet Base58 codec preserving leading
+zero bytes as leading `1`s; and `pcg32`, the PCG-XSH-RR seedable PRNG
+producing uint32 values plus a `nextFloat` helper.
+
+---
+
 ## Version 4.19.0 -- 500-Improvement Wave 15
 
 Wave 15 ships ten more building blocks: `radixSort`, an LSD radix sort

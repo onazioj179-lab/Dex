@@ -10,6 +10,26 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.20.0 - 500-Improvement Wave 16: Fuzzy match, hashing, sampling, varint
+
+Sixteenth wave. 10 more shared modules, 25 new tests pass.
+
+### Added
+- `damerauDistance` Damerau-Levenshtein edit distance (with transposition).
+- `wildcardMatch` glob match supporting `*`, `?`, `**`.
+- `arc4Stream` / `arc4Encrypt` RC4 stream cipher (TEST/EDUCATION ONLY, not crypto).
+- `fnv1a32` / `fnv1a32Hex` non-cryptographic FNV-1a hash.
+- `ReservoirSampler` / `reservoirSample` Algorithm R streaming sampler.
+- `TopKHeap` streaming top-K via min-heap.
+- `bitapSearch` Bitap (Wu-Manber) approximate substring search.
+- `zigZagEncode` / `zigZagDecode` int32 <-> uint32 ZigZag encoding.
+- `base58Encode` / `base58Decode` Bitcoin-alphabet Base58 codec.
+- `pcg32` PCG-XSH-RR seedable PRNG (uint32 + nextFloat).
+
+### Changed
+- Barrel re-exports all 10 new Wave 16 modules.
+- `package.json` bumped to 4.20.0.
+
 ## v4.19.0 - 500-Improvement Wave 15: Radix, A*, ULID, color, scheduling
 
 Fifteenth wave. 10 more shared modules, 22 new tests pass.
