@@ -148,7 +148,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
           <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Export</span>
         </button>
         {ui.showExport && (
-          <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', padding: 4, minWidth: 160, maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(320px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
+          <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', padding: 4, minWidth: 160, maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(320px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
             {(['stl', 'gltf', 'dxf', 'pdf', 'json', 'png'] as const).map(fmt => (
               <button key={fmt} onClick={() => { onExport(fmt); ui.toggleExport(); }}
                 className="dex-hover-bg"

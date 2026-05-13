@@ -22,7 +22,7 @@ export function muLawEncode(sample: number): number {
 
 export function muLawDecode(byte: number): number {
   const inverted = 0xff - (byte & 0xff);
-  const sign = (inverted & 0x80) === 0 ? 1 : -1;
+  const sign = (inverted & 0x80) === 0 ? -1 : 1;
   const magnitude = inverted & 0x7f;
   const compressed = magnitude / 127;
   const value = ((1 + MU) ** compressed - 1) / MU;

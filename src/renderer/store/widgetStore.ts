@@ -8,9 +8,11 @@
  * Widget Store - Frontend widget layout management
  * Zustand store with localStorage persistence for home screen widgets.
  * Supports add, remove, move, resize with sensible defaults.
+ * Phase 15: layout snapshots via HomeLayoutStore for save/restore/tidy.
  */
 
 import { create } from 'zustand';
+import { HomeLayoutStore } from '../../shared/phase15/homeLayoutStore';
 
 export type WidgetType =
   | 'clock'
@@ -94,6 +96,67 @@ function saveWidgets(widgets: Widget[]) {
   } catch { /* ignore */ }
 }
 
+// ---------------------------------------------------------------------------
+// Phase 15 HomeLayoutStore bridge — persist/restore named layout snapshots
+// so users can save Home widget arrangements (e.g. "Focus", "Studio") and
+// jump back to them. All I/O goes through localStorage; no network involved.
+// ---------------------------------------------------------------------------
+
+const LAYOUT_SNAPSHOT_KEY = 'dex-home-layout-snapshots';
+
+function buildHomeLayoutStore(widgets: Widget[]): HomeLayoutStore {
+  const store = new HomeLayoutStore({ maxSnapshots: 10 });
+  const W = typeof window !== 'undefined' ? window.innerWidth : 1920;
+  const H = typeof window !== 'undefined' ? window.innerHeight : 1080;
+  for (const w of widgets) {
+    store.upsert({
+      id: w.id,
+      kind: 'custom',
+      sourceId: w.type,
+      x: W > 0 ? Math.max(0, Math.min(1, w.x / W)) : 0,
+      y: H > 0 ? Math.max(0, Math.min(1, w.y / H)) : 0,
+      w: W > 0 ? Math.max(0.05, Math.min(1, w.width / W)) : 0.15,
+      h: H > 0 ? Math.max(0.05, Math.min(1, w.height / H)) : 0.15,
+      pinned: false,
+      z: 0,
+    });
+  }
+  // Hydrate saved snapshots from localStorage.
+  try {
+    const raw = localStorage.getItem(LAYOUT_SNAPSHOT_KEY);
+    if (raw) {
+      const hydrated = HomeLayoutStore.deserialize(raw);
+      for (const s of hydrated.snapshots_()) {
+        store.snapshot(s.label, s.savedAt);
+      }
+    }
+  } catch { /* ignore */ }
+  return store;
+}
+
+/**
+ * Save a named Home layout snapshot so it can be restored later.
+ * `widgets` is the current widget array from the store.
+ */
+export function saveHomeLayoutSnapshot(widgets: Widget[], label: string): void {
+  try {
+    const ls = buildHomeLayoutStore(widgets);
+    ls.snapshot(label);
+    localStorage.setItem(LAYOUT_SNAPSHOT_KEY, ls.serialize());
+  } catch { /* never throw */ }
+}
+
+/**
+ * List saved Home layout snapshot labels.
+ */
+export function listHomeLayoutSnapshots(): string[] {
+  try {
+    const raw = localStorage.getItem(LAYOUT_SNAPSHOT_KEY);
+    if (!raw) return [];
+    return HomeLayoutStore.deserialize(raw).snapshots_().map(s => s.label ?? '');
+  } catch { return []; }
+}
+
 interface WidgetStoreState {
   widgets: Widget[];
   editMode: boolean;
@@ -103,6 +166,8 @@ interface WidgetStoreState {
   resizeWidget: (id: string, width: number, height: number) => void;
   toggleEditMode: () => void;
   setEditMode: (v: boolean) => void;
+  /** Save a named Home layout snapshot (Phase 15). */
+  snapshotLayout: (label?: string) => void;
 }
 
 export const useWidgetStore = create<WidgetStoreState>((set, get) => ({
@@ -156,4 +221,8 @@ export const useWidgetStore = create<WidgetStoreState>((set, get) => ({
 
   toggleEditMode: () => set(s => ({ editMode: !s.editMode })),
   setEditMode: (v) => set({ editMode: v }),
+
+  snapshotLayout: (label = 'snapshot') => {
+    saveHomeLayoutSnapshot(get().widgets, label);
+  },
 }));

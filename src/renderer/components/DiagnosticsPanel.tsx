@@ -39,7 +39,10 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
 
   useEffect(() => {
     if (!open) return;
-    const update = () => setSnapshots(rendererMetrics.snapshots());
+    const update = () => {
+      if (document.hidden) return;
+      setSnapshots(rendererMetrics.snapshots());
+    };
     update();
     const id = setInterval(update, 2000);
     return () => clearInterval(id);

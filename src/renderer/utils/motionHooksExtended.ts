@@ -1525,18 +1525,33 @@ export function useWakeLock() {
 }
 
 // ---------------------------------------------------------------------------
-// useGamepad -- gamepad input
+// useGamepad -- gamepad input. Polls only while at least one gamepad is
+// connected and the document is visible; idle cost is zero.
 // ---------------------------------------------------------------------------
 export function useGamepad() {
   const [gamepads, setGamepads] = useState<(Gamepad | null)[]>([]);
   useEffect(() => {
-    const update = () => setGamepads(Array.from(navigator.getGamepads()));
-    const connect = () => update();
-    const disconnect = () => update();
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const update = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      setGamepads(Array.from(navigator.getGamepads()));
+    };
+    const start = () => { if (interval === null) interval = setInterval(update, 100); };
+    const stop = () => { if (interval !== null) { clearInterval(interval); interval = null; } };
+    const connect = () => { update(); start(); };
+    const disconnect = () => {
+      update();
+      const any = (navigator.getGamepads?.() || []).some(Boolean);
+      if (!any) stop();
+    };
     window.addEventListener("gamepadconnected", connect);
     window.addEventListener("gamepaddisconnected", disconnect);
-    const interval = setInterval(update, 100);
-    return () => { window.removeEventListener("gamepadconnected", connect); window.removeEventListener("gamepaddisconnected", disconnect); clearInterval(interval); };
+    if ((navigator.getGamepads?.() || []).some(Boolean)) { update(); start(); }
+    return () => {
+      window.removeEventListener("gamepadconnected", connect);
+      window.removeEventListener("gamepaddisconnected", disconnect);
+      stop();
+    };
   }, []);
   return gamepads;
 }

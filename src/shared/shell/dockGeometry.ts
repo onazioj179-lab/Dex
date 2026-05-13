@@ -170,6 +170,47 @@ export function isFloatingPreset(preset: DockSizePreset): boolean {
   return preset === 'floating';
 }
 
+export interface ReservedInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/**
+ * Pixel insets the dock visually occupies on each viewport edge. Used by
+ * the window manager to size maximized/snapped windows so that app surfaces
+ * never sit underneath the dock. Magnification is included with a small
+ * safety margin so the dock pill never clips the active window even when an
+ * icon is hovered.
+ *
+ * When `visible` is false the dock is hidden off-edge and reserves nothing.
+ */
+export function getDockReservedInsets(
+  edge: DockEdge,
+  preset: DockSizePreset,
+  visible: boolean,
+): ReservedInsets {
+  const empty: ReservedInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  if (!visible) return empty;
+  const margin = EDGE_MARGIN_BY_PRESET[preset];
+  const iconSize = ICON_SIZE_BY_PRESET[preset];
+  const inner = INNER_PADDING_BY_PRESET[preset];
+  const magnification = MAGNIFICATION_BY_PRESET[preset];
+  // Pill thickness perpendicular to the dock edge, with magnification headroom.
+  const pillThickness = Math.ceil(iconSize * magnification + inner.y * 2);
+  // Total inset = margin from edge + pill thickness + a small breathing pad.
+  const breathingPad = 8;
+  const reserved = margin + pillThickness + breathingPad;
+  switch (edge) {
+    case 'top':    return { ...empty, top: reserved };
+    case 'bottom': return { ...empty, bottom: reserved };
+    case 'left':   return { ...empty, left: reserved };
+    case 'right':  return { ...empty, right: reserved };
+    default:       return empty;
+  }
+}
+
 /**
  * Returns the cardinal screen-edge a (clientX, clientY) cursor is closest to,
  * for "drag dock to a new edge" UX. Distance is computed against viewport

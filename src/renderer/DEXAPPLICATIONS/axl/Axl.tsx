@@ -2023,7 +2023,7 @@ const AXL: React.FC = () => {
         ];
         const menuItems = [...partItems, ...viewItems];
         return (
-          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 8, padding: '4px 0', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 8, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: '#333', margin: '4px 8px' }} />
               : <div key={i} className="axl-ctx-item" onClick={() => { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); }} style={{ padding: '6px 14px', fontSize: 11, color: (item as any).danger ? 'var(--color-error)' : '#e0e0e0', cursor: 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>

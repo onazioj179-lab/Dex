@@ -6022,3 +6022,77 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   filter: invert(0.85);
   cursor: pointer;
 }
+
+/* =============================================================================
+   PHASE 15 — SHELL APPEARANCE BUS
+   These rules consume the --dex-* tokens written by appearanceToCssVars()
+   so that toggling Settings -> Appearance immediately changes shell behavior
+   without requiring per-component code changes.
+   ============================================================================= */
+
+/* Transparency master switch: when off, force solid surfaces everywhere. */
+:root[style*="--dex-transparency: 0"] .dex-glass,
+:root[style*="--dex-transparency: 0"] [data-glass],
+:root[style*="--dex-transparency: 0"] .dex-blur,
+:root[style*="--dex-transparency: 0"] [data-blur] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: var(--color-bg, #0f1115) !important;
+  background-image: none !important;
+}
+
+/* Blur tier — caps the maximum blur radius regardless of per-surface CSS. */
+:root[style*="--dex-blur-tier: off"] .dex-glass,
+:root[style*="--dex-blur-tier: off"] [data-glass] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root[style*="--dex-blur-tier: eco"] .dex-glass,
+:root[style*="--dex-blur-tier: eco"] [data-glass] {
+  backdrop-filter: blur(6px) saturate(1.05) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(1.05) !important;
+}
+:root[style*="--dex-blur-tier: standard"] .dex-glass,
+:root[style*="--dex-blur-tier: standard"] [data-glass] {
+  backdrop-filter: blur(14px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
+}
+/* high tier uses each surface's own per-component blur (no override). */
+
+/* Motion master switch — mirrors the .reduce-motion class above so that
+   either trigger flattens animations to zero. */
+:root[style*="--dex-motion: off"] *,
+:root[style*="--dex-motion: off"] *::before,
+:root[style*="--dex-motion: off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Density — adjusts the global UI scale for compact / comfortable layouts. */
+:root[style*="--dex-density: compact"] {
+  --dex-row-height: 28px;
+  --dex-button-height: 28px;
+  --dex-pad: 6px;
+}
+:root[style*="--dex-density: regular"] {
+  --dex-row-height: 36px;
+  --dex-button-height: 32px;
+  --dex-pad: 10px;
+}
+:root[style*="--dex-density: comfortable"] {
+  --dex-row-height: 44px;
+  --dex-button-height: 40px;
+  --dex-pad: 14px;
+}
+
+/* Contrast — escalate borders and outlines when high contrast is active. */
+:root[style*="--dex-contrast: high"] {
+  --color-border: rgba(255, 255, 255, 0.65) !important;
+  --color-border-strong: rgba(255, 255, 255, 0.85) !important;
+}
+:root[style*="--dex-contrast: high"] :focus-visible {
+  outline: 3px solid #ffd400 !important;
+  outline-offset: 2px !important;
+}

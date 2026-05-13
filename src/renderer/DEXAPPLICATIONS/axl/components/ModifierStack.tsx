@@ -110,7 +110,7 @@ const styles = {
   dropdown: {
     position: 'absolute' as const, top: '100%', left: 0, right: 0,
     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-    borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+    borderRadius: 8, boxShadow: 'var(--pg-shadow-panel)',
     zIndex: 100, maxHeight: 280, overflowY: 'auto' as const,
   },
   dropdownCategory: {

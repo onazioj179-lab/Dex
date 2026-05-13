@@ -1064,7 +1064,7 @@ export const Audio: React.FC = () => {
 
         {/* 10-Band Equalizer */}
         {showEqualizer && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 120, transform: 'translateX(-50%)', width: 400, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 120, transform: 'translateX(-50%)', width: 400, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Equalizer</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowEqualizer(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1090,7 +1090,7 @@ export const Audio: React.FC = () => {
 
         {/* Queue Management */}
         {showQueue && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 60, width: 280, maxHeight: 400, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 16px 48px rgba(0,0,0,0.6)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 60, width: 280, maxHeight: 400, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Up Next</span>
               <div style={{ display: 'flex', gap: 4 }}>
@@ -1121,7 +1121,7 @@ export const Audio: React.FC = () => {
 
         {/* Mini Player */}
         {showMiniPlayer && currentTrack && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, bottom: 80, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 16px 48px rgba(0,0,0,0.6)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, bottom: 80, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{ width: 44, height: 44, borderRadius: 8, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
               <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -1145,7 +1145,7 @@ export const Audio: React.FC = () => {
 
         {/* Audio Visualizer */}
         {showVisualizer && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: 100, transform: 'translateX(-50)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: 100, transform: 'translateX(-50)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Visualizer</span>
@@ -1163,7 +1163,7 @@ export const Audio: React.FC = () => {
 
         {/* Crossfade Settings */}
         {showCrossfadeSettings && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 160, transform: 'translateX(-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 160, transform: 'translateX(-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crossfade</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCrossfadeSettings(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1198,7 +1198,7 @@ export const Audio: React.FC = () => {
                   <div style={{
                     width: 16, height: 16, borderRadius: '50%', background: 'var(--color-bg-surface)',
                     position: 'absolute', top: 2, left: gaplessMode ? 18 : 2,
-                    transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    transition: 'left 0.2s ease', boxShadow: 'var(--pg-shadow-chip)',
                   }} />
                 </button>
               </div>
@@ -1214,7 +1214,7 @@ export const Audio: React.FC = () => {
         {/* Metadata Editor */}
         {editingTrack && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={() => setEditingTrack(null)}>
-            <div style={{ width: 340, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', animation: 'dex-panel-in 200ms ease-out' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ width: 340, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border)', boxShadow: 'var(--pg-shadow-modal)', animation: 'dex-panel-in 200ms ease-out' }} onMouseDown={e => e.stopPropagation()}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Edit Track Info</span>
                 <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setEditingTrack(null)} aria-label="Close"><DexIcon name="close" size={14} /></button>

@@ -71,6 +71,40 @@ export interface FloatingWindowProps {
 const SAFE_TOP = 0;
 const SAFE_GUTTER = 0;
 
+/**
+ * Read the dock-reserved insets that AppManager publishes on `<html>` as
+ * CSS variables. Falls back to zero when the variables are absent (e.g. in
+ * unit tests or before AppManager mounts) so behavior is identical to before.
+ */
+function getReservedInsets(): { top: number; right: number; bottom: number; left: number } {
+  if (typeof document === 'undefined') {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+  const cs = getComputedStyle(document.documentElement);
+  const read = (name: string): number => {
+    const raw = cs.getPropertyValue(name).trim();
+    if (!raw) return 0;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : 0;
+  };
+  return {
+    top: read('--dex-reserved-top'),
+    right: read('--dex-reserved-right'),
+    bottom: read('--dex-reserved-bottom'),
+    left: read('--dex-reserved-left'),
+  };
+}
+
+/** Bounds for a fully-maximized window that respects the dock reservation. */
+function getMaximizedBounds(): { x: number; y: number; width: number; height: number } {
+  const r = getReservedInsets();
+  const x = SAFE_GUTTER + r.left;
+  const y = SAFE_TOP + r.top;
+  const width = Math.max(0, window.innerWidth - r.left - r.right - SAFE_GUTTER * 2);
+  const height = Math.max(0, window.innerHeight - r.top - r.bottom - SAFE_TOP - SAFE_GUTTER);
+  return { x, y, width, height };
+}
+
 /** Map snapEngine's 13-zone vocabulary back onto FloatingWindow's 7-zone API. */
 function normalizeZone(z: EngineSnapZone | null): SnapZone | null {
   if (!z) return null;
@@ -96,13 +130,38 @@ function normalizeZone(z: EngineSnapZone | null): SnapZone | null {
 }
 
 function detectSnapZone(x: number, y: number, windowWidth: number, windowHeight: number): SnapZone | null {
-  const env = snapMakeEnv(windowWidth, windowHeight, { top: SAFE_TOP, left: SAFE_GUTTER, right: SAFE_GUTTER, bottom: SAFE_GUTTER });
+  const r = getReservedInsets();
+  const env = snapMakeEnv(windowWidth, windowHeight, {
+    top: SAFE_TOP + r.top,
+    left: SAFE_GUTTER + r.left,
+    right: SAFE_GUTTER + r.right,
+    bottom: SAFE_GUTTER + r.bottom,
+  });
   return normalizeZone(snapDetectZone(x, y, env));
 }
 
 function getSnapBounds(zone: SnapZone): { x: number; y: number; width: number; height: number } {
-  const env = snapMakeEnv(window.innerWidth, window.innerHeight, { top: SAFE_TOP, left: SAFE_GUTTER, right: SAFE_GUTTER, bottom: SAFE_GUTTER });
+  const r = getReservedInsets();
+  const env = snapMakeEnv(window.innerWidth, window.innerHeight, {
+    top: SAFE_TOP + r.top,
+    left: SAFE_GUTTER + r.left,
+    right: SAFE_GUTTER + r.right,
+    bottom: SAFE_GUTTER + r.bottom,
+  });
   return snapRectForZone(zone, env);
+}
+
+function clampWindowPosition(x: number, y: number, width: number, height: number): { x: number; y: number } {
+  const r = getReservedInsets();
+  const visibleInset = 40;
+  const minX = -(Math.max(0, width - visibleInset)) + r.left;
+  const minY = r.top;
+  const maxX = Math.max(0, window.innerWidth - visibleInset - r.right);
+  const maxY = Math.max(0, window.innerHeight - visibleInset - r.bottom);
+  return {
+    x: Math.min(maxX, Math.max(minX, x)),
+    y: Math.min(maxY, Math.max(minY, y)),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +222,15 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const [sizeTooltip, setSizeTooltip] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
+
+  // Forces a re-render when the viewport changes so maximize bounds reflow.
+  const [, setReflowTick] = useState(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onResize = () => setReflowTick((t) => t + 1);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Live refs for pos/size — avoid stale closures in drag/resize handlers
   const posRef = useRef(pos);
@@ -275,8 +343,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     let rafScheduled = false;
 
     const onMove = (ev: PointerEvent) => {
-      latestPos.x = ev.clientX - dragOffsetRef.current.x;
-      latestPos.y = ev.clientY - dragOffsetRef.current.y;
+      const unclampedX = ev.clientX - dragOffsetRef.current.x;
+      const unclampedY = ev.clientY - dragOffsetRef.current.y;
+      const clamped = clampWindowPosition(unclampedX, unclampedY, sizeRef.current.width, sizeRef.current.height);
+      latestPos.x = clamped.x;
+      latestPos.y = clamped.y;
       
       // Schedule RAF only once - it will read latest position when it fires
       if (!rafScheduled) {
@@ -317,14 +388,21 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     };
 
     const onUp = (ev: PointerEvent) => {
-      el.releasePointerCapture(ev.pointerId);
+      if (el.hasPointerCapture(ev.pointerId)) {
+        el.releasePointerCapture(ev.pointerId);
+      }
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      el.removeEventListener('lostpointercapture', onLostCapture);
       if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
       setDragging(false);
 
-      const finalX = ev.clientX - dragOffsetRef.current.x;
-      const finalY = ev.clientY - dragOffsetRef.current.y;
+      const unclampedX = ev.clientX - dragOffsetRef.current.x;
+      const unclampedY = ev.clientY - dragOffsetRef.current.y;
+      const clamped = clampWindowPosition(unclampedX, unclampedY, sizeRef.current.width, sizeRef.current.height);
+      const finalX = clamped.x;
+      const finalY = clamped.y;
       const zone = detectSnapZone(ev.clientX, ev.clientY, window.innerWidth, window.innerHeight);
       previewZoneRef.current = null;
       setPreviewZone(null);
@@ -353,8 +431,24 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       flushPersist();
     };
 
+    const onLostCapture = () => {
+      if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+      el.removeEventListener('lostpointercapture', onLostCapture);
+      setDragging(false);
+      const clamped = clampWindowPosition(latestPos.x, latestPos.y, sizeRef.current.width, sizeRef.current.height);
+      setPos(clamped);
+      previewZoneRef.current = null;
+      setPreviewZone(null);
+      flushPersist();
+    };
+
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    el.addEventListener('lostpointercapture', onLostCapture);
   }, [flushPersist, handleFocus, id, maximized, snapZone]);
 
   // -----------------------------------------------------------------------
@@ -398,6 +492,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
       setResizing(false);
       sizeTooltipTimerRef.current = setTimeout(() => setSizeTooltip(null), 500);
       flushPersist();
@@ -405,6 +500,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   }, [flushPersist, handleFocus, minWidth, minHeight]);
 
   // -----------------------------------------------------------------------
@@ -434,8 +530,9 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       setSnapZone(null);
     } else {
       preSnapRef.current = { x: posRef.current.x, y: posRef.current.y, width: sizeRef.current.width, height: sizeRef.current.height };
-      setPos({ x: 0, y: 0 });
-      setSize({ width: window.innerWidth, height: window.innerHeight });
+      const m = getMaximizedBounds();
+      setPos({ x: m.x, y: m.y });
+      setSize({ width: m.width, height: m.height });
       setMaximized(true);
       setSnapZone('full');
     }
@@ -458,10 +555,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     ? '0 8px 32px rgba(0,0,0,0.5), 0 0 0 0.5px var(--color-border-subtle), 0 0 12px rgba(74,158,255,0.06)'
     : '0 4px 16px rgba(0,0,0,0.35), 0 0 0 0.5px var(--color-bg-hover)';
 
-  const actualX = maximized ? 0 : pos.x;
-  const actualY = maximized ? 0 : pos.y;
-  const actualW = maximized ? window.innerWidth : size.width;
-  const actualH = maximized ? window.innerHeight : size.height;
+  const maxBounds = maximized ? getMaximizedBounds() : null;
+  const actualX = maxBounds ? maxBounds.x : pos.x;
+  const actualY = maxBounds ? maxBounds.y : pos.y;
+  const actualW = maxBounds ? maxBounds.width : size.width;
+  const actualH = maxBounds ? maxBounds.height : size.height;
 
   const HANDLE = 6;
   const cursorMap: Record<string, string> = {

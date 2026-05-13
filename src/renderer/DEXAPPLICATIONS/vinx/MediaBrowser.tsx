@@ -391,7 +391,7 @@ const MediaTab: React.FC = memo(() => {
             background: 'var(--color-bg-elevated, #1a1a1e)',
             border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
             borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+            boxShadow: 'var(--pg-shadow-context)',
             fontSize: 12, color: 'var(--color-text-primary)',
           }}
         >

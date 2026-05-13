@@ -126,13 +126,24 @@ describe('Home Page', () => {
 describe('Notes Page', () => {
   it('renders without crashing', async () => {
     const { default: Notes } = await import('../../src/renderer/DEXAPPLICATIONS/notes/DexNotes');
-    const { container } = render(<Notes />);
+    let container!: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<Notes />));
+      // Flush pending microtasks scheduled by store.initialize() / auto-create.
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(container).toBeTruthy();
   });
 
   it('has a create new note button', async () => {
     const { default: Notes } = await import('../../src/renderer/DEXAPPLICATIONS/notes/DexNotes');
-    const { container } = render(<Notes />);
+    let container!: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<Notes />));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     // Component auto-creates a note when empty, verify it rendered
     expect(container.querySelector('div')).toBeTruthy();
   });

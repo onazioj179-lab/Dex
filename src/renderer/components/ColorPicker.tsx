@@ -238,7 +238,7 @@ const ColorSlider: React.FC<ColorSliderProps> = ({
             background: colors.bg.elevated,
             border: `2px solid ${colors.border.default}`,
             borderRadius: '50%',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--pg-shadow-chip)',
             pointerEvents: 'none',
           }}
         />

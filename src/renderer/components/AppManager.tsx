@@ -21,7 +21,7 @@ import { useAppTransition } from '../utils/motionHooks';
 import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
 import { useUkiStore } from '../store/ukiStore';
 import { liquidGlassDock, glassModal, adaptiveShadow } from '../styles/glassMenu';
-import { computeDockGeometry } from '../../shared/shell/dockGeometry';
+import { computeDockGeometry, getDockReservedInsets } from '../../shared/shell/dockGeometry';
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
@@ -52,6 +52,27 @@ import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
 import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
 import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
+import { CalmFocusEngine } from '../../shared/phase15/calmFocus';
+import { WorkspaceSnapshotStore } from '../../shared/phase15/workspaceSnapshot';
+
+// Module-level singletons — one engine per renderer process lifetime.
+const _calmEngine = new CalmFocusEngine();
+const _wsStore = new WorkspaceSnapshotStore({ maxNamed: 20, maxAuto: 5 });
+
+// Hydrate snapshot store from localStorage on first load.
+try {
+  const _raw = localStorage.getItem('dex-workspace-snapshots');
+  if (_raw) {
+    const _hydrated = WorkspaceSnapshotStore.deserialize(_raw);
+    for (const s of _hydrated.listNamed()) _wsStore.saveNamed(s);
+    for (const s of _hydrated.listAuto()) _wsStore.saveAuto(s);
+  }
+} catch { /* never block startup */ }
+
+/** Persist workspace store to localStorage (call after mutations). */
+function _persistWsStore(): void {
+  try { localStorage.setItem('dex-workspace-snapshots', _wsStore.serialize()); } catch { /* ignore */ }
+}
 
 // Retry wrapper for lazy imports — survives stale chunks after rebuild
 function lazyRetry<T extends React.ComponentType<any>>(
@@ -652,6 +673,17 @@ export const AppManager: React.FC = () => {
   const [systemVolume, setSystemVolume] = useState(() => { try { return Number(localStorage.getItem('dex-system-volume') ?? '80'); } catch { return 80; } });
   const [spatialAudioOn, setSpatialAudioOn] = useState(() => isSoundEnabled());
 
+  // -- Publish dock-reserved insets as CSS variables so floating windows can
+  //    size maximize/snap bounds without ever clipping under the dock. --
+  useEffect(() => {
+    const insets = getDockReservedInsets(dockEdgePref, dockPresetPref, taskbarVisible);
+    const root = document.documentElement;
+    root.style.setProperty('--dex-reserved-top', `${insets.top}px`);
+    root.style.setProperty('--dex-reserved-right', `${insets.right}px`);
+    root.style.setProperty('--dex-reserved-bottom', `${insets.bottom}px`);
+    root.style.setProperty('--dex-reserved-left', `${insets.left}px`);
+  }, [dockEdgePref, dockPresetPref, taskbarVisible]);
+
   // -- Suspend/Resume & Crash Recovery toasts --
   useEffect(() => {
     const ipcRenderer = (window as any).electron?.ipcRenderer;
@@ -671,6 +703,12 @@ export const AppManager: React.FC = () => {
     // System suspend/OS-lock events: do not force a Dex lock overlay. Only lock when
     // the user has explicitly enabled `lockOnSleep`. Always flush autosave + park work.
     const onSystemSuspend = () => {
+      // Auto-snapshot workspace before suspend for crash/resume recovery.
+      try {
+        const snap = _wsStore.capture('auto-suspend', [], null);
+        _wsStore.saveAuto(snap);
+        _persistWsStore();
+      } catch { /* never block suspend */ }
       window.dispatchEvent(new CustomEvent('dex-system-suspend'));
       try {
         const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
@@ -680,6 +718,12 @@ export const AppManager: React.FC = () => {
       } catch { /* ignore */ }
     };
     const onSystemLock = () => {
+      // Auto-snapshot workspace before locking for post-unlock continuity.
+      try {
+        const snap = _wsStore.capture('auto-lock', [], null);
+        _wsStore.saveAuto(snap);
+        _persistWsStore();
+      } catch { /* never block lock */ }
       window.dispatchEvent(new CustomEvent('dex-system-lock'));
       try {
         const cfg = (require('../store/useAuthStore') as any).useAuthStore?.getState?.()?.config;
@@ -697,11 +741,21 @@ export const AppManager: React.FC = () => {
     // of truth). AppManager no longer flickers body opacity on visibility change
     // — that caused the wallpaper to flash when returning from idle.
 
-    // Check for crash recovery state
+    // Check for crash recovery state — gate toast through calm engine so it
+    // never interrupts deep-flow focus unnecessarily (warnings always pass through).
     (window as any).electron?.invoke?.('recovery:savedState').then((state: any) => {
       if (state?.timestamp) {
         const ago = Math.round((Date.now() - state.timestamp) / 60000);
-        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `Previous session recovered (${ago}m ago)` } }));
+        const decision = _calmEngine.decide('notification');
+        if (decision.allow) {
+          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `Previous session recovered (${ago}m ago)` } }));
+        }
+        // Always persist recovery point in the workspace snapshot store.
+        try {
+          const snap = _wsStore.capture(`crash-recovery-${state.timestamp}`, [], null, state.timestamp);
+          _wsStore.saveAuto(snap);
+          _persistWsStore();
+        } catch { /* never block */ }
       }
     }).catch((e: unknown) => { console.warn('[DEX] recovery:', e); });
 
@@ -979,6 +1033,22 @@ export const AppManager: React.FC = () => {
     return `${d}  ${t}`;
   });
   const [titlebarMenuOpen, setTitlebarMenuOpen] = useState(false);
+
+  // -- CalmFocusEngine: record input activity so the engine can decide whether
+  //    to suppress non-essential interruptions (hover glows, tips, badges)
+  //    during deep-work flow states. This single effect is the only place we
+  //    feed the module-level engine from real DOM events. --------------------
+  useEffect(() => {
+    const onActivity = () => _calmEngine.recordActivity();
+    document.addEventListener('mousedown', onActivity, { passive: true, capture: true });
+    document.addEventListener('keydown', onActivity, { passive: true, capture: true });
+    document.addEventListener('pointerdown', onActivity, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('mousedown', onActivity, true);
+      document.removeEventListener('keydown', onActivity, true);
+      document.removeEventListener('pointerdown', onActivity, true);
+    };
+  }, []);
 
   // Close the control-center dropdown on any outside click without painting a
   // full-screen invisible overlay (which polluted the page with a fixed div).
@@ -3956,7 +4026,7 @@ export const AppManager: React.FC = () => {
                       position: 'absolute', top: 2, left: 2,
                       transform: spatialAudioOn ? 'translateX(14px)' : 'translateX(0)',
                       transition: 'transform 0.2s ease',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      boxShadow: 'var(--pg-shadow-chip)',
                     }} />
                   </button>
                 </div>
@@ -3981,7 +4051,7 @@ export const AppManager: React.FC = () => {
                       position: 'absolute', top: 2, left: 2,
                       transform: isReduceMotion() ? 'translateX(14px)' : 'translateX(0)',
                       transition: 'transform 0.2s ease',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      boxShadow: 'var(--pg-shadow-chip)',
                     }} />
                   </button>
                 </div>

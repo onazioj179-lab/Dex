@@ -866,6 +866,7 @@ export function cleanupOnMemoryPressure(cleanup: () => void): () => void {
   // Check if memory pressure API is available
   if ('memory' in performance) {
     const checkMemory = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       const info = getMemoryInfo();
       if (info?.isUnderPressure) {
         cleanup();

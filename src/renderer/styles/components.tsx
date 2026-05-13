@@ -1039,7 +1039,7 @@ export const DexSwitch: React.FC<DexSwitchProps> = ({
     height: s.knob,
     background: '#fff',
     borderRadius: '50%',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+    boxShadow: 'var(--pg-shadow-chip)',
     transition: `left ${transition.fast}`,
   };
 

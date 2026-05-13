@@ -2083,7 +2083,7 @@ export const Browser: React.FC = () => {
         <div style={{
           position: 'absolute', top: '80px', right: '12px', zIndex: 'var(--z-modal)',
           background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
-          borderRadius: '10px', padding: '14px 16px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+          borderRadius: '10px', padding: '14px 16px', boxShadow: 'var(--pg-shadow-tooltip)',
           width: '280px', fontSize: '12px',
         }}>
           <div style={{ fontWeight: 600, marginBottom: '8px', color: 'var(--color-text-primary)' }}>Save password for {savePrompt.domain}?</div>

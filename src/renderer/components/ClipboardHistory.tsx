@@ -106,8 +106,20 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     };
 
     checkClipboard();
-    const interval = setInterval(checkClipboard, 5000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = setInterval(checkClipboard, 5000);
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (interval !== null) { clearInterval(interval); interval = null; }
+      } else if (interval === null) {
+        checkClipboard();
+        interval = setInterval(checkClipboard, 5000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (interval !== null) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [isOpen]);
 
   // Focus input when opened

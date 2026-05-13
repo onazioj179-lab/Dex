@@ -108,6 +108,19 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const colorStateRef = useRef<{ color?: string; bold?: boolean }>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const shouldFollowOutputRef = useRef(true);
+
+  const flushTailBuffer = useCallback(() => {
+    const tail = bufferRef.current;
+    if (!tail) return;
+    bufferRef.current = '';
+    const { spans, color, bold } = parseAnsi(tail, colorStateRef.current.color, colorStateRef.current.bold);
+    colorStateRef.current = { color, bold };
+    setLines(prev => {
+      const next = prev.concat({ id: ++lineIdRef.current, spans: spans.length ? spans : [{ text: '' }] });
+      return next.length > 8000 ? next.slice(next.length - 8000) : next;
+    });
+  }, []);
 
   // -------------------------------------------------------------------------
   // Append output (buffer until newline, then commit lines)
@@ -158,6 +171,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     const onExit = (...args: unknown[]) => {
       const payload = args[args.length - 1] as { sessionId?: string; code?: number };
       if (payload?.sessionId === activeId) {
+        flushTailBuffer();
         appendOutput(`\r\n[session exited code=${payload.code ?? 0}]\r\n`);
         if (mounted) setSessionId(null);
       }
@@ -184,6 +198,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         cancelAnimationFrame(flushRafRef.current);
         flushRafRef.current = null;
       }
+      flushTailBuffer();
       mounted = false;
       if (dataOff) dataOff();
       if (exitOff) exitOff();
@@ -191,15 +206,28 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         b.invoke('pty:kill', { sessionId: activeId }).catch(() => { /* shutting down */ });
       }
     };
-  }, [autoSpawn, cwd, shell, appendOutput]);
+  }, [autoSpawn, cwd, shell, appendOutput, flushTailBuffer]);
 
   // -------------------------------------------------------------------------
   // Auto-scroll on new output
   // -------------------------------------------------------------------------
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el || !shouldFollowOutputRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [lines]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      shouldFollowOutputRef.current = distance <= 20;
+    };
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   // -------------------------------------------------------------------------
   // Send input
@@ -209,7 +237,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     if (!b || !sessionId) return;
     // Echo locally so the line appears immediately
     appendOutput(`${text}\r\n`);
-    b.invoke('pty:write', { sessionId, data: text + (process.platform === 'win32' ? '\r\n' : '\n') }).catch(() => { /* */ });
+    const isWindows = typeof navigator !== 'undefined' && /win/i.test(navigator.platform);
+    b.invoke('pty:write', { sessionId, data: text + (isWindows ? '\r\n' : '\n') }).catch(() => { /* */ });
   }, [sessionId, appendOutput]);
 
   const onKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {

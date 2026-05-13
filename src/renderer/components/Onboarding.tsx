@@ -845,7 +845,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           border: '1px solid var(--color-border-subtle)',
           borderRadius: 14,
           overflow: 'hidden',
-          boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+          boxShadow: 'var(--pg-shadow-popover)',
         }}
       >
         <div style={{

@@ -147,6 +147,13 @@
   --pg-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
   --pg-shadow-overlay: 0 24px 80px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35);
   --pg-shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 28px rgba(0, 0, 0, 0.35);
+  /* Additional surface tiers (added v4.57 -- token convergence) */
+  --pg-shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --pg-shadow-popover: 0 16px 48px rgba(0, 0, 0, 0.6);
+  --pg-shadow-popover-strong: 0 16px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.30);
+  --pg-shadow-context: 0 12px 40px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --pg-shadow-tooltip: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --pg-shadow-chip: 0 1px 3px rgba(0, 0, 0, 0.3);
 
   /* Sidebar dimensions */
   --pg-sidebar-width: 232px;

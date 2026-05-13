@@ -1567,7 +1567,7 @@ export const Files: React.FC = () => {
         >
           <div onClick={e => e.stopPropagation()} style={{
             background: 'var(--color-bg-elevated, #2c2c2e)', borderRadius: 12,
-            boxShadow: '0 24px 80px rgba(0,0,0,0.5)', overflow: 'hidden', maxWidth: '80vw', maxHeight: '80vh',
+            boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', maxWidth: '80vw', maxHeight: '80vh',
           }}>
             {/* Quick Look header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))' }}>
@@ -1692,7 +1692,7 @@ export const Files: React.FC = () => {
           <div style={{
             position: 'absolute', left: contextMenu.x, top: contextMenu.y,
             background: 'var(--color-bg-elevated, #1c1c1e)', border: '1px solid var(--color-border, var(--color-border))',
-            borderRadius: '8px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '4px 0', minWidth: '180px',
+            borderRadius: '8px', boxShadow: 'var(--pg-shadow-popover)', padding: '4px 0', minWidth: '180px',
           }} onClick={(e) => e.stopPropagation()}>
             <button onClick={() => handleItemDoubleClick(contextMenu.file)} aria-label={`Open ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Open

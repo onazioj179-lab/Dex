@@ -65,7 +65,7 @@ export function PiiGuardDialog({
         maxWidth: '100%',
         maxHeight: modal.maxHeight,
         overflowY: 'auto',
-        boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+        boxShadow: 'var(--pg-shadow-popover)',
       }}>
         <h2 style={{ margin: 0, fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.text.primary }}>
           Sensitive data detected

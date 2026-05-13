@@ -252,8 +252,20 @@ export function useLockoutStatus() {
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 30000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = setInterval(checkStatus, 30000);
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (interval) { clearInterval(interval); interval = null; }
+      } else if (!interval) {
+        checkStatus();
+        interval = setInterval(checkStatus, 30000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   return status;
@@ -402,8 +414,20 @@ export function useTabHealth() {
     };
 
     fetchHealth();
-    const interval = setInterval(fetchHealth, 30000); // Reduced: was 5s, now 30s
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = setInterval(fetchHealth, 30000); // Reduced: was 5s, now 30s
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (interval) { clearInterval(interval); interval = null; }
+      } else if (!interval) {
+        fetchHealth();
+        interval = setInterval(fetchHealth, 30000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const unhealthyTabs = tabHealth.filter(t => t.status !== 'healthy');
@@ -494,8 +518,20 @@ export function useQ1Status() {
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 10000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = setInterval(fetchStatus, 10000);
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (interval) { clearInterval(interval); interval = null; }
+      } else if (!interval) {
+        fetchStatus();
+        interval = setInterval(fetchStatus, 10000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const allHealthy = status.every(s => s.healthy);

@@ -3080,7 +3080,7 @@ const S: Record<string, React.CSSProperties> = {
     position: 'absolute' as const,
     top: 2,
     transition: 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1)',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+    boxShadow: 'var(--pg-shadow-chip)',
   },
 
   // Exclude
@@ -3199,7 +3199,7 @@ const S: Record<string, React.CSSProperties> = {
     maxHeight: '85vh',
     objectFit: 'contain' as const,
     borderRadius: 8,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    boxShadow: 'var(--pg-shadow-popover)',
   },
   lightboxClose: {
     position: 'absolute' as const,

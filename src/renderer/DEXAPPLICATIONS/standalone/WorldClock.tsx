@@ -49,8 +49,20 @@ const WorldClock: React.FC = () => {
   const [is24h, setIs24h] = useState(true);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | null = setInterval(() => setNow(new Date()), 1000);
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (timer) { clearInterval(timer); timer = null; }
+      } else if (!timer) {
+        setNow(new Date());
+        timer = setInterval(() => setNow(new Date()), 1000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (timer) clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   useEffect(() => {

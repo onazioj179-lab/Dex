@@ -260,7 +260,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
             background: COLOR_BG,
             border: `1px solid ${COLOR_BORDER}`,
             borderRadius: 12,
-            boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+            boxShadow: 'var(--pg-shadow-popover)',
             padding: 16,
             backdropFilter: 'blur(20px)',
           }}

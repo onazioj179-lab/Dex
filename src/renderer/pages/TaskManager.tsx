@@ -259,11 +259,21 @@ const TaskManager: React.FC = () => {
   useEffect(() => {
     refreshStatus();
     refreshProcesses();
-    const statusTimer = window.setInterval(refreshStatus, 1000);
-    const processTimer = window.setInterval(refreshProcesses, 3000);
+    let statusTimer: number | null = window.setInterval(refreshStatus, 1000);
+    let processTimer: number | null = window.setInterval(refreshProcesses, 3000);
+    const stop = () => {
+      if (statusTimer !== null) { window.clearInterval(statusTimer); statusTimer = null; }
+      if (processTimer !== null) { window.clearInterval(processTimer); processTimer = null; }
+    };
+    const start = () => {
+      if (statusTimer === null) { refreshStatus(); statusTimer = window.setInterval(refreshStatus, 1000); }
+      if (processTimer === null) { refreshProcesses(); processTimer = window.setInterval(refreshProcesses, 3000); }
+    };
+    const onVisibility = () => { if (document.hidden) stop(); else start(); };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      window.clearInterval(statusTimer);
-      window.clearInterval(processTimer);
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [refreshStatus, refreshProcesses]);
 

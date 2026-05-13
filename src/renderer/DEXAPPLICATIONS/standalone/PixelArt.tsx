@@ -311,7 +311,7 @@ const PixelArt: React.FC = () => {
             height={canvasPx}
             style={{
               imageRendering: 'pixelated', cursor: 'crosshair',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.4)', borderRadius: 4,
+              boxShadow: 'var(--pg-shadow-context)', borderRadius: 4,
             }}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}

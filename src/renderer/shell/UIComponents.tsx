@@ -73,7 +73,7 @@ export const DexToggle: React.FC<{
         height: circleSize,
         borderRadius: '50%',
         background: '#fff',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        boxShadow: 'var(--pg-shadow-chip)',
         transition: isReduceMotion() ? 'none' : 'left 0.2s cubic-bezier(0.34,1.56,0.64,1)',
       }} />
     </button>

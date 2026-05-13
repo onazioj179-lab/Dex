@@ -139,17 +139,21 @@ const Banner: React.FC<{
   const [hovered, setHovered] = useState(false);
   const [progress, setProgress] = useState(1);
   const [swipeX, setSwipeX] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef(performance.now());
   const pausedAtRef = useRef<number | null>(null);
   const duration = notification.duration ?? DEFAULT_DURATION;
   const bannerRef = useRef<HTMLDivElement>(null);
 
-  // Auto dismiss timer with progress
+  // Auto dismiss with progress (rAF -- auto-throttles when hidden, smoother
+  // than a 250ms interval, no extra wake-ups when paused).
   useEffect(() => {
     startTimeRef.current = performance.now();
     const tick = () => {
-      if (pausedAtRef.current !== null) return;
+      if (pausedAtRef.current !== null) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const elapsed = performance.now() - startTimeRef.current;
       const remaining = 1 - elapsed / duration;
       if (remaining <= 0) {
@@ -157,9 +161,10 @@ const Banner: React.FC<{
         return;
       }
       setProgress(remaining);
+      rafRef.current = requestAnimationFrame(tick);
     };
-    timerRef.current = setInterval(tick, 250);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
   }, [notification.id, duration, onDismiss]);
 
   // Pause on hover
@@ -240,7 +245,7 @@ const Banner: React.FC<{
         borderRadius: 12,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+        boxShadow: 'var(--pg-shadow-panel)',
         overflow: 'hidden',
         cursor: 'pointer',
         transform: `translateX(${swipeX}px)`,
@@ -577,7 +582,7 @@ export const NotificationCenter: React.FC<{
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
         borderRadius: 16,
-        boxShadow: '0 16px 64px rgba(0,0,0,0.55)',
+        boxShadow: 'var(--pg-shadow-popover-strong)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
         backdropFilter: 'blur(40px)',

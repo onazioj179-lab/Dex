@@ -1088,7 +1088,7 @@ const Transfers: React.FC = () => {
           position: 'absolute', right: 16, top: 56, width: 320, zIndex: 2000,
           background: 'var(--color-bg-surface-solid)',
           borderRadius: 12, border: '1px solid var(--color-border)',
-          boxShadow: '0 16px 48px rgba(0,0,0,0.6)', overflow: 'hidden',
+          boxShadow: 'var(--pg-shadow-popover)', overflow: 'hidden',
         }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Transfer Settings</span>

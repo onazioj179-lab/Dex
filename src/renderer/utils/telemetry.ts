@@ -765,8 +765,11 @@ class InputMethodTracker {
       () => window.removeEventListener('pointerdown', pointerHandler),
     );
 
-    // Gamepad polling
+    // Gamepad polling -- only runs when at least one gamepad is connected,
+    // and skips work while the document is hidden. Idle baseline cost: zero.
+    let gpInterval: ReturnType<typeof setInterval> | null = null;
     const pollGamepad = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       const gamepads = navigator.getGamepads?.() || [];
       for (const gp of gamepads) {
         if (gp?.buttons.some(b => b.pressed)) {
@@ -774,8 +777,28 @@ class InputMethodTracker {
         }
       }
     };
-    const gpInterval = setInterval(pollGamepad, 100);
-    this.listeners.push(() => clearInterval(gpInterval));
+    const startGpPoll = () => {
+      if (gpInterval !== null) return;
+      gpInterval = setInterval(pollGamepad, 100);
+    };
+    const stopGpPoll = () => {
+      if (gpInterval === null) return;
+      clearInterval(gpInterval);
+      gpInterval = null;
+    };
+    const onGpConnected = () => startGpPoll();
+    const onGpDisconnected = () => {
+      const any = (navigator.getGamepads?.() || []).some(Boolean);
+      if (!any) stopGpPoll();
+    };
+    window.addEventListener('gamepadconnected', onGpConnected);
+    window.addEventListener('gamepaddisconnected', onGpDisconnected);
+    if ((navigator.getGamepads?.() || []).some(Boolean)) startGpPoll();
+    this.listeners.push(() => {
+      window.removeEventListener('gamepadconnected', onGpConnected);
+      window.removeEventListener('gamepaddisconnected', onGpDisconnected);
+      stopGpPoll();
+    });
   }
 
   stop(): void {

@@ -990,7 +990,7 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         backdropFilter: 'blur(34px) saturate(180%)',
         WebkitBackdropFilter: 'blur(34px) saturate(180%)',
         borderRadius: 16, border: '1px solid rgba(255,255,255,0.10)',
-        boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+        boxShadow: 'var(--pg-shadow-popover)',
         padding: 20, overflow: 'auto',
       }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 14 }}>Add Widget</div>

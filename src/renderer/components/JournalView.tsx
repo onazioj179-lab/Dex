@@ -228,7 +228,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     padding: 16,
     zIndex: 100,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    boxShadow: 'var(--pg-shadow-popover)',
   },
   manageSectionTitle: {
     fontSize: 11,

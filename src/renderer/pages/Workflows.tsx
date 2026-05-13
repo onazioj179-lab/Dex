@@ -1314,7 +1314,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)', borderRadius: 12,
     padding: 16, width: 'min(280px, calc(100% - 32px))', maxHeight: 'min(420px, calc(100% - 68px))',
-    overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', boxSizing: 'border-box' as const,
+    overflow: 'auto', boxShadow: 'var(--pg-shadow-panel)', boxSizing: 'border-box' as const,
   },
   templateCard: {
     display: 'block', width: '100%', textAlign: 'left' as const, padding: '10px 12px',

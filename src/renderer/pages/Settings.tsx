@@ -318,8 +318,20 @@ const SystemMonitorPanel: React.FC = () => {
 
   React.useEffect(() => {
     refresh();
-    const id = window.setInterval(refresh, 3000);
-    return () => window.clearInterval(id);
+    let id: number | null = window.setInterval(refresh, 3000);
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (id !== null) { window.clearInterval(id); id = null; }
+      } else if (id === null) {
+        refresh();
+        id = window.setInterval(refresh, 3000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (id !== null) window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [refresh]);
 
   const handleEndProcess = React.useCallback(async (pid: number, name: string) => {
@@ -1050,7 +1062,25 @@ const applySettings = (settings: Record<string, unknown>) => {
     const opacity = typeof settings.glassOpacity === 'number' ? settings.glassOpacity : 0.85;
     root.style.setProperty('--blur-intensity', `${blur}px`);
     root.style.setProperty('--glass-opacity', String(opacity));
-    
+
+    // -- Phase 15: publish appearance bus tokens so all shell surfaces share one truth --
+    import('../../shared/phase15').then(({ appearanceToCssVars, normalizeAppearance }) => {
+      const profile = normalizeAppearance({
+        theme: settings.darkMode !== false ? 'dark' : 'light',
+        transparency: settings.transparency !== false,
+        reducedTransparency: !!settings.reduceTransparency,
+        reducedMotion: !!settings.reduceMotion,
+        density: settings.compactMode ? 'compact' : 'regular',
+        contrast: settings.highContrast ? 'high' : 'normal',
+        allowHeavyBlur: settings.transparency !== false && !settings.reduceTransparency,
+      });
+      const systemDark = settings.darkMode !== false;
+      const vars = appearanceToCssVars(profile, systemDark);
+      for (const [k, v] of Object.entries(vars)) {
+        root.style.setProperty(k, v as string);
+      }
+    }).catch(() => { /* phase15 import must never break settings apply */ });
+
   } catch (e) {
     if (import.meta.env.DEV) console.warn('[Settings] Failed to apply settings:', e);
   }
@@ -1973,6 +2003,23 @@ export const Settings: React.FC = () => {
         try { localStorage.setItem('dex-predictive-prewarm', nextVal ? '1' : '0'); }
         catch { /* storage blocked */ }
       }
+      // Keep the shell-prefs glass mode in sync when the legacy boolean
+      // transparency toggles are flipped from anywhere in Settings.
+      if (key === 'transparency') {
+        try {
+          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'normal') : 'off');
+        } catch { /* store not ready */ }
+      }
+      if (key === 'reduceTransparency') {
+        try {
+          if (prev.transparency === false) {
+            // transparency disabled -- glass stays off
+            shellPrefs.setGlassMode('off');
+          } else {
+            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'normal');
+          }
+        } catch { /* store not ready */ }
+      }
       return { ...prev, [key]: nextVal };
     });
   };
@@ -2360,8 +2407,51 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Visual Effects</h3>
       {renderToggle('reduceMotion', 'Reduce Motion', 'Minimize animated effects')}
-      {renderToggle('transparency', 'Transparency', 'Use transparent backgrounds')}
-      
+
+      {/* Glass mode segmented control -- single source of truth, mirrored
+          into the legacy `transparency` boolean for back-compat with older
+          components that still read settings.transparency. */}
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Glass</span>
+          <span style={styles.settingDesc}>Off, Reduced (light blur), Normal, or Liquid (richest depth).</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([
+            { id: 'off', label: 'Off' },
+            { id: 'reduced', label: 'Reduced' },
+            { id: 'normal', label: 'Normal' },
+            { id: 'liquid', label: 'Liquid' },
+          ] as const).map((mode) => {
+            const active = shellPrefs.glassMode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                aria-label={`Glass mode ${mode.label}`}
+                aria-pressed={active}
+                onClick={() => {
+                  shellPrefs.setGlassMode(mode.id);
+                  // Mirror to legacy boolean so existing CSS gates keep working.
+                  setSettings(prev => ({
+                    ...prev,
+                    transparency: mode.id !== 'off',
+                    reduceTransparency: mode.id === 'reduced',
+                  }));
+                }}
+                style={{
+                  padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+                  background: active ? 'rgba(10,132,255,0.15)' : 'transparent',
+                  color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                }}
+              >{mode.label}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      {renderToggle('reduceTransparency', 'Reduce Transparency', 'Force solid surfaces over translucency for readability')}
+
       <h3 style={styles.sectionTitle}>Wallpaper</h3>
       <div style={{
         padding: 16, borderRadius: 12,
@@ -2553,7 +2643,7 @@ export const Settings: React.FC = () => {
             width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
             transition: 'transform 0.2s ease',
             transform: settings.stageManager ? 'translateX(20px)' : 'translateX(0)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--pg-shadow-chip)',
           }} />
         </button>
       </div>
@@ -2943,7 +3033,7 @@ export const Settings: React.FC = () => {
                     <span style={{
                       position: 'absolute', left: entry.enabled ? 20 : 2, top: 2, width: 20, height: 20,
                       borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      boxShadow: 'var(--pg-shadow-chip)',
                     }} />
                   </span>
                 </label>
@@ -3106,7 +3196,7 @@ export const Settings: React.FC = () => {
               aria-label="Toggle optional product analytics"
             />
             <span style={{ position: 'absolute', inset: 0, borderRadius: 12, background: optionalAnalytics ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
-              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: 'var(--pg-shadow-chip)' }} />
             </span>
           </label>
         </div>
@@ -3434,7 +3524,7 @@ export const Settings: React.FC = () => {
                   <span style={{
                     position: 'absolute', left: autoOpt ? 20 : 2, top: 2, width: 20, height: 20,
                     borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    boxShadow: 'var(--pg-shadow-chip)',
                   }} />
                 </span>
               </label>
@@ -4502,7 +4592,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '20px',
     borderRadius: '50%',
     background: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+    boxShadow: 'var(--pg-shadow-chip)',
     position: 'absolute',
     left: '2px',
     top: '50%',

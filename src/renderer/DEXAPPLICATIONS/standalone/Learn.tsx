@@ -193,8 +193,9 @@ const Learn: React.FC = () => {
       setRestrictedMode(restrictions?.pauseNonEssentialTimers ?? false);
     }).catch(() => {});
     
-    // Real-time metrics
+    // Real-time metrics -- only poll while document is visible.
     const updateMetrics = () => {
+      if (document.hidden) return;
       ipc.invoke('system:getCpuUsage').then((cpu: number) => setCpuUsage(cpu || 0)).catch(() => {});
       ipc.invoke('system:getMemoryUsage').then((mem: number) => setMemoryUsage(mem || 0)).catch(() => {});
     };

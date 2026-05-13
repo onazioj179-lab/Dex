@@ -398,7 +398,7 @@ const PresentationBuilder: React.FC = () => {
               ))}
             </div>
             {/* Editor visible canvas */}
-            <div style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+            <div style={{ boxShadow: 'var(--pg-shadow-popover)' }}>
               {currentSlide && renderSlide(currentSlide, 1, true)}
             </div>
           </div>

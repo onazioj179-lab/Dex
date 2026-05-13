@@ -895,7 +895,7 @@ const DexNotes: React.FC = () => {
           padding: '10px 16px', borderRadius: 10,
           background: 'var(--color-bg-surface-solid, #2C2C2E)',
           border: '1px solid var(--color-border-subtle)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          boxShadow: 'var(--pg-shadow-panel)',
           fontSize: 13, color: '#e5e5ea', whiteSpace: 'nowrap',
           animation: 'fadeIn 0.2s ease-out',
         }}>

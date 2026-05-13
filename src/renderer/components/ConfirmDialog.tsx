@@ -114,7 +114,7 @@ const dialogStyle: React.CSSProperties = {
   padding: space[5],
   minWidth: 320,
   maxWidth: 480,
-  boxShadow: '0 24px 64px rgba(0,0,0,0.45)',
+  boxShadow: 'var(--pg-shadow-modal)',
   display: 'flex',
   flexDirection: 'column',
   gap: space[4],

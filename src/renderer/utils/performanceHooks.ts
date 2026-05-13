@@ -504,7 +504,7 @@ export const DEX_THEME = {
   radiusXl: '20px',
   
   // Shadows
-  shadow: '0 8px 32px rgba(0,0,0,0.4)',
+  shadow: 'var(--pg-shadow-panel)',
   shadowSm: '0 4px 16px rgba(0,0,0,0.2)',
   shadowInset: 'inset 0 1px 0 var(--color-bg-hover)',
   

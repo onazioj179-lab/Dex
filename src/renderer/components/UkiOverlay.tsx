@@ -2004,7 +2004,7 @@ const UkiOverlay: React.FC = () => {
                 border: '1px solid var(--color-border-subtle)',
                 borderRadius: 8, fontSize: 11,
                 maxHeight: 220, overflowY: 'auto',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                boxShadow: 'var(--pg-shadow-tooltip)',
                 zIndex: 2,
               }}>
                 {matches.map(m => (
