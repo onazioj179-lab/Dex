@@ -17,7 +17,7 @@ import {
   MockIpc,
   testFactory,
   IDENTITY, worldToScreen, screenToWorld, zoomAt, panBy, fitToView,
-  rafThrottle,
+  rafCoalesce,
   downloadBlob, downloadJson, downloadCsv,
   stepLayout, DEFAULT_LAYOUT_OPTIONS,
   EventBus,
@@ -163,7 +163,7 @@ describe('rafThrottle', () => {
   it('coalesces rapid calls into one frame', async () => {
     let count = 0;
     let lastArg = 0;
-    const fn = rafThrottle((n: number) => { count++; lastArg = n; });
+    const fn = rafCoalesce((n: number) => { count++; lastArg = n; });
     fn(1); fn(2); fn(3);
     await new Promise<void>((r) => setTimeout(r, 30));
     expect(count).toBe(1);
