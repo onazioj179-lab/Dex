@@ -10,6 +10,42 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.55.0 - Master Evolution Plan Phase 0: governance, ADRs, KPI baselines
+
+First release after the 500-improvement backlog closed. Begins the Master
+Evolution Plan with Phase 0 deliverables. No user-facing behavior changes;
+this lands the binding governance scaffolding that downstream phases depend
+on.
+
+New architecture decision records under `docs/adr/`:
+
+- ADR 0001 - record architecture decisions.
+- ADR 0002 - master evolution plan phasing (binding sequence and deps).
+- ADR 0003 - improvements500 shared-primitive layer policy.
+- ADR 0004 - IPC contract formalization (registry, schemas, rate categories,
+  correlation IDs, versioning rule).
+- ADR 0005 - release rings and rollback policy (dev/canary/beta/stable with
+  health-gated promotion and automatic rollback).
+
+New governance documents:
+
+- `docs/KPI_BASELINES.md` - performance, reliability, intelligence, UX,
+  accessibility, creative, and collaboration KPI baselines plus IPC rate
+  categories and health/memory/attention thresholds.
+- `docs/RELEASE_RINGS.md` - ring promotion workflow.
+- `docs/ROLLBACK_POLICY.md` - automatic and manual rollback procedure plus
+  forward-fix ban during freeze.
+- `docs/DEPENDENCY_MAP.md` - phase graph, hard dependencies, cross-cutting
+  producer/consumer matrix, and risk hotspots inherited from the audit.
+
+New runtime module:
+
+- `src/shared/governance/index.ts` - programmatic mirror of the KPI and
+  ring policy documents (release ring constants, gate thresholds, IPC rate
+  budgets, health/memory/attention defaults, and promotion helpers
+  `canPromote` and `nextRing`). Code consuming KPI thresholds reads from
+  this module so the docs and the runtime cannot drift. 10 unit tests pass.
+
 ## v4.54.0 - 500-Improvement Wave 50 (final): operational and master-plan primitives
 
 Fiftieth and final wave. 10 modules close out the 500-improvement backlog (501 total
