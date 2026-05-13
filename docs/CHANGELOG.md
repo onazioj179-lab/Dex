@@ -10,6 +10,36 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.25.0 - 500-Improvement Wave 21: Signals, geometry, flow networks
+
+Twenty-first wave. 10 more shared modules, 12 new tests pass.
+
+- `Deque<T>` circular-buffer double-ended queue with O(1) operations.
+- `PerlinNoise` 2D and 3D classic Perlin gradient noise (seedable).
+- `SimplexNoise` 2D simplex noise (smoother than Perlin).
+- `catmullRomSpline` interpolating spline through control points.
+- `bsplineCurve` De Boor evaluation with clamped uniform knots.
+- `polynomialFit` + `polynomialEval` least-squares regression and Horner eval.
+- `fft` / `ifft` / `fftFromReal` radix-2 Cooley-Tukey FFT.
+- `hammingEncode4` / `hammingDecode7` Hamming(7,4) single-bit error correction.
+- `sutherlandHodgmanClip` polygon clipping against convex region.
+- `fordFulkerson` Edmonds-Karp max-flow on directed graphs.
+
+## v4.24.0 - 500-Improvement Wave 20: Search, balanced trees, matrices
+
+Twentieth wave. 10 more shared modules, 12 new tests pass.
+
+- `SkipList<T>` probabilistic ordered set with O(log n) expected operations.
+- `AvlTree<K>` height-balanced BST with rotation rebalancing.
+- `Treap<K>` randomized BST keyed by random priorities.
+- `kmpSearch` / `kmpAll` linear-time substring search via KMP failure function.
+- `rabinKarpSearch` / `rabinKarpAll` rolling-hash substring search.
+- `longestPalindrome` Manacher's algorithm in O(n).
+- `suffixArray` + `lcpArray` for fast substring/text indexing.
+- `editScript` Wagner-Fischer with full edit-op traceback.
+- `mat4*` 4x4 column-major matrix utilities (multiply/transpose/translate/scale/rotate).
+- `CountingBloomFilter` add/remove/contains with small per-cell counters.
+
 ## v4.23.0 - 500-Improvement Wave 19: Graphs, trees, number theory
 
 Nineteenth wave. 10 more shared modules, 18 new tests pass.

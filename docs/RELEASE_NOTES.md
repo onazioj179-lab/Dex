@@ -4,6 +4,41 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.25.0 -- 500-Improvement Wave 21
+
+Wave 21 adds ten more shared utilities focused on signals, geometry,
+and graph flow. `Deque` provides a circular-buffer double-ended queue;
+`PerlinNoise` and `SimplexNoise` deliver seedable gradient noise for
+procedural visuals; `catmullRomSpline` and `bsplineCurve` produce
+smooth interpolating curves; `polynomialFit` solves least-squares
+regression to recover polynomial coefficients from data;
+`fft`/`ifft` deliver a radix-2 Cooley-Tukey FFT for spectrum analysis
+and convolution; `hammingEncode4`/`hammingDecode7` adds single-bit
+error correction over 4-bit nibbles; `sutherlandHodgmanClip` clips
+any polygon against a convex region; and `fordFulkerson` computes
+maximum flow on directed capacitated graphs via the Edmonds-Karp
+variant. All twelve unit tests pass green.
+
+---
+
+## Version 4.24.0 -- 500-Improvement Wave 20
+
+Wave 20 lands ten more shared algorithm utilities focused on search,
+balanced trees, and matrix math. `SkipList`, `AvlTree`, and `Treap`
+add three different ordered-set strategies with O(log n) expected
+operations; `kmpSearch` and `rabinKarpSearch` provide linear-time
+substring search; `longestPalindrome` uses Manacher's algorithm to
+find the longest palindromic substring in O(n); `suffixArray` plus
+`lcpArray` enable fast substring queries on large texts; `editScript`
+reconstructs the full sequence of insert/delete/replace operations to
+transform one string into another; `mat4*` adds 4x4 matrix multiply,
+transpose, translation, scale, and rotation primitives; and
+`CountingBloomFilter` extends the classic bloom filter with counted
+cells so entries can be removed without rebuilding the filter. All
+twelve unit tests pass green.
+
+---
+
 ## Version 4.23.0 -- 500-Improvement Wave 19
 
 Wave 19 ships ten classic algorithm utilities for graphs, trees, and
