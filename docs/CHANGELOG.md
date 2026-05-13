@@ -10,7 +10,46 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
-## v4.5.0 - 500-Improvement Wave 1: Shared infrastructure
+## v4.6.0 - 500-Improvement Wave 2: Perf, a11y, shell infrastructure
+
+Second shipping wave. Adds 10 more force-multiplier modules under
+`src/renderer/improvements500/`, advancing 29 backlog items.
+
+### Added
+
+- **List virtualization** (`virtualList.ts`): `computeSlice` pure math +
+  `useVirtualList` hook with ResizeObserver. *(T6-001..006)*
+- **Leak-safe effect helpers** (`safeEffects.ts`): `useTimeout`,
+  `useInterval`, `useEventListener`, `useRaf`, `useFetchJson`
+  (auto-aborting), `useDocumentVisible`, `useDebounced`. *(T6-015, T6-017,
+  T6-026, T6-027, T6-029, T6-030, T6-032)*
+- **LRU cache** (`lru.ts`): capacity-bounded with bump-on-get. *(T6-024)*
+- **Modal focus trap** (`focusTrap.ts`): Tab cycle + initial focus + ESC.
+  *(T1-050)*
+- **Live region announcer** (`liveRegion.ts`): polite/assertive global
+  channels with idempotent re-announce. *(T1-051, T1-057, T1-059)*
+- **OS a11y preference hooks** (`a11yPrefs.ts`): `useReducedMotion`,
+  `useHighContrast`, `useDarkScheme`. *(T1-055, T1-056)*
+- **Command palette registry** (`commandPalette.ts`): register / search with
+  consecutive-streak fuzzy scoring. *(T9-004)*
+- **Shortcut registry + remap** (`shortcuts.ts`): default + per-user binding,
+  parser, dispatcher, cheat-sheet data. *(T9-003, T9-021)*
+- **Idle detector** (`idleDetector.ts`): active/idle/away transitions on
+  pointer/keyboard/touch input. *(T4-039, T7-009)*
+- **Secure clipboard** (`secureClipboard.ts`): `copySecret` with auto-clear
+  and `readClipboard` gated on recent user gesture. *(T7-008, T7-032)*
+
+### Tests
+
+- New [tests/unit/improvements500-wave2.test.ts](../tests/unit/improvements500-wave2.test.ts)
+  (20 tests covering all 10 new modules). All 70 cumulative wave tests pass.
+
+### Notes
+
+Twenty-nine backlog items are now `[~]` infrastructure-shipped pending UI
+integration. Wave 3 will start wiring these into call sites across apps.
+
+
 
 First shipping wave of the 500-improvement program. This release focuses on
 landing the *shared infrastructure* that subsequent UI integrations will

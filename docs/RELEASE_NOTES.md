@@ -4,6 +4,27 @@ Simple, plain language. What changed, what it means for you.
 
 ---
 
+## Version 4.6.0 -- 500-Improvement Wave 2
+
+Continues the foundation pass. Wave 2 adds ten more shared modules that the
+rest of the app will plug into: list virtualization, leak-safe React effect
+helpers, an LRU cache, a modal focus trap, a screen-reader live-region
+announcer, OS accessibility preference hooks (reduced-motion / high-contrast
+/ dark-scheme), a command palette registry, a keyboard-shortcut registry with
+user remap and cheat-sheet, an idle/away detector, and a secure clipboard
+with auto-clear plus user-gesture gating for reads.
+
+These mean: bigger lists will scroll smoothly without rendering thousands of
+hidden rows, modals will be properly trappable for keyboard users, important
+status changes (downloads, window opens) can announce themselves to screen
+readers, every app respects your OS reduced-motion / high-contrast settings,
+and the vault clipboard will auto-clear so secrets do not linger.
+
+Twenty-nine more backlog items advanced this wave. The next release will
+start wiring these into the visible app surfaces.
+
+---
+
 ## Version 4.5.0 -- 500-Improvement Wave 1
 
 This is the first shipping wave of a planned 500-item improvement program.

@@ -74,16 +74,16 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done.
 - [ ] T1-047 — Dock: aria-current="true" on active app (done) — verify.
 - [ ] T1-048 — Window header: aria-label minimize/maximize/close.
 - [ ] T1-049 — Context menus: role="menu" + roving tabindex.
-- [ ] T1-050 — Modals: focus trap + initial focus + ESC closes.
-- [ ] T1-051 — Toasts: aria-live region.
+- [~] T1-050 — Modals: focus trap + initial focus + ESC closes. (useFocusTrap shipped v4.6.0)
+- [~] T1-051 — Toasts: aria-live region. (liveRegion.announce shipped v4.6.0)
 - [ ] T1-052 — Form fields: every input has an associated label.
 - [ ] T1-053 — Color contrast audit pass (target WCAG AA 4.5:1).
 - [ ] T1-054 — Provide skip-link to main content.
-- [ ] T1-055 — Reduced-motion: every animation respects `prefers-reduced-motion`.
-- [ ] T1-056 — High-contrast preference: honor `prefers-contrast: more`.
-- [ ] T1-057 — Screen-reader announce when a window opens / closes.
+- [~] T1-055 — Reduced-motion: every animation respects `prefers-reduced-motion`. (useReducedMotion / a11yPrefs shipped v4.6.0)
+- [~] T1-056 — High-contrast preference: honor `prefers-contrast: more`. (useHighContrast shipped v4.6.0)
+- [~] T1-057 — Screen-reader announce when a window opens / closes. (liveRegion.announce shipped v4.6.0)
 - [ ] T1-058 — Tooltips reachable via keyboard focus, not only hover.
-- [ ] T1-059 — Live region for download progress.
+- [~] T1-059 — Live region for download progress. (liveRegion.announce assertive shipped v4.6.0)
 - [ ] T1-060 — Axe-core scan in CI; fail PR on new violations.
 
 ## T2 — Iconography & visual polish (45)
@@ -227,8 +227,8 @@ FORGE (8):
 - [x] T4-036 — Notifications: do-not-disturb toggle. setDnd/shouldDeliver shipped v4.5.0.
 - [x] T4-037 — Notifications: per-app mute. setAppMuted shipped v4.5.0.
 - [x] T4-038 — Notifications: snooze. snoozeApp shipped v4.5.0.
-- [ ] T4-039 — Presence: idle/away/busy detection.
-- [ ] T4-040 — Presence: custom status string.
+- [~] T4-039 — Presence: idle/away/busy detection. (IdleDetector shipped v4.6.0)
+- [~] T4-040 — Presence: custom status string. (presence.setCustomText shipped v4.5.0)
 - [ ] T4-041 — Profile: avatar upload + crop.
 - [ ] T4-042 — Profile: bio + links.
 - [ ] T4-043 — Profile: timezone display on hover.
@@ -295,12 +295,12 @@ FORGE (8):
 
 ## T6 — Performance & stability (55)
 
-- [ ] T6-001 — Virtualize Files list when items > 500.
-- [ ] T6-002 — Virtualize Notes list.
-- [ ] T6-003 — Virtualize Tasks list.
-- [ ] T6-004 — Virtualize Gallery grid.
-- [ ] T6-005 — Virtualize Recents list.
-- [ ] T6-006 — Virtualize Search results.
+- [~] T6-001 — Virtualize Files list when items > 500. (useVirtualList shipped v4.6.0)
+- [~] T6-002 — Virtualize Notes list. (useVirtualList shipped v4.6.0)
+- [~] T6-003 — Virtualize Tasks list. (useVirtualList shipped v4.6.0)
+- [~] T6-004 — Virtualize Gallery grid. (useVirtualList shipped v4.6.0)
+- [~] T6-005 — Virtualize Recents list. (useVirtualList shipped v4.6.0)
+- [~] T6-006 — Virtualize Search results. (useVirtualList shipped v4.6.0)
 - [ ] T6-007 — Lazy-load every standalone app via React.lazy.
 - [ ] T6-008 — Code-split per major surface (Settings panels).
 - [ ] T6-009 — Memoize selectors in zustand stores.
@@ -309,24 +309,24 @@ FORGE (8):
 - [ ] T6-012 — Dock: avoid full re-render on hover (item-local state).
 - [ ] T6-013 — FloatingWindow: drag uses transform, not left/top.
 - [ ] T6-014 — FloatingWindow: resize uses CSS aspect-ratio where possible.
-- [ ] T6-015 — Cancel in-flight fetches on app close.
+- [~] T6-015 — Cancel in-flight fetches on app close. (useFetchJson AbortController shipped v4.6.0)
 - [ ] T6-016 — Throttle scroll listeners to rAF.
-- [ ] T6-017 — Debounce text-input → store updates.
+- [~] T6-017 — Debounce text-input → store updates. (useDebounced shipped v4.6.0)
 - [ ] T6-018 — Web workers for image processing in PRISM/FLUX.
 - [ ] T6-019 — Web workers for FFT in Imosion visualizers.
 - [ ] T6-020 — Worker pool for thumbnail generation.
 - [ ] T6-021 — Off-screen canvas for VINX preview render.
 - [ ] T6-022 — IndexedDB cache for thumbnails.
 - [ ] T6-023 — IndexedDB cache for embeddings.
-- [ ] T6-024 — LRU eviction for caches.
+- [~] T6-024 — LRU eviction for caches. (LRU class shipped v4.6.0)
 - [ ] T6-025 — Detach unused canvases when window minimized.
-- [ ] T6-026 — Pause animations when window not visible.
-- [ ] T6-027 — Pause polling when document.hidden.
+- [~] T6-026 — Pause animations when window not visible. (useDocumentVisible shipped v4.6.0)
+- [~] T6-027 — Pause polling when document.hidden. (useDocumentVisible shipped v4.6.0)
 - [ ] T6-028 — Tear down audio nodes on Imosion close.
-- [ ] T6-029 — Leak audit: every useEffect cleans up timers.
-- [ ] T6-030 — Leak audit: every useEffect cleans up event listeners.
+- [~] T6-029 — Leak audit: every useEffect cleans up timers. (useTimeout/useInterval shipped v4.6.0)
+- [~] T6-030 — Leak audit: every useEffect cleans up event listeners. (useEventListener shipped v4.6.0)
 - [ ] T6-031 — Leak audit: zustand subscriptions unsubscribed.
-- [ ] T6-032 — Leak audit: requestAnimationFrame cancelled.
+- [~] T6-032 — Leak audit: requestAnimationFrame cancelled. (useRaf shipped v4.6.0)
 - [ ] T6-033 — Bundle analyzer in build pipeline.
 - [ ] T6-034 — Tree-shake icon library imports.
 - [ ] T6-035 — Replace moment-style date libs with native Intl.
@@ -360,8 +360,8 @@ FORGE (8):
 - [ ] T7-005 — Vault: argon2id for key derivation.
 - [ ] T7-006 — Vault: AES-256-GCM for entry encryption.
 - [ ] T7-007 — Vault: master-key never stored.
-- [ ] T7-008 — Vault: clipboard auto-clear after 30s.
-- [ ] T7-009 — Vault: lock-on-idle.
+- [~] T7-008 — Vault: clipboard auto-clear after 30s. (secureClipboard.copySecret shipped v4.6.0)
+- [~] T7-009 — Vault: lock-on-idle. (IdleDetector shipped v4.6.0)
 - [ ] T7-010 — Vault: audit log of access events.
 - [ ] T7-011 — Plugin sandbox: iframe with strict CSP.
 - [ ] T7-012 — Plugin sandbox: postMessage protocol with validated schema.
@@ -384,7 +384,7 @@ FORGE (8):
 - [ ] T7-029 — Logs: redact secrets via regex pre-write.
 - [ ] T7-030 — Crash dumps: strip PII before submit.
 - [ ] T7-031 — File pickers: enforce extension allowlist.
-- [ ] T7-032 — Clipboard reads: explicit user gesture required.
+- [~] T7-032 — Clipboard reads: explicit user gesture required. (recordUserGesture/readClipboard shipped v4.6.0)
 - [ ] T7-033 — Notification permission gated per app.
 - [ ] T7-034 — Camera/mic permission gated per app.
 - [ ] T7-035 — Pen-test checklist in `docs/SECURITY.md`.
@@ -431,8 +431,8 @@ FORGE (8):
 
 - [ ] T9-001 — First-run welcome tour (dismissible).
 - [ ] T9-002 — Per-app one-time tooltip pointing to a key feature.
-- [ ] T9-003 — Shortcut cheat-sheet overlay (Cmd/Ctrl+/).
-- [ ] T9-004 — Command palette (Cmd/Ctrl+K) covers every action.
+- [~] T9-003 — Shortcut cheat-sheet overlay (Cmd/Ctrl+/). (shortcuts.cheatSheet shipped v4.6.0)
+- [~] T9-004 — Command palette (Cmd/Ctrl+K) covers every action. (commandPalette registry + fuzzy search shipped v4.6.0)
 - [ ] T9-005 — "What's new" panel after update.
 - [ ] T9-006 — Empty home → suggested actions list.
 - [ ] T9-007 — Recovery banner if previous session crashed.
@@ -449,7 +449,7 @@ FORGE (8):
 - [ ] T9-018 — Tutorial videos linked from each app's empty state.
 - [ ] T9-019 — Hover guide overlay (press Alt) labels every visible control.
 - [ ] T9-020 — Per-user theme preset editor.
-- [ ] T9-021 — Per-user shortcut remap UI.
+- [~] T9-021 — Per-user shortcut remap UI. (shortcuts.setBinding/getBinding/resetBinding shipped v4.6.0)
 - [x] T9-022 — Multi-window layout presets (save/load). workspaceLayouts.saveLayout/getLayout/listLayouts/deleteLayout shipped v4.5.0.
 - [x] T9-023 — Workspace switcher (sets of windows). workspace field on layouts + listWorkspaces shipped v4.5.0.
 - [ ] T9-024 — Focus mode (hide non-active windows).
@@ -498,7 +498,7 @@ FORGE (8):
 - [~] T11-021 — Pen pressure → FLUX brush stroke width. (applyBrushDynamics shipped v4.5.0)
 - [~] T11-022 — Pen pressure → AXL pen tool weight. (applyBrushDynamics shipped v4.5.0)
 - [x] T11-023 — Pen barrel-button → eraser. isEraserGesture shipped v4.5.0.
-- [ ] T11-024 — Palm rejection on canvases.
+- [~] T11-024 — Palm rejection on canvases. (samplePen palm heuristic shipped v4.5.0)
 - [ ] T11-025 — Imosion spectrum canvas: touch scrub.
 - [ ] T11-026 — Imosion waveform canvas: pinch-zoom + touch scrub.
 - [ ] T11-027 — Soft-keyboard affordance for kiosk text inputs.
