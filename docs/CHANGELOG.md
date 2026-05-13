@@ -10,6 +10,22 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+## v4.40.0 - 500-Improvement Wave 36: encoding, color, stats, numerics
+
+Thirty-sixth wave. 10 more shared modules, 10 new tests pass.
+
+### Added
+- `base85Encode/base85Decode` - Adobe Ascii85 binary-to-text codec.
+- `bwtTransform/bwtInverse` - Burrows-Wheeler transform with primary index.
+- `constantTimeEqual/constantTimeStringEqual` - timing-safe equality checks.
+- `rgbToOklab/oklabToRgb` - perceptually uniform Oklab color space conversion.
+- `kahanSum/neumaierSum` - compensated floating-point summation.
+- `percentileLinear/quantiles` - linear-interpolation percentile estimation.
+- `MultiMap<K,V>` - keys mapping to arrays of values, size tracking.
+- `Tfidf` - term-frequency / inverse-document-frequency document ranking.
+- `simpsonsRule/trapezoidRule` - numerical quadrature.
+- `newtonRaphson/bisection` - one-dimensional root finders.
+
 ## v4.39.0 - 500-Improvement Wave 35: MST, alignment, clustering, DSP
 
 Thirty-fifth wave. 10 more shared modules, 10 new tests pass.
