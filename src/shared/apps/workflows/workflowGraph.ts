@@ -119,7 +119,8 @@ export type TriggerEvent =
   | { kind: 'fs'; path: string; change: 'add' | 'modify' | 'remove' }
   | { kind: 'clock'; iso: string }
   | { kind: 'webhook'; route: string; body?: unknown }
-  | { kind: 'event-bus'; topic: string; payload?: unknown };
+  | { kind: 'event-bus'; topic: string; payload?: unknown }
+  | { kind: 'manual'; at: number };
 
 export function matchesTrigger(node: WorkflowNode, e: TriggerEvent): boolean {
   if (node.kind !== 'trigger') return false;
@@ -128,6 +129,7 @@ export function matchesTrigger(node: WorkflowNode, e: TriggerEvent): boolean {
     case 'clock': return node.type === 'cron' && cronTick(String(node.config.cron ?? ''), e.iso);
     case 'webhook': return node.type === 'http.in' && node.config.route === e.route;
     case 'event-bus': return node.type === 'bus.subscribe' && node.config.topic === e.topic;
+    case 'manual': return node.type === 'manual';
   }
 }
 

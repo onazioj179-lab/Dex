@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v4.60.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm run package:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Build (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npm run package:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Build (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run package:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dex-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/latest*.yml
+          if-no-files-found: warn
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          ls -la release-assets
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish to public Dex repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" --repo "${{ github.repository }}" release-assets/* --clobber
+          else
+            gh release create "$TAG" --repo "${{ github.repository }}" --title "DEX $TAG" --generate-notes release-assets/*
+          fi
+      - name: Publish to dex-updates repo
+        if: ${{ secrets.DEX_UPDATES_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.DEX_UPDATES_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          REPO="onazioj179-lab/dex-updates"
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$REPO" release-assets/* --clobber
+          else
+            gh release create "$TAG" --repo "$REPO" --title "DEX $TAG" --notes "Auto-update channel for DEX $TAG" release-assets/*
+          fi

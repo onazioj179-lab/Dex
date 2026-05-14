@@ -1,6 +1,6 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 4.2.0 - Copyright (c) 2026 - DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 4.60.1 - Copyright (c) 2026 - DEX Software License Agreement v1.0
 
 DEX is a calm, fast, local-first desktop workspace. One launcher, one assistant,
 one home for the apps you use every day. Take notes, run timers, open files,
@@ -53,6 +53,19 @@ page for what is shipping next.
 
 The Windows installer asks you to read and accept the License before any files
 are written. No silent installs.
+
+### Latest release: v4.60.1
+
+| Platform | Download | SHA-256 |
+|---|---|---|
+| Windows x64 | [DEX-4.60.1-win-x64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v4.60.1/DEX-4.60.1-win-x64.exe) (86.6 MB) | `D29B374A2148CF7EC753E3D2802239581BCB620F73D84B300D0CAA5768B9666D` |
+| macOS (arm64 + x64) | building on next CI run | -- |
+| Linux (AppImage + deb) | building on next CI run | -- |
+
+- **All releases**: https://github.com/onazioj179-lab/Dex/releases
+- **Auto-update channel**: https://github.com/onazioj179-lab/dex-updates/releases
+- **Release notes**: [release-notes-4.60.1.md](release-notes-4.60.1.md)
+- The latest 3 releases are kept on each repo; older builds are pruned automatically.
 
 ## What is in the box
 

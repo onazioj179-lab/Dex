@@ -10,6 +10,8 @@
 
 import { topoOrder, validateGraph, type WorkflowGraph, type WorkflowNode, type TriggerEvent, matchesTrigger } from './workflowGraph';
 
+
+
 export type NodeHandler = (
   node: WorkflowNode,
   inputs: Record<string, unknown>,
@@ -122,3 +124,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
     p.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
   });
 }
+
+
+
+export type { WorkflowGraph, TriggerEvent } from './workflowGraph';
