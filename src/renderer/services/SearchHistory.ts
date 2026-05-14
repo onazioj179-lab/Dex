@@ -404,9 +404,7 @@ export function getCompletions(query: string, limit = 5): string[] {
 }
 
 // ============================================================================
-// Voice Search Stub
-// ============================================================================
-// Voice Search
+// Voice Search — Web Speech API
 // ============================================================================
 
 // Type declarations for Web Speech API

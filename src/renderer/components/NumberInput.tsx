@@ -279,7 +279,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
               color: colors.text.primary,
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              boxShadow: 'var(--pg-shadow-chip)',
             }}
           >
             {formatValue(value)}{unit}

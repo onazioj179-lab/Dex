@@ -675,7 +675,7 @@ export const Home: React.FC = () => {
                     borderRadius: 16, cursor: 'pointer',
                     color: 'var(--color-text-primary)', fontSize: 12,
                     textAlign: 'left',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
+                    boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
                     transition: 'background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = '0 12px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.10)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
@@ -742,7 +742,7 @@ export const Home: React.FC = () => {
               zIndex: Z_CONTEXT_MENU, minWidth: 200, padding: '5px 0',
               background: 'var(--color-bg-elevated)',
               borderRadius: 12, border: '1px solid var(--color-border-subtle)',
-              boxShadow: '0 12px 40px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.04)',
+              boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.04)',
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >
@@ -1067,7 +1067,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
               background: 'rgba(28, 28, 32, 0.95)',
               borderRadius: 12,
               border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.5), inset 0 0.5px 0 rgba(255,255,255,0.08)',
+              boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
               backdropFilter: 'blur(24px) saturate(180%)',
               WebkitBackdropFilter: 'blur(24px) saturate(180%)',
               animation: 'ctxFadeIn 0.15s cubic-bezier(0.23, 1, 0.32, 1)',
@@ -1133,7 +1133,7 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
       backdropFilter: 'blur(34px) saturate(180%)',
       WebkitBackdropFilter: 'blur(34px) saturate(180%)',
       border: '1px solid rgba(255,255,255,0.10)',
-      boxShadow: '0 8px 22px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.08)',
+      boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
       opacity: done ? 0.6 : 1,
       cursor: 'default',
       transition: 'opacity 0.5s ease, transform 0.4s ease, background 0.15s ease, box-shadow 0.15s ease',

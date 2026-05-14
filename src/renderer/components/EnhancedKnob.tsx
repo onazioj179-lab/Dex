@@ -249,7 +249,7 @@ export const EnhancedKnob: React.FC<EnhancedKnobProps> = ({
               color: colors.text.primary,
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              boxShadow: 'var(--pg-shadow-chip)',
               animation: 'fadeIn 0.1s ease',
             }}
           >

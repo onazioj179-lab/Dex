@@ -77,6 +77,8 @@ export function initAnimationBudget(): () => void {
   // Check reduced motion preference
   const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   state.reducedMotion = mediaQuery.matches;
+  // Apply immediately so callers see the correct mode before the first frame
+  updatePerformanceMode();
   
   const handleMotionChange = (e: MediaQueryListEvent) => {
     state.reducedMotion = e.matches;
@@ -597,6 +599,42 @@ export function getPlaybackThrottle(): number {
 export function usePerformanceTier(): PerformanceTier {
   const [tier] = useState(() => detectPerformanceTier());
   return tier;
+}
+
+// -----------------------------------------------------------------------------
+// K3 — GPU-aware expensive-effect skip gate
+// -----------------------------------------------------------------------------
+// Combines the animationBudget frame-time pressure signal with the
+// SystemTier hardware classification to produce a single boolean that
+// indicates whether a costly visual effect (layered blur, particle system,
+// real-time shadow etc.) should be skipped entirely for this frame cycle.
+//
+// Rules:
+//   - PerformanceTier 'low'  → always skip
+//   - performanceMode 'disabled' → always skip
+//   - performanceMode 'reduced' + tier not 'ultra' → skip
+//   - Otherwise → allow
+// -----------------------------------------------------------------------------
+
+/**
+ * Returns true when expensive visual effects (blur layers, particle systems,
+ * real-time shadows, convolution filters) should be skipped based on the
+ * current hardware tier and live frame-time pressure.
+ *
+ * Callers should gate their expensive work behind this:
+ * ```ts
+ * if (!shouldSkipExpensiveEffect()) {
+ *   renderParticles();
+ * }
+ * ```
+ */
+export function shouldSkipExpensiveEffect(): boolean {
+  const tier = cachedTier ?? detectPerformanceTier();
+  if (tier === 'low') return true;
+  const mode = getPerformanceMode();
+  if (mode === 'disabled') return true;
+  if (mode === 'reduced' && tier !== 'ultra') return true;
+  return false;
 }
 
 /**

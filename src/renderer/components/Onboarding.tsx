@@ -903,7 +903,7 @@ export const BeginnerTip: React.FC<{
     borderRadius: 10,
     padding: '10px 12px',
     maxWidth: 200,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+    boxShadow: 'var(--pg-shadow-tooltip)',
   }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
       <div>

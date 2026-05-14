@@ -525,8 +525,17 @@ export class EmbeddingEngine {
     const cached = this.cache.get(text);
     if (cached) return cached;
 
-    // Simulate embedding generation
-    const vector = this.generateMockEmbedding(text);
+    // Prefer the main-process EmbeddingService over IPC. Falls back to a
+    // local hash embedding if the bridge is unavailable (renderer-only tests,
+    // dev hot-reload before main is ready, etc.).
+    let vector: number[];
+    const bridge = (globalThis as { dexAPI?: { embedding?: { compute?: (t: string) => Promise<{ vector: number[] } | null> } } }).dexAPI;
+    try {
+      const dto = await bridge?.embedding?.compute?.(text);
+      vector = dto?.vector ?? localHashEmbed(text);
+    } catch {
+      vector = localHashEmbed(text);
+    }
     const result: EmbeddingResult = {
       vector,
       dimensions: vector.length,
@@ -537,6 +546,16 @@ export class EmbeddingEngine {
   }
 
   async embedBatch(texts: string[]): Promise<EmbeddingResult[]> {
+    // Try one round-trip via the batch IPC; fall back to per-text on failure.
+    const bridge = (globalThis as { dexAPI?: { embedding?: { computeBatch?: (t: string[]) => Promise<Array<{ vector: number[] }> | null> } } }).dexAPI;
+    try {
+      const dtos = await bridge?.embedding?.computeBatch?.(texts);
+      if (dtos && dtos.length === texts.length) {
+        return dtos.map((d) => ({ vector: d.vector, dimensions: d.vector.length }));
+      }
+    } catch {
+      /* fall through */
+    }
     return Promise.all(texts.map(t => this.embed(t)));
   }
 
@@ -571,19 +590,55 @@ export class EmbeddingEngine {
       .slice(0, topK);
   }
 
-  private generateMockEmbedding(text: string): number[] {
-    // Generate deterministic mock embedding based on text
-    const vector: number[] = [];
-    for (let i = 0; i < 128; i++) {
-      const charCode = text.charCodeAt(i % text.length) || 0;
-      vector.push(Math.sin(charCode * (i + 1)) * 0.5 + 0.5);
-    }
-    return vector;
-  }
-
   clearCache(): void {
     this.cache.clear();
   }
+}
+
+/**
+ * Renderer-side fallback: feature-hashing embedding mirroring
+ * `src/main/services/EmbeddingService.ts` so cosine similarity stays
+ * comparable across the boundary. Pure JS, deterministic, 128-dim.
+ * Uses FNV-1a (no Node `crypto` in renderer) — collision rate is fine for
+ * the offline-fallback path; the main-process service is preferred when the
+ * IPC bridge is reachable.
+ */
+function localHashEmbed(text: string): number[] {
+  const DIM = 128;
+  const vec = new Array<number>(DIM).fill(0);
+  if (!text) return vec;
+  const lower = text.toLowerCase();
+  const tokens = lower.match(/[a-z0-9_]+/g) ?? [];
+  const counts = new Map<string, number>();
+  for (const t of tokens) counts.set(t, (counts.get(t) ?? 0) + 1);
+  for (const [tok, count] of counts) {
+    const { bucket, sign } = fnv1aBucket(`tok:${tok}`, DIM);
+    vec[bucket] += sign * Math.log(1 + count);
+  }
+  for (const tok of tokens) {
+    const padded = `^${tok}$`;
+    for (let i = 0; i < padded.length - 2; i++) {
+      const tri = padded.slice(i, i + 3);
+      const { bucket, sign } = fnv1aBucket(`tri:${tri}`, DIM);
+      vec[bucket] += sign * 0.25;
+    }
+  }
+  let norm = 0;
+  for (let i = 0; i < DIM; i++) norm += vec[i] * vec[i];
+  norm = Math.sqrt(norm);
+  if (norm > 0) for (let i = 0; i < DIM; i++) vec[i] /= norm;
+  return vec;
+}
+
+function fnv1aBucket(s: string, dim: number): { bucket: number; sign: number } {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  // Squeeze into unsigned 32-bit then split into bucket + sign bit.
+  const u = h >>> 0;
+  return { bucket: u % dim, sign: (u & 0x80000000) ? -1 : 1 };
 }
 
 export const embeddingEngine = new EmbeddingEngine();

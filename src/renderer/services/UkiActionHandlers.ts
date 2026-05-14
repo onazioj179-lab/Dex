@@ -20,7 +20,7 @@
  *   ui.openLink              reversible   payload: { url }
  *   text.summarize           safe         payload: { text }   -> first sentence + length stat (local heuristic)
  *   text.wordCount           safe         payload: { text }
- *   text.translate           safe         payload: { text, to } -> stub: tags target lang
+ *   text.translate           safe         payload: { text, to, from? } -> LibreTranslate (configurable endpoint) or passthrough
  *   shell.toast              safe         payload: { message, severity? }
  *   media.muteToggle         safe         (best-effort via Web Audio focus)
  *   focus.toggle             safe         (toggles document.body.classList 'dex-focus')
@@ -143,10 +143,54 @@ export function registerUkiActionHandlers(): () => void {
     return { words: words.length, chars: text.length, lines: lines.length };
   }));
 
-  offs.push(ActionBus.register('text.translate', (p) => {
+  offs.push(ActionBus.register('text.translate', async (p) => {
     const text = asString(p?.text);
     const to = asString(p?.to, 'en');
-    return { translated: text, sourceLang: 'auto', targetLang: to, note: 'INTENTIONAL STUB: local translation model not bundled; passthrough.' };
+    const from = asString(p?.from, 'auto');
+    if (!text) return { translated: '', sourceLang: from, targetLang: to };
+
+    // Optional self-hosted LibreTranslate endpoint configured by the user.
+    // Read at call time so settings changes take effect without reload.
+    let endpoint = '';
+    try {
+      endpoint = (typeof localStorage !== 'undefined' && localStorage.getItem('uki.translate.endpoint')) || '';
+    } catch { /* sandboxed: no localStorage */ }
+
+    if (endpoint && /^https?:\/\//i.test(endpoint)) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4000);
+        const res = await fetch(endpoint.replace(/\/$/, '') + '/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q: text, source: from, target: to, format: 'text' }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json() as { translatedText?: string; detectedLanguage?: { language?: string } };
+          if (typeof data.translatedText === 'string') {
+            return {
+              translated: data.translatedText,
+              sourceLang: data.detectedLanguage?.language ?? from,
+              targetLang: to,
+              backend: 'libretranslate',
+            };
+          }
+        }
+      } catch {
+        /* fall through to passthrough */
+      }
+    }
+
+    // Offline passthrough — no model bundled. Caller can detect via `backend`.
+    return {
+      translated: text,
+      sourceLang: from,
+      targetLang: to,
+      backend: 'passthrough',
+      note: 'No translation backend reachable. Configure a LibreTranslate endpoint in Settings → UKI → Translate.',
+    };
   }));
 
   offs.push(ActionBus.register('shell.toast', (p) => {

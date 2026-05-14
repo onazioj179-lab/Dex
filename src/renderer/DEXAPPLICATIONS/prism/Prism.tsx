@@ -353,6 +353,8 @@ const Prism: React.FC = () => {
   const [brushSize, setBrushSize] = useState(20);
   const [brushHardness, setBrushHardness] = useState(100);
   const [brushOpacity, setBrushOpacity] = useState(100);
+  // Brush stabilization: 0 = off, 1-10 = rolling average window size
+  const [brushStabilization, setBrushStabilization] = useState(0);
   const [foregroundColor, setForegroundColor] = useState('#000000');
   const [backgroundColor, setBackgroundColor] = useState('var(--color-text-primary)');
   const [brushCursorPos, setBrushCursorPos] = useState<{ x: number; y: number } | null>(null);
@@ -618,6 +620,8 @@ const Prism: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  // Stabilization: rolling buffer of recent pointer positions
+  const stabBufferRef = useRef<{ x: number; y: number }[]>([]);
   const canvasDragRafRef = useRef<number>(0);
   const checkerPatternRef = useRef<CanvasPattern | null>(null);
   const layerImageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -1073,7 +1077,17 @@ const Prism: React.FC = () => {
     };
   }, [zoom]);
 
-  const drawStroke = useCallback((ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, pressure = 0.5) => {
+  const drawStroke = useCallback((ctx: CanvasRenderingContext2D, from: { x: number; y: number }, rawTo: { x: number; y: number }, pressure = 0.5) => {
+    // Brush stabilization: maintain a rolling average of recent points
+    let to = rawTo;
+    if (brushStabilization > 0) {
+      stabBufferRef.current.push(rawTo);
+      const windowSize = Math.min(brushStabilization + 1, stabBufferRef.current.length);
+      const tail = stabBufferRef.current.slice(-windowSize);
+      const ax = tail.reduce((s, p) => s + p.x, 0) / tail.length;
+      const ay = tail.reduce((s, p) => s + p.y, 0) / tail.length;
+      to = { x: ax, y: ay };
+    }
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
@@ -1096,7 +1110,7 @@ const Prism: React.FC = () => {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
-  }, [activeTool, foregroundColor, brushSize, brushOpacity, brushHardness]);
+  }, [activeTool, foregroundColor, brushSize, brushOpacity, brushHardness, brushStabilization]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Capture pointer for smooth drag across canvas boundary
@@ -1353,6 +1367,8 @@ const Prism: React.FC = () => {
     if (!drawCanvas) return;
     isDrawingRef.current = true;
     lastPointRef.current = pt;
+    // Reset stabilization buffer on each new stroke
+    stabBufferRef.current = [];
     if (activeTool === 'dodge' || activeTool === 'burn') {
       // Dodge/burn directly on main canvas
       const mainCanvas = canvasRef.current;

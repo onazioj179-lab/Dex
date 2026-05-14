@@ -136,7 +136,7 @@ const dialogStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: space[2],
-  boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+  boxShadow: 'var(--pg-shadow-popover-strong)',
 };
 const listStyle: React.CSSProperties = {
   listStyle: 'none',

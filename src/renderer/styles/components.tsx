@@ -127,7 +127,7 @@ export const DexButton = forwardRef<HTMLButtonElement, DexButtonProps>(({
     opacity: disabled ? 0.4 : 1,
     transform: pressScale,
     // Faster transitions for snappier button response
-    transition: `background 0.08s ease, border-color 0.08s ease, color 0.08s ease, transform 0.05s cubic-bezier(0.4,0,0.2,1), opacity 0.1s ease`,
+    transition: `background 0.08s ease, border-color 0.08s ease, color 0.08s ease, transform 0.05s var(--pg-curve-standard, cubic-bezier(0.4,0,0.2,1)), opacity 0.1s ease`,
     outline: 'none',
     width: fullWidth ? '100%' : 'auto',
     textTransform: 'none' as const,
@@ -413,8 +413,8 @@ export const DexModal: React.FC<DexModalProps> = ({
     zIndex: zIndex.modal,
     padding: space[6],
     animation: exiting 
-      ? 'dex-modal-backdrop-out 0.15s cubic-bezier(0.4, 0, 1, 1) forwards'
-      : 'dex-modal-backdrop-in 0.2s cubic-bezier(0, 0, 0.2, 1) forwards',
+      ? 'dex-modal-backdrop-out 0.15s var(--pg-curve-accelerate, cubic-bezier(0.4, 0, 1, 1)) forwards'
+      : 'dex-modal-backdrop-in 0.2s var(--pg-curve-decelerate, cubic-bezier(0, 0, 0.2, 1)) forwards',
   };
 
   const modalStyle: React.CSSProperties = {
@@ -430,8 +430,8 @@ export const DexModal: React.FC<DexModalProps> = ({
     overflow: 'hidden',
     outline: 'none',
     animation: exiting
-      ? 'dex-modal-exit 0.15s cubic-bezier(0.4, 0, 1, 1) forwards'
-      : 'dex-modal-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+      ? 'dex-modal-exit 0.15s var(--pg-curve-accelerate, cubic-bezier(0.4, 0, 1, 1)) forwards'
+      : 'dex-modal-enter 0.2s var(--pg-curve-emphasized, cubic-bezier(0.16, 1, 0.3, 1)) forwards',
   };
 
   const headerStyle: React.CSSProperties = {
@@ -1793,8 +1793,19 @@ export const DexToastContainer: React.FC = () => {
   useEffect(() => {
     const listener = (newToasts: ToastItem[]) => setToasts(newToasts);
     toastListeners.push(listener);
+    // Bridge legacy `dex-toast` CustomEvents (dispatched from across the app
+    // and from sub-apps that don't import the toast() API) into the queue.
+    // Without this, hundreds of `window.dispatchEvent('dex-toast', ...)`
+    // calls were going to /dev/null.
+    const onDexToast = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ message?: string; type?: ToastVariant; duration?: number }>).detail;
+      if (!detail || !detail.message) return;
+      toast.show(detail.message, detail.type ?? 'info', detail.duration ?? 4000);
+    };
+    window.addEventListener('dex-toast', onDexToast as EventListener);
     return () => {
       toastListeners = toastListeners.filter(l => l !== listener);
+      window.removeEventListener('dex-toast', onDexToast as EventListener);
     };
   }, []);
 

@@ -97,12 +97,15 @@ export default defineConfig({
   },
   // Item 141: esbuild optimizations for faster builds
   esbuild: {
-    // Drop console.log in production builds
-    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+    // Drop noisy console levels in production builds; KEEP `console.warn`
+    // and `console.error` so genuine production failures still surface in
+    // the renderer dev tools / electron-log forwarder.
+    drop: process.env.NODE_ENV === 'production' ? ['debugger'] : [],
+    pure: process.env.NODE_ENV === 'production'
+      ? ['console.log', 'console.debug', 'console.info', 'console.trace']
+      : [],
     // Use modern syntax target
     target: 'es2022',
-    // Pure annotations help tree-shaking
-    pure: ['console.log', 'console.debug'],
   },
   // Item 142: CSS processing optimizations
   css: {

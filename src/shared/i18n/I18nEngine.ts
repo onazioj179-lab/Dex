@@ -901,7 +901,7 @@ export class I18nEngine extends EventEmitter {
           if (typeof localStorage !== 'undefined') {
             return localStorage.getItem(this.config.detection.lookupLocalStorage);
           }
-        } catch {}
+        } catch { /* intentional: localStorage unreachable in some sandboxes; fall back to next detection method */ }
         return null;
         
       case 'navigator':

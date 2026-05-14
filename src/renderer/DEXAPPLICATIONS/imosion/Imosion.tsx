@@ -947,6 +947,8 @@ class AudioEngine {
   private trackNodes = new Map<string, { input: GainNode; gain: GainNode; pan: StereoPannerNode; phase: GainNode; sends: Map<string, GainNode> }>();
   private busNodes = new Map<string, { input: GainNode; gain: GainNode; pan: StereoPannerNode }>();
   private pluginNodes = new Map<string, Map<string, PluginNodeChain>>();
+  /** Active sidechain control loops keyed by `${destTrackId}:${pluginId}`. */
+  private sidechainLoops = new Map<string, { stop: () => void }>();
   private masterChainNodes: AudioNode[] = [];
   private oversampling: 1 | 2 | 4 | 8 = 1;
   private bitDepth: BitDepth = 32;
@@ -1178,6 +1180,16 @@ class AudioEngine {
         comp.connect(makeup);
         chain.nodes.push(comp, makeup);
         lastNode = makeup;
+        // Stash the makeup gain + threshold so setSidechainSource() can
+        // attach a real ducking control loop driven by the source track's
+        // analyser. DynamicsCompressorNode has no sidechain input, so
+        // ducking is implemented as gain attenuation on the makeup stage.
+        (chain as PluginNodeChain & { _scMakeup?: GainNode; _scThresholdDb?: number; _scRatio?: number }).
+          _scMakeup = makeup;
+        (chain as PluginNodeChain & { _scMakeup?: GainNode; _scThresholdDb?: number; _scRatio?: number }).
+          _scThresholdDb = p.threshold ?? -20;
+        (chain as PluginNodeChain & { _scMakeup?: GainNode; _scThresholdDb?: number; _scRatio?: number }).
+          _scRatio = p.ratio ?? 4;
         break;
       }
       case 'reverb': {
@@ -1389,6 +1401,64 @@ class AudioEngine {
     trackPlugins.set(plugin.id, chain);
 
     this.rebuildTrackPluginChain(trackId);
+  }
+
+  /**
+   * Wire (or rewire) a sidechain ducking loop. Pass `sourceTrackId === null`
+   * to disable. The loop reads the source track's gain output via an
+   * AnalyserNode and modulates the destination compressor's makeup-gain
+   * stage in proportion to the source RMS exceeding the compressor's
+   * threshold. This emulates classic SC ducking since Web Audio's
+   * DynamicsCompressorNode has no real sidechain input.
+   */
+  setSidechainSource(destTrackId: string, pluginId: string, sourceTrackId: string | null): void {
+    const key = `${destTrackId}:${pluginId}`;
+    const existing = this.sidechainLoops.get(key);
+    if (existing) { existing.stop(); this.sidechainLoops.delete(key); }
+    if (!sourceTrackId || !this.ctx) return;
+
+    const destChain = this.pluginNodes.get(destTrackId)?.get(pluginId) as
+      (PluginNodeChain & { _scMakeup?: GainNode; _scThresholdDb?: number; _scRatio?: number }) | undefined;
+    const sourceNode = this.trackNodes.get(sourceTrackId);
+    if (!destChain || !destChain._scMakeup || !sourceNode) return;
+
+    const ctx = this.ctx;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.4;
+    sourceNode.gain.connect(analyser);
+
+    const buf = new Float32Array(analyser.fftSize);
+    const baseGain = destChain._scMakeup.gain.value;
+    const thresholdDb = destChain._scThresholdDb ?? -20;
+    const ratio = Math.max(1, destChain._scRatio ?? 4);
+    let stopped = false;
+
+    const tick = () => {
+      if (stopped) return;
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -120;
+      const overDb = Math.max(0, rmsDb - thresholdDb);
+      // Apply ratio: every overDb of source above threshold pulls the
+      // destination down by overDb * (1 - 1/ratio) — same shape Web Audio
+      // would use internally if it accepted a real sidechain input.
+      const reductionDb = overDb * (1 - 1 / ratio);
+      const targetGain = baseGain * Math.pow(10, -reductionDb / 20);
+      destChain._scMakeup!.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.02);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+
+    this.sidechainLoops.set(key, {
+      stop: () => {
+        stopped = true;
+        try { sourceNode.gain.disconnect(analyser); } catch { /* already torn down */ }
+        try { destChain._scMakeup!.gain.setTargetAtTime(baseGain, ctx.currentTime, 0.02); } catch { /* */ }
+      },
+    });
   }
 
   // Rebuild the audio graph for a track's plugin chain
@@ -3602,6 +3672,16 @@ const Imosion: React.FC = () => {
       const hasSolo = tracks.some(tr => tr.solo);
       getAudioEngine().updateTrack(t.id, t.volume, t.pan, t.muted || (hasSolo && !t.solo), t.phase, t.trim);
       t.plugins.forEach(p => getAudioEngine().processPlugin(t.id, p));
+      // Apply real sidechain ducking routes whenever the plugin chain is
+      // (re)built. setSidechainSource(..., null) is a no-op cleanup when the
+      // route is disabled or the source index is invalid.
+      t.plugins.forEach(p => {
+        if (p.type !== 'compressor') return;
+        const srcIdx = (p.params.sidechainSource ?? -1) as number;
+        const sourceTrack = srcIdx >= 0 && srcIdx < tracks.length ? tracks[srcIdx] : null;
+        const sourceId = sourceTrack && sourceTrack.id !== t.id ? sourceTrack.id : null;
+        try { getAudioEngine().setSidechainSource(t.id, p.id, sourceId); } catch (e) { console.warn('[DEX]', e); }
+      });
       t.sends.forEach(s => getAudioEngine().updateSend(t.id, s.id, s.level));
     });
     buses.forEach(b => {

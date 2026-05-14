@@ -52,7 +52,7 @@ describe('wave T cad', () => {
   });
   it('DXF counts entities', () => {
     const dxf = '0\nLINE\n0\nLINE\n0\nCIRCLE\n0\nARC\n0\nLWPOLYLINE\n';
-    expect(countDxfEntities(dxf)).toEqual({ lines: 2, circles: 1, arcs: 1, polylines: 1 });
+    expect(countDxfEntities(dxf)).toEqual({ lines: 2, circles: 1, arcs: 1, polylines: 1, texts: 0 });
   });
   it('FEA bar stiffness', () => {
     expect(barStiffness(200e9, 0.01, 1)).toBeCloseTo(2e9, -2);

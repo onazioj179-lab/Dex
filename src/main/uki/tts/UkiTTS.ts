@@ -98,7 +98,11 @@ class UkiTTSEngine extends EventEmitter {
   }
 }
 
-// Main-process stub so UkiEngine can import without crashing
+// Main-process bridge that forwards speak/stop to the renderer over IPC.
+// SpeechSynthesis is a renderer-only Web API, so the main process cannot
+// invoke it directly. The renderer listens on `uki:tts:speak` / `uki:tts:stop`
+// and emits `uki:tts:ended` on real completion; we keep a conservative
+// fallback timer so the speaking flag cannot wedge if the renderer is gone.
 class UkiTTSStub extends EventEmitter {
   private static _instance: UkiTTSStub;
   private mainWindow: any = null;

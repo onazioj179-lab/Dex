@@ -228,7 +228,7 @@ export const DexSlider: React.FC<{
         height: 16,
         borderRadius: '50%',
         background: '#fff',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+        boxShadow: 'var(--pg-shadow-chip)',
         transition: isReduceMotion() ? 'none' : 'transform 0.08s ease',
         scale: (hovered || dragging) ? '1.2' : '1',
       }}>
@@ -672,7 +672,7 @@ export const SelectionToolbar: React.FC<{
       borderRadius: 8,
       background: 'var(--color-bg-elevated)',
       border: '1px solid var(--color-border-subtle)',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+      boxShadow: 'var(--pg-shadow-tooltip)',
       animation: isReduceMotion() ? 'none' : 'toolbarIn 0.1s ease-out',
     }}>
       {onCut && (

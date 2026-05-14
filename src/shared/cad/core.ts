@@ -107,14 +107,179 @@ export function aggregateBom(items: readonly BomItem[]): BomItem[] {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([partNumber, quantity]) => ({ partNumber, quantity }));
 }
 
-// ---- STEP/IGES/DXF parse stub: count entities by simple regex ----
-export function countDxfEntities(dxf: string): { lines: number; circles: number; arcs: number; polylines: number } {
-  return {
-    lines: (dxf.match(/\bLINE\b/g) ?? []).length,
-    circles: (dxf.match(/\bCIRCLE\b/g) ?? []).length,
-    arcs: (dxf.match(/\bARC\b/g) ?? []).length,
-    polylines: (dxf.match(/\bPOLYLINE\b|\bLWPOLYLINE\b/g) ?? []).length,
-  };
+// ---- DXF parser ----
+//
+// Minimal but real DXF reader. DXF is a paired-group ASCII format: lines come
+// in pairs of (group code, value). Group code 0 starts a new top-level item;
+// the next line is the item type ("SECTION", "ENDSEC", "LINE", "CIRCLE", ...).
+// Codes 10/20/30 = X/Y/Z of primary point; 11/21/31 = secondary point;
+// 40 = radius / first float; 50/51 = start/end angles; 1 = text value;
+// 8 = layer name; 70 = flags.
+//
+// We only walk the ENTITIES section and extract LINE, CIRCLE, ARC, LWPOLYLINE,
+// POLYLINE/VERTEX, and TEXT/MTEXT. Everything else is ignored. Coordinates
+// are returned as plain numbers; bad entities are skipped silently rather
+// than throwing — DXF in the wild is messy.
+
+export type DxfEntity =
+  | { type: 'LINE'; layer: string; start: [number, number, number]; end: [number, number, number] }
+  | { type: 'CIRCLE'; layer: string; center: [number, number, number]; radius: number }
+  | { type: 'ARC'; layer: string; center: [number, number, number]; radius: number; startAngle: number; endAngle: number }
+  | { type: 'POLYLINE'; layer: string; vertices: Array<[number, number, number]>; closed: boolean }
+  | { type: 'TEXT'; layer: string; position: [number, number, number]; value: string };
+
+export interface DxfDocument {
+  entities: DxfEntity[];
+}
+
+interface DxfPair { code: number; value: string }
+
+function tokenizeDxf(src: string): DxfPair[] {
+  const lines = src.split(/\r?\n/);
+  const out: DxfPair[] = [];
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = Number.parseInt(lines[i].trim(), 10);
+    if (!Number.isFinite(code)) continue;
+    out.push({ code, value: lines[i + 1] ?? '' });
+  }
+  return out;
+}
+
+export function parseDxf(src: string): DxfDocument {
+  const pairs = tokenizeDxf(src);
+  const entities: DxfEntity[] = [];
+  let i = 0;
+
+  // Seek to ENTITIES section. If we never find one (loose entity dumps used
+  // by tests + simple exporters), fall back to scanning from the top.
+  let foundSection = false;
+  while (i < pairs.length) {
+    if (pairs[i].code === 0 && pairs[i].value.trim().toUpperCase() === 'SECTION') {
+      const next = pairs[i + 1];
+      if (next?.code === 2 && next.value.trim().toUpperCase() === 'ENTITIES') {
+        i += 2;
+        foundSection = true;
+        break;
+      }
+    }
+    i++;
+  }
+  if (!foundSection) i = 0;
+
+  while (i < pairs.length) {
+    const p = pairs[i];
+    if (p.code === 0 && p.value.trim().toUpperCase() === 'ENDSEC') break;
+    if (p.code !== 0) { i++; continue; }
+    const type = p.value.trim().toUpperCase();
+    i++;
+
+    // Collect codes for this entity until next code-0.
+    const fields = new Map<number, string[]>();
+    while (i < pairs.length && pairs[i].code !== 0) {
+      const arr = fields.get(pairs[i].code) ?? [];
+      arr.push(pairs[i].value);
+      fields.set(pairs[i].code, arr);
+      i++;
+    }
+    const f = (code: number, idx = 0): string | undefined => fields.get(code)?.[idx];
+    const num = (code: number, idx = 0, fallback = 0): number => {
+      const v = f(code, idx);
+      const n = v === undefined ? NaN : Number.parseFloat(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const layer = (f(8) ?? '0').trim();
+
+    switch (type) {
+      case 'LINE':
+        entities.push({
+          type: 'LINE',
+          layer,
+          start: [num(10), num(20), num(30)],
+          end: [num(11), num(21), num(31)],
+        });
+        break;
+      case 'CIRCLE':
+        entities.push({
+          type: 'CIRCLE',
+          layer,
+          center: [num(10), num(20), num(30)],
+          radius: num(40),
+        });
+        break;
+      case 'ARC':
+        entities.push({
+          type: 'ARC',
+          layer,
+          center: [num(10), num(20), num(30)],
+          radius: num(40),
+          startAngle: num(50),
+          endAngle: num(51),
+        });
+        break;
+      case 'LWPOLYLINE': {
+        const xs = fields.get(10) ?? [];
+        const ys = fields.get(20) ?? [];
+        const verts: Array<[number, number, number]> = [];
+        for (let k = 0; k < Math.min(xs.length, ys.length); k++) {
+          const x = Number.parseFloat(xs[k]); const y = Number.parseFloat(ys[k]);
+          if (Number.isFinite(x) && Number.isFinite(y)) verts.push([x, y, 0]);
+        }
+        const flags = num(70, 0, 0);
+        entities.push({ type: 'POLYLINE', layer, vertices: verts, closed: (flags & 1) === 1 });
+        break;
+      }
+      case 'POLYLINE': {
+        // Old-style POLYLINE: vertices follow as separate VERTEX entities until SEQEND.
+        const verts: Array<[number, number, number]> = [];
+        const flags = num(70, 0, 0);
+        while (i < pairs.length && pairs[i].code === 0) {
+          const sub = pairs[i].value.trim().toUpperCase();
+          if (sub === 'SEQEND') { i++; break; }
+          if (sub !== 'VERTEX') break;
+          i++;
+          let vx = 0, vy = 0, vz = 0;
+          while (i < pairs.length && pairs[i].code !== 0) {
+            const c = pairs[i].code; const v = Number.parseFloat(pairs[i].value);
+            if (c === 10 && Number.isFinite(v)) vx = v;
+            else if (c === 20 && Number.isFinite(v)) vy = v;
+            else if (c === 30 && Number.isFinite(v)) vz = v;
+            i++;
+          }
+          verts.push([vx, vy, vz]);
+        }
+        entities.push({ type: 'POLYLINE', layer, vertices: verts, closed: (flags & 1) === 1 });
+        // i already advanced past SEQEND or sits on next code-0 sentinel.
+        continue;
+      }
+      case 'TEXT':
+      case 'MTEXT':
+        entities.push({
+          type: 'TEXT',
+          layer,
+          position: [num(10), num(20), num(30)],
+          value: (f(1) ?? '').replace(/\\P/g, '\n'),
+        });
+        break;
+      default:
+        // Unknown entity — already skipped its fields.
+        break;
+    }
+  }
+
+  return { entities };
+}
+
+export function countDxfEntities(dxf: string): { lines: number; circles: number; arcs: number; polylines: number; texts: number } {
+  const doc = parseDxf(dxf);
+  let lines = 0, circles = 0, arcs = 0, polylines = 0, texts = 0;
+  for (const e of doc.entities) {
+    if (e.type === 'LINE') lines++;
+    else if (e.type === 'CIRCLE') circles++;
+    else if (e.type === 'ARC') arcs++;
+    else if (e.type === 'POLYLINE') polylines++;
+    else if (e.type === 'TEXT') texts++;
+  }
+  return { lines, circles, arcs, polylines, texts };
 }
 
 // ---- FEA: 1D bar element stiffness ----

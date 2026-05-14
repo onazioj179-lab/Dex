@@ -459,7 +459,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         padding: 4,
         borderRadius: radius.md,
         border: `1px solid ${colors.border.default}`,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        boxShadow: 'var(--pg-shadow-chip)',
       }}
     >
       <button onClick={zoomOut} style={buttonStyle} title="Zoom out (Ctrl -)">

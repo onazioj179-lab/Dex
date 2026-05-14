@@ -180,6 +180,12 @@ export interface DexAPI {
     revoke: (permission: string) => Promise<void>;
   };
 
+  // Embedding (text → vector via main-process EmbeddingService)
+  embedding: {
+    compute: (text: string) => Promise<{ vector: number[]; dim: number; backend: string } | null>;
+    computeBatch: (texts: string[]) => Promise<Array<{ vector: number[]; dim: number; backend: string }> | null>;
+  };
+
   // Emergency controls
   emergency: {
     stop: () => Promise<void>;
@@ -2065,6 +2071,11 @@ const api: DexAPI = {
     getAll: () => ipcRenderer.invoke('permissions:getAll'),
     grant: (permission) => ipcRenderer.invoke('permissions:grant', permission),
     revoke: (permission) => ipcRenderer.invoke('permissions:revoke', permission),
+  },
+
+  embedding: {
+    compute: (text: string) => ipcRenderer.invoke('embedding:compute', text),
+    computeBatch: (texts: string[]) => ipcRenderer.invoke('embedding:compute-batch', texts),
   },
 
   emergency: {

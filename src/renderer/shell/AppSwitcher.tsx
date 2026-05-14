@@ -43,7 +43,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
         borderRadius: 18,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border)',
-        boxShadow: '0 12px 48px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.4)',
+        boxShadow: 'var(--pg-shadow-popover)',
         animation: 'switcherIn 0.12s ease-out',
       }}
     >

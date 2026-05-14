@@ -128,7 +128,7 @@ export const EnhancedContextMenu: React.FC<EnhancedContextMenuProps> = ({
           border: '1px solid var(--color-border-subtle)',
           borderRadius: 10,
           padding: PADDING,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 0.5px 0 var(--color-bg-hover)',
+          boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
           animation: isReduceMotion() ? 'none' : 'contextMenuIn 0.12s ease-out',
           transformOrigin: `${x - finalPos.x}px ${y - finalPos.y}px`,
         }}

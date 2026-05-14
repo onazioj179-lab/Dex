@@ -341,14 +341,23 @@ class UnifiedMotionSystem {
     if (this.tier === 3 || this.prefersReducedMotion) {
       return { ...config, duration: 0, easing: 'linear' };
     }
+    // Track K2: hardware tier shortens durations on low-tier devices and may
+    // lengthen them slightly on high-tier devices. Read the CSS variable set
+    // by SystemTier so the math is centralized in one policy table.
+    let hwScale = 1;
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue('--tier-anim-scale').trim();
+      const parsed = parseFloat(raw);
+      if (Number.isFinite(parsed) && parsed > 0 && parsed <= 2) hwScale = parsed;
+    }
     if (this.tier === 2) {
       return {
         ...config,
-        duration: Math.min(config.duration, THROTTLED_MAX_MS),
+        duration: Math.min(config.duration, THROTTLED_MAX_MS) * hwScale,
         easing: MOTION_EASING.LINEAR,
       };
     }
-    return config;
+    return hwScale === 1 ? config : { ...config, duration: config.duration * hwScale };
   }
 
   // ---------------------------------------------------------------------------

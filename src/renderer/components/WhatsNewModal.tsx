@@ -50,7 +50,7 @@ const WhatsNewModal: React.FC = () => {
 
   const close = useCallback(() => {
     setOpen(false);
-    try { localStorage.setItem(STORAGE_KEY, WHATSNEW_VERSION); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, WHATSNEW_VERSION); } catch { /* intentional: dismiss-flag persistence is best-effort; modal will simply re-show next session */ }
   }, []);
 
   useEffect(() => {

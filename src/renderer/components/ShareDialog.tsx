@@ -34,7 +34,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 520,
     background: 'var(--color-bg-elevated)',
     borderRadius: 16,
-    boxShadow: '0 24px 80px rgba(0,0,0,0.5), 0 0 1px rgba(255,255,255,0.1) inset',
+    boxShadow: 'var(--pg-shadow-modal), 0 0 1px rgba(255,255,255,0.1) inset',
     overflow: 'hidden',
     animation: 'slideUp 0.2s ease',
   },
@@ -213,7 +213,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#fff',
     borderRadius: '50%',
     transition: 'transform 0.2s ease',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    boxShadow: 'var(--pg-shadow-chip)',
   },
   linkToggleKnobOn: {
     transform: 'translateX(20px)',

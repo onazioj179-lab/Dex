@@ -115,8 +115,10 @@ class UkiASREngine extends EventEmitter {
   get isListening(): boolean { return this.listening; }
 }
 
-// Main-process stub — just re-exports the class so UkiEngine can import it
-// Actual recognition runs in renderer and bridges via IPC
+// Main-process facade. Real recognition runs in the renderer (Web Speech API
+// is renderer-only) and bridges results through window.electron IPC. The
+// `UkiASR` class here is a singleton hook so other main-process modules can
+// hold a stable reference; renderer code uses `UkiASREngine` directly.
 export class UkiASR {
   private static _instance: UkiASR;
   static getInstance(): UkiASR {

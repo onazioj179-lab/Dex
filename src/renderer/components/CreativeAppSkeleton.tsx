@@ -184,7 +184,7 @@ export const CreativeAppSkeleton: React.FC<CreativeAppSkeletonProps> = ({ type, 
           borderRadius: 8,
           fontSize: 13,
           color: 'var(--color-text-secondary)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          boxShadow: 'var(--pg-shadow-chip)',
         }}>
           {message}
         </div>

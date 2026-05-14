@@ -68,24 +68,24 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
   const toggleSeconds = () => {
     const newValue = !showSeconds;
     setShowSeconds(newValue);
-    try { localStorage.setItem('dex-clock-show-seconds', String(newValue)); } catch {}
+    try { localStorage.setItem('dex-clock-show-seconds', String(newValue)); } catch { /* intentional: widget pref persistence is best-effort */ }
   };
 
   const toggle24Hour = () => {
     const next = !use24Hour;
     setUse24Hour(next);
-    try { localStorage.setItem('dex-clock-24h', String(next)); } catch {}
+    try { localStorage.setItem('dex-clock-24h', String(next)); } catch { /* intentional: widget pref persistence is best-effort */ }
   };
 
   const toggleDate = () => {
     const next = !showDate;
     setShowDate(next);
-    try { localStorage.setItem('dex-clock-show-date', String(next)); } catch {}
+    try { localStorage.setItem('dex-clock-show-date', String(next)); } catch { /* intentional: widget pref persistence is best-effort */ }
   };
 
   const updateTimezone = (tz: string) => {
     setTimezone(tz);
-    try { localStorage.setItem('dex-clock-timezone', tz); } catch {}
+    try { localStorage.setItem('dex-clock-timezone', tz); } catch { /* intentional: widget pref persistence is best-effort */ }
   };
 
   const timeOptions: Intl.DateTimeFormatOptions = {
@@ -142,7 +142,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
             background: 'rgba(18,18,22,0.92)',
             padding: 8,
             zIndex: 3,
-            boxShadow: '0 10px 24px rgba(0,0,0,0.45)',
+            boxShadow: 'var(--pg-shadow-panel)',
           }}
         >
           <button type="button" onClick={toggleSeconds} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
@@ -798,7 +798,7 @@ const DailyTipWidget: React.FC = () => {
   });
   const dismiss = () => {
     setDismissed(true);
-    try { localStorage.setItem(dismissKey, 'true'); } catch {}
+    try { localStorage.setItem(dismissKey, 'true'); } catch { /* intentional: dismiss-flag persistence is best-effort */ }
   };
   if (dismissed) {
     return (
@@ -919,7 +919,7 @@ const DraggableWidget: React.FC<{
         backdropFilter: 'blur(34px) saturate(180%)',
         WebkitBackdropFilter: 'blur(34px) saturate(180%)',
         border: editMode ? '1.5px dashed rgba(10,132,255,0.5)' : '1px solid rgba(255,255,255,0.10)',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)',
+        boxShadow: 'var(--pg-shadow-context), var(--pg-gloss-top)',
         overflow: 'hidden',
         cursor: editMode ? 'move' : 'default',
         transition: editMode ? 'none' : 'box-shadow 0.2s',

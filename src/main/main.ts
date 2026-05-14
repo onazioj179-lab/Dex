@@ -291,6 +291,7 @@ import { registerCorePcIpc, verifyCoreIntegrity } from './services/CorePCService
 import { registerPermissionsIpc } from './services/PermissionsService';
 import { registerCreatorAccessIpc } from './services/CreatorAccessService';
 import { registerAppStoreIpc } from './services/AppStoreService';
+import { registerEmbeddingIpc } from './services/EmbeddingService';
 import { registerGamesIpc } from './services/GamesService';
 import { registerCapabilityBrokerIpc } from './services/CapabilityBrokerService';
 import { registerAudioNativeHandlers } from './services/AudioNativeService';
@@ -3603,6 +3604,8 @@ class DexApp {
     // -------------------------------------------------------------------------
     try { registerAppStoreIpc(); log.info('[DEX] AppStore IPC registered'); }
     catch (err) { log.error('[DEX] AppStore IPC failed:', err); }
+    try { registerEmbeddingIpc(); }
+    catch (err) { log.error('[DEX] Embedding IPC failed:', err); }
     try { registerGamesIpc(); log.info('[DEX] Games IPC registered'); }
     catch (err) { log.error('[DEX] Games IPC failed:', err); }
     try { registerCapabilityBrokerIpc(); log.info('[DEX] CapabilityBroker IPC registered'); }

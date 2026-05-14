@@ -330,7 +330,7 @@ export const UKI_SHORTCUTS = [
 ];
 
 // ============================================================================
-// Voice Input (Stub)
+// Voice Input — Web Speech API (browser-native, no model bundled)
 // ============================================================================
 
 export interface VoiceInputState {

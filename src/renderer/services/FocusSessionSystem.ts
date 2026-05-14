@@ -44,6 +44,16 @@ export interface FocusSessionRecord {
 
 export type FocusAppMode = 'default' | 'notes' | 'vinx';
 
+/** Per-app behaviour overrides applied while a focus session is active. */
+export interface AppFocusProfile {
+  /** Hide window chrome (title bar, controls) for maximum canvas space. */
+  hideChrome: boolean;
+  /** Suppress all non-urgent notifications while this app is in focus. */
+  muteNotifications: boolean;
+  /** Dim the background/desktop to direct attention to this app. */
+  dimBackground: boolean;
+}
+
 interface FocusSessionState {
   active: boolean;
   paused: boolean;
@@ -58,6 +68,8 @@ interface FocusSessionState {
   showExitHint: boolean;
   sessions: FocusSessionRecord[];
   appsUsedThisSession: Set<string>;
+  /** Per-app focus profiles keyed by appId. Missing entries use defaults. */
+  appFocusProfiles: Record<string, AppFocusProfile>;
   tasksCompletedThisSession: string[];
   notesCreatedThisSession: string[];
 
@@ -75,6 +87,8 @@ interface FocusSessionState {
   tick: () => void;
   getSessionSummary: () => FocusSessionRecord | null;
   getRecentSessions: (count: number) => FocusSessionRecord[];
+  setAppFocusProfile: (appId: string, profile: Partial<AppFocusProfile>) => void;
+  getAppFocusProfile: (appId: string) => AppFocusProfile;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +127,7 @@ export const useFocusSessionStore = create<FocusSessionState>()(
       showExitHint: false,
       sessions: [],
       appsUsedThisSession: new Set(),
+      appFocusProfiles: {},
       tasksCompletedThisSession: [],
       notesCreatedThisSession: [],
 
@@ -226,12 +241,38 @@ export const useFocusSessionStore = create<FocusSessionState>()(
       getRecentSessions: (count) => {
         return get().sessions.slice(-count).reverse();
       },
+
+      setAppFocusProfile: (appId, profile) => {
+        set((state) => {
+          const existing: AppFocusProfile = state.appFocusProfiles[appId] ?? {
+            hideChrome: false,
+            muteNotifications: true,
+            dimBackground: false,
+          };
+          return {
+            appFocusProfiles: {
+              ...state.appFocusProfiles,
+              [appId]: { ...existing, ...profile },
+            },
+          };
+        });
+      },
+
+      getAppFocusProfile: (appId) => {
+        const profiles = get().appFocusProfiles;
+        return profiles[appId] ?? {
+          hideChrome: false,
+          muteNotifications: true,
+          dimBackground: false,
+        };
+      },
     }),
     {
       name: 'dex-focus-sessions',
       partialize: (state) => ({
         durationMinutes: state.durationMinutes,
         sessions: state.sessions.slice(-50),
+        appFocusProfiles: state.appFocusProfiles,
       }),
     }
   )

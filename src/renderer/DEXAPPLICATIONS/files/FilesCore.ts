@@ -374,67 +374,64 @@ export class FilesEngine {
   private loadDirectory(paneId: string, path: string): void {
     const pane = this.panes.get(paneId);
     if (!pane) return;
-    
+
     pane.isLoading = true;
     this.emit('loading-started', { paneId });
-    
-    // Simulate loading directory entries
-    setTimeout(() => {
-      pane.entries = this.generateMockEntries(path);
+
+    // Real fs scan via preload bridge. The bridge enforces the user's
+    // configured scope list, so an unscoped path returns null and we end
+    // with an empty pane instead of fabricating entries.
+    void (async () => {
+      const bridge = (globalThis as { dexAPI?: { files?: { list?: (p: string) => Promise<unknown[] | null> } } }).dexAPI;
+      try {
+        const raw = await bridge?.files?.list?.(path);
+        pane.entries = Array.isArray(raw) ? raw.map((r) => this.normalizeFsEntry(r as Record<string, unknown>, path)) : [];
+      } catch {
+        pane.entries = [];
+      }
       pane.isLoading = false;
       this.applyFilterAndSort(paneId);
       this.emit('loading-complete', { paneId, entries: pane.entries });
-    }, 100);
+    })();
   }
-  
-  private generateMockEntries(path: string): FileEntry[] {
-    const entries: FileEntry[] = [];
-    const now = Date.now();
-    
-    // Generate some mock directories
-    for (let i = 0; i < 5; i++) {
-      entries.push({
-        id: this.generateId('dir'),
-        name: `Folder ${i + 1}`,
-        path: `${path}/Folder ${i + 1}`,
-        parentPath: path,
-        type: 'directory',
-        mimeType: 'inode/directory',
-        size: 0,
-        created: now - Math.random() * 10000000000,
-        modified: now - Math.random() * 1000000000,
-        accessed: now,
-        permissions: { readable: true, writable: true, executable: true, owner: 'user', group: 'users', mode: 0o755 },
-        isHidden: false,
-        isSystem: false,
-        isSymlink: false
-      });
-    }
-    
-    // Generate some mock files
-    const fileTypes = ['.txt', '.jpg', '.mp3', '.pdf', '.zip', '.html'];
-    for (let i = 0; i < 10; i++) {
-      const ext = fileTypes[Math.floor(Math.random() * fileTypes.length)];
-      const name = `File ${i + 1}${ext}`;
-      entries.push({
-        id: this.generateId('file'),
-        name,
-        path: `${path}/${name}`,
-        parentPath: path,
-        type: 'file',
-        mimeType: MIME_TYPE_MAP[ext] || 'application/octet-stream',
-        size: Math.floor(Math.random() * 10000000),
-        created: now - Math.random() * 10000000000,
-        modified: now - Math.random() * 1000000000,
-        accessed: now,
-        permissions: { readable: true, writable: true, executable: false, owner: 'user', group: 'users', mode: 0o644 },
-        isHidden: Math.random() > 0.9,
-        isSystem: false,
-        isSymlink: false
-      });
-    }
-    
-    return entries;
+
+  /**
+   * Map a raw entry returned by the main-process file-scope bridge into the
+   * shape the rest of FilesCore expects. Missing fields fall back to safe
+   * defaults; we never invent timestamps or sizes.
+   */
+  private normalizeFsEntry(raw: Record<string, unknown>, parentPath: string): FileEntry {
+    const name = String(raw.name ?? '');
+    const type: 'directory' | 'file' = raw.type === 'directory' || raw.isDirectory === true ? 'directory' : 'file';
+    const ext = type === 'file' ? '.' + name.split('.').pop()!.toLowerCase() : '';
+    const fullPath = String(raw.path ?? `${parentPath}/${name}`);
+    const sizeNum = typeof raw.size === 'number' ? raw.size : 0;
+    const created = typeof raw.created === 'number' ? raw.created : (typeof raw.birthtimeMs === 'number' ? raw.birthtimeMs : 0);
+    const modified = typeof raw.modified === 'number' ? raw.modified : (typeof raw.mtimeMs === 'number' ? raw.mtimeMs : 0);
+    const accessed = typeof raw.accessed === 'number' ? raw.accessed : (typeof raw.atimeMs === 'number' ? raw.atimeMs : 0);
+    return {
+      id: this.generateId(type === 'directory' ? 'dir' : 'file'),
+      name,
+      path: fullPath,
+      parentPath,
+      type,
+      mimeType: type === 'directory' ? 'inode/directory' : (MIME_TYPE_MAP[ext] ?? 'application/octet-stream'),
+      size: sizeNum,
+      created,
+      modified,
+      accessed,
+      permissions: {
+        readable: true,
+        writable: raw.writable !== false,
+        executable: type === 'directory',
+        owner: 'user',
+        group: 'users',
+        mode: type === 'directory' ? 0o755 : 0o644,
+      },
+      isHidden: name.startsWith('.'),
+      isSystem: false,
+      isSymlink: raw.isSymlink === true,
+    };
   }
   
   // Selection

@@ -16,9 +16,15 @@
  * `AccountSyncTransport` interface so unit tests can drive it in-memory and
  * the real implementation can plug in HTTPS later.
  *
- * INTENTIONAL STUB: real cloud transport (HTTPS + signed token) lives in
- * src/main/account/CloudTransport.ts in a later wave. This module ships the
- * full local API surface plus an in-memory transport for tests.
+ * Two transports ship in this file:
+ *   - `createInMemoryTransport()` — used by tests and preview builds.
+ *   - `createHttpsTransport({ endpoint, token })` — real cloud transport
+ *     against a user-configured HTTPS endpoint with a bearer token. The
+ *     endpoint is expected to expose:
+ *         GET  /accounts/:id   -> AccountProfile JSON | 404
+ *         POST /accounts/:id   -> 200/201 (body = AccountProfile JSON)
+ *     If the endpoint is unreachable, push/pull throw — callers stay
+ *     local-first and surface the failure to the user.
  */
 
 // DEX v3.8.7 - account system
@@ -156,6 +162,73 @@ export function createInMemoryTransport(): AccountSyncTransport & { dump: () => 
     pull: async (id) => store.get(id) ?? null,
     push: async (profile) => { store.set(profile.id, profile); },
     dump: () => store,
+  };
+}
+
+export interface HttpsTransportOptions {
+  /** Base URL — must be https://. Trailing slash optional. */
+  endpoint: string;
+  /** Bearer token sent as `Authorization: Bearer <token>`. */
+  token: string;
+  /** Network timeout in ms. Default 8000. */
+  timeoutMs?: number;
+  /** Optional `fetch` override for tests. */
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * HTTPS-backed cloud transport. Local-first: every call throws on failure
+ * so the caller can keep working offline rather than silently dropping
+ * data. Endpoint must use https:// — http:// is rejected to avoid leaking
+ * tokens in plaintext.
+ */
+export function createHttpsTransport(opts: HttpsTransportOptions): AccountSyncTransport {
+  const { endpoint, token } = opts;
+  if (!/^https:\/\//i.test(endpoint)) {
+    throw new Error('AccountStore: HTTPS transport endpoint must use https://');
+  }
+  if (!token) throw new Error('AccountStore: HTTPS transport requires a token');
+  const base = endpoint.replace(/\/+$/, '');
+  const timeoutMs = opts.timeoutMs ?? 8000;
+  const fetchImpl: typeof fetch | undefined = opts.fetchImpl ?? (globalThis as { fetch?: typeof fetch }).fetch;
+  if (!fetchImpl) throw new Error('AccountStore: no fetch implementation available');
+  const fetchFn: typeof fetch = fetchImpl;
+
+  async function request(path: string, init?: RequestInit): Promise<Response> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      return await fetchFn(`${base}${path}`, {
+        ...init,
+        signal: ctrl.signal,
+        headers: {
+          ...(init?.headers ?? {}),
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return {
+    pull: async (accountId: string) => {
+      const safe = encodeURIComponent(accountId);
+      const res = await request(`/accounts/${safe}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`AccountStore: pull HTTP ${res.status}`);
+      return await res.json() as AccountProfile;
+    },
+    push: async (profile: AccountProfile) => {
+      const safe = encodeURIComponent(profile.id);
+      const res = await request(`/accounts/${safe}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      if (!res.ok) throw new Error(`AccountStore: push HTTP ${res.status}`);
+    },
   };
 }
 

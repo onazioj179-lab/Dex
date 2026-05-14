@@ -82,7 +82,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         background: 'var(--pg-surface-overlay, rgba(10,10,14,0.97))',
         border: '1px solid var(--pg-border-subtle, rgba(255,255,255,0.10))',
         borderRadius: 12,
-        boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
+        boxShadow: 'var(--pg-shadow-modal)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',

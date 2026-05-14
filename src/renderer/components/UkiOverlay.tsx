@@ -1647,7 +1647,7 @@ const UkiOverlay: React.FC = () => {
         WebkitBackdropFilter: 'blur(34px) saturate(180%)',
         border: '1px solid rgba(255,255,255,0.10)',
         borderRadius: 16,
-        boxShadow: '0 8px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.10)',
+        boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
         overflow: 'hidden',
         cursor: draggingRef.current ? 'grabbing' : 'grab',
       }}>

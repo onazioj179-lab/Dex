@@ -366,8 +366,9 @@ class VaultHardeningClass extends EventEmitter {
   }
 
   /**
-   * Check password against known breaches (local bloom filter or k-anonymity API)
-   * This is a placeholder - in production, use Have I Been Pwned k-anonymity API
+   * Check password against known breaches using Have I Been Pwned k-anonymity API.
+   * Sends only the first 5 chars of the SHA-1 hash; the full password never leaves the device.
+   * Falls back to a small offline common-password list when the network is unavailable.
    */
   async checkPasswordBreach(password: string): Promise<BreachCheckResult> {
     // Use Have I Been Pwned k-anonymity API (sends only first 5 chars of SHA-1 hash)

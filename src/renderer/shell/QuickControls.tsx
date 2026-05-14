@@ -109,6 +109,7 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
       onClick={onClick}
       title={title}
       aria-label={ariaLabel}
+      aria-haspopup="dialog"
       aria-expanded={ariaExpanded}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -116,6 +117,7 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
         background: ariaExpanded ? 'var(--color-border)' : 'transparent',
         border: 'none', cursor: 'pointer',
         color: baseColor,
+        boxShadow: ariaExpanded ? 'var(--pg-shadow-chip)' : 'none',
         transition: 'background 0.15s ease, color 0.15s ease',
         position: 'relative',
         flexShrink: 0,
@@ -347,7 +349,7 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
             width: 12, height: 12, borderRadius: '50%',
             background: '#fff',
             transition: 'left 0.15s',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+            boxShadow: 'var(--pg-shadow-chip)',
           }} />
         </span>
       </button>
@@ -399,12 +401,36 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
 
   useEffect(() => { networkRefresh(); }, [networkRefresh]);
 
+  const syncAnchor = useCallback((key: Exclude<OpenKey, null>) => {
+    const el = refs.current[key];
+    if (!el) {
+      setAnchor(null);
+      return;
+    }
+    setAnchor(el.getBoundingClientRect());
+  }, []);
+
   const togglePop = useCallback((key: Exclude<OpenKey, null>) => {
     if (open === key) { setOpen(null); setAnchor(null); return; }
-    const el = refs.current[key];
-    if (el) setAnchor(el.getBoundingClientRect());
+    syncAnchor(key);
     setOpen(key);
-  }, [open]);
+  }, [open, syncAnchor]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updateAnchor = () => {
+      syncAnchor(open);
+    };
+
+    updateAnchor();
+    window.addEventListener('resize', updateAnchor);
+    window.addEventListener('scroll', updateAnchor, true);
+    return () => {
+      window.removeEventListener('resize', updateAnchor);
+      window.removeEventListener('scroll', updateAnchor, true);
+    };
+  }, [open, syncAnchor]);
 
   const close = useCallback(() => { setOpen(null); setAnchor(null); }, []);
 

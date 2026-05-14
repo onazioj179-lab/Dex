@@ -1628,7 +1628,7 @@ export const Gallery: React.FC = () => {
                         }} />
                         <div style={{
                           position: 'absolute', top: -4, width: 12, height: 12, borderRadius: '50%',
-                          background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                          background: '#fff', boxShadow: 'var(--pg-shadow-chip)',
                           left: videoDuration ? `calc(${(videoCurrentTime / videoDuration) * 100}% - 6px)` : '-6px',
                           transition: 'left 0.1s linear', opacity: showVideoControls ? 1 : 0,
                         }} />

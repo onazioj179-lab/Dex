@@ -553,24 +553,94 @@ export class PreviewEngine {
     this.networkRequests = [];
   }
   
-  // Performance analysis
-  async analyzePerformance(sessionId: string): Promise<PerformanceMetrics> {
-    // Simulated performance metrics
-    return {
-      lcp: Math.random() * 2000 + 500,
-      fid: Math.random() * 100,
-      cls: Math.random() * 0.1,
-      ttfb: Math.random() * 500,
-      fcp: Math.random() * 1500 + 300,
-      domContentLoaded: Math.random() * 2000 + 500,
-      load: Math.random() * 3000 + 1000,
-      totalResources: Math.floor(Math.random() * 50 + 10),
-      totalSize: Math.floor(Math.random() * 2000000 + 100000),
-      jsSize: Math.floor(Math.random() * 500000 + 50000),
-      cssSize: Math.floor(Math.random() * 100000 + 10000),
-      imageSize: Math.floor(Math.random() * 1000000 + 50000),
-      fontsize: Math.floor(Math.random() * 200000 + 20000)
+  // Performance analysis — uses real PerformanceObserver / Navigation Timing
+  // when running inside a real browser context. Falls back to zeroed metrics
+  // if the APIs are unavailable (e.g. headless test runners) so callers can
+  // detect "no data" via every value being 0.
+  async analyzePerformance(_sessionId: string): Promise<PerformanceMetrics> {
+    const empty: PerformanceMetrics = {
+      lcp: 0, fid: 0, cls: 0, ttfb: 0, fcp: 0,
+      domContentLoaded: 0, load: 0, totalResources: 0, totalSize: 0,
+      jsSize: 0, cssSize: 0, imageSize: 0, fontsize: 0,
     };
+    if (typeof performance === 'undefined' || typeof PerformanceObserver === 'undefined') {
+      return empty;
+    }
+
+    const out: PerformanceMetrics = { ...empty };
+
+    // Navigation Timing — synchronous reads.
+    const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    const nav = navEntries[0];
+    if (nav) {
+      out.ttfb = Math.max(0, nav.responseStart - nav.requestStart);
+      out.domContentLoaded = Math.max(0, nav.domContentLoadedEventEnd - nav.startTime);
+      out.load = Math.max(0, nav.loadEventEnd - nav.startTime);
+    }
+
+    // Paint Timing — FCP.
+    const fcpEntry = performance.getEntriesByName('first-contentful-paint')[0];
+    if (fcpEntry) out.fcp = fcpEntry.startTime;
+
+    // LCP — observe up to 1s; LCP is the last reported entry.
+    out.lcp = await new Promise<number>((resolve) => {
+      try {
+        let last = 0;
+        const obs = new PerformanceObserver((list) => {
+          const entries = list.getEntries() as PerformanceEntry[];
+          if (entries.length) last = entries[entries.length - 1].startTime;
+        });
+        obs.observe({ type: 'largest-contentful-paint', buffered: true });
+        setTimeout(() => { obs.disconnect(); resolve(last); }, 1000);
+      } catch { resolve(0); }
+    });
+
+    // CLS — accumulate layout-shift entries that aren't user-initiated.
+    out.cls = await new Promise<number>((resolve) => {
+      try {
+        let total = 0;
+        const obs = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) {
+            if (!entry.hadRecentInput && typeof entry.value === 'number') total += entry.value;
+          }
+        });
+        obs.observe({ type: 'layout-shift', buffered: true });
+        setTimeout(() => { obs.disconnect(); resolve(total); }, 1000);
+      } catch { resolve(0); }
+    });
+
+    // FID — first event timing whose processingStart - startTime is the input delay.
+    out.fid = await new Promise<number>((resolve) => {
+      try {
+        const obs = new PerformanceObserver((list) => {
+          const entries = list.getEntries() as Array<PerformanceEntry & { processingStart?: number }>;
+          for (const e of entries) {
+            if (typeof e.processingStart === 'number') {
+              obs.disconnect();
+              resolve(Math.max(0, e.processingStart - e.startTime));
+              return;
+            }
+          }
+        });
+        obs.observe({ type: 'first-input', buffered: true });
+        setTimeout(() => { obs.disconnect(); resolve(0); }, 1000);
+      } catch { resolve(0); }
+    });
+
+    // Resource Timing — bucket by initiatorType / extension.
+    const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+    out.totalResources = resources.length;
+    for (const r of resources) {
+      const size = r.transferSize || r.encodedBodySize || 0;
+      out.totalSize += size;
+      const ext = (r.name.split('?')[0].split('.').pop() || '').toLowerCase();
+      if (r.initiatorType === 'script' || ext === 'js' || ext === 'mjs') out.jsSize += size;
+      else if (r.initiatorType === 'css' || ext === 'css') out.cssSize += size;
+      else if (r.initiatorType === 'img' || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg'].includes(ext)) out.imageSize += size;
+      else if (['woff', 'woff2', 'ttf', 'otf', 'eot'].includes(ext)) out.fontsize += size;
+    }
+
+    return out;
   }
   
   // Responsive testing

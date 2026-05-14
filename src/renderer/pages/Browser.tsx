@@ -2302,7 +2302,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tabActive: {
     background: 'var(--color-border)',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+    boxShadow: 'var(--pg-shadow-chip)',
   },
   pinDot: {
     width: '5px',
@@ -2697,7 +2697,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: '2px',
     left: '2px',
     transition: 'transform 0.2s',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+    boxShadow: 'var(--pg-shadow-chip)',
   },
   selectInput: {
     width: '100%',

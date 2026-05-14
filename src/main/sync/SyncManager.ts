@@ -15,6 +15,8 @@ import * as https from 'https';
 import * as http from 'http';
 import * as log from 'electron-log';
 import Store from 'electron-store';
+import { run as runWorkflow } from '../services/WorkflowService';
+import type { WorkflowGraph, TriggerEvent } from '../../shared/apps/workflows/runner';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -571,20 +573,27 @@ class SyncManager {
   private async handleRemoteCommand(command: RemoteCommand): Promise<unknown> {
     switch (command.type) {
       case 'run-workflow': {
-        const payload = command.payload as { workflowId?: string } | undefined;
+        const payload = command.payload as { workflowId?: string; trigger?: TriggerEvent; capsHeld?: string[] } | undefined;
         if (!payload?.workflowId) return { success: false, error: 'Missing workflowId' };
         try {
-          // Use existing IPC handler to execute workflow
-          const fakeEvent = { sender: this.mainWindow?.webContents } as any;
-          const result = await ipcMain.listeners('workflow:execute').length > 0
-            ? await new Promise((resolve) => {
-                ipcMain.emit('workflow:execute', fakeEvent, payload.workflowId);
-                resolve({ started: true });
-              })
-            : { started: false, error: 'No workflow handler registered' };
-          return { success: true, message: 'Workflow started', result };
-        } catch (err: any) {
-          return { success: false, error: err.message };
+          // Resolve the workflow graph from local storage and execute it
+          // through the real WorkflowService runner. The runner enforces
+          // capability checks against `capsHeld` so unauthorized remote
+          // commands cannot escalate beyond what the device already grants.
+          const wfStore = new Store({ name: 'dex-workflows' });
+          const all = wfStore.get('workflows', []) as Array<{ id: string; graph?: WorkflowGraph } & Record<string, unknown>>;
+          const found = all.find((w) => w.id === payload.workflowId);
+          const graph: WorkflowGraph | undefined = (found?.graph ?? (found as unknown as WorkflowGraph));
+          if (!graph || !Array.isArray((graph as { nodes?: unknown }).nodes)) {
+            return { success: false, error: `Workflow ${payload.workflowId} not found or has no graph` };
+          }
+          const trigger: TriggerEvent = payload.trigger ?? { kind: 'manual', at: Date.now() };
+          const caps = payload.capsHeld ?? [];
+          const result = await runWorkflow(graph, trigger, caps);
+          return { success: true, message: 'Workflow executed', result };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, error: msg };
         }
       }
       

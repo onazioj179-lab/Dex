@@ -16,6 +16,7 @@
  */
 
 import { sharedTick } from '../services/SharedTick';
+import { flushAll as flushAllCaches } from '../services/CacheRegistry';
 
 type PressureLevel = 'normal' | 'moderate' | 'high' | 'critical';
 
@@ -68,6 +69,16 @@ function releaseCaches(): void {
       sessionStorage.removeItem(key);
     }
   }
+
+  // Track K8: hint the V8 GC when --js-flags=--expose-gc is in effect.
+  // No-op in normal builds. Cheap and safe to call from the moderate level.
+  const w = globalThis as { gc?: () => void };
+  if (typeof w.gc === 'function') {
+    try { w.gc(); } catch { /* intentional: gc must never crash */ }
+  }
+
+  // Track K10: flush all registered caches via CacheRegistry.
+  flushAllCaches();
 }
 
 async function serializeStateToMain(): Promise<void> {

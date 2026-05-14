@@ -414,7 +414,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
             background: colors.bg.elevated,
             border: `1px solid ${colors.border.default}`,
             borderRadius: radius.md,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            boxShadow: 'var(--pg-shadow-tooltip)',
             maxHeight: 200,
             overflowY: 'auto',
             zIndex: 1000,

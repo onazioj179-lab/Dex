@@ -378,7 +378,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
         zIndex: 9900,
         borderRadius: 12,
         overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)',
+        boxShadow: 'var(--pg-shadow-popover), 0 0 0 1px rgba(255,255,255,0.08)',
         background: '#000',
         cursor: dragging ? 'grabbing' : 'default',
         transition: dragging || resizing ? 'none' : 'box-shadow 0.2s ease',

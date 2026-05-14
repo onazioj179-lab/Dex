@@ -69,3 +69,14 @@ _archive_v2/run_log.txt
 
 ci-out.txt
 runs.json
+
+# Transient command-output artifacts at repo root (P1)
+/tsc_output.txt
+/tsc_pcf.txt
+/tsc_final_check.txt
+/test_output.txt
+/test-fail-details.txt
+/vitest-out.txt
+/runs.txt
+/runs_output.txt
+/run_status.json

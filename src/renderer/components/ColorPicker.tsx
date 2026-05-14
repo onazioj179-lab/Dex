@@ -327,7 +327,7 @@ const SatLightArea: React.FC<SatLightAreaProps> = ({
           height: 12,
           border: '2px solid white',
           borderRadius: '50%',
-          boxShadow: '0 0 0 1px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.3)',
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.3), var(--pg-shadow-chip)',
           pointerEvents: 'none',
         }}
       />

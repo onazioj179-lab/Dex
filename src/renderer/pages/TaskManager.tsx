@@ -607,7 +607,7 @@ const styles: Record<string, React.CSSProperties> = {
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
   sparkWrap: { marginTop: 6, height: 46 },
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 12 },
-  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.08)' },
+  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-chip), var(--pg-gloss-top)' },
   panelHeader: { height: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 12px', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 700 },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 },

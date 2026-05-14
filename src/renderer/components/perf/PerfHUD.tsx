@@ -129,7 +129,7 @@ export const PerfHUD: React.FC<PerfHUDProps> = ({
         backdropFilter: 'blur(8px)',
         minWidth: 180,
         pointerEvents: 'none',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        boxShadow: 'var(--pg-shadow-tooltip)',
         border: '1px solid rgba(255,255,255,0.08)',
       }}
     >

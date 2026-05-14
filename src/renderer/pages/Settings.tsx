@@ -676,7 +676,7 @@ const UpdateManagerSection: React.FC = () => {
       <span style={{
         position: 'absolute', top: 3, left: on ? 21 : 3,
         width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+        boxShadow: 'var(--pg-shadow-chip)',
       }} />
     </button>
   );
@@ -1317,12 +1317,12 @@ const TextDensityControls: React.FC<{
   const applyFontScale = (v: number) => {
     setFontScale(v);
     document.documentElement.style.setProperty('--font-scale', String(v));
-    try { localStorage.setItem('dex-font-scale', String(v)); } catch {}
+    try { localStorage.setItem('dex-font-scale', String(v)); } catch { /* intentional: localStorage write is best-effort; persists on next change if quota recovers */ }
   };
   const applyCompact = (v: boolean) => {
     setCompact(v);
     document.documentElement.style.setProperty('--density-scale', v ? '0.85' : '1');
-    try { localStorage.setItem('dex-density-compact', String(v)); } catch {}
+    try { localStorage.setItem('dex-density-compact', String(v)); } catch { /* intentional: localStorage write is best-effort */ }
   };
 
   return (

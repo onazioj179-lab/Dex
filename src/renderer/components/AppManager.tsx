@@ -1816,7 +1816,7 @@ export const AppManager: React.FC = () => {
   }, [openAppInWindow]);
 
   // -- Window tiling presets (up to 5 windows) ----------------------------
-  type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize';
+  type TilePosition = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'top' | 'bottom' | 'maximize' | 'left-third' | 'center-third' | 'right-third';
   const tileWindow = useCallback((appId: AppId, position: TilePosition) => {
     const workspace = getShellWorkspace(0);
     const maximizedWorkspace = getMaximizedWindowBounds();
@@ -1840,6 +1840,9 @@ export const AppManager: React.FC = () => {
       bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
       center:       { x: LEFT + Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
       maximize:     { ...maximizedWorkspace },
+      'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
+      'center-third': { x: LEFT + PAD * 2 + Math.floor((W - PAD * 4) / 3), y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
+      'right-third':  { x: LEFT + PAD * 3 + Math.floor((W - PAD * 4) / 3) * 2, y: TOP + PAD, w: Math.floor((W - PAD * 4) / 3), h: usableH - PAD * 2 },
     };
 
     const rect = positions[position];
@@ -1919,6 +1922,9 @@ export const AppManager: React.FC = () => {
         bottom:       { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: W - PAD * 2, h: halfH },
         center:       { x: LEFT + Math.floor(W * 0.15), y: TOP + Math.floor(usableH * 0.1), w: Math.floor(W * 0.7), h: Math.floor(usableH * 0.8) },
         maximize:     { ...workspace },
+        'left-third':   { x: LEFT + PAD, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
+        'center-third': { x: LEFT + PAD * 2 + thirdW, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
+        'right-third':  { x: LEFT + PAD * 3 + thirdW * 2, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
       };
 
       // For 6 windows: use a 3x2 grid
@@ -2681,7 +2687,7 @@ export const AppManager: React.FC = () => {
                         background: 'var(--color-bg-elevated)',
                         border: '1px solid var(--color-border)', borderRadius: 12,
                         padding: '10px 10px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5,
-                        boxShadow: '0 12px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3), inset 0 0.5px 0 var(--color-border-subtle)',
+                        boxShadow: 'var(--pg-shadow-context), inset 0 0.5px 0 var(--color-border-subtle)',
                         width: 240,
                         animation: 'fadeIn 0.18s ease',
                       } as React.CSSProperties}>
@@ -2695,6 +2701,9 @@ export const AppManager: React.FC = () => {
                           { pos: 'top-right' as const, label: 'Top R', svg: <><rect x="12" y="2" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="2" y="13" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="12" y="13" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
                           { pos: 'bottom-left' as const, label: 'Bot L', svg: <><rect x="2" y="12" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="13" y="2" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="13" y="12" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
                           { pos: 'bottom-right' as const, label: 'Bot R', svg: <><rect x="12" y="12" width="10" height="10" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="12" y="2" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="2" y="12" width="9" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
+                          { pos: 'left-third' as const, label: '1/3 L', svg: <><rect x="2" y="2" width="6" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="16" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
+                          { pos: 'center-third' as const, label: '1/3 C', svg: <><rect x="9" y="2" width="6" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="16" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
+                          { pos: 'right-third' as const, label: '1/3 R', svg: <><rect x="16" y="2" width="6" height="20" rx="1.5" fill="currentColor" opacity="0.3" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/><rect x="9" y="2" width="6" height="20" rx="1" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15"/></> },
                         ] as const).map(({ pos, label, svg }) => (
                           <button key={pos} onClick={() => { tileWindow(appId, pos); setSnapLayoutApp(null); }}
                             title={label}
@@ -3667,7 +3676,7 @@ export const AppManager: React.FC = () => {
       lastDeltaRef.current = 0;
       cancelAnimationFrame(dragRafRef.current);
       // Persist tab order
-      try { localStorage.setItem('dex-tab-order', JSON.stringify(tabOrder)); } catch {}
+      try { localStorage.setItem('dex-tab-order', JSON.stringify(tabOrder)); } catch { /* intentional: tab order persistence is best-effort */ }
     }
   }, [draggingTab, tabOrder]);
 
@@ -3676,7 +3685,7 @@ export const AppManager: React.FC = () => {
     try {
       const saved = localStorage.getItem('dex-tab-order');
       if (saved) setTabOrder(JSON.parse(saved));
-    } catch {}
+    } catch { /* intentional: corrupt or unavailable storage falls back to default tab order */ }
   }, []);
 
   const renderAppTabBar = () => {
@@ -3959,7 +3968,7 @@ export const AppManager: React.FC = () => {
                   backdropFilter: 'blur(42px) saturate(180%)',
                   WebkitBackdropFilter: 'blur(42px) saturate(180%)',
                   borderRadius: 14, border: '1px solid rgba(255,255,255,0.10)',
-                  boxShadow: '0 18px 58px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.08)',
+                  boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
                   animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
                   transformOrigin: 'top right',
                 }}
@@ -4321,7 +4330,7 @@ export const AppManager: React.FC = () => {
             border: '1px solid var(--color-border)',
             padding: '7px 14px',
             pointerEvents: 'auto',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
+            boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
             display: 'flex', alignItems: 'center', gap: 8,
             animation: isReduceMotion() ? 'none' : 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
           } as React.CSSProperties}>
@@ -4643,7 +4652,7 @@ export const AppManager: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.14)',
               borderRadius: 22,
               padding: '20px 20px 16px',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)',
+              boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
               animation: 'appMenuSlideUp 0.22s cubic-bezier(0.23,1,0.32,1)',
             } as React.CSSProperties}
           >
@@ -4826,7 +4835,7 @@ export const AppManager: React.FC = () => {
               background: 'rgba(30,30,34,0.98)',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 12, padding: 4,
-              boxShadow: '0 12px 40px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.04)',
+              boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.04)',
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >
@@ -4889,7 +4898,7 @@ export const AppManager: React.FC = () => {
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border)',
             borderRadius: 12, padding: 4,
-            boxShadow: '0 12px 48px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)',
+            boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
             animation: 'ctxMenuIn 0.3s cubic-bezier(0.23,1,0.32,1)',
             transformOrigin: 'bottom left',
           }}>

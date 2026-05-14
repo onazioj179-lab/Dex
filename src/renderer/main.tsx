@@ -109,6 +109,21 @@ startHeapMonitor();
 import { initPerformanceSystems } from './utils/performanceIndex';
 const _cleanupPerf = initPerformanceSystems();
 
+// Track K1: hardware-class system tier detection (low/mid/high). Adapts blur,
+// animation duration, and shadow magnitudes via CSS variables. Detection runs
+// once and caches; subsequent reads are synchronous via getSystemTier().
+import { detectSystemTier } from './services/SystemTier';
+void detectSystemTier();
+
+// Track D: forward renderer console.warn/console.error to electron-log so real
+// production failures are persisted to disk even with devtools closed.
+import { installConsoleBridge } from './utils/consoleBridge';
+installConsoleBridge();
+
+// Track K6: proactive cache flush + worker throttle on idle transitions.
+import { startIdleResourceBalancer } from './services/IdleResourceBalancer';
+startIdleResourceBalancer();
+
 // Wave 1: register UKI AutoPilot ActionBus handlers as soon as renderer boots
 import { registerUkiActionHandlers } from './services/UkiActionHandlers';
 registerUkiActionHandlers();

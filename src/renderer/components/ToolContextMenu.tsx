@@ -181,7 +181,7 @@ export const ToolContextMenu: React.FC<ToolContextMenuProps> = ({
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         border: `1px solid ${colors.border.default}`,
         borderRadius: radius.lg,
-        boxShadow: '0 12px 40px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.08)',
+        boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.08)',
         padding: '4px 0',
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'scale(1)' : 'scale(0.96)',

@@ -618,7 +618,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               WebkitBackdropFilter: 'blur(42px) saturate(180%)',
               border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: 18,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.08)',
+              boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: '4px',
               animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
             }}
@@ -689,7 +689,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           background: 'var(--color-bg-surface-solid, #141416)',
           border: '1px solid var(--color-border)',
           borderRadius: 22,
-          boxShadow: '0 24px 80px rgba(0,0,0,0.65), 0 0 0 1px var(--color-bg-hover), inset 0 1px 0 var(--color-border-subtle)',
+          boxShadow: 'var(--pg-shadow-modal), 0 0 0 1px var(--color-bg-hover), var(--pg-gloss-top)',
           overflow: 'hidden',
         }}
       >

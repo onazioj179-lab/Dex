@@ -26,6 +26,21 @@ import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useFileDrop } from '../../utils/useFileDrop';
+import { trackFeature, type TrackPoint } from './vinxMotionTracker';
+
+/**
+ * Run a real frame-diff feature track using the active <video> element.
+ * Direction = 'forward' | 'backward'. Falls back to a single anchor point if
+ * no video is mounted yet (so the panel still gives the user feedback).
+ */
+async function runMotionTrack(direction: 'forward' | 'backward', frames: number): Promise<TrackPoint[]> {
+  const video = document.querySelector<HTMLVideoElement>('video[data-vinx-viewer]')
+    ?? document.querySelector<HTMLVideoElement>('video');
+  if (!video) return [{ frame: 0, x: 960, y: 540, confidence: 0 }];
+  const cx = video.videoWidth / 2 || 960;
+  const cy = video.videoHeight / 2 || 540;
+  return trackFeature(video, cx, cy, { frames: direction === 'forward' ? frames : -frames });
+}
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
@@ -1321,12 +1336,18 @@ const VinxEditor: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button aria-label="Track backward" title="Track Backward" onClick={() => {
-                      useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const, trackPoints: Array.from({ length: 30 }, (_, i) => ({ frame: i, x: 960 + Math.sin(i * 0.2) * 40, y: 540 + Math.cos(i * 0.15) * 30, confidence: 0.85 + Math.random() * 0.15 })) } : tr) } }));
-                      setTimeout(() => { useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const } : tr) } })); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${30} points)` } })); }, 800);
+                      useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
+                      void runMotionTrack('backward', 30).then((trackPoints) => {
+                        useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
+                        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
+                      });
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)' }}><DexIcon name="chevron-left" size={10} /> Track</button>
                     <button aria-label="Track forward" title="Track Forward" onClick={() => {
-                      useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const, trackPoints: Array.from({ length: 60 }, (_, i) => ({ frame: i, x: 960 + Math.sin(i * 0.15) * 50, y: 540 + Math.cos(i * 0.1) * 35, confidence: 0.9 + Math.random() * 0.1 })) } : tr) } }));
-                      setTimeout(() => { useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const } : tr) } })); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${60} points)` } })); }, 800);
+                      useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
+                      void runMotionTrack('forward', 60).then((trackPoints) => {
+                        useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
+                        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
+                      });
                     }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
                     <button aria-label="Delete tracker" title="Delete" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).filter(tr => tr.id !== t.id) } }));

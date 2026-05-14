@@ -131,7 +131,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         borderRadius: 12,
         background: 'rgba(22,22,26,1)',
         border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: '0 16px 48px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.06), inset 0 0.5px 0 rgba(255,255,255,0.08)',
+        boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px rgba(255,255,255,0.06), var(--pg-gloss-top)',
         animation: 'ctxFadeIn 0.15s cubic-bezier(0.23, 1, 0.32, 1)',
       } as React.CSSProperties}
     >
@@ -212,7 +212,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                   padding: '5px 0', borderRadius: 10,
                   background: 'rgba(30,30,34,0.98)',
                   border: '1px solid var(--color-border)',
-                  boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+                  boxShadow: 'var(--pg-shadow-panel)',
                 }}>
                   {item.submenu!.map((sub, si) => (
                     <div

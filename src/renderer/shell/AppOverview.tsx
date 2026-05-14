@@ -261,7 +261,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                   : '1px solid var(--color-border-subtle)',
                 overflow: 'hidden',
                 position: 'relative',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                boxShadow: 'var(--pg-shadow-card)',
               }}>
                 {/* App thumbnail from DOM snapshot */}
                 {(() => {

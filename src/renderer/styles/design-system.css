@@ -224,7 +224,7 @@
      ───────────────────────────────────────────────────────────────────────── */
   
   --font-family: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Inter var', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
   
   /* Font Sizes -- tighter CLI scale */
@@ -237,6 +237,19 @@
   --text-2xl: 24px;
   --text-3xl: 28px;
   --text-4xl: 32px;
+
+  /* Per-region size scale (M1) — chrome/body/headline tiers */
+  --text-chrome-sm: 11px;   /* dense chrome: labels, badges, status bars */
+  --text-chrome:    13px;   /* standard chrome: toolbar, tab bar, dock labels */
+  --text-body-sm:   14px;   /* compact body: list items, metadata */
+  --text-body:      16px;   /* standard body: readable content */
+  --text-headline:  20px;   /* section headings */
+  --text-display:   28px;   /* hero/display headings */
+
+  /* Per-region line-height scale (M1) */
+  --leading-chrome: 1.35;   /* tight for dense chrome */
+  --leading-body:   1.55;   /* comfortable for body text */
+  --leading-headline: 1.25; /* tight for large headings */
   
   /* Font Weights */
   --weight-normal: 400;
@@ -306,7 +319,27 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-tahoe: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-color: cubic-bezier(0.4, 0, 0.2, 1);
-  
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Unified Motion Curves (M4) — semantic aliases for UnifiedMotionSystem.ts
+     Use these in code instead of raw cubic-bezier or transition strings.
+     ───────────────────────────────────────────────────────────────────────── */
+  --pg-curve-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --pg-curve-emphasized: cubic-bezier(0.2, 0.0, 0, 1);
+  --pg-curve-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --pg-curve-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
+  --pg-curve-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Translucency Scale (M3) — opacity rungs for glass / popover / panel layers
+     Use as `background: rgba(22,22,24, var(--pg-translucency-3))` etc.
+     ───────────────────────────────────────────────────────────────────────── */
+  --pg-translucency-1: 0.40;  /* whisper — barely-there scrim */
+  --pg-translucency-2: 0.55;  /* subtle — drop-down menus */
+  --pg-translucency-3: 0.72;  /* default — popovers, sheets */
+  --pg-translucency-4: 0.85;  /* strong — modals, blur-heavy panels */
+  --pg-translucency-5: 0.94;  /* near-solid — toolbars over busy bg */
+
   /* ─────────────────────────────────────────────────────────────────────────
      Z-Index Scale — Unified Shell Layering
      ─────────────────────────────────────────────────────────────────────────

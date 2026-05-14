@@ -750,7 +750,7 @@ export function useSessionStorage<T>(key: string, initialValue: T): [T, (value: 
   const setValue = (value: T | ((val: T) => T)) => {
     const valueToStore = value instanceof Function ? value(storedValue) : value;
     setStoredValue(valueToStore);
-    try { window.sessionStorage.setItem(key, JSON.stringify(valueToStore)); } catch {}
+    try { window.sessionStorage.setItem(key, JSON.stringify(valueToStore)); } catch { /* intentional: sessionStorage may be disabled (private mode, quota); persistence is best-effort */ }
   };
   return [storedValue, setValue];
 }
@@ -2578,7 +2578,7 @@ export function useIntersection(options?: IntersectionObserverInit) {
 export function usePerformanceObserver(types: string[], callback: (entries: PerformanceEntry[]) => void) {
   useEffect(() => {
     const observer = new PerformanceObserver((list) => callback(list.getEntries()));
-    types.forEach(type => { try { observer.observe({ type, buffered: true }); } catch {} });
+    types.forEach(type => { try { observer.observe({ type, buffered: true }); } catch { /* intentional: not every PerformanceObserver entry type is supported on every browser/electron version */ } });
     return () => observer.disconnect();
   }, [types, callback]);
 }
