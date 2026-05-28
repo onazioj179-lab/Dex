@@ -17,6 +17,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSystemMetrics } from '../services/PerformanceMonitor';
 import { useStageStore } from '../store/stageStore';
+import { Z_MINI_PULSE } from '../../shared/zIndex';
 
 const RING_LEN = 60;
 const PILL_W = 240;
@@ -127,7 +128,7 @@ export const MiniPulse: React.FC<MiniPulseProps> = ({ onExpand, hidden }) => {
         top: pos.y,
         width: PILL_W,
         height: PILL_H,
-        zIndex: 8500,
+        zIndex: Z_MINI_PULSE,
         display: 'flex',
         alignItems: 'center',
         gap: 10,

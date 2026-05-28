@@ -817,6 +817,7 @@ export const AppManager: React.FC = () => {
 
   // -- Minimized floating windows (hidden but still running) ---------------
   const [minimizedApps, setMinimizedApps] = useState<Set<string>>(new Set());
+  const [showMinimizedList, setShowMinimizedList] = useState(false);
   const minimizeFloatingApp = useCallback((appId: string) => {
     setMinimizedApps(prev => { const next = new Set(prev); next.add(appId); return next; });
   }, []);
@@ -831,6 +832,14 @@ export const AppManager: React.FC = () => {
       return next;
     });
   }, []);
+
+  // Close minimized-list popover on outside click
+  useEffect(() => {
+    if (!showMinimizedList) return;
+    const handler = () => setShowMinimizedList(false);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
+  }, [showMinimizedList]);
 
   // -- Snap layout picker state for floating window maximize hover ----------
   const [snapLayoutApp, setSnapLayoutApp] = useState<string | null>(null);
@@ -3870,9 +3879,70 @@ export const AppManager: React.FC = () => {
                 );
               }) : null}
               {hasMinimized && (
-                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 2 }}>
-                  {minimizedApps.size} minimized
-                </span>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowMinimizedList(v => !v)}
+                    aria-label={`${minimizedApps.size} minimized window${minimizedApps.size > 1 ? 's' : ''} — click to restore`}
+                    title="Click to see minimized windows"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3,
+                      background: showMinimizedList ? 'rgba(255,255,255,0.12)' : 'none',
+                      border: 'none', cursor: 'pointer', padding: '2px 5px', borderRadius: 8,
+                      fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 2,
+                      transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
+                    onMouseLeave={e => { if (!showMinimizedList) (e.currentTarget as HTMLElement).style.background = 'none'; }}
+                  >
+                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                      <rect x="1" y="4" width="10" height="7" rx="1.5" />
+                      <path d="M4 4V2.5A1.5 1.5 0 0 1 5.5 1h1A1.5 1.5 0 0 1 8 2.5V4" />
+                    </svg>
+                    {minimizedApps.size} minimized
+                  </button>
+                  {showMinimizedList && (
+                    <div
+                      role="menu"
+                      aria-label="Minimized windows"
+                      style={{
+                        position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+                        background: 'var(--pg-toolbar, rgba(28,28,32,0.92))',
+                        border: '1px solid var(--pg-border, rgba(255,255,255,0.10))',
+                        borderRadius: 10, padding: '4px 0',
+                        boxShadow: 'var(--pg-shadow-overlay, 0 12px 32px rgba(0,0,0,0.45))',
+                        backdropFilter: 'blur(24px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                        minWidth: 160, zIndex: 6500,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {Array.from(minimizedApps).map(id => {
+                        const def = APP_DEFINITIONS[id];
+                        const col = def?.color || '#8E8E93';
+                        return (
+                          <button
+                            key={id}
+                            role="menuitem"
+                            onClick={() => { restoreFloatingApp(id); setCurrentApp(id as AppId); setShowMinimizedList(false); }}
+                            title={`Restore ${def?.name || id}`}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              width: '100%', padding: '6px 12px',
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              fontSize: 12, color: 'var(--color-text-primary, #f5f5f7)',
+                              textAlign: 'left', transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
+                          >
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0, boxShadow: `0 0 4px ${col}60` }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{def?.name || id}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
               {activeCreative.length === 0 && <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{getLabel(currentApp)}</span>}
             </div>

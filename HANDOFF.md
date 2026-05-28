@@ -3,7 +3,7 @@
 Operational state of the DEX desktop platform. Update this file at the end of
 every working session. Keep it short, current, and actionable.
 
-Current version: **4.60.1** · Working branch: `claude/test-coverage-analysis-vYvyJ`
+Current version: **4.60.2** · Working branch: `claude/test-coverage-analysis-vYvyJ`
 
 ---
 
@@ -39,7 +39,7 @@ immediate objectives are:
 ## Files & Systems Recently Modified
 
 Production shell:
-- `src/renderer/components/AppManager.tsx` — removed dead What's New modal block; cleaned auto-dismiss timer.
+- `src/renderer/components/AppManager.tsx` — removed dead What's New modal block; cleaned auto-dismiss timer. Added minimized-window restore popover in activities strip (see Minimized-window discoverability below).
 - `src/renderer/components/MiniPulse.tsx` — z-index reset from `2,147,483,000` to `8,500` (sits below the focus-session overlay at `99,998` so it never traps Focus Mode controls).
 - `src/renderer/components/HelpOverlay.tsx` — removed `QuickTipBanner` (auto-popping tip spam).
 - `src/renderer/components/LockScreen.tsx` — added Caps Lock detection.
@@ -58,6 +58,12 @@ Native-dialog migration (window.confirm / window.prompt → in-app input/Confirm
 - `src/renderer/components/Onboarding.tsx` (quit)
 - `src/renderer/DEXAPPLICATIONS/imosion/Imosion.tsx` (save chain preset)
 - `src/renderer/DEXAPPLICATIONS/rewind/Rewind.tsx` (focus goal)
+
+Z-index ladder:
+- `src/shared/zIndex.ts` *(new)* — single source of truth for all stacking layers. Named constants from `Z_FLOATING_WINDOW_BASE` through `Z_FOCUS_SESSION_TOP`. Migrated all hardcoded values in `MiniPulse`, `DiagnosticsPanel`, `HelpOverlay`, `PolicyViewer`, `Onboarding`, `SystemFeatures`, and `FocusSessionSystem`.
+
+Onboarding prefs wiring:
+- `src/renderer/components/Onboarding.tsx` — `handleComplete` now fires `diagnostics:setPreferences({ crashReportingEnabled })` and `updates:setPreferences({ autoCheck })` via IPC so the crash-reporting and auto-update toggles actually take effect. Previously only `analytics` was wired downstream.
 
 Release tooling:
 - `scripts/prune-releases.js` *(new)* — Node-based, cross-platform; uses `gh` CLI. `--repo <owner/name> --keep N [--dry-run]`.
@@ -101,28 +107,35 @@ Release tooling:
 
 In priority order:
 
-1. **Minimized-window discoverability** — minimized windows are
-   reachable through the Dock (it checks `minimizedApps`), but title-bar
-   minimize on macOS-style chrome lands the window with no on-screen
-   "restore" affordance besides a count in the activities strip. Add a
-   per-app entry list (or strip expansion) so a user who minimized via
-   the yellow traffic light can find the window again.
-2. **`dex-onboarding-prefs` wiring** — Onboarding writes `analytics`,
-   `crashReports`, and `autoUpdates` toggle states to localStorage; only
-   `analytics` is honored downstream (`setOptionalAnalyticsEnabled`).
-   The other two need to flow into the settings store or the toggles
-   should be removed from onboarding.
-3. **Z-index ladder doc** — there are values from 1000 to 99,999 across
-   components. Codify the tiers in a `src/shared/zIndex.ts` constants
-   file and migrate hardcoded numbers. Current ladder:
-   `dock ≤ 5000 < dropdowns 6000-9000 < MiniPulse 8500 < diagnostics 9999 <
-   help/overlays 10000-12000 < focus session 99998-99999`.
-4. **Release cache reclaim** — `ReleaseManager.cacheLocation` is
+1. **Release cache reclaim** — `ReleaseManager.cacheLocation` is
    reported but never auto-pruned on a schedule. Wire it into a periodic
    cleanup so installer downloads don't accumulate in `tmp/dex-cache`
    across upgrades.
-5. **HANDOFF.md cadence** — every session must update this file in the
+2. **`dex-onboarding-prefs` Settings sync** — The onboarding prefs are
+   now wired to IPC at completion time. Verify that the Settings page
+   reads the same IPC channels (`diagnostics:getPreferences`,
+   `updates:getPreferences`) to display current state, and that toggling
+   in Settings round-trips correctly with what onboarding set.
+3. **Minimized-window popover — keyboard access** — The restore popover
+   now opens on click. Add keyboard support: when focus is on the
+   "N minimized" button, Space/Enter opens the list; arrow keys navigate
+   entries; Escape closes without restoring.
+4. **HANDOFF.md cadence** — every session must update this file in the
    final commit.
+
+## Completed Items (session 2026-05-28)
+
+- **Minimized-window discoverability** — "N minimized" in the activities
+  strip is now a clickable button that opens a per-app restore popover.
+  Each entry shows the app's accent color dot and name; clicking restores
+  and focuses that app. Popover dismisses on outside click.
+- **`dex-onboarding-prefs` wiring** — `handleComplete` in `Onboarding`
+  now calls `diagnostics:setPreferences({ crashReportingEnabled })` and
+  `updates:setPreferences({ autoCheck })` over IPC. The toggles are
+  functional end-to-end instead of writing to localStorage and stopping.
+- **Z-index constants** — `src/shared/zIndex.ts` created with the full
+  named ladder. Migrated: `MiniPulse`, `DiagnosticsPanel`, `HelpOverlay`,
+  `PolicyViewer`, `Onboarding`, `SystemFeatures`, `FocusSessionSystem`.
 
 ---
 
