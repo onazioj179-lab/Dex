@@ -138,9 +138,9 @@ describe('DatabaseManager', () => {
       expect(vi.mocked(app.getPath)).toHaveBeenCalledWith('userData');
     });
 
-    it('derives the db path inside the databases sub-directory', () => {
+    it('derives the db path inside the databases sub-directory', async () => {
       // dbPath is private but we verify the mkdirSync target contains 'databases'
-      const fsMod = require('fs');
+      const fsMod = await import('fs');
       const call = vi.mocked(fsMod.mkdirSync).mock.calls[0];
       expect(call[0]).toContain('databases');
     });

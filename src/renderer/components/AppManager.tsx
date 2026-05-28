@@ -1347,13 +1347,11 @@ export const AppManager: React.FC = () => {
     updateClock();
     // Align to minute boundary then tick every 60s (was 1s — eliminates 59 repaints/min)
     const msToNextMinute = 60000 - (Date.now() % 60000);
-    const alignTimer = setTimeout(() => {
+    let clockIntervalId: ReturnType<typeof setInterval> | undefined;
+    const alignTimeoutId = setTimeout(() => {
       updateClock();
-      const clockTimer = setInterval(updateClock, 60000);
-      (alignTimerRef as any)._interval = clockTimer;
+      clockIntervalId = setInterval(updateClock, 60_000);
     }, msToNextMinute);
-    const alignTimerRef = { _interval: null as ReturnType<typeof setInterval> | null, _timeout: alignTimer };
-    const clockTimer = -1 as unknown as ReturnType<typeof setInterval>; // placeholder — actual interval created on align
     let battCleanup: (() => void) | undefined;
     if ('getBattery' in navigator) {
       (navigator as any).getBattery().then((batt: any) => {
@@ -1371,9 +1369,8 @@ export const AppManager: React.FC = () => {
       }).catch((e: unknown) => { console.warn('[DEX]', e); });
     }
     return () => {
-      clearTimeout(alignTimerRef._timeout);
-      if (alignTimerRef._interval) clearInterval(alignTimerRef._interval);
-      void clockTimer; // unused placeholder
+      clearTimeout(alignTimeoutId);
+      if (clockIntervalId) clearInterval(clockIntervalId);
       battCleanup?.();
     };
   }, []);

@@ -301,10 +301,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
 
   useEffect(() => { persistState(); }, [pos, size, minimized, maximized, snapZone, persistState]);
 
-  // Clean up persist timer and any in-flight resize listeners on unmount.
+  // Clean up persist timer and any in-flight drag/resize listeners on unmount.
   useEffect(() => () => {
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     if (sizeTooltipTimerRef.current) clearTimeout(sizeTooltipTimerRef.current);
+    if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
     if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
     if (resizeCleanupRef.current) {
       resizeCleanupRef.current();

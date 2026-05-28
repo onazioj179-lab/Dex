@@ -25,17 +25,19 @@ vi.mock('electron', () => ({
 
 const storeData: Record<string, unknown> = {};
 vi.mock('electron-store', () => ({
-  default: vi.fn(() => ({
-    get: vi.fn((key: string, defaultValue?: unknown) => {
-      if (key in storeData) return storeData[key];
-      return defaultValue;
-    }),
-    set: vi.fn((key: string, value: unknown) => {
-      storeData[key] = value;
-    }),
-    delete: vi.fn((key: string) => { delete storeData[key]; }),
-    path: '/mock/dex-security.json',
-  })),
+  default: vi.fn(function() {
+    return {
+      get: vi.fn((key: string, defaultValue?: unknown) => {
+        if (key in storeData) return storeData[key];
+        return defaultValue;
+      }),
+      set: vi.fn((key: string, value: unknown) => {
+        storeData[key] = value;
+      }),
+      delete: vi.fn((key: string) => { delete storeData[key]; }),
+      path: '/mock/dex-security.json',
+    };
+  }),
 }));
 
 vi.mock('electron-log', () => ({
