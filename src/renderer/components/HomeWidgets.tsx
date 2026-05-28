@@ -14,6 +14,7 @@ import { useWidgetStore, WIDGET_TEMPLATES, type Widget, type WidgetType } from '
 import { useRecentFiles } from '../store/useRecentFiles';
 import { sharedTick } from '../services/SharedTick';
 import DexIcon from './DexIcon';
+import { platform } from '../utils';
 
 // ======================================================================
 // WIDGET CONTENT RENDERERS
@@ -763,13 +764,15 @@ const MusicControlsWidget: React.FC = () => {
   );
 };
 
+const _M = platform.isMac ? '⌘' : 'Ctrl';
+
 const DAILY_TIPS: string[] = [
-  'Press Ctrl+K to open the command palette anywhere.',
+  `Press ${_M}+K to open the command palette anywhere.`,
   'Drag any window to a screen edge to snap it.',
-  'Hold Ctrl to peek at all keyboard shortcuts.',
+  `Hold ${_M} to peek at all keyboard shortcuts.`,
   'Press ? on the home screen to open the shortcuts help.',
   'Right-click the Home background to add a new widget.',
-  'Use Ctrl+/ to keep the shortcuts overlay sticky.',
+  `Use ${_M}+/ to keep the shortcuts overlay sticky.`,
   'Pin a window with the title bar pin button to keep it on top.',
   'Switch wallpapers from Settings, Appearance, Wallpaper.',
   'Type a math expression in the command palette for an instant answer.',
@@ -781,8 +784,8 @@ const DAILY_TIPS: string[] = [
   'Frame snapping has 16 zones. Drag to a corner for a quarter snap.',
   'Permissions are batched by capability and remembered with a TTL.',
   'Creator Access unlocks Power tier features with a signed key.',
-  'Use Ctrl+L to lock the screen instantly.',
-  'Open Quick Settings with Ctrl+, for fast toggles.',
+  `Use ${_M}+L to lock the screen instantly.`,
+  `Open Quick Settings with ${_M}+, for fast toggles.`,
   'Press F11 to toggle fullscreen on the active window.',
 ];
 
