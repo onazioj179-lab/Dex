@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DexIcon from '../components/DexIcon';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 // Pulse v2: per-app process governance class. The renderer treats this as a hint;
 // downstream RenderGovernor / native scheduler can act on it as backends mature.
@@ -201,6 +202,7 @@ const TaskManager: React.FC = () => {
   const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
   const [compactMode, setCompactMode] = useState(false);
   const [killing, setKilling] = useState<number | null>(null);
+  const [killConfirm, setKillConfirm] = useState<{ pid: number; name: string; force: boolean } | null>(null);
 
   // Pulse v2: workspace grouping + governance state.
   const stages = useStageStore(s => s.stages);
@@ -329,28 +331,46 @@ const TaskManager: React.FC = () => {
     refreshProcesses();
   };
 
-  const handleEndProcess = useCallback(async (pid: number, name: string) => {
+  const handleEndProcess = useCallback((pid: number, name: string) => {
     if (typeof pid !== 'number' || pid <= 0) return;
     const dexApi = (window as any).dex;
     if (!dexApi?.system?.killProcess) return;
-    if (!window.confirm(`End process "${name}" (PID ${pid})? Unsaved work in this process may be lost.`)) return;
+    setKillConfirm({ pid, name, force: false });
+  }, []);
+
+  const executeKill = useCallback(async () => {
+    if (!killConfirm) return;
+    const { pid, name, force } = killConfirm;
+    setKillConfirm(null);
     setKilling(pid);
     try {
-      const result = await dexApi.system.killProcess(pid, false);
-      if (result && result.success === false) {
-        const retry = window.confirm(`Could not end "${name}": ${result.message}. Force kill?`);
-        if (retry) await dexApi.system.killProcess(pid, true);
+      const dexApi = (window as any).dex;
+      const result = await dexApi.system.killProcess(pid, force);
+      if (result && result.success === false && !force) {
+        setKillConfirm({ pid, name, force: true });
+      } else {
+        await refreshProcesses();
       }
-      await refreshProcesses();
     } catch (e) {
       console.warn('[TaskManager] killProcess failed', e);
     } finally {
       setKilling(null);
     }
-  }, [refreshProcesses]);
+  }, [killConfirm, refreshProcesses]);
 
   return (
     <div style={styles.container}>
+      <ConfirmDialog
+        open={killConfirm !== null}
+        title={killConfirm?.force ? `Force Kill "${killConfirm.name}"?` : `End Process "${killConfirm?.name}"?`}
+        message={killConfirm?.force
+          ? 'Could not end gracefully. Force kill will immediately terminate the process.'
+          : 'Unsaved work in this process will be lost.'}
+        confirmLabel={killConfirm?.force ? 'Force Kill' : 'End Process'}
+        tone="destructive"
+        onConfirm={executeKill}
+        onCancel={() => setKillConfirm(null)}
+      />
       <div style={styles.header}>
         <div style={styles.titleWrap}>
           <span style={styles.titleIcon}><DexIcon name="activity" size={18} color="#fff" strokeWidth={2.25} /></span>
