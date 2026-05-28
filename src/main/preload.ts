@@ -3822,6 +3822,14 @@ contextBridge.exposeInMainWorld('dexNative', dexNativeAPI);
 // window.electron.invoke / window.electron.ipcRenderer.*
 // Wire them to the same validated API so those calls succeed.
 // Item 146: Hardened legacy bridge -- all channels go through allowlist
+//
+// Per-callback wrapper registry so ipcRenderer.off() removes only the
+// specific listener instead of all listeners on the channel.
+const legacyListenerWrappers = new WeakMap<
+  (...args: any[]) => void,
+  Map<string, (...args: any[]) => void>
+>();
+
 const electronLegacyBridge = {
   invoke: (channel: string, ...args: any[]) => {
     if (!isAllowedDynamicInvokeChannel(channel)) {
@@ -3858,10 +3866,21 @@ const electronLegacyBridge = {
         return;
       }
       const wrapper = (_event: any, ...callbackArgs: any[]) => callback(...callbackArgs);
+      let channelMap = legacyListenerWrappers.get(callback);
+      if (!channelMap) {
+        channelMap = new Map();
+        legacyListenerWrappers.set(callback, channelMap);
+      }
+      channelMap.set(channel, wrapper);
       ipcRenderer.on(channel, wrapper);
     },
     off: (channel: string, callback: (...args: any[]) => void) => {
-      ipcRenderer.removeAllListeners(channel);
+      const channelMap = legacyListenerWrappers.get(callback);
+      const wrapper = channelMap?.get(channel);
+      if (wrapper) {
+        ipcRenderer.removeListener(channel, wrapper);
+        channelMap!.delete(channel);
+      }
     },
   },
   shell: {

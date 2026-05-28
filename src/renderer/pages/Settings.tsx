@@ -318,20 +318,8 @@ const SystemMonitorPanel: React.FC = () => {
 
   React.useEffect(() => {
     refresh();
-    let id: number | null = window.setInterval(refresh, 3000);
-    const onVisibility = () => {
-      if (document.hidden) {
-        if (id !== null) { window.clearInterval(id); id = null; }
-      } else if (id === null) {
-        refresh();
-        id = window.setInterval(refresh, 3000);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      if (id !== null) window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
+    const id = window.setInterval(refresh, 3000);
+    return () => window.clearInterval(id);
   }, [refresh]);
 
   const handleEndProcess = React.useCallback(async (pid: number, name: string) => {
@@ -689,7 +677,7 @@ const UpdateManagerSection: React.FC = () => {
       <span style={{
         position: 'absolute', top: 3, left: on ? 21 : 3,
         width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
-        boxShadow: 'var(--pg-shadow-chip)',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
       }} />
     </button>
   );
@@ -1355,12 +1343,12 @@ const TextDensityControls: React.FC<{
   const applyFontScale = (v: number) => {
     setFontScale(v);
     document.documentElement.style.setProperty('--font-scale', String(v));
-    try { localStorage.setItem('dex-font-scale', String(v)); } catch { /* intentional: localStorage write is best-effort; persists on next change if quota recovers */ }
+    try { localStorage.setItem('dex-font-scale', String(v)); } catch {}
   };
   const applyCompact = (v: boolean) => {
     setCompact(v);
     document.documentElement.style.setProperty('--density-scale', v ? '0.85' : '1');
-    try { localStorage.setItem('dex-density-compact', String(v)); } catch { /* intentional: localStorage write is best-effort */ }
+    try { localStorage.setItem('dex-density-compact', String(v)); } catch {}
   };
 
   return (
@@ -2698,7 +2686,7 @@ export const Settings: React.FC = () => {
             width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
             transition: 'transform 0.2s ease',
             transform: settings.stageManager ? 'translateX(20px)' : 'translateX(0)',
-            boxShadow: 'var(--pg-shadow-chip)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
           }} />
         </button>
       </div>
@@ -3088,7 +3076,7 @@ export const Settings: React.FC = () => {
                     <span style={{
                       position: 'absolute', left: entry.enabled ? 20 : 2, top: 2, width: 20, height: 20,
                       borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                      boxShadow: 'var(--pg-shadow-chip)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                     }} />
                   </span>
                 </label>
@@ -3251,7 +3239,7 @@ export const Settings: React.FC = () => {
               aria-label="Toggle optional product analytics"
             />
             <span style={{ position: 'absolute', inset: 0, borderRadius: 12, background: optionalAnalytics ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
-              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: 'var(--pg-shadow-chip)' }} />
+              <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
         </div>
@@ -3579,7 +3567,7 @@ export const Settings: React.FC = () => {
                   <span style={{
                     position: 'absolute', left: autoOpt ? 20 : 2, top: 2, width: 20, height: 20,
                     borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                    boxShadow: 'var(--pg-shadow-chip)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                   }} />
                 </span>
               </label>
@@ -4647,7 +4635,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '20px',
     borderRadius: '50%',
     background: '#ffffff',
-    boxShadow: 'var(--pg-shadow-chip)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
     position: 'absolute',
     left: '2px',
     top: '50%',

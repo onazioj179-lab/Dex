@@ -1037,7 +1037,7 @@ const Forge: React.FC = () => {
                 }
               }
             };
-            window.electron?.on?.('watch:fileAdded', handler);
+            window.electron?.ipcRenderer?.on?.('watch:fileAdded', handler);
           } catch {
             // Watch IPC not available - folder saved but monitoring won't auto-detect
             console.warn('[Forge] File watching IPC not available');

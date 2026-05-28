@@ -65,17 +65,27 @@ export async function runWorkflow(
   const outputs: Record<string, Record<string, unknown> | undefined> = {};
   const skipped: string[] = [];
   const incomingMap = buildIncoming(graph);
+  const nodeMap = new Map(graph.nodes.map(n => [n.id, n] as const));
 
   for (const id of order) {
-    const node = graph.nodes.find(n => n.id === id)!;
+    const node = nodeMap.get(id);
+    if (!node) {
+      return { ok: false, outputs, skipped, failedNodeId: id, error: `missing-node:${id}` };
+    }
 
     // For triggers, verify match. Otherwise no-op pass-through.
     if (node.kind === 'trigger') {
-      if (!matchesTrigger(node, trigger)) {
-        // No matching trigger means downstream cannot run — short-circuit.
-        return { ok: true, outputs, skipped: order.filter(x => x !== id) };
+      if (matchesTrigger(node, trigger)) {
+        outputs[id] = (trigger as unknown as Record<string, unknown>);
       }
-      outputs[id] = (trigger as unknown as Record<string, unknown>);
+      continue;
+    }
+
+    // If this node has upstream dependencies but none produced output,
+    // this path was not activated by the current trigger.
+    const upstream = incomingMap.get(id) ?? [];
+    if (upstream.length > 0 && upstream.every(upId => outputs[upId] === undefined)) {
+      skipped.push(id);
       continue;
     }
 
@@ -88,7 +98,7 @@ export async function runWorkflow(
 
     // Collect inputs from upstream outputs.
     const inputs: Record<string, unknown> = {};
-    for (const upId of incomingMap.get(id) ?? []) {
+    for (const upId of upstream) {
       const o = outputs[upId];
       if (o) Object.assign(inputs, o);
     }

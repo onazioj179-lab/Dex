@@ -152,8 +152,7 @@ export const LockScreen: React.FC = () => {
       setIdleWarning({ active: true, seconds: data.secondsUntilLock });
       setIdleSeconds(data.secondsUntilLock);
     };
-    // @ts-ignore - electron IPC
-    window.electron?.on?.('auth:idleWarning', handler);
+    window.electron?.ipcRenderer?.on?.('auth:idleWarning', handler);
 
     let countdown: ReturnType<typeof setInterval>;
     if (idleWarning?.active) {
@@ -170,8 +169,7 @@ export const LockScreen: React.FC = () => {
     }
 
     return () => {
-      // @ts-ignore
-      window.electron?.removeListener?.('auth:idleWarning', handler);
+      window.electron?.ipcRenderer?.off?.('auth:idleWarning', handler);
       if (countdown) clearInterval(countdown);
     };
   }, [idleWarning?.active, setIdleWarning]);

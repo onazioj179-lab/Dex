@@ -862,9 +862,9 @@ export const Browser: React.FC = () => {
           : d
       ));
     };
-    window.electron?.on?.('download:progress', handleProgress);
+    window.electron?.ipcRenderer?.on?.('download:progress', handleProgress);
     return () => {
-      window.electron?.off?.('download:progress', handleProgress);
+      window.electron?.ipcRenderer?.off?.('download:progress', handleProgress);
     };
   }, []);
 

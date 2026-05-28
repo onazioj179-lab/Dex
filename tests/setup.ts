@@ -221,6 +221,13 @@ if (typeof window !== 'undefined') {
       },
     },
   });
+
+  // Stub HTMLCanvasElement.getContext so jsdom does not emit
+  // 'Not implemented: HTMLCanvasElement.prototype.getContext' warnings
+  // during GPU-tier detection and animation budget probing.
+  if (typeof HTMLCanvasElement !== 'undefined') {
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as any;
+  }
 }
 
 // ===========================================================================
@@ -228,8 +235,7 @@ if (typeof window !== 'undefined') {
 // ===========================================================================
 
 beforeAll(() => {
-  // Global setup before all tests
-  console.log('DEX Test Suite Starting...');
+  // intentionally empty — no noise
 });
 
 afterEach(() => {
@@ -240,7 +246,6 @@ afterEach(() => {
 afterAll(() => {
   // Cleanup after all tests
   vi.restoreAllMocks();
-  console.log('DEX Test Suite Complete');
 });
 
 // ===========================================================================
