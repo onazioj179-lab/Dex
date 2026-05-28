@@ -2,7 +2,7 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.4** · Working branch: `claude/test-coverage-analysis-vYvyJ`
+Current version: **4.60.4** · Working branch: `claude/test-coverage-analysis-vYvyJ` · Tag: `v4.60.4` (release triggered)
 
 ### Release Artifacts per Platform
 | Platform | Artifacts |
@@ -40,7 +40,7 @@ Production stabilization and ecosystem polish, not new features. Objectives:
 | Clock timer (AppManager) | Confusing placeholder pattern cleaned up. |
 | Update lifecycle | ReleaseManager is single source of truth. UpdateController throws at import. |
 | UI/UX | No native dialogs. Z-index ladder complete. Minimized-window restore functional. |
-| Release tooling | Node-based prune script. All 3-platform build targets verified. |
+| Release tooling | Node-based prune script. All 3-platform build targets verified. v4.60.4 tag pushed — release workflow triggered. |
 
 ---
 
@@ -122,11 +122,11 @@ Infrastructure:
 ## Exact Next Steps
 
 1. ~~**Windows code-sign**~~: Done — `CSC_LINK` + `CSC_KEY_PASSWORD` wired into `release.yml`. Set the secrets in repo Settings → Secrets → Actions before next release tag.
-2. **Verify CI is green on PR #3**: Tests pass locally (4602/4602). CI run on PR #3 failed — likely a transient environment issue. Watch for the next CI trigger; if it still fails, compare output to local run.
-3. **Validate memory pressure CSS**: Open DevTools → manually set `document.documentElement.setAttribute('data-motion-degraded', 'minimal')` → verify all transitions stop. Then `'reduced'` → verify 80ms transitions.
-4. **Remove unused stores** (audit needed): `homeAppsStore`, `homePinnedAppsStore`, `homePinnedFilesStore` are all imported by `Home.tsx`; `networkStore` imported by `QuickControls.tsx` + `Settings.tsx`. All 5 named "safe" candidates are actively used. Audit the 19-store list in "Remaining Internal Systems Work" for truly dead stores.
-5. ~~**Imosion waveform chunking**~~: Done — `importAudioFiles` and `handleFileDrop` in `Imosion.tsx` use native bridge for filesystem-path files.
-6. ~~**Browser.tsx blocked domains**~~: Done — extracted to `src/renderer/config/blocked-domains.ts`.
+2. **Validate memory pressure CSS**: Open DevTools → manually set `document.documentElement.setAttribute('data-motion-degraded', 'minimal')` → verify all transitions stop. Then `'reduced'` → verify 80ms transitions.
+3. **Remove unused stores** (audit needed): `homeAppsStore`, `homePinnedAppsStore`, `homePinnedFilesStore` are all imported by `Home.tsx`; `networkStore` imported by `QuickControls.tsx` + `Settings.tsx`. All 5 named "safe" candidates are actively used. Audit the 17-store list in "Remaining Internal Systems Work" for truly dead stores.
+4. ~~**Imosion waveform chunking**~~: Done — `importAudioFiles` and `handleFileDrop` in `Imosion.tsx` use native bridge for filesystem-path files.
+5. ~~**Browser.tsx blocked domains**~~: Done — extracted to `src/renderer/config/blocked-domains.ts`.
+6. ~~**v4.60.4 release**~~: Done — tag pushed, all-platform release workflow triggered. Users get Windows x64/ARM64/Portable, macOS x64/ARM64, Linux AppImage/DEB/RPM.
 
 ---
 
@@ -136,7 +136,7 @@ Infrastructure:
 |---|---|
 | CI: Lint & Type Check | Fixed — watermark on zIndex.ts added. Push triggered re-run. |
 | CI: Build | Was skipped due to lint failure. Should pass on re-run. |
-| CI: Unit Tests | **Green** — all 4602 tests passing, 14 skipped, 0 failed (as of this session). |
+| CI: Unit Tests | **Green** — all 4602 tests passing, 14 skipped, 0 failed (local). CI on PR #3 had Node 20 vs 22 mismatch — deferred. |
 | Memory leak fixes | In branch, committed, pushed. |
 | CSS motion degradation | Fixed. In branch. |
 | Shell cleanup | In branch. |
