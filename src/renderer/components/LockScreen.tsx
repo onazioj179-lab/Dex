@@ -75,6 +75,7 @@ export const LockScreen: React.FC = () => {
   const [shake, setShake] = useState(false);
   const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [unlocking, setUnlocking] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
@@ -453,6 +454,8 @@ export const LockScreen: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  onKeyDown={e => setCapsLockOn(e.getModifierState('CapsLock'))}
+                  onKeyUp={e => setCapsLockOn(e.getModifierState('CapsLock'))}
                   placeholder="Password"
                   style={styles.passwordInput}
                   className="lock-password-input"
@@ -481,6 +484,12 @@ export const LockScreen: React.FC = () => {
                   )}
                 </button>
               </div>
+              {capsLockOn && !showPassword && (
+                <div style={{ fontSize: 11, color: 'rgba(255,214,10,0.85)', textAlign: 'center', marginTop: -4, marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22V12M12 12L7 17M12 12l5 5"/><rect x="5" y="3" width="14" height="6" rx="1"/></svg>
+                  Caps Lock is on
+                </div>
+              )}
               <button
                 type="submit"
                 style={{

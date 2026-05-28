@@ -285,6 +285,9 @@ export const Files: React.FC = () => {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string>('');
 
+  // Inline new-folder input state — replaces window.prompt
+  const [folderNameDraft, setFolderNameDraft] = useState<string | null>(null);
+
   // Pin Registry (v2): unified cross-shell pinning. Used here for folder pinning
   // from the Quick Actions row. Live list is read for the "Pinned" indicator.
   const pinFolder = usePinRegistry(s => s.pinFolder);
@@ -588,16 +591,20 @@ export const Files: React.FC = () => {
     }
   };
 
-  const handleCreateFolder = async () => {
-    const name = window.prompt('New folder name:');
-    if (!name?.trim()) return;
+  const handleCreateFolder = () => {
+    setFolderNameDraft('');
+  };
+
+  const submitFolderCreate = async () => {
+    const name = folderNameDraft?.trim();
+    setFolderNameDraft(null);
+    if (!name) return;
     try {
       if (window.electron?.invoke) {
-        await window.electron.invoke('files:mkdir', `${currentPath}/${name.trim()}`);
+        await window.electron.invoke('files:mkdir', `${currentPath}/${name}`);
         loadFiles(currentPath);
       }
     } catch (err) {
-      console.error('Create folder failed:', err);
       toast.error('Failed to create folder');
     }
   };
@@ -1136,14 +1143,26 @@ export const Files: React.FC = () => {
             </button>
             
             {/* New Folder */}
-            <button
-              style={styles.navBtn}
-              onClick={handleCreateFolder}
-              title="New Folder (Ctrl+Shift+N)"
-              aria-label="Create new folder"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-            </button>
+            {folderNameDraft !== null ? (
+              <input
+                autoFocus
+                value={folderNameDraft}
+                onChange={e => setFolderNameDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') submitFolderCreate(); if (e.key === 'Escape') setFolderNameDraft(null); }}
+                onBlur={submitFolderCreate}
+                placeholder="Folder name"
+                style={{ height: 26, padding: '0 8px', borderRadius: 5, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none', width: 120 }}
+              />
+            ) : (
+              <button
+                style={styles.navBtn}
+                onClick={handleCreateFolder}
+                title="New Folder (Ctrl+Shift+N)"
+                aria-label="Create new folder"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+              </button>
+            )}
 
             {/* Organize by Type */}
             <button

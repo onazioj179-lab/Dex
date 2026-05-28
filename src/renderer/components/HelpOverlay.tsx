@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import DexIcon from './DexIcon';
+import { platform } from '../utils';
 
 // ============================================================================
 // Types
@@ -48,15 +49,17 @@ interface HelpOverlayProps {
 // Help Content - Organized by app/feature
 // ============================================================================
 
+const _MOD = platform.isMac ? '⌘' : 'Ctrl';
+
 const HELP_SECTIONS: HelpSection[] = [
   {
     id: 'getting-started',
     title: 'Getting Started',
     icon: 'rocket',
     tips: [
-      { id: 'welcome', target: '', title: 'Welcome to DEX', content: 'DEX is your complete creative workspace. Use the dock at the bottom to launch apps, or press Ctrl+K for the command palette.' },
+      { id: 'welcome', target: '', title: 'Welcome to DEX', content: `DEX is your complete creative workspace. Use the dock at the bottom to launch apps, or press ${_MOD}+K for the command palette.` },
       { id: 'uki', target: '', title: 'Meet UKI', content: 'UKI is your AI assistant. Say "Hey UKI" or press the microphone button to get help, open apps, or ask questions.' },
-      { id: 'navigation', target: '', title: 'Quick Navigation', content: 'Use Ctrl+1-9 to jump between apps. Hold Ctrl to see all shortcuts.' },
+      { id: 'navigation', target: '', title: 'Quick Navigation', content: `Use ${_MOD}+1–9 to jump between apps. Hold ${_MOD} to see all shortcuts.` },
     ],
   },
   {
@@ -90,93 +93,13 @@ const HELP_SECTIONS: HelpSection[] = [
     icon: 'settings',
     tips: [
       { id: 'nexus', target: '', title: 'Nexus', content: 'Visual knowledge graph and file explorer. Explore your data in 3D space.' },
-      { id: 'spotlight', target: '', title: 'Spotlight', content: 'Press Ctrl+K to search files, apps, and commands instantly.' },
+      { id: 'spotlight', target: '', title: 'Spotlight', content: `Press ${_MOD}+K to search files, apps, and commands instantly.` },
       { id: 'notifications', target: '', title: 'Notifications', content: 'Click the bell icon to view notifications and alerts.' },
       { id: 'settings', target: '', title: 'Settings', content: 'Customize DEX appearance, privacy, and performance options.' },
     ],
   },
 ];
 
-// Quick tips shown randomly
-const QUICK_TIPS = [
-  'Tip: Double-click the titlebar to maximize a window',
-  'Tip: Drag windows to screen edges to snap them',
-  'Tip: Use Ctrl+Z to undo in any app',
-  'Tip: Right-click for context menus with more options',
-  'Tip: Press F11 for fullscreen mode',
-  'Tip: Use Ctrl+Tab to switch between open apps',
-  'Tip: Drag files onto app icons to open them',
-  'Tip: Hold Shift while clicking for multi-select',
-  'Tip: Use Ctrl+S to save your work frequently',
-  'Tip: Ask UKI "What can you do?" for help',
-];
-
-// ============================================================================
-// Quick Tip Banner Component
-// ============================================================================
-
-const QuickTipBanner: React.FC<{ onDismiss?: () => void }> = memo(({ onDismiss }) => {
-  const [tip, setTip] = useState('');
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    // Show a random tip after a short delay
-    const showTimer = setTimeout(() => {
-      setTip(QUICK_TIPS[Math.floor(Math.random() * QUICK_TIPS.length)]);
-      setVisible(true);
-    }, 5000);
-
-    // Auto-dismiss after 10 seconds
-    const hideTimer = setTimeout(() => {
-      setVisible(false);
-    }, 15000);
-
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  }, []);
-
-  if (!visible || !tip) return null;
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 80,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'rgba(22, 22, 26, 0.95)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        borderRadius: 10,
-        padding: '10px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-        zIndex: 9000,
-        animation: 'fadeInUp 300ms ease-out',
-      }}
-    >
-      <span style={{ fontSize: 14, color: '#fff' }}>{tip}</span>
-      <button
-        onClick={() => { setVisible(false); onDismiss?.(); }}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--color-text-muted)',
-          cursor: 'pointer',
-          padding: 4,
-        }}
-        aria-label="Dismiss tip"
-      >
-        <DexIcon name="close" size={14} />
-      </button>
-    </div>
-  );
-});
 
 // ============================================================================
 // Help Card Component
@@ -671,5 +594,5 @@ export function useHelp() {
 // Exports
 // ============================================================================
 
-export { QuickTipBanner, HelpOverlay };
+export { HelpOverlay };
 export default HelpOverlay;

@@ -7,11 +7,12 @@
 /**
  * KeyboardShortcuts — Hold-to-reveal overlay showing all shortcuts
  *
- * Press and hold Ctrl (or Cmd) to reveal an overlay with all keyboard
- * shortcuts grouped by category. Tap Ctrl+/ to toggle sticky mode.
+ * Press and hold Ctrl/Cmd to reveal an overlay with all keyboard
+ * shortcuts grouped by category. Tap Ctrl+/ (or Cmd+/) to toggle sticky mode.
  */
 
 import React, { useState, useEffect, memo, useCallback, useRef } from 'react';
+import { platform } from '../utils';
 
 interface ShortcutEntry {
   keys: string;
@@ -23,44 +24,47 @@ interface ShortcutGroup {
   shortcuts: ShortcutEntry[];
 }
 
+const MOD = platform.isMac ? '⌘' : 'Ctrl';
+const OPT = platform.isMac ? '⌥' : 'Alt';
+
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Navigation',
     shortcuts: [
-      { keys: 'Ctrl+1', label: 'Home' },
-      { keys: 'Ctrl+2', label: 'Settings' },
-      { keys: 'Ctrl+3', label: 'Files' },
-      { keys: 'Ctrl+4', label: 'Notes' },
-      { keys: 'Ctrl+5', label: 'Tasks' },
-      { keys: 'Ctrl+6', label: 'Browser' },
-      { keys: 'Ctrl+7', label: 'Gallery' },
-      { keys: 'Ctrl+8', label: 'Calendar' },
-      { keys: 'Ctrl+9', label: 'Kanban' },
+      { keys: `${MOD}+1`, label: 'Home' },
+      { keys: `${MOD}+2`, label: 'Settings' },
+      { keys: `${MOD}+3`, label: 'Files' },
+      { keys: `${MOD}+4`, label: 'Notes' },
+      { keys: `${MOD}+5`, label: 'Tasks' },
+      { keys: `${MOD}+6`, label: 'Browser' },
+      { keys: `${MOD}+7`, label: 'Gallery' },
+      { keys: `${MOD}+8`, label: 'Calendar' },
+      { keys: `${MOD}+9`, label: 'Kanban' },
     ],
   },
   {
     title: 'Creative Suite',
     shortcuts: [
-      { keys: 'Alt+V', label: 'VINX' },
-      { keys: 'Alt+I', label: 'Imosion' },
-      { keys: 'Alt+R', label: 'PRISM' },
-      { keys: 'Alt+F', label: 'FLUX' },
-      { keys: 'Alt+G', label: 'FORGE' },
-      { keys: 'Alt+X', label: 'AXL' },
-      { keys: 'Alt+W', label: 'Rewind' },
+      { keys: `${OPT}+V`, label: 'VINX' },
+      { keys: `${OPT}+I`, label: 'Imosion' },
+      { keys: `${OPT}+R`, label: 'PRISM' },
+      { keys: `${OPT}+F`, label: 'FLUX' },
+      { keys: `${OPT}+G`, label: 'FORGE' },
+      { keys: `${OPT}+X`, label: 'AXL' },
+      { keys: `${OPT}+W`, label: 'Rewind' },
     ],
   },
   {
     title: 'System',
     shortcuts: [
-      { keys: 'Ctrl+K', label: 'Command Palette' },
-      { keys: 'Ctrl+L', label: 'Lock Screen' },
-      { keys: 'Ctrl+,', label: 'Quick Settings' },
-      { keys: 'Alt+T', label: 'Transfers' },
-      { keys: 'Alt+P', label: 'Power' },
-      { keys: 'Alt+C', label: 'Calculator' },
+      { keys: `${MOD}+K`, label: 'Command Palette' },
+      { keys: `${MOD}+L`, label: 'Lock Screen' },
+      { keys: `${MOD}+,`, label: 'Quick Settings' },
+      { keys: `${OPT}+T`, label: 'Transfers' },
+      { keys: `${OPT}+P`, label: 'Power' },
+      { keys: `${OPT}+C`, label: 'Calculator' },
       { keys: 'F11', label: 'Fullscreen' },
-      { keys: 'Ctrl+/', label: 'Toggle Shortcuts' },
+      { keys: `${MOD}+/`, label: 'Toggle Shortcuts' },
     ],
   },
 ];
@@ -103,7 +107,7 @@ const KeyboardShortcuts: React.FC = () => {
       }
     }
 
-    // Ctrl+/ toggles sticky mode
+    // Ctrl+/ or Cmd+/ toggles sticky mode
     if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.code === 'Slash')) {
       e.preventDefault();
       clearRevealTimer();
@@ -204,7 +208,7 @@ const KeyboardShortcuts: React.FC = () => {
           Click anywhere or press <kbd style={{
             fontSize: 10, padding: '2px 6px', borderRadius: 4,
             background: 'var(--color-border)', border: '1px solid var(--color-border)',
-          }}>Ctrl+/</kbd> to close
+          }}>{MOD}+/</kbd> to close
         </div>
       )}
     </div>

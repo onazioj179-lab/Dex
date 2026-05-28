@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
-// UnifiedSearch retired -- Ctrl+K is owned by CommandPalette (mounted in App.tsx).
+import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
 
@@ -997,20 +997,7 @@ export const AppManager: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [splashVisible]);
 
-  // -- What's New modal (post-update) ------------------------------------
-  // Disabled: modal at z-index 99998 blocks all interaction with dock/apps
-  const [showWhatsNew, setShowWhatsNew] = useState(false);
-  const dismissWhatsNew = useCallback(() => {
-    setShowWhatsNew(false);
-    try { localStorage.setItem('dex-whats-new-seen', '3.6.0'); } catch (e) { console.warn('[DEX]', e); }
-  }, []);
 
-  // Auto-dismiss What's New after 10s to prevent blocking UI forever
-  useEffect(() => {
-    if (!showWhatsNew) return;
-    const timer = setTimeout(dismissWhatsNew, 10000);
-    return () => clearTimeout(timer);
-  }, [showWhatsNew, dismissWhatsNew]);
 
   // Smooth cross-fade on app switch
   useAppTransition(currentAppId, contentRef);
@@ -3333,12 +3320,14 @@ export const AppManager: React.FC = () => {
     }
   }, [openDockApp, sendAssetToApp]);
 
-  // Shortcut hints for dock tooltips
+  // Shortcut hints for dock tooltips — platform-aware modifier key
+  const _M = platform.isMac ? '⌘' : 'Ctrl';
+  const _O = platform.isMac ? '⌥' : 'Alt';
   const dockShortcut: Record<string, string> = {
-    home: 'Ctrl+1', settings: 'Ctrl+2', files: 'Ctrl+3', notes: 'Ctrl+4', tasks: 'Ctrl+5',
-    browser: 'Ctrl+6', gallery: 'Ctrl+7', calendar: 'Ctrl+8', kanban: 'Ctrl+9',
-    videoeditor: 'Alt+V', imosion: 'Alt+I', prism: 'Alt+R', flux: 'Alt+F', forge: 'Alt+G',
-    power: 'Alt+P', calculator: 'Alt+C', transfers: 'Alt+T',
+    home: `${_M}+1`, settings: `${_M}+2`, files: `${_M}+3`, notes: `${_M}+4`, tasks: `${_M}+5`,
+    browser: `${_M}+6`, gallery: `${_M}+7`, calendar: `${_M}+8`, kanban: `${_M}+9`,
+    videoeditor: `${_O}+V`, imosion: `${_O}+I`, prism: `${_O}+R`, flux: `${_O}+F`, forge: `${_O}+G`,
+    power: `${_O}+P`, calculator: `${_O}+C`, transfers: `${_O}+T`,
   };
 
   // Item 145: Arrow key navigation within dock
@@ -3833,7 +3822,7 @@ export const AppManager: React.FC = () => {
         <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
-        <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--color-accent)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip="Browser (Ctrl+6)" aria-label="Open Browser">
+        <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--color-accent)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
       </div>
@@ -5054,50 +5043,6 @@ export const AppManager: React.FC = () => {
         </div>
       )}
 
-      {/* What's New Modal */}
-      {showWhatsNew && !splashVisible && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-max)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)' } as React.CSSProperties} onMouseDown={dismissWhatsNew} />
-          <div style={{
-            ...glassModal,
-            position: 'relative', width: 420, maxHeight: '80vh', overflowY: 'auto',
-            padding: '28px 24px 20px',
-            animation: 'appMenuSlideUp 0.15s cubic-bezier(0.23,1,0.32,1)',
-          } as React.CSSProperties}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 4 }}>What's New in DEX 3.0</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 16 }}>Fresh design, new features, smoother experience</div>
-            {[
-              { icon: 'palette', title: 'New Glass Design', desc: 'Sleek glass-style sidebars and menus that look beautiful on any wallpaper.' },
-              { icon: 'zap', title: 'Workflow Automations', desc: 'Create custom shortcuts to automate repetitive tasks with 60+ actions.' },
-              { icon: 'image', title: 'Gallery Upgrades', desc: 'Fullscreen slideshow, batch select and export, and faster photo browsing.' },
-              { icon: 'music', title: 'Better Music Player', desc: 'Browse by artist, album, or genre. Visualizer, equalizer, and queue management.' },
-              { icon: 'folder', title: 'Smart File Manager', desc: 'Color-coded tags, drag-and-drop, Quick Look preview, and saved searches.' },
-              { icon: 'calendar', title: 'Tasks & Calendar', desc: 'Due dates, recurring tasks, subtasks, and a calendar view to stay organized.' },
-              { icon: 'monitor', title: 'System Monitor', desc: 'See CPU, memory, battery, and running processes in the Power dashboard.' },
-              { icon: 'settings', title: 'Faster Performance', desc: 'Optimized for smooth performance on all computers, from low-end to high-end.' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, padding: '8px 0', borderTop: i > 0 ? '1px solid var(--color-bg-hover)' : 'none' }}>
-                <span style={{ fontSize: 18, flexShrink: 0 }}><DexIcon name={item.icon} size={18} /></span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{item.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{item.desc}</div>
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={dismissWhatsNew}
-              style={{
-                width: '100%', marginTop: 16, padding: '10px 0',
-                background: 'var(--color-accent, #4a9eff)', color: '#fff',
-                border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                cursor: 'pointer', transition: 'opacity 0.2s',
-              }}
-            >
-              Get Started
-            </button>
-          </div>
-        </div>
-      )}
 
 
     </div>
