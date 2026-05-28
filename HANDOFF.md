@@ -3,7 +3,7 @@
 Operational state of the DEX desktop platform. Update this file at the end of
 every working session. Keep it short, current, and actionable.
 
-Current version: **4.60.2** · Working branch: `claude/test-coverage-analysis-vYvyJ`
+Current version: **4.60.3** · Working branch: `claude/test-coverage-analysis-vYvyJ`
 
 ---
 
@@ -116,22 +116,26 @@ Minimized-window popover — keyboard access:
 
 ## Next Steps
 
-In priority order:
+1. **Verify cache prune on a real upgrade** — logic is correct in code.
+   Confirm `downloadedArtifactPath` is preserved after a real update cycle.
+2. **Browser.tsx dropdowns** — zIndex 9999 at lines 2448/2480 are inside
+   the Browser FloatingWindow stacking context (scoped, not global). Safe
+   to leave, but document this in a comment if confusing.
+3. **HANDOFF.md cadence** — every session must update this file.
 
-1. **Migrate remaining hardcoded z-index integers** — a few non-critical
-   call sites still use raw numbers (`Browser.tsx`, `MediaBrowser.tsx`,
-   `useFileDrop.ts`, `TouchInputSystem.ts`, `CreativeAppsSnappy.ts`).
-   Migrate to the named constants from `src/shared/zIndex.ts` so the
-   ladder stays honest as new layers are added.
-2. **Surface cache-reclaim in Settings → About** — `dexUpdates.pruneCache()`
-   exists over IPC. Add a "Clear update cache" button to the Settings →
-   Updates section that surfaces the freed-bytes return value to the user.
-3. **Verify cache prune across real upgrade cycles** — the 7-day age cap
-   and protected-current-artifact logic is correct on paper. Run a real
-   update + relaunch to confirm `downloadedArtifactPath` survives a
-   prune cycle.
-4. **HANDOFF.md cadence** — every session must update this file in the
-   final commit.
+## Completed This Session (4.60.3)
+
+- **Settings "Clear Cache" button** — Settings → Updates now has a
+  "Clear Cache" button that calls `dexUpdates.pruneCache()` and shows
+  freed MB inline. State: idle / clearing… / result.
+- **Z-index: full ladder complete** — Added `Z_PANEL=5500`, `Z_PIP=9900`
+  to `src/shared/zIndex.ts`. Migrated `ConfirmDialog`, `ShareDialog`,
+  `RegistryCommandPalette`, `PictureInPicture`, `ChatPanel` to named
+  constants. All global overlay z-index values are now named.
+- **console.log cleanup** — Removed production noise from `snappy.ts`,
+  `MemoryMonitor`, `UIPolishSystem`, `InputPriority`, `ScreenGuardSystem`,
+  `ProPerformanceEngine`. Removed data-leaking debug log in
+  `ImosionPlugins` (was printing preset names + values to devtools).
 
 ## Completed Items (session 2026-05-28)
 

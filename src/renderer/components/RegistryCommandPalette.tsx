@@ -22,6 +22,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { TextInput } from '../ui/TextInput';
 import { space, radius, fontSize, fontWeight } from '../styles/tokens';
 import { searchCommands, type CommandRegistry, type PaletteCommand } from '../../shared/commands/registry';
+import { Z_DROPDOWN_MAX } from '../../shared/zIndex';
 
 export interface RegistryCommandPaletteProps {
   open: boolean;
@@ -125,7 +126,7 @@ const backdropStyle: React.CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'center',
   paddingTop: '12vh',
-  zIndex: 9100,
+  zIndex: Z_DROPDOWN_MAX + 100,
 };
 const dialogStyle: React.CSSProperties = {
   background: 'var(--color-bg-elevated, #1A1A1E)',

@@ -554,6 +554,8 @@ const UpdateManagerSection: React.FC = () => {
   const [backups, setBackups] = React.useState<any[]>([]);
   const [changelog, setChangelog] = React.useState<string>('');
   const [showChangelog, setShowChangelog] = React.useState(false);
+  const [cachePruning, setCachePruning] = React.useState(false);
+  const [cachePruneResult, setCachePruneResult] = React.useState<{ freedBytes: number; removed: number } | null>(null);
   const pollRef = React.useRef<ReturnType<typeof setInterval>>();
 
   // Load everything on mount
@@ -647,6 +649,17 @@ const UpdateManagerSection: React.FC = () => {
   const savePrefs = async (next: UpdatePrefs) => {
     setPrefs(next);
     try { await dexUpdates?.setPreferences?.(next); } catch { /* ok */ }
+  };
+
+  const pruneUpdateCache = async () => {
+    if (cachePruning) return;
+    setCachePruning(true);
+    setCachePruneResult(null);
+    try {
+      const result = await dexUpdates?.pruneCache?.();
+      if (result) setCachePruneResult(result);
+    } catch { /* IPC unavailable */ }
+    setCachePruning(false);
   };
 
   const rollback = async (backupId: string) => {
@@ -772,6 +785,28 @@ const UpdateManagerSection: React.FC = () => {
           value={prefs.channel}
           onChange={v => savePrefs({ ...prefs, channel: v as 'stable' | 'beta' })}
         />
+      </div>
+
+      {/* Cache Reclaim */}
+      <div style={row}>
+        <div>
+          <div style={label}>Update Cache</div>
+          <div style={desc}>
+            {cachePruneResult
+              ? cachePruneResult.removed === 0
+                ? 'Cache is clean — no files to remove'
+                : `Freed ${(cachePruneResult.freedBytes / 1024 / 1024).toFixed(1)} MB (${cachePruneResult.removed} file${cachePruneResult.removed !== 1 ? 's' : ''} removed)`
+              : 'Remove stale installer downloads from the update cache'}
+          </div>
+        </div>
+        <button
+          onClick={pruneUpdateCache}
+          disabled={cachePruning}
+          aria-label="Clear update cache"
+          style={{ ...btnBase, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', opacity: cachePruning ? 0.5 : 1, minWidth: 80, cursor: cachePruning ? 'default' : 'pointer' }}
+        >
+          {cachePruning ? 'Clearing…' : 'Clear Cache'}
+        </button>
       </div>
 
       {/* Changelog */}

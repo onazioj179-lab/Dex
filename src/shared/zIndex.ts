@@ -2,42 +2,40 @@
 // DEX Platform — Z-Index Constants
 // =============================================================================
 // Single source of truth for all stacking layers. Keep values in ascending
-// order so the ladder stays readable. Never hard-code z-index values elsewhere;
-// import from here instead.
+// order. Never hard-code z-index values in components — import from here.
 //
-// Ladder (ascending):
-//   floating windows  <  dock  <  dropdowns  <  MiniPulse  <  diagnostics
-//   <  help/overlays  <  focus session
+// Ladder:
+//   floating windows < dock < share/fixed panels < dropdowns < MiniPulse
+//   < PiP < diagnostics < help/overlays < focus session
 // =============================================================================
 
-/** Floating windows managed by FloatingWindow.tsx (baseline 200, cap 4990). */
+/** Floating windows (FloatingWindow.tsx). Baseline 200, cap 4990. */
 export const Z_FLOATING_WINDOW_BASE = 200;
 export const Z_FLOATING_WINDOW_MAX  = 4990;
 
-/** Dock / taskbar (AppManager top bar + bottom dock). */
+/** Dock / taskbar. */
 export const Z_DOCK = 5000;
 
-/** Dropdown menus, context menus, and similar transient popups. */
+/** Fixed panels that must sit above dock but below dropdowns (e.g. ShareDialog, ChatPanel). */
+export const Z_PANEL = 5500;
+
+/** Dropdown menus, context menus, command palette, confirm dialogs. */
 export const Z_DROPDOWN_BASE = 6000;
 export const Z_DROPDOWN_MAX  = 9000;
 
-/**
- * MiniPulse always-on-top pill.
- * Sits inside the dropdown band but below DiagnosticsPanel so it never
- * obscures diagnostics or the Focus Mode controls.
- */
+/** MiniPulse pill — inside dropdown band, below DiagnosticsPanel. */
 export const Z_MINI_PULSE = 8500;
+
+/** Picture-in-picture overlay — above dropdowns, below diagnostics. */
+export const Z_PIP = 9900;
 
 /** DiagnosticsPanel / developer overlay. */
 export const Z_DIAGNOSTICS = 9999;
 
-/** Help overlay, onboarding spotlights, and similar guidance layers. */
+/** Help overlay, onboarding, guidance layers. */
 export const Z_HELP_OVERLAY_BASE = 10000;
 export const Z_HELP_OVERLAY_MAX  = 12000;
 
-/**
- * Focus Session overlay — must cover everything except the system title bar.
- * Two values: the tinted background (BASE) and the controls on top (TOP).
- */
-export const Z_FOCUS_SESSION      = 99998;
-export const Z_FOCUS_SESSION_TOP  = 99999;
+/** Focus Session overlay. BASE = tinted bg, TOP = controls. */
+export const Z_FOCUS_SESSION     = 99998;
+export const Z_FOCUS_SESSION_TOP = 99999;

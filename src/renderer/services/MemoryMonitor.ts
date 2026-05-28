@@ -150,13 +150,10 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     
     set({ lastCleanup: now });
     
-    console.log(`[MemoryMonitor] Running cleanup (pressure: ${pressureLevel}, tasks: ${cleanupTasks.length})`);
-    
     // Run cleanup tasks in priority order
     for (const task of cleanupTasks) {
       try {
         await task.cleanup();
-        console.log(`[MemoryMonitor] Completed: ${task.name}`);
       } catch (err) {
         console.warn(`[MemoryMonitor] Task ${task.name} failed:`, err);
       }
@@ -360,5 +357,4 @@ export function initMemoryMonitor(): void {
   // Start monitoring
   store.startMonitoring();
   
-  console.log('[MemoryMonitor] Initialized');
 }

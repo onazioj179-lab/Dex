@@ -848,7 +848,6 @@ export class PluginManager {
     }
     
     // Would save to storage
-    console.log('Saving preset:', presetName, presetData);
   }
   
   // =============================================================================
