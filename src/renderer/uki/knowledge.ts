@@ -33,7 +33,7 @@ export const DEX_APP_CATALOG: readonly DexAppKnowledge[] = [
     id: 'notes', name: 'Notes', category: 'productivity',
     oneLine: 'Markdown notebook with backlinks, tags, and rewind history.',
     capabilities: ['markdown', 'backlinks', 'tags', 'export', 'search'],
-    shortcuts: { 'new note': 'Ctrl+N', 'search notes': 'Ctrl+K' },
+    shortcuts: { 'new note': `${_M}+N`, 'search notes': `${_M}+K` },
   },
   {
     id: 'tasks', name: 'Tasks', category: 'productivity',
@@ -100,7 +100,7 @@ export const DEX_APP_CATALOG: readonly DexAppKnowledge[] = [
 
 /** Common cross-app keyboard shortcuts. */
 export const DEX_GLOBAL_SHORTCUTS: Readonly<Record<string, string>> = {
-  'open UKI': 'Ctrl+Space',
+  'open UKI': `${_M}+Space`,
   'command palette': `${_M}+K`,
   'switch app': `${_M}+Tab`,
   'close window': `${_M}+W`,
@@ -115,7 +115,7 @@ export const DEX_WORKFLOWS: readonly { id: string; title: string; steps: readonl
   {
     id: 'capture-thought',
     title: 'Capture a thought fast',
-    steps: ['Press Ctrl+Space to open UKI', 'Type "note: ..." then Enter', 'UKI files it under today\'s notes'],
+    steps: [`Press ${_M}+Space to open UKI`, 'Type "note: ..." then Enter', 'UKI files it under today\'s notes'],
   },
   {
     id: 'restore-session',
