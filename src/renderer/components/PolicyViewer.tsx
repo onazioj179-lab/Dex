@@ -13,6 +13,7 @@ import {
   type PolicySlug,
 } from '../../shared/policies';
 import { POLICY_DOCUMENTS } from '../../shared/policyDocuments';
+import { Z_HELP_OVERLAY_MAX } from '../../shared/zIndex';
 
 interface PolicyViewerProps {
   open?: boolean;
@@ -122,7 +123,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
   if (compact) return content;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="DEX legal and privacy policy viewer" style={{ position: 'fixed', inset: 0, zIndex: 12000, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div role="dialog" aria-modal="true" aria-label="DEX legal and privacy policy viewer" style={{ position: 'fixed', inset: 0, zIndex: Z_HELP_OVERLAY_MAX, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       {content}
     </div>
   );

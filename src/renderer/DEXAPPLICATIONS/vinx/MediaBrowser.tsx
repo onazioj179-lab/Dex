@@ -17,6 +17,7 @@ import {
   generateId, formatTimecode, EFFECT_DEFINITIONS, AUDIO_EFFECTS,
   VIDEO_TRANSITIONS, AUDIO_TRANSITIONS, TITLE_PRESETS,
 } from './VinxTypes';
+import { Z_DROPDOWN_MAX } from '../../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -386,7 +387,7 @@ const MediaTab: React.FC = memo(() => {
           aria-label="Media item actions"
           onMouseDown={(e) => e.stopPropagation()}
           style={{
-            position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999,
+            position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: Z_DROPDOWN_MAX,
             minWidth: 160, padding: '4px 0',
             background: 'var(--color-bg-elevated, #1a1a1e)',
             border: '1px solid var(--color-border, rgba(255,255,255,0.12))',

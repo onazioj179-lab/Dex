@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "4.60.1",
+  "version": "4.60.3",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
@@ -34,18 +34,30 @@
     "test:legacy": "node tests/run-tests.js",
     "package": "npm run build && electron-builder",
     "package:win": "npm run build && electron-builder --win",
-    "package:win:portable": "npm run build && electron-builder --win portable",
+    "package:win:x64": "npm run build && electron-builder --win --x64",
+    "package:win:arm64": "npm run build && electron-builder --win --arm64",
+    "package:win:portable": "npm run build && electron-builder --win portable --x64",
     "package:mac": "npm run build && electron-builder --mac",
+    "package:mac:x64": "npm run build && electron-builder --mac --x64",
+    "package:mac:arm64": "npm run build && electron-builder --mac --arm64",
     "package:linux": "npm run build && electron-builder --linux",
+    "package:linux:deb": "npm run build && electron-builder --linux deb",
+    "package:linux:rpm": "npm run build && electron-builder --linux rpm",
+    "package:linux:appimage": "npm run build && electron-builder --linux AppImage",
     "package:all": "npm run build && electron-builder -mwl",
+    "release:win": "node scripts/release.js --platform win",
+    "release:mac": "node scripts/release.js --platform mac",
+    "release:linux": "node scripts/release.js --platform linux",
+    "release:publish": "node scripts/release.js --publish",
     "postinstall": "npx electron-builder install-app-deps",
     "generate-icons": "node scripts/generate-icons.js",
     "watermark": "node scripts/add-watermarks.js",
     "watermark:check": "node scripts/add-watermarks.js --check",
     "lint": "tsc --noEmit && node scripts/add-watermarks.js --check",
-    "release:prune": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prune-releases.ps1 -Repo onazioj179-lab/Dex -Keep 3",
-    "release:prune:updates": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/prune-releases.ps1 -Repo onazioj179-lab/dex-updates -Keep 3",
-    "release:prune:all": "npm run release:prune && npm run release:prune:updates"
+    "release:prune": "node scripts/prune-releases.js --repo onazioj179-lab/Dex --keep 3",
+    "release:prune:updates": "node scripts/prune-releases.js --repo onazioj179-lab/dex-updates --keep 3",
+    "release:prune:all": "npm run release:prune && npm run release:prune:updates",
+    "release:prune:dry": "node scripts/prune-releases.js --repo onazioj179-lab/Dex --keep 3 --dry-run"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -144,12 +156,19 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
         }
       ],
-      "publisherName": "Onazi Treasure OJ"
+      "publisherName": "Onazi Treasure OJ",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -162,11 +181,16 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DEX",
+      "menuCategory": "DEX",
       "runAfterFinish": true,
-      "warningsAsErrors": false
+      "warningsAsErrors": false,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -226,23 +250,23 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         },
         {
           "target": "deb",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64"]
         }
       ],
       "icon": "assets/icon.png",
       "category": "Utility",
-      "maintainer": "Dex Team",
-      "vendor": "Dex",
+      "maintainer": "Onazi Treasure OJ <onazi75@gmail.com>",
+      "vendor": "Onazi Treasure OJ",
       "synopsis": "Personal Control Hub",
-      "description": "Dex - Desktop automation and system control tool"
+      "description": "DEX — desktop automation and productivity platform"
     },
     "appImage": {
       "artifactName": "${productName}-${version}.${ext}"

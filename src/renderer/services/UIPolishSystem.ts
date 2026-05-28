@@ -416,7 +416,6 @@ export function initUIPolishSystem() {
   initialized = true;
   
   // Screen guard is auto-initialized
-  console.log('[UIPolish] System initialized');
   
   // Apply global CSS for instant button feedback
   const style = document.createElement('style');

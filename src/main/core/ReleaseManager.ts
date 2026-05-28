@@ -103,6 +103,7 @@ export class ReleaseManager {
   private downloadedArtifactSha256: string | null = null;
   private expectedArtifactSha256: string | null = null;
   private codeSigning = createCodeSigningService();
+  private cachePruneTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     const userDataPath = app.getPath('userData');
@@ -881,6 +882,9 @@ export class ReleaseManager {
     ipcMain.handle('updates:canDowngrade', () => this.canDowngrade());
     ipcMain.handle('updates:downgrade', (_e, target?: string) => this.downgrade(target));
     ipcMain.handle('updates:getInstallHistory', () => this.getInstallHistory());
+
+    // Cache reclaim
+    ipcMain.handle('updates:pruneCache', () => this.pruneCache());
   }
 
   private notifyRenderer(channel: string, data?: unknown): void {
@@ -970,7 +974,75 @@ export class ReleaseManager {
       try { fs.unlinkSync(this.postUpdateMarkerPath); } catch { /* ignore */ }
     }
 
+    // Reclaim stale installer downloads from tmp/dex-cache. Run once on
+    // startup (delayed so we don't block init) and then every 12 hours.
+    setTimeout(() => { this.pruneCache(); }, 30_000);
+    this.cachePruneTimer = setInterval(() => { this.pruneCache(); }, 12 * 60 * 60 * 1000);
+    if (typeof this.cachePruneTimer.unref === 'function') this.cachePruneTimer.unref();
+
     log.info('[ReleaseManager] Initialized');
+  }
+
+  /**
+   * Remove stale installer downloads from the temp cache. Anything older
+   * than 3 days is removed unconditionally; the currently-downloaded
+   * artifact (if any) is preserved regardless of age. Returns the number
+   * of bytes freed.
+   */
+  pruneCache(maxAgeMs: number = 3 * 24 * 60 * 60 * 1000): { freedBytes: number; removed: number } {
+    const cachePath = path.join(app.getPath('temp'), 'dex-cache');
+    if (!fs.existsSync(cachePath)) return { freedBytes: 0, removed: 0 };
+
+    const protectedPath = this.downloadedArtifactPath
+      ? path.resolve(this.downloadedArtifactPath)
+      : null;
+    const cutoff = Date.now() - maxAgeMs;
+    let freedBytes = 0;
+    let removed = 0;
+
+    const walk = (dir: string): void => {
+      let entries: fs.Dirent[] = [];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+          // Remove now-empty directories
+          try {
+            if (fs.readdirSync(full).length === 0) fs.rmdirSync(full);
+          } catch { /* ignore */ }
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        if (protectedPath && path.resolve(full) === protectedPath) continue;
+        try {
+          const stat = fs.statSync(full);
+          if (stat.mtimeMs < cutoff) {
+            freedBytes += stat.size;
+            fs.unlinkSync(full);
+            removed += 1;
+          }
+        } catch { /* ignore */ }
+      }
+    };
+
+    walk(cachePath);
+    if (removed > 0) {
+      log.info(`[ReleaseManager] Cache prune freed ${(freedBytes / 1024 / 1024).toFixed(1)} MB across ${removed} files`);
+      this.recordHistory('cache-pruned', { freedBytes, removed });
+    }
+    return { freedBytes, removed };
+  }
+
+  dispose(): void {
+    if (this.cachePruneTimer) {
+      clearInterval(this.cachePruneTimer);
+      this.cachePruneTimer = null;
+    }
   }
 
   private loadUpdateServerUrl(): string {

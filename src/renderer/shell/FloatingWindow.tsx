@@ -255,6 +255,10 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const resizeStartRef = useRef({ x: 0, y: 0, w: 0, h: 0, px: 0, py: 0 });
   const resizeRafRef = useRef<number>(0);
   const sizeTooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Active resize-drag listener cleanup. Set while a resize gesture is in
+  // flight; called from both onUp and the component's unmount effect so
+  // closing a window mid-drag does not leak document listeners.
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
 
   // Shake detection
   const shakeHistoryRef = useRef<{ x: number; ts: number }[]>([]);
@@ -297,9 +301,15 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
 
   useEffect(() => { persistState(); }, [pos, size, minimized, maximized, snapZone, persistState]);
 
-  // Clean up persist timer on unmount
+  // Clean up persist timer and any in-flight resize listeners on unmount.
   useEffect(() => () => {
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    if (sizeTooltipTimerRef.current) clearTimeout(sizeTooltipTimerRef.current);
+    if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+    if (resizeCleanupRef.current) {
+      resizeCleanupRef.current();
+      resizeCleanupRef.current = null;
+    }
   }, []);
 
   // Focus on click
@@ -489,11 +499,16 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       });
     };
 
-    const onUp = () => {
-      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+    const detach = () => {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       document.removeEventListener('pointercancel', onUp);
+    };
+
+    const onUp = () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
+      detach();
+      resizeCleanupRef.current = null;
       setResizing(false);
       sizeTooltipTimerRef.current = setTimeout(() => setSizeTooltip(null), 500);
       flushPersist();
@@ -502,6 +517,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
     document.addEventListener('pointercancel', onUp);
+    resizeCleanupRef.current = detach;
   }, [flushPersist, handleFocus, minWidth, minHeight]);
 
   // -----------------------------------------------------------------------
