@@ -71,7 +71,9 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.deb
+            release/*.rpm
             release/latest*.yml
+            release/latest-*.yml
           if-no-files-found: warn
 
   publish:
@@ -80,6 +82,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -87,7 +92,8 @@ jobs:
         run: |
           mkdir -p release-assets
           find artifacts -type f -exec cp {} release-assets/ \;
-          ls -la release-assets
+          echo "Release assets:"
+          ls -lh release-assets
       - name: Resolve tag
         id: tag
         run: |
@@ -96,17 +102,43 @@ jobs:
           else
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
-      - name: Publish to public Dex repo
+      - name: Extract changelog for this version
+        id: notes
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VER="${TAG#v}"
+          # Extract the section for this version from CHANGELOG.md
+          node -e "
+            const fs = require('fs');
+            const text = fs.readFileSync('docs/CHANGELOG.md', 'utf8');
+            const lines = text.split('\n');
+            let inside = false, notes = [];
+            for (const line of lines) {
+              if (!inside && line.startsWith('## v' + process.argv[1])) { inside = true; notes.push(line); continue; }
+              if (inside && line.startsWith('## v') && !line.startsWith('## v' + process.argv[1])) break;
+              if (inside) notes.push(line);
+            }
+            fs.writeFileSync('release-notes.md', notes.join('\n').trim() + '\n');
+          " "$VER"
+          echo "Generated release notes:"
+          cat release-notes.md
+      - name: Publish to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$TAG" --repo "${{ github.repository }}" release-assets/* --clobber
+          REPO="${{ github.repository }}"
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$REPO" release-assets/* --clobber
+            gh release edit "$TAG" --repo "$REPO" --notes-file release-notes.md --title "DEX $TAG"
           else
-            gh release create "$TAG" --repo "${{ github.repository }}" --title "DEX $TAG" --generate-notes release-assets/*
+            gh release create "$TAG" --repo "$REPO" --title "DEX $TAG" --notes-file release-notes.md release-assets/*
           fi
-      - name: Publish to dex-updates repo
+      - name: Prune old releases (keep newest 3)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/prune-releases.js --repo "${{ github.repository }}" --keep 3
+      - name: Publish to dex-updates auto-update channel
         if: ${{ secrets.DEX_UPDATES_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.DEX_UPDATES_TOKEN }}
@@ -116,5 +148,6 @@ jobs:
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             gh release upload "$TAG" --repo "$REPO" release-assets/* --clobber
           else
-            gh release create "$TAG" --repo "$REPO" --title "DEX $TAG" --notes "Auto-update channel for DEX $TAG" release-assets/*
+            gh release create "$TAG" --repo "$REPO" --title "DEX $TAG" --notes-file release-notes.md release-assets/*
           fi
+          node scripts/prune-releases.js --repo "$REPO" --keep 3
