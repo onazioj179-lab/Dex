@@ -2,7 +2,7 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.4** · Branch: `main` · Tag: `v4.60.4` (released)
+Current version: **4.60.4** · Branch: `main` · Tag: `v4.60.4` (released) · Session: 2026-05-28
 Three-phase goal: [GOAL-1-COMPLETION.md](GOAL-1-COMPLETION.md) · [GOAL-2-STABILITY.md](GOAL-2-STABILITY.md) · [GOAL-3-RELEASE.md](GOAL-3-RELEASE.md)
 
 ### Release Artifacts per Platform
@@ -50,7 +50,11 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 
 ## Files & Systems Recently Modified
 
-**Session: IPC precision, multi-trigger workflow routing, test harness**
+**Session 2 (2026-05-28): Shell wiring + CSS token completion**
+- `src/main/main.ts` — WorkspaceSnapshot.initialize() + .shutdown() now called; crash recovery and auto-save are live
+- `src/renderer/styles/design-system.css` — defined missing --pg-text-primary/secondary/tertiary tokens; DiagnosticsPanel/LogsPanel/PolicyViewer/ProgressRing now render correct text colors
+
+**Session 1: IPC precision, multi-trigger workflow routing, test harness**
 - `src/main/preload.ts` — WeakMap per-callback wrappers; `off()` no longer calls removeAllListeners
 - `src/shared/apps/workflows/runner.ts` — Multi-trigger routing, O(1) nodeMap, upstream-skip logic
 - `src/shared/apps/workflows/workflowGraph.ts` — Manual trigger activates all trigger-anchored paths
@@ -87,6 +91,10 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 - **Multi-trigger workflow early-return bug**: Fixed — runner now continues past non-matching triggers.
 - **--pg-shadow-chip unresolved token in Settings**: Inlined concrete box-shadow values.
 - **jsdom canvas getContext noise**: Guarded in animationBudget and stubbed in test setup.
+- **WorkspaceSnapshot never initialized**: initialize() and shutdown() were never called from main.ts — fixed. Auto-save now runs, crash recovery loads snapshots from disk on startup.
+- **--pg-text-primary/secondary/tertiary undefined**: Used in 4 components, never defined — added to design-system.css aliasing color-text-* tokens.
+- **Tasks drag-drop**: Confirmed complete in 2522dba. draggable, dragIdRef, reorderTasks all implemented.
+- **Browser tab suspension**: Already solid — background:true tabs are unmounted from DOM; 40-tab limit enforced.
 - **32-bit Windows**: Not supported — Electron ≥28 dropped ia32. x64+ARM64 only. Correct.
 
 ---
@@ -139,13 +147,12 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 
 ## Exact Next Steps
 
-1. Confirm CI green after latest push (workflow-runner fix + IPC precision + stale artifact cleanup)
-2. Validate memory pressure CSS in DevTools: set `data-motion-degraded=minimal` → verify transitions stop
-3. Audit `Tasks.tsx` drag-drop (2522dba) — confirm it's complete or flag remaining gaps
-4. Audit remaining `var(--pg-*)` CSS token references across Settings and shell
-5. Shell workspace restoration audit (`src/main/` window lifecycle handlers)
-6. Browser hidden-tab suspension pass (`src/renderer/pages/Browser.tsx`)
-7. Set `CSC_LINK` + `CSC_KEY_PASSWORD` repo secrets before next signed release
+1. Validate memory pressure CSS in DevTools: set `data-motion-degraded=minimal` → verify transitions stop
+2. Audit achievementsCatalog.ts for dynamic import (330KB sync import at startup, ~40ms parse cost)
+3. Settings CSS token audit — find remaining unresolved `var(--pg-*)` references (done for pg-text-*, pg-shadow-chip; check remaining files)
+4. CollaborationLayer.ts vs CollaborationSystem.ts — 938-line file, appears unused, needs import audit before removal
+5. Forge job queue cap — add MAX_ENCODE_JOBS=200 guard
+6. Set `CSC_LINK` + `CSC_KEY_PASSWORD` repo secrets before next signed release
 
 ---
 
