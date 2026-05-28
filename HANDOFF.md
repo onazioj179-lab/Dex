@@ -2,7 +2,7 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.4** · Branch: `main` · Tag: `v4.60.4` (released) · Session: 2026-05-28
+Current version: **4.60.4** · Branch: `main` · Tag: `v4.60.4` (released) · Last session: 2026-05-28 (session 3)
 Three-phase goal: [GOAL-1-COMPLETION.md](GOAL-1-COMPLETION.md) · [GOAL-2-STABILITY.md](GOAL-2-STABILITY.md) · [GOAL-3-RELEASE.md](GOAL-3-RELEASE.md)
 
 ### Release Artifacts per Platform
@@ -43,12 +43,20 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 | Workflow runner | Multi-trigger routing, manual trigger activates all paths, O(1) nodeMap. |
 | Update lifecycle | ReleaseManager is single source of truth. UpdateController deprecated/tombstoned. |
 | UI/UX | No native dialogs. Z-index ladder complete. Minimized-window restore functional. |
+| Workspace snapshot | Wired into main.ts startup + shutdown. Auto-save live, crash recovery loads from disk. |
+| Forge queue | Capped at 200 jobs across all add-callsites. |
+| Notes autosave | Content save debounced to 500ms (was per-keystroke IPC). |
 | Release tooling | Node-based prune script. v4.60.4 tag pushed — release workflow triggered. |
-| Test suite | 8/8 workflow-runner tests passing. |
+| Test suite | 8/8 workflow-runner tests passing. TS clean on renderer + main. |
 
 ---
 
 ## Files & Systems Recently Modified
+
+**Session 3 (2026-05-28): Completion & consistency pass**
+- `src/renderer/DEXAPPLICATIONS/forge/Forge.tsx` — MAX_QUEUE_JOBS=200 cap at all 8 add-job callsites; bulk drops slice to remaining capacity (was unbounded → OOM risk)
+- `src/renderer/DEXAPPLICATIONS/notes/DexNotes.tsx` — content save debounced 500ms (was 1 IPC call per keystroke); save timer cleared on unmount
+- `src/renderer/services/index.ts` — removed dead CollaborationLayer barrel re-exports (zero consumers; CollaborationSystem is the live store)
 
 **Session 2 (2026-05-28): Shell wiring + CSS token completion**
 - `src/main/main.ts` — WorkspaceSnapshot.initialize() + .shutdown() now called; crash recovery and auto-save are live
@@ -95,38 +103,39 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 - **--pg-text-primary/secondary/tertiary undefined**: Used in 4 components, never defined — added to design-system.css aliasing color-text-* tokens.
 - **Tasks drag-drop**: Confirmed complete in 2522dba. draggable, dragIdRef, reorderTasks all implemented.
 - **Browser tab suspension**: Already solid — background:true tabs are unmounted from DOM; 40-tab limit enforced.
+- **Power.tsx polling failure toast**: Already present (line 231, added in 2522dba) — toasts after 3 consecutive poll failures.
+- **UKI speech recognition stream**: Non-issue. startVoiceInput uses Web Speech API (SpeechRecognition), which manages mic access internally; recognition.stop() releases it. No explicit getUserMedia stream to clean up.
+- **Forge unbounded queue**: Fixed — MAX_QUEUE_JOBS=200 enforced at all add-callsites.
+- **Notes per-keystroke IPC**: Fixed — content save debounced to 500ms.
+- **CollaborationLayer dead exports**: Removed from barrel. File itself (938 lines) retained — not deleted, but no longer reachable via services/index.ts.
 - **32-bit Windows**: Not supported — Electron ≥28 dropped ia32. x64+ARM64 only. Correct.
 
 ---
 
 ## Remaining UI/UX Work
 
-- **Tasks.tsx drag-drop reordering**: No drag handlers implemented despite UI indicators. (Remote has drag-to-reorder merged in 2522dba — verify it's complete.)
 - **Gallery.tsx 200-item hardcoded limit**: Line 210. Low priority.
-- **Power.tsx silent polling failures**: No toast when IPC bridge breaks. Low urgency.
 - **Spotlight / Stage**: Old fallback UI still partially visible. Needs density pass.
 - **DexCode output panel**: Exposed debug elements in release UI.
 - **Creative app panels** (Vinx timeline, Imosion toolbar): Density and alignment pass needed.
-- **Inconsistent CSS tokens**: Audit remaining `var(--pg-*)` references that may be unresolved.
+- ~~Tasks drag-drop~~ Done (2522dba). ~~Power polling toast~~ Done (2522dba). ~~pg-text tokens~~ Done (session 2).
 
 ---
 
 ## Remaining Internal Systems Work
 
-- **CollaborationLayer.ts vs CollaborationSystem.ts**: Two systems; CollaborationLayer appears unused (938 lines). Verify before removing.
+- **CollaborationLayer.ts**: Barrel exports removed (session 3). File (938 lines) still on disk but unreachable. Safe to delete in a future cleanup once confirmed no dynamic import references it.
 - **Remaining unused stores**: `featureSuiteStore` (2 importers), `notificationStore` (1 importer) — verify dead before removing.
-- **UKI speech recognition stream**: `getUserMedia` stream not stored for explicit cleanup in ukiBridge.ts. Minor.
-- **Shell workspace restoration**: Crash/restart recovery path not smoke-tested.
-- **Browser tab lifecycle**: Hidden-tab suspension not implemented.
-- **Notes autosave**: Reliability pass needed under low memory.
+- **Shell workspace restoration**: Now wired (session 2). Crash/restart recovery path still needs end-to-end smoke test on real abnormal exit.
 - **Notification stale layer**: Rendering stale-layer cleanup pass.
+- ~~Notes autosave reliability~~ Done (session 3, 500ms debounce). ~~Browser tab suspension~~ Already implemented. ~~UKI stream cleanup~~ Non-issue (Web Speech API self-manages).
 
 ---
 
 ## Remaining Performance Work
 
 - **achievementsCatalog.ts lazy load**: 330KB file synchronously imported at startup. Dynamic import saves ~40ms parse time. Medium refactor.
-- **Forge job queue cap**: No maximum on encode queue. Cap at 200 jobs recommended.
+- ~~Forge job queue cap~~ Done (session 3, MAX_QUEUE_JOBS=200).
 - **Imosion waveform chunking**: Done for native IPC path. Fallback still decodes full AudioBuffer.
 - **Prism canvas ImageData pooling**: Ping-pong buffer reuse for filter passes. Medium priority.
 - **Long-session memory profile**: Heap snapshot at t=0, t=30m, t=2h not yet done.
@@ -148,10 +157,10 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 ## Exact Next Steps
 
 1. Validate memory pressure CSS in DevTools: set `data-motion-degraded=minimal` → verify transitions stop
-2. Audit achievementsCatalog.ts for dynamic import (330KB sync import at startup, ~40ms parse cost)
-3. Settings CSS token audit — find remaining unresolved `var(--pg-*)` references (done for pg-text-*, pg-shadow-chip; check remaining files)
-4. CollaborationLayer.ts vs CollaborationSystem.ts — 938-line file, appears unused, needs import audit before removal
-5. Forge job queue cap — add MAX_ENCODE_JOBS=200 guard
+2. achievementsCatalog.ts lazy load (330KB sync import, ~40ms) — deferred: medium refactor, needs checkAchievements/getTotalPoints/getAchievementStats made async + AppManager updated. 40ms cost acceptable short-term.
+3. Delete CollaborationLayer.ts file (now unreachable) after confirming no dynamic-import references
+4. Smoke-test WorkspaceSnapshot crash recovery end-to-end (kill process mid-session, relaunch, confirm restore prompt)
+5. Audit `featureSuiteStore` / `notificationStore` for removal
 6. Set `CSC_LINK` + `CSC_KEY_PASSWORD` repo secrets before next signed release
 
 ---
