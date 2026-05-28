@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "4.60.3",
+  "version": "4.60.4",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "main": "dist/main/main.js",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
@@ -156,15 +156,22 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "publisherName": "Onazi Treasure OJ",
@@ -250,15 +257,21 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.png",
