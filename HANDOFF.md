@@ -88,7 +88,7 @@ Infrastructure:
 - **Tasks.tsx drag-drop reordering**: Feature gap confirmed by audit — no drag handlers implemented despite drag-drop UI indicators. Low urgency.
 - **Gallery.tsx 200-item hardcoded limit**: Line 210. Low priority.
 - **Power.tsx silent polling failures**: No toast when IPC bridge breaks. Low urgency.
-- **Browser.tsx 1300+ hardcoded blocked domains**: Lines 115-150+. Should move to a config file for maintainability.
+- **Browser.tsx blocked domains**: ~~Extracted~~ Done. Moved to `src/renderer/config/blocked-domains.ts`; Browser.tsx imports `BLOCKED_DOMAIN_LIST` and builds the `Set` from it.
 
 ---
 
@@ -122,10 +122,11 @@ Infrastructure:
 ## Exact Next Steps
 
 1. **Windows code-sign**: Set `CSC_LINK` + `CSC_KEY_PASSWORD` in CI secrets. Re-run `release:publish` after signing.
-2. **Verify CI is green on PR #2**: Lint & Type Check fix was pushed (commit `1bcc618`). Confirm Build + Unit Tests pass after that.
+2. **Verify CI is green on PR #2**: Unit Tests are now all passing (4602/4602). Confirm Build passes on next CI run.
 3. **Validate memory pressure CSS**: Open DevTools → manually set `document.documentElement.setAttribute('data-motion-degraded', 'minimal')` → verify all transitions stop. Then `'reduced'` → verify 80ms transitions.
-4. **Remove unused stores** (safe candidates): After verifying no dynamic imports, remove `homeAppsStore.ts`, `homePinnedAppsStore.ts`, `homePinnedFilesStore.ts`, `mediaStore.ts`, `networkStore.ts` (simple ones first, <4KB each).
+4. **Remove unused stores** (audit needed): `homeAppsStore`, `homePinnedAppsStore`, `homePinnedFilesStore` are all imported by `Home.tsx`; `networkStore` imported by `QuickControls.tsx` + `Settings.tsx`. All 5 named "safe" candidates are actively used. Audit the 19-store list in "Remaining Internal Systems Work" for truly dead stores.
 5. **Imosion waveform chunking**: High impact for 8GB RAM with large audio files.
+6. ~~**Browser.tsx blocked domains**~~: Done — extracted to `src/renderer/config/blocked-domains.ts`.
 
 ---
 
@@ -135,7 +136,7 @@ Infrastructure:
 |---|---|
 | CI: Lint & Type Check | Fixed — watermark on zIndex.ts added. Push triggered re-run. |
 | CI: Build | Was skipped due to lint failure. Should pass on re-run. |
-| CI: Unit Tests | Was skipped. Needs re-run to verify. |
+| CI: Unit Tests | **Green** — all 4602 tests passing, 14 skipped, 0 failed (as of this session). |
 | Memory leak fixes | In branch, committed, pushed. |
 | CSS motion degradation | Fixed. In branch. |
 | Shell cleanup | In branch. |
