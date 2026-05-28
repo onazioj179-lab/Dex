@@ -54,6 +54,7 @@ import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWo
 import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
 import { CalmFocusEngine } from '../../shared/phase15/calmFocus';
 import { WorkspaceSnapshotStore } from '../../shared/phase15/workspaceSnapshot';
+import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
 
 // Module-level singletons — one engine per renderer process lifetime.
 const _calmEngine = new CalmFocusEngine();
@@ -833,12 +834,32 @@ export const AppManager: React.FC = () => {
     });
   }, []);
 
-  // Close minimized-list popover on outside click
+  // Close minimized-list popover on outside click and Escape
+  const minimizedListRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!showMinimizedList) return;
-    const handler = () => setShowMinimizedList(false);
-    document.addEventListener('pointerdown', handler, true);
-    return () => document.removeEventListener('pointerdown', handler, true);
+    const onPointer = (e: PointerEvent) => {
+      if (!minimizedListRef.current) return;
+      if (minimizedListRef.current.contains(e.target as Node)) return;
+      setShowMinimizedList(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMinimizedList(false);
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener('pointerdown', onPointer, true);
+    document.addEventListener('keydown', onKey);
+    // Focus the first menu item once the popover renders
+    queueMicrotask(() => {
+      const first = minimizedListRef.current?.querySelector<HTMLButtonElement>('button[role="menuitem"]');
+      first?.focus();
+    });
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [showMinimizedList]);
 
   // -- Snap layout picker state for floating window maximize hover ----------
@@ -3902,8 +3923,21 @@ export const AppManager: React.FC = () => {
                   </button>
                   {showMinimizedList && (
                     <div
+                      ref={minimizedListRef}
                       role="menu"
                       aria-label="Minimized windows"
+                      onKeyDown={e => {
+                        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+                        e.preventDefault();
+                        const items = Array.from(minimizedListRef.current?.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]') || []);
+                        if (items.length === 0) return;
+                        const active = document.activeElement as HTMLButtonElement | null;
+                        const idx = active ? items.indexOf(active) : -1;
+                        const next = e.key === 'ArrowDown'
+                          ? items[(idx + 1) % items.length]
+                          : items[(idx - 1 + items.length) % items.length];
+                        next?.focus();
+                      }}
                       style={{
                         position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
                         background: 'var(--pg-toolbar, rgba(28,28,32,0.92))',
@@ -3912,7 +3946,7 @@ export const AppManager: React.FC = () => {
                         boxShadow: 'var(--pg-shadow-overlay, 0 12px 32px rgba(0,0,0,0.45))',
                         backdropFilter: 'blur(24px) saturate(180%)',
                         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-                        minWidth: 160, zIndex: 6500,
+                        minWidth: 160, zIndex: Z_DROPDOWN_BASE + 500,
                         whiteSpace: 'nowrap',
                       }}
                     >

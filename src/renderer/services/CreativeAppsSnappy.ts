@@ -15,6 +15,7 @@ import { progressiveCache, loadWithSWR, loadImageProgressively } from '../utils/
 import { workerPool } from './WorkerPool';
 import { inputPriority, createVirtualScroll } from './InputPriority';
 import { SPRING_PRESETS, springTransform } from '../utils/spring-animation';
+import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
 // 201-210. Common Creative App State Caching
@@ -628,7 +629,7 @@ export function createSnappyLayerDrag(): {
     ghost.style.position = 'fixed';
     ghost.style.pointerEvents = 'none';
     ghost.style.opacity = '0.8';
-    ghost.style.zIndex = '10000';
+    ghost.style.zIndex = String(Z_HELP_OVERLAY_BASE);
     ghost.style.transform = 'scale(0.95)';
     ghost.style.transition = 'transform 100ms ease-out';
     document.body.appendChild(ghost);

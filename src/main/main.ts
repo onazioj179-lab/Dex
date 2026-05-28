@@ -800,6 +800,11 @@ class DexApp {
       // --- UKI Voice Assistant ---
       await shutdownWithTimeout('UkiController', () => ukiController.shutdown());
 
+      // --- ReleaseManager: stop the cache-prune interval ---
+      if (this.releaseManager) {
+        await shutdownWithTimeout('ReleaseManager', () => this.releaseManager?.dispose());
+      }
+
       // --- IPC Crypto session key wipe ---
       IPCCrypto.destroy();
 

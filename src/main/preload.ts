@@ -239,6 +239,7 @@ export interface DexAPI {
     canDowngrade: () => Promise<{ eligible: boolean; daysRemaining: number; targetVersion: string | null; reason: string }>;
     downgrade: () => Promise<{ success: boolean; eligibility: { eligible: boolean; daysRemaining: number; targetVersion: string | null; reason: string }; restoredBackup?: string; error?: string }>;
     getInstallHistory: () => Promise<Array<{ version: string; fromVersion: string | null; installedAt: number }>>;
+    pruneCache: () => Promise<{ freedBytes: number; removed: number }>;
   };
 
   // Diagnostics
@@ -2146,6 +2147,8 @@ const api: DexAPI = {
     canDowngrade: () => ipcRenderer.invoke('updates:canDowngrade'),
     downgrade: (targetVersion?: string) => ipcRenderer.invoke('updates:downgrade', targetVersion),
     getInstallHistory: () => ipcRenderer.invoke('updates:getInstallHistory'),
+    // Cache reclaim
+    pruneCache: () => ipcRenderer.invoke('updates:pruneCache'),
   },
 
   // Phase 11: Diagnostics

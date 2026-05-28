@@ -1795,6 +1795,17 @@ export const Settings: React.FC = () => {
     });
   }, []);
 
+  // Sync crash-reporting toggle from the main-process diagnostics controller
+  // so what Settings displays matches what was actually set (e.g. by Onboarding).
+  React.useEffect(() => {
+    const electron = (window as unknown as { electron?: { diagnostics?: { getPreferences?: () => Promise<{ crashReportingEnabled?: boolean }> } } }).electron;
+    electron?.diagnostics?.getPreferences?.().then((p) => {
+      if (p && typeof p.crashReportingEnabled === 'boolean') {
+        setSettings(prev => prev.crashReports === p.crashReportingEnabled ? prev : { ...prev, crashReports: !!p.crashReportingEnabled });
+      }
+    }).catch(() => { /* IPC unavailable */ });
+  }, []);
+
   React.useEffect(() => {
     const handleSettingsNavigate = (event: Event) => {
       const detail = (event as CustomEvent).detail as { section?: string } | undefined;
@@ -2022,6 +2033,12 @@ export const Settings: React.FC = () => {
             shellPrefs.setGlassMode(nextVal ? 'reduced' : 'normal');
           }
         } catch { /* store not ready */ }
+      }
+      if (key === 'crashReports') {
+        try {
+          const electron = (window as unknown as { electron?: { diagnostics?: { setPreferences?: (p: object) => Promise<unknown> } } }).electron;
+          electron?.diagnostics?.setPreferences?.({ crashReportingEnabled: nextVal });
+        } catch { /* IPC may be unavailable */ }
       }
       return { ...prev, [key]: nextVal };
     });
