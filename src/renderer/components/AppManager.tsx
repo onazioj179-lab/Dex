@@ -1005,12 +1005,6 @@ export const AppManager: React.FC = () => {
     try { localStorage.setItem('dex-whats-new-seen', '3.6.0'); } catch (e) { console.warn('[DEX]', e); }
   }, []);
 
-  // Auto-dismiss What's New after 10s to prevent blocking UI forever
-  useEffect(() => {
-    if (!showWhatsNew) return;
-    const timer = setTimeout(dismissWhatsNew, 10000);
-    return () => clearTimeout(timer);
-  }, [showWhatsNew, dismissWhatsNew]);
 
   // Smooth cross-fade on app switch
   useAppTransition(currentAppId, contentRef);
