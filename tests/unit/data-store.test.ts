@@ -11,18 +11,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const mockStoreData: Record<string, any> = {};
 
-vi.mock('electron-store', () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
+vi.mock('electron-store', () => ({
+  default: vi.fn(function() {
+    return {
       get: vi.fn((key: string) => mockStoreData[key] ?? []),
       set: vi.fn((key: string, value: any) => { mockStoreData[key] = value; }),
       delete: vi.fn((key: string) => { delete mockStoreData[key]; }),
       has: vi.fn((key: string) => key in mockStoreData),
       path: '/mock/store.json',
       clear: vi.fn(() => { Object.keys(mockStoreData).forEach(k => delete mockStoreData[k]); }),
-    })),
-  };
-});
+    };
+  }),
+}));
 
 vi.mock('electron-log', () => ({
   info: vi.fn(),

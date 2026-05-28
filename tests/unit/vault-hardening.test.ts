@@ -39,8 +39,7 @@ describe('VaultHardening', () => {
   beforeEach(async () => {
     vi.resetModules();
     const mod = await import('../../src/main/security/VaultHardening');
-    VaultHardening = mod.VaultHardening;
-    hardening = VaultHardening;
+    hardening = mod.vaultHardening;
   });
 
   // -------------------------------------------------------------------------

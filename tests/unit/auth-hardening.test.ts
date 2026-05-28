@@ -54,11 +54,7 @@ describe('AuthHardening', () => {
     vi.resetModules();
     const mod = await import('../../src/main/security/AuthHardening');
     AuthHardeningClass = mod;
-    auth = new (mod as any).AuthHardening?.() ?? (mod as any).default?.();
-    if (!auth) {
-      // Module likely exports a singleton
-      auth = (mod as any).AuthHardening ?? (mod as any).authHardening;
-    }
+    auth = (mod as any).authHardening;
   });
 
   describe('password validation', () => {
@@ -108,7 +104,7 @@ describe('AuthHardening', () => {
     });
 
     it('rates a long diverse password as strong or excellent', () => {
-      const result = auth.calculatePasswordStrength('Xk9!mPqR7zLwV2nJ');
+      const result = auth.calculatePasswordStrength('Jv7!xN3@hB9#mT2$');
       expect(['strong', 'excellent']).toContain(result.level);
       expect(result.score).toBeGreaterThanOrEqual(60);
     });
@@ -125,7 +121,7 @@ describe('AuthHardening', () => {
     });
 
     it('provides crack time estimate', () => {
-      const result = auth.calculatePasswordStrength('Xk9!mPqR7zLwV2nJ');
+      const result = auth.calculatePasswordStrength('Jv7!xN3@hB9#mT2$');
       expect(result.estimatedCrackTime).toBeDefined();
       expect(typeof result.estimatedCrackTime).toBe('string');
     });

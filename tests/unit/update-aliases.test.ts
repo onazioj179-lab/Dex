@@ -221,9 +221,13 @@ describe('Update System -- Alias Compatibility', () => {
       'updates:openReleaseNotes',
       'updates:getChangelog',
       'updates:getReleaseNotesForVersion',
+      'updates:canDowngrade',
+      'updates:downgrade',
+      'updates:getInstallHistory',
+      'updates:pruneCache',
     ];
 
-    it('should register all 12 backward-compat updates:* alias channels', async () => {
+    it('should register all 16 backward-compat updates:* alias channels', async () => {
       const { ReleaseManager } = await import('../../src/main/core/ReleaseManager');
       new ReleaseManager();
 
@@ -309,14 +313,14 @@ describe('Update System -- Alias Compatibility', () => {
   // -------------------------------------------------------------------------
 
   describe('Handler collision safety', () => {
-    it('total registered channels should be exactly 27 (12 primary + 15 alias/extended)', async () => {
+    it('total registered channels should be exactly 28 (12 primary + 16 alias/extended)', async () => {
       const { ReleaseManager } = await import('../../src/main/core/ReleaseManager');
       new ReleaseManager();
 
       const updateChannels = Array.from(registeredHandlers.keys()).filter(
         (ch) => ch.startsWith('update:') || ch.startsWith('updates:')
       );
-      expect(updateChannels.length).toBe(27);
+      expect(updateChannels.length).toBe(28);
     });
 
     it('should not allow double-registration of the same channel', async () => {

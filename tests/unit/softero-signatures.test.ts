@@ -20,16 +20,23 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('electron-log', () => ({
-  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  default: {
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+    transports: { file: { level: 'info' }, console: { level: false } },
+  },
+  info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+  transports: { file: { level: 'info' }, console: { level: false } },
 }));
 
-vi.mock('../utils/Logger', () => ({
-  Logger: vi.fn().mockImplementation(() => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    success: vi.fn(),
-  })),
+vi.mock('../../src/main/utils/Logger', () => ({
+  Logger: vi.fn(function() {
+    return {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      success: vi.fn(),
+    };
+  }),
 }));
 
 let fsReadFileMock: ReturnType<typeof vi.fn>;
