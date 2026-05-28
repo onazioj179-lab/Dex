@@ -12,6 +12,58 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v4.60.4 — Stability, Security & Resource Optimization (2026-05-28)
+
+### Improvements
+
+- **Imosion: large audio files no longer spike renderer memory.** Dragging or
+  importing a 2-hour audio file used to decode the entire file into a 200 MB
+  `AudioBuffer` in the renderer just to extract 50 waveform peaks. Imosion now
+  calls the native Rust bridge (`native:audio-waveform`) for any file with a
+  filesystem path, extracting peaks in the main process without ever allocating
+  the full audio data in the renderer. Short recorded clips (no filesystem path)
+  continue to use the existing in-renderer decode path.
+
+- **Windows code signing wired.** The release workflow now passes `CSC_LINK` and
+  `CSC_KEY_PASSWORD` CI secrets to the Windows build step. Once those secrets are
+  set in repo Settings → Secrets → Actions, the `.exe` installer will be signed
+  and Windows Defender will not flag it.
+
+- **Browser: blocked-domain list extracted to a config file.** The 100+ ad/tracker
+  domains previously hardcoded in Browser.tsx are now in
+  `src/renderer/config/blocked-domains.ts`. Domains can be added or removed without
+  touching the 2900-line component.
+
+### Fixes
+
+- Fixed 12 unit test files that were failing due to Vitest v4 breaking changes
+  (arrow functions cannot be used as constructors in `vi.fn()` mocks, TDZ errors
+  in hoisted mocks, missing `transports` on electron-log mock, API shape
+  mismatches in vault and auth store tests).
+
+- Fixed memory pressure CSS gap: `data-motion-degraded` and
+  `data-compositor-pressure` HTML attributes were being set by
+  `MemoryPressureBridge.ts` and `CompositorHealth.ts` but had no matching CSS
+  rules. Added `reduced` (80ms transitions), `minimal` (transitions/animations
+  off), and `compositor-pressure=high` (will-change reset) rules to `globals.css`.
+
+- Fixed achievement hot-path performance: `checkAchievements`, `getTotalPoints`,
+  and `getAchievementStats` now use `Set.has()` instead of `Array.includes()`,
+  reducing the per-event cost from O(n×m) to O(n+m).
+
+- Fixed drag RAF leak: closing a FloatingWindow mid-drag left a pending
+  `requestAnimationFrame` frame. The `dragRafRef` is now cancelled on unmount.
+
+- Reduced background resource pressure: `completedTasks` LRU cap set to 200,
+  MemoryPressureBridge auto-relax timer deduplicated (no more timer stacking),
+  MemoryMonitor polling halved (5s→10s), DOM `querySelectorAll('*')` fallback
+  removed from memory monitors.
+
+- Removed 2 confirmed-unused Zustand stores (`intentSessionStore`,
+  `blackBoxStore` — 1145 lines) that had zero imports across the codebase.
+
+---
+
 ## v4.60.3 — Production Polish & Shell Stability (2026-05-28)
 
 ### Improvements
