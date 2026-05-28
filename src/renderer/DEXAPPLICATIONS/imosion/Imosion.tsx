@@ -4442,22 +4442,36 @@ const Imosion: React.FC = () => {
         ...DEFAULT_CLIP_PROPS
       };
 
-      // Compute real waveform peaks and detect BPM from decoded audio
+      // Compute real waveform peaks and detect BPM.
+      // Fast path: use native IPC bridge when the file has a filesystem path
+      // (Electron drag-drop exposes file.path). This avoids decoding the full
+      // AudioBuffer in the renderer — critical for 2-hour+ files (~200MB).
       try {
-        const resp = await fetch(url);
-        const arrBuf = await resp.arrayBuffer();
-        const tmpCtx = new AudioContext();
-        const decoded = await tmpCtx.decodeAudioData(arrBuf);
-        newClip.waveform = AudioEngine.computeWaveformPeaks(decoded, 50);
-        newClip.duration = decoded.duration;
-        // Auto-detect BPM from audio content
-        const detectedBPM = detectBPM(decoded);
-        if (detectedBPM > 0) {
-          newClip.originalBPM = detectedBPM;
-          newClip.tempoLocked = true;
-          newClip.stretch = bpm / detectedBPM;
+        const filePath = (file as any).path as string | undefined;
+        let usedNativePath = false;
+        if (filePath) {
+          const waveData = await (window as any).dex?.invoke('native:audio-waveform', filePath, 50);
+          if (waveData?.peaksPositive?.length > 0) {
+            newClip.waveform = Array.from(waveData.peaksPositive) as number[];
+            newClip.duration = waveData.durationSecs;
+            usedNativePath = true;
+          }
         }
-        tmpCtx.close();
+        if (!usedNativePath) {
+          const resp = await fetch(url);
+          const arrBuf = await resp.arrayBuffer();
+          const tmpCtx = new AudioContext();
+          const decoded = await tmpCtx.decodeAudioData(arrBuf);
+          newClip.waveform = AudioEngine.computeWaveformPeaks(decoded, 50);
+          newClip.duration = decoded.duration;
+          const detectedBPM = detectBPM(decoded);
+          if (detectedBPM > 0) {
+            newClip.originalBPM = detectedBPM;
+            newClip.tempoLocked = true;
+            newClip.stretch = bpm / detectedBPM;
+          }
+          tmpCtx.close();
+        }
       } catch (e) { console.warn('[DEX]', e); }
 
       setTracks(prev => prev.map(t => t.id === trackId ? { ...t, clips: [...t.clips, newClip] } : t));
@@ -4504,22 +4518,33 @@ const Imosion: React.FC = () => {
         ...DEFAULT_CLIP_PROPS
       };
 
-      // Compute real waveform peaks and detect BPM from decoded audio
+      // Fast path: use native IPC bridge when a filesystem path is available.
       try {
-        const resp = await fetch(url);
-        const arrBuf = await resp.arrayBuffer();
-        const tmpCtx = new AudioContext();
-        const decoded = await tmpCtx.decodeAudioData(arrBuf);
-        newClip.waveform = AudioEngine.computeWaveformPeaks(decoded, 50);
-        newClip.duration = decoded.duration;
-        // Auto-detect BPM from audio content
-        const detectedBPM = detectBPM(decoded);
-        if (detectedBPM > 0) {
-          newClip.originalBPM = detectedBPM;
-          newClip.tempoLocked = true;
-          newClip.stretch = bpm / detectedBPM;
+        const filePath = (file as any).path as string | undefined;
+        let usedNativePath = false;
+        if (filePath) {
+          const waveData = await (window as any).dex?.invoke('native:audio-waveform', filePath, 50);
+          if (waveData?.peaksPositive?.length > 0) {
+            newClip.waveform = Array.from(waveData.peaksPositive) as number[];
+            newClip.duration = waveData.durationSecs;
+            usedNativePath = true;
+          }
         }
-        tmpCtx.close();
+        if (!usedNativePath) {
+          const resp = await fetch(url);
+          const arrBuf = await resp.arrayBuffer();
+          const tmpCtx = new AudioContext();
+          const decoded = await tmpCtx.decodeAudioData(arrBuf);
+          newClip.waveform = AudioEngine.computeWaveformPeaks(decoded, 50);
+          newClip.duration = decoded.duration;
+          const detectedBPM = detectBPM(decoded);
+          if (detectedBPM > 0) {
+            newClip.originalBPM = detectedBPM;
+            newClip.tempoLocked = true;
+            newClip.stretch = bpm / detectedBPM;
+          }
+          tmpCtx.close();
+        }
       } catch (e) { console.warn('[DEX]', e); }
 
       setTracks(prev => prev.map(t => t.id === trackId ? { ...t, clips: [...t.clips, newClip] } : t));

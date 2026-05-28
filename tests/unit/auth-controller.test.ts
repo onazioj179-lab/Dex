@@ -25,10 +25,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// IPC handler capture
+// IPC handler capture — must be hoisted so it's available when the mocked
+// ipcMain.handle is called during AuthController's module-level instantiation.
 // ---------------------------------------------------------------------------
 
-const ipcHandlers = new Map<string, Function>();
+const ipcHandlers = vi.hoisted(() => new Map<string, Function>());
 
 // ---------------------------------------------------------------------------
 // Mock Setup
@@ -73,11 +74,16 @@ vi.mock('electron-log', () => ({
   },
 }));
 
+// In-memory file store so writeFileSync/readFileSync/existsSync are consistent
+const mockFs = vi.hoisted(() => new Map<string, Buffer>());
+
 vi.mock('fs', () => ({
-  existsSync: vi.fn(() => false),
+  existsSync: vi.fn((p: string) => mockFs.has(p)),
   mkdirSync: vi.fn(),
-  readFileSync: vi.fn(() => Buffer.from('enc:{}')),
-  writeFileSync: vi.fn(),
+  readFileSync: vi.fn((p: string) => mockFs.get(p) ?? Buffer.from('enc:{}')),
+  writeFileSync: vi.fn((p: string, data: any) => {
+    mockFs.set(p, Buffer.isBuffer(data) ? data : Buffer.from(String(data)));
+  }),
 }));
 
 vi.mock('fs/promises', () => ({
@@ -133,6 +139,7 @@ describe('AuthController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ipcHandlers.clear();
+    mockFs.clear();
     vi.useFakeTimers();
   });
 
@@ -537,9 +544,9 @@ describe('AuthController', () => {
   // -----------------------------------------------------------------------
 
   describe('Config updates', () => {
-    it('should update auth config successfully', () => {
+    it('should update auth config successfully', async () => {
       new AuthController();
-      const result = invokeIPC('auth:updateConfig', { enabled: true, method: 'password' });
+      const result = await invokeIPC('auth:updateConfig', { enabled: true, method: 'password' });
 
       expect(result.success).toBe(true);
     });
@@ -707,18 +714,18 @@ describe('AuthController', () => {
   // -----------------------------------------------------------------------
 
   describe('Recovery codes', () => {
-    it('should generate 8 recovery codes', () => {
+    it('should generate 8 recovery codes', async () => {
       new AuthController();
-      const result = invokeIPC('auth:generateRecoveryCodes');
+      const result = await invokeIPC('auth:generateRecoveryCodes');
 
       expect(result.success).toBe(true);
       expect(result.codes).toBeDefined();
       expect(result.codes).toHaveLength(8);
     });
 
-    it('should generate codes in XXXX-XXXX format', () => {
+    it('should generate codes in XXXX-XXXX format', async () => {
       new AuthController();
-      const result = invokeIPC('auth:generateRecoveryCodes');
+      const result = await invokeIPC('auth:generateRecoveryCodes');
 
       for (const code of result.codes) {
         expect(code).toMatch(/^[0-9A-F]{4}-[0-9A-F]{4}$/);
@@ -727,7 +734,7 @@ describe('AuthController', () => {
 
     it('should authenticate with a valid recovery code', async () => {
       new AuthController();
-      const genResult = invokeIPC('auth:generateRecoveryCodes');
+      const genResult = await invokeIPC('auth:generateRecoveryCodes');
 
       const code = genResult.codes[0];
       const result = await invokeIPC('auth:authenticateRecovery', seal(code));
@@ -738,7 +745,7 @@ describe('AuthController', () => {
 
     it('should reject an invalid recovery code', async () => {
       new AuthController();
-      invokeIPC('auth:generateRecoveryCodes');
+      await invokeIPC('auth:generateRecoveryCodes');
 
       const result = await invokeIPC('auth:authenticateRecovery', seal('ZZZZ-ZZZZ'));
 
@@ -748,7 +755,7 @@ describe('AuthController', () => {
 
     it('should consume a recovery code after use (one-time use)', async () => {
       new AuthController();
-      const genResult = invokeIPC('auth:generateRecoveryCodes');
+      const genResult = await invokeIPC('auth:generateRecoveryCodes');
 
       const code = genResult.codes[0];
       // First use should succeed

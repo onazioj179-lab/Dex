@@ -39,6 +39,12 @@ jobs:
         run: npm run package:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code-signing: set CSC_LINK (base64-encoded .pfx) and CSC_KEY_PASSWORD
+          # in repo Settings → Secrets → Actions.  When both secrets are present,
+          # electron-builder will sign the .exe automatically.  Without them the
+          # build still succeeds but Windows Defender will flag the unsigned binary.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Build (macOS)

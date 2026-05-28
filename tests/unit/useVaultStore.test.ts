@@ -11,6 +11,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const mockVault = {
   checkExists: vi.fn(),
+  getState: vi.fn(),
+  onStateChange: vi.fn(),
   create: vi.fn(),
   unlock: vi.fn(),
   lock: vi.fn(),
@@ -23,6 +25,8 @@ const mockVault = {
   deleteAuthenticator: vi.fn(),
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
+  getCategories: vi.fn(),
+  addCategory: vi.fn(),
   generatePassword: vi.fn(),
   generateTOTP: vi.fn(),
   runAudit: vi.fn(),
@@ -71,13 +75,15 @@ describe('useVaultStore', () => {
 
   describe('initialize', () => {
     it('checks if vault exists', async () => {
-      mockVault.checkExists.mockResolvedValue(true);
+      mockVault.getState.mockResolvedValue({ isUnlocked: false, vaultExists: true });
+      mockVault.onStateChange.mockImplementation(() => {});
       await store.getState().initialize();
       expect(store.getState().vaultExists).toBe(true);
     });
 
     it('handles missing vault', async () => {
-      mockVault.checkExists.mockResolvedValue(false);
+      mockVault.getState.mockResolvedValue({ isUnlocked: false, vaultExists: false });
+      mockVault.onStateChange.mockImplementation(() => {});
       await store.getState().initialize();
       expect(store.getState().vaultExists).toBe(false);
     });
@@ -85,9 +91,8 @@ describe('useVaultStore', () => {
 
   describe('createVault', () => {
     it('creates vault and marks as existing + unlocked', async () => {
-      mockVault.create.mockResolvedValue(true);
-      mockVault.getCredentials.mockResolvedValue([]);
-      mockVault.getAuthenticators.mockResolvedValue([]);
+      mockVault.create.mockResolvedValue({ success: true });
+      mockVault.getCategories.mockResolvedValue([]);
       mockVault.getSettings.mockResolvedValue(null);
 
       const result = await store.getState().createVault('MasterPass123!');
@@ -100,12 +105,13 @@ describe('useVaultStore', () => {
 
   describe('unlockVault', () => {
     it('unlocks with correct password', async () => {
-      mockVault.unlock.mockResolvedValue(true);
+      mockVault.unlock.mockResolvedValue({ success: true });
       mockVault.getCredentials.mockResolvedValue([
         { id: 'c1', type: 'website', title: 'GitHub', username: 'user', favorite: false, tags: [], category: 'dev', createdAt: 1, updatedAt: 1 },
       ]);
       mockVault.getAuthenticators.mockResolvedValue([]);
       mockVault.getSettings.mockResolvedValue(null);
+      mockVault.getCategories.mockResolvedValue([]);
 
       const result = await store.getState().unlockVault('correct');
 
@@ -115,7 +121,7 @@ describe('useVaultStore', () => {
     });
 
     it('stays locked with wrong password', async () => {
-      mockVault.unlock.mockResolvedValue(false);
+      mockVault.unlock.mockResolvedValue({ success: false, error: 'Invalid master password' });
 
       const result = await store.getState().unlockVault('wrong');
 

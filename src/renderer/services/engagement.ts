@@ -164,12 +164,13 @@ export function checkAchievements(
   totalPoints?: number,
 ): { state: EngagementState; newUnlocks: Achievement[] } {
   const newUnlocks: Achievement[] = [];
+  const unlockedSet = new Set(state.unlockedAchievements); // O(1) has() vs O(n) includes()
   let unlocked = [...state.unlockedAchievements];
   const unlockedCount = unlocked.length;
   const pts = totalPoints ?? getTotalPoints(unlocked);
 
   for (const ach of ACHIEVEMENTS) {
-    if (unlocked.includes(ach.id)) continue;
+    if (unlockedSet.has(ach.id)) continue;
 
     let passes = false;
     if (ach.id.startsWith('ach-count-')) {
@@ -189,7 +190,7 @@ export function checkAchievements(
       passes = pts >= (ptMap[label] || 999999);
     } else if (ach.id === 'final-all-categories') {
       const cats = Object.keys(CATEGORY_META);
-      passes = cats.every(c => ACHIEVEMENTS.filter(a => a.category === c && unlocked.includes(a.id)).length >= 100);
+      passes = cats.every(c => ACHIEVEMENTS.filter(a => a.category === c && unlockedSet.has(a.id)).length >= 100);
     } else if (ach.id.startsWith('rank-')) {
       const rank = getUserRank(pts);
       const rankMap: Record<string, string> = {
@@ -206,6 +207,7 @@ export function checkAchievements(
 
     if (passes) {
       unlocked.push(ach.id);
+      unlockedSet.add(ach.id);
       newUnlocks.push(ach);
     }
   }
@@ -227,7 +229,8 @@ export function getTipOfDay(state: EngagementState): { id: string; text: string;
 
 /** Get total points from unlocked achievements */
 export function getTotalPoints(unlocked: string[]): number {
-  return ACHIEVEMENTS.filter(a => unlocked.includes(a.id)).reduce((sum, a) => sum + a.points, 0);
+  const set = new Set(unlocked);
+  return ACHIEVEMENTS.filter(a => set.has(a.id)).reduce((sum, a) => sum + a.points, 0);
 }
 
 /** Get user rank based on points -- no emojis, icon names only */
@@ -249,13 +252,14 @@ export function getUserRank(points: number): { title: string; icon: string; next
 
 /** Get achievement stats summary */
 export function getAchievementStats(unlocked: string[]) {
+  const set = new Set(unlocked);
   const points = getTotalPoints(unlocked);
   const rank = getUserRank(points);
   const byCategory: Record<string, { unlocked: number; total: number }> = {};
 
   for (const cat of Object.keys(CATEGORY_META) as AchievementCategory[]) {
     const total = ACHIEVEMENTS.filter(a => a.category === cat).length;
-    const unl = ACHIEVEMENTS.filter(a => a.category === cat && unlocked.includes(a.id)).length;
+    const unl = ACHIEVEMENTS.filter(a => a.category === cat && set.has(a.id)).length;
     byCategory[cat] = { unlocked: unl, total };
   }
 
