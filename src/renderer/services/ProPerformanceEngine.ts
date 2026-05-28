@@ -95,7 +95,6 @@ class TaskScheduler {
 
   constructor() {
     this.maxConcurrent = getConcurrencyLimit();
-    console.log(`[TaskScheduler] Initialized with ${this.maxConcurrent} concurrent slots`);
   }
 
   /**
@@ -319,7 +318,6 @@ class GPUAccelerator {
         if (this.gl) {
           this.isAvailable = true;
           this.queryMemoryInfo();
-          console.log('[GPUAccelerator] WebGL initialized');
         }
       }
     } catch (e) {
@@ -332,8 +330,7 @@ class GPUAccelerator {
     
     const ext = this.gl.getExtension('WEBGL_debug_renderer_info');
     if (ext) {
-      const renderer = this.gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-      console.log(`[GPUAccelerator] GPU: ${renderer}`);
+      this.gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
     }
 
     // Query memory if extension available
@@ -925,7 +922,6 @@ class ProPerformanceEngine {
     // Listen for visibility changes to pause/resume
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
 
-    console.log('[ProPerformanceEngine] Initialized');
   }
 
   private handleVisibilityChange = () => {
@@ -945,7 +941,6 @@ class ProPerformanceEngine {
       // If memory is high, evict cache
       if (usedMB > 400) {
         this.cache.evictForPressure(40);
-        console.log('[ProPerformanceEngine] Memory pressure detected, evicted cache');
       } else if (usedMB > 250) {
         this.cache.evictForPressure(20);
       }

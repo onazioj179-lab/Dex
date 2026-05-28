@@ -21,6 +21,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Button } from '../ui/Button';
 import { space, radius, fontSize, fontWeight } from '../styles/tokens';
+import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
 
 export type ConfirmTone = 'neutral' | 'destructive';
 
@@ -104,7 +105,7 @@ const backdropStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 6000,
+  zIndex: Z_DROPDOWN_BASE,
   padding: space[4],
 };
 const dialogStyle: React.CSSProperties = {

@@ -80,7 +80,6 @@ export class InputPriorityManager {
     // Start background task scheduler
     this.scheduleBackgroundWork();
 
-    console.log('[InputPriority] Initialized - input latency tracking active');
   }
 
   /**

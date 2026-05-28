@@ -10,12 +10,13 @@
 // =============================================================================
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { 
-  useCollaborationStore, 
-  useChatMessages, 
+import {
+  useCollaborationStore,
+  useChatMessages,
   useOnlineCollaborators,
-  ChatMessage 
+  ChatMessage
 } from '../services/CollaborationSystem';
+import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
 // STYLES (Claude-inspired with DEX colors)
@@ -32,7 +33,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeft: '1px solid rgba(255,255,255,0.06)',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 6500,
+    zIndex: Z_DROPDOWN_BASE + 500,
     boxShadow: '-8px 0 40px rgba(0,0,0,0.3)',
     animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
   },
