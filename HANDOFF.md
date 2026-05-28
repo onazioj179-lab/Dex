@@ -70,6 +70,17 @@ Release tooling:
 - `scripts/release.js` — switched prune step from PowerShell to Node so Linux/macOS release runners can execute the retention pass without a `pwsh` install.
 - `scripts/prune-releases.ps1` — kept as parity sibling for Windows-only invocations.
 
+Release cache reclaim:
+- `src/main/core/ReleaseManager.ts` — new `pruneCache(maxAgeMs)` method removes files older than 7 days from `tmp/dex-cache`, preserving the currently-downloaded artifact. Scheduled at startup (30s delay) and every 24h via `setInterval`. Disposed in main shutdown sequence (`releaseManager.dispose()`). New IPC channel `updates:pruneCache` for manual trigger.
+- `src/main/preload.ts` — `dexUpdates.pruneCache()` exposed to renderer.
+- `src/main/main.ts` — `releaseManager.dispose()` wired into `before-quit` shutdown chain.
+
+Settings ↔ Onboarding sync:
+- `src/renderer/pages/Settings.tsx` — `crashReports` toggle now fires `diagnostics:setPreferences({ crashReportingEnabled })` via IPC, matching what Onboarding wrote. A new mount-time effect reads `diagnostics:getPreferences` and reconciles the displayed state with the main-process source of truth.
+
+Minimized-window popover — keyboard access:
+- `src/renderer/components/AppManager.tsx` — popover auto-focuses first entry on open; ArrowUp/ArrowDown wrap-navigate entries; Escape closes; outside-click handler now uses a containment check via `minimizedListRef` so clicking inside the menu doesn't dismiss it. Popover z-index pulled into the named ladder (`Z_DROPDOWN_BASE + 500`).
+
 ---
 
 ## Problems Already Investigated
@@ -107,19 +118,18 @@ Release tooling:
 
 In priority order:
 
-1. **Release cache reclaim** — `ReleaseManager.cacheLocation` is
-   reported but never auto-pruned on a schedule. Wire it into a periodic
-   cleanup so installer downloads don't accumulate in `tmp/dex-cache`
-   across upgrades.
-2. **`dex-onboarding-prefs` Settings sync** — The onboarding prefs are
-   now wired to IPC at completion time. Verify that the Settings page
-   reads the same IPC channels (`diagnostics:getPreferences`,
-   `updates:getPreferences`) to display current state, and that toggling
-   in Settings round-trips correctly with what onboarding set.
-3. **Minimized-window popover — keyboard access** — The restore popover
-   now opens on click. Add keyboard support: when focus is on the
-   "N minimized" button, Space/Enter opens the list; arrow keys navigate
-   entries; Escape closes without restoring.
+1. **Migrate remaining hardcoded z-index integers** — a few non-critical
+   call sites still use raw numbers (`Browser.tsx`, `MediaBrowser.tsx`,
+   `useFileDrop.ts`, `TouchInputSystem.ts`, `CreativeAppsSnappy.ts`).
+   Migrate to the named constants from `src/shared/zIndex.ts` so the
+   ladder stays honest as new layers are added.
+2. **Surface cache-reclaim in Settings → About** — `dexUpdates.pruneCache()`
+   exists over IPC. Add a "Clear update cache" button to the Settings →
+   Updates section that surfaces the freed-bytes return value to the user.
+3. **Verify cache prune across real upgrade cycles** — the 7-day age cap
+   and protected-current-artifact logic is correct on paper. Run a real
+   update + relaunch to confirm `downloadedArtifactPath` survives a
+   prune cycle.
 4. **HANDOFF.md cadence** — every session must update this file in the
    final commit.
 
@@ -128,14 +138,22 @@ In priority order:
 - **Minimized-window discoverability** — "N minimized" in the activities
   strip is now a clickable button that opens a per-app restore popover.
   Each entry shows the app's accent color dot and name; clicking restores
-  and focuses that app. Popover dismisses on outside click.
+  and focuses that app. Popover dismisses on outside click and Escape;
+  ArrowUp/Down wrap-navigate entries; auto-focuses first entry on open.
 - **`dex-onboarding-prefs` wiring** — `handleComplete` in `Onboarding`
   now calls `diagnostics:setPreferences({ crashReportingEnabled })` and
-  `updates:setPreferences({ autoCheck })` over IPC. The toggles are
-  functional end-to-end instead of writing to localStorage and stopping.
+  `updates:setPreferences({ autoCheck })` over IPC. Settings page reads
+  the same `diagnostics:getPreferences` on mount and writes back when the
+  `crashReports` toggle flips, so the two surfaces stay in sync.
 - **Z-index constants** — `src/shared/zIndex.ts` created with the full
   named ladder. Migrated: `MiniPulse`, `DiagnosticsPanel`, `HelpOverlay`,
-  `PolicyViewer`, `Onboarding`, `SystemFeatures`, `FocusSessionSystem`.
+  `PolicyViewer`, `Onboarding`, `SystemFeatures`, `FocusSessionSystem`,
+  and the AppManager minimized-window popover.
+- **Release cache reclaim** — `ReleaseManager.pruneCache()` removes
+  installer downloads older than 7 days from `tmp/dex-cache`, preserving
+  the active artifact. Runs at startup (30s delay) and every 24h. IPC
+  channel `updates:pruneCache` exposed via preload as
+  `dexUpdates.pruneCache()`. Disposed cleanly in shutdown sequence.
 
 ---
 
