@@ -85,6 +85,7 @@ import { initializeSync, shutdownSync } from './sync/SyncManager';
 // Core Services
 import { backgroundTasks } from './core/BackgroundTasks';
 import { CrashRecoverySystem } from './core/CrashRecoverySystem';
+import { WorkspaceSnapshot } from './core/WorkspaceSnapshot';
 import { ClipboardHistoryManager } from './core/ClipboardHistoryManager';
 import { dataIntegrity } from './core/DataIntegrity';
 import { errorRecovery } from './core/ErrorRecovery';
@@ -800,6 +801,9 @@ class DexApp {
       // --- UKI Voice Assistant ---
       await shutdownWithTimeout('UkiController', () => ukiController.shutdown());
 
+      // --- Workspace Snapshot: flush session state to disk before exit ---
+      await shutdownWithTimeout('WorkspaceSnapshot', () => WorkspaceSnapshot.shutdown());
+
       // --- ReleaseManager: stop the cache-prune interval ---
       if (this.releaseManager) {
         await shutdownWithTimeout('ReleaseManager', () => this.releaseManager?.dispose());
@@ -958,6 +962,7 @@ class DexApp {
     memoryManager.startMonitoring();
     backgroundTasks.start();
     CrashRecoverySystem.initialize();
+    WorkspaceSnapshot.initialize();
     pythonExecutor.start();
     performanceGuardian.start();
     performanceGuardian.recordStartupTime(Date.now() - 5000);
