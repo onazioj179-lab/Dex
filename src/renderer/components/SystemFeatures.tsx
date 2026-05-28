@@ -289,53 +289,6 @@ const toastContainerStyles: React.CSSProperties = {
   pointerEvents: 'none',
 };
 
-// ==================== SESSION AUTO-SAVE ====================
-export const useSessionAutoSave = () => {
-  const { instances, activeInstanceId } = useAppSubsystem();
-  
-  useEffect(() => {
-    const saveSession = () => {
-      try {
-        // Convert Map to array of app IDs
-        const runningApps: string[] = [];
-        instances.forEach((instance) => {
-          runningApps.push(instance.appId);
-        });
-        
-        const session = {
-          runningApps,
-          activeInstanceId,
-          lastActivity: Date.now(),
-        };
-        localStorage.setItem('dex-session', JSON.stringify(session));
-      } catch (e) { console.warn('[DEX]', e); }
-    };
-    
-    // Save every 30 seconds
-    const interval = setInterval(saveSession, 30000);
-    
-    // Save on visibility change
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        saveSession();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Save on beforeunload
-    const handleBeforeUnload = () => {
-      saveSession();
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [instances, activeInstanceId]);
-};
-
 // ==================== ADDITIONAL OVERLAY COMPONENTS ====================
 
 const launcherStyles: Record<string, React.CSSProperties> = {
