@@ -41,7 +41,7 @@ import {
 import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
 import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
-import { SystemFeatures, useSessionAutoSave } from './components/SystemFeatures';
+import { SystemFeatures } from './components/SystemFeatures';
 import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
 import MiniPulse from './components/MiniPulse';
@@ -240,9 +240,6 @@ export const App: React.FC = () => {
     if (wpMode === 'live') return { background: 'var(--color-bg-base)' };
     return { backgroundColor: wpValue };
   }, [wpMode, wpValue]);
-
-  // Enable session auto-save
-  useSessionAutoSave();
 
   // Initialize authentication system
   const authInitialize = useAuthStore(s => s.initialize);

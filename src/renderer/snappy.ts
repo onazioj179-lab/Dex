@@ -257,7 +257,6 @@ export function initSnappyUX(): void {
   // Initialize worker pool
   _workerPool.init();
   
-  console.log('[DEX] Snappy UX initialized');
 }
 
 /**

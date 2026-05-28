@@ -12,6 +12,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from './DexIcon';
+import { Z_PIP } from '../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -375,7 +376,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
         top: pos.y,
         width: size.width,
         height: size.height,
-        zIndex: 9900,
+        zIndex: Z_PIP,
         borderRadius: 12,
         overflow: 'hidden',
         boxShadow: 'var(--pg-shadow-popover), 0 0 0 1px rgba(255,255,255,0.08)',

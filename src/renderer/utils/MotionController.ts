@@ -132,6 +132,23 @@ let _mediaQuery: MediaQueryList | null = null;
 let _mediaQueryHandler: ((e: MediaQueryListEvent) => void) | null = null;
 const _listeners: Set<(reduced: boolean) => void> = new Set();
 
+// User override (set by the Reduce Motion toggle in the system menu). When
+// present this beats the OS preference so users can force the calm path even
+// on systems where the media query is unavailable or reports the opposite.
+function readUserOverride(): boolean | null {
+  try {
+    const raw = localStorage.getItem('dex-reduce-motion');
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+  } catch { /* storage unavailable — fall through */ }
+  return null;
+}
+
+function applyClass(reduced: boolean): void {
+  if (reduced) document.documentElement.classList.add('reduce-motion');
+  else document.documentElement.classList.remove('reduce-motion');
+}
+
 export function initReduceMotion(): void {
   if (typeof window === 'undefined') return;
   // Cleanup previous listener if re-initialized (e.g., HMR)
@@ -139,19 +156,15 @@ export function initReduceMotion(): void {
     _mediaQuery.removeEventListener('change', _mediaQueryHandler);
   }
   _mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-  _reduceMotion = _mediaQuery.matches;
+  const override = readUserOverride();
+  _reduceMotion = override ?? _mediaQuery.matches;
   _mediaQueryHandler = (e: MediaQueryListEvent) => {
-    _reduceMotion = e.matches;
+    const cur = readUserOverride();
+    _reduceMotion = cur ?? e.matches;
     _listeners.forEach(fn => fn(_reduceMotion));
-    if (_reduceMotion) {
-      document.documentElement.classList.add('reduce-motion');
-    } else {
-      document.documentElement.classList.remove('reduce-motion');
-    }
+    applyClass(_reduceMotion);
   };
-  if (_reduceMotion) {
-    document.documentElement.classList.add('reduce-motion');
-  }
+  applyClass(_reduceMotion);
   _mediaQuery.addEventListener('change', _mediaQueryHandler);
 }
 

@@ -15,6 +15,7 @@ import { DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, type Policy
 import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { AccountAuthFlow } from './account/AccountAuthFlow';
 import { platform } from '../utils';
+import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 
 const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
 
@@ -679,6 +680,12 @@ export const OnboardingWizard: React.FC<{
     } catch {
       // storage unavailable
     }
+    // Wire crash reporting and auto-update toggles to their respective controllers
+    try {
+      const electron = (window as unknown as { electron?: { diagnostics?: { setPreferences?: (p: object) => Promise<unknown> }; updates?: { setPreferences?: (p: object) => Promise<unknown> } } }).electron;
+      electron?.diagnostics?.setPreferences?.({ crashReportingEnabled: prefs.crashReportsEnabled });
+      electron?.updates?.setPreferences?.({ autoCheck: prefs.autoUpdatesEnabled });
+    } catch { /* IPC may not be available in renderer-only mode */ }
     setExiting(true);
     setTimeout(onComplete, 300);
   }, [jumpToPolicy, loadSample, onComplete, policyAccepted, prefs]);
@@ -713,7 +720,7 @@ export const OnboardingWizard: React.FC<{
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 10000,
+      position: 'fixed', inset: 0, zIndex: Z_HELP_OVERLAY_BASE,
       background: '#000000',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       opacity: exiting ? 0 : 1,

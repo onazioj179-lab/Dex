@@ -12,6 +12,7 @@
 import React, { useEffect, useCallback, useState, memo } from 'react';
 import { useAppSubsystem } from '../store/appSubsystem';
 import { initializeTheme, toggleTheme, getCurrentTheme } from './ThemeManager';
+import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 
 // ==================== SIMPLE NOTIFICATION SYSTEM ====================
 interface SimpleNotification {
@@ -285,55 +286,8 @@ const toastContainerStyles: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column-reverse',
   gap: 8,
-  zIndex: 10000,
+  zIndex: Z_HELP_OVERLAY_BASE,
   pointerEvents: 'none',
-};
-
-// ==================== SESSION AUTO-SAVE ====================
-export const useSessionAutoSave = () => {
-  const { instances, activeInstanceId } = useAppSubsystem();
-  
-  useEffect(() => {
-    const saveSession = () => {
-      try {
-        // Convert Map to array of app IDs
-        const runningApps: string[] = [];
-        instances.forEach((instance) => {
-          runningApps.push(instance.appId);
-        });
-        
-        const session = {
-          runningApps,
-          activeInstanceId,
-          lastActivity: Date.now(),
-        };
-        localStorage.setItem('dex-session', JSON.stringify(session));
-      } catch (e) { console.warn('[DEX]', e); }
-    };
-    
-    // Save every 30 seconds
-    const interval = setInterval(saveSession, 30000);
-    
-    // Save on visibility change
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        saveSession();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Save on beforeunload
-    const handleBeforeUnload = () => {
-      saveSession();
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [instances, activeInstanceId]);
 };
 
 // ==================== ADDITIONAL OVERLAY COMPONENTS ====================
@@ -542,7 +496,7 @@ const ToastNotification: React.FC<ToastNotificationProps> = memo(({ notification
         pointerEvents: 'auto',
         transform: `translateY(${offset * -8}px)`,
         opacity: 1 - offset * 0.2,
-        zIndex: 10000 - offset,
+        zIndex: Z_HELP_OVERLAY_BASE - offset,
         cursor: 'pointer',
       }}
       onClick={onDismiss}

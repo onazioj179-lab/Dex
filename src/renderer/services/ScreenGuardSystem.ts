@@ -73,7 +73,6 @@ class ScreenGuardSystem {
     // 6. Start frame monitoring
     this.startFrameMonitoring();
 
-    console.log('[ScreenGuard] System initialized');
   }
 
   /**
@@ -323,7 +322,6 @@ class ButtonResponsivenessSystem {
     // Watch for new buttons
     this.startObserving();
 
-    console.log('[ButtonResponsiveness] System initialized');
   }
 
   /**
@@ -606,7 +604,6 @@ export function initScreenGuardSystems(): void {
   screenGuard.initialize();
   buttonResponsiveness.initialize();
   
-  console.log('[ScreenGuard] All systems initialized');
 }
 
 // Auto-initialize on import

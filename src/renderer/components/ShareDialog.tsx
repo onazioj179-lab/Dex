@@ -12,6 +12,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useCollaborationStore, CollaboratorRole, Collaborator } from '../services/CollaborationSystem';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { Z_PANEL } from '../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -26,7 +27,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 5500,
+    zIndex: Z_PANEL,
     animation: 'fadeIn 0.15s ease',
   },
   dialog: {

@@ -7,6 +7,8 @@
 // Touch and Stylus Input System for DEX
 // Uses Pointer Events API exclusively - no Touch Events API
 
+import { Z_HELP_OVERLAY_MAX } from '../../shared/zIndex';
+
 type GestureType =
   | 'tap'
   | 'double-tap'
@@ -379,7 +381,7 @@ class GestureRecognizer {
   private startDrag(pointerId: number, element: HTMLElement, x: number, y: number): void {
     const clone = element.cloneNode(true) as HTMLElement;
     clone.style.position = 'fixed';
-    clone.style.zIndex = '99999';
+    clone.style.zIndex = String(Z_HELP_OVERLAY_MAX);
     clone.style.pointerEvents = 'none';
     clone.style.opacity = '0.8';
     clone.style.transform = 'scale(1.05)';
