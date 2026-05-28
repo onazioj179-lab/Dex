@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
+import { useToastHelpers } from '../components/Toast';
 import { glassPanel, glassButton, glassMenu } from '../styles/glassMenu';
 import { useRunningApps } from '../store/runningApps';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -174,6 +175,8 @@ export const Power: React.FC = () => {
 
   // Live CPU history for chart
   const [cpuHistory, setCpuHistory] = useState<number[]>(Array(60).fill(0));
+  const toast = useToastHelpers();
+  const pollFailCountRef = useRef(0);
 
   // Load initial data from IPC on mount
   useEffect(() => {
@@ -220,8 +223,13 @@ export const Power: React.FC = () => {
             : prev[prev.length - 1] || 0;
           return [...prev.slice(1), total];
         });
+        pollFailCountRef.current = 0;
       } catch (e) {
         console.warn('[Power] Polling error:', e);
+        pollFailCountRef.current += 1;
+        if (pollFailCountRef.current === 3) {
+          toast.error('Power monitor lost connection to system bridge. Data may be stale.');
+        }
       }
     };
     const start = () => { if (!interval) interval = setInterval(poll, 3000); };

@@ -216,7 +216,9 @@ export const Tasks: React.FC = () => {
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'priority' | 'date' | 'name'>('priority');
+  const [sortBy, setSortBy] = useState<'priority' | 'date' | 'name' | 'manual'>('priority');
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragIdRef = React.useRef<string | null>(null);
   const newTaskInputRef = React.useRef<HTMLInputElement>(null);
 
   // Keyboard shortcuts: Ctrl+N to focus new task input
@@ -270,17 +272,32 @@ export const Tasks: React.FC = () => {
     }
   }), [tasks, showCompleted, selectedList, searchQuery]);
 
-  const sortedTasks = useMemo(() => [...filteredTasks].sort((a, b) => {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    if (sortBy === 'date') {
-      const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-      const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-      return aDate - bDate;
-    }
-    if (sortBy === 'name') return a.title.localeCompare(b.title);
-    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-    return (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
-  }), [filteredTasks, sortBy]);
+  const reorderTasks = useCallback((sourceId: string, targetId: string) => {
+    setTasks(prev => {
+      const arr = [...prev];
+      const srcIdx = arr.findIndex(t => t.id === sourceId);
+      const tgtIdx = arr.findIndex(t => t.id === targetId);
+      if (srcIdx === -1 || tgtIdx === -1 || srcIdx === tgtIdx) return prev;
+      const [moved] = arr.splice(srcIdx, 1);
+      arr.splice(tgtIdx, 0, moved);
+      return arr;
+    });
+  }, []);
+
+  const sortedTasks = useMemo(() => {
+    if (sortBy === 'manual') return filteredTasks;
+    return [...filteredTasks].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (sortBy === 'date') {
+        const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return aDate - bDate;
+      }
+      if (sortBy === 'name') return a.title.localeCompare(b.title);
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      return (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+    });
+  }, [filteredTasks, sortBy]);
 
   const clearCompleted = () => setTasks(prev => prev.filter(t => !t.completed));
 
@@ -488,7 +505,7 @@ export const Tasks: React.FC = () => {
           {/* Sort Dropdown */}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'priority' | 'date' | 'name')}
+            onChange={(e) => setSortBy(e.target.value as 'priority' | 'date' | 'name' | 'manual')}
             aria-label="Sort tasks by"
             style={{
               padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500,
@@ -500,6 +517,7 @@ export const Tasks: React.FC = () => {
             <option value="priority">Priority</option>
             <option value="date">Due Date</option>
             <option value="name">Name</option>
+            <option value="manual">Manual</option>
           </select>
           {/* Clear Completed */}
           {tasks.some(t => t.completed) && (
@@ -650,14 +668,30 @@ export const Tasks: React.FC = () => {
           {sortedTasks.map(task => (
             <div key={task.id}>
               <div
+                draggable={sortBy === 'manual'}
+                onDragStart={() => { dragIdRef.current = task.id; }}
+                onDragOver={e => { if (sortBy !== 'manual') return; e.preventDefault(); setDragOverId(task.id); }}
+                onDrop={e => { e.preventDefault(); if (dragIdRef.current && dragIdRef.current !== task.id) reorderTasks(dragIdRef.current, task.id); setDragOverId(null); dragIdRef.current = null; }}
+                onDragEnd={() => { setDragOverId(null); dragIdRef.current = null; }}
                 style={{
                   ...styles.taskItem,
                   opacity: task.completed ? 0.5 : 1,
-                  cursor: 'pointer',
+                  cursor: sortBy === 'manual' ? 'grab' : 'pointer',
+                  outline: dragOverId === task.id ? '2px solid var(--color-accent)' : 'none',
+                  outlineOffset: '-2px',
                 }}
                 onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
                 onContextMenu={e => showCtx(e, buildTaskCtxItems(task))}
               >
+                {sortBy === 'manual' && (
+                  <span style={{ flexShrink: 0, color: 'var(--color-text-muted)', opacity: 0.5, lineHeight: 0 }}>
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+                      <circle cx="3" cy="3" r="1.5"/><circle cx="7" cy="3" r="1.5"/>
+                      <circle cx="3" cy="8" r="1.5"/><circle cx="7" cy="8" r="1.5"/>
+                      <circle cx="3" cy="13" r="1.5"/><circle cx="7" cy="13" r="1.5"/>
+                    </svg>
+                  </span>
+                )}
                 <button
                   aria-label={task.completed ? `Mark "${task.title}" incomplete` : `Complete "${task.title}"`}
                   style={{
