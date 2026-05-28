@@ -975,9 +975,9 @@ export class ReleaseManager {
     }
 
     // Reclaim stale installer downloads from tmp/dex-cache. Run once on
-    // startup (delayed so we don't block init) and then every 24 hours.
+    // startup (delayed so we don't block init) and then every 12 hours.
     setTimeout(() => { this.pruneCache(); }, 30_000);
-    this.cachePruneTimer = setInterval(() => { this.pruneCache(); }, 24 * 60 * 60 * 1000);
+    this.cachePruneTimer = setInterval(() => { this.pruneCache(); }, 12 * 60 * 60 * 1000);
     if (typeof this.cachePruneTimer.unref === 'function') this.cachePruneTimer.unref();
 
     log.info('[ReleaseManager] Initialized');
@@ -985,11 +985,11 @@ export class ReleaseManager {
 
   /**
    * Remove stale installer downloads from the temp cache. Anything older
-   * than 7 days is removed unconditionally; the currently-downloaded
+   * than 3 days is removed unconditionally; the currently-downloaded
    * artifact (if any) is preserved regardless of age. Returns the number
    * of bytes freed.
    */
-  pruneCache(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): { freedBytes: number; removed: number } {
+  pruneCache(maxAgeMs: number = 3 * 24 * 60 * 60 * 1000): { freedBytes: number; removed: number } {
     const cachePath = path.join(app.getPath('temp'), 'dex-cache');
     if (!fs.existsSync(cachePath)) return { freedBytes: 0, removed: 0 };
 

@@ -79,6 +79,7 @@ class TaskScheduler {
   private taskQueue: Map<string, Task> = new Map();
   private runningTasks: Map<string, Task> = new Map();
   private completedTasks: Map<string, unknown> = new Map();
+  private readonly MAX_COMPLETED = 200;
   private maxConcurrent: number;
   private isProcessing = false;
   private rafId: number = 0;
@@ -242,6 +243,11 @@ class TaskScheduler {
       this.metrics.averageWaitTime = this.metrics.totalWaitTime / this.metrics.tasksProcessed;
       this.metrics.averageProcessTime = this.metrics.totalProcessTime / this.metrics.tasksProcessed;
 
+      // Evict oldest entries when the ring fills (Maps iterate insertion order).
+      if (this.completedTasks.size >= this.MAX_COMPLETED) {
+        const oldest = this.completedTasks.keys().next().value;
+        if (oldest !== undefined) this.completedTasks.delete(oldest);
+      }
       this.completedTasks.set(task.id, result);
       task.onComplete?.(result);
     } catch (error) {
