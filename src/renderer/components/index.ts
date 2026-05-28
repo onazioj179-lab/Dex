@@ -135,6 +135,5 @@ export {
 export {
   HelpOverlay,
   HelpTooltip,
-  QuickTipBanner,
   useHelp,
 } from './HelpOverlay';

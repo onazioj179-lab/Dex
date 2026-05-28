@@ -61,7 +61,6 @@ export const PluginMarketplace: React.FC = () => {
   }, [refreshInstalled, refreshRegistry]);
 
   const install = async (entry: RegistryEntry) => {
-    if (!confirm(`Install ${entry.manifest.name}? Review plugin permissions and publisher trust before enabling. DEX may disable unsafe plugins.`)) return;
     setBusyId(entry.manifest.id);
     setStatus(`Installing ${entry.manifest.name}…`);
     try {
@@ -82,7 +81,6 @@ export const PluginMarketplace: React.FC = () => {
   };
 
   const uninstall = async (row: InstalledRow) => {
-    if (!confirm(`Uninstall ${row.manifest.name}?`)) return;
     setBusyId(row.manifest.id);
     try {
       await dex?.invoke?.('plugins:uninstall', row.manifest.id);

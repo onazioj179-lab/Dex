@@ -688,10 +688,6 @@ export const OnboardingWizard: React.FC<{
   }, [jumpToPolicy]);
 
   const handleQuit = useCallback(() => {
-    const ok = typeof window !== 'undefined' && typeof window.confirm === 'function'
-      ? window.confirm('Quit DEX setup? You can run setup again the next time you launch DEX.')
-      : true;
-    if (!ok) return;
     try {
       const electron = (window as unknown as { electron?: { invoke?: (ch: string, ...args: unknown[]) => Promise<unknown> } }).electron;
       if (electron?.invoke) {

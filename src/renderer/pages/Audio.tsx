@@ -205,6 +205,8 @@ export const Audio: React.FC = () => {
   const [queueDragIdx, setQueueDragIdx] = useState<number | null>(null);
   const [queueOverIdx, setQueueOverIdx] = useState<number | null>(null);
 
+  const [playlistNameDraft, setPlaylistNameDraft] = useState<string | null>(null);
+
   // === PRO FEATURES STATE ===
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [eqBands, setEqBands] = useState([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -290,16 +292,21 @@ export const Audio: React.FC = () => {
   }, [playlists]);
 
   const createPlaylist = useCallback(() => {
-    const name = window.prompt('Playlist name:');
-    if (!name?.trim()) return;
+    setPlaylistNameDraft('');
+  }, []);
+
+  const submitPlaylistCreate = useCallback(() => {
+    const name = playlistNameDraft?.trim();
+    setPlaylistNameDraft(null);
+    if (!name) return;
     const newPlaylist: Playlist = {
       id: `playlist-${Date.now()}`,
-      name: name.trim(),
+      name,
       tracks: 0,
     };
     setPlaylists(prev => [...prev, newPlaylist]);
     setSelectedPlaylist(newPlaylist.id);
-  }, []);
+  }, [playlistNameDraft]);
 
   // Create audio element once
   useEffect(() => {
@@ -867,10 +874,22 @@ export const Audio: React.FC = () => {
             </button>
           ))}
           
-          <button style={styles.newPlaylistBtn} onClick={createPlaylist} aria-label="New Playlist">
-            {Icons.plus}
-            <span>New Playlist</span>
-          </button>
+          {playlistNameDraft !== null ? (
+            <input
+              autoFocus
+              value={playlistNameDraft}
+              onChange={e => setPlaylistNameDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submitPlaylistCreate(); if (e.key === 'Escape') setPlaylistNameDraft(null); }}
+              onBlur={submitPlaylistCreate}
+              placeholder="Playlist name"
+              style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none' }}
+            />
+          ) : (
+            <button style={styles.newPlaylistBtn} onClick={createPlaylist} aria-label="New Playlist">
+              {Icons.plus}
+              <span>New Playlist</span>
+            </button>
+          )}
         </div>
       </div>
 

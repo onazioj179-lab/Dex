@@ -108,7 +108,7 @@ export const EnhancedKnob: React.FC<EnhancedKnobProps> = ({
 
     const handleUp = () => {
       setIsDragging(false);
-      setTimeout(() => setShowValue(false), 800);
+      setTimeout(() => setShowValue(false), 400);
     };
 
     document.addEventListener('mousemove', handleMove);

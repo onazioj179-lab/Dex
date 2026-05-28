@@ -42,6 +42,8 @@ export const NexusBiometrics: React.FC = () => {
   const [records, setRecords] = useState<EnrolledRecord[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState('');
+  const [enrollKind, setEnrollKind] = useState<string | null>(null);
+  const [enrollLabel, setEnrollLabel] = useState('');
 
   const refresh = useCallback(async () => {
     try {
@@ -53,9 +55,17 @@ export const NexusBiometrics: React.FC = () => {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const enroll = async (kind: string) => {
-    const label = window.prompt(`Label for new ${kind} record:`, `${kind}-1`);
-    if (!label) return;
+  const beginEnroll = (kind: string) => {
+    setEnrollKind(kind);
+    setEnrollLabel(`${kind}-1`);
+  };
+
+  const confirmEnroll = async () => {
+    if (!enrollKind || !enrollLabel.trim()) return;
+    const kind = enrollKind;
+    const label = enrollLabel.trim();
+    setEnrollKind(null);
+    setEnrollLabel('');
     setBusy(kind);
     setStatus(`Enrolling ${kind}…`);
     try {
@@ -78,7 +88,6 @@ export const NexusBiometrics: React.FC = () => {
   };
 
   const revoke = async (rec: EnrolledRecord) => {
-    if (!confirm(`Revoke ${rec.label}?`)) return;
     setBusy(rec.id);
     try {
       await dex?.nexusBio?.revoke?.(rec.id);
@@ -123,9 +132,24 @@ export const NexusBiometrics: React.FC = () => {
               color: cap.available ? '#5cd17a' : 'var(--color-text-tertiary)',
               border: cap.available ? '1px solid rgba(52,199,89,0.3)' : '1px solid var(--pg-border)',
             }}>{cap.available ? 'available' : 'unavailable'}</span>
-            <button disabled={!cap.available || busy === cap.kind} onClick={() => enroll(cap.kind)} style={btnStyle(cap.available ? 'accent' : 'muted')}>Enroll</button>
+            <button disabled={!cap.available || busy === cap.kind} onClick={() => beginEnroll(cap.kind)} style={btnStyle(cap.available ? 'accent' : 'muted')}>Enroll</button>
           </GlassSurface>
         ))}
+
+        {enrollKind && (
+          <GlassSurface variant="card" style={{ padding: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>Label for {enrollKind}:</span>
+            <input
+              autoFocus
+              value={enrollLabel}
+              onChange={e => setEnrollLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') confirmEnroll(); if (e.key === 'Escape') { setEnrollKind(null); setEnrollLabel(''); } }}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--pg-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--color-text-primary)', outline: 'none' }}
+            />
+            <button onClick={confirmEnroll} disabled={!enrollLabel.trim()} style={btnStyle('accent')}>Confirm</button>
+            <button onClick={() => { setEnrollKind(null); setEnrollLabel(''); }} style={btnStyle('muted')}>Cancel</button>
+          </GlassSurface>
+        )}
 
         <SectionHeader style={{ paddingTop: 18 }}>Enrolled records</SectionHeader>
         {records.length === 0 && <div style={emptyStyle}>No records enrolled yet.</div>}

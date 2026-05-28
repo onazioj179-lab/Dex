@@ -127,7 +127,7 @@ export const MiniPulse: React.FC<MiniPulseProps> = ({ onExpand, hidden }) => {
         top: pos.y,
         width: PILL_W,
         height: PILL_H,
-        zIndex: 2147483000,
+        zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         gap: 10,

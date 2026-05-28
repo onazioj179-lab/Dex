@@ -2058,6 +2058,7 @@ const Imosion: React.FC = () => {
   const [showTrackNotes, setShowTrackNotes] = useState(false);
   const [trackNotes, setTrackNotes] = useState<Record<string, string>>({});
   const [showChainPreset, setShowChainPreset] = useState(false);
+  const [chainPresetNameDraft, setChainPresetNameDraft] = useState<string | null>(null);
   const [chainPresets, setChainPresets] = useState([
     { id: 'cp1', name: 'Pop Vocal', effects: ['EQ', 'Compressor', 'De-Esser', 'Reverb', 'Delay'] },
     { id: 'cp2', name: 'Rock Guitar', effects: ['EQ', 'Saturation', 'Reverb', 'Delay'] },
@@ -7116,7 +7117,26 @@ const Imosion: React.FC = () => {
               </button>
             ))}
             <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-              <button aria-label="Save current chain as preset" onClick={() => { const name = window.prompt('Preset name?', `Custom ${chainPresets.length + 1}`); if (!name) return; setChainPresets(prev => [...prev, { id: `cp-${Date.now()}`, name, effects: ['EQ', 'Compressor'] }]); }} style={{ flex: 1, padding: '6px', borderRadius: 5, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Save Current Chain</button>
+              {chainPresetNameDraft !== null ? (
+                <input
+                  autoFocus
+                  value={chainPresetNameDraft}
+                  onChange={e => setChainPresetNameDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const name = chainPresetNameDraft.trim() || `Custom ${chainPresets.length + 1}`;
+                      setChainPresets(prev => [...prev, { id: `cp-${Date.now()}`, name, effects: ['EQ', 'Compressor'] }]);
+                      setChainPresetNameDraft(null);
+                    }
+                    if (e.key === 'Escape') setChainPresetNameDraft(null);
+                  }}
+                  onBlur={() => setChainPresetNameDraft(null)}
+                  placeholder={`Custom ${chainPresets.length + 1}`}
+                  style={{ flex: 1, padding: '5px 8px', borderRadius: 5, border: '1px solid rgba(10,132,255,0.4)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, outline: 'none' }}
+                />
+              ) : (
+                <button aria-label="Save current chain as preset" onClick={() => setChainPresetNameDraft('')} style={{ flex: 1, padding: '6px', borderRadius: 5, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Save Current Chain</button>
+              )}
             </div>
           </div>
         </div>
