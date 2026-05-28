@@ -185,13 +185,6 @@ export {
   useMobileCompanionStore,
 } from './PlatformExtensions';
 
-// Collaboration Layer
-export {
-  useCRDTSyncStore,
-  useCoEditStore,
-  useCommentsAnnotationsStore,
-} from './CollaborationLayer';
-
 // Rewind Extensions
 export {
   useVisualTimelineStore,

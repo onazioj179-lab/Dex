@@ -38,6 +38,8 @@ import { useCreativeAppSettings } from '../../utils/creative-suite';
 export const FORGE_VERSION = '1.0.0';
 export const FORGE_BUILD_DATE = '2026-04-11';
 
+const MAX_QUEUE_JOBS = 200;
+
 // ==================== TYPES ====================
 interface Job {
   id: string;
@@ -270,7 +272,7 @@ const Forge: React.FC = () => {
         estimatedTime: 0,
         inputSize: 0,
       };
-      setJobs(prev => [...prev, newJob]);
+      setJobs(prev => prev.length < MAX_QUEUE_JOBS ? [...prev, newJob] : prev);
       setIsDirty(true);
     }
     toast.success(`Imported "${asset.name}" from ${asset.sourceApp}`);
@@ -418,7 +420,7 @@ const Forge: React.FC = () => {
       fileMapRef.current.set(newJob.id, file);
       newJobs.push(newJob);
     }
-    setJobs(prev => [...prev, ...newJobs]);
+    setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
     if (newJobs.length > 0) setSelectedJobId(newJobs[0].id);
   }, [selectedPreset, presets, customOutputDir]);
 
@@ -900,7 +902,7 @@ const Forge: React.FC = () => {
         newJobs.push(newJob);
       }
       
-      setJobs(prev => [...prev, ...newJobs]);
+      setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
       if (newJobs.length > 0) {
         setSelectedJobId(newJobs[0].id);
       }
@@ -1033,7 +1035,7 @@ const Forge: React.FC = () => {
                     estimatedTime: 0,
                   }));
                 if (newJobs.length > 0) {
-                  setJobs(prev => [...prev, ...newJobs]);
+                  setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
                 }
               }
             };
@@ -1108,7 +1110,7 @@ const Forge: React.FC = () => {
             };
           });
           if (newJobs.length > 0) {
-            setJobs(prev => [...prev, ...newJobs]);
+            setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
           }
           return;
         }
@@ -1150,7 +1152,7 @@ const Forge: React.FC = () => {
         }
         result = await iter.next();
       }
-      setJobs(prev => [...prev, ...newJobs]);
+      setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
       if (newJobs.length > 0) setSelectedJobId(newJobs[0].id);
       else toast.warning('No supported media files found in the selected folder.');
     } catch (err: any) {
@@ -1316,7 +1318,7 @@ const Forge: React.FC = () => {
           newJobs.push(newJob);
         }
         if (newJobs.length > 0) {
-          setJobs(prev => [...prev, ...newJobs]);
+          setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
           setSelectedJobId(newJobs[0].id);
         }
       }}
