@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { useLearningStore } from '../../store/learningStore';
+import { platform } from '../../utils';
 
 // -- Helpers ---------------------------------------------------------------
 const fmtMs = (ms: number): string => {
@@ -55,27 +56,30 @@ const POWER_PROFILES: PowerProfile[] = [
 ];
 
 // -- Keyboard shortcuts reference ------------------------------------------
+const _M = platform.isMac ? '⌘' : 'Ctrl';
+const _O = platform.isMac ? '⌥' : 'Alt';
+
 const SHORTCUT_SECTIONS = [
   {
     title: 'Navigation',
     items: [
-      { keys: 'Ctrl+1–9', desc: 'Switch to dock app 1–9' },
+      { keys: `${_M}+1–9`, desc: 'Switch to dock app 1–9' },
       { keys: 'F3', desc: 'Toggle app overview' },
-      { keys: 'Ctrl+Tab', desc: 'Switch between running apps' },
-      { keys: 'Ctrl+W', desc: 'Close current app' },
-      { keys: 'Ctrl+Shift+W', desc: 'Close all apps' },
+      { keys: `${_M}+Tab`, desc: 'Switch between running apps' },
+      { keys: `${_M}+W`, desc: 'Close current app' },
+      { keys: `${_M}+Shift+W`, desc: 'Close all apps' },
       { keys: 'Escape', desc: 'Close menu / go back' },
     ],
   },
   {
     title: 'Creative Suite',
     items: [
-      { keys: 'Alt+V', desc: 'Open VINX (Video Editor)' },
-      { keys: 'Alt+I', desc: 'Open Imosion (Music)' },
-      { keys: 'Alt+F', desc: 'Open FLUX (Motion Graphics)' },
-      { keys: 'Alt+R', desc: 'Open PRISM (Photo Editor)' },
-      { keys: 'Alt+G', desc: 'Open FORGE (Encoder)' },
-      { keys: 'Alt+X', desc: 'Open AXL (Engineering)' },
+      { keys: `${_O}+V`, desc: 'Open VINX (Video Editor)' },
+      { keys: `${_O}+I`, desc: 'Open Imosion (Music)' },
+      { keys: `${_O}+F`, desc: 'Open FLUX (Motion Graphics)' },
+      { keys: `${_O}+R`, desc: 'Open PRISM (Photo Editor)' },
+      { keys: `${_O}+G`, desc: 'Open FORGE (Encoder)' },
+      { keys: `${_O}+X`, desc: 'Open AXL (Engineering)' },
     ],
   },
   {
@@ -89,9 +93,9 @@ const SHORTCUT_SECTIONS = [
   {
     title: 'System',
     items: [
-      { keys: 'Ctrl+Space', desc: 'Open Spotlight search' },
-      { keys: 'Ctrl+,', desc: 'Open Settings' },
-      { keys: 'Alt+P', desc: 'Power controls' },
+      { keys: `${_M}+K`, desc: 'Command palette / search' },
+      { keys: `${_M}+,`, desc: 'Open Settings' },
+      { keys: `${_O}+P`, desc: 'Power controls' },
     ],
   },
 ];
