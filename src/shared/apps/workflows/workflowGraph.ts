@@ -129,7 +129,8 @@ export function matchesTrigger(node: WorkflowNode, e: TriggerEvent): boolean {
     case 'clock': return node.type === 'cron' && cronTick(String(node.config.cron ?? ''), e.iso);
     case 'webhook': return node.type === 'http.in' && node.config.route === e.route;
     case 'event-bus': return node.type === 'bus.subscribe' && node.config.topic === e.topic;
-    case 'manual': return node.type === 'manual';
+    // Manual runs should execute any trigger-anchored workflow path.
+    case 'manual': return true;
   }
 }
 

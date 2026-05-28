@@ -525,12 +525,19 @@ export function detectPerformanceTier(): PerformanceTier {
 
   const cores = navigator.hardwareConcurrency || 2;
   const memory = (navigator as any).deviceMemory || 4; // GB, Chrome-only
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
   let gpu = 'unknown';
-  if (gl) {
-    const dbg = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
-    if (dbg) gpu = (gl as WebGLRenderingContext).getParameter(dbg.UNMASKED_RENDERER_WEBGL) || 'unknown';
+  const isLikelyJsdom = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '');
+  if (!isLikelyJsdom) {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (gl) {
+        const dbg = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
+        if (dbg) gpu = (gl as WebGLRenderingContext).getParameter(dbg.UNMASKED_RENDERER_WEBGL) || 'unknown';
+      }
+    } catch {
+      gpu = 'unknown';
+    }
   }
 
   let score = 0;

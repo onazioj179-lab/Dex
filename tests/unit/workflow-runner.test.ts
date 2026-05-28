@@ -52,6 +52,42 @@ describe('Workflow runner', () => {
     const r = await runWorkflow(graph, { kind: 'fs', path: 'x.txt', change: 'add' }, {}, ctx());
     expect(r.ok).toBe(true);
     expect(r.outputs).toEqual({});
+    expect(r.skipped).toEqual(expect.arrayContaining(['a', 'b']));
+  });
+
+  it('runs matching path when graph has multiple triggers', async () => {
+    const multi: WorkflowGraph = {
+      id: 'wf-multi',
+      nodes: [
+        { id: 'tfs', kind: 'trigger', type: 'fs.watch', capabilities: [], config: { glob: '**/*.md' } },
+        { id: 'tbus', kind: 'trigger', type: 'bus.subscribe', capabilities: [], config: { topic: 'jobs.run' } },
+        { id: 'a', kind: 'action', type: 'http.post', capabilities: ['network'], config: { url: 'x' } },
+      ],
+      edges: [
+        { fromId: 'tfs', toId: 'a' },
+        { fromId: 'tbus', toId: 'a' },
+      ],
+    };
+
+    const handlers: Record<string, NodeHandler> = {
+      'http.post': async () => ({ posted: true }),
+    };
+
+    const ev: TriggerEvent = { kind: 'event-bus', topic: 'jobs.run' };
+    const r = await runWorkflow(multi, ev, handlers, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.outputs.a).toMatchObject({ posted: true });
+  });
+
+  it('manual trigger activates trigger-anchored path', async () => {
+    const handlers: Record<string, NodeHandler> = {
+      'http.post': async () => ({ posted: true }),
+      'log': async (_n, inputs) => inputs,
+    };
+    const r = await runWorkflow(graph, { kind: 'manual', at: Date.now() }, handlers, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.outputs.a).toMatchObject({ posted: true });
+    expect(r.outputs.b).toMatchObject({ posted: true });
   });
 
   it('fails on missing handler', async () => {
