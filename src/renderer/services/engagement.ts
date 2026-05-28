@@ -13,6 +13,7 @@ import {
   type UserStats, type Achievement, type AchievementCategory,
   ACHIEVEMENTS, DEFAULT_STATS, CATEGORY_META, RARITY_META,
 } from './achievementsCatalog';
+import { platform } from '../utils';
 
 // Re-export types and catalog for backward compatibility
 export type { UserStats, Achievement, AchievementCategory };
@@ -36,10 +37,12 @@ const DEFAULT_STATE: EngagementState = {
 
 // === Tips catalog (icon names, no emojis) ===
 
+const _M = platform.isMac ? '⌘' : 'Ctrl';
+
 export const TIPS: { id: string; text: string; icon: string }[] = [
-  { id: 'tip-spotlight', text: 'Press Ctrl+Space to open Spotlight Search -- find anything instantly!', icon: 'search' },
-  { id: 'tip-cmdpalette', text: 'Press Ctrl+Shift+P to open the Command Palette for quick actions.', icon: 'terminal' },
-  { id: 'tip-clipboard', text: 'Ctrl+Shift+V opens Clipboard History -- access your recent copies.', icon: 'clipboard' },
+  { id: 'tip-spotlight', text: `Press ${_M}+K to open Spotlight Search -- find anything instantly!`, icon: 'search' },
+  { id: 'tip-cmdpalette', text: `Press ${_M}+Shift+P to open the Command Palette for quick actions.`, icon: 'terminal' },
+  { id: 'tip-clipboard', text: `${_M}+Shift+V opens Clipboard History -- access your recent copies.`, icon: 'clipboard' },
   { id: 'tip-vinx', text: 'Try VINX Video Editor (Alt+V) for professional editing right in DEX.', icon: 'film' },
   { id: 'tip-imosion', text: 'Imosion DAW (Alt+I) is a full music production studio -- make beats!', icon: 'music' },
   { id: 'tip-prism', text: 'PRISM Image Editor (Alt+R) handles layers, filters, and batch edits.', icon: 'image' },

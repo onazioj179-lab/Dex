@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
-// UnifiedSearch retired -- Ctrl+K is owned by CommandPalette (mounted in App.tsx).
+import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
 
@@ -3333,12 +3333,14 @@ export const AppManager: React.FC = () => {
     }
   }, [openDockApp, sendAssetToApp]);
 
-  // Shortcut hints for dock tooltips
+  // Shortcut hints for dock tooltips — platform-aware modifier key
+  const _M = platform.isMac ? '⌘' : 'Ctrl';
+  const _O = platform.isMac ? '⌥' : 'Alt';
   const dockShortcut: Record<string, string> = {
-    home: 'Ctrl+1', settings: 'Ctrl+2', files: 'Ctrl+3', notes: 'Ctrl+4', tasks: 'Ctrl+5',
-    browser: 'Ctrl+6', gallery: 'Ctrl+7', calendar: 'Ctrl+8', kanban: 'Ctrl+9',
-    videoeditor: 'Alt+V', imosion: 'Alt+I', prism: 'Alt+R', flux: 'Alt+F', forge: 'Alt+G',
-    power: 'Alt+P', calculator: 'Alt+C', transfers: 'Alt+T',
+    home: `${_M}+1`, settings: `${_M}+2`, files: `${_M}+3`, notes: `${_M}+4`, tasks: `${_M}+5`,
+    browser: `${_M}+6`, gallery: `${_M}+7`, calendar: `${_M}+8`, kanban: `${_M}+9`,
+    videoeditor: `${_O}+V`, imosion: `${_O}+I`, prism: `${_O}+R`, flux: `${_O}+F`, forge: `${_O}+G`,
+    power: `${_O}+P`, calculator: `${_O}+C`, transfers: `${_O}+T`,
   };
 
   // Item 145: Arrow key navigation within dock
@@ -3833,7 +3835,7 @@ export const AppManager: React.FC = () => {
         <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
-        <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--color-accent)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip="Browser (Ctrl+6)" aria-label="Open Browser">
+        <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--color-accent)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
       </div>
