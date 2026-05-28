@@ -301,19 +301,19 @@ const DexNotes: React.FC = () => {
   // -- Auto-title: derive name from first line of content ----------------
 
   const autoTitleTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const handleEditorChangeWithAutoTitle = useCallback((content: string, plainText: string, wordCount: number) => {
     if (!activeNote) return;
 
-    // If user hasn't set a manual title, derive from first line
     const currentTitle = activeNote.title || '';
     const isUntitled = !currentTitle || currentTitle === 'Untitled' || currentTitle === 'New Note' || currentTitle.startsWith('Daily Note');
 
     if (isUntitled && plainText.trim()) {
-      // Get first line as title (max 60 chars)
       const firstLine = plainText.split('\n')[0].trim().slice(0, 60);
       if (firstLine && firstLine !== currentTitle) {
         if (autoTitleTimerRef.current) clearTimeout(autoTitleTimerRef.current);
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         autoTitleTimerRef.current = setTimeout(() => {
           setTitleValue(firstLine);
           store.updateNote(activeNote.id, { title: firstLine, content, plain_text: plainText });
@@ -322,7 +322,11 @@ const DexNotes: React.FC = () => {
       }
     }
 
-    store.updateNote(activeNote.id, { content, plain_text: plainText });
+    // Debounce content-only saves — avoid an IPC call on every keystroke.
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      store.updateNote(activeNote.id, { content, plain_text: plainText });
+    }, 500);
   }, [activeNote, store]);
 
   // -- Auto-save pane sizes ---------------------------------------------
@@ -330,6 +334,7 @@ const DexNotes: React.FC = () => {
   useEffect(() => {
     return () => {
       if (autoTitleTimerRef.current) clearTimeout(autoTitleTimerRef.current);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, []);
 
