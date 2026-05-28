@@ -15,6 +15,9 @@ import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { toggleTheme } from '../utils/theme';
 import { useFocusTrap } from '../utils/useFocusTrap';
 import { safeMath, formatResult } from '../utils/safeMath';
+import { platform } from '../utils';
+
+const _M = platform.isMac ? '⌘' : 'Ctrl';
 
 // ==================== TYPES ====================
 
@@ -167,7 +170,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'home', title: 'Go to Home', icon: Icons.home, category: 'app', action: () => openApp('home'), keywords: ['dashboard', 'main'] },
     { id: 'files', title: 'Open Files', icon: Icons.files, category: 'app', action: () => openApp('files'), keywords: ['folder', 'documents'] },
     { id: 'browser', title: 'Open Browser', icon: Icons.browser, category: 'app', action: () => openApp('browser'), keywords: ['web', 'internet', 'safari'] },
-    { id: 'settings', title: 'Open Settings', icon: Icons.settings, category: 'app', action: () => openApp('settings'), keywords: ['preferences', 'config'], shortcut: 'Ctrl+,' },
+    { id: 'settings', title: 'Open Settings', icon: Icons.settings, category: 'app', action: () => openApp('settings'), keywords: ['preferences', 'config'], shortcut: `${_M}+,` },
     { id: 'power', title: 'Open Power Manager', icon: Icons.power, category: 'app', action: () => openApp('power'), keywords: ['battery', 'cpu', 'performance'] },
     { id: 'recyclebin', title: 'Open Recycle Bin', icon: Icons.trash, category: 'app', action: () => openApp('recyclebin'), keywords: ['trash', 'deleted', 'restore'] },
 
@@ -214,7 +217,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'new-note', title: 'Create New Note', subtitle: 'Start a new note', icon: Icons.newNote, category: 'action', action: () => { openApp('notes'); }, keywords: ['add', 'create'] },
     { id: 'new-task', title: 'Create New Task', subtitle: 'Add a new task', icon: Icons.newTask, category: 'action', action: () => { openApp('tasks'); }, keywords: ['add', 'todo'] },
     { id: 'new-workflow', title: 'Create New Workflow', subtitle: 'Build automation', icon: Icons.workflows, category: 'action', action: () => { openApp('workflows'); }, keywords: ['automate', 'create'] },
-    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: 'Ctrl+L' },
+    { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
     { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
     { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { localStorage.removeItem('dex-clipboard-history'); }, keywords: ['clean', 'privacy'] },
     { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },

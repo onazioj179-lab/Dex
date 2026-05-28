@@ -522,15 +522,20 @@ const BUILTIN_ALIASES: Record<string, string> = {
 // KEYBOARD SHORTCUT HINTS
 // ---------------------------------------------------------------------------
 
+const _isMac = typeof navigator !== 'undefined'
+  ? /Mac|macOS/i.test((navigator as any).userAgentData?.platform || navigator.platform || '')
+  : false;
+const _MOD = _isMac ? 'Cmd' : 'Ctrl';
+
 const KEYBOARD_SHORTCUTS: Record<string, string> = {
-  'settings': 'Ctrl+,',
-  'browser': 'Ctrl+Shift+B',
-  'files': 'Ctrl+E',
-  'notes': 'Ctrl+N',
-  'tasks': 'Ctrl+T',
-  'calculator': 'Ctrl+Shift+C',
-  'calendar': 'Ctrl+Shift+K',
-  'power': 'Ctrl+Shift+P',
+  'settings':   `${_MOD}+,`,
+  'browser':    `${_MOD}+Shift+B`,
+  'files':      `${_MOD}+E`,
+  'notes':      `${_MOD}+N`,
+  'tasks':      `${_MOD}+T`,
+  'calculator': `${_MOD}+Shift+C`,
+  'calendar':   `${_MOD}+Shift+K`,
+  'power':      `${_MOD}+Shift+P`,
 };
 
 // ---------------------------------------------------------------------------

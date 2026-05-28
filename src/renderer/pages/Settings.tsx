@@ -1105,6 +1105,9 @@ const darkenColor = (hex: string, percent: number): string => {
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 };
 
+const _isMac = !navigator.platform?.includes('Win') && !navigator.platform?.includes('Linux');
+const _M = _isMac ? '⌘' : 'Ctrl';
+
 const DEFAULT_SETTINGS = {
   // General
   launchAtStartup: true,
@@ -1261,9 +1264,9 @@ const DEFAULT_SETTINGS = {
 
   // Keyboard Shortcuts
   enableGlobalShortcuts: true,
-  cmdPaletteShortcut: 'Ctrl+Shift+P',
-  quickSearchShortcut: 'Ctrl+K',
-  screenshotShortcut: 'Ctrl+Shift+S',
+  cmdPaletteShortcut: `${_M}+Shift+P`,
+  quickSearchShortcut: `${_M}+K`,
+  screenshotShortcut: `${_M}+Shift+S`,
 
   // Storage & Data
   autoCleanCache: true,
@@ -3810,7 +3813,7 @@ export const Settings: React.FC = () => {
           </div>
         ))}
         <div style={{ ...styles.settingDesc, marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
-          Keyboard shortcut customization is available in the Command Palette (Ctrl+Shift+P → "Keyboard Shortcuts").
+          Keyboard shortcut customization is available in the Command Palette ({_M}+Shift+P → "Keyboard Shortcuts").
         </div>
       </div>
     );

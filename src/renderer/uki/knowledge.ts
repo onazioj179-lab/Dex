@@ -11,6 +11,10 @@
  * help systems, command palette, and onboarding.
  */
 
+import { platform } from '../utils';
+const _M = platform.isMac ? '⌘' : 'Ctrl';
+const _O = platform.isMac ? '⌥' : 'Alt';
+
 export interface DexAppKnowledge {
   id: string;
   name: string;
@@ -29,7 +33,7 @@ export const DEX_APP_CATALOG: readonly DexAppKnowledge[] = [
     id: 'notes', name: 'Notes', category: 'productivity',
     oneLine: 'Markdown notebook with backlinks, tags, and rewind history.',
     capabilities: ['markdown', 'backlinks', 'tags', 'export', 'search'],
-    shortcuts: { 'new note': 'Ctrl+N', 'search notes': 'Ctrl+K' },
+    shortcuts: { 'new note': `${_M}+N`, 'search notes': `${_M}+K` },
   },
   {
     id: 'tasks', name: 'Tasks', category: 'productivity',
@@ -90,19 +94,20 @@ export const DEX_APP_CATALOG: readonly DexAppKnowledge[] = [
     id: 'dexcode', name: 'DEXCode', category: 'developer',
     oneLine: 'Lightweight code editor with split views and terminal.',
     capabilities: ['edit', 'split', 'terminal', 'search', 'autosave'],
-    shortcuts: { 'command palette': 'Ctrl+Shift+P', 'find in files': 'Ctrl+Shift+F' },
+    shortcuts: { 'command palette': `${_M}+Shift+P`, 'find in files': `${_M}+Shift+F` },
   },
 ];
 
 /** Common cross-app keyboard shortcuts. */
 export const DEX_GLOBAL_SHORTCUTS: Readonly<Record<string, string>> = {
-  'open spotlight / UKI': 'Ctrl+Space',
-  'switch app': 'Ctrl+Tab',
-  'close window': 'Ctrl+W',
-  'new window': 'Ctrl+N',
-  'settings': 'Ctrl+,',
-  'rewind': 'Ctrl+Shift+Z',
-  'focus mode': 'Ctrl+Shift+F',
+  'open UKI': `${_M}+Space`,
+  'command palette': `${_M}+K`,
+  'switch app': `${_M}+Tab`,
+  'close window': `${_M}+W`,
+  'new window': `${_M}+N`,
+  'settings': `${_M}+,`,
+  'rewind': `${_M}+Shift+Z`,
+  'focus mode': `${_M}+Shift+F`,
 };
 
 /** Canonical workflow recipes UKI can suggest. */
@@ -110,7 +115,7 @@ export const DEX_WORKFLOWS: readonly { id: string; title: string; steps: readonl
   {
     id: 'capture-thought',
     title: 'Capture a thought fast',
-    steps: ['Press Ctrl+Space', 'Type "note: ..." then Enter', 'UKI files it under today\'s notes'],
+    steps: [`Press ${_M}+Space to open UKI`, 'Type "note: ..." then Enter', 'UKI files it under today\'s notes'],
   },
   {
     id: 'restore-session',

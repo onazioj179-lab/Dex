@@ -975,8 +975,7 @@ const timer = setInterval(check, 15000);
         if (!isRecording) await toggleRecording();
         break;
       case 'start-focus': {
-        const goal = window.prompt('Enter focus goal') || 'Focus session';
-        if (dex?.rewind?.startFocusSession) await dex.rewind.startFocusSession(goal);
+        if (dex?.rewind?.startFocusSession) await dex.rewind.startFocusSession('Focus session');
         break;
       }
       case 'end-focus':

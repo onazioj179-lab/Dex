@@ -16,6 +16,7 @@ import * as Depth from './WindowDepthManager';
 import { playLift } from './SpatialAudio';
 import { isOperationActive, deferDuringOperation } from '../services/FluidOperations';
 import { detectZone as snapDetectZone, rectForZone as snapRectForZone, makeEnv as snapMakeEnv, type SnapZone as EngineSnapZone } from './snapEngine';
+import { platform } from '../utils';
 
 // Throttle interval for snap zone detection (ms) - increased for better perf under memory pressure
 const SNAP_DETECT_THROTTLE_MS = 64;
@@ -662,14 +663,22 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
             // webkit-app-region inherited from parent [data-floating-window]
           }}
         >
-          {/* Traffic light buttons */}
-          <div style={{ position: 'absolute', left: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
-            <TrafficButton color="#FF5F57" hoverMark="close" onClick={handleCloseClick} ariaLabel="Close window" />
-            <TrafficButton color="#FEBC2E" hoverMark="minimize" onClick={handleMinimizeClick} ariaLabel="Minimize window" />
-            <TrafficButton color="#28C840" hoverMark="maximize" onClick={handleMaximizeClick} ariaLabel="Maximize window" />
-          </div>
+          {/* Window controls — macOS left, Windows/Linux right */}
+          {platform.isMac ? (
+            <div style={{ position: 'absolute', left: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <TrafficButton color="#FF5F57" hoverMark="close" onClick={handleCloseClick} ariaLabel="Close window" />
+              <TrafficButton color="#FEBC2E" hoverMark="minimize" onClick={handleMinimizeClick} ariaLabel="Minimize window" />
+              <TrafficButton color="#28C840" hoverMark="maximize" onClick={handleMaximizeClick} ariaLabel="Maximize window" />
+            </div>
+          ) : (
+            <div style={{ position: 'absolute', right: 0, display: 'flex', alignItems: 'stretch' }}>
+              <WinButton action="minimize" onClick={handleMinimizeClick} ariaLabel="Minimize window" />
+              <WinButton action="maximize" onClick={handleMaximizeClick} ariaLabel="Maximize window" />
+              <WinButton action="close" onClick={handleCloseClick} ariaLabel="Close window" />
+            </div>
+          )}
 
-          {/* Title */}
+          {/* Title — centered on macOS, left-aligned on Windows (matches OS conventions) */}
           <span
             id={`window-title-${id}`}
             style={{
@@ -678,6 +687,10 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
             fontWeight: 500,
             letterSpacing: '-0.01em',
             pointerEvents: 'none',
+            ...(platform.isMac ? {} : {
+              position: 'absolute',
+              left: 12,
+            }),
           }}>
             {title}
           </span>
@@ -716,6 +729,56 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         </div>
       )}
     </>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// WINDOWS SYSTEM BUTTON
+// ---------------------------------------------------------------------------
+
+const WinButton: React.FC<{
+  action: 'close' | 'minimize' | 'maximize';
+  ariaLabel: string;
+  onClick: (e: React.MouseEvent) => void;
+}> = ({ action, ariaLabel, onClick }) => {
+  const [hovered, setHovered] = useState(false);
+
+  const icon = (() => {
+    switch (action) {
+      case 'close':
+        return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg>;
+      case 'minimize':
+        return <svg width="10" height="2" viewBox="0 0 10 2" fill="none"><line x1="0" y1="1" x2="10" y2="1" stroke="currentColor" strokeWidth="1.2"/></svg>;
+      case 'maximize':
+        return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1"><rect x="0.5" y="0.5" width="9" height="9" rx="0"/></svg>;
+    }
+  })();
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      aria-label={ariaLabel}
+      style={{
+        width: 46,
+        height: '100%',
+        border: 'none',
+        background: hovered
+          ? action === 'close' ? '#C42B1C' : 'rgba(255,255,255,0.08)'
+          : 'transparent',
+        color: hovered && action === 'close' ? '#fff' : 'var(--color-text-muted)',
+        cursor: 'default',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        transition: 'background 0.1s, color 0.1s',
+        WebkitAppRegion: 'no-drag',
+      } as React.CSSProperties}
+    >
+      {icon}
+    </button>
   );
 };
 

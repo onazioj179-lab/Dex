@@ -11,6 +11,8 @@
 // =============================================================================
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { platform as _plat } from '../../utils';
+const _M = _plat.isMac ? '⌘' : 'Ctrl';
 
 // =============================================================================
 // SVG ICONS
@@ -1005,7 +1007,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'zoom', icon: Icons.zoom, label: 'Zoom Tool', shortcut: 'Z' },
     { id: 'rotate', icon: Icons.rotate, label: 'Rotation Tool', shortcut: 'W' },
     { id: 'pen', icon: Icons.pen, label: 'Pen Tool', shortcut: 'G' },
-    { id: 'text', icon: Icons.text, label: 'Text Tool', shortcut: 'Ctrl+T' },
+    { id: 'text', icon: Icons.text, label: 'Text Tool', shortcut: `${_M}+T` },
     { id: 'shape', icon: Icons.shape, label: 'Shape Tool', shortcut: 'Q' }
   ];
   

@@ -7,6 +7,9 @@
 // System Apps Complete - All features for System, Polish, Rewind, Standalone
 // ===========================================================================
 
+const _isMac = /Mac|macOS/i.test((navigator as any).userAgentData?.platform || navigator.platform || '');
+const _M = _isMac ? '⌘' : 'Ctrl';
+
 // Browser-compatible EventEmitter
 class EventEmitter {
   private listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
@@ -224,11 +227,11 @@ export class SystemComplete extends EventEmitter {
       name: 'Keyboard Shortcuts',
       icon: 'keyboard',
       settings: [
-        { id: 'newWindow', name: 'New Window', description: 'Open new window', type: 'keybind', value: 'Ctrl+N', default: 'Ctrl+N' },
-        { id: 'closeWindow', name: 'Close Window', description: 'Close current window', type: 'keybind', value: 'Ctrl+W', default: 'Ctrl+W' },
-        { id: 'search', name: 'Search', description: 'Open search', type: 'keybind', value: 'Ctrl+K', default: 'Ctrl+K' },
-        { id: 'settings', name: 'Settings', description: 'Open settings', type: 'keybind', value: 'Ctrl+,', default: 'Ctrl+,' },
-        { id: 'uki', name: 'UKI Assistant', description: 'Open UKI', type: 'keybind', value: 'Ctrl+Space', default: 'Ctrl+Space' }
+        { id: 'newWindow', name: 'New Window', description: 'Open new window', type: 'keybind', value: `${_M}+N`, default: `${_M}+N` },
+        { id: 'closeWindow', name: 'Close Window', description: 'Close current window', type: 'keybind', value: `${_M}+W`, default: `${_M}+W` },
+        { id: 'search', name: 'Search', description: 'Open search', type: 'keybind', value: `${_M}+K`, default: `${_M}+K` },
+        { id: 'settings', name: 'Settings', description: 'Open settings', type: 'keybind', value: `${_M}+,`, default: `${_M}+,` },
+        { id: 'uki', name: 'UKI Assistant', description: 'Open UKI', type: 'keybind', value: `${_M}+Space`, default: `${_M}+Space` }
       ]
     },
     {

@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
+import { platform as _plat } from '../../utils';
 import { sharedTick } from '../../services/SharedTick';
 import { useVinxStore } from './VinxStore';
 import { PlaybackEngine } from './PlaybackEngine';
@@ -2081,9 +2082,9 @@ const VinxEditor: React.FC = () => {
             <div style={{ padding: 16, overflowY: 'auto', maxHeight: '60vh' }}>
               {[
                 { cat: 'Transport', shortcuts: [['Space', 'Play/Pause'], ['J', 'Reverse'], ['K', 'Stop'], ['L', 'Forward'], ['I', 'Set In Point'], ['O', 'Set Out Point'], [',', 'Step Back 1 Frame'], ['.', 'Step Forward 1 Frame'], ['Up', 'Previous Edit'], ['Down', 'Next Edit']] },
-                { cat: 'Editing', shortcuts: [['V', 'Select Tool'], ['B', 'Razor/Blade'], ['N', 'Ripple Delete'], ['A', 'Range Select'], ['S', 'Slip Tool'], ['H', 'Hand Tool'], ['Ctrl+K', 'Cut at Playhead'], ['Alt+Left', 'Nudge Clip -1'], ['Alt+Right', 'Nudge Clip +1'], ['Alt+Shift+Left/Right', 'Nudge Clip x10']] },
-                { cat: 'Timeline', shortcuts: [['Ctrl+Z', 'Undo'], ['Ctrl+Shift+Z', 'Redo'], ['Ctrl+C', 'Copy'], ['Ctrl+V', 'Paste'], ['Delete', 'Delete Clip'], ['M', 'Add Marker']] },
-                { cat: 'View', shortcuts: [['Ctrl+S', 'Save'], ['Ctrl+E', 'Export'], ['=', 'Zoom In'], ['-', 'Zoom Out'], ['Shift+Z', 'Reset Zoom'], ['F', 'Fullscreen Viewer']] },
+                { cat: 'Editing', shortcuts: [['V', 'Select Tool'], ['B', 'Razor/Blade'], ['N', 'Ripple Delete'], ['A', 'Range Select'], ['S', 'Slip Tool'], ['H', 'Hand Tool'], [(_plat.isMac?'⌘':'Ctrl')+'+K', 'Cut at Playhead'], [(_plat.isMac?'⌥':'Alt')+'+Left', 'Nudge Clip -1'], [(_plat.isMac?'⌥':'Alt')+'+Right', 'Nudge Clip +1'], [(_plat.isMac?'⌥':'Alt')+'+Shift+Left/Right', 'Nudge Clip x10']] },
+                { cat: 'Timeline', shortcuts: [[(_plat.isMac?'⌘':'Ctrl')+'+Z', 'Undo'], [(_plat.isMac?'⌘':'Ctrl')+'+Shift+Z', 'Redo'], [(_plat.isMac?'⌘':'Ctrl')+'+C', 'Copy'], [(_plat.isMac?'⌘':'Ctrl')+'+V', 'Paste'], ['Delete', 'Delete Clip'], ['M', 'Add Marker']] },
+                { cat: 'View', shortcuts: [[(_plat.isMac?'⌘':'Ctrl')+'+S', 'Save'], [(_plat.isMac?'⌘':'Ctrl')+'+E', 'Export'], ['=', 'Zoom In'], ['-', 'Zoom Out'], ['Shift+Z', 'Reset Zoom'], ['F', 'Fullscreen Viewer']] },
               ].map(group => (
                 <div key={group.cat} style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group.cat}</div>

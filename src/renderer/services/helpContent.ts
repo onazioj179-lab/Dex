@@ -8,7 +8,11 @@
  * DEX Help Content -- Structured help data for every inner app.
  * guide: step-by-step instructions.
  * shortcuts: keyboard reference.
+ * NOTE: Use _M for the platform modifier key (⌘ on macOS, Ctrl on Windows).
  */
+
+import { platform } from '../utils';
+const _M = platform.isMac ? '⌘' : 'Ctrl';
 
 export interface HelpGuideEntry {
   title: string;
@@ -54,12 +58,12 @@ const HELP: Record<string, AppHelpContent> = {
       { key: 'Home / End', action: 'Go to start / end' },
       { key: 'M', action: 'Add marker' },
       { key: 'Delete', action: 'Delete selected' },
-      { key: 'Ctrl+Z', action: 'Undo' },
-      { key: 'Ctrl+Shift+Z', action: 'Redo' },
-      { key: 'Ctrl+S', action: 'Save / Export' },
-      { key: 'Ctrl+C', action: 'Split clip at playhead' },
-      { key: 'Ctrl+D', action: 'Duplicate clip' },
-      { key: 'Ctrl+A', action: 'Select all clips' },
+      { key: `${_M}+Z`, action: 'Undo' },
+      { key: `${_M}+Shift+Z`, action: 'Redo' },
+      { key: `${_M}+S`, action: 'Save / Export' },
+      { key: `${_M}+C`, action: 'Split clip at playhead' },
+      { key: `${_M}+D`, action: 'Duplicate clip' },
+      { key: `${_M}+A`, action: 'Select all clips' },
       { key: '+ / -', action: 'Zoom in / out timeline' },
     ],
   },
@@ -78,10 +82,10 @@ const HELP: Record<string, AppHelpContent> = {
       { key: 'Space', action: 'Play / Pause' },
       { key: 'R', action: 'Record' },
       { key: 'M', action: 'Toggle metronome' },
-      { key: 'Ctrl+Z', action: 'Undo' },
-      { key: 'Ctrl+Shift+Z', action: 'Redo' },
+      { key: `${_M}+Z`, action: 'Undo' },
+      { key: `${_M}+Shift+Z`, action: 'Redo' },
       { key: 'Delete', action: 'Delete selected region' },
-      { key: 'Ctrl+S', action: 'Save session' },
+      { key: `${_M}+S`, action: 'Save session' },
     ],
   },
   prism: {
@@ -102,9 +106,9 @@ const HELP: Record<string, AppHelpContent> = {
       { key: 'G', action: 'Gradient' },
       { key: 'P', action: 'Pen' },
       { key: '[ / ]', action: 'Decrease / Increase brush size' },
-      { key: 'Ctrl+Z', action: 'Undo' },
-      { key: 'Ctrl+Shift+Z', action: 'Redo' },
-      { key: 'Ctrl+T', action: 'Transform' },
+      { key: `${_M}+Z`, action: 'Undo' },
+      { key: `${_M}+Shift+Z`, action: 'Redo' },
+      { key: `${_M}+T`, action: 'Transform' },
     ],
   },
   flux: {
@@ -120,8 +124,8 @@ const HELP: Record<string, AppHelpContent> = {
     shortcuts: [
       { key: 'Space', action: 'Preview' },
       { key: 'T', action: 'Add text layer' },
-      { key: 'Ctrl+Z', action: 'Undo' },
-      { key: 'Ctrl+Shift+Z', action: 'Redo' },
+      { key: `${_M}+Z`, action: 'Undo' },
+      { key: `${_M}+Shift+Z`, action: 'Redo' },
       { key: '+ / -', action: 'Zoom timeline' },
     ],
   },
@@ -137,7 +141,7 @@ const HELP: Record<string, AppHelpContent> = {
     shortcuts: [
       { key: 'Enter', action: 'Start encoding' },
       { key: 'Delete', action: 'Remove from queue' },
-      { key: 'Ctrl+A', action: 'Select all' },
+      { key: `${_M}+A`, action: 'Select all' },
     ],
   },
   rewind: {
@@ -149,7 +153,7 @@ const HELP: Record<string, AppHelpContent> = {
       { title: 'Timeline', body: 'Scroll through the visual timeline to browse captured frames chronologically.' },
     ],
     shortcuts: [
-      { key: 'Ctrl+F', action: 'Search' },
+      { key: `${_M}+F`, action: 'Search' },
       { key: 'Esc', action: 'Close search' },
     ],
   },
@@ -162,8 +166,8 @@ const HELP: Record<string, AppHelpContent> = {
       { title: 'Context menu', body: 'Right-click for rename, delete, copy path, and other operations.' },
     ],
     shortcuts: [
-      { key: 'Ctrl+N', action: 'New file' },
-      { key: 'Ctrl+Shift+N', action: 'New folder' },
+      { key: `${_M}+N`, action: 'New file' },
+      { key: `${_M}+Shift+N`, action: 'New folder' },
       { key: 'Delete', action: 'Delete selected' },
       { key: 'F2', action: 'Rename' },
     ],
@@ -177,10 +181,10 @@ const HELP: Record<string, AppHelpContent> = {
       { title: 'Bookmarks', body: 'Click the bookmark icon to save the current page.' },
     ],
     shortcuts: [
-      { key: 'Ctrl+T', action: 'New tab' },
-      { key: 'Ctrl+W', action: 'Close tab' },
-      { key: 'Ctrl+L', action: 'Focus address bar' },
-      { key: 'Ctrl+R', action: 'Reload page' },
+      { key: `${_M}+T`, action: 'New tab' },
+      { key: `${_M}+W`, action: 'Close tab' },
+      { key: `${_M}+L`, action: 'Focus address bar' },
+      { key: `${_M}+R`, action: 'Reload page' },
     ],
   },
   notes: {
@@ -192,9 +196,9 @@ const HELP: Record<string, AppHelpContent> = {
       { title: 'Markdown preview', body: 'Toggle the preview pane to see rendered Markdown.' },
     ],
     shortcuts: [
-      { key: 'Ctrl+B', action: 'Bold' },
-      { key: 'Ctrl+I', action: 'Italic' },
-      { key: 'Ctrl+N', action: 'New note' },
+      { key: `${_M}+B`, action: 'Bold' },
+      { key: `${_M}+I`, action: 'Italic' },
+      { key: `${_M}+N`, action: 'New note' },
     ],
   },
   tasks: {
@@ -279,8 +283,8 @@ const HELP: Record<string, AppHelpContent> = {
       { title: 'Run', body: 'Select a workflow and click Run to execute it.' },
     ],
     shortcuts: [
-      { key: 'Ctrl+N', action: 'New workflow' },
-      { key: 'Ctrl+R', action: 'Run selected' },
+      { key: `${_M}+N`, action: 'New workflow' },
+      { key: `${_M}+R`, action: 'Run selected' },
     ],
   },
   calculator: {
@@ -318,7 +322,7 @@ const HELP: Record<string, AppHelpContent> = {
     ],
     shortcuts: [
       { key: 'Enter', action: 'Generate new password' },
-      { key: 'Ctrl+C', action: 'Copy to clipboard' },
+      { key: `${_M}+C`, action: 'Copy to clipboard' },
     ],
   },
   settings: {
@@ -345,7 +349,7 @@ const HELP: Record<string, AppHelpContent> = {
       { title: 'Launch apps', body: 'Click any app tile to open it. Recently-used apps appear first.' },
     ],
     shortcuts: [
-      { key: 'Ctrl+K', action: 'Command palette' },
+      { key: `${_M}+K`, action: 'Command palette' },
     ],
   },
 };

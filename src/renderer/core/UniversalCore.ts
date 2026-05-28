@@ -729,16 +729,20 @@ export class ShortcutEngine extends EventEmitter {
 
   private getKeyCombo(e: KeyboardEvent): string {
     const parts: string[] = [];
-    if (e.ctrlKey) parts.push('ctrl');
+    // On macOS Cmd (metaKey) is the primary modifier; treat it as 'ctrl'
+    // so bindings stored as 'Ctrl+N' fire correctly on both platforms.
+    const isMac = /Mac|macOS/i.test((navigator as any).userAgentData?.platform || navigator.platform || '');
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (mod) parts.push('ctrl');
+    if (!isMac && e.ctrlKey && e.metaKey) parts.push('meta'); // Win/Linux explicit meta
     if (e.altKey) parts.push('alt');
     if (e.shiftKey) parts.push('shift');
-    if (e.metaKey) parts.push('meta');
-    
+
     const key = e.key.toLowerCase();
     if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
       parts.push(key);
     }
-    
+
     return parts.join('+');
   }
 

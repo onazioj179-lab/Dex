@@ -5,6 +5,7 @@
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { platform as _plat } from '../../utils';
 import { useRunningApps } from '../../store/runningApps';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
@@ -2057,6 +2058,7 @@ const Imosion: React.FC = () => {
   const [showTrackNotes, setShowTrackNotes] = useState(false);
   const [trackNotes, setTrackNotes] = useState<Record<string, string>>({});
   const [showChainPreset, setShowChainPreset] = useState(false);
+  const [chainPresetNameDraft, setChainPresetNameDraft] = useState<string | null>(null);
   const [chainPresets, setChainPresets] = useState([
     { id: 'cp1', name: 'Pop Vocal', effects: ['EQ', 'Compressor', 'De-Esser', 'Reverb', 'Delay'] },
     { id: 'cp2', name: 'Rock Guitar', effects: ['EQ', 'Saturation', 'Reverb', 'Delay'] },
@@ -7115,7 +7117,26 @@ const Imosion: React.FC = () => {
               </button>
             ))}
             <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-              <button aria-label="Save current chain as preset" onClick={() => { const name = window.prompt('Preset name?', `Custom ${chainPresets.length + 1}`); if (!name) return; setChainPresets(prev => [...prev, { id: `cp-${Date.now()}`, name, effects: ['EQ', 'Compressor'] }]); }} style={{ flex: 1, padding: '6px', borderRadius: 5, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Save Current Chain</button>
+              {chainPresetNameDraft !== null ? (
+                <input
+                  autoFocus
+                  value={chainPresetNameDraft}
+                  onChange={e => setChainPresetNameDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const name = chainPresetNameDraft.trim() || `Custom ${chainPresets.length + 1}`;
+                      setChainPresets(prev => [...prev, { id: `cp-${Date.now()}`, name, effects: ['EQ', 'Compressor'] }]);
+                      setChainPresetNameDraft(null);
+                    }
+                    if (e.key === 'Escape') setChainPresetNameDraft(null);
+                  }}
+                  onBlur={() => setChainPresetNameDraft(null)}
+                  placeholder={`Custom ${chainPresets.length + 1}`}
+                  style={{ flex: 1, padding: '5px 8px', borderRadius: 5, border: '1px solid rgba(10,132,255,0.4)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, outline: 'none' }}
+                />
+              ) : (
+                <button aria-label="Save current chain as preset" onClick={() => setChainPresetNameDraft('')} style={{ flex: 1, padding: '6px', borderRadius: 5, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Save Current Chain</button>
+              )}
             </div>
           </div>
         </div>
@@ -8593,7 +8614,7 @@ const Imosion: React.FC = () => {
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Editing</div>
-              {[['Ctrl+Z', 'Undo'], ['Ctrl+Y', 'Redo'], ['Ctrl+C', 'Copy clip'], ['Ctrl+V', 'Paste clip'], ['Delete', 'Delete selected'], ['Ctrl+A', 'Select all']].map(([key, desc]) => (
+              {([[`${_plat.isMac?'⌘':'Ctrl'}+Z`, 'Undo'], [`${_plat.isMac?'⌘':'Ctrl'}+Y`, 'Redo'], [`${_plat.isMac?'⌘':'Ctrl'}+C`, 'Copy clip'], [`${_plat.isMac?'⌘':'Ctrl'}+V`, 'Paste clip'], ['Delete', 'Delete selected'], [`${_plat.isMac?'⌘':'Ctrl'}+A`, 'Select all']] as [string,string][]).map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
                   <kbd style={{ padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>
@@ -8611,7 +8632,7 @@ const Imosion: React.FC = () => {
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Tracks</div>
-              {[['Ctrl+T', 'Add new track'], ['M', 'Mute selected track'], ['S', 'Solo selected track'], ['Ctrl+Shift+N', 'Rename track']].map(([key, desc]) => (
+              {([[`${_plat.isMac?'⌘':'Ctrl'}+T`, 'Add new track'], ['M', 'Mute selected track'], ['S', 'Solo selected track'], [`${_plat.isMac?'⌘':'Ctrl'}+Shift+N`, 'Rename track']] as [string,string][]).map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
                   <kbd style={{ padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>

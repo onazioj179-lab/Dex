@@ -118,10 +118,7 @@ const WhatsNewModal: React.FC = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <button
-            onClick={() => {
-              // eslint-disable-next-line no-console
-              console.log('[WhatsNew] View full changelog clicked');
-            }}
+            onClick={() => { /* changelog link placeholder */ }}
             style={{
               background: 'none', border: 'none',
               color: 'var(--color-accent)', cursor: 'pointer',

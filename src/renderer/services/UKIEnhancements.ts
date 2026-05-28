@@ -11,6 +11,8 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { platform } from '../utils';
+const _M = platform.isMac ? '⌘' : 'Ctrl';
 
 // ============================================================================
 // Types
@@ -322,11 +324,11 @@ export const useUKIStore = create<UKIStore>()(
 // ============================================================================
 
 export const UKI_SHORTCUTS = [
-  { key: 'Ctrl+Shift+U', action: 'toggle', description: 'Open/Close UKI' },
+  { key: `${_M}+Shift+U`, action: 'toggle', description: 'Open/Close UKI' },
   { key: 'Escape', action: 'minimize', description: 'Minimize UKI' },
-  { key: 'Ctrl+N', action: 'new-conversation', description: 'New conversation' },
-  { key: 'Ctrl+Enter', action: 'send', description: 'Send message' },
-  { key: 'Ctrl+/', action: 'focus-input', description: 'Focus input' },
+  { key: `${_M}+N`, action: 'new-conversation', description: 'New conversation' },
+  { key: `${_M}+Enter`, action: 'send', description: 'Send message' },
+  { key: `${_M}+/`, action: 'focus-input', description: 'Focus input' },
 ];
 
 // ============================================================================
