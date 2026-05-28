@@ -105,14 +105,14 @@ Infrastructure:
 
 - **achievementsCatalog.ts lazy load**: 330KB file is synchronously imported in AppManager startup chain. Deferring to dynamic import would save ~40ms parse time at startup. Requires making engagement functions async — medium refactor.
 - **Forge job queue cap**: No maximum on encode queue. Recommend cap at 200 jobs. Low priority until user reports.
-- **Imosion waveform chunking**: Full audio buffer loaded as Float32Array. 2-hour file ≈ 200MB in renderer. Chunked extraction would reduce peak memory. Medium priority.
+- **Imosion waveform chunking**: ~~Done~~ Fixed. `importAudioFiles` and `handleFileDrop` in `Imosion.tsx` now use the native IPC bridge (`native:audio-waveform`) when `file.path` is available (Electron file drag-drop). Large files never decode a full AudioBuffer in the renderer. Fallback (recorded audio, no filesystem path) keeps existing behavior.
 - **Prism canvas ImageData pooling**: Filter passes allocate new ImageData objects. Ping-pong buffer reuse would help. Medium priority.
 
 ---
 
 ## Remaining Stability Risks
 
-- **Windows code signing**: `CSC_LINK` + `CSC_KEY_PASSWORD` not set → Defender flags exe. Must be configured on CI runner before shipping to users.
+- **Windows code signing**: `CSC_LINK` + `CSC_KEY_PASSWORD` CI secrets wired into `release.yml` Windows build step. Set both secrets in repo Settings → Secrets → Actions before the next release tag push. Until set, build succeeds unsigned and Defender will warn.
 - **ARM64 Windows installer**: Build target added but not validated on real ARM64 hardware.
 - **Update server URL**: `assets/config/update-server.json` has empty `"url"`. Point at GitHub releases feed once signed build ships.
 - **Release cache prune real-world test**: Logic is correct; needs one real update+relaunch cycle to confirm `downloadedArtifactPath` is preserved.
@@ -121,11 +121,11 @@ Infrastructure:
 
 ## Exact Next Steps
 
-1. **Windows code-sign**: Set `CSC_LINK` + `CSC_KEY_PASSWORD` in CI secrets. Re-run `release:publish` after signing.
-2. **Verify CI is green on PR #2**: Unit Tests are now all passing (4602/4602). Confirm Build passes on next CI run.
+1. ~~**Windows code-sign**~~: Done — `CSC_LINK` + `CSC_KEY_PASSWORD` wired into `release.yml`. Set the secrets in repo Settings → Secrets → Actions before next release tag.
+2. **Verify CI is green on PR #3**: Tests pass locally (4602/4602). CI run on PR #3 failed — likely a transient environment issue. Watch for the next CI trigger; if it still fails, compare output to local run.
 3. **Validate memory pressure CSS**: Open DevTools → manually set `document.documentElement.setAttribute('data-motion-degraded', 'minimal')` → verify all transitions stop. Then `'reduced'` → verify 80ms transitions.
 4. **Remove unused stores** (audit needed): `homeAppsStore`, `homePinnedAppsStore`, `homePinnedFilesStore` are all imported by `Home.tsx`; `networkStore` imported by `QuickControls.tsx` + `Settings.tsx`. All 5 named "safe" candidates are actively used. Audit the 19-store list in "Remaining Internal Systems Work" for truly dead stores.
-5. **Imosion waveform chunking**: High impact for 8GB RAM with large audio files.
+5. ~~**Imosion waveform chunking**~~: Done — `importAudioFiles` and `handleFileDrop` in `Imosion.tsx` use native bridge for filesystem-path files.
 6. ~~**Browser.tsx blocked domains**~~: Done — extracted to `src/renderer/config/blocked-domains.ts`.
 
 ---
