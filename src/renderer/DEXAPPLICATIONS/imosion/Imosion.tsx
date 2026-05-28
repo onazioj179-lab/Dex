@@ -5,6 +5,7 @@
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { platform as _plat } from '../../utils';
 import { useRunningApps } from '../../store/runningApps';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
@@ -8593,7 +8594,7 @@ const Imosion: React.FC = () => {
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Editing</div>
-              {[['Ctrl+Z', 'Undo'], ['Ctrl+Y', 'Redo'], ['Ctrl+C', 'Copy clip'], ['Ctrl+V', 'Paste clip'], ['Delete', 'Delete selected'], ['Ctrl+A', 'Select all']].map(([key, desc]) => (
+              {([[`${_plat.isMac?'⌘':'Ctrl'}+Z`, 'Undo'], [`${_plat.isMac?'⌘':'Ctrl'}+Y`, 'Redo'], [`${_plat.isMac?'⌘':'Ctrl'}+C`, 'Copy clip'], [`${_plat.isMac?'⌘':'Ctrl'}+V`, 'Paste clip'], ['Delete', 'Delete selected'], [`${_plat.isMac?'⌘':'Ctrl'}+A`, 'Select all']] as [string,string][]).map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
                   <kbd style={{ padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>
@@ -8611,7 +8612,7 @@ const Imosion: React.FC = () => {
             </div>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Tracks</div>
-              {[['Ctrl+T', 'Add new track'], ['M', 'Mute selected track'], ['S', 'Solo selected track'], ['Ctrl+Shift+N', 'Rename track']].map(([key, desc]) => (
+              {([[`${_plat.isMac?'⌘':'Ctrl'}+T`, 'Add new track'], ['M', 'Mute selected track'], ['S', 'Solo selected track'], [`${_plat.isMac?'⌘':'Ctrl'}+Shift+N`, 'Rename track']] as [string,string][]).map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
                   <kbd style={{ padding: '1px 6px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>

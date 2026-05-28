@@ -13,6 +13,7 @@
 
 import React, { useRef, useCallback, useEffect, useState, memo } from 'react';
 import DOMPurify from 'dompurify';
+import { platform } from '../../utils';
 import {
   DocRoot,
   docToHTML,
@@ -51,11 +52,13 @@ interface ToolbarAction {
 // Toolbar Configuration
 // ---------------------------------------------------------------------------
 
+const _M = platform.isMac ? '⌘' : 'Ctrl';
+
 const TOOLBAR_GROUPS: ToolbarAction[][] = [
   [
-    { id: 'bold', label: 'Bold', icon: 'B', command: 'bold', shortcut: 'Ctrl+B' },
-    { id: 'italic', label: 'Italic', icon: 'I', command: 'italic', shortcut: 'Ctrl+I' },
-    { id: 'underline', label: 'Underline', icon: 'U', command: 'underline', shortcut: 'Ctrl+U' },
+    { id: 'bold', label: 'Bold', icon: 'B', command: 'bold', shortcut: `${_M}+B` },
+    { id: 'italic', label: 'Italic', icon: 'I', command: 'italic', shortcut: `${_M}+I` },
+    { id: 'underline', label: 'Underline', icon: 'U', command: 'underline', shortcut: `${_M}+U` },
     { id: 'strikethrough', label: 'Strikethrough', icon: 'S', command: 'strikeThrough' },
   ],
   [
