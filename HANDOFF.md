@@ -95,7 +95,7 @@ Infrastructure:
 ## Remaining Internal Systems Work
 
 - **CollaborationLayer.ts** vs **CollaborationSystem.ts**: Two systems, only CollaborationSystem is imported. CollaborationLayer (938 lines) appears unused. Verify before removing.
-- **19 unused renderer stores**: featureSuiteStore (50K), intentSessionStore (20K), missionStore (19K), blackBoxStore (19K), notesStore (27K), notificationStore (13K), and 13 others. Total ~227K. Verify none are dynamically imported before removing.
+- **Remaining unused stores**: `intentSessionStore` and `blackBoxStore` removed (1145 lines, confirmed zero imports). `featureSuiteStore` has 2 importers, `notificationStore` has 1 — verify those are also dead before removing. 17 others still need auditing.
 - **UKI speech recognition stream**: `getUserMedia` stream not stored for explicit cleanup in ukiBridge.ts. Minor: `recognition.stop()` releases the mic; stream GC handles the rest. But explicit `stream.getTracks().forEach(t => t.stop())` would be cleaner.
 - **Worker thread pool**: Only one worker (`searchIndexer.worker.ts`). No pool coordination. Single-threaded search indexing. Low priority unless search latency becomes an issue.
 
