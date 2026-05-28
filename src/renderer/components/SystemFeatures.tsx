@@ -12,6 +12,7 @@
 import React, { useEffect, useCallback, useState, memo } from 'react';
 import { useAppSubsystem } from '../store/appSubsystem';
 import { initializeTheme, toggleTheme, getCurrentTheme } from './ThemeManager';
+import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 
 // ==================== SIMPLE NOTIFICATION SYSTEM ====================
 interface SimpleNotification {
@@ -285,7 +286,7 @@ const toastContainerStyles: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column-reverse',
   gap: 8,
-  zIndex: 10000,
+  zIndex: Z_HELP_OVERLAY_BASE,
   pointerEvents: 'none',
 };
 
@@ -495,7 +496,7 @@ const ToastNotification: React.FC<ToastNotificationProps> = memo(({ notification
         pointerEvents: 'auto',
         transform: `translateY(${offset * -8}px)`,
         opacity: 1 - offset * 0.2,
-        zIndex: 10000 - offset,
+        zIndex: Z_HELP_OVERLAY_BASE - offset,
         cursor: 'pointer',
       }}
       onClick={onDismiss}

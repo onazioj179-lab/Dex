@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import DexIcon from './DexIcon';
 import { platform } from '../utils';
+import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 
 // ============================================================================
 // Types
@@ -302,7 +303,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10000,
+        zIndex: Z_HELP_OVERLAY_BASE,
         animation: 'fadeInScale 200ms ease-out',
       }}
     >
@@ -545,7 +546,7 @@ export const HelpTooltip: React.FC<TooltipProps> = memo(({
             color: '#fff',
             whiteSpace: 'nowrap',
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-            zIndex: 10000,
+            zIndex: Z_HELP_OVERLAY_BASE,
             animation: 'fadeInScale 150ms ease-out',
             pointerEvents: 'none',
           }}

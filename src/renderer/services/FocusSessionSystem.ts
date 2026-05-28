@@ -25,6 +25,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { Z_FOCUS_SESSION, Z_FOCUS_SESSION_TOP } from '../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -294,7 +295,7 @@ export const FOCUS_MODE_STYLES = {
     top: 0,
     left: '50%',
     transform: 'translateX(-50%)',
-    zIndex: 99999,
+    zIndex: Z_FOCUS_SESSION_TOP,
     padding: '6px 16px',
     borderRadius: '0 0 8px 8px',
     background: 'rgba(0,0,0,0.85)',
@@ -314,7 +315,7 @@ export const FOCUS_MODE_STYLES = {
     height: 1,
     background: 'var(--accent-primary, #007aff)',
     transition: 'width 1s linear',
-    zIndex: 99998,
+    zIndex: Z_FOCUS_SESSION,
   },
   notesFocused: {
     maxWidth: 680,

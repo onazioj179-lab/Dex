@@ -19,6 +19,7 @@
 import React, { useEffect, useState } from 'react';
 import { rendererMetrics, type MetricSnapshot } from '../../shared/metrics';
 import LogsPanel from './LogsPanel';
+import { Z_DIAGNOSTICS } from '../../shared/zIndex';
 
 interface DiagnosticsPanelProps {
   open: boolean;
@@ -78,7 +79,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         right: 16,
         width: 520,
         maxHeight: '80vh',
-        zIndex: 9999,
+        zIndex: Z_DIAGNOSTICS,
         background: 'var(--pg-surface-overlay, rgba(10,10,14,0.97))',
         border: '1px solid var(--pg-border-subtle, rgba(255,255,255,0.10))',
         borderRadius: 12,
