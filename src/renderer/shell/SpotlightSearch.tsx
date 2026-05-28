@@ -6,7 +6,7 @@
 // =============================================================================
 /**
  * DEX Spotlight Search UI
- * Two variants: Home (600px embedded) and Overlay (680px modal, Ctrl+Space).
+ * Two variants: Home (600px embedded) and Overlay (680px modal, Cmd+K / Ctrl+K).
  * Spring-animated results, keyboard navigation, match highlighting,
  * category headings, sliding selection indicator.
  */
@@ -15,6 +15,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from '
 import { spotlightEngine, type SpotlightResult, type SpotlightCategory, type HighlightSpan } from './SpotlightEngine';
 import { SPRING_PRESETS, SpringAnimator, isReduceMotion } from '../utils/MotionController';
 import DexIcon from '../components/DexIcon';
+import { platform } from '../utils';
 
 // ---------------------------------------------------------------------------
 // CATEGORY LABELS & ICONS
@@ -823,6 +824,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           {[
             { keys: ['↑', '↓'], label: 'Navigate' },
             { keys: ['↵'], label: 'Open' },
+            { keys: [platform.isMac ? '⌘K' : 'Ctrl+K'], label: 'Search' },
             { keys: ['Esc'], label: 'Close' },
           ].map(hint => (
             <div key={hint.label} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
