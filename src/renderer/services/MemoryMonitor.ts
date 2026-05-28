@@ -186,7 +186,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 // ============================================================================
 
 let pollingInterval: ReturnType<typeof setInterval> | null = null;
-const POLLING_INTERVAL = 5000; // 5 seconds
+const POLLING_INTERVAL = 10_000; // 10 seconds — halved to reduce background CPU
 
 function startMemoryPolling(): void {
   if (pollingInterval) return;
@@ -224,19 +224,9 @@ function getMemoryStats(): MemoryStats | null {
       };
     }
     
-    // Fallback estimation based on DOM complexity
-    const elementCount = document.querySelectorAll('*').length;
-    const estimatedUsage = elementCount * 1000; // Rough estimate: 1KB per element
-    const estimatedTotal = 512 * 1024 * 1024; // Assume 512MB limit
-    
-    return {
-      heapUsed: estimatedUsage,
-      heapTotal: estimatedTotal,
-      external: 0,
-      arrayBuffers: 0,
-      percentUsed: estimatedUsage / estimatedTotal,
-      timestamp: Date.now(),
-    };
+    // performance.memory unavailable (non-Chromium or disabled). Return null
+    // rather than running a full DOM traversal every polling interval.
+    return null;
   } catch (e) {
     return null;
   }

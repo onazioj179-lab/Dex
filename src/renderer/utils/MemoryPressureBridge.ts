@@ -27,9 +27,10 @@ export type DegradationLevel = 'none' | 'reduced' | 'minimal';
 interface State {
   level: DegradationLevel;
   lastEventAt: number;
+  relaxTimer: ReturnType<typeof setTimeout> | null;
 }
 
-const state: State = { level: 'none', lastEventAt: 0 };
+const state: State = { level: 'none', lastEventAt: 0, relaxTimer: null };
 
 /** Current degradation hint. Animation systems can poll this cheaply. */
 export function getDegradationLevel(): DegradationLevel {
@@ -82,11 +83,12 @@ export function installMemoryPressureBridge(): void {
       dexBus.emit('memory:pressure', { level: payload.level, heapUsedMB: payload.heapUsedMB });
     } catch { /* bus may not be ready in tests */ }
 
-    // Auto-relax after 60s without further pressure events. The main process
-    // re-fires on any level change, so a sustained quiet period means we
-    // recovered and can re-enable full motion.
+    // Auto-relax after 60s without further pressure events. Cancel any
+    // pending timer so only one ever queues at a time.
+    if (state.relaxTimer !== null) clearTimeout(state.relaxTimer);
     const seenAt = state.lastEventAt;
-    setTimeout(() => {
+    state.relaxTimer = setTimeout(() => {
+      state.relaxTimer = null;
       if (state.lastEventAt === seenAt) relax();
     }, 60_000);
   };
