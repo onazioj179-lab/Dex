@@ -5077,6 +5077,32 @@ html.reduce-motion,
   scroll-behavior: auto !important;
 }
 
+/* Memory Pressure Degradation (set by MemoryPressureBridge.ts on the <html> element) */
+/* reduced: shorten but keep transitions — keeps usability while easing GPU load */
+[data-motion-degraded="reduced"] *,
+[data-motion-degraded="reduced"] *::before,
+[data-motion-degraded="reduced"] *::after {
+  animation-duration: 80ms !important;
+  transition-duration: 80ms !important;
+}
+
+/* minimal: kill all animations — critical pressure, 8GB RAM systems */
+[data-motion-degraded="minimal"],
+[data-motion-degraded="minimal"] * {
+  scroll-behavior: auto !important;
+}
+[data-motion-degraded="minimal"] *,
+[data-motion-degraded="minimal"] *::before,
+[data-motion-degraded="minimal"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Compositor Pressure (set by CompositorHealth.ts) — release GPU layer hints */
+[data-compositor-pressure="high"] * {
+  will-change: auto !important;
+}
+
 /* Focus Mode - Hide non-essential UI */
 html.focus-mode,
 :root.focus-mode {
