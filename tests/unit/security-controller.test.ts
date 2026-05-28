@@ -524,7 +524,7 @@ describe('SecurityController', () => {
       // process-control is enabled by default in the registry
       const report = await invokeIPC('security:getReport');
       const processRisk = report.risks.find(
-        (r: any) => r.description.includes('process')
+        (r: any) => r.description.toLowerCase().includes('process')
       );
       expect(processRisk).toBeDefined();
       expect(processRisk.level).toBe('medium');

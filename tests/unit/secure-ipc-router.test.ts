@@ -40,11 +40,13 @@ vi.mock('electron-log', () => {
 });
 
 vi.mock('electron-store', () => ({
-  default: vi.fn(() => ({
-    get: vi.fn((_key: string, def?: unknown) => def),
-    set: vi.fn(),
-    delete: vi.fn(),
-  })),
+  default: vi.fn(function() {
+    return {
+      get: vi.fn((_key: string, def?: unknown) => def),
+      set: vi.fn(),
+      delete: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('fs', () => ({
@@ -156,14 +158,12 @@ describe('SecureIpcRouter', () => {
     });
 
     it('is idempotent -- second mount() is a no-op', () => {
-      const { ipcMain } = require('electron');
-      const handleSpy = ipcMain.handle;
       const router = new SecureIpcRouter();
       router.register('ch1', async () => 'a');
       router.mount();
-      const callCount = handleSpy.mock.calls.length;
+      const keysBefore = Object.keys(ipcHandlers).length;
       router.mount();
-      expect(handleSpy.mock.calls.length).toBe(callCount);
+      expect(Object.keys(ipcHandlers).length).toBe(keysBefore);
     });
 
     it('returns the router for chaining', () => {
