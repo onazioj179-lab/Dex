@@ -10,6 +10,91 @@ prior releases, see the git tag history (`git tag --list`) and the GitHub
 Releases page. Older changelog entries were trimmed in v3.8.9 to keep the
 public document short and focused on what has actually shipped to users now.
 
+---
+
+## v4.60.3 — Production Polish & Shell Stability (2026-05-28)
+
+### Improvements
+
+- **Minimized windows are now easy to restore.** The "N minimized" indicator in
+  the top bar is now a clickable button. Click it to see a list of all minimized
+  apps by name. Click any app in the list to bring it back. Works with keyboard
+  too — Arrow keys to navigate, Enter to restore, Escape to dismiss.
+
+- **Settings → Updates: Clear Cache button.** A new "Clear Cache" button in
+  Settings → Updates removes stale installer downloads from the system temp
+  folder. The button shows how much space was freed (e.g. "Freed 142 MB").
+  The cache is also cleaned automatically at startup and every 24 hours.
+
+- **Onboarding preferences now take effect.** The crash reporting and
+  auto-update toggles in the initial setup wizard are now properly wired.
+  Turning them on or off during setup now actually changes the behaviour
+  of the app — previously only the analytics toggle had any effect.
+
+- **Crash reports toggle in Settings is live.** The crash reports toggle in
+  Settings → Privacy is now connected to the diagnostics system. Toggling it
+  on or off takes effect immediately and persists across restarts.
+
+- **Platform shortcuts everywhere.** Keyboard shortcut labels throughout the
+  app now show the correct modifier for your platform — ⌘ on macOS, Ctrl on
+  Windows and Linux. Shortcuts that were displayed correctly but didn't fire
+  on macOS (using Cmd key) are now fixed.
+
+- **Reduce Motion toggle works.** The Reduce Motion toggle in the system menu
+  now correctly applies — previously it wrote a preference but the compositor
+  ignored it.
+
+- **Caps Lock warning on Lock Screen.** When Caps Lock is active while typing
+  your password on the lock screen, a small amber warning appears below the
+  input so you know why your password might not be working.
+
+- **Release retention is automatic.** Old GitHub releases are pruned
+  automatically during the release process (newest 3 kept). The prune script
+  now works on Windows, macOS, and Linux runners.
+
+### Fixes
+
+- Fixed minimized floating windows being unrecoverable after using the
+  macOS-style yellow traffic-light button to minimize them.
+
+- Fixed the Reduce Motion toggle doing nothing (the localStorage key was
+  written but never read by the motion controller on startup or change).
+
+- Fixed floating window resize gesture leaking pointer listeners when a
+  window was closed mid-drag (three document-level event listeners were
+  never removed, causing phantom drag behaviour in subsequent windows).
+
+- Fixed MiniPulse widget (live CPU/RAM/FPS pill) blocking interaction with
+  the Focus Session overlay — it was stacked at z-index 2,147,483,000 which
+  is above everything in the app. Now correctly sits below the focus overlay.
+
+- Fixed Cmd+key shortcuts silently failing on macOS. The keyboard handler
+  was comparing `metaKey` events against `ctrl` bindings; it now maps
+  macOS Cmd → the internal ctrl modifier so all shortcuts fire correctly.
+
+- Removed all `window.confirm()` and `window.prompt()` native dialog calls
+  from production code. These blocked the UI thread and ignored the DEX theme.
+  Replaced with in-app dialogs and inline inputs throughout.
+
+- Removed a debug log statement in the audio chain preset save path that was
+  printing user preset names and parameter values to the developer console.
+
+- Fixed 9 service init log statements printing noise to DevTools in every
+  production session (MemoryMonitor, UIPolishSystem, InputPriority,
+  ScreenGuardSystem, ProPerformanceEngine, Snappy).
+
+### Windows
+
+- Installer now builds for both x64 and ARM64.
+- Added portable `.exe` (no-install, run anywhere) alongside the NSIS
+  installer.
+- Added `.zip` archive for manual extraction installs.
+- NSIS installer properly stops any running DEX instance before upgrading,
+  prevents duplicate startup entries, writes install timestamp to registry,
+  and cleans the update cache on uninstall.
+
+---
+
 ## v4.56.0 - Master Evolution Plan Phase 1: IPC contracts, unified search, canonical error boundary
 
 Phase 1 of the Master Evolution Plan (per ADR 0002 and ADR 0004) lands three

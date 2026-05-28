@@ -5,6 +5,13 @@ every working session. Keep it short, current, and actionable.
 
 Current version: **4.60.3** · Working branch: `claude/test-coverage-analysis-vYvyJ`
 
+### Release Artifacts per Platform
+| Platform | Artifacts |
+|---|---|
+| Windows | NSIS installer (x64 + ARM64) · Portable exe (x64) · ZIP (x64) |
+| macOS | DMG (x64 + ARM64) · ZIP (x64 + ARM64) |
+| Linux | AppImage (x64) · DEB (x64) · RPM (x64) |
+
 ---
 
 ## Main Goal
@@ -116,12 +123,34 @@ Minimized-window popover — keyboard access:
 
 ## Next Steps
 
-1. **Verify cache prune on a real upgrade** — logic is correct in code.
-   Confirm `downloadedArtifactPath` is preserved after a real update cycle.
-2. **Browser.tsx dropdowns** — zIndex 9999 at lines 2448/2480 are inside
-   the Browser FloatingWindow stacking context (scoped, not global). Safe
-   to leave, but document this in a comment if confusing.
-3. **HANDOFF.md cadence** — every session must update this file.
+1. **Code-sign Windows build** — Set `CSC_LINK` + `CSC_KEY_PASSWORD` env
+   vars in the CI runner before running `release:publish`. Without signing
+   Windows Defender flags the exe. macOS needs `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+   `APPLE_TEAM_ID` for notarization.
+2. **Test ARM64 Windows installer** — `package:win:arm64` added. Validate
+   on a Windows ARM64 machine / VM before shipping to users.
+3. **Update server URL** — `assets/config/update-server.json` has an empty
+   `url`. Point it at the GitHub releases auto-update feed URL once the
+   first signed build ships.
+4. **HANDOFF.md cadence** — every session must update this file.
+
+## Completed This Session (4.60.3 — final)
+
+- **Version bumped** — `package.json` → `4.60.3`.
+- **CHANGELOG written** — `docs/CHANGELOG.md` updated with full user-facing
+  improvements, fixes, and Windows section for v4.60.3.
+- **Windows build: 3 targets** — NSIS installer (x64 + ARM64), portable exe
+  (x64), ZIP (x64). `package:win`, `package:win:x64`, `package:win:arm64`,
+  `package:win:portable` scripts added.
+- **macOS build: 2 arches** — DMG + ZIP, x64 and ARM64. `package:mac:x64`,
+  `package:mac:arm64` scripts added.
+- **Linux build: 3 targets** — AppImage, DEB, RPM all x64.
+  `package:linux:deb`, `package:linux:rpm`, `package:linux:appimage` added.
+- **Release scripts** — `release:win`, `release:mac`, `release:linux`,
+  `release:publish` added. Prune scripts migrated from pwsh to Node.
+- **NSIS installer hardened** — stops running instance before upgrade,
+  cleans temp cache on uninstall, writes install metadata to registry,
+  covers x64 + ARM64.
 
 ## Completed This Session (4.60.3)
 
