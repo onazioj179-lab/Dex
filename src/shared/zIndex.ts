@@ -1,5 +1,8 @@
 // =============================================================================
-// DEX Platform — Z-Index Constants
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 // Single source of truth for all stacking layers. Keep values in ascending
 // order. Never hard-code z-index values in components — import from here.
