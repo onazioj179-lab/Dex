@@ -155,6 +155,11 @@
   --pg-shadow-tooltip: 0 4px 16px rgba(0, 0, 0, 0.35);
   --pg-shadow-chip: 0 1px 3px rgba(0, 0, 0, 0.3);
 
+  /* Text hierarchy — alias the canonical color-text tokens into the pg namespace */
+  --pg-text-primary: var(--color-text-primary, #FFFFFF);
+  --pg-text-secondary: var(--color-text-secondary, #B8B8BD);
+  --pg-text-tertiary: var(--color-text-tertiary, #8E8E93);
+
   /* Sidebar dimensions */
   --pg-sidebar-width: 232px;
   --pg-sidebar-width-compact: 64px;
