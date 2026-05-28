@@ -2,7 +2,7 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.3** · Working branch: `claude/test-coverage-analysis-vYvyJ`
+Current version: **4.60.4** · Working branch: `claude/test-coverage-analysis-vYvyJ`
 
 ### Release Artifacts per Platform
 | Platform | Artifacts |
