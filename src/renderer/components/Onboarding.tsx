@@ -14,6 +14,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, type PolicySlug } from '../../shared/policies';
 import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 import { AccountAuthFlow } from './account/AccountAuthFlow';
+import { platform } from '../utils';
 
 const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
 
@@ -86,10 +87,10 @@ export const KEYBOARD_SHORTCUTS: Record<string, { key: string; action: string }[
     { key: 'Del', action: 'Remove' },
   ],
   dexcode: [
-    { key: 'Ctrl+Enter', action: 'Run Code' },
-    { key: 'Ctrl+F', action: 'Find' },
-    { key: 'Ctrl+H', action: 'Replace' },
-    { key: 'Ctrl+S', action: 'Export' },
+    { key: `${platform.isMac ? '⌘' : 'Ctrl'}+Enter`, action: 'Run Code' },
+    { key: `${platform.isMac ? '⌘' : 'Ctrl'}+F`, action: 'Find' },
+    { key: `${platform.isMac ? '⌘' : 'Ctrl'}+H`, action: 'Replace' },
+    { key: `${platform.isMac ? '⌘' : 'Ctrl'}+S`, action: 'Export' },
   ],
   axl: [
     { key: 'V', action: 'Select' },
@@ -599,7 +600,7 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
       }}>?</kbd> anytime for keyboard shortcuts.
     </p>
     <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 36px' }}>
-      Tip: Use Ctrl+K to open the Command Palette.
+      Tip: Use {platform.isMac ? '⌘' : 'Ctrl'}+K to open the Command Palette.
     </p>
     <button style={ACCENT_BTN} onClick={onComplete}>Launch DEX</button>
   </div>
