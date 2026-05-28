@@ -326,14 +326,15 @@ function main() {
 
     // Retention rule: keep only the 3 newest GitHub releases per repo.
     // Older releases (and their tags) are deleted automatically.
+    // Uses the cross-platform Node script; the .ps1 sibling stays for parity.
     console.log(`\n  Pruning old GitHub releases (keep newest 3)...`);
     try {
-      const pruneScript = path.join(ROOT, 'scripts', 'prune-releases.ps1');
-      if (fs.existsSync(pruneScript)) {
-        run(`pwsh -NoProfile -ExecutionPolicy Bypass -File "${pruneScript}" -Repo onazioj179-lab/Dex -Keep 3`, { allowFailure: true });
-        run(`pwsh -NoProfile -ExecutionPolicy Bypass -File "${pruneScript}" -Repo onazioj179-lab/dex-updates -Keep 3`, { allowFailure: true });
+      const pruneJs = path.join(ROOT, 'scripts', 'prune-releases.js');
+      if (fs.existsSync(pruneJs)) {
+        run(`node "${pruneJs}" --repo onazioj179-lab/Dex --keep 3`, { allowFailure: true });
+        run(`node "${pruneJs}" --repo onazioj179-lab/dex-updates --keep 3`, { allowFailure: true });
       } else {
-        console.log('  prune-releases.ps1 not found -- skipping retention pass');
+        console.log('  prune-releases.js not found -- skipping retention pass');
       }
     } catch (pruneErr) {
       console.warn(`  WARNING: prune step failed: ${pruneErr.message || pruneErr}`);
