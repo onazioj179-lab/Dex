@@ -207,7 +207,7 @@ const loadAllMedia = async (): Promise<MediaItem[]> => {
 
       const processFiles = (files: Array<{ path?: string; name?: string; extension?: string; modified?: number; size?: number; duration?: number }>, fallbackType: 'image' | 'video') => {
         if (!files || !Array.isArray(files)) return;
-        for (const f of files.slice(0, 200)) {
+        for (const f of files) {
           const ext = (f.extension || f.name?.split('.').pop() || '').toLowerCase();
           const isVideo = VIDEO_EXTENSIONS.test(`.${ext}`);
           const isImage = IMAGE_EXTENSIONS.test(`.${ext}`);
