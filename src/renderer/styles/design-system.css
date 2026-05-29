@@ -644,28 +644,32 @@
    PREMIUM UI UTILITIES (v3.5.0)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Premium glass panel */
+/* Premium glass panel — fluid glass: saturated backdrop, hairline light border,
+   and a 1px inner top highlight for crisp modern depth. The inset highlight is
+   stripped automatically on low tier (backdrop-filter disabled there). */
 .dex-glass-panel {
   background: var(--surface-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(24px) saturate(185%);
+  -webkit-backdrop-filter: blur(24px) saturate(185%);
+  border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-premium-md);
+  box-shadow: var(--shadow-premium-md), var(--pg-gloss-top);
 }
 
 /* Frosted surface */
 .dex-frosted {
   background: var(--surface-frosted);
-  backdrop-filter: blur(32px) saturate(150%);
-  -webkit-backdrop-filter: blur(32px) saturate(150%);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid var(--color-border-glass);
+  box-shadow: var(--pg-gloss-top);
 }
 
 /* Tinted overlay */
 .dex-tinted {
   background: var(--surface-tinted);
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
 }
 
 /* Premium button with spring interaction */
