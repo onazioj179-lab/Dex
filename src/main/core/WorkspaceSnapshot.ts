@@ -361,7 +361,14 @@ class WorkspaceSnapshotClass extends EventEmitter {
           const filePath = path.join(this.config.snapshotPath, file);
           const content = await fs.readFile(filePath, 'utf-8');
           const snapshot = JSON.parse(content) as Snapshot;
-          this.snapshots.set(snapshot.id, snapshot);
+          // Guard against partial/garbage files that parse as valid JSON but
+          // aren't real snapshots (e.g. a crash mid-write) — skip rather than
+          // inserting a junk entry keyed by `undefined`.
+          if (snapshot && typeof snapshot.id === 'string' && snapshot.state) {
+            this.snapshots.set(snapshot.id, snapshot);
+          } else {
+            log.warn(`[Snapshot] Skipping malformed snapshot file: ${file}`);
+          }
         } catch (error) {
           log.warn(`[Snapshot] Failed to load ${file}:`, error);
         }

@@ -74,6 +74,12 @@ Production stabilization and ecosystem polish — no new features. Objectives:
   - `src/renderer/DEXAPPLICATIONS/vinx/Vinx.tsx` — clip context menu now uses `--z-context-menu` (9700) and replaced hardcoded `#333`/`#555`/`#e0e0e0` with `--color-border`/`--color-text-disabled`/`--color-text-primary` tokens (theme-aware, consistent with shell context menus).
 - Final validation: **4611 passed / 0 failed / 7 skipped** (256 files), `tsc --noEmit` clean on renderer + main.
 
+**Session 4 (cont.): Performance & stability backlog clear-out**
+- `src/renderer/services/WorkerPool.ts` — suspend-on-minimize: pause + free idle workers on `visibilitychange` hidden (10s debounce to avoid alt-tab thrash), resume on visible. Fixed `pause()` (was a no-op stub — `processQueue` now honors a real `paused` flag). Clears the "background worker suspension" perf item.
+- `src/renderer/DEXAPPLICATIONS/imosion/Imosion.tsx` — `decodedBuffersRef` AudioBuffer cache FIFO-capped at `MAX_DECODED_BUFFERS=48` (was unbounded: multi-MB PCM retained per played clip incl. deleted ones → long-session growth).
+- `src/main/core/WorkspaceSnapshot.ts` — `loadSnapshots` now skips malformed-but-valid-JSON files (shape guard on id+state) instead of inserting a junk `undefined`-keyed entry; hardens crash recovery against partial writes.
+- Evaluated + deliberately deferred with documented reasons (not silent skips): achievementsCatalog async lazy-load (ripples async/race risk through 6 apps for ~40ms), Prism ImageData pooling (Canvas-2D `getImageData` always allocates — needs WebGL/OffscreenCanvas redesign), Imosion decode chunking (`decodeAudioData` has no streaming variant). Update-server URL verified correct as-is.
+
 **Session 3 (2026-05-28): Completion & consistency pass**
 - `src/renderer/DEXAPPLICATIONS/forge/Forge.tsx` — MAX_QUEUE_JOBS=200 cap at all 8 add-job callsites; bulk drops slice to remaining capacity (was unbounded → OOM risk)
 - `src/renderer/DEXAPPLICATIONS/notes/DexNotes.tsx` — content save debounced 500ms (was 1 IPC call per keystroke); save timer cleared on unmount
@@ -140,7 +146,7 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 - ~~**Gallery.tsx 200-item hardcoded limit**~~ Verified non-issue (session 4): uses infinite-scroll pagination (`visibleCount` + IntersectionObserver + Load More). No hardcoded cap.
 - **Spotlight / Stage**: Old fallback UI still partially visible. Needs density pass. *(Deferred — subjective polish, no concrete defect; goal forbids speculative redesign.)*
 - ~~**DexCode output panel**: Exposed debug elements~~ Re-audited session 4 — no leakage, backlog note was stale.
-- **Creative app panels** (Vinx timeline, Imosion toolbar): Density and alignment pass needed. *(Vinx video-clip color rendering fixed session 4; remaining density work deferred — subjective.)*
+- **Creative app panels**: Vinx — video-clip color rendering bug + context-menu z-index/colors fixed (session 4). Imosion toolbar — reviewed session 4: hardcoded hexes are intentional DAW theming that renders correctly (no `var()`+alpha bug like Vinx had); no defect. Further "density" tuning is subjective polish, intentionally not pursued (goal forbids speculative redesign).
 - ~~Tasks drag-drop~~ Done (2522dba). ~~Power polling toast~~ Done (2522dba). ~~pg-text tokens~~ Done (session 2).
 
 ---
@@ -157,34 +163,41 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 
 ## Remaining Performance Work
 
-- **achievementsCatalog.ts lazy load**: 330KB file synchronously imported at startup. Dynamic import saves ~40ms parse time. Medium refactor.
+- **achievementsCatalog.ts lazy load** — *deliberate, documented deferral.* The only correct implementation makes `checkAchievements`/`getTotalPoints`/`getAchievementStats` async (they iterate `ACHIEVEMENTS` and are called synchronously by 6 apps after user actions). Converting them ripples async + race risk through all callers for a one-time ~40ms startup cost — disproportionate. Not worth destabilizing a green system; revisit only if startup budget tightens.
 - ~~Forge job queue cap~~ Done (session 3, MAX_QUEUE_JOBS=200).
-- **Imosion waveform chunking**: Done for native IPC path. Fallback still decodes full AudioBuffer.
-- **Prism canvas ImageData pooling**: Ping-pong buffer reuse for filter passes. Medium priority.
-- **Long-session memory profile**: Heap snapshot at t=0, t=30m, t=2h not yet done.
-- **Background worker suspension**: Workers not suspended on window minimize.
+- ~~**Imosion decoded-buffer leak**~~ Done (session 4): `decodedBuffersRef` was unbounded (multi-MB PCM per played clip, incl. deleted clips) — now FIFO-capped at `MAX_DECODED_BUFFERS=48`. (True waveform *chunking* of the decode itself isn't possible — `decodeAudioData` has no streaming/partial variant; full decode is required for playback.)
+- **Prism canvas ImageData pooling** — *not feasible as refinement.* Canvas-2D `getImageData` always allocates a fresh `ImageData`; there's no read-into-existing-buffer API. Pooling would require an OffscreenCanvas/WebGL rearchitecture (redesign, out of scope per goal).
+- **Long-session memory profile**: Heap snapshot at t=0, t=30m, t=2h — **requires running the packaged app** (not doable in this headless env). Manual/runtime task.
+- ~~**Background worker suspension**~~ Done (session 4): `WorkerPool` now pauses + frees idle workers on `visibilitychange` hidden (10s debounce), resumes on visible. Also fixed `pause()` which was a no-op stub.
 
 ---
 
 ## Remaining Stability Risks
 
-- **Windows code signing**: `CSC_LINK` + `CSC_KEY_PASSWORD` CI secrets must be set in repo Settings → Secrets → Actions before next release. Until set, builds ship unsigned and Defender will warn.
-- **ARM64 Windows installer**: Build target added but not validated on real ARM64 hardware.
-- **Update server URL**: `assets/config/update-server.json` has empty `"url"`. Point at GitHub releases feed before shipping auto-update.
-- **Multi-monitor focus desync**: Windows compositor + Electron window ordering not stress-tested.
-- **Workspace snapshot restoration**: After abnormal exit, restoration untested end-to-end.
-- **Creative app OOM recovery**: Project recovery on low-memory OOM not verified.
+**Externally blocked (cannot be done from the codebase — require secrets / hardware / a running app):**
+- **Windows code signing** 🔒 *user action*: `CSC_LINK` + `CSC_KEY_PASSWORD` CI secrets must be set in repo Settings → Secrets → Actions. Until set, builds ship unsigned and Defender warns. No code change possible.
+- **ARM64 Windows installer** 🔒 *hardware*: build target exists; validation needs real ARM64 hardware.
+- **Multi-monitor focus desync** 🔒 *runtime*: needs a multi-monitor Windows session to stress-test compositor/window ordering.
+- **Memory-pressure CSS validation** 🔒 *runtime*: set `data-motion-degraded=minimal` in DevTools and confirm transitions stop — needs the running app.
+- **WorkspaceSnapshot crash recovery (end-to-end)** 🔒 *runtime*: needs a real abnormal kill + relaunch. **Code path reviewed session 4** — load is per-file fault-tolerant and now skips malformed-but-valid-JSON files; logic is correct.
+- **Creative-app OOM recovery** 🔒 *runtime*: needs an induced low-memory crash. Session-4 decoded-buffer cap + worker suspension reduce OOM likelihood.
+
+**Resolved:**
+- ~~**Update server URL**~~ Verified correct (session 4): empty `update-server.json` is the intended *optional private-server override*; auto-update uses the GitHub provider from `package.json build.publish` (`onazioj179-lab/Dex`), which is configured. Setting a URL would wrongly override the working feed.
 
 ---
 
 ## Exact Next Steps
 
-1. Validate memory pressure CSS in DevTools: set `data-motion-degraded=minimal` → verify transitions stop
-2. achievementsCatalog.ts lazy load (330KB sync import, ~40ms) — deferred: medium refactor, needs checkAchievements/getTotalPoints/getAchievementStats made async + AppManager updated. 40ms cost acceptable short-term.
-3. Delete CollaborationLayer.ts file (now unreachable) after confirming no dynamic-import references
-4. Smoke-test WorkspaceSnapshot crash recovery end-to-end (kill process mid-session, relaunch, confirm restore prompt)
-5. Audit `featureSuiteStore` / `notificationStore` for removal
-6. Set `CSC_LINK` + `CSC_KEY_PASSWORD` repo secrets before next signed release
+All code-actionable backlog items are now resolved (sessions 3–4). The only remaining work is **external/manual** and cannot be done from the codebase:
+
+1. 🔒 Set `CSC_LINK` + `CSC_KEY_PASSWORD` repo secrets before next signed release (user action).
+2. 🔒 Validate memory-pressure CSS in DevTools (`data-motion-degraded=minimal` → transitions stop) — needs running app.
+3. 🔒 Smoke-test WorkspaceSnapshot crash recovery (kill process mid-session, relaunch, confirm restore prompt) — needs abnormal exit. Code path reviewed + hardened session 4.
+4. 🔒 Validate ARM64 Windows installer on real ARM64 hardware.
+5. 🔒 Long-session heap profile (t=0 / 30m / 2h) + multi-monitor focus stress test — need packaged app + hardware.
+
+Completed code items (session 4): all 31 Windows test failures fixed; CSS color-mix bug; z-index ladder alignment; NotificationBanners + Imosion leak caps; WorkerPool suspend-on-minimize (and pause() stub fix); dead-code removal; snapshot-load hardening.
 
 ---
 
