@@ -259,7 +259,7 @@ const Banner: React.FC<{
       <div style={{ padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <div style={{
           width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: `${iconColor}15`,
+          background: `color-mix(in srgb, ${iconColor} 8%, transparent)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {iconSvg}
@@ -482,6 +482,13 @@ export function useBannerNotifications() {
     const lastSeen = recentTitlesRef.current.get(titleKey);
     if (lastSeen && now - lastSeen < DUPLICATE_COALESCE_MS && priority !== 'urgent') return;
     recentTitlesRef.current.set(titleKey, now);
+    // Prune entries past the coalesce window so the map can't grow unbounded
+    // across a long session (one key per distinct notification title otherwise).
+    if (recentTitlesRef.current.size > 64) {
+      for (const [key, ts] of recentTitlesRef.current) {
+        if (now - ts >= DUPLICATE_COALESCE_MS) recentTitlesRef.current.delete(key);
+      }
+    }
 
     const item: BannerNotification = {
       ...notification,
@@ -714,7 +721,7 @@ export const NotificationCenter: React.FC<{
                   {group.unreadCount > 0 && (
                     <span style={{
                       fontSize: 9, fontWeight: 600, color: 'var(--color-accent)',
-                      background: 'var(--color-accent)15',
+                      background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
                       padding: '1px 5px', borderRadius: 8,
                     }}>
                       {group.unreadCount} new
@@ -732,7 +739,7 @@ export const NotificationCenter: React.FC<{
                       style={{
                         padding: '10px 12px', borderRadius: 10, marginBottom: 4,
                         background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
-                        border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'var(--color-accent)30'}`,
+                        border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
                         cursor: 'pointer',
                         transition: 'background 0.15s ease',
                       }}
@@ -778,7 +785,7 @@ export const NotificationCenter: React.FC<{
                     <div style={{
                       width: 8, height: 8, borderRadius: '50%',
                       background: color, flexShrink: 0, marginTop: 4,
-                      boxShadow: `0 0 6px ${color}60`,
+                      boxShadow: `0 0 6px color-mix(in srgb, ${color} 38%, transparent)`,
                     }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>

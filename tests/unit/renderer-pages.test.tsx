@@ -204,13 +204,13 @@ describe('Gallery Page', () => {
 describe('Power Page', () => {
   it('renders without crashing', async () => {
     const { default: Power } = await import('../../src/renderer/pages/Power');
-    const { container } = render(<Power />);
+    const { container } = render(<WithToast><Power /></WithToast>);
     expect(container).toBeTruthy();
   });
 
   it('contains sidebar with tab navigation', async () => {
     const { default: Power } = await import('../../src/renderer/pages/Power');
-    render(<Power />);
+    render(<WithToast><Power /></WithToast>);
     // Power has a sidebar with h2 "Power" heading
     expect(screen.getByText('Power')).toBeInTheDocument();
   });

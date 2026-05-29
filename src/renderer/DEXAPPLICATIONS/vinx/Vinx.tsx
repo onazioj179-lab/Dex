@@ -2120,10 +2120,10 @@ const VinxEditor: React.FC = () => {
           { label: 'Delete Clip', fn: () => _removeClip(ctxMenu.clipId!), danger: true },
         ];
         return (
-          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 170, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 8, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-context-menu)', minWidth: 170, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
-              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px 8px' }} />
-              : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>
+              ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 8px' }} />
+              : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? 'var(--color-text-disabled)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );

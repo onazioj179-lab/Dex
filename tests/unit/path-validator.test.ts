@@ -28,10 +28,14 @@ import * as path from 'path';
 // Mocks
 // ===========================================================================
 
-const MOCK_HOME = '/home/testuser';
+// Resolve to a platform-absolute path so path.resolve()/path.sep comparisons in
+// PathValidator behave identically on POSIX (`/home/testuser`) and Windows
+// (`C:\home\testuser`). Using a bare POSIX literal made every "inside home"
+// check fail on Windows because path.resolve() re-rooted it onto the C: drive.
+const MOCK_HOME = path.resolve('/home/testuser');
 
 vi.mock('os', () => ({
-  homedir: vi.fn(() => '/home/testuser'),
+  homedir: vi.fn(() => require('path').resolve('/home/testuser')),
 }));
 
 vi.mock('fs', () => ({
@@ -56,12 +60,12 @@ describe('PathValidator.validatePath', () => {
   describe('valid paths within home directory', () => {
     it('accepts a simple file within home', () => {
       const result = PathValidator.validatePath(`${MOCK_HOME}/Documents/test.txt`);
-      expect(result).toBe(`${MOCK_HOME}/Documents/test.txt`);
+      expect(result).toBe(path.resolve(`${MOCK_HOME}/Documents/test.txt`));
     });
 
     it('accepts a nested path within home', () => {
       const result = PathValidator.validatePath(`${MOCK_HOME}/Documents/subdir/deep/file.json`);
-      expect(result).toBe(`${MOCK_HOME}/Documents/subdir/deep/file.json`);
+      expect(result).toBe(path.resolve(`${MOCK_HOME}/Documents/subdir/deep/file.json`));
     });
 
     it('accepts the home directory itself', () => {
@@ -71,7 +75,7 @@ describe('PathValidator.validatePath', () => {
 
     it('accepts Downloads directory', () => {
       const result = PathValidator.validatePath(`${MOCK_HOME}/Downloads/song.mp3`);
-      expect(result).toBe(`${MOCK_HOME}/Downloads/song.mp3`);
+      expect(result).toBe(path.resolve(`${MOCK_HOME}/Downloads/song.mp3`));
     });
 
     it('resolves relative ../ components and accepts if still in home', () => {
@@ -196,7 +200,9 @@ describe('PathValidator.validatePath', () => {
     it('resolves symlink and rejects if real path is in blocked directory', () => {
       const symlinkPath = `${MOCK_HOME}/Documents/key-link`;
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.realpathSync).mockReturnValue(`${MOCK_HOME}/.ssh/id_rsa`);
+      // realpathSync returns a normalized, platform-separator absolute path;
+      // path.join keeps it consistent with how BLOCKED_PATHS is built.
+      vi.mocked(fs.realpathSync).mockReturnValue(path.join(MOCK_HOME, '.ssh', 'id_rsa'));
 
       expect(() => PathValidator.validatePath(symlinkPath)).toThrow('Access denied: sensitive directory');
     });
@@ -229,7 +235,7 @@ describe('PathValidator.validatePath', () => {
 
       // Should not throw - OS errors are swallowed
       const result = PathValidator.validatePath(filePath);
-      expect(result).toBe(filePath);
+      expect(result).toBe(path.resolve(filePath));
     });
 
     it('re-throws access-denied errors from symlink resolution', () => {
@@ -256,7 +262,7 @@ describe('PathValidator.validatePath', () => {
       vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
 
       const result = PathValidator.validatePath(`${MOCK_HOME}/existing.txt`, { requireExists: true });
-      expect(result).toBe(`${MOCK_HOME}/existing.txt`);
+      expect(result).toBe(path.resolve(`${MOCK_HOME}/existing.txt`));
     });
   });
 });
@@ -271,17 +277,17 @@ describe('PathValidator.validateScopedPath', () => {
   describe('valid paths within scope', () => {
     it('accepts a file within the scope directory', () => {
       const result = PathValidator.validateScopedPath(`${scopeDir}/file.txt`, scopeDir);
-      expect(result).toBe(`${scopeDir}/file.txt`);
+      expect(result).toBe(path.resolve(`${scopeDir}/file.txt`));
     });
 
     it('accepts a nested file within scope', () => {
       const result = PathValidator.validateScopedPath(`${scopeDir}/sub/deep/file.txt`, scopeDir);
-      expect(result).toBe(`${scopeDir}/sub/deep/file.txt`);
+      expect(result).toBe(path.resolve(`${scopeDir}/sub/deep/file.txt`));
     });
 
     it('accepts path that equals the scope directory exactly', () => {
       const result = PathValidator.validateScopedPath(scopeDir, scopeDir);
-      expect(result).toBe(scopeDir);
+      expect(result).toBe(path.resolve(scopeDir));
     });
   });
 

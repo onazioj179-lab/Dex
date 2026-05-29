@@ -188,7 +188,11 @@ export class PathValidator {
       return `file_${Date.now()}`;
     }
 
-    return path.basename(filename)
+    // Use POSIX basename so only `/` strips directory components on every
+    // platform; the regex below then neutralises `\` (and other dangerous
+    // chars) as content. With platform basename, Windows would treat `\` as a
+    // separator and silently drop the prefix, diverging from POSIX behaviour.
+    return path.posix.basename(filename)
       .replace(/[<>:"/\\|?*\0]/g, '_')  // Replace dangerous chars
       .replace(/^\.+/, '_')              // Don't start with dots
       .slice(0, 255);                    // Max filename length

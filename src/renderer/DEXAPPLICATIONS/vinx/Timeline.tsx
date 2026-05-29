@@ -50,6 +50,16 @@ function getClipColor(trackType: Track['type']): string {
   return VINX_COLORS.titleTrack;
 }
 
+/**
+ * Translucent variant of a clip color. getClipColor can return a CSS var()
+ * token (videoTrack === 'var(--color-accent)'); appending hex-alpha digits to a
+ * var() produces invalid CSS, so video clips would lose all tint/border. color-mix
+ * (premultiplied) keeps the hue and works for both hex and token inputs.
+ */
+function alpha(color: string, pct: number): string {
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+}
+
 /** Collect all snap-worthy frame positions in the sequence */
 function collectSnapPoints(tracks: Track[], currentFrame: number, markers: Marker[], excludeClipId?: string): number[] {
   const pts: number[] = [0, currentFrame];
@@ -301,8 +311,8 @@ const ClipVisual: React.FC<{
     top: 2,
     width: Math.max(width, 2),
     height: track.height - 4,
-    background: selected ? `${color}30` : `${color}18`,
-    border: `1px solid ${selected ? color : `${color}40`}`,
+    background: selected ? alpha(color, 19) : alpha(color, 9),
+    border: `1px solid ${selected ? color : alpha(color, 25)}`,
     borderRadius: 3,
     overflow: 'hidden',
     cursor: activeTool === 'razor' ? 'crosshair' : activeTool === 'select' ? 'grab' : 'default',
@@ -316,7 +326,7 @@ const ClipVisual: React.FC<{
       <div
         style={{
           position: 'absolute', left: 0, top: 0, bottom: 0, width: TRIM_HANDLE_WIDTH,
-          cursor: 'ew-resize', background: selected ? `${color}40` : 'transparent',
+          cursor: 'ew-resize', background: selected ? alpha(color, 25) : 'transparent',
           zIndex: 1,
         }}
         onPointerDown={e => { e.stopPropagation(); onTrimStart(clip.id, 'left'); }}
@@ -324,7 +334,7 @@ const ClipVisual: React.FC<{
       <div
         style={{
           position: 'absolute', right: 0, top: 0, bottom: 0, width: TRIM_HANDLE_WIDTH,
-          cursor: 'ew-resize', background: selected ? `${color}40` : 'transparent',
+          cursor: 'ew-resize', background: selected ? alpha(color, 25) : 'transparent',
           zIndex: 1,
         }}
         onPointerDown={e => { e.stopPropagation(); onTrimStart(clip.id, 'right'); }}
@@ -342,14 +352,14 @@ const ClipVisual: React.FC<{
       {track.type === 'video' && (
         <div style={{
           flex: 1, display: 'flex', alignItems: 'stretch', overflow: 'hidden',
-          background: `linear-gradient(90deg, ${color}15 0%, ${color}08 50%, ${color}15 100%)`,
+          background: `linear-gradient(90deg, ${alpha(color, 8)} 0%, ${alpha(color, 3)} 50%, ${alpha(color, 8)} 100%)`,
         }}>
           {Array.from({ length: Math.max(1, Math.floor(width / 36)) }, (_, i) => {
             const seed = clip.id.charCodeAt(0) + i * 7;
             const brightness = 28 + (seed % 12);
             return (
               <div key={i} style={{
-                flex: 1, borderRight: `1px solid ${color}15`,
+                flex: 1, borderRight: `1px solid ${alpha(color, 8)}`,
                 background: `linear-gradient(180deg, hsl(${(seed * 37) % 360}, 15%, ${brightness}%) 0%, hsl(${(seed * 37 + 20) % 360}, 12%, ${brightness - 6}%) 100%)`,
               }} />
             );
@@ -386,16 +396,16 @@ const ClipVisual: React.FC<{
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0,
           width: frameToPixels(clip.transitionIn.durationFrames, zoom),
-          background: `linear-gradient(90deg, ${color}30, transparent)`,
-          borderRight: `1px dashed ${color}60`,
+          background: `linear-gradient(90deg, ${alpha(color, 19)}, transparent)`,
+          borderRight: `1px dashed ${alpha(color, 38)}`,
         }} />
       )}
       {clip.transitionOut && (
         <div style={{
           position: 'absolute', right: 0, top: 0, bottom: 0,
           width: frameToPixels(clip.transitionOut.durationFrames, zoom),
-          background: `linear-gradient(270deg, ${color}30, transparent)`,
-          borderLeft: `1px dashed ${color}60`,
+          background: `linear-gradient(270deg, ${alpha(color, 19)}, transparent)`,
+          borderLeft: `1px dashed ${alpha(color, 38)}`,
         }} />
       )}
     </div>

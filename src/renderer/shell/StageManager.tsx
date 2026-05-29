@@ -254,7 +254,7 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
           onMouseEnter={handleStripEnter}
           style={{
             position: 'fixed', left: 0, top: 36, bottom: 74,
-            width: COLLAPSED_WIDTH + 24, zIndex: 'var(--z-max)', cursor: 'default',
+            width: COLLAPSED_WIDTH + 24, zIndex: 'var(--z-stage-manager)', cursor: 'default',
           }}
           aria-hidden
         >
@@ -284,7 +284,7 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
           alignItems: 'center',
           gap: 6,
           padding: '12px 8px',
-          zIndex: 'var(--z-max)',
+          zIndex: 'var(--z-stage-manager)',
           overflowY: 'auto',
           overflowX: 'hidden',
           scrollbarWidth: 'none',

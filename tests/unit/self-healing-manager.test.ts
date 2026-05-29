@@ -83,15 +83,18 @@ vi.mock('electron-store', () => ({
 
 const mockFsStore: Record<string, string> = {};
 const mockDirs = new Set<string>();
+// Normalize separators so the mock matches both POSIX (`/`) seed paths and the
+// backslash paths that path.join() produces on Windows.
+const norm = (p: string) => p.replace(/\\/g, '/');
 
 vi.mock('fs', () => ({
-  existsSync: vi.fn((p: string) => mockDirs.has(p) || p in mockFsStore),
-  mkdirSync: vi.fn((p: string) => { mockDirs.add(p); }),
+  existsSync: vi.fn((p: string) => mockDirs.has(norm(p)) || norm(p) in mockFsStore),
+  mkdirSync: vi.fn((p: string) => { mockDirs.add(norm(p)); }),
   copyFileSync: vi.fn((src: string, dest: string) => {
-    mockFsStore[dest] = mockFsStore[src] ?? '';
+    mockFsStore[norm(dest)] = mockFsStore[norm(src)] ?? '';
   }),
-  readFileSync: vi.fn((p: string) => mockFsStore[p] ?? '{}'),
-  writeFileSync: vi.fn((p: string, data: string) => { mockFsStore[p] = data; }),
+  readFileSync: vi.fn((p: string) => mockFsStore[norm(p)] ?? '{}'),
+  writeFileSync: vi.fn((p: string, data: string) => { mockFsStore[norm(p)] = data; }),
   statSync: vi.fn(() => ({ size: 128 })),
   readdirSync: vi.fn(() => ['settings.json']),
   rmSync: vi.fn(),
