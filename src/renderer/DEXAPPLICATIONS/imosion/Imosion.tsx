@@ -711,6 +711,20 @@ const MAX_PLUGINS_PER_TRACK = 10;
 const MAX_SENDS_PER_TRACK = 8;
 const SAMPLE_RESOLUTION = 0.001; // 1ms precision for sample manipulation
 
+// Cap the decoded-AudioBuffer cache. Each entry is multi-MB of PCM; without a
+// bound the map grew once per played clip (including deleted clips) for the whole
+// session. FIFO-evict the oldest entry once over cap; an evicted clip simply
+// re-decodes on next playback. Keeps Imosion within the 8 GB long-session target.
+const MAX_DECODED_BUFFERS = 48;
+function cacheDecodedBuffer(cache: Map<string, AudioBuffer>, id: string, buffer: AudioBuffer): void {
+  cache.set(id, buffer);
+  while (cache.size > MAX_DECODED_BUFFERS) {
+    const oldest = cache.keys().next().value as string | undefined;
+    if (oldest === undefined || oldest === id) break;
+    cache.delete(oldest);
+  }
+}
+
 const DEFAULT_BUS: AudioBus = { id: '', name: '', type: 'aux', color: 'var(--color-accent)', volume: 1, pan: 0, muted: false, solo: false, plugins: [], output: 'master' };
 
 const DEFAULT_CLIP_PROPS = { fadeIn: 0, fadeOut: 0, pitch: 0, stretch: 1, reverse: false, trimStart: 0, trimEnd: 0, loopEnabled: false, loopStart: 0, loopEnd: 0, tempoLocked: true, originalBPM: 0, detectedKey: null as MusicalKey | null, detectedScale: null as MusicalScale | null, keyLocked: false, transposeAmount: 0, warpMode: 'beats' as const, speedMultiplier: 1 };
@@ -3953,12 +3967,12 @@ const Imosion: React.FC = () => {
               const response = await fetch(clip.url);
               const arrayBuf = await response.arrayBuffer();
               buffer = await ctx.decodeAudioData(arrayBuf);
-              decodedBuffersRef.current.set(clip.id, buffer);
+              cacheDecodedBuffer(decodedBuffersRef.current, clip.id, buffer);
             }
             // Synthesize audio for demo clips without real audio files
             if (!buffer && !clip.url) {
               buffer = synthesizeDemoBuffer(ctx, clip.name, clip.duration);
-              decodedBuffersRef.current.set(clip.id, buffer);
+              cacheDecodedBuffer(decodedBuffersRef.current, clip.id, buffer);
             }
             if (!buffer || cancelled) continue;
 

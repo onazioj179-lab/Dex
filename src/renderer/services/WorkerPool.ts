@@ -51,6 +51,9 @@ class WorkerPool {
   private enablePriority: boolean;
   private idCounter = 0;
   private initialized = false;
+  private paused = false;
+  private lifecycleInstalled = false;
+  private suspendTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: WorkerPoolOptions = {}) {
     this.maxWorkers = options.maxWorkers || Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
@@ -72,7 +75,44 @@ class WorkerPool {
 
     // Pre-spawn one worker for immediate use
     this.spawnWorker();
+    this.installLifecycle();
     this.initialized = true;
+  }
+
+  /**
+   * Pause background processing and free idle workers while the window is
+   * minimized/hidden, then resume when it returns. Cuts idle long-session
+   * resource pressure (8 GB target) without losing queued work — tasks stay
+   * queued and idle workers respawn lazily on the next submit.
+   */
+  private installLifecycle(): void {
+    if (this.lifecycleInstalled || typeof document === 'undefined') return;
+    this.lifecycleInstalled = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pause();
+        // Defer worker teardown briefly so a quick alt-tab doesn't thrash spawns.
+        if (this.suspendTimer) clearTimeout(this.suspendTimer);
+        this.suspendTimer = setTimeout(() => this.suspendIdle(), 10000);
+      } else {
+        if (this.suspendTimer) { clearTimeout(this.suspendTimer); this.suspendTimer = null; }
+        this.resume();
+      }
+    });
+  }
+
+  /**
+   * Terminate idle (non-busy) workers to release memory. Busy workers keep
+   * running so in-flight tasks complete; the queue is preserved.
+   */
+  private suspendIdle(): void {
+    for (let i = this.workers.length - 1; i >= 0; i--) {
+      const w = this.workers[i];
+      if (!w.busy) {
+        w.worker.terminate();
+        this.workers.splice(i, 1);
+      }
+    }
   }
 
   /**
@@ -249,6 +289,7 @@ class WorkerPool {
    * Process the task queue
    */
   private processQueue(): void {
+    if (this.paused) return;
     if (this.taskQueue.length === 0) return;
 
     // Find available worker
@@ -412,16 +453,19 @@ class WorkerPool {
   }
 
   /**
-   * Pause processing (keeps workers alive)
+   * Pause processing — queued tasks stay queued and are not dispatched until
+   * resume(). In-flight tasks on busy workers are allowed to finish.
    */
   pause(): void {
-    // Tasks stay in queue but aren't processed
+    this.paused = true;
   }
 
   /**
-   * Resume processing
+   * Resume processing and drain any tasks queued while paused.
    */
   resume(): void {
+    if (!this.paused) { this.processQueue(); return; }
+    this.paused = false;
     this.processQueue();
   }
 
@@ -429,6 +473,8 @@ class WorkerPool {
    * Terminate all workers and clear queue
    */
   terminate(): void {
+    if (this.suspendTimer) { clearTimeout(this.suspendTimer); this.suspendTimer = null; }
+    this.paused = false;
     // Reject pending tasks
     for (const task of this.taskQueue) {
       task.reject(new Error('Pool terminated'));
