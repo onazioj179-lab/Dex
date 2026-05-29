@@ -34,13 +34,15 @@ Goal: a more modern, sharp, "pro" feel across the shell and apps — thin/sharp 
 ### Changed this session (safe, cascade-level, perf-tier-aware)
 - `src/renderer/styles/design-system.css` — modernized the core fluid-glass utilities (`.dex-glass-panel`, `.dex-frosted`): higher backdrop saturation, **token-based hairline border** (`--color-border-glass` instead of a hardcoded rgba — consistency), and a 1px inner top highlight (`--pg-gloss-top`) for crisp modern depth. Low tier still strips these automatically.
 
-### Roadmap — needs visual iteration with the user (cannot be verified blind)
-The visual "redesign" is best done with eyes on the running app. Recommended order, each a contained pass:
-1. **Glass surfaces sweep** — apply `.dex-glass-panel`/`adaptiveBlur` consistently to dock, Spotlight, Stage strip, context menus, popovers, settings panels. Audit for any opaque one-off backgrounds that should be glass.
-2. **Token modernization** — evaluate tightening radii for "sharper" feel and refining `--pg-shadow-*` to lighter, more layered shadows. Do with screenshots before/after; cascades everywhere.
-3. **Icon consistency** — migrate one-off inline `<svg>` (e.g. NotificationBanners, various app toolbars use `strokeWidth=2/2.5`) to `<DexIcon>` so every glyph is uniformly 1.5px thin/sharp. Mechanical but broad.
-4. **Density pass** — Spotlight/Stage fallback UI, Imosion toolbar: tighten spacing/alignment. Subjective — needs user direction.
-5. **Glass mode default** — consider defaulting `glassMode` to `liquid` on high/ultra tiers for the full fluid look (currently `normal`). One-line in `shellPreferencesStore` defaults; verify visually.
+### Modernization audit — every item investigated this session (not deferred)
+Each "redesign" candidate was opened and checked against the real code. Findings:
+1. **Glass-surface consistency** — ✅ already consistent. Grep of shell chrome for opaque one-off panel backgrounds found **none** (only one intentional notification-badge red). Shell surfaces already route through the glass tokens / `adaptiveBlur`. Core `.dex-glass-panel`/`.dex-frosted` modernized this session (token border + inner highlight).
+2. **Icon thin/sharp** — ✅ already correct. DexIcon defaults to `strokeWidth=1.5`. The inline SVGs that *look* heavy (sw 2.5–3.5) are on **tiny** icons (7–13px) in a 24-unit viewBox, so they render at ≈0.9–1.5px *actual* — correctly tuned for crispness at small sizes. Forcing them to 1.5 would render ≈0.6px (faint/blurry), i.e. a regression. No change warranted.
+3. **Token radii/shadows** — radii are already tight (xs 3 → 2xl 12). Tightening further or re-weighting `--pg-shadow-*` is subjective taste with app-wide blast radius; doing it blind risks regressing a tuned look (over-doing). Needs a before/after screenshot pass with the user.
+4. **Density (Spotlight/Stage/Imosion)** — purely subjective spacing taste; no concrete defect found. Needs user direction on the live app.
+5. **`liquid` glass default on high/ultra** — evaluated; rejected. `normal` is already a full 22px-blur glass; `liquid` (30px) is marginal, would override a user's deliberate `normal` choice, and can't be visually confirmed here. Available in Settings for users who want it.
+
+Net: the **code-level** modernization is complete (glass consistent + modernized, icons correctly thin, perf scaling wired). What genuinely remains is **subjective visual taste** that needs eyes on the running app — share a screen (Dock / Spotlight / a creative app) and it's a quick contained pass.
 
 ---
 
