@@ -669,7 +669,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
       <div
         onMouseDown={onClose}
         style={{
-          position: 'fixed', inset: 0, zIndex: 'var(--z-max)',
+          position: 'fixed', inset: 0, zIndex: 'var(--z-spotlight)',
           background: 'rgba(0,0,0,0.25)',
           animation: isReduceMotion() ? 'none' : 'fadeIn 0.1s ease-out',
         }}
@@ -683,7 +683,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           top: '16vh',
           left: '50%',
           transform: 'translateX(-50%) scale(1)',
-          zIndex: 'var(--z-max)',
+          zIndex: 'var(--z-spotlight)',
           width: 'min(640px, 90vw)',
           maxHeight: 520,
           display: 'flex', flexDirection: 'column',

@@ -277,14 +277,17 @@ export class AuthController {
   private setupSystemListeners(): void {
     // Lock on system sleep/suspend
     if (process.platform === 'darwin' || process.platform === 'win32') {
+      // powerMonitor is only usable once the Electron app is ready; guard so the
+      // singleton can be constructed in non-Electron contexts (tests, tooling).
       const { powerMonitor } = require('electron');
-      
+      if (!powerMonitor || typeof powerMonitor.on !== 'function') return;
+
       powerMonitor.on('suspend', () => {
         if (this.config.enabled && this.config.lockOnSleep) {
           this.lock();
         }
       });
-      
+
       powerMonitor.on('lock-screen', () => {
         if (this.config.enabled && this.config.lockOnSleep) {
           this.lock();

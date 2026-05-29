@@ -2,7 +2,7 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.4** · Branch: `main` · Tag: `v4.60.4` (released) · Last session: 2026-05-28 (session 3)
+Current version: **4.60.4** · Branch: `main` · Tag: `v4.60.4` (released) · Last session: 2026-05-29 (session 4)
 Three-phase goal: [GOAL-1-COMPLETION.md](GOAL-1-COMPLETION.md) · [GOAL-2-STABILITY.md](GOAL-2-STABILITY.md) · [GOAL-3-RELEASE.md](GOAL-3-RELEASE.md)
 
 ### Release Artifacts per Platform
@@ -47,11 +47,32 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 | Forge queue | Capped at 200 jobs across all add-callsites. |
 | Notes autosave | Content save debounced to 500ms (was per-keystroke IPC). |
 | Release tooling | Node-based prune script. v4.60.4 tag pushed — release workflow triggered. |
-| Test suite | 8/8 workflow-runner tests passing. TS clean on renderer + main. |
+| Test suite | Full suite green on Windows: 4611 passed / 0 failed / 7 skipped (256 files). TS clean on renderer + main. |
 
 ---
 
 ## Files & Systems Recently Modified
+
+**Session 4 (2026-05-29): UI/UX stabilization — invalid `var()` + hex-alpha CSS bug**
+- Root cause: appending hex-alpha digits to a CSS `var()` token (e.g. `` `${iconColor}15` `` where `iconColor = 'var(--color-accent)'`) yields `var(--color-accent)15`, which is invalid CSS — the `var()` substitutes a color token, then a stray `15` follows, so the whole declaration is dropped and the element renders with no tint/border/glow. Only broken when the base is a `var()` token; concrete hex bases (`#RRGGBB` + `NN` → valid 8-digit hex) are unaffected, which is why it was easy to miss. Fixed with premultiplied `color-mix(in srgb, <color> N%, transparent)` (works for both hex and token inputs; Chromium ≥111 / Electron ≥28).
+- `src/renderer/shell/NotificationBanners.tsx` — icon-badge tint (l.262), grouped unread badge bg (l.717) + border (l.735), and timeline dot glow (l.781) were rendering transparent/invalid for every banner; now use `color-mix`. Affects all notifications (icon colors are always `var()` tokens).
+- `src/renderer/DEXAPPLICATIONS/vinx/Timeline.tsx` — `VINX_COLORS.videoTrack = 'var(--color-accent)'`, so every **video** clip lost its background tint, border, trim handles, frame-strip gradient, and transition gradients. Added `alpha(color, pct)` helper and routed the `getClipColor`-derived usages through it. Audio/title tracks (hex) were unaffected and untouched.
+
+**Session 4 (2026-05-29): Windows test-suite green + dead-code/leak cleanup**
+- Test suite went from **31 failing → 0** on Windows. All failures were Windows-only (the prior "green" baseline ran on Linux CI, which skips win32 branches / uses `/` separators):
+  - `src/main/controllers/AuthController.ts` — `setupSystemListeners()` called `powerMonitor.on(...)` from a `require('electron')` that returns no `powerMonitor` outside an Electron runtime, throwing during singleton construction at import time on win32/darwin. Guarded with `if (!powerMonitor || typeof powerMonitor.on !== 'function') return;` (real robustness fix, not just a test fix).
+  - `src/main/security/PathValidator.ts` — `sanitizeFilename` used platform `path.basename`, so on Windows `\` was treated as a separator (dropping the prefix) instead of being sanitized. Switched to `path.posix.basename` so only `/` strips directories and the regex neutralises `\` identically on every OS. Only caller (`main.ts:3438`) passes a URL-derived basename, so behaviour is unchanged in production.
+  - `tests/unit/self-healing-manager.test.ts` — fs mock now normalises `\`→`/` so it matches `path.join` output on Windows.
+  - `tests/unit/path-validator.test.ts` — `MOCK_HOME`/`os.homedir` mock made platform-absolute via `path.resolve`; return-value assertions wrapped in `path.resolve` (no-op on POSIX); symlink `realpathSync` mock returns a `path.join` path so it matches `BLOCKED_PATHS`.
+  - `tests/unit/renderer-pages.test.tsx` — Power page tests now wrap `<Power/>` in `<WithToast>` (Power started using `useToastHelpers` in 2522dba; tests weren't updated).
+- `src/renderer/shell/NotificationBanners.tsx` — pruned `recentTitlesRef` duplicate-coalesce map past the 5s window (was one retained entry per distinct notification title forever → unbounded long-session growth). Addresses the "notification stale layer" backlog item.
+- Deleted dead code: `src/renderer/services/CollaborationLayer.ts` (938 lines, zero refs after session-3 barrel prune) and `src/renderer/store/notificationStore.ts` (zero importers; HANDOFF's "1 importer" note conflated a local const in SystemFeatures.tsx).
+- Verified-stale backlog notes (no fix needed): Gallery has proper infinite-scroll pagination (`visibleCount` grows via IntersectionObserver + Load More) — no hardcoded 200 cap exists; `featureSuiteStore` is **live** (Files.tsx `useColorLabelsStore`) — kept.
+- **Z-index ladder consistency** (Spotlight/Stage backlog): components were hardcoding `var(--z-max)` (9999) instead of their dedicated ladder tokens, floating above everything incl. modals/toasts/context-menus:
+  - `src/renderer/shell/SpotlightSearch.tsx` — overlay backdrop + container now use `--z-spotlight` (8500).
+  - `src/renderer/shell/StageManager.tsx` — left-edge strip + hit-zone now use `--z-stage-manager` (5400).
+  - `src/renderer/DEXAPPLICATIONS/vinx/Vinx.tsx` — clip context menu now uses `--z-context-menu` (9700) and replaced hardcoded `#333`/`#555`/`#e0e0e0` with `--color-border`/`--color-text-disabled`/`--color-text-primary` tokens (theme-aware, consistent with shell context menus).
+- Final validation: **4611 passed / 0 failed / 7 skipped** (256 files), `tsc --noEmit` clean on renderer + main.
 
 **Session 3 (2026-05-28): Completion & consistency pass**
 - `src/renderer/DEXAPPLICATIONS/forge/Forge.tsx` — MAX_QUEUE_JOBS=200 cap at all 8 add-job callsites; bulk drops slice to remaining capacity (was unbounded → OOM risk)
@@ -109,25 +130,27 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 - **Notes per-keystroke IPC**: Fixed — content save debounced to 500ms.
 - **CollaborationLayer dead exports**: Removed from barrel. File itself (938 lines) retained — not deleted, but no longer reachable via services/index.ts.
 - **32-bit Windows**: Not supported — Electron ≥28 dropped ia32. x64+ARM64 only. Correct.
+- **DexCode "exposed debug elements"**: Re-audited (session 4). The output panel, status bar, and footer hint bar are intentional production UI — no `console.`/`__DEV__`/`process.env` leakage or raw dev dumps. No fix needed; backlog note was stale.
+- **`var()` + hex-alpha invalid-CSS antipattern**: Swept `src/renderer` (session 4). Only `var()`-token bases were broken — found in NotificationBanners + Vinx Timeline (both fixed). All other `${color}NN` sites use concrete hex (`track.color`, `app.color`, `meta.color`, `marker.color`, hardcoded `activeColor`) → valid 8-digit hex, not broken.
 
 ---
 
 ## Remaining UI/UX Work
 
-- **Gallery.tsx 200-item hardcoded limit**: Line 210. Low priority.
-- **Spotlight / Stage**: Old fallback UI still partially visible. Needs density pass.
-- **DexCode output panel**: Exposed debug elements in release UI.
-- **Creative app panels** (Vinx timeline, Imosion toolbar): Density and alignment pass needed.
+- ~~**Gallery.tsx 200-item hardcoded limit**~~ Verified non-issue (session 4): uses infinite-scroll pagination (`visibleCount` + IntersectionObserver + Load More). No hardcoded cap.
+- **Spotlight / Stage**: Old fallback UI still partially visible. Needs density pass. *(Deferred — subjective polish, no concrete defect; goal forbids speculative redesign.)*
+- ~~**DexCode output panel**: Exposed debug elements~~ Re-audited session 4 — no leakage, backlog note was stale.
+- **Creative app panels** (Vinx timeline, Imosion toolbar): Density and alignment pass needed. *(Vinx video-clip color rendering fixed session 4; remaining density work deferred — subjective.)*
 - ~~Tasks drag-drop~~ Done (2522dba). ~~Power polling toast~~ Done (2522dba). ~~pg-text tokens~~ Done (session 2).
 
 ---
 
 ## Remaining Internal Systems Work
 
-- **CollaborationLayer.ts**: Barrel exports removed (session 3). File (938 lines) still on disk but unreachable. Safe to delete in a future cleanup once confirmed no dynamic import references it.
-- **Remaining unused stores**: `featureSuiteStore` (2 importers), `notificationStore` (1 importer) — verify dead before removing.
+- ~~**CollaborationLayer.ts**~~ Deleted session 4 (zero refs confirmed across src/tests).
+- ~~**Remaining unused stores**~~ Session 4: `notificationStore` deleted (zero importers); `featureSuiteStore` is **live** (Files.tsx `useColorLabelsStore`) — kept.
 - **Shell workspace restoration**: Now wired (session 2). Crash/restart recovery path still needs end-to-end smoke test on real abnormal exit.
-- **Notification stale layer**: Rendering stale-layer cleanup pass.
+- ~~**Notification stale layer**~~ Session 4: pruned unbounded `recentTitlesRef` coalesce map in NotificationBanners.
 - ~~Notes autosave reliability~~ Done (session 3, 500ms debounce). ~~Browser tab suspension~~ Already implemented. ~~UKI stream cleanup~~ Non-issue (Web Speech API self-manages).
 
 ---
@@ -170,7 +193,7 @@ Production stabilization and ecosystem polish — no new features. Objectives:
 | Item | State |
 |---|---|
 | CI: Lint & Type Check | Green |
-| CI: Unit Tests | 8/8 workflow-runner. Full suite was 4602 passing locally (last run). |
+| CI: Unit Tests | Full suite green on Windows: 4611 passed / 0 failed / 7 skipped (session 4). |
 | Memory leak fixes | Committed and pushed. |
 | CSS motion degradation | Fixed and pushed. |
 | Shell cleanup | Committed and pushed. |
