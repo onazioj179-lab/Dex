@@ -60,13 +60,15 @@ export const adaptiveShadow = (highValue: string, midValue?: string): { boxShado
   return { boxShadow: highValue };
 };
 
-/** Standard glass menu/dropdown: frosted glass with border */
+/** Standard glass menu/dropdown: frosted glass with rim-lit edge */
 export const glassMenu: React.CSSProperties = {
   background: 'var(--color-bg-glass, rgba(28, 28, 32, 0.72))',
   ...adaptiveBlur(20, 180),
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 6,
-  boxShadow: '0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.25)',
+  border: '1px solid rgba(255, 255, 255, 0.10)',
+  borderRadius: 10,
+  // Layered drop shadow + top rim-light: the "light catches the top edge"
+  // vibrancy that reads as premium fluid glass on a dark surface.
+  boxShadow: '0 8px 28px rgba(0,0,0,0.42), 0 2px 8px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.10)',
 };
 
 /** Stronger panel for sidebars/cards */
@@ -74,8 +76,8 @@ export const glassPanel: React.CSSProperties = {
   background: 'var(--color-bg-surface)',
   ...adaptiveBlur(12, 150),
   border: '1px solid var(--color-border-subtle)',
-  borderRadius: 6,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+  borderRadius: 10,
+  boxShadow: '0 2px 10px rgba(0,0,0,0.26), inset 0 0.5px 0 rgba(255,255,255,0.06)',
 };
 
 /** Lighter glass for toolbar-level elements */
@@ -83,7 +85,8 @@ export const glassToolbar: React.CSSProperties = {
   background: 'var(--color-bg-elevated)',
   ...adaptiveBlur(12, 150),
   border: '1px solid var(--color-border)',
-  borderRadius: 6,
+  borderRadius: 8,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.22), inset 0 0.5px 0 rgba(255,255,255,0.05)',
 };
 
 /** Glass overlay for modals/palettes */
