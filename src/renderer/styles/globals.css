@@ -118,6 +118,15 @@ html[data-thermal-state="warm"] [style*="backdropFilter"] {
   backdrop-filter: blur(16px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
 }
+/* Warm: also cap class/token glass blur so the heaviest surfaces ease off
+   before the machine reaches the "hot" cutoff. */
+html[data-thermal-state="warm"] .dex-glass-panel,
+html[data-thermal-state="warm"] .dex-frosted,
+html[data-thermal-state="warm"] .liquid-glass-dock,
+html[data-thermal-state="warm"] .liquid-glass-overlay {
+  backdrop-filter: blur(14px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+}
 html[data-thermal-state="warm"] .animate-float,
 html[data-thermal-state="warm"] .animate-pulse {
   animation-duration: 3s !important;
