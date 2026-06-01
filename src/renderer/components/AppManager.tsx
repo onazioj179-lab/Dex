@@ -4664,7 +4664,7 @@ export const AppManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom hover trigger zone -- center-only with hover-intent (velocity + dwell) to prevent accidental popups */}
+      {/* Bottom hover trigger zone -- full-width strip with hover-intent (velocity + dwell) to prevent accidental popups */}
       <div
         onMouseEnter={(e) => beginDockIntent(e)}
         onMouseMove={(e) => trackDockIntent(e)}
