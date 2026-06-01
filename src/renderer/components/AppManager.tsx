@@ -4674,9 +4674,13 @@ export const AppManager: React.FC = () => {
         onPointerMove={(e) => trackDockIntent(e)}
         onPointerLeave={() => { cancelDockIntent(); scheduleDockHide(); }}
         style={{
-          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-          width: 320,
-          height: 32,
+          // Full-width bottom reveal strip: a cursor thrown to the bottom screen
+          // edge anywhere (not just the center 320px) now reveals the dock — the
+          // standard auto-hide pattern. The hover-intent gate (dwell + velocity)
+          // still prevents accidental popups, and the thin height avoids stealing
+          // app interaction along the bottom edge.
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          height: 8,
           zIndex: 5001, cursor: 'default', background: 'transparent',
           pointerEvents: anyWindowMaximized ? 'none' : 'auto',
         }}
