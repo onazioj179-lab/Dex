@@ -1,7 +1,16 @@
 # DEX — Premium UI/UX Phase HANDOFF
 
 Companion to the main `HANDOFF.md` (stabilization sessions 1–4). Start here for the
-premium UI/UX + overheat/dock work. Version **4.60.4** · Branch `main`.
+premium UI/UX + overheat/dock work. Version **4.60.5** · Branch `main`.
+
+> **Release status (2026-06-01):** v4.60.5 tagged and the **release workflow is building
+> (unsigned)**. Root cause that blocked ALL releases since v4.60.1 was found & fixed:
+> `release.yml` used `if: ${{ secrets.DEX_UPDATES_TOKEN != '' }}` — GitHub forbids the
+> `secrets` context in `if:`, failing the workflow at startup in 0s (added in `1484dc8`,
+> i.e. every tag after v4.60.1 silently failed). Fixed in `fc3c183` (lift to job `env`,
+> test `env.` in `if:`). The workflow auto-prunes old releases to newest 3 after publish,
+> satisfying the "release first, then delete old exe's" request. Code signing still not
+> configured (set `CSC_LINK`/`CSC_KEY_PASSWORD` repo secrets for signed builds).
 
 > **Accuracy log (read this):** Two earlier missteps this phase, now corrected —
 > 1. Commit `e29845c` claimed an overheat fix landed; it didn't (a `TierManager` edit
