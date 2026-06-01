@@ -137,6 +137,18 @@ html[data-thermal-state="hot"] [style*="backdropFilter"] {
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
 }
+/* When sustained-hot, kill ALL backdrop-filter — not just inline-styled
+   elements. Class/token glass (.dex-glass-panel, .dex-frosted, .liquid-glass-*,
+   tokenized surfaces) otherwise keeps re-rasterizing blur every frame, which is
+   the dominant continuous GPU cost driving overheat on weaker machines. Applied
+   dynamically by ThermalAdaptiveMonitor only while hot; auto-removed when FPS
+   recovers. Mirrors the proven html[data-perf-tier="low"] rule. */
+html[data-thermal-state="hot"] *,
+html[data-thermal-state="hot"] *::before,
+html[data-thermal-state="hot"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
 html[data-thermal-state="hot"] .animate-pulse,
 html[data-thermal-state="hot"] .animate-spin,
 html[data-thermal-state="hot"] .animate-float,
