@@ -2,7 +2,9 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.4** · Branch: `main` · Last session: 2026-05-29 (UI/UX modernization phase opened)
+Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-01 (overheat + dock fixes, v4.60.5 release tagged unsigned)
+
+> See **HANDOFF-PREMIUM.md** for the premium UI/UX phase: overheat fix (thermal-hot universal backdrop-filter kill), dock full-width reveal fix, fluid-glass refinement. v4.60.5 tagged to trigger an unsigned release build; the release workflow auto-prunes old releases to newest 3.
 
 ### Release Artifacts per Platform
 | Platform | Artifacts |
