@@ -20,7 +20,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # Windows-only release builds for now (per product decision). macOS/Linux
+        # targets remain wired below behind matrix.os guards — re-add them to this
+        # list to ship those platforms again.
+        os: [windows-latest]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,12 +42,11 @@ jobs:
         run: npm run package:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Code-signing: set CSC_LINK (base64-encoded .pfx) and CSC_KEY_PASSWORD
-          # in repo Settings → Secrets → Actions.  When both secrets are present,
-          # electron-builder will sign the .exe automatically.  Without them the
-          # build still succeeds but Windows Defender will flag the unsigned binary.
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Unsigned build: CSC_LINK / CSC_KEY_PASSWORD are intentionally NOT set
+          # here. electron-builder treats an *empty-but-defined* CSC_LINK as a file
+          # path and fails ("Env WIN_CSC_LINK is not correct, cannot resolve"), so
+          # the vars must be ABSENT, not empty, to skip signing. To sign later, set
+          # the secrets and add them back as env here.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Build (macOS)
