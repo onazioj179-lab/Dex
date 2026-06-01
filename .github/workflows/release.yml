@@ -80,6 +80,12 @@ jobs:
     name: Publish release
     needs: build
     runs-on: ubuntu-latest
+    # Lift the optional dex-updates token to job env so it can be referenced in a
+    # step-level `if:` — GitHub does NOT allow the `secrets` context in `if:`
+    # conditions (doing so fails the whole workflow at startup with "workflow file
+    # issue"). `env` IS allowed in `if:`.
+    env:
+      DEX_UPDATES_TOKEN: ${{ secrets.DEX_UPDATES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -139,7 +145,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/prune-releases.js --repo "${{ github.repository }}" --keep 3
       - name: Publish to dex-updates auto-update channel
-        if: ${{ secrets.DEX_UPDATES_TOKEN != '' }}
+        if: ${{ env.DEX_UPDATES_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.DEX_UPDATES_TOKEN }}
         run: |
