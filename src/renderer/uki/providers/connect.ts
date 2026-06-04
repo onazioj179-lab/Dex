@@ -16,6 +16,7 @@
 import { getProvider, providerForModel } from './registry';
 import { chat, type FetchLike, type ChatOptions } from './orchestrator';
 import { createStreamParser, type StreamFormat } from './stream';
+import { getPreferredModel } from './modelPrefs';
 import { configuredProviders, getApiKey } from '../keystore';
 import type { ChatMessage, ProviderId } from './types';
 
@@ -27,16 +28,24 @@ import type { ChatMessage, ProviderId } from './types';
 export const PROVIDER_PRIORITY: ProviderId[] = ['openai', 'anthropic', 'google', 'openrouter', 'ollama'];
 
 /**
- * Pick the default chat model id for the first configured provider (in priority
- * order). `configured` is the list of provider ids that have a stored key — passed
- * in so this stays pure/testable. Returns null when nothing is configured.
+ * Pick the chat model id for the first configured provider (in priority order):
+ * the user's preferred model for that provider if it's set and still valid, else
+ * the provider's default (first) model. `configured` is the list of provider ids
+ * that have a stored key; `prefFor` resolves a provider's preferred model — both
+ * injected so this stays pure/testable. Returns null when nothing is configured.
  */
-export function pickConfiguredModelId(configured: readonly string[]): string | null {
+export function pickConfiguredModelId(
+  configured: readonly string[],
+  prefFor: (providerId: string) => string | null = getPreferredModel,
+): string | null {
   for (const pid of PROVIDER_PRIORITY) {
     if (!configured.includes(pid)) continue;
     const provider = getProvider(pid);
-    const model = provider?.listModels()[0];
-    if (model) return model.id;
+    if (!provider) continue;
+    const models = provider.listModels();
+    const preferred = prefFor(pid);
+    if (preferred && models.some((m) => m.id === preferred)) return preferred;
+    if (models[0]) return models[0].id;
   }
   return null;
 }

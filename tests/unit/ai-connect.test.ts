@@ -8,9 +8,45 @@ import {
   type StreamFetchLike,
 } from '../../src/renderer/uki/providers/connect';
 import { setApiKey } from '../../src/renderer/uki/keystore';
+import { getPreferredModel, setPreferredModel, clearPreferredModel } from '../../src/renderer/uki/providers/modelPrefs';
 import type { FetchLike } from '../../src/renderer/uki/providers/orchestrator';
 
 beforeEach(() => localStorage.clear());
+
+describe('modelPrefs (per-provider preferred model)', () => {
+  it('round-trips and clears a preference', () => {
+    expect(getPreferredModel('openai')).toBeNull();
+    setPreferredModel('openai', 'gpt-4o-mini');
+    expect(getPreferredModel('openai')).toBe('gpt-4o-mini');
+    clearPreferredModel('openai');
+    expect(getPreferredModel('openai')).toBeNull();
+  });
+
+  it('setting an empty model clears the preference', () => {
+    setPreferredModel('openai', 'gpt-4o-mini');
+    setPreferredModel('openai', '');
+    expect(getPreferredModel('openai')).toBeNull();
+  });
+});
+
+describe('pickConfiguredModelId honors the preferred model', () => {
+  it('uses a valid preferred model over the default', () => {
+    expect(pickConfiguredModelId(['openai'], () => 'gpt-4o-mini')).toBe('gpt-4o-mini');
+  });
+
+  it('falls back to the default when the preferred model is invalid', () => {
+    expect(pickConfiguredModelId(['openai'], () => 'not-a-real-model')).toBe('gpt-4o');
+  });
+
+  it('falls back to the default when no preference is set', () => {
+    expect(pickConfiguredModelId(['openai'], () => null)).toBe('gpt-4o');
+  });
+
+  it('reads the real modelPrefs store by default', () => {
+    setPreferredModel('openai', 'gpt-4o-mini');
+    expect(pickConfiguredModelId(['openai'])).toBe('gpt-4o-mini');
+  });
+});
 
 describe('pickConfiguredModelId (pure model selection)', () => {
   it('returns null when nothing is configured', () => {

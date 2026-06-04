@@ -15,6 +15,7 @@
 import React, { useState } from 'react';
 import { allProviders } from '../uki/providers/registry';
 import { getApiKey, setApiKey, removeApiKey } from '../uki/keystore';
+import { getPreferredModel, setPreferredModel } from '../uki/providers/modelPrefs';
 
 const AiProviderSettings: React.FC = () => {
   const providers = allProviders();
@@ -23,7 +24,17 @@ const AiProviderSettings: React.FC = () => {
     for (const p of providers) init[p.id] = getApiKey(p.id) ?? '';
     return init;
   });
+  const [models, setModels] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const p of providers) init[p.id] = getPreferredModel(p.id) ?? p.listModels()[0]?.id ?? '';
+    return init;
+  });
   const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  const chooseModel = (id: string, modelId: string) => {
+    setModels((m) => ({ ...m, [id]: modelId }));
+    setPreferredModel(id, modelId);
+  };
 
   const connected = (id: string) => (getApiKey(id)?.length ?? 0) > 0;
 
@@ -107,8 +118,25 @@ const AiProviderSettings: React.FC = () => {
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            Models: {p.listModels().map((m) => m.label).join(' · ')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }} htmlFor={`model-${p.id}`}>
+              Model
+            </label>
+            <select
+              id={`model-${p.id}`}
+              value={models[p.id] ?? ''}
+              onChange={(e) => chooseModel(p.id, e.target.value)}
+              aria-label={`${p.label} model`}
+              style={{
+                height: 28, padding: '0 8px', borderRadius: 8, fontSize: 12,
+                background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              {p.listModels().map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
           </div>
         </div>
       ))}
