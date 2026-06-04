@@ -28,7 +28,23 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > (`ids: ['uki','aiproviders']`) + render `case 'aiproviders'`. **Verified live in the Vite preview:**
 > Settings → AI Providers renders OpenAI/Anthropic/Google/Ollama/OpenRouter with **4 key inputs**
 > (the 4 key-requiring providers); `tsc --noEmit` = **0 errors**. A user can now paste a key and it
-> persists. Remaining for end-to-end chat: wire `UkiOverlay` to `orchestrator.chat()`/`createStreamParser`.
+> persists.
+>
+> ✅ **UKI → LLM WIRING (2026-06-04) — the assistant now talks to the configured provider.**
+> New `src/renderer/uki/providers/connect.ts` bridges the framework to UKI's chat surface:
+> `pickConfiguredModelId(configured)` (pure — priority openai→anthropic→google→openrouter→ollama,
+> returns that provider's default model), `hasConfiguredProvider()` (reads the keystore), and
+> `askConfiguredLLM(userText, systemPrompt, {history, fetchImpl})` (builds system+history+user
+> messages, runs `orchestrator.chat`, returns text or **null on any failure so UKI never hard-fails**).
+> Wired into `UkiOverlay.tsx`: in the free-form fallback (after the structured slash/app/system/web
+> routes), **if a provider key is configured** it builds a `buildSystemPrompt` context + the last 4
+> turns and calls `askConfiguredLLM`; on success it streams the real LLM reply, else it degrades to
+> the existing local-AI/HuggingFace fallback. **10 new unit tests green** (`ai-connect` — pure model
+> selection, keystore-gated `hasConfiguredProvider`, and end-to-end `askConfiguredLLM` via injectable
+> fetch incl. system+history ordering and graceful HTTP-failure/empty degradation). `tsc` = **0**;
+> live app re-renders clean after HMR (no Vite error). **End-to-end path is now closed:** paste a key
+> in Settings → AI Providers, ask UKI a free-form question → it routes to that provider. (Structured
+> commands still answer instantly/offline; only un-routed free-form questions escalate to the LLM.)
 >
 > 🔄 **SYNC-ENGINE CORE (2026-06-04) — second "needs-runtime" item, built + tested as pure logic.**
 > `src/shared/sync/`: **`lww.ts`** — Last-Writer-Wins CRDT register + map (deterministic conflict

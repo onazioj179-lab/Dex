@@ -19,6 +19,7 @@ import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 import { UKIPatternStore } from '../services/UKIPatternStore';
 import { buildSystemPrompt } from '../uki';
+import { askConfiguredLLM, hasConfiguredProvider } from '../uki/providers/connect';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -1542,6 +1543,41 @@ const UkiOverlay: React.FC = () => {
     pushStep('No structured route matched -- escalating to local AI');
     useUkiStore.getState().setTranscript(text);
     setStreamingResponse('');
+
+    // Real LLM first — if the user pasted a provider key in Settings -> AI Providers,
+    // route the free-form question through the AI-provider framework (orchestrator.chat).
+    if (hasConfiguredProvider()) {
+      pushStep('Configured AI provider found -- querying LLM');
+      let fgApp: string | null = null;
+      let openIds: string[] = [];
+      let isOnline = true;
+      try {
+        const ra = useRunningApps.getState();
+        fgApp = ra.currentAppId ?? null;
+        openIds = (ra.runningApps ?? []).map(a => a.id);
+        isOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+      } catch { /* best-effort context */ }
+      const sysPrompt = buildSystemPrompt({
+        foregroundAppId: fgApp,
+        openAppIds: openIds,
+        online: isOnline,
+        localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+      // Give the model a little conversational context (last few turns).
+      const recent = useUkiStore.getState().conversationHistory.slice(-4);
+      const history = recent.flatMap(t => ([
+        { role: 'user' as const, content: t.userText || '' },
+        { role: 'assistant' as const, content: t.response || '' },
+      ])).filter(m => m.content);
+      const llmReply = await askConfiguredLLM(normalized, sysPrompt, { history });
+      if (llmReply) {
+        pushStep('LLM returned a response');
+        streamResponse(empathyPrefix + llmReply, 'llm', text, false);
+        return;
+      }
+      pushStep('LLM call failed/empty -- continuing to local fallback');
+    }
+
     const dex = (window as any).dex;
     if (dex?.uki?.query) {
       try {
