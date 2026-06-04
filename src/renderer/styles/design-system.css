@@ -336,6 +336,38 @@
   --pg-curve-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ─────────────────────────────────────────────────────────────────────────
+     DEX Motion Framework (v4.61) — one motion contract, organised by category.
+     Each token is a `duration easing` pair, used directly as the tail of a
+     transition: `transition: transform var(--motion-dock-reveal)`. Animation
+     exists to communicate STATE, never decoration. Durations stay tight and
+     interruptible. Low perf-tier clamps every transition to 50ms and thermal
+     `critical` disables them entirely (universal rules further down), so these
+     are the high-end defaults — the gating is centralised, not per call site.
+     The programmatic twin of this contract lives in UnifiedMotionSystem.ts
+     (same names: window-x, workspace-x, dock-x, panel-x).
+     ───────────────────────────────────────────────────────────────────────── */
+  /* Window motion — spatial, deliberate */
+  --motion-window-open: 220ms var(--pg-curve-decelerate);
+  --motion-window-close: 160ms var(--pg-curve-accelerate);
+  --motion-window-minimize: 200ms var(--pg-curve-accelerate);
+  --motion-window-restore: 220ms var(--pg-curve-decelerate);
+  --motion-window-expand: 240ms var(--ease-spring);
+  /* Workspace motion — larger surfaces, smooth glide */
+  --motion-workspace-switch: 260ms var(--ease-tahoe);
+  --motion-project-switch: 300ms var(--ease-tahoe);
+  --motion-focus-switch: 180ms var(--pg-curve-decelerate);
+  /* Dock motion — snappy, anchored */
+  --motion-dock-reveal: 200ms var(--pg-curve-decelerate);
+  --motion-dock-hide: 160ms var(--pg-curve-accelerate);
+  --motion-dock-launch: 360ms var(--ease-spring);
+  --motion-dock-hover: 120ms var(--ease-out);
+  --motion-dock-drag: 90ms var(--ease-out);
+  /* Panel motion — expand / collapse / reorganise */
+  --motion-panel-expand: 200ms var(--pg-curve-decelerate);
+  --motion-panel-collapse: 160ms var(--pg-curve-accelerate);
+  --motion-panel-reorganize: 240ms var(--ease-spring);
+
+  /* ─────────────────────────────────────────────────────────────────────────
      Translucency Scale (M3) — opacity rungs for glass / popover / panel layers
      Use as `background: rgba(22,22,24, var(--pg-translucency-3))` etc.
      ───────────────────────────────────────────────────────────────────────── */
@@ -670,6 +702,81 @@
   background: var(--surface-tinted);
   backdrop-filter: blur(20px) saturate(130%);
   -webkit-backdrop-filter: blur(20px) saturate(130%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEX Surface Framework (v4.61) — four named material tiers.
+   Pick a surface by ROLE, not by how it looks. One vocabulary across the whole
+   ecosystem so every panel/menu/overlay reads as the same system:
+     .dex-surface-solid   → core productivity & creative workspaces (opaque)
+     .dex-surface-soft    → utility panels & secondary content (light frost)
+     .dex-surface-glass   → shell UI: dock, control center, notifications
+     .dex-surface-overlay → context menus, quick actions, transient popovers
+   All four are built only from existing design tokens (no one-off values), and
+   the universal low-tier / thermal-hot rules below strip backdrop-filter + box-
+   shadow, so each tier keeps an opaque-enough base that stays readable with the
+   blur removed. The motion contract above supplies their transitions.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dex-surface-solid {
+  background: var(--color-bg-surface-solid);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--pg-shadow-card);
+}
+.dex-surface-soft {
+  background: var(--surface-matte);
+  border: 1px solid var(--pg-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-contact-2), var(--pg-gloss-top);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+}
+.dex-surface-glass {
+  background: var(--surface-glass);
+  border: 1px solid var(--color-border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--pg-shadow-panel), var(--pg-gloss-top);
+  backdrop-filter: blur(24px) saturate(185%);
+  -webkit-backdrop-filter: blur(24px) saturate(185%);
+}
+.dex-surface-overlay {
+  background: var(--pg-surface-strong);
+  border: 1px solid var(--pg-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--pg-shadow-context), var(--pg-gloss-top);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEX Comfort & Accessibility (v4.61) — user-controlled overrides applied to
+   <html> by improvements500/comfortPrefs.ts. Defaults are no-ops: nothing
+   changes until the user opts in (data-reduce-motion="off",
+   data-contrast="normal", --dex-text-scale: 1).
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root { --dex-text-scale: 1; }
+
+/* Forced reduce-motion (user override, independent of the OS media query). */
+html[data-reduce-motion="on"] *,
+html[data-reduce-motion="on"] *::before,
+html[data-reduce-motion="on"] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High-contrast: firmer borders + stronger secondary/tertiary text and a clear
+   focus ring. Token-level so it cascades across every app and surface. */
+html[data-contrast="high"] {
+  --color-border: rgba(255, 255, 255, 0.32);
+  --color-border-default: rgba(255, 255, 255, 0.32);
+  --color-border-strong: rgba(255, 255, 255, 0.50);
+  --color-text-secondary: #E6E6EA;
+  --color-text-tertiary: #C4C4CC;
+}
+html[data-contrast="high"] *:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* Premium button with spring interaction */
@@ -1652,9 +1759,9 @@ img, svg {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* Dim scrim only — NOT a full-screen blur. Blurring the whole desktop behind a
+     dialog is jarring (and costly); a dim focuses attention without the haze. */
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;

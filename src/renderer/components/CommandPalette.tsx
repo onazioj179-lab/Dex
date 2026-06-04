@@ -16,6 +16,8 @@ import { toggleTheme } from '../utils/theme';
 import { useFocusTrap } from '../utils/useFocusTrap';
 import { safeMath, formatResult } from '../utils/safeMath';
 import { platform } from '../utils';
+import { scopedQuery } from '../services/commandScope';
+import { getRecentCommandIds, recordRecentCommand } from '../services/recentCommands';
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 
@@ -153,6 +155,7 @@ function fuzzyScore(query: string, text: string): number {
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
@@ -231,12 +234,26 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
-    if (!query.trim()) return commands;
-    const q = query.toLowerCase();
+    if (!query.trim()) {
+      // Empty box: surface recently-used commands at the top (deduped from the
+      // normal groups below), then the full list. `recentIds` is refreshed in
+      // state whenever the palette opens, so this memo recomputes with fresh data.
+      const recent = recentIds
+        .map(id => commands.find(c => c.id === id))
+        .filter((c): c is Command => !!c)
+        .map(c => ({ ...c, category: 'recent' as const }));
+      if (recent.length === 0) return commands;
+      const recentSet = new Set(recentIds);
+      return [...recent, ...commands.filter(c => !recentSet.has(c.id))];
+    }
+    // Scoped search ("in:apps prism", "kind:settings"): filter by category, then
+    // fuzzy-match the residual text. Unrecognised scopes fall back to a normal search.
+    const { text: scopeText, allowedCategories } = scopedQuery(query);
+    const q = scopeText.toLowerCase();
 
-    // Math evaluation
-    const mathResult = tryEvalMath(query);
-    const unitResult = tryUnitConvert(query);
+    // Math evaluation (on the residual text after any scope prefix)
+    const mathResult = tryEvalMath(scopeText);
+    const unitResult = tryUnitConvert(scopeText);
     const inlineResults: Command[] = [];
     if (mathResult) inlineResults.push({
       id: 'math-result',
@@ -257,7 +274,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       keywords: [],
     });
 
-    const scored = commands.map(cmd => {
+    const scored = commands
+      .filter(cmd => !allowedCategories || allowedCategories.has(cmd.category))
+      .map(cmd => {
       const titleScore = fuzzyScore(q, cmd.title);
       const keywordScore = cmd.keywords ? Math.max(...cmd.keywords.map(k => fuzzyScore(q, k))) : 0;
       const subtitleScore = cmd.subtitle ? fuzzyScore(q, cmd.subtitle) : 0;
@@ -265,16 +284,25 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     }).filter(x => x.score > 0);
     scored.sort((a, b) => b.score - a.score);
     return [...inlineResults, ...scored.map(x => x.cmd)];
-  }, [commands, query]);
+  }, [commands, query, recentIds]);
 
   // Reset state when opened
   useEffect(() => {
     if (isOpen) {
       setQuery('');
       setSelectedIndex(0);
+      setRecentIds(getRecentCommandIds()); // refresh recents each time it opens
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
+
+  // Execute a command: record it as recent (except transient math/unit results),
+  // run its action, and close.
+  const runCommand = useCallback((cmd: Command) => {
+    if (cmd.id !== 'math-result' && cmd.id !== 'unit-result') recordRecentCommand(cmd.id);
+    cmd.action();
+    onClose();
+  }, [onClose]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -290,8 +318,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       case 'Enter':
         e.preventDefault();
         if (filteredCommands[selectedIndex]) {
-          filteredCommands[selectedIndex].action();
-          onClose();
+          runCommand(filteredCommands[selectedIndex]);
         }
         break;
       case 'Escape':
@@ -299,7 +326,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         onClose();
         break;
     }
-  }, [filteredCommands, selectedIndex, onClose]);
+  }, [filteredCommands, selectedIndex, onClose, runCommand]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -485,7 +512,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                         ...(isSelected ? styles.itemSelected : {}),
                         color: isSelected ? '#fff' : undefined,
                       }}
-                      onClick={() => { cmd.action(); onClose(); }}
+                      onClick={() => runCommand(cmd)}
                       onMouseEnter={() => setSelectedIndex(currentIndex)}
                     >
                       <div style={{

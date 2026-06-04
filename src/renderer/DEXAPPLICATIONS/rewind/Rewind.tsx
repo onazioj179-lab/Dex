@@ -5,12 +5,13 @@
  * DVR for your desktop day -- records active windows, clipboard,
  * file events, browser tabs. All local, no cloud, no accounts.
  */
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { RewindViewErrorBoundary } from './RewindViewErrorBoundary';
 import { getBundledAppVersion } from '../../utils/appVersion';
 import DexIcon from '../../components/DexIcon';
 import { useConfirm } from '../../components/ConfirmDialog';
+import { buildTimeline, sessionDuration } from '../../../shared/rewind/timeline';
 
 // ===========================================================================
 // TYPES
@@ -1105,6 +1106,16 @@ const timer = setInterval(check, 15000);
 
   const userInitial = username.charAt(0).toUpperCase();
 
+  // Group the loaded activity into work sessions by idle gap, for a scannable
+  // timeline summary. Makes shared/rewind/timeline.ts (buildTimeline) load-bearing
+  // instead of orphaned — the renderer now reconstructs sessions from the log.
+  const timelineSessions = useMemo(
+    () => buildTimeline(
+      timeline.map(e => ({ ts: e.timestamp, appId: e.appName, kind: e.type, label: e.content })),
+    ),
+    [timeline],
+  );
+
   // =======================================================================
   // RENDER
   // =======================================================================
@@ -1675,6 +1686,30 @@ const timer = setInterval(check, 15000);
             </button>
           ))}
         </div>
+
+        {/* Work sessions (idle-gap grouped, reconstructed from the activity log) */}
+        {!loading && timelineSessions.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 4px 4px' }} aria-label="Work sessions">
+            {timelineSessions.map(sess => (
+              <div
+                key={sess.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', borderRadius: 999,
+                  background: 'rgba(74,158,255,0.10)',
+                  border: '1px solid rgba(74,158,255,0.18)',
+                  fontSize: 11, color: 'var(--rewind-text, #e4e4e7)',
+                }}
+                title={sess.label}
+              >
+                <span style={{ fontWeight: 600 }}>{sess.primaryAppId}</span>
+                <span style={{ opacity: 0.5 }}>{Math.max(1, Math.round(sessionDuration(sess) / 60000))}m</span>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span style={{ opacity: 0.6 }}>{sess.eventCount}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Entries */}
         <div style={S.entryList} role="list" aria-label="Timeline entries">
