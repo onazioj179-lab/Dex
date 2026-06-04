@@ -17,5 +17,6 @@ export * as ukiCache from './cache';
 export * as ukiFreeApis from './freeApis';
 export * as ukiMemory from './memory';
 export * as ukiContext from './context';
+export * as ukiOperator from './operator';
 export * as ukiPermissions from './permissions';
 export * as ukiIndex from './index_search';

@@ -43,8 +43,9 @@ export interface ContextEventMap {
   /** "Send to app" handoff -- routes payload + intent. Receivers ack via continuity:handoffAck. */
   'continuity:handoff':     { id: string; from: string; to: string; kind: 'file' | 'asset' | 'selection' | 'clip' | 'layer'; payload: unknown };
   'continuity:handoffAck':  { id: string; accepted: boolean; reason?: string };
-  /** A creative asset (brush, sample, LUT, palette) became active. */
-  'continuity:assetFocus':  { source: string; assetId: string; kind: 'brush' | 'palette' | 'sample' | 'lut' | 'font' | 'preset' };
+  /** An asset became active. `kind` is an AssetLibrary AssetKind (creative or
+   *  universal content kind) — kept as string here to avoid a renderer import. */
+  'continuity:assetFocus':  { source: string; assetId: string; kind: string };
   /** Project context switched in any app -- enables shared project memory. */
   'continuity:project':     { projectId: string; manifestPath?: string; source: string };
   /** Stage / workspace switched. */

@@ -5,6 +5,7 @@
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { useGlobalUndo } from '../../services/undoManager';
 
 interface Point {
   x: number;
@@ -33,8 +34,19 @@ const Canvas: React.FC = () => {
   const [brushSize, setBrushSize] = useState(4);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
-  const [undoStack, setUndoStack] = useState<Stroke[][]>([]);
   const [bgColor, setBgColor] = useState('#FFFFFF');
+
+  // Shared, bounded undo/redo (replaces the old unbounded Stroke[][] stack that
+  // copied every prior stroke on each action — O(n^2) memory). Canvas is the first
+  // adopter of the shared GlobalUndoManager (100-deep cap, Ctrl+Z / Ctrl+Shift+Z).
+  const { push: pushUndo, undo, redo, canUndo, canRedo, clear: clearHistory } = useGlobalUndo('Canvas');
+
+  // Own the shared stack for this app's lifetime: start fresh on mount and drop
+  // our commands on unmount so stale closures never fire on an unmounted canvas.
+  useEffect(() => {
+    clearHistory();
+    return () => clearHistory();
+  }, [clearHistory]);
 
   // Initialize canvas
   useEffect(() => {
@@ -183,24 +195,19 @@ const Canvas: React.FC = () => {
         size: brushSize,
         tool,
       };
-      setUndoStack(prev => [...prev, strokes]);
-      setStrokes(prev => [...prev, newStroke]);
+      const before = strokes;
+      const after = [...strokes, newStroke];
+      setStrokes(after);
+      pushUndo('Draw stroke', () => setStrokes(after), () => setStrokes(before));
     }
     setCurrentStroke([]);
   };
 
-  const undo = () => {
-    if (undoStack.length === 0) return;
-    const prev = undoStack[undoStack.length - 1];
-    setUndoStack(undoStack.slice(0, -1));
-    setStrokes(prev);
-  };
-
   const clear = () => {
-    if (strokes.length > 0) {
-      setUndoStack(prev => [...prev, strokes]);
-    }
+    if (strokes.length === 0) return;
+    const before = strokes;
     setStrokes([]);
+    pushUndo('Clear canvas', () => setStrokes([]), () => setStrokes(before));
   };
 
   const saveImage = () => {
@@ -271,8 +278,11 @@ const Canvas: React.FC = () => {
 
         {/* Actions */}
         <div style={s.actionGroup}>
-          <button style={s.actionBtn} onClick={undo} disabled={undoStack.length === 0} title="Undo">
+          <button style={s.actionBtn} onClick={() => undo()} disabled={!canUndo} title="Undo (Ctrl+Z)">
             <DexIcon name="undo" size={16} />
+          </button>
+          <button style={s.actionBtn} onClick={() => redo()} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
+            <DexIcon name="redo" size={16} />
           </button>
           <button style={s.actionBtn} onClick={clear} title="Clear">
             <DexIcon name="trash" size={16} />

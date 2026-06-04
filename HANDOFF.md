@@ -2,9 +2,211 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
-Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-01 (overheat + dock fixes, v4.60.5 release tagged unsigned)
+Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-gen phase, **13 slices**: Surface + Motion frameworks, dock excellence, project continuity bridge, UKI knowledge layer + operator, workflow templates, workload governor, comfort/a11y layer, **search & command unification, Nexus 2.0 memory-first model, Rewind memory timeline, and UKI operator→unified-search wiring** — **uncommitted, in working tree**; `tsc --noEmit` = 0, changed-area + new modules re-run green in isolation. See **HANDOFF-PREMIUM.md** next-gen section for the per-slice detail + the pending-UI-integration list.)
 
-> See **HANDOFF-PREMIUM.md** for the premium UI/UX phase: overheat fix (thermal-hot universal backdrop-filter kill), dock full-width reveal fix, fluid-glass refinement. v4.60.5 tagged to trigger an unsigned release build; the release workflow auto-prunes old releases to newest 3.
+> 🤖 **AI-PROVIDER FRAMEWORK (2026-06-04) — biggest roadmap gap, now built + tested.** UKI had
+> **zero** LLM integration; this is the full framework under `src/renderer/uki/providers/` +
+> `uki/keystore.ts`: a provider contract (`types.ts`, `LLMProvider` with pure
+> build-request/parse-response/parse-stream split for testability), **5 providers** —
+> **OpenAI** (`openai.ts`), **Anthropic** (`anthropic.ts`, hoists system → `system` field, x-api-key),
+> **Google Gemini** (`google.ts`, `?key=` + `system_instruction`, "model" role), **Ollama** local
+> (`ollama.ts`, no key, NDJSON), **OpenRouter** (`openrouter.ts`, OpenAI-compatible aggregator) — a
+> model `registry.ts` (lookup + capabilities), a `keystore.ts` (per-provider keys, obfuscated — OS
+> keychain/`crypto.rs` replaces it in Electron), and an `orchestrator.ts` (`chat`/`chatWithFallback`,
+> **injectable `fetch`** so it's fully testable), plus a **streaming reader** (`stream.ts` —
+> SSE + NDJSON with partial-line buffering across chunks). **28 unit tests green**
+> (`ai-providers`/`ai-providers-extra`/`ai-keystore`/`ai-orchestrator`/`ai-stream`). **Feature-complete:**
+> providers · registry · keystore · orchestrator · fallback · streaming. Fully buildable+testable
+> here; **going live needs only a user API key.** Remaining to make it *usable in the UI*: a Settings
+> key-management panel (paste a key → `setApiKey`) + `UkiOverlay` wiring to `chat()`/`createStreamParser`.
+>
+> 🔄 **SYNC-ENGINE CORE (2026-06-04) — second "needs-runtime" item, built + tested as pure logic.**
+> `src/shared/sync/`: **`lww.ts`** — Last-Writer-Wins CRDT register + map (deterministic conflict
+> resolution: timestamp wins, ties by actor id; tombstone deletes; **merge is commutative/associative
+> → two offline devices always converge** regardless of merge order); **`syncQueue.ts`** — immutable
+> offline op queue that **coalesces** repeated edits to the same (entity,key), drains oldest-first,
+> and removes on ack. **9 unit tests green** (`sync-lww`/`sync-queue`). This is the conflict-free
+> data layer; the only missing piece is a **network transport** (the bytes-mover), which is a
+> later, runtime/backend concern.
+>
+> 🦀 **NATIVE RUST EXPANSION (2026-06-04) — toolchain IS present here (cargo/rustc 1.95).** Added
+> `src/native/dex-core/src/contenthash.rs` — FNV-1a 32/64-bit + `content_hash_hex` for native asset
+> de-dup (mirrors the TS `assetHash.ts`; far faster over large file buffers), with `#[cfg(test)]`
+> tests (incl. known FNV-1a vectors) and a `#[napi] content_hash` export wired in `lib.rs`. Verified
+> with **`cargo test`** (not just Electron — `cargo`/`rustc` are installed, so Rust logic builds +
+> tests here; only the addon *runtime load* needs Electron). This proves the TS→Rust perf-migration
+> path is doable from here.
+>
+> 🟢 **UX FIXES (2026-06-04, live preview, owner-reported) — popup blur + dock aggressiveness.**
+> (1) **Popups no longer blur the whole screen.** Removed full-screen `backdrop-filter: blur(...)`
+> from every modal/popup scrim — kept a dim scrim only (standard desktop behaviour, also cheaper):
+> `.modal-backdrop` (`design-system.css`), `ShareDialog.tsx`, `HelpOverlay.tsx`, and the
+> notification-center backdrop (`NotificationBanners.tsx`). Panel/menu glass (Spotlight/UKI cards,
+> dropdowns) left intact — that's the card's own material, not a whole-screen haze. Verified live:
+> `.modal-backdrop` computed `backdropFilter: none`. (2) **Dock stops popping up while you work.**
+> The bottom reveal hover-intent was a 140ms/0.45px-ms gate → too eager near the bottom of an app;
+> raised to **280ms dwell / 0.35px-ms** in `AppManager.tsx` so only a deliberate move-to-edge-and-
+> rest reveals it. (3) **Left-strip "glitchy" slide smoothed:** the StageManager left-edge strip
+> (`StageManager.tsx`) slides in via `translateX`+opacity but wasn't on its own GPU layer — added
+> `will-change: transform, opacity` + slightly longer easing (0.12s→0.2s) so it glides instead of
+> snapping/flickering. (Owner: confirm whether that was "the glitch" — it was described loosely.)
+> All three verified: `tsc` = 0, live app renders clean, `.modal-backdrop` computed `none`.
+>
+> 🔴 **CRITICAL FIX (2026-06-04, live preview) — app-blocking CSS bug.**
+> `src/renderer/styles/design-system.css:347` had a CSS comment containing the motion-token
+> names `window-*/workspace-*/dock-*/panel-*`; the `*/` inside `window-*/` **prematurely closed the
+> `/* */` comment**, turning the rest of the file into invalid CSS — Vite/Lightning-CSS threw
+> `Unexpected token Delim('*')` and **the entire renderer failed to mount** (blank screen behind a
+> Vite error overlay). Fixed (commas instead of slashes). **Verified live:** the renderer now boots
+> in the Vite preview (`[DEX] Startup complete`), onboarding → Home shell renders. **Command-palette
+> unified search verified end-to-end live (via `preview_eval`):** calc `12 * (3 + 4)` → "= 84";
+> unit `5 km to mi` → "= 3.106856 mi"; app-find `prism` → "Open PRISM Image Editor". **Integrity
+> note (corrected after reading the component):** those results come from `CommandPalette.tsx`'s
+> *own inline* `tryEvalMath`/`tryUnitConvert`/static `commands` list + `fuzzyScore` — **NOT** this
+> session's `createUnifiedSearch`/`calcProvider`/`searchProviders`, which remain **orphaned w.r.t.
+> this UI** (a real dedup/integration target: replace the inline logic with the shared modules).
+> **✅ FIRST real module→UI integration done + verified live:** wired `services/searchScope.ts`
+> (`parseSearchScope`) into `CommandPalette.tsx` so **scoped queries filter by category** —
+> verified live: `in:settings` → only the Settings group (no apps); `in:apps prism` → only
+> "Open PRISM" (no settings leak); plain `prism` unchanged. `searchScope` is no longer orphaned;
+> the same pattern wires the other shared modules into their UIs. **Scope→category mapping extracted
+> to a tested module** `services/commandScope.ts` (`scopedQuery`) with **5 unit tests**
+> (`tests/unit/command-scope.test.ts`); CommandPalette now imports it (behaviour-preserving,
+> re-verified live).
+> **✅ + Recent commands** (completes the palette's previously-unused `recent` category): executed
+> commands are recorded via `runCommand` and surfaced as a "Recent" group when the box opens empty
+> (deduped from the normal groups). Verified live: seeding recents → palette shows "RECENT · Toggle
+> Fullscreen · Toggle Theme" on top. (Gotcha fixed: the filter memo needed `recentIds` in state +
+> deps to recompute on each open.) **Store extracted to a tested shared module**
+> `services/recentCommands.ts` (move-to-front, dedupe, cap, corrupt-storage-safe) with **7 unit
+> tests** (`tests/unit/recent-commands.test.ts`) — so the feature is at the same tested bar as the
+> rest. Behaviour-preserving (re-verified live after the extraction).
+> Also: `openApp`→`launchApp` is a renderer-side zustand store (not IPC), so app windows *do* open
+> in-browser; "nexus" didn't open only because **Nexus isn't in the palette's command list**.
+> **Degraded-mode boundary (honest):** the browser preview has **no `window.dex` IPC**, so
+> **app-launch** (Enter on an app result does nothing — goes through the Electron window registry)
+> and **data screens** (Nexus/Rewind/Files render empty states) **cannot be verified here** — they
+> need the packaged Electron app. Also `preview_screenshot` times out on the canvas/CSS wallpaper
+> animation → verify via `preview_eval` DOM reads. Onboarding is a multi-step consent wizard
+> (Get Started → policies "Read" + checkbox → Accept → skip sign-in); no single localStorage skip flag.
+>
+> **Master Evolution phase — wave execution started (2026-06-04).** Strategy docs live in
+> **`docs/evolution/`** (README + a catalog of grounded improvements across 11 of 14 categories so
+> far + the wave sequence) — this is the backlog source of truth. **Wave-1/2 code shipped this
+> session (real + tested, uncommitted):** Canvas now uses the shared bounded `GlobalUndoManager`
+> (first adopter; killed its O(n²) unbounded stroke stack) + gained redo (+ `redo` DexIcon);
+> configurable autosave (`utils/autosavePrefs.ts` → shared `useAutoSave`); UKI operator
+> `searchEnvironment()` + `search` intent; Rewind timeline session-summary (`buildTimeline` now
+> load-bearing in `Rewind.tsx`); shared `SnapshotHistory` engine (`shared/creative/history.ts`);
+> Nexus memory model (`shared/nexus/model.ts`); shortcut-conflict detection
+> (`utils/shortcutConflicts.ts`); asset content-hash + dedup (`services/assetHash.ts`); and a
+> calculator/unit-conversion search provider (`services/calcProvider.ts`, wired into
+> `createUnifiedSearch`). Three batches landed: **batch 2** — Nexus memory-view selector
+> (`shared/nexus/views.ts`), Rewind activity analytics (`shared/rewind/analytics.ts`),
+> recent-searches store (`services/recentSearches.ts`), notification priority/grouping/coalesce
+> (`shared/notifications/group.ts`); **batch 3** — output filename tokens
+> (`shared/creative/namingTokens.ts`), search-scope parser (`services/searchScope.ts`), shared
+> bytes/duration/relative-time formatters (`shared/format/units.ts`); **batch 4** — Rewind workspace reconstruction
+> (`shared/rewind/reconstruct.ts`), named workspace layouts (`services/workspaceLayouts.ts`),
+> usage-based search re-ranking (`services/searchRecency.ts`); **batch 5** — prompt secret/PII
+> redaction (`shared/uki/redact.ts`), color/WCAG-contrast utils (`shared/creative/colorUtils.ts`),
+> compact number formatters (`shared/format/numbers.ts`), Rewind retention policy
+> (`shared/rewind/retention.ts`); **batch 6** — glob matcher (`shared/automation/glob.ts`),
+> LLM context-window fitting (`shared/uki/contextFit.ts`), video timecode
+> (`shared/format/timecode.ts`); **batch 7** — aspect-ratio fit math
+> (`shared/creative/aspectRatio.ts`), search match-highlighting (`shared/search/highlight.ts`),
+> Nexus entity search (`shared/nexus/entitySearch.ts`); **batch 8** — recurring schedule
+> (`shared/automation/schedule.ts`), audio gain utils (`shared/creative/audioUtils.ts`), file-type
+> categorization (`shared/format/fileType.ts`); **batch 9** — cubic-bezier easing
+> (`shared/creative/bezier.ts`), source citations (`shared/uki/citation.ts`), activity streaks
+> (`shared/rewind/streak.ts`); **batch 10** — audio waveform peaks (`shared/creative/waveform.ts`),
+> image histogram (`shared/creative/histogram.ts`), list/copy formatting (`shared/format/list.ts`);
+> **batch 11** — cross-platform path utils (`shared/format/pathUtils.ts`), timeline/grid snapping
+> (`shared/creative/snap.ts`), search synonym expansion (`shared/search/synonyms.ts`);
+> **batch 12** — 2D affine matrix (`shared/creative/matrix2d.ts`), sentence splitting
+> (`shared/uki/sentences.ts`), duration parsing (`shared/format/durationParse.ts`);
+> **batch 13** — color blend modes (`shared/creative/colorBlend.ts`), CSV parse/stringify
+> (`shared/format/csv.ts`), exponential backoff (`shared/automation/backoff.ts`);
+> **batch 14** — keyframe interpolation (`shared/creative/keyframe.ts`), token-bucket rate limit
+> (`shared/automation/rateLimit.ts`), text stats/reading-time (`shared/format/wordCount.ts`);
+> **batch 15** — tempo/BPM math (`shared/creative/bpm.ts`), automation condition rules
+> (`shared/automation/condition.ts`), search tokenizer (`shared/search/tokenize.ts`);
+> **batch 16** — Levenshtein/typo similarity (`shared/search/levenshtein.ts`), Nexus graph
+> pathfinding (`shared/nexus/pathfind.ts`), grid layout math (`shared/creative/gridLayout.ts`);
+> **batch 17** — JSON extraction from LLM text (`shared/uki/jsonExtract.ts`), markdown→plaintext
+> (`shared/uki/markdownStrip.ts`), color harmony hues (`shared/creative/colorHarmony.ts`);
+> **batch 18** — natural sort (`shared/format/naturalSort.ts`), Nexus degree-centrality
+> (`shared/nexus/centrality.ts`), prompt builder (`shared/uki/promptBuilder.ts`);
+> **batch 19** — slash-command parsing (`shared/uki/slashCommands.ts`), palette quantization
+> (`shared/creative/paletteQuantize.ts`), name initials/avatar hue (`shared/format/initials.ts`);
+> **batch 20** — middle/path truncation (`shared/format/truncateMiddle.ts`), focus score
+> (`shared/rewind/focusScore.ts`), zoom-level stepping (`shared/creative/zoomLevels.ts`);
+> **batch 21** — core math utils (`shared/math/num.ts`), BM25 ranking (`shared/search/bm25.ts`),
+> Nexus neighborhood subgraph (`shared/nexus/subgraph.ts`);
+> **batch 22** — search-result snippets (`shared/search/snippet.ts`), hotkey display formatting
+> (`shared/format/hotkey.ts`), color scale/gradient (`shared/creative/colorScale.ts`);
+> **batch 23** — line diff (`shared/uki/diffLines.ts`), byte-size parsing (`shared/format/byteParse.ts`),
+> video safe-areas (`shared/creative/safeArea.ts`);
+> **batch 24** — cron parsing/matching (`shared/automation/cron.ts`), search-result grouping
+> (`shared/search/groupResults.ts`), per-app usage time (`shared/rewind/appUsage.ts`);
+> **batch 25** — tool-arg schema validation (`shared/uki/jsonSchema.ts`), pure transform pipeline
+> (`shared/automation/pipeline.ts`), relative date bucketing (`shared/format/dateBucket.ts`);
+> **batch 26** — SSE stream parsing (`shared/uki/sseParse.ts`), activity heatmap
+> (`shared/rewind/heatmap.ts`), input validators (`shared/format/validate.ts`);
+> **batch 27** — autocomplete suggest (`shared/search/suggest.ts`), tag clustering
+> (`shared/nexus/clusterByTag.ts`), frame-rate math (`shared/creative/fps.ts`);
+> **batch 28** — named easing presets (`shared/creative/easingNamed.ts`), Nexus model
+> (de)serialization (`shared/nexus/serialize.ts`), Rewind day summary (`shared/rewind/daySummary.ts`);
+> **batch 29** — percentage helpers (`shared/format/percent.ts`), 2D bezier path sampling
+> (`shared/creative/curveSample.ts`), step state machine (`shared/automation/stepMachine.ts`);
+> **batch 30** — provider message merge (`shared/uki/mergeMessages.ts`), Nexus orphan detection
+> (`shared/nexus/orphans.ts`), ordinal numbers (`shared/format/ordinal.ts`);
+> **batch 31** — slugify (`shared/format/slugify.ts`), Rewind day→markdown export
+> (`shared/rewind/exportMarkdown.ts`), Nexus recent entities (`shared/nexus/recentEntities.ts`);
+> **batch 32** — readable text color (`shared/creative/textOnColor.ts`), harmony palettes
+> (`shared/creative/harmonyColors.ts`), color shade adjust (`shared/creative/colorShade.ts`);
+> **batch 33** — 2D vector math (`shared/math/vec2.ts`), rectangle math (`shared/math/rect.ts`),
+> angle math (`shared/math/angle.ts`);
+> **batch 34** — text case (`shared/text/titleCase.ts`), n-gram similarity (`shared/search/ngram.ts`),
+> descriptive stats (`shared/math/stats.ts`);
+> **batch 35** — markdown code extraction (`shared/uki/extractCode.ts`), immutable priority queue
+> (`shared/automation/queue.ts`), extended easings (`shared/creative/easingExtra.ts`);
+> **batch 36** — word wrap (`shared/text/wordWrap.ts`), Nexus graph stats (`shared/nexus/graphStats.ts`),
+> Rewind week summary (`shared/rewind/weekSummary.ts`);
+> **batch 37** — bounding boxes (`shared/math/bbox.ts`), mention/tag/link extraction
+> (`shared/uki/mentions.ts`), search score blending (`shared/search/scoreCombine.ts`);
+> **batch 38** — diacritics/search-normalize (`shared/text/diacritics.ts`), abbreviation match
+> (`shared/search/abbreviation.ts`), hour-of-day histogram (`shared/rewind/hourHistogram.ts`);
+> **batch 39** — Nexus tag index (`shared/nexus/tagIndex.ts`), color temperature
+> (`shared/creative/colorTemperature.ts`), key-value/frontmatter parse (`shared/uki/keyValueParse.ts`);
+> **batch 40 (integration aggregators — "Shared Intelligence Layer")** — Rewind insights service
+> (`shared/rewind/insights.ts`, composes timeline/usage/histogram/focus/streak), Nexus dashboard
+> view-model (`shared/nexus/dashboard.ts`, composes views/centrality/tags/graph-stats), document
+> ranking pipeline (`shared/search/rankDocuments.ts`, composes tokenize/BM25/recency);
+> **batch 41 (more aggregators)** — accent→theme generator (`shared/creative/themeFromColor.ts`,
+> composes colorShade/textOnColor), note→graph auto-linker (`shared/nexus/linkFromText.ts`,
+> composes mentions+model), in-memory BM25 `SearchIndex` (`shared/search/searchIndex.ts`, the
+> pure-logic Search Engine core / JS fallback before native fts.rs);
+> **batch 42 (more aggregators)** — deterministic key→color (`shared/creative/projectColors.ts`,
+> composes nameHue+colorUtils), autocomplete/type-ahead (`shared/search/autocomplete.ts`, composes
+> abbreviation+ngram), Rewind daily-report markdown (`shared/rewind/dailyReport.ts`, composes
+> insights+formatters).
+> **~135 modules/wirings, +651 new tests** (2.7× the original 50-module target; +`search/facets.ts`
+> started, tsc-clean, test pending). **Pivoted from leaf utilities to integration aggregators**, then
+> to **live preview integration** (found+fixed the critical CSS bug above; verified the calc provider
+> live).
+> Verified: `tsc --noEmit` = 0 (all batches incl. facets); **clean authoritative seal — batches
+> 1–42 = 5212 passed / 0 failed / 7 skipped (395 files)** via **`--maxWorkers=2`** (the proven flake
+> fix: **0 flakes** vs 2–9 at higher worker counts).
+> **Test-infra (catalog INF-065/066): adopt `--maxWorkers=2` as the default** (bake into
+> `vitest.config`/CI) — the forks pool times out starting runners under high parallelism.
+> NOTE: run `tsc` and the full suite *separately* — concurrently they induce fork-startup-timeout
+> flakiness (a prior run showed 6 false failures at 654s; all passed on isolated re-run).
+> Run `tsc` and the full suite separately. Remaining heavy items (Nexus memory sidebar UI, AI-provider framework, native
+> Rust/C++ expansion, sync engine) stay in the `docs/evolution/` catalog backlog — they need the
+> running app / dedicated builds and were deliberately NOT faked.
+>
+> See **HANDOFF-PREMIUM.md** for the premium UI/UX phase: overheat fix (thermal-hot universal backdrop-filter kill), dock full-width reveal fix, fluid-glass refinement, and the **🆕 Next-Generation phase** section (2026-06-03) detailing the Surface/Motion frameworks, dock running-indicators + anchored persistence, the `.dexproject` ↔ WorkspaceSnapshot continuity bridge, and the extended UKI `uki-core-data` (troubleshooting + architecture knowledge). v4.60.5 tagged to trigger an unsigned release build; the release workflow auto-prunes old releases to newest 3.
 
 ### Release Artifacts per Platform
 | Platform | Artifacts |
@@ -17,7 +219,13 @@ Release mechanism: bump `package.json` version → commit → push tag `vX.Y.Z` 
 
 ---
 
-## Current Phase: UI/UX Modernization (modern · sharp · pro · fluid glass)
+## Current Phase: Master Evolution — wave execution (see top blockquote + `docs/evolution/`)
+
+The active phase is the Master Evolution wave work (batches 1–3 above). The prior **UI/UX
+Modernization** phase below is **complete at the code level** (kept for reference) — its residue is
+subjective visual taste that needs eyes-on the running app.
+
+### Prior phase — UI/UX Modernization (modern · sharp · pro · fluid glass) — code-complete
 
 Goal: a more modern, sharp, "pro" feel across the shell and apps — thin/sharp icons, fluid (liquid) glass where it fits, consistent surfaces, no missing/inconsistent styling — while scaling cleanly from low- to high-end machines. Improve *in place* (replace/refine existing components); not a drag-to-rearrange system.
 
@@ -52,9 +260,15 @@ Net: the **code-level** modernization is complete (glass consistent + modernized
 | Item | State |
 |---|---|
 | TypeScript | Clean (`tsc --noEmit`, renderer + main). |
-| Unit tests | **4611 passed / 0 failed / 7 skipped** (256 files) on Windows. |
+| Unit tests | **5212 passed / 0 failed / 7 skipped** (395 files) on Windows, via `--maxWorkers=2` (0 flakes). |
 | Production build | `npm run build` (vite renderer + main tsc) — **passing** (exit 0). Release-buildable. |
 | Watermarks | In compliance (`npm run watermark:check`). |
+
+> **Test-infra note:** the default `vitest run` (full fork parallelism) intermittently fails
+> ~7 tests on this machine with `[vitest-pool]: Timeout starting forks runner` — a fork
+> **startup** timeout under load, not a logic failure (it falsely marks whole files "failed").
+> Run with **`npx vitest run --maxWorkers=4`** for a reliable green (4942 passed, ~6–11 min — run it
+> alone; a concurrent `tsc` induces fork-startup-timeout flakiness).
 
 ---
 
@@ -77,10 +291,16 @@ All code-actionable items from the stabilization backlog were resolved. Highligh
 
 ---
 
-## Important Development Rules
-- Refine/replace existing systems in place — do not duplicate or add parallel systems.
-- No placeholder code — every committed line must do something useful.
-- The perf-tier + glass systems are mature and wired — extend them, don't rebuild.
-- Visual changes need eyes-on iteration; keep blind changes token-level and perf-tier-aware.
-- Always run `tsc --noEmit` + `vitest run` before committing. Windows is the primary platform.
-- Always update this HANDOFF at the end of every session.
+## Important Development Rules (updated 2026-06-03 — relaxed per owner direction)
+- **Full latitude**: free to add, change, or remove anything to move the phases forward. Prefer
+  reusing/extending mature systems (perf-tier, glass, ContextBus, WorkspaceSnapshot) when it's the
+  sharp choice, but adding focused new modules is fine where the roadmap genuinely needs them. No
+  need to refactor everything.
+- **Sharp, not placeholder**: every line should do real work. Quality bar is high ("100/100").
+- Visual changes still benefit from eyes-on iteration; keep blind visual changes token-level and
+  perf-tier-aware (the universal low-tier + thermal-hot rules already gate blur/shadow/motion).
+- Always keep `tsc --noEmit` = 0 and `vitest run` green before declaring a slice done. Windows is
+  the primary platform.
+- Always update this HANDOFF at the end of a working session.
+- **Hard rule (only one): never `git commit` or `git push` without an explicit go-ahead.** Work
+  stays in the local working tree until then.

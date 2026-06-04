@@ -295,9 +295,13 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
           borderRadius: 16,
           boxShadow: expanded ? 'var(--pg-shadow-overlay)' : 'none',
           opacity: expanded ? 1 : 0,
-          transition: reducedMotion ? 'none' : `transform 0.12s ${spring}, opacity 0.1s ease, background 0.1s ease`,
+          // Slightly longer, GPU-composited slide so the strip glides in from the
+          // left smoothly instead of snapping/flickering. `will-change` promotes it
+          // to its own layer for the transform/opacity animation.
+          transition: reducedMotion ? 'none' : `transform 0.2s ${spring}, opacity 0.16s ease, background 0.16s ease`,
           pointerEvents: expanded ? 'auto' : 'none',
           contain: 'layout style',
+          willChange: reducedMotion ? 'auto' : 'transform, opacity',
         } as React.CSSProperties}
         aria-label="Stage Manager"
         role="navigation"

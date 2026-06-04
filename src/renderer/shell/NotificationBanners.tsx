@@ -576,8 +576,8 @@ export const NotificationCenter: React.FC<{
       <div
         style={{
           position: 'fixed', inset: 0, zIndex: 'var(--z-notification)',
-          background: 'rgba(0,0,0,0.25)',
-          backdropFilter: 'blur(8px)',
+          /* Dim scrim only — no full-screen blur when the notification center opens. */
+          background: 'rgba(0,0,0,0.3)',
           animation: isReduceMotion() ? 'none' : 'notifBackdropIn 0.2s cubic-bezier(0.23,1,0.32,1)',
         } as React.CSSProperties}
         onClick={onClose}

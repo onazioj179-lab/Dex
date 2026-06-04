@@ -15,6 +15,7 @@
  */
 
 import { ContextBus } from '../services/ContextBus';
+import type { WorkspaceSnapshot } from '../../shared/phase15/workspaceSnapshot';
 
 export const DEXPROJECT_VERSION = 1 as const;
 export const DEXPROJECT_FILENAME = '.dexproject';
@@ -66,6 +67,15 @@ export interface DexProjectManifest {
   tags?: string[];
   /** Optional thumbnail path (relative to manifest). */
   thumbnail?: string;
+  /**
+   * Optional workspace snapshot: which apps/windows were open and focused for
+   * this project. This is the bridge that makes "open project → restore the
+   * full window layout" work — the project-centric continuity contract. Reuses
+   * the shared WorkspaceSnapshot shape (shared/phase15/workspaceSnapshot.ts);
+   * actual restoration is performed by the renderer window registry, this field
+   * only carries the data.
+   */
+  workspace?: WorkspaceSnapshot;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +128,16 @@ export function getAppView(m: DexProjectManifest, appId: string): AppViewState |
   return (m.views ?? []).find((v) => v.appId === appId);
 }
 
+/** Attach (or replace) the workspace snapshot this project should restore to. */
+export function setProjectWorkspace(m: DexProjectManifest, workspace: WorkspaceSnapshot): DexProjectManifest {
+  return { ...m, workspace, updatedAt: new Date().toISOString() };
+}
+
+/** Read the workspace snapshot to restore when this project is opened. */
+export function getProjectWorkspace(m: DexProjectManifest): WorkspaceSnapshot | undefined {
+  return m.workspace;
+}
+
 export function addPaletteColor(m: DexProjectManifest, hex: string): DexProjectManifest {
   const norm = hex.trim().toLowerCase();
   if (!/^#([0-9a-f]{6}|[0-9a-f]{8})$/.test(norm)) return m;
@@ -143,6 +163,13 @@ export function addMarker(
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
+
+/** Minimal structural guard for a carried workspace snapshot (v1 + windows[]). */
+function isWorkspaceLike(v: unknown): v is WorkspaceSnapshot {
+  if (!v || typeof v !== 'object') return false;
+  const w = v as Partial<WorkspaceSnapshot>;
+  return w.version === 1 && Array.isArray(w.windows);
+}
 
 export function isDexProjectManifest(value: unknown): value is DexProjectManifest {
   if (!value || typeof value !== 'object') return false;
@@ -182,6 +209,7 @@ export function coerceManifest(raw: unknown): DexProjectManifest | null {
       timeline: (r.timeline && typeof r.timeline === 'object') ? r.timeline as SharedTimeline : undefined,
       tags: Array.isArray(r.tags) ? r.tags.filter((x): x is string => typeof x === 'string') : undefined,
       thumbnail: typeof r.thumbnail === 'string' ? r.thumbnail : undefined,
+      workspace: isWorkspaceLike(r.workspace) ? r.workspace : undefined,
     };
     return candidate;
   } catch {
