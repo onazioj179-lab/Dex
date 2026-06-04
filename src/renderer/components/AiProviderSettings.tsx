@@ -1,0 +1,119 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
+/**
+ * AI Providers settings panel. Connects UKI to an LLM provider by managing
+ * API keys (stored locally via the keystore). This is the UI half of the
+ * AI-provider framework — once a key is saved here, `orchestrator.chat()` can
+ * route to that provider. Self-contained so the Settings page only needs a
+ * one-line mount.
+ */
+
+import React, { useState } from 'react';
+import { allProviders } from '../uki/providers/registry';
+import { getApiKey, setApiKey, removeApiKey } from '../uki/keystore';
+
+const AiProviderSettings: React.FC = () => {
+  const providers = allProviders();
+  const [keys, setKeys] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const p of providers) init[p.id] = getApiKey(p.id) ?? '';
+    return init;
+  });
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  const connected = (id: string) => (getApiKey(id)?.length ?? 0) > 0;
+
+  const save = (id: string) => {
+    setApiKey(id, keys[id]);
+    setSavedAt(id);
+    setTimeout(() => setSavedAt((s) => (s === id ? null : s)), 1500);
+  };
+
+  const clear = (id: string) => {
+    removeApiKey(id);
+    setKeys((k) => ({ ...k, [id]: '' }));
+    setSavedAt(null);
+  };
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
+        AI Providers
+      </h2>
+      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.5 }}>
+        Connect a provider to power UKI. Keys are stored locally on this device (obfuscated; the
+        packaged app uses the OS keychain). Ollama runs locally and needs no key.
+      </p>
+
+      {providers.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            padding: 14, marginBottom: 10, borderRadius: 12,
+            background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.label}</span>
+            {connected(p.id) && (
+              <span style={{ fontSize: 11, color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-success)' }} /> Connected
+              </span>
+            )}
+            {!p.requiresKey && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>local · no key</span>
+            )}
+          </div>
+
+          {p.requiresKey && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <input
+                type="password"
+                value={keys[p.id] ?? ''}
+                onChange={(e) => setKeys((k) => ({ ...k, [p.id]: e.target.value }))}
+                placeholder={`${p.label} API key`}
+                aria-label={`${p.label} API key`}
+                style={{
+                  flex: 1, height: 32, padding: '0 10px', borderRadius: 8, fontSize: 13,
+                  background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              <button
+                onClick={() => save(p.id)}
+                style={{
+                  height: 32, padding: '0 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  background: 'var(--color-accent)', color: '#fff', border: 'none', cursor: 'pointer',
+                }}
+              >
+                {savedAt === p.id ? 'Saved ✓' : 'Save'}
+              </button>
+              {connected(p.id) && (
+                <button
+                  onClick={() => clear(p.id)}
+                  style={{
+                    height: 32, padding: '0 12px', borderRadius: 8, fontSize: 13,
+                    background: 'transparent', color: 'var(--color-error)',
+                    border: '1px solid var(--color-border)', cursor: 'pointer',
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            Models: {p.listModels().map((m) => m.label).join(' · ')}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default AiProviderSettings;
