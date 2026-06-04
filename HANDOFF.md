@@ -17,8 +17,18 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > SSE + NDJSON with partial-line buffering across chunks). **28 unit tests green**
 > (`ai-providers`/`ai-providers-extra`/`ai-keystore`/`ai-orchestrator`/`ai-stream`). **Feature-complete:**
 > providers · registry · keystore · orchestrator · fallback · streaming. Fully buildable+testable
-> here; **going live needs only a user API key.** Remaining to make it *usable in the UI*: a Settings
-> key-management panel (paste a key → `setApiKey`) + `UkiOverlay` wiring to `chat()`/`createStreamParser`.
+> here; **going live needs only a user API key.**
+>
+> ✅ **AI-PROVIDER UI WIRING (2026-06-04, live-verified) — the framework is now usable from Settings.**
+> New `src/renderer/components/AiProviderSettings.tsx` — a self-contained panel that lists every
+> provider from `registry.allProviders()` and, for each key-requiring one, a password key input +
+> Save/Remove backed by the `keystore` (`getApiKey`/`setApiKey`/`removeApiKey`), a live "Connected"
+> dot, and the provider's model list; Ollama shows "local · no key". Mounted into `Settings.tsx` with
+> a one-line additive change: new **`AI Providers`** section under the **Intelligence** category
+> (`ids: ['uki','aiproviders']`) + render `case 'aiproviders'`. **Verified live in the Vite preview:**
+> Settings → AI Providers renders OpenAI/Anthropic/Google/Ollama/OpenRouter with **4 key inputs**
+> (the 4 key-requiring providers); `tsc --noEmit` = **0 errors**. A user can now paste a key and it
+> persists. Remaining for end-to-end chat: wire `UkiOverlay` to `orchestrator.chat()`/`createStreamParser`.
 >
 > 🔄 **SYNC-ENGINE CORE (2026-06-04) — second "needs-runtime" item, built + tested as pure logic.**
 > `src/shared/sync/`: **`lww.ts`** — Last-Writer-Wins CRDT register + map (deterministic conflict
