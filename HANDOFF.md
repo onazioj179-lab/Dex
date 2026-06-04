@@ -59,8 +59,19 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > network tokens as they arrive, then `commitTurn`s on completion (degrades to the local/HF fallback on
 > failure). **+5 streaming unit tests** (15 total in `ai-connect`): SSE token stream, **chunk-boundary
 > reassembly**, no-provider/null, non-ok response, and **Ollama NDJSON local (keyless)**. `tsc` = **0**;
-> live app re-renders clean after the refactor. Remaining AI niceties (optional): a model picker in
-> the AI Providers panel; cancel-in-flight; tool-call/function execution from `toolCall.ts`.
+> live app re-renders clean after the refactor.
+>
+> ✅ **PER-PROVIDER MODEL PICKER (2026-06-04, live-verified) — choose the model, not just the key.**
+> New pure `src/renderer/uki/providers/modelPrefs.ts` (`get/set/clearPreferredModel` over localStorage).
+> `pickConfiguredModelId` now takes an injectable `prefFor` resolver (defaults to the real store): it
+> uses the user's preferred model when set **and still valid**, else the provider's default — so a
+> stale/removed model id can never wedge selection. The AI Providers panel gained a per-provider model
+> `<select>` (persists on change via `setPreferredModel`). **+6 unit tests** (21 total in `ai-connect`):
+> prefs round-trip/clear/empty-clears, and pref honored / invalid-falls-back / unset-falls-back /
+> reads-real-store. `tsc` = **0**. **Live-verified:** Settings → AI Providers shows **5 model dropdowns**
+> with the right options (OpenAI/Anthropic/Google/Ollama/OpenRouter), and changing OpenAI → "GPT-4o mini"
+> persists to `localStorage['dex-uki-model-openai']`. Remaining AI niceties (optional): cancel-in-flight;
+> tool-call/function execution from `toolCall.ts`.
 >
 > 🔄 **SYNC-ENGINE CORE (2026-06-04) — second "needs-runtime" item, built + tested as pure logic.**
 > `src/shared/sync/`: **`lww.ts`** — Last-Writer-Wins CRDT register + map (deterministic conflict
