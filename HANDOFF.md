@@ -46,6 +46,22 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > in Settings → AI Providers, ask UKI a free-form question → it routes to that provider. (Structured
 > commands still answer instantly/offline; only un-routed free-form questions escalate to the LLM.)
 >
+> ✅ **UKI LLM STREAMING (2026-06-04) — replies now token-stream live instead of arriving whole.**
+> Added `streamConfiguredLLM(text, systemPrompt, onToken, {history, streamFetch})` to `connect.ts`:
+> builds the request with `stream:true`, reads the response body as an async iterable of chunks (a
+> `defaultStreamFetch` wraps real `fetch` + `ReadableStream.getReader()`/`TextDecoder`; injectable for
+> tests), and drives the existing **`createStreamParser`** with the right wire format per provider
+> (`STREAM_FORMAT`: OpenAI/Anthropic/Google/OpenRouter = SSE, Ollama = NDJSON) — so partial JSON lines
+> split across network chunks are buffered/reassembled correctly. To avoid the previous fake-typewriter
+> double-animation, `UkiOverlay`'s finalize logic was **extracted into a shared `commitTurn()`**
+> (history + UKI memory + pattern learning + Nexus feed + optional TTS); the typewriter path and the
+> new live-stream path both call it. UKI's LLM branch now sets `streamingResponse` straight from the
+> network tokens as they arrive, then `commitTurn`s on completion (degrades to the local/HF fallback on
+> failure). **+5 streaming unit tests** (15 total in `ai-connect`): SSE token stream, **chunk-boundary
+> reassembly**, no-provider/null, non-ok response, and **Ollama NDJSON local (keyless)**. `tsc` = **0**;
+> live app re-renders clean after the refactor. Remaining AI niceties (optional): a model picker in
+> the AI Providers panel; cancel-in-flight; tool-call/function execution from `toolCall.ts`.
+>
 > 🔄 **SYNC-ENGINE CORE (2026-06-04) — second "needs-runtime" item, built + tested as pure logic.**
 > `src/shared/sync/`: **`lww.ts`** — Last-Writer-Wins CRDT register + map (deterministic conflict
 > resolution: timestamp wins, ties by actor id; tombstone deletes; **merge is commutative/associative

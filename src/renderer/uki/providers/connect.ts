@@ -13,9 +13,10 @@
  * unit-testable; the live send reuses the orchestrator's injectable `fetch`.
  */
 
-import { getProvider } from './registry';
+import { getProvider, providerForModel } from './registry';
 import { chat, type FetchLike, type ChatOptions } from './orchestrator';
-import { configuredProviders } from '../keystore';
+import { createStreamParser, type StreamFormat } from './stream';
+import { configuredProviders, getApiKey } from '../keystore';
 import type { ChatMessage, ProviderId } from './types';
 
 /**
@@ -83,6 +84,120 @@ export async function askConfiguredLLM(
     );
     const text = res.content?.trim();
     return text && text.length > 0 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Streaming — token-by-token so the assistant's reply appears as it is produced.
+// ---------------------------------------------------------------------------
+
+/** Wire format each provider streams in (OpenAI-style SSE vs Ollama NDJSON). */
+const STREAM_FORMAT: Record<string, StreamFormat> = {
+  openai: 'sse',
+  anthropic: 'sse',
+  google: 'sse',
+  openrouter: 'sse',
+  ollama: 'ndjson',
+};
+
+/** A streamed HTTP response: an async iterable of decoded body chunks. */
+export interface StreamFetchResponse {
+  ok: boolean;
+  status: number;
+  body: AsyncIterable<string>;
+}
+export type StreamFetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string },
+) => Promise<StreamFetchResponse>;
+
+/** Default stream fetch: real `fetch`, reading the ReadableStream body as text chunks. */
+const defaultStreamFetch: StreamFetchLike = async (url, init) => {
+  const res = await fetch(url, init);
+  const rawBody = res.body as ReadableStream<Uint8Array> | null;
+  async function* iterate(): AsyncIterable<string> {
+    if (!rawBody) return;
+    const reader = rawBody.getReader();
+    const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) yield decoder.decode(value, { stream: true });
+      }
+      const tail = decoder.decode();
+      if (tail) yield tail;
+    } finally {
+      reader.releaseLock?.();
+    }
+  }
+  return { ok: res.ok, status: res.status, body: iterate() };
+};
+
+export interface StreamOptions extends AskOptions {
+  /** Injectable streaming fetch for tests. */
+  streamFetch?: StreamFetchLike;
+}
+
+/**
+ * Stream a free-form question to the configured LLM. `onToken(token, full)` fires
+ * for each incremental token (the running text in `full`). Returns the complete
+ * text, or null if no provider is configured or the call fails (caller degrades to
+ * the local/HF fallback — partial output is the caller's to keep or discard).
+ */
+export async function streamConfiguredLLM(
+  userText: string,
+  systemPrompt: string,
+  onToken: (token: string, full: string) => void,
+  opts: StreamOptions = {},
+): Promise<string | null> {
+  const modelId = opts.modelId ?? pickConfiguredModelId(configuredProviders());
+  if (!modelId) return null;
+  const provider = providerForModel(modelId);
+  if (!provider) return null;
+
+  const apiKey = provider.requiresKey ? getApiKey(provider.id) ?? '' : undefined;
+  if (provider.requiresKey && !apiKey) return null;
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...(opts.history ?? []),
+    { role: 'user', content: userText },
+  ];
+
+  const httpReq = provider.buildChatRequest(
+    {
+      model: modelId,
+      messages,
+      temperature: opts.chatOptions?.temperature ?? 0.7,
+      maxTokens: opts.chatOptions?.maxTokens ?? 600,
+      stream: true,
+    },
+    { apiKey, baseUrl: opts.chatOptions?.baseUrl },
+  );
+
+  const doFetch = opts.streamFetch ?? defaultStreamFetch;
+  try {
+    const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body });
+    if (!res.ok) return null;
+
+    const format = STREAM_FORMAT[provider.id] ?? 'sse';
+    const parser = createStreamParser(format, (d) => provider.parseStreamChunk(d));
+    let full = '';
+    for await (const chunk of res.body) {
+      for (const tok of parser.push(chunk)) {
+        full += tok;
+        onToken(tok, full);
+      }
+    }
+    for (const tok of parser.flush()) {
+      full += tok;
+      onToken(tok, full);
+    }
+    const trimmed = full.trim();
+    return trimmed.length > 0 ? trimmed : null;
   } catch {
     return null;
   }

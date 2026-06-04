@@ -3,7 +3,9 @@ import {
   pickConfiguredModelId,
   hasConfiguredProvider,
   askConfiguredLLM,
+  streamConfiguredLLM,
   PROVIDER_PRIORITY,
+  type StreamFetchLike,
 } from '../../src/renderer/uki/providers/connect';
 import { setApiKey } from '../../src/renderer/uki/keystore';
 import type { FetchLike } from '../../src/renderer/uki/providers/orchestrator';
@@ -87,5 +89,62 @@ describe('askConfiguredLLM (end-to-end via injectable fetch)', () => {
     setApiKey('openai', 'sk-test');
     const out = await askConfiguredLLM('q', 'sys', { fetchImpl: okFetch('   ') });
     expect(out).toBeNull();
+  });
+});
+
+describe('streamConfiguredLLM (token streaming)', () => {
+  async function* gen(chunks: string[]): AsyncIterable<string> {
+    for (const c of chunks) yield c;
+  }
+  const streamFetch = (chunks: string[], ok = true, status = 200): StreamFetchLike =>
+    async () => ({ ok, status, body: gen(chunks) });
+
+  const sse = (content: string) => `data: {"choices":[{"delta":{"content":${JSON.stringify(content)}}}]}\n`;
+
+  it('streams OpenAI SSE tokens and returns the full text', async () => {
+    setApiKey('openai', 'sk-test');
+    const tokens: string[] = [];
+    const full = await streamConfiguredLLM('hi', 'sys', (tok) => tokens.push(tok), {
+      streamFetch: streamFetch([sse('Hel'), sse('lo'), sse(' there'), 'data: [DONE]\n']),
+    });
+    expect(tokens).toEqual(['Hel', 'lo', ' there']);
+    expect(full).toBe('Hello there');
+  });
+
+  it('reassembles a token whose JSON line is split across chunk boundaries', async () => {
+    setApiKey('openai', 'sk-test');
+    const seen: string[] = [];
+    // The single data line is cut in the middle of the JSON string.
+    const line = sse('World'); // 'data: {...:"World"}}]}\n'
+    const cut = Math.floor(line.length / 2);
+    const full = await streamConfiguredLLM('hi', 'sys', (_t, acc) => seen.push(acc), {
+      streamFetch: streamFetch([line.slice(0, cut), line.slice(cut)]),
+    });
+    expect(full).toBe('World');
+    expect(seen[seen.length - 1]).toBe('World');
+  });
+
+  it('returns null when no provider is configured', async () => {
+    const full = await streamConfiguredLLM('hi', 'sys', () => {}, { streamFetch: streamFetch([sse('x')]) });
+    expect(full).toBeNull();
+  });
+
+  it('returns null on a non-ok streamed response', async () => {
+    setApiKey('openai', 'sk-test');
+    const full = await streamConfiguredLLM('hi', 'sys', () => {}, { streamFetch: streamFetch([], false, 500) });
+    expect(full).toBeNull();
+  });
+
+  it('streams Ollama NDJSON locally without a key (explicit model)', async () => {
+    const tokens: string[] = [];
+    const full = await streamConfiguredLLM('hi', 'sys', (tok) => tokens.push(tok), {
+      modelId: 'llama3.1',
+      streamFetch: streamFetch([
+        '{"message":{"content":"Local "}}\n',
+        '{"message":{"content":"reply"}}\n',
+      ]),
+    });
+    expect(tokens).toEqual(['Local ', 'reply']);
+    expect(full).toBe('Local reply');
   });
 });
