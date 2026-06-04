@@ -70,7 +70,16 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > prefs round-trip/clear/empty-clears, and pref honored / invalid-falls-back / unset-falls-back /
 > reads-real-store. `tsc` = **0**. **Live-verified:** Settings → AI Providers shows **5 model dropdowns**
 > with the right options (OpenAI/Anthropic/Google/Ollama/OpenRouter), and changing OpenAI → "GPT-4o mini"
-> persists to `localStorage['dex-uki-model-openai']`. Remaining AI niceties (optional): cancel-in-flight;
+> persists to `localStorage['dex-uki-model-openai']`.
+>
+> ✅ **ACTIVE-MODEL BANNER (2026-06-04, live-verified) — the AI panel now tells you what UKI will use.**
+> The AI Providers panel shows a status banner computed from the live keystore via
+> `pickConfiguredModelId(configuredProviders())` → `findModel`: when a provider is connected it reads
+> **"UKI will use {model} · {provider}"** (green), otherwise **"No AI provider connected — paste a key…"**
+> (and notes structured commands still work without a key). Reactive: saving/removing a key re-renders it.
+> `tsc` = **0**. **Live-verified both states:** empty shows the connect prompt; after saving an Anthropic
+> key through the UI the banner flips to "UKI will use Claude 3.5 Sonnet · Anthropic". This exercises the
+> real selection logic end-to-end in the browser. Remaining AI niceties (optional): cancel-in-flight;
 > tool-call/function execution from `toolCall.ts`.
 >
 > 🔄 **SYNC-ENGINE CORE (2026-06-04) — second "needs-runtime" item, built + tested as pure logic.**
