@@ -6,6 +6,7 @@
 // =============================================================================
 import { useEffect, useRef } from 'react';
 import { sharedTick } from '../services/SharedTick';
+import { resolveAutosaveInterval } from './autosavePrefs';
 
 const invoke = (window as any).electron?.invoke;
 
@@ -20,6 +21,9 @@ export function useAutoSave(
 ): void {
   const instanceIdRef = useRef(`autosave-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const lastVersionSave = useRef(0);
+  // The user's global autosave-interval preference wins when set; otherwise the
+  // call site's own value is used (so existing apps are unchanged until opt-in).
+  const effectiveInterval = resolveAutosaveInterval(intervalMs);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -31,7 +35,7 @@ export function useAutoSave(
     };
     const autosaveId = `${instanceIdRef.current}-${key}`;
     const versionId = `${autosaveId}-version`;
-    sharedTick.subscribe(autosaveId, save, intervalMs);
+    sharedTick.subscribe(autosaveId, save, effectiveInterval);
 
     const flushContinuity = (event?: Event) => {
       const current = (event as CustomEvent<{ current?: string }> | undefined)?.detail?.current;
@@ -61,7 +65,7 @@ export function useAutoSave(
       window.removeEventListener('dex-idle-continuity-change', flushContinuity as EventListener);
       document.removeEventListener('visibilitychange', flushOnHidden);
     };
-  }, [key, getData, isDirty, intervalMs]);
+  }, [key, getData, isDirty, effectiveInterval]);
 }
 
 export function loadAutoSave<T>(key: string): T | null {

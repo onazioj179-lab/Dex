@@ -19,6 +19,7 @@ import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 import { UKIPatternStore } from '../services/UKIPatternStore';
 import { buildSystemPrompt } from '../uki';
+import { streamConfiguredLLM, hasConfiguredProvider } from '../uki/providers/connect';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -1363,6 +1364,58 @@ const UkiOverlay: React.FC = () => {
   }, []);
 
   /** Stream response with typewriter effect and optional TTS */
+  // Finalize a completed turn: commit to history + UKI memory, clear the live
+  // buffers, record the learning pattern, feed Nexus, and optionally speak it.
+  // Shared by the typewriter path (streamResponse) and the live LLM stream path.
+  const commitTurn = useCallback((reply: string, intent: string, userText: string, finalSteps: string[], speakIt: boolean) => {
+    useUkiStore.getState().setResponse(reply);
+    useUkiStore.getState().addConversationTurn({
+      id: `${intent}-${Date.now()}`,
+      userText,
+      response: reply,
+      intent,
+      success: true,
+      timestamp: Date.now(),
+      thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
+    });
+    // Persist to UKI memory layer (encrypted at rest, capped at MAX_TURNS).
+    // Fire-and-forget: failure here must never break the chat UI.
+    import('../uki').then((u) => u.ukiMemory.recordTurn(userText, reply, {
+      intent,
+      thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
+    })).catch(() => { /* memory write failed, non-fatal */ });
+    // Clear the live transcript + streaming buffer once the turn is committed
+    // to history, otherwise the same You/UKI pair renders twice.
+    useUkiStore.getState().setTranscript('');
+    useUkiStore.getState().setResponse('');
+    setStreamingResponse('');
+
+    // Rapid learning: record pattern so future inputs benefit
+    try {
+      UKIPatternStore.record(intent, [userText.slice(0, 80).toLowerCase()]);
+    } catch { /* non-fatal */ }
+
+    // Feed Nexus knowledge graph from each conversation turn
+    try {
+      const storeState = useUkiStore.getState();
+      const nodes = storeState.knowledgeNodes ?? [];
+      const newNode: UkiKnowledgeNode = {
+        id: `uki-${Date.now()}`,
+        label: userText.slice(0, 48),
+        weight: 1,
+        color: '#0A84FF',
+        category: intent,
+        timestamp: Date.now(),
+      };
+      storeState.setKnowledgeNodes([...nodes.slice(-49), newNode]);
+    } catch { /* non-fatal */ }
+
+    // Speak response if enabled and not too long
+    if (speakIt && speakResponses && reply.length < 300) {
+      speakWithVoice(reply);
+    }
+  }, [speakResponses]);
+
   const streamResponse = useCallback((reply: string, intent: string, userText: string, speakIt = true) => {
     setIsThinking(false);
     const finalSteps = [...thoughtStepsRef.current];
@@ -1377,57 +1430,11 @@ const UkiOverlay: React.FC = () => {
       if (i < reply.length) {
         streamTimerRef.current = setTimeout(tick, speed);
       } else {
-        useUkiStore.getState().setResponse(reply);
-        useUkiStore.getState().addConversationTurn({
-          id: `${intent}-${Date.now()}`,
-          userText,
-          response: reply,
-          intent,
-          success: true,
-          timestamp: Date.now(),
-          thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
-        });
-        // Persist to UKI memory layer (encrypted at rest, capped at MAX_TURNS).
-        // Fire-and-forget: failure here must never break the chat UI.
-        import('../uki').then((u) => u.ukiMemory.recordTurn(userText, reply, {
-          intent,
-          thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
-        })).catch(() => { /* memory write failed, non-fatal */ });
-        // Clear the live transcript + streaming buffer once the turn is
-        // committed to history, otherwise the same You/UKI pair renders
-        // twice (once in history, once as the live row).
-        useUkiStore.getState().setTranscript('');
-        useUkiStore.getState().setResponse('');
-        setStreamingResponse('');
-
-        // Rapid learning: record pattern so future inputs benefit
-        try {
-          UKIPatternStore.record(intent, [userText.slice(0, 80).toLowerCase()]);
-        } catch { /* non-fatal */ }
-
-        // Feed Nexus knowledge graph from each conversation turn
-        try {
-          const storeState = useUkiStore.getState();
-          const nodes = storeState.knowledgeNodes ?? [];
-          const newNode: UkiKnowledgeNode = {
-            id: `uki-${Date.now()}`,
-            label: userText.slice(0, 48),
-            weight: 1,
-            color: '#0A84FF',
-            category: intent,
-            timestamp: Date.now(),
-          };
-          storeState.setKnowledgeNodes([...nodes.slice(-49), newNode]);
-        } catch { /* non-fatal */ }
-
-        // Speak response if enabled and not too long
-        if (speakIt && speakResponses && reply.length < 300) {
-          speakWithVoice(reply);
-        }
+        commitTurn(reply, intent, userText, finalSteps, speakIt);
       }
     };
     streamTimerRef.current = setTimeout(tick, speed);
-  }, [speakResponses]);
+  }, [commitTurn]);
 
   const handleSendText = useCallback(async () => {
     const text = inputText.trim();
@@ -1542,6 +1549,46 @@ const UkiOverlay: React.FC = () => {
     pushStep('No structured route matched -- escalating to local AI');
     useUkiStore.getState().setTranscript(text);
     setStreamingResponse('');
+
+    // Real LLM first — if the user pasted a provider key in Settings -> AI Providers,
+    // route the free-form question through the AI-provider framework and stream it.
+    if (hasConfiguredProvider()) {
+      pushStep('Configured AI provider found -- streaming from LLM');
+      let fgApp: string | null = null;
+      let openIds: string[] = [];
+      let isOnline = true;
+      try {
+        const ra = useRunningApps.getState();
+        fgApp = ra.currentAppId ?? null;
+        openIds = (ra.runningApps ?? []).map(a => a.id);
+        isOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+      } catch { /* best-effort context */ }
+      const sysPrompt = buildSystemPrompt({
+        foregroundAppId: fgApp,
+        openAppIds: openIds,
+        online: isOnline,
+        localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+      // Give the model a little conversational context (last few turns).
+      const recent = useUkiStore.getState().conversationHistory.slice(-4);
+      const history = recent.flatMap(t => ([
+        { role: 'user' as const, content: t.userText || '' },
+        { role: 'assistant' as const, content: t.response || '' },
+      ])).filter(m => m.content);
+      // Stream tokens straight into the live response area as they arrive.
+      setIsThinking(false);
+      const llmReply = await streamConfiguredLLM(normalized, sysPrompt, (_tok, acc) => {
+        setStreamingResponse(empathyPrefix + acc);
+      }, { history });
+      if (llmReply) {
+        pushStep('LLM stream complete');
+        commitTurn(empathyPrefix + llmReply, 'llm', text, [...thoughtStepsRef.current], false);
+        return;
+      }
+      pushStep('LLM stream failed/empty -- continuing to local fallback');
+      setStreamingResponse('');
+    }
+
     const dex = (window as any).dex;
     if (dex?.uki?.query) {
       try {
@@ -1577,7 +1624,7 @@ const UkiOverlay: React.FC = () => {
         streamResponse(fallback, 'fallback', text, false);
       }
     }
-  }, [inputText, streamResponse]);
+  }, [inputText, streamResponse, commitTurn]);
 
   // Auto-scroll to bottom when content changes
   useEffect(() => {

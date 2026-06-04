@@ -34,6 +34,7 @@ import {
 import { initializeTier } from './services/TierManager';
 import { startAdaptivePerfMonitor } from './services/AdaptivePerfMonitor';
 import { startIdlePauseCoordinator } from './utils/idlePause';
+import { initComfort } from './improvements500/comfortPrefs';
 import { startPermissionAutoDisable, stopPermissionAutoDisable } from './store/permissionStore';
 import { 
   initAppSubsystemIPC 
@@ -145,6 +146,9 @@ const STARTUP_MARK = performance.now();
 // 5-tier system: lowest | low | mid | high | ultra — managed by TierManager
 (() => {
   const tier = initializeTier();
+  // Apply user comfort/accessibility prefs (reduce-motion / contrast / text
+  // scale) early so first paint already respects them. No-op until opted in.
+  try { initComfort(); } catch { /* non-fatal */ }
   // Start adaptive perf monitor (silently downgrades tier on sustained jank or thermal heat)
   try { startAdaptivePerfMonitor(); } catch { /* non-fatal */ }
   // Apple-style idle pause coordinator: when the window is hidden, blurred,

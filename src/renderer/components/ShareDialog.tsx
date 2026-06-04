@@ -22,8 +22,8 @@ const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'fixed',
     inset: 0,
+    // Dim scrim only — do not blur the whole screen behind the dialog.
     background: 'rgba(0,0,0,0.6)',
-    backdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

@@ -37,8 +37,17 @@ pub mod fts;
 pub mod network;
 pub mod supervisor;
 pub mod phantom;
+pub mod contenthash;
 
 use napi::bindgen_prelude::*;
+
+/// Fast FNV-1a content hash (16-char hex) for native asset de-duplication.
+/// Mirrors the renderer `assetHash.ts`; for large file buffers this is far
+/// faster than the JS path.
+#[napi]
+pub fn content_hash(data: String) -> String {
+    contenthash::content_hash_hex(data.as_bytes())
+}
 
 // ---------------------------------------------------------------------------
 // Physics engine singleton

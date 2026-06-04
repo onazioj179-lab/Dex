@@ -34,6 +34,7 @@ import {
 } from '../store/networkStore';
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
+import AiProviderSettings from '../components/AiProviderSettings';
 import PolicyViewer from '../components/PolicyViewer';
 import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
@@ -214,6 +215,7 @@ const SECTIONS: SettingSection[] = [
   { id: 'storage', name: 'Storage & Data', icon: Icons.storage },
   { id: 'browser', name: 'Browser', icon: Icons.browser },
   { id: 'uki', name: 'UKI & Memory', icon: Icons.uki },
+  { id: 'aiproviders', name: 'AI Providers', icon: Icons.uki },
   { id: 'creativeapps', name: 'Creative Suite', icon: Icons.creativeapps },
   { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.plugins },
   { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.nexus },
@@ -227,7 +229,7 @@ const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
   { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
-  { label: 'Intelligence', ids: ['uki'] },
+  { label: 'Intelligence', ids: ['uki', 'aiproviders'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
   { label: 'Extensions', ids: ['plugins', 'nexus'] },
   { label: 'Info', ids: ['updates', 'about'] },
@@ -4278,6 +4280,7 @@ export const Settings: React.FC = () => {
       case 'storage': return renderStorageSettings();
       case 'browser': return renderBrowserSettings();
       case 'uki': return renderUkiSettings();
+      case 'aiproviders': return <AiProviderSettings />;
       case 'creativeapps': return renderCreativeAppsSettings();
       case 'plugins': return <PluginMarketplace />;
       case 'nexus': return <NexusBiometrics />;

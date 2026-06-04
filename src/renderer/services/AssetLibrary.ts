@@ -18,8 +18,17 @@
  */
 
 import { ContextBus } from './ContextBus';
+import { fuzzyMatch } from '../../shared/commands/registry';
 
-export type AssetKind = 'brush' | 'palette' | 'sample' | 'lut' | 'font' | 'preset';
+/**
+ * Universal asset kinds. The original creative kinds (brush…preset) plus the
+ * "everything is an asset" content kinds (note, image, video, …, project) so a
+ * single library + search spans the whole workspace. Nothing is required to
+ * produce the new kinds; they are available for apps to contribute.
+ */
+export type AssetKind =
+  | 'brush' | 'palette' | 'sample' | 'lut' | 'font' | 'preset'
+  | 'note' | 'image' | 'video' | 'audio' | 'document' | 'task' | 'workflow' | 'project';
 
 export interface AssetMeta {
   id: string;
@@ -150,6 +159,27 @@ export const AssetLibrary = {
     const out: AssetMeta[] = [];
     state.byKind.forEach((bucket) => bucket.forEach((a) => out.push(a)));
     return out;
+  },
+
+  /**
+   * Fuzzy-search assets across all kinds (or a subset). Pure read — this is the
+   * "assets remain searchable" half of the universal asset system, and the data
+   * source behind the asset search provider in the unified search.
+   */
+  search(query: string, opts?: { kinds?: AssetKind[]; limit?: number }): AssetMeta[] {
+    const q = query.trim();
+    const limit = opts?.limit ?? 20;
+    const kinds = opts?.kinds;
+    const out: { a: AssetMeta; score: number }[] = [];
+    state.byKind.forEach((bucket, kind) => {
+      if (kinds && !kinds.includes(kind)) return;
+      bucket.forEach((a) => {
+        const hay = `${a.name} ${a.kind} ${(a.tags ?? []).join(' ')}`;
+        const score = q ? fuzzyMatch(hay, q) : 1;
+        if (score > 0) out.push({ a, score });
+      });
+    });
+    return out.sort((x, y) => y.score - x.score).slice(0, limit).map((s) => s.a);
   },
 
   /** Test / HMR teardown. */

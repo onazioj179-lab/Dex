@@ -37,6 +37,24 @@ const MOTION_DURATION = {
   TAB_SWITCH: 150,
   LIST_ITEM_ENTER: 80,
   LIST_ITEM_EXIT: 60,
+  // DEX Motion Framework categories (mirror of the --motion-* CSS contract in
+  // design-system.css; keep the two in sync).
+  WINDOW_OPEN: 220,
+  WINDOW_CLOSE: 160,
+  WINDOW_MINIMIZE: 200,
+  WINDOW_RESTORE: 220,
+  WINDOW_EXPAND: 240,
+  WORKSPACE_SWITCH: 260,
+  PROJECT_SWITCH: 300,
+  FOCUS_SWITCH: 180,
+  DOCK_REVEAL: 200,
+  DOCK_HIDE: 160,
+  DOCK_LAUNCH: 360,
+  DOCK_HOVER: 120,
+  DOCK_DRAG: 90,
+  PANEL_EXPAND: 200,
+  PANEL_COLLAPSE: 160,
+  PANEL_REORGANIZE: 240,
 } as const;
 
 const MOTION_EASING = {
@@ -48,6 +66,7 @@ const MOTION_EASING = {
   ACCELERATE: 'cubic-bezier(0.4, 0.0, 1.0, 1.0)',
   SHARP: 'cubic-bezier(0.4, 0.0, 0.6, 1.0)',
   SPRING: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+  TAHOE: 'cubic-bezier(0.23, 1.0, 0.32, 1.0)',
 } as const;
 
 const FRAME_BUDGET_MS = 16.67;
@@ -332,6 +351,27 @@ class UnifiedMotionSystem {
       'tab-switch': { duration: MOTION_DURATION.TAB_SWITCH, easing: MOTION_EASING.SHARP, properties: ['opacity'] },
       'dropdown-open': { duration: MOTION_DURATION.DROPDOWN_OPEN, easing: MOTION_EASING.DECELERATE, properties: ['transform', 'opacity'] },
       'dropdown-close': { duration: MOTION_DURATION.DROPDOWN_CLOSE, easing: MOTION_EASING.ACCELERATE, properties: ['transform', 'opacity'] },
+
+      // DEX Motion Framework — window category
+      'window-open': { duration: MOTION_DURATION.WINDOW_OPEN, easing: MOTION_EASING.DECELERATE, properties: ['transform', 'opacity'] },
+      'window-close': { duration: MOTION_DURATION.WINDOW_CLOSE, easing: MOTION_EASING.ACCELERATE, properties: ['transform', 'opacity'] },
+      'window-minimize': { duration: MOTION_DURATION.WINDOW_MINIMIZE, easing: MOTION_EASING.ACCELERATE, properties: ['transform', 'opacity'] },
+      'window-restore': { duration: MOTION_DURATION.WINDOW_RESTORE, easing: MOTION_EASING.DECELERATE, properties: ['transform', 'opacity'] },
+      'window-expand': { duration: MOTION_DURATION.WINDOW_EXPAND, easing: MOTION_EASING.SPRING, properties: ['transform'] },
+      // workspace category
+      'workspace-switch': { duration: MOTION_DURATION.WORKSPACE_SWITCH, easing: MOTION_EASING.TAHOE, properties: ['transform', 'opacity'] },
+      'project-switch': { duration: MOTION_DURATION.PROJECT_SWITCH, easing: MOTION_EASING.TAHOE, properties: ['transform', 'opacity'] },
+      'focus-switch': { duration: MOTION_DURATION.FOCUS_SWITCH, easing: MOTION_EASING.DECELERATE, properties: ['opacity', 'filter'] },
+      // dock category
+      'dock-reveal': { duration: MOTION_DURATION.DOCK_REVEAL, easing: MOTION_EASING.DECELERATE, properties: ['transform', 'opacity'] },
+      'dock-hide': { duration: MOTION_DURATION.DOCK_HIDE, easing: MOTION_EASING.ACCELERATE, properties: ['transform', 'opacity'] },
+      'dock-launch': { duration: MOTION_DURATION.DOCK_LAUNCH, easing: MOTION_EASING.SPRING, properties: ['transform'] },
+      'dock-hover': { duration: MOTION_DURATION.DOCK_HOVER, easing: MOTION_EASING.EASE_OUT, properties: ['transform'] },
+      'dock-drag': { duration: MOTION_DURATION.DOCK_DRAG, easing: MOTION_EASING.EASE_OUT, properties: ['transform'] },
+      // panel category
+      'panel-expand': { duration: MOTION_DURATION.PANEL_EXPAND, easing: MOTION_EASING.DECELERATE, properties: ['transform', 'opacity'] },
+      'panel-collapse': { duration: MOTION_DURATION.PANEL_COLLAPSE, easing: MOTION_EASING.ACCELERATE, properties: ['transform', 'opacity'] },
+      'panel-reorganize': { duration: MOTION_DURATION.PANEL_REORGANIZE, easing: MOTION_EASING.SPRING, properties: ['transform'] },
     };
 
     return presets[preset] ?? { duration: MOTION_DURATION.NORMAL, easing: MOTION_EASING.EASE_OUT, properties: ['opacity'] };

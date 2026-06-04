@@ -25,7 +25,7 @@ import {
   getCompressionStats,
   type UkiArchiveRecord,
 } from './compressedMemory';
-import { DEX_APP_CATALOG, DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS } from './knowledge';
+import { DEX_APP_CATALOG, DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS, DEX_TROUBLESHOOTING, DEX_ARCHITECTURE } from './knowledge';
 
 const ARCHIVE_KEY = 'uki:mem:archive';
 const FEED_STATE_KEY = 'uki:feed:state';
@@ -329,6 +329,24 @@ function collectKnowledgeReference(): SourceFact[] {
         source: 'knowledge-reference',
         user: `How do I ${wf.title}?`,
         response: clip(`${wf.title}: ${wf.steps.join(' -> ')}`),
+        ts: Date.now(),
+      });
+    }
+    // Troubleshooting (symptom -> cause -> fix) so UKI can diagnose offline.
+    for (const t of DEX_TROUBLESHOOTING) {
+      out.push({
+        source: 'knowledge-reference',
+        user: t.symptom,
+        response: clip(`${t.symptom} Likely cause: ${t.cause}. Fix: ${t.fix.join(' -> ')}`),
+        ts: Date.now(),
+      });
+    }
+    // System-architecture facts so UKI can explain how DEX itself works.
+    for (const a of DEX_ARCHITECTURE) {
+      out.push({
+        source: 'knowledge-reference',
+        user: `How does DEX handle ${a.topic}?`,
+        response: clip(a.fact),
         ts: Date.now(),
       });
     }

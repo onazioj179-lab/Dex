@@ -1111,10 +1111,11 @@ export const AppManager: React.FC = () => {
     setTaskbarVisible(true);
   }, [anyWindowMaximized]);
 
-  // Hover-intent gate for bottom trigger zone. Requires cursor to dwell ~140ms
-  // with average velocity below 0.45 px/ms before revealing the dock. This
-  // kills accidental popups when the cursor merely passes through the strip
-  // (e.g. while reaching for an app's bottom-edge control or scrollbar).
+  // Hover-intent gate for bottom trigger zone. Requires cursor to dwell ~280ms
+  // with average velocity below 0.35 px/ms before revealing the dock. The longer,
+  // stricter gate keeps the dock from popping up while the user is *working* near
+  // the bottom of an app (a brief pause on a bottom-edge control/scrollbar no
+  // longer triggers it) — only a deliberate move-to-edge-and-rest reveals it.
   const cancelDockIntent = useCallback(() => {
     if (dockIntentTimerRef.current) { clearTimeout(dockIntentTimerRef.current); dockIntentTimerRef.current = null; }
     dockIntentSampleRef.current = null;
@@ -1130,7 +1131,7 @@ export const AppManager: React.FC = () => {
       // Velocity check happens in trackDockIntent on every move; if no move
       // arrived (cursor is resting), velocity is 0 — definitely intentional.
       showDock();
-    }, 140);
+    }, 280);
   }, [taskbarVisible, showDock]);
   const trackDockIntent = useCallback((e: React.PointerEvent | React.MouseEvent) => {
     const sample = dockIntentSampleRef.current;
@@ -1143,12 +1144,12 @@ export const AppManager: React.FC = () => {
     // Refresh sample baseline so velocity is computed over the last hop.
     dockIntentSampleRef.current = { t: performance.now(), x: e.clientX, y: e.clientY };
     // If still moving fast, restart the dwell window to require a fresh pause.
-    if (v > 0.45) {
+    if (v > 0.35) {
       clearTimeout(dockIntentTimerRef.current);
       dockIntentTimerRef.current = setTimeout(() => {
         dockIntentTimerRef.current = null;
         showDock();
-      }, 140);
+      }, 280);
     }
   }, [showDock]);
   const scheduleDockHide = useCallback(() => {
@@ -1157,6 +1158,9 @@ export const AppManager: React.FC = () => {
     // Delay before hiding allows user to return and see smooth transition
     dockHideTimerRef.current = setTimeout(() => {
       if (showAppMenuRef.current) return;
+      // Anchored persistence: never hide while the user is actively dragging a
+      // dock icon (touch reorder in progress) — the dock stays put while in use.
+      if (dockTouchReorderRef.current?.dragging) return;
       // Don't hide if any menu/dropdown is open in any app
       if (isAnyMenuOpen()) return;
       // Don't hide if a menu just closed (200ms grace period)
@@ -3387,7 +3391,9 @@ export const AppManager: React.FC = () => {
         const shortcut = dockShortcut[item.id];
         const tooltip = shortcut ? `${item.label}  (${shortcut})` : item.label;
 
-        // No continuity ring or running indicator — users discover app state on their own.
+        // Running-state indicator: a subtle dot beneath running apps, brighter
+        // and accent-tinted for the active app (rendered below, absolute so it
+        // adds no layout shift and scales with dock magnification).
 
         return (
         <div key={item.id} data-dock-item style={{
@@ -3533,7 +3539,22 @@ export const AppManager: React.FC = () => {
               </span>
             )}
           </button>
-
+          {(isRunning || isActive) && (
+            <span
+              aria-hidden="true"
+              data-dock-running-dot
+              style={{
+                position: 'absolute', bottom: -3, left: '50%',
+                width: isActive ? 5 : 4, height: isActive ? 5 : 4,
+                borderRadius: '50%', transform: 'translateX(-50%)',
+                background: isActive ? item.color : 'var(--color-text-tertiary)',
+                boxShadow: isActive ? `0 0 5px ${item.color}80` : 'none',
+                opacity: isMinimized ? 0.5 : 1,
+                transition: 'width var(--motion-dock-hover), height var(--motion-dock-hover), background var(--motion-dock-hover), opacity var(--motion-dock-hover)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
         </div>
       );
       } catch (err) {
@@ -4528,7 +4549,11 @@ export const AppManager: React.FC = () => {
             transform: taskbarVisible ? geom.visibleTransform : geom.hiddenTransform,
             display: 'flex', justifyContent: 'center',
             opacity: taskbarVisible ? 1 : 0,
-            transition: 'opacity 0.2s cubic-bezier(0.23,1,0.32,1), transform 0.2s cubic-bezier(0.23,1,0.32,1)',
+            // Reveal/hide via the DEX motion contract (dock category): quick
+            // decelerate in on reveal, a snappier accelerate out on hide.
+            transition: taskbarVisible
+              ? 'opacity var(--motion-dock-reveal), transform var(--motion-dock-reveal)'
+              : 'opacity var(--motion-dock-hide), transform var(--motion-dock-hide)',
             pointerEvents: taskbarVisible ? 'auto' : 'none',
           } as React.CSSProperties;
         })()}
@@ -4912,6 +4937,7 @@ export const AppManager: React.FC = () => {
           <div style={{ position: 'fixed', inset: 0, zIndex: 5005 }} onMouseDown={() => setLaunchpadCtx(null)} />
           <div
             role="menu"
+            className="dex-surface-overlay"
             aria-label={`${launchpadCtx.label} options`}
             onKeyDown={e => {
               if (e.key === 'Escape') setLaunchpadCtx(null);
@@ -4925,11 +4951,11 @@ export const AppManager: React.FC = () => {
             }}
             style={{
               position: 'fixed', left: Math.min(launchpadCtx.x, window.innerWidth - 200), top: Math.min(launchpadCtx.y, window.innerHeight - 200),
+              // Material (background/border/shadow) now comes from the unified
+              // .dex-surface-overlay class — the canonical overlay surface for
+              // context menus. Blur is perf-tier/thermal gated automatically.
               zIndex: 5006, minWidth: 180,
-              background: 'rgba(30,30,34,0.98)',
-              border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 12, padding: 4,
-              boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.04)',
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >

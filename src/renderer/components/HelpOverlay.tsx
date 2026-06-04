@@ -297,9 +297,8 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
       style={{
         position: 'fixed',
         inset: 0,
+        /* Dim scrim only — no full-screen blur behind the overlay. */
         background: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

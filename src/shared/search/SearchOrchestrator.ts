@@ -41,6 +41,7 @@ export type SearchKind =
   | 'calculator'
   | 'unit'
   | 'web'
+  | 'asset'
   | 'action';
 
 export interface SearchQuery {
