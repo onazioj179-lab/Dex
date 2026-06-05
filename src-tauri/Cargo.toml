@@ -19,6 +19,7 @@ serde_json = "1"
 dex-smart-router = { path = "../core/dex-smart-router" }
 dex-vault = { path = "../core/dex-vault" }
 dex-search = { path = "../core/dex-search" }
+dex-audio = { path = "../core/dex-audio" }
 # Native backend ports (Electron->Tauri migration):
 sysinfo = "0.30"   # system status + process list/kill
 open = "5"          # shell: open path / external url with the OS default
