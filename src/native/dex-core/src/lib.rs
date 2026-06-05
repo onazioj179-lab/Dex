@@ -38,6 +38,8 @@ pub mod network;
 pub mod supervisor;
 pub mod phantom;
 pub mod contenthash;
+pub mod recency;
+pub mod color;
 
 use napi::bindgen_prelude::*;
 
@@ -47,6 +49,28 @@ use napi::bindgen_prelude::*;
 #[napi]
 pub fn content_hash(data: String) -> String {
     contenthash::content_hash_hex(data.as_bytes())
+}
+
+/// Recency × frequency relevance score for native memory ranking. Mirrors the
+/// renderer `shared/nexus/memoryItems.ts` so large memory sets can be ranked
+/// natively. `age_ms` is how long ago the item was touched; `half_life_ms` sets
+/// the decay rate (e.g. 7 days).
+#[napi]
+pub fn recency_score(age_ms: f64, hits: u32, half_life_ms: f64) -> f64 {
+    recency::recency_score(age_ms, hits, half_life_ms)
+}
+
+/// `(r,g,b)` -> `#rrggbb`. Native color helper for the creative apps.
+#[napi]
+pub fn rgb_to_hex(r: u32, g: u32, b: u32) -> String {
+    color::rgb_to_hex(r as u8, g as u8, b as u8)
+}
+
+/// WCAG contrast ratio (1.0..=21.0) between two RGB colors — for native a11y
+/// contrast checks in the Shell.
+#[napi]
+pub fn contrast_ratio(r1: u32, g1: u32, b1: u32, r2: u32, g2: u32, b2: u32) -> f64 {
+    color::contrast_ratio((r1 as u8, g1 as u8, b1 as u8), (r2 as u8, g2 as u8, b2 as u8))
 }
 
 // ---------------------------------------------------------------------------

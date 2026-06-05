@@ -12,6 +12,7 @@ import { getBundledAppVersion } from '../../utils/appVersion';
 import DexIcon from '../../components/DexIcon';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { buildTimeline, sessionDuration } from '../../../shared/rewind/timeline';
+import { groupSessionsByDay, describeSession, formatDuration } from '../../../shared/rewind/timelineView';
 
 // ===========================================================================
 // TYPES
@@ -1116,6 +1117,11 @@ const timer = setInterval(check, 15000);
     [timeline],
   );
 
+  // Day-grouped, newest-first projection of those sessions for a scannable
+  // timeline ("Today", "Yesterday", richer per-session labels + durations).
+  // Makes shared/rewind/timelineView.ts load-bearing instead of orphaned.
+  const sessionDays = useMemo(() => groupSessionsByDay(timelineSessions), [timelineSessions]);
+
   // =======================================================================
   // RENDER
   // =======================================================================
@@ -1687,25 +1693,35 @@ const timer = setInterval(check, 15000);
           ))}
         </div>
 
-        {/* Work sessions (idle-gap grouped, reconstructed from the activity log) */}
-        {!loading && timelineSessions.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 4px 4px' }} aria-label="Work sessions">
-            {timelineSessions.map(sess => (
-              <div
-                key={sess.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '4px 10px', borderRadius: 999,
-                  background: 'rgba(74,158,255,0.10)',
-                  border: '1px solid rgba(74,158,255,0.18)',
-                  fontSize: 11, color: 'var(--rewind-text, #e4e4e7)',
-                }}
-                title={sess.label}
-              >
-                <span style={{ fontWeight: 600 }}>{sess.primaryAppId}</span>
-                <span style={{ opacity: 0.5 }}>{Math.max(1, Math.round(sessionDuration(sess) / 60000))}m</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span style={{ opacity: 0.6 }}>{sess.eventCount}</span>
+        {/* Work sessions — idle-gap grouped, then day-bucketed with relative
+            headings + human labels (shared/rewind/timelineView.ts). */}
+        {!loading && sessionDays.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 4px' }} aria-label="Work sessions">
+            {sessionDays.map(day => (
+              <div key={day.dayTs}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.45, margin: '2px 0 6px' }}>
+                  {day.heading}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {day.sessions.map(sess => (
+                    <div
+                      key={sess.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '4px 10px', borderRadius: 999,
+                        background: 'rgba(74,158,255,0.10)',
+                        border: '1px solid rgba(74,158,255,0.18)',
+                        fontSize: 11, color: 'var(--rewind-text, #e4e4e7)',
+                      }}
+                      title={describeSession(sess)}
+                    >
+                      <span style={{ fontWeight: 600 }}>{sess.primaryAppId}</span>
+                      <span style={{ opacity: 0.5 }}>{formatDuration(sessionDuration(sess))}</span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span style={{ opacity: 0.6 }}>{sess.eventCount} event{sess.eventCount === 1 ? '' : 's'}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

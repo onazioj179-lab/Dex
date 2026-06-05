@@ -1,11 +1,22 @@
 # DEX -- Personal Control Hub
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 4.60.1 - Copyright (c) 2026 - DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; - Version 5.0.0 - Copyright (c) 2026 - DEX Software License Agreement v1.0
 
 DEX is a calm, fast, local-first desktop workspace. One launcher, one assistant,
 one home for the apps you use every day. Take notes, run timers, open files,
 snap a screenshot, focus your screen, mute the room, draw, write, plan, ship --
 without ever leaving the keyboard. Everything happens on your machine.
+
+## What's new in 5.0
+
+- **Bring your own AI.** Paste an OpenAI, Anthropic, Google, Ollama, or
+  OpenRouter key in **Settings -> AI Providers**, pick your model, and UKI
+  answers using it -- streaming replies token by token.
+- **A clearer Rewind.** Your day is reconstructed into real work sessions,
+  grouped under **Today / Yesterday** with readable labels and durations.
+- **Notifications that actually show up.** Banners now surface reliably, sort by
+  priority, and collapse extras into a tidy "+N more".
+- **Faster under the hood.** More of the heavy lifting moved to native code.
 
 ## Why people use DEX
 

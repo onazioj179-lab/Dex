@@ -14,6 +14,7 @@ import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { useFileDrop } from '../../utils/useFileDrop';
+import { capHistoryTail } from '../../../shared/creative/history';
 import {
   ADJUSTMENT_PRESETS,
   QUICK_EXPORT_PRESETS,
@@ -28,6 +29,9 @@ import type { AdjustmentType as PrismAdjustmentType, BlendMode as PrismBlendMode
 // ==================== APP IDENTITY ====================
 export const PRISM_VERSION = '1.0.0';
 export const PRISM_BUILD_DATE = '2026-04-11';
+/** Max retained undo snapshots. Each is a full deep clone of all layers, so this
+ *  bounds the editor's worst-case history memory (was previously unbounded). */
+const PRISM_HISTORY_LIMIT = 60;
 
 import {
   type SelectionState,
@@ -1005,10 +1009,16 @@ const Prism: React.FC = () => {
       layers: structuredClone(layers),
       timestamp: Date.now(),
     };
-    setHistory(prev => [...prev.slice(0, historyIndex + 1), state]);
-    setHistoryIndex(prev => prev + 1);
+    // Append after the current index (dropping any redo tail), then cap growth.
+    // Each entry is a full deep clone of all layers, so an unbounded stack leaks
+    // memory over a long session; capHistoryTail (shared, unit-tested) trims the
+    // oldest while keeping the index valid — consistent undo behaviour across apps.
+    const appended = [...history.slice(0, historyIndex + 1), state];
+    const capped = capHistoryTail(appended, appended.length - 1, PRISM_HISTORY_LIMIT);
+    setHistory(capped.history);
+    setHistoryIndex(capped.index);
     setIsDirty(true);
-  }, [layers, historyIndex]);
+  }, [layers, history, historyIndex]);
 
   const undo = useCallback(() => {
     if (historyIndex <= 0) return;

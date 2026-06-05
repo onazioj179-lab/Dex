@@ -790,6 +790,30 @@ export const AppManager: React.FC = () => {
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   const bannerNotifications = useBannerNotifications();
 
+  // Wire the app-wide 'dex-notification' CustomEvent to the banner system.
+  // Dispatchers across the app (shortcuts, workflows, app lifecycle in
+  // runningApps) fire this event, but nothing listened — so those banners never
+  // appeared. This connects them, mapping the event's {title,body,type,priority}
+  // onto a banner (type -> icon).
+  const notifyPush = bannerNotifications.push;
+  useEffect(() => {
+    const ICONS = ['info', 'success', 'warning', 'error'];
+    const PRIOS = ['low', 'normal', 'high', 'urgent'];
+    const onNotify = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      if (!d || !d.title) return;
+      notifyPush({
+        title: String(d.title),
+        body: d.body != null ? String(d.body) : undefined,
+        icon: ICONS.includes(d.icon) ? d.icon : (ICONS.includes(d.type) ? d.type : 'info'),
+        priority: PRIOS.includes(d.priority) ? d.priority : 'normal',
+        source: d.source != null ? String(d.source) : undefined,
+      });
+    };
+    window.addEventListener('dex-notification', onNotify as EventListener);
+    return () => window.removeEventListener('dex-notification', onNotify as EventListener);
+  }, [notifyPush]);
+
   // -- Split-screen tiling ------------------------------------------------
   const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
 

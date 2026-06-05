@@ -13,6 +13,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
 import { playNotification } from './SpatialAudio';
+import { selectVisible } from '../../shared/notifications/center';
+import type { NotificationRecord, NotificationPriority } from '../../shared/notifications/group';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -375,17 +377,25 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
   onDismiss,
   onClick,
 }) => {
-  // Sort by priority (urgent first) then by timestamp (newest first)
-  const sorted = useMemo(() => {
-    return [...notifications].sort((a, b) => {
-      const priorityA = PRIORITY_ORDER[a.priority || 'normal'] || 2;
-      const priorityB = PRIORITY_ORDER[b.priority || 'normal'] || 2;
-      if (priorityA !== priorityB) return priorityB - priorityA;
-      return (b.timestamp || 0) - (a.timestamp || 0);
-    });
+  // Visible/overflow selection via the shared, tested Notification Center model
+  // (shared/notifications/center.ts) — one source of truth for priority ordering
+  // and the "+N more" overflow, replacing the inline sort/slice.
+  const { visible, overflow } = useMemo(() => {
+    const records: NotificationRecord[] = notifications.map((n) => ({
+      id: n.id,
+      title: n.title || '',
+      body: n.body,
+      source: n.source || 'system',
+      priority: (n.priority || 'normal') as NotificationPriority,
+      ts: n.timestamp || 0,
+    }));
+    const sel = selectVisible(records, MAX_VISIBLE);
+    const byId = new Map(notifications.map((n) => [n.id, n]));
+    return {
+      visible: sel.visible.map((r) => byId.get(r.id)).filter(Boolean) as BannerNotification[],
+      overflow: sel.overflow,
+    };
   }, [notifications]);
-
-  const visible = sorted.slice(0, MAX_VISIBLE);
 
   if (visible.length === 0) return null;
 
@@ -410,14 +420,14 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
         />
       ))}
       {/* Show "+N more" indicator if there are hidden notifications */}
-      {sorted.length > MAX_VISIBLE && (
+      {overflow > 0 && (
         <div style={{
           fontSize: 11, color: 'var(--color-text-tertiary)',
           textAlign: 'center', padding: '4px 0',
           background: 'var(--color-bg-elevated)',
           borderRadius: 8, opacity: 0.9,
         }}>
-          +{sorted.length - MAX_VISIBLE} more notification{sorted.length - MAX_VISIBLE > 1 ? 's' : ''}
+          +{overflow} more notification{overflow > 1 ? 's' : ''}
         </div>
       )}
     </div>
