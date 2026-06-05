@@ -16,6 +16,13 @@ import './styles/globals.css';
 import './styles/design-system.css';
 import './styles/print.css';
 
+// Electron->Tauri migration (GOAL-6A): install the window.dex / window.electron
+// compatibility layer FIRST — before any service reads window.dex — so the
+// renderer's IPC calls route to the native dex_ipc dispatcher under the Tauri
+// shell. This is a no-op under Electron (where the real preload provides them).
+import { installTauriCompat } from './services/platform/tauriCompat';
+installTauriCompat();
+
 // RC4: CSS Containment -- inject before first paint
 import { injectContainmentCSS } from './utils/CSSContainment';
 injectContainmentCSS();
