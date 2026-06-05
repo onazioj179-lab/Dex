@@ -94,9 +94,83 @@ pub fn find_duplicates(root: &Path, max: usize) -> Vec<DupGroup> {
     groups
 }
 
+/// Map a filename to a high-level category for smart organization.
+pub fn categorize(name: &str) -> &'static str {
+    let ext = std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "svg" | "heic" | "tiff" => "images",
+        "mp4" | "mov" | "avi" | "mkv" | "webm" | "flv" | "wmv" => "videos",
+        "mp3" | "wav" | "flac" | "ogg" | "aac" | "m4a" | "wma" => "audio",
+        "pdf" | "doc" | "docx" | "txt" | "md" | "rtf" | "odt" | "pages" => "documents",
+        "xls" | "xlsx" | "csv" | "ods" | "numbers" => "spreadsheets",
+        "ppt" | "pptx" | "key" | "odp" => "presentations",
+        "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => "archives",
+        "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "java" | "go" | "c" | "cpp" | "h" | "html"
+        | "css" | "json" | "xml" | "sh" | "rb" | "php" | "sql" => "code",
+        "exe" | "msi" | "dmg" | "app" | "deb" | "rpm" => "applications",
+        _ => "other",
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct TypeGroup {
+    pub category: String,
+    pub count: usize,
+    pub total_size: u64,
+    pub paths: Vec<String>,
+}
+
+/// Group files under `root` by category (count + total size + paths), largest first.
+pub fn group_by_type(root: &Path, max: usize) -> Vec<TypeGroup> {
+    let mut map: HashMap<&'static str, (usize, u64, Vec<String>)> = HashMap::new();
+    for (path, size) in walk(root, max) {
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let entry = map.entry(categorize(&name)).or_default();
+        entry.0 += 1;
+        entry.1 += size;
+        entry.2.push(path.to_string_lossy().to_string());
+    }
+    let mut out: Vec<TypeGroup> = map
+        .into_iter()
+        .map(|(cat, (count, total_size, paths))| TypeGroup {
+            category: cat.to_string(),
+            count,
+            total_size,
+            paths,
+        })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn categorizes_by_extension() {
+        assert_eq!(categorize("photo.JPG"), "images");
+        assert_eq!(categorize("song.mp3"), "audio");
+        assert_eq!(categorize("main.rs"), "code");
+        assert_eq!(categorize("report.pdf"), "documents");
+        assert_eq!(categorize("noext"), "other");
+    }
+
+    #[test]
+    fn groups_files_by_type() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.png"), b"x").unwrap();
+        std::fs::write(dir.path().join("b.png"), b"yy").unwrap();
+        std::fs::write(dir.path().join("c.rs"), b"zzz").unwrap();
+        let groups = group_by_type(dir.path(), 1000);
+        let images = groups.iter().find(|g| g.category == "images").unwrap();
+        assert_eq!(images.count, 2);
+        assert!(groups.iter().any(|g| g.category == "code" && g.count == 1));
+    }
 
     #[test]
     fn finds_byte_identical_duplicates() {
