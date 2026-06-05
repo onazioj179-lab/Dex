@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the DEX main window during the Electron->Tauri migration. Custom app commands (e.g. smart_router_route) are allowed by default; this grants the core window/app permissions the shell needs.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

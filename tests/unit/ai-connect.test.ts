@@ -1,14 +1,21 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   pickConfiguredModelId,
   hasConfiguredProvider,
+  routeConfiguredModels,
   askConfiguredLLM,
   streamConfiguredLLM,
   PROVIDER_PRIORITY,
   type StreamFetchLike,
 } from '../../src/renderer/uki/providers/connect';
 import { setApiKey } from '../../src/renderer/uki/keystore';
-import { getPreferredModel, setPreferredModel, clearPreferredModel } from '../../src/renderer/uki/providers/modelPrefs';
+import { getPreferredModel, setPreferredModel, clearPreferredModel, getRoutingGoal, setRoutingGoal } from '../../src/renderer/uki/providers/modelPrefs';
 import type { FetchLike } from '../../src/renderer/uki/providers/orchestrator';
 
 beforeEach(() => localStorage.clear());
@@ -74,6 +81,44 @@ describe('hasConfiguredProvider (reads keystore)', () => {
     expect(hasConfiguredProvider()).toBe(false);
     setApiKey('openai', 'sk-test');
     expect(hasConfiguredProvider()).toBe(true);
+  });
+});
+
+describe('routing goal store', () => {
+  it('defaults to auto and round-trips a valid goal', () => {
+    expect(getRoutingGoal()).toBe('auto');
+    setRoutingGoal('smartest');
+    expect(getRoutingGoal()).toBe('smartest');
+  });
+  it('ignores a corrupt stored value, falling back to auto', () => {
+    localStorage.setItem('dex-uki-routing-goal', 'not-a-goal');
+    expect(getRoutingGoal()).toBe('auto');
+  });
+});
+
+describe('routeConfiguredModels (registry + keystore + Smart Router)', () => {
+  it('returns [] when nothing is configured for a non-offline goal', () => {
+    expect(routeConfiguredModels('auto', 'hi')).toEqual([]);
+  });
+
+  it('ranks a configured provider\'s models for the goal', () => {
+    setApiKey('openai', 'sk-test');
+    const r = routeConfiguredModels('cheapest', 'hi');
+    expect(r[0]).toBe('gpt-4o-mini'); // cheapest OpenAI model
+    expect(r).toContain('gpt-4o');
+  });
+
+  it('offline pulls local (keyless) providers even with no key stored', () => {
+    const r = routeConfiguredModels('offline', 'hi');
+    expect(r).toContain('llama3.1');
+    expect(r.every((id) => ['llama3.1', 'qwen2.5', 'mistral'].includes(id))).toBe(true);
+  });
+
+  it('smartest prefers a frontier model across all configured providers', () => {
+    setApiKey('openai', 'sk-test');
+    setApiKey('anthropic', 'sk-test');
+    const r = routeConfiguredModels('smartest', 'hi');
+    expect(['gpt-4o', 'gpt-4-turbo', 'claude-3-5-sonnet-latest', 'claude-3-opus-latest']).toContain(r[0]);
   });
 });
 
