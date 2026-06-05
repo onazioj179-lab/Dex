@@ -4,6 +4,24 @@ Operational state of the DEX desktop platform. Update at the end of every sessio
 
 Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-gen phase, **13 slices**: Surface + Motion frameworks, dock excellence, project continuity bridge, UKI knowledge layer + operator, workflow templates, workload governor, comfort/a11y layer, **search & command unification, Nexus 2.0 memory-first model, Rewind memory timeline, and UKI operator→unified-search wiring** — **uncommitted, in working tree**; `tsc --noEmit` = 0, changed-area + new modules re-run green in isolation. See **HANDOFF-PREMIUM.md** next-gen section for the per-slice detail + the pending-UI-integration list.)
 
+> 🎨 **WORKSPACE REDESIGN — GOAL-6D foundations (2026-06-05).** Owner pasted the "Workspace &
+> Navigation Redesign" spec; it's ~90% visual (needs eyes-on — headless can't verify the look).
+> Captured as **`GOAL-6D-WORKSPACE-REDESIGN.md`** + built the **testable logic foundations** across its
+> sections (all green, on PR #7 / branch `feat/dex-6.0-tauri-native-engines`):
+> • **Reduced glass** (design tokens, `design-system.css`): `--blur-*` −60%, `--glass-opacity-*` −50%
+> transparency, `--pg-shadow-*` −40% (cascades; the ~247 hardcoded inline blurs are a follow-up
+> consolidation pass).
+> • **UKI 3.0** `shared/uki/contextEngine.ts` — live project/file/workspace/task + activity → summarize().
+> • **Dock 2.0** `shared/dock/appCategories.ts` — auto creative/dev/comm/utility grouping.
+> • **Linked windows** `shared/workspace/windowLinks.ts` (link graph) + `linkedLayout.ts` (smart-expansion tiling).
+> • **Plugin system** `shared/plugins/manifest.ts` — manifest validation.
+> • **Onboarding** `shared/onboarding/redesignFlow.ts` — 6-step <3min flow.
+> • **Integrations** `shared/integrations/registry.ts` — GitHub/Figma/Slack/Gmail/Drive/Notion framework.
+> • **Project-centered** `shared/project/projectModel.ts` — a project bundles notes/files/workflows/etc.
+> **+35 vitest tests.** These are the LOGIC; the **UI wiring + purely-visual sections (window chrome,
+> layouts, dock rendering, creative apps, dev-mode UI, design-system consolidation) need eyes-on** on the
+> running app. The foundation modules are **not yet wired into the renderer** — adopt incrementally.
+>
 > 🦀 **TAURI MIGRATION STARTED (2026-06-05) — owner approved "full Tauri".** Scope reality: the
 > renderer drives the whole backend through `window.dex.<ns>.<method>()` / `window.electron.invoke`,
 > all funnelling through `ipcRenderer.invoke('<ns>:<method>', ...)` — **~2,369 `ipcMain` handlers across
