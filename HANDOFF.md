@@ -94,9 +94,16 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > `audio:getMetadata`/`audio:getInfo` → metadata; `audio:getWaveform`/`audio:getPeaks`/`media:getWaveform`
 > → peaks. Capability list + test updated (`audio` now native; `automation` is the not-yet-ported
 > example). **Playback (a real output sink) is intentionally OUT of scope** — device-dependent +
-> untestable headlessly; analysis is the verified core. Core workspace cargo test now **29** (smart-router
-> 10 + vault 14 + search 2 + audio 3). Three native engines done (Vault, Search, Audio); remaining heavy:
-> automation/agents, transfer.
+> untestable headlessly; analysis is the verified core.
+> • **⚙️ AUTOMATION + 🔁 SCANNER ENGINES (GOAL-6C/6A, 2026-06-05):** `core/dex-automation` — workflow
+> execution (setVar/transform/concat/condition/log over a context with `${var}` interpolation; unknown
+> steps skipped; conditions gate the run) → `{success,context,log,stepsRun}`, **4 cargo tests**; wired
+> `automation:run`/`workflow:executeNew` (id-based `workflow:execute`/`automations:execute` need a native
+> store → graceful). `core/dex-scanner` — duplicate detection (size-group → streaming SHA-256), **3 cargo
+> tests**; wired `fileIntel:findDuplicates`. `automation` added to the capability native list (`transfer`
+> is now the not-yet-ported example). **Core workspace cargo test now 36** (smart-router 10 + vault 14 +
+> search 2 + audio 3 + automation 4 + scanner 3). **Five native engines done** (Vault, Search, Audio,
+> Automation, Scanner); remaining heavy: transfer (network) + audio playback (device).
 > **Next:** owner tests via `npm run dev:tauri` (live renderer + bridge; window buttons work; other
 > backend returns null until ported). Then port IPC subsystems — NOTE **localStorage-based state already
 > works under WebView2** (keystore, modelPrefs, perf tier, onboarding, most prefs), so only the

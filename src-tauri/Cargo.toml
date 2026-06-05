@@ -20,6 +20,8 @@ dex-smart-router = { path = "../core/dex-smart-router" }
 dex-vault = { path = "../core/dex-vault" }
 dex-search = { path = "../core/dex-search" }
 dex-audio = { path = "../core/dex-audio" }
+dex-automation = { path = "../core/dex-automation" }
+dex-scanner = { path = "../core/dex-scanner" }
 # Native backend ports (Electron->Tauri migration):
 sysinfo = "0.30"   # system status + process list/kill
 open = "5"          # shell: open path / external url with the OS default
