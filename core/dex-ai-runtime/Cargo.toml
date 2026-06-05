@@ -1,0 +1,10 @@
+[package]
+name = "dex-ai-runtime"
+description = "DEX 6.0 native AI runtime (provider transport + streaming) — scaffold (GOAL-6A/6B)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+dex-smart-router = { path = "../dex-smart-router" }

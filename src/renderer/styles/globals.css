@@ -484,9 +484,15 @@ html[data-perf-tier="low"] * {
 }
 html[data-perf-tier="low"] [style*="backdrop"],
 html[data-perf-tier="low"] [style*="blur"] {
-  background: rgba(20,20,22,0.72) !important;
-  backdrop-filter: blur(10px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(140%) !important;
+  /* Budget/low-tier hardware: drop the GPU-expensive backdrop blur entirely
+     (this matches the TierManager low preset `enableBackdropFilter:false` —
+     the old rule forced a 10px blur on EVERY glass panel and was a major
+     compositor load on the exact machines that overload). Use a near-solid
+     surface so panels stay readable instead of letting the wallpaper/widgets
+     bleed through. */
+  background: rgba(20,20,22,0.95) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 html[data-perf-tier="low"] img, html[data-perf-tier="low"] video {
   image-rendering: optimizeSpeed;

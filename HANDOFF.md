@@ -4,6 +4,154 @@ Operational state of the DEX desktop platform. Update at the end of every sessio
 
 Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-gen phase, **13 slices**: Surface + Motion frameworks, dock excellence, project continuity bridge, UKI knowledge layer + operator, workflow templates, workload governor, comfort/a11y layer, **search & command unification, Nexus 2.0 memory-first model, Rewind memory timeline, and UKI operator→unified-search wiring** — **uncommitted, in working tree**; `tsc --noEmit` = 0, changed-area + new modules re-run green in isolation. See **HANDOFF-PREMIUM.md** next-gen section for the per-slice detail + the pending-UI-integration list.)
 
+> 🦀 **TAURI MIGRATION STARTED (2026-06-05) — owner approved "full Tauri".** Scope reality: the
+> renderer drives the whole backend through `window.dex.<ns>.<method>()` / `window.electron.invoke`,
+> all funnelling through `ipcRenderer.invoke('<ns>:<method>', ...)` — **~2,369 `ipcMain` handlers across
+> 200+ files** (main.ts 276, SecurityController 82, WorkflowController 62…). So "full Tauri" =
+> re-implementing the entire backend in Rust: a long, phased migration with **Electron staying the
+> shipping product** until parity. Done this session:
+> • **Tooling + feasibility:** installed `@tauri-apps/cli` 2.11 + `@tauri-apps/api`; `tauri info` shows
+> WebView2 present. **Tauri builds on the GNU toolchain here** — debug `cargo build` of `src-tauri`
+> compiled the full stack (tauri/wry/webview2-com) → runnable `dex-tauri.exe`, **no MSVC/VS Build Tools
+> required**. v2 config completed: `withGlobalTauri:true`, window `label:"main"`, `capabilities/default.json`.
+> • **IPC compatibility bridge (the migration seam):** `src/renderer/services/platform/tauriCompat.ts`
+> installs a Proxy-based `window.dex`/`window.electron` that routes EVERY `<ns>:<method>` call to one
+> native command **`dex_ipc(channel, args)`** (`src-tauri/src/main.rs`); unported channels return `null`
+> for a graceful degraded boot (same as the browser preview). `installTauriCompat()` is wired first in
+> `main.tsx` — **no-op under Electron** (shipping app untouched). `tsc` = 0.
+> • **Installer WORKS:** `npm run build:tauri` produces **`DEX_6.0.0_x64-setup.exe` (NSIS, 3.8 MB)** +
+> `DEX_6.0.0_x64_en-US.msi` (5.9 MB) in `src-tauri/target/release/bundle/` — ~40x smaller than
+> Electron's ~150 MB (uses the system WebView2). The first failure was only the one-time WiX/NSIS
+> toolset download (cached now). The installers embed the renderer WITH the bridge.
+> • **Subsystems ported (native `dex_ipc` handlers — owner said "do them all, you drive"):**
+> **window controls** (min/max→toggle/close/hide → Tauri window API); **Files** full read+write —
+> `files:list` (real `std::fs` dir listing via Tauri path resolver, matching the Electron shape
+> `{success,path,files:[{name,path,isDirectory,size,modified,extension}]}`) + `rename`/`move`
+> (cross-volume copy+remove fallback)/`copy`/`delete`/`mkdir`; **System** via `sysinfo` —
+> `getStatus`/`getProcesses`/`killProcess` (+ `power:getStats`,`power:closeProcess`); **Shell**
+> `openPath`/`openExternal` via the `open` crate; **OS** `lockScreen` (shutdown/restart/sleep DEFERRED
+> for safety until GUI-tested — avoids an accidental shutdown). **Everything else returns `null` →
+> graceful degrade** (and most renderer state is localStorage, which works natively under WebView2).
+> Crates added to `src-tauri`: `sysinfo`, `open`. Debug build green (3m21s); `tsc`=0, watermark OK (2412).
+> Raw Rust `std::fs`/`sysinfo` aren't gated by Tauri permissions, so these work without fs/plugin perms.
+> • **+5 more batches (2026-06-05):** (1) **clipboard** (`arboard`) — `clipboard:writeText/readText`,
+> `vault:copyToClipboard`; (2) **persistent KV store** — `capability:storage`/`storage` get/set → JSON
+> in the app config dir; (3) **reveal/open** — `fileIntel:revealInExplorer`/`openFile`,
+> `shell:showItemInFolder`, `media:openWithSystem` (explorer `/select` + `open` crate); (4)
+> **health/diagnostics** — `health:check`/`getStatus`, `watchdog:health`, `diagnostics:getSystemInfo`;
+> (5) **app data locations** — `app:getPath`, `data:getLocations`. Crate `arboard` added. Debug build
+> green (1m08s). Owner directive: "do them all, sharp, work multiple, update HANDOFF every ~5 batches."
+> • **Wave 2 (+5 batches, 2026-06-05) — real file search/recent without an index yet:** (6)
+> **`files:search`/`fileSearch:search`/`search:query`** — bounded recursive filename search (cap 8k
+> files, skips hidden/`node_modules`/recycle so it can't hang the worker thread); (7) **`files:recent`/
+> `fileIntel:getRecentFiles`** — walks Documents/Desktop/Downloads, sorts by mtime; (8) **scopes** —
+> `files:getScopes`/`fileSearch:getScopes` (kv-backed, defaults to user dirs); (9) **diagnostics/crash**
+> — `diagnostics:getPerformance` (sysinfo), `getLogs`/`crashReporter:*` empties; (10) **connectivity** —
+> `connection:isOnline`/`networkHygiene:isOnline`. Debug build green (11s). **~10 subsystems / ~40
+> channels ported.** Remaining = heavy engines only (vault crypto, Tantivy search index, audio DSP,
+> automation/agent VMs, transfer protocols) — each a real multi-session project; all degrade gracefully
+> meanwhile. A native search **index** would replace the bounded walk for big trees.
+> • **🔐 VAULT ENGINE (GOAL-6B, 2026-06-05) — first heavy engine done, 100/100:** new tested Rust crate
+> **`core/dex-vault`** — Argon2id KDF + AES-256-GCM (`crypto.rs`), RFC-6238 TOTP + base32 + otpauth parse
+> (`totp.rs`), password generate/strength (`password.rs`), and `VaultManager` in `lib.rs` (create/unlock/
+> lock, credential + authenticator CRUD, search, export/import with a SEPARATE password, change-master).
+> **14 cargo tests green** incl. the RFC-6238 TOTP vector (`287082`), crypto round-trip + wrong-password
+> rejection, full vault round-trip, export/import, master-change. Wired into `dex_ipc` via a Tauri-managed
+> `Mutex<VaultManager>` — **all ~28 `vault:*` channels**. Vault file at `app_config_dir/vault.dex`; key
+> only in memory while unlocked. Core workspace `cargo test` green (smart-router 10 + vault 14 = 24).
+> Crates: `aes-gcm`,`argon2`,`hmac`,`sha1`,`rand`,`base64`.
+> • **Wave B (2026-06-05) — breadth:** `files:trash`/`shell:trashItem`/`fileIntel:moveToTrash` → recycle
+> bin (`trash` crate, safe delete); `os:getInfo`/`system:getInfo` (platform/arch/cores/mem/hostname);
+> `app:getName`; `system:getDiskUsage` (sysinfo disks). Debug build green (4m14s). **Net: ~16 subsystems
+> / ~70 channels ported + the Vault crypto engine.** Next heavy engine = native **search index (Tantivy)**
+> — same A-style deep build as the Vault. Remaining heavy: audio, automation/agents, transfer.
+> • **🔎 SEARCH INDEX (GOAL-6A, 2026-06-05) — Tantivy engine built + tested:** new crate
+> **`core/dex-search`** — Tantivy full-text file index with an **edge-ngram tokenizer** for prefix search
+> ("budg" → "budget.pdf"); `open_or_create`/`index_path`(bounded walk)/`clear`/`count`/`search` →
+> `FileHit{path,name,extension,type,modified,size,score}`. **2 cargo tests green** (index+prefix, clear).
+> Wired into `dex_ipc`: `search:query`/`files:search`/`fileSearch:search` prefer the index + fall back to
+> the bounded walk when empty; `search:rebuild`/`fileSearch:reindex` build from the user doc dirs;
+> `search:getStats`; managed `Mutex<Option<SearchIndex>>` in setup. **The src-tauri build with Tantivy is
+> green (debug 5m52s) — the index is live in the shell.** Core workspace cargo test now **26**
+> (smart-router 10 + vault 14 + search 2).
+> • **🔗 DUAL-SHELL BLEND (2026-06-05):** affirmed + sharpened the Electron+Tauri model — one renderer,
+> both shells, `detectShell()`-selected; Electron = full backend, Tauri = native-where-ported + graceful.
+> New `services/platform/capabilities.ts` (`getCapabilities`/`hasNative`/`TAURI_NATIVE_SUBSYSTEMS`) +
+> re-export from `platform/index.ts` so the UI is operable-everywhere-aware. `tsc`=0. See
+> `docs/TAURI-MIGRATION.md` → "Dual-shell blend". (You can't fuse the two runtimes into one binary; this
+> is one codebase → two shells, which is the real, working "blend".)
+> • **🧩 CAPABILITY UI WIRING (B, 2026-06-05):** `useCapabilities()` hook + reusable
+> **`DesktopFeatureNotice`** component (`components/DesktopFeatureNotice.tsx`) — renders a calm "runs in
+> the full desktop app" notice for unported features under Tauri, and a no-op passthrough under Electron
+> (so it's safe to wrap any feature); plus a "Running on {shell}" indicator in the AI Providers panel.
+> **4 vitest tests** for the capability logic across web/electron/tauri (`tests/unit/capabilities.test.ts`,
+> 58 passing in the AI+capability subset). `tsc`=0, watermark OK (2416), Electron build green.
+> **Next:** owner tests via `npm run dev:tauri` (live renderer + bridge; window buttons work; other
+> backend returns null until ported). Then port IPC subsystems — NOTE **localStorage-based state already
+> works under WebView2** (keystore, modelPrefs, perf tier, onboarding, most prefs), so only the
+> IPC-backed features need porting: Files (Tauri fs), universal search, system/processes, vault, audio,
+> notifications, transfer. Port order should follow what the Home/shell touch first.
+>
+> 🩹 **UI + PERF FIXES (2026-06-05) — owner-reported glitches from live screenshots.**
+> • **Spotlight bleed-through (Home):** the embedded results dropdown was 64% opaque AND the
+> `HomeWidgets` layer (clock) painted over it (it renders as a later sibling inside the
+> `zIndex:2` scroll context). Fixed: dropdown is now near-opaque (`rgba(18,18,22,0.97)`) in
+> `shell/SpotlightSearch.tsx`; the home variant dispatches `dex-home-search-active` and
+> `pages/Home.tsx` fades + click-disables the widget layer while results are open (clear stacking
+> fix, fully reversible). **Verified live** (preview, low tier): dropdown bg opaque, `backdrop-filter:none`,
+> widget layer `opacity:0`, no console errors.
+> • **🔴 LOW-TIER PERF BUG (also fixes bleed-through on budget PCs):** `globals.css`
+> `html[data-perf-tier="low"] [style*="backdrop"], [style*="blur"]` was **forcing
+> `backdrop-filter: blur(10px) !important` on EVERY glass panel** — directly contradicting the
+> `TierManager` low preset (`enableBackdropFilter:false`) and a major compositor load on exactly the
+> machines that overload/crash. Changed to **`backdrop-filter: none !important`** + opaque
+> `rgba(20,20,22,0.95)`. Budget/low-tier hardware now gets flat, readable, cheap panels. (Owner is on a
+> budget PC reporting overload — this is a direct win; the broader timer-swarm/blur audit is still open.)
+> • **Settings doubled window chrome:** a maximized detached app rendered its **own** titlebar
+> (min/max/close) under the global shell bar + tab = triple chrome. Fixed in `components/AppManager.tsx`:
+> the floating titlebar is hidden when `isMaximized` (chromeless full-screen app); **double-click the
+> app's tab** toggles maximize/restore (`tileWindow(id,'maximize')` is a toggle) so a maximized app is
+> never stranded. Compiles + app renders clean in the preview; **needs eyes-on the real Electron app**
+> (the Settings page can't render in the headless browser preview — it needs `window.dex`).
+> • **Green:** `tsc --noEmit` = 0; **watermark gate restored** — `node scripts/add-watermarks.js`
+> stamped **156** previously-unstamped files (mostly pre-existing `tests/unit/*.test.ts` + the 2 new
+> Smart-Router tests), so `npm run lint` (tsc + watermark `--check`) is green again (2411 in compliance).
+> Full `vitest run --maxWorkers=2` + `npm run build` were run to confirm the CI test+build jobs.
+>
+> 🚀 **DEX 6.0 KICKOFF (2026-06-04) — Tauri migration decided; Native Core + Smart Router first slice.**
+> Direction (owner-approved): treat DEX as the operating layer above Win/macOS/Linux; **migrate to
+> Tauri** as a long-horizon, additive track (Electron stays the shipping product); roadmap covers all
+> pillars. Three 6.0 phase files added — **`GOAL-6A-NATIVE-CORE.md`** (Tauri + Rust `core/` + perf
+> targets), **`GOAL-6B-INTELLIGENCE.md`** (UKI 2.0 Smart Router + Memory Graph + Agents),
+> **`GOAL-6C-PLATFORM.md`** (Workflows/Marketplace/Creative/Cloud/SDK/Visual). The leading-edge slice
+> of 6A+6B shipped this session:
+>
+> • **Smart Router (UKI 2.0), TS — lands in today's Electron app.** New pure modules
+> `src/shared/uki/modelProfiles.ts` (cost/latency/intelligence catalog keyed to the provider model
+> ids) + `src/shared/uki/smartRouter.ts` (`classifyTask`, `routeModels`, `fanOutModels`; goals
+> Auto/Cheapest/Fastest/Smartest/Offline). Wired into `uki/providers/connect.ts`: new
+> `configuredCandidates`/`routeConfiguredModels`; `askConfiguredLLM` now runs the ranked list through
+> `chatWithFallback` (degrades pick→pick), `streamConfiguredLLM` streams the top pick; routing goal
+> stored in `modelPrefs.ts` (`get/setRoutingGoal`, default `auto`). UI: `AiProviderSettings.tsx` gains
+> a **Routing** selector + a routing-aware active-model banner. **54 unit tests green** (new
+> `smart-router`/`model-profiles` + extended `ai-connect`; **the 32 prior ai-connect tests still pass
+> — no regression**). `tsc --noEmit` = **0**.
+>
+> 🦀 • **Native core proven in Rust.** New Cargo workspace **`core/`** with `dex-smart-router` — a
+> **parity port** of the TS router (`core/dex-smart-router/src/lib.rs`), **`cargo test` = 10/10 green**;
+> plus scaffold crates `dex-search`/`dex-rewind`/`dex-scanner`/`dex-ai-runtime` (workspace compiles).
+> This extends the `contenthash.rs` TS→Rust precedent and is the load-bearing proof of the migration.
+>
+> 🪟 • **Tauri shell + platform bridge (additive, does not touch `src/main`).** `src-tauri/`
+> (Cargo.toml/build.rs/tauri.conf.json/main.rs) loads the **existing Vite renderer** and exposes
+> `smart_router_route` (backed by the crate). New seam `src/renderer/services/platform/index.ts`
+> (`detectShell`, `smartRouterRoute`) dispatches to the native command under Tauri, else the TS path —
+> proving the Electron↔Tauri seam with one channel. `package.json`: `dev:tauri`/`build:tauri` scripts +
+> `@tauri-apps/api`/`@tauri-apps/cli` deps; `.gitignore` updated for `core/target`, `src-tauri/target`.
+> **Deferred (network-heavy, NOT run here):** `npm install` (fetch Tauri CLI/api) + first
+> `npm run dev:tauri` (downloads the `tauri` crate) to boot the shell. The Rust logic is `cargo test`-
+> verified regardless; the rest of the `window.dex` IPC surface migrates behind the bridge in later 6A.
+>
 > 🤖 **AI-PROVIDER FRAMEWORK (2026-06-04) — biggest roadmap gap, now built + tested.** UKI had
 > **zero** LLM integration; this is the full framework under `src/renderer/uki/providers/` +
 > `uki/keystore.ts`: a provider contract (`types.ts`, `LLMProvider` with pure
@@ -281,11 +429,13 @@ Release mechanism: bump `package.json` version → commit → push tag `vX.Y.Z` 
 
 ---
 
-## Current Phase: Master Evolution — wave execution (see top blockquote + `docs/evolution/`)
+## Current Phase: DEX 6.0 — Native Core + Smart Router (GOAL-6A/6B kickoff; see top blockquote)
 
-The active phase is the Master Evolution wave work (batches 1–3 above). The prior **UI/UX
-Modernization** phase below is **complete at the code level** (kept for reference) — its residue is
-subjective visual taste that needs eyes-on the running app.
+The active phase is **DEX 6.0** (see `GOAL-6A/6B/6C-*.md` + the top blockquote): a Tauri migration as
+an additive track, with the Smart Router (UKI 2.0) as the first shipped slice. The earlier **Master
+Evolution** wave work and the prior **UI/UX Modernization** phase below are kept for reference (the
+latter is complete at the code level; its residue is subjective visual taste that needs eyes-on the
+running app).
 
 ### Prior phase — UI/UX Modernization (modern · sharp · pro · fluid glass) — code-complete
 

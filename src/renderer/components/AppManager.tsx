@@ -2521,7 +2521,10 @@ export const AppManager: React.FC = () => {
             className="dex-app-opening"
             onPointerDown={() => { if (focusedFloatingAppId !== appId) bringToFront(appId); }}
           >
-            {/* Floating title bar -- draggable (including maximized restore-drag) */}
+            {/* Floating title bar -- hidden when maximized so a maximized app is
+                chromeless (no redundant second window bar under the shell bar +
+                tab). Double-click the app's tab to restore. Draggable otherwise. */}
+            {!isMaximized && (
             <div
               style={{
                 height: 38, display: 'flex', alignItems: 'center', gap: 8,
@@ -2786,6 +2789,7 @@ export const AppManager: React.FC = () => {
                 </>
               )}
             </div>
+            )}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
               <AppErrorBoundary appId={appId}>
                 <Suspense fallback={<Loading appId={appId} />}>
@@ -3800,6 +3804,8 @@ export const AppManager: React.FC = () => {
                   setCurrentApp(app.id as AppId);
                 }
               }}
+              onDoubleClick={() => { if (!draggingTab) tileWindow(app.id as AppId, 'maximize'); }}
+              title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0 10px 0 8px', height: 26, borderRadius: 6,

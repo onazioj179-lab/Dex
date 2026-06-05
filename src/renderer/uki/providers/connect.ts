@@ -13,11 +13,12 @@
  * unit-testable; the live send reuses the orchestrator's injectable `fetch`.
  */
 
-import { getProvider, providerForModel } from './registry';
-import { chat, type FetchLike, type ChatOptions } from './orchestrator';
+import { getProvider, providerForModel, allModels, allProviders } from './registry';
+import { chatWithFallback, type FetchLike, type ChatOptions } from './orchestrator';
 import { createStreamParser, type StreamFormat } from './stream';
-import { getPreferredModel } from './modelPrefs';
+import { getPreferredModel, getRoutingGoal } from './modelPrefs';
 import { configuredProviders, getApiKey } from '../keystore';
+import { routeModels, classifyTask, type RouteCandidate, type RoutingGoal } from '../../../shared/uki/smartRouter';
 import type { ChatMessage, ProviderId } from './types';
 
 /**
@@ -55,14 +56,48 @@ export function hasConfiguredProvider(): boolean {
   return pickConfiguredModelId(configuredProviders()) !== null;
 }
 
+/**
+ * The model candidates the Smart Router may choose from for a goal. For
+ * `offline` these are the local (keyless) providers; for every other goal they
+ * are the providers the user has configured a key for. Shaped as plain
+ * `RouteCandidate`s so the same set can feed either the TS router or the native
+ * (Tauri) `smart_router_route` command — see services/platform.
+ */
+export function configuredCandidates(goal: RoutingGoal): RouteCandidate[] {
+  const providerIds = new Set<string>(
+    goal === 'offline'
+      ? allProviders().filter((p) => !p.requiresKey).map((p) => p.id)
+      : configuredProviders().filter((pid) => getProvider(pid as ProviderId)),
+  );
+  return allModels()
+    .filter((m) => providerIds.has(m.provider))
+    .map((m) => ({
+      id: m.id,
+      contextWindow: m.contextWindow,
+      vision: !!m.capabilities.vision,
+      tools: !!m.capabilities.tools,
+    }));
+}
+
+/**
+ * Smart Router entry point: rank the configured candidates for a goal + prompt.
+ * Returns model ids best-first for `chatWithFallback`, or [] when nothing usable
+ * is available (e.g. `offline` with no local model — the caller then degrades).
+ */
+export function routeConfiguredModels(goal: RoutingGoal, userText: string): string[] {
+  return routeModels(goal, classifyTask(userText), configuredCandidates(goal));
+}
+
 export interface AskOptions {
   /** Prior turns to give the model context (most-recent last). */
   history?: ChatMessage[];
   chatOptions?: ChatOptions;
   /** Injectable fetch for tests. */
   fetchImpl?: FetchLike;
-  /** Override the model id (else the configured default is used). */
+  /** Override the model id (skips the Smart Router and uses exactly this model). */
   modelId?: string;
+  /** Override the routing goal (else the stored goal, defaulting to 'auto'). */
+  goal?: RoutingGoal;
 }
 
 /**
@@ -75,8 +110,12 @@ export async function askConfiguredLLM(
   systemPrompt: string,
   opts: AskOptions = {},
 ): Promise<string | null> {
-  const modelId = opts.modelId ?? pickConfiguredModelId(configuredProviders());
-  if (!modelId) return null;
+  // The Smart Router produces an ordered list; chatWithFallback tries each in
+  // turn (so a cheap/fast first pick degrades to the next on failure). An
+  // explicit modelId override pins exactly one model.
+  const goal = opts.goal ?? getRoutingGoal();
+  const modelIds = opts.modelId ? [opts.modelId] : routeConfiguredModels(goal, userText);
+  if (modelIds.length === 0) return null;
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -85,8 +124,8 @@ export async function askConfiguredLLM(
   ];
 
   try {
-    const res = await chat(
-      modelId,
+    const res = await chatWithFallback(
+      modelIds,
       messages,
       opts.chatOptions ?? { temperature: 0.7, maxTokens: 600 },
       opts.fetchImpl,
@@ -162,7 +201,12 @@ export async function streamConfiguredLLM(
   onToken: (token: string, full: string) => void,
   opts: StreamOptions = {},
 ): Promise<string | null> {
-  const modelId = opts.modelId ?? pickConfiguredModelId(configuredProviders());
+  // Streaming commits tokens as they arrive, so it can't fall back mid-reply —
+  // it streams from the Smart Router's top pick (or an explicit override).
+  const goal = opts.goal ?? getRoutingGoal();
+  const modelId = opts.modelId
+    ?? routeConfiguredModels(goal, userText)[0]
+    ?? pickConfiguredModelId(configuredProviders());
   if (!modelId) return null;
   const provider = providerForModel(modelId);
   if (!provider) return null;
