@@ -739,6 +739,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "dex-automation"
+version = "6.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "dex-scanner"
+version = "6.0.0"
+dependencies = [
+ "serde",
+ "sha2",
+]
+
+[[package]]
 name = "dex-search"
 version = "6.0.0"
 dependencies = [
@@ -759,6 +775,8 @@ version = "6.0.0"
 dependencies = [
  "arboard",
  "dex-audio",
+ "dex-automation",
+ "dex-scanner",
  "dex-search",
  "dex-smart-router",
  "dex-vault",

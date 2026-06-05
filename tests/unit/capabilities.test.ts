@@ -45,7 +45,8 @@ describe('platform capabilities (the blend layer)', () => {
     expect(caps.has('vault')).toBe(true); // ported
     expect(caps.has('files')).toBe(true); // ported
     expect(caps.has('audio')).toBe(true); // ported (analysis engine)
-    expect(caps.has('automation')).toBe(false); // not ported yet (heavy engine)
+    expect(caps.has('automation')).toBe(true); // ported (execution engine)
+    expect(caps.has('transfer')).toBe(false); // not ported yet (network engine)
     expect(caps.nativeSubsystems).toEqual([...TAURI_NATIVE_SUBSYSTEMS]);
   });
 

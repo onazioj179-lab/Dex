@@ -730,6 +730,24 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
             audio_waveform(&arg_str(0).unwrap_or_default(), arg_u64(1).unwrap_or(256) as usize)
         }
 
+        // --- Native file scanner: duplicate detection (GOAL-6A) ------------
+        "fileIntel:findDuplicates" => {
+            let root = resolve_path(&app, &arg_str(0).unwrap_or_else(|| "home".into()));
+            json!({ "success": true, "groups": dex_scanner::find_duplicates(&root, 20000) })
+        }
+
+        // --- Native automation engine (GOAL-6C) ----------------------------
+        // Definition-based runs execute natively; id-based execute needs a native
+        // store (later) and degrades gracefully.
+        "automation:run" | "workflow:executeNew" | "workflow:execute" | "automations:execute" => {
+            let def = args.get(0).cloned().unwrap_or(Value::Null);
+            if def.get("steps").is_some() {
+                dex_automation::run(&def, &args.get(1).cloned().unwrap_or_else(|| json!({})))
+            } else {
+                json!({ "success": false, "error": "automation not found (native store pending)" })
+            }
+        }
+
         // --- Window controls (first real subsystem port) -------------------
         "window:minimize" => {
             let _ = window.minimize();
