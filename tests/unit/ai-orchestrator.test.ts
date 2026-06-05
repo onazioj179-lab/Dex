@@ -1,3 +1,9 @@
+// =============================================================================
+// DEX Platform
+// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+// Created by Onazi Treasure OJ <onazi75@gmail.com>
+// Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+// =============================================================================
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getProvider, findModel, providerForModel, allModels } from '../../src/renderer/uki/providers/registry';
 import { chat, chatWithFallback, type FetchLike } from '../../src/renderer/uki/providers/orchestrator';

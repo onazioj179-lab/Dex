@@ -1,0 +1,31 @@
+[package]
+name = "dex-tauri"
+description = "DEX 6.0 Tauri shell (GOAL-6A) — hosts the existing Vite renderer"
+version = "6.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["Onazi Treasure OJ <onazi75@gmail.com>"]
+
+# Standalone package (NOT a member of core/'s workspace) so `cd core && cargo
+# test` stays fast and tauri-free. It depends on the native router by path.
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dex-smart-router = { path = "../core/dex-smart-router" }
+dex-vault = { path = "../core/dex-vault" }
+dex-search = { path = "../core/dex-search" }
+dex-audio = { path = "../core/dex-audio" }
+# Native backend ports (Electron->Tauri migration):
+sysinfo = "0.30"   # system status + process list/kill
+open = "5"          # shell: open path / external url with the OS default
+arboard = "3"       # clipboard read/write
+trash = "5"         # move-to-recycle-bin (safe delete)
+
+[features]
+# Tauri's default release feature for the embedded asset protocol.
+custom-protocol = ["tauri/custom-protocol"]

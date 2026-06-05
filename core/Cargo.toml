@@ -1,0 +1,35 @@
+# =============================================================================
+# DEX 6.0 — Native Core (GOAL-6A)
+# Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+#
+# The Cargo workspace that becomes the heavy lifting layer of the Tauri shell:
+# search index, rewind, file scanner, AI runtime and the Smart Router. Built
+# additively alongside the shipping Electron app — see GOAL-6A-NATIVE-CORE.md.
+# Today only `dex-smart-router` carries real logic (a parity port of the TS
+# Smart Router); the rest are scaffolds whose bodies land in later 6A slices.
+# =============================================================================
+[workspace]
+resolver = "2"
+members = [
+    "dex-smart-router",
+    "dex-vault",
+    "dex-search",
+    "dex-audio",
+    "dex-rewind",
+    "dex-scanner",
+    "dex-ai-runtime",
+]
+
+[workspace.package]
+version = "6.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["Onazi Treasure OJ <onazi75@gmail.com>"]
+
+# Mirrors native/Cargo.toml's tuned release profile (LTO, max opt, stripped).
+[profile.release]
+opt-level = 3
+lto = "fat"
+strip = "symbols"
+codegen-units = 1
+panic = "abort"

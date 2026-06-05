@@ -525,6 +525,17 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
     }
   }, [selectedIndex, flatResults.length]);
 
+  // Tell Home when the embedded search has results open so it can fade its
+  // widgets (clock etc.) out of the way — otherwise the widget layer, which
+  // renders after the scroll content, paints over the results dropdown.
+  const homeSearchActive = variant === 'home' && showResults && flatResults.length > 0;
+  useEffect(() => {
+    if (variant !== 'home') return undefined;
+    window.dispatchEvent(new CustomEvent('dex-home-search-active', { detail: { active: homeSearchActive } }));
+    // On unmount, always clear the flag so widgets are never stuck hidden.
+    return () => { window.dispatchEvent(new CustomEvent('dex-home-search-active', { detail: { active: false } })); };
+  }, [variant, homeSearchActive]);
+
   // -----------------------------------------------------------------------
   // HOME VARIANT: Embedded search bar with dropdown results
   // -----------------------------------------------------------------------
@@ -614,7 +625,9 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               position: 'absolute', top: 58, left: 0, right: 0,
               maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
-              background: 'rgba(24,24,28,0.64)',
+              // Near-opaque so Home wallpaper/widgets never bleed through and
+              // make results unreadable (kept a hint of glass + the blur).
+              background: 'rgba(18,18,22,0.97)',
               backdropFilter: 'blur(42px) saturate(180%)',
               WebkitBackdropFilter: 'blur(42px) saturate(180%)',
               border: '1px solid rgba(255,255,255,0.10)',
