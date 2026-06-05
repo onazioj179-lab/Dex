@@ -63,6 +63,8 @@ and the gap closes one ported subsystem at a time.
 | Storage | `capability:storage:get/set`, `storage:get/set` (JSON in app config dir) |
 | Health/Diag | `health:check/getStatus`, `watchdog:health`, `diagnostics:getSystemInfo/getPerformance`, `crashReporter:getStats` |
 | App/Net | `app:getVersion/getPath`, `data:getLocations`, `connection:isOnline`, `networkHygiene:isOnline` |
+| Audio | `audio:getMetadata/getInfo` (Symphonia metadata), `audio:getWaveform/getPeaks`, `media:getWaveform` (decode + downsampled peaks) — `core/dex-audio` |
+| Vault | `vault:*` — encrypted password manager + TOTP (`core/dex-vault`: Argon2id + AES-256-GCM) |
 | AI | `smart_router_route` (dedicated command, native `dex-smart-router` crate) |
 
 Crates added to `src-tauri`: `sysinfo`, `open`, `arboard`.
@@ -73,7 +75,7 @@ Currently graceful-`null`; need genuine native implementations:
 
 - **Vault / auth / encryption / secureKeys** — AES-GCM, TOTP, key lifecycle
 - **Native search index** — Tantivy (supersedes the bounded walk for big trees)
-- **Audio** — playback/DSP (symphonia)
+- **Audio playback** — a real output sink (metadata + waveform analysis already done via `core/dex-audio`)
 - **Automation / agents / scripting** — execution engine
 - **Transfer / device / HTTP transfer** — network protocols + pairing
 - **Notifications (OS)**, native file/folder **dialogs** (use the Tauri dialog

@@ -436,6 +436,20 @@ fn disk_usage() -> Value {
     json!({ "success": true, "disks": list })
 }
 
+// --- Native audio analysis (GOAL-6C) ---------------------------------------
+fn audio_metadata(path: &str) -> Value {
+    match dex_audio::metadata(path) {
+        Ok(m) => json!(m),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+fn audio_waveform(path: &str, buckets: usize) -> Value {
+    match dex_audio::waveform(path, buckets) {
+        Ok(peaks) => json!({ "success": true, "peaks": peaks }),
+        Err(e) => json!({ "success": false, "error": e }),
+    }
+}
+
 // --- Native search index (Tantivy, GOAL-6A) --------------------------------
 /// Query the index; `None` when the index is empty so the caller falls back to
 /// the bounded filesystem walk.
@@ -709,6 +723,12 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
         // --- Native search index (GOAL-6A, Tantivy) ------------------------
         "search:rebuild" | "fileSearch:reindex" => index_rebuild(&app),
         "search:getStats" => index_stats(&app),
+
+        // --- Native audio analysis (GOAL-6C) -------------------------------
+        "audio:getMetadata" | "audio:getInfo" => audio_metadata(&arg_str(0).unwrap_or_default()),
+        "audio:getWaveform" | "audio:getPeaks" | "media:getWaveform" => {
+            audio_waveform(&arg_str(0).unwrap_or_default(), arg_u64(1).unwrap_or(256) as usize)
+        }
 
         // --- Window controls (first real subsystem port) -------------------
         "window:minimize" => {

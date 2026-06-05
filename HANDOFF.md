@@ -86,6 +86,17 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > (so it's safe to wrap any feature); plus a "Running on {shell}" indicator in the AI Providers panel.
 > **4 vitest tests** for the capability logic across web/electron/tauri (`tests/unit/capabilities.test.ts`,
 > 58 passing in the AI+capability subset). `tsc`=0, watermark OK (2416), Electron build green.
+> • **🔊 AUDIO ANALYSIS ENGINE (GOAL-6C, 2026-06-05) — third engine, 100/100:** new crate
+> **`core/dex-audio`** — Symphonia `metadata()` (duration/sampleRate/channels + title/artist/album tags)
+> + `waveform(path, buckets)` (full decode → mono-mix → downsampled peak amplitudes in [0,1]). Codecs:
+> wav/pcm/mp3/flac/ogg/aac/m4a. **3 cargo tests green** (metadata + waveform exercised against a
+> programmatically-generated WAV, no fixture; + downsample bounds). Wired into `dex_ipc`:
+> `audio:getMetadata`/`audio:getInfo` → metadata; `audio:getWaveform`/`audio:getPeaks`/`media:getWaveform`
+> → peaks. Capability list + test updated (`audio` now native; `automation` is the not-yet-ported
+> example). **Playback (a real output sink) is intentionally OUT of scope** — device-dependent +
+> untestable headlessly; analysis is the verified core. Core workspace cargo test now **29** (smart-router
+> 10 + vault 14 + search 2 + audio 3). Three native engines done (Vault, Search, Audio); remaining heavy:
+> automation/agents, transfer.
 > **Next:** owner tests via `npm run dev:tauri` (live renderer + bridge; window buttons work; other
 > backend returns null until ported). Then port IPC subsystems — NOTE **localStorage-based state already
 > works under WebView2** (keystore, modelPrefs, perf tier, onboarding, most prefs), so only the

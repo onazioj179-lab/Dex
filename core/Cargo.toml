@@ -14,6 +14,7 @@ members = [
     "dex-smart-router",
     "dex-vault",
     "dex-search",
+    "dex-audio",
     "dex-rewind",
     "dex-scanner",
     "dex-ai-runtime",
