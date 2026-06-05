@@ -735,6 +735,16 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
             let root = resolve_path(&app, &arg_str(0).unwrap_or_else(|| "home".into()));
             json!({ "success": true, "groups": dex_scanner::find_duplicates(&root, 20000) })
         }
+        "fileIntel:groupByType" => {
+            let root = resolve_path(&app, &arg_str(0).unwrap_or_else(|| "home".into()));
+            json!({ "success": true, "groups": dex_scanner::group_by_type(&root, 20000) })
+        }
+        "fileIntel:getStatistics" => {
+            let root = resolve_path(&app, &arg_str(0).unwrap_or_else(|| "home".into()));
+            let groups = dex_scanner::group_by_type(&root, 20000);
+            let total: usize = groups.iter().map(|g| g.count).sum();
+            json!({ "success": true, "total": total, "byType": groups })
+        }
 
         // --- Native automation engine (GOAL-6C) ----------------------------
         // Definition-based runs execute natively; id-based execute needs a native
