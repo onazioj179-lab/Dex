@@ -28,6 +28,8 @@ export interface CatalogEntry {
   iconUrl?: string;
   screenshots?: string[];
   reviewSummary?: { count: number; avg: number };
+  /** Announced but not yet installable (no published bundle). Shown, not installable. */
+  comingSoon?: boolean;
 }
 
 export interface StoreCatalog {
@@ -41,6 +43,31 @@ export interface InstalledApp {
   installedAt: number;
   /** Capabilities the user already granted. */
   grantedCaps: string[];
+  /** Storefront metadata captured at install time so the app shows a real
+   *  name/icon in the grid even if it later leaves the catalog. */
+  name?: string;
+  description?: string;
+  iconUrl?: string;
+  categories?: string[];
+}
+
+/** True when a catalog entry can actually be installed (has a published bundle). */
+export function isInstallable(entry: CatalogEntry): boolean {
+  return !entry.comingSoon && typeof entry.bundleUrl === 'string' && entry.bundleUrl.length > 0;
+}
+
+/**
+ * Capture storefront metadata onto an InstalledApp record at install time so the
+ * installed app renders a real name/icon/category in the grid. Pure.
+ */
+export function enrichInstalledApp(base: InstalledApp, entry: CatalogEntry): InstalledApp {
+  return {
+    ...base,
+    name: entry.manifest.name || base.name || base.packageId,
+    description: entry.manifest.description ?? base.description,
+    iconUrl: entry.iconUrl ?? base.iconUrl,
+    categories: entry.manifest.categories ? [...entry.manifest.categories] : base.categories,
+  };
 }
 
 export type InstallStep =
