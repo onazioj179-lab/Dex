@@ -78,8 +78,14 @@ export function upsertPublisher(input: unknown): { ok: boolean; errors?: string[
  * Adding the key to the trust store is what makes the publisher's signed apps
  * actually pass the install/validation gate.
  */
+const RECOGNITION_LEVELS: Recognition[] = ['recognized', 'partner', 'first-party'];
+
 export function verifyPublisher(id: string, publicKeyHex: string, recognition: Recognition = 'recognized'): { ok: boolean; error?: string } {
   if (!/^[0-9a-f]{64}$/i.test(publicKeyHex)) return { ok: false, error: 'bad-public-key' };
+  // Whitelist the recognition tier — the value arrives from the renderer and is
+  // TypeScript-typed only, so an out-of-band string must never reach the badge
+  // (defense-in-depth against first-party-badge spoofing via the IPC boundary).
+  if (!RECOGNITION_LEVELS.includes(recognition)) return { ok: false, error: 'bad-recognition' };
   const list = load();
   const p = list.find((x) => x.id === id);
   if (!p) return { ok: false, error: 'unknown-publisher' };

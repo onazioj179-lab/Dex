@@ -3590,6 +3590,7 @@ const Imosion: React.FC = () => {
         case 'KeyL': setIsLooping(l => !l); break;
         case 'Equal': case 'NumpadAdd': setZoom(z => Math.min(200, z * 1.15)); break;
         case 'Minus': case 'NumpadSubtract': setZoom(z => Math.max(10, z / 1.15)); break;
+        case 'Digit0': case 'Numpad0': if (ctrl) { e.preventDefault(); setZoom(40); } break; // reset zoom (matches the 1:1 button)
         case 'KeyP': if (!ctrl) setShowPluginBrowser(p => !p); break;
         case 'KeyZ': if (ctrl) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); } break;
         case 'KeyY': if (ctrl) { e.preventDefault(); redo(); } break;
