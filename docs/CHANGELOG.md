@@ -12,6 +12,29 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v5.0.1 — DEX Store, reviews & quality pass (2026-06-06)
+
+### New
+
+- **DEX Store.** A redesigned storefront with a featured hero, category rails,
+  and app detail pages (screenshots, "what this app can do", publisher card).
+- **Ratings & reviews** with built-in anti-fake integrity — the public average
+  counts only non-suspicious reviews.
+- **Install apps from a signed file.** Developers can trust a signing key and
+  sideload a signed package through the full validation gate.
+
+### Improvements
+
+- Ghost drag-to-place window tabs; Gallery multi-select with right-click remove
+  and keyboard shortcuts; Prism/Imosion zoom shortcuts.
+- Clearer privacy and terms, with explicit data-use, advertising, and opt-out
+  controls; re-consent prompted on first launch.
+
+### Fixes
+
+- Local install now requests permissions before writing files, restores bundled
+  store tiles on uninstall, and accepts current package manifests end to end.
+
 ## v4.60.4 — Stability, Security & Resource Optimization (2026-05-28)
 
 ### Improvements
