@@ -307,7 +307,7 @@ class PluginManager {
       return merged;
     });
     ipcMain.handle('plugins:downloadAndInstall', async (_, source: string | any) => {
-      const { parseEnvelope, verifyEnvelope } = await import('../plugins/PluginPublisher.js');
+      const { parseEnvelope } = await import('../plugins/PluginPublisher.js');
       let envelope: any;
       if (typeof source === 'string') {
         // URL: fetch JSON envelope
@@ -327,26 +327,86 @@ class PluginManager {
       } else {
         envelope = source;
       }
-      const verify = verifyEnvelope(envelope);
-      if (!verify.ok) throw new Error(`Envelope failed verification: ${verify.reason}`);
-      // Materialize to temp dir then call installPlugin(localPath)
-      const tmpDir = path.join(app.getPath('temp'), 'dex-plug-' + crypto.randomBytes(4).toString('hex'));
-      fs.mkdirSync(tmpDir, { recursive: true });
-      for (const [rel, b64] of Object.entries(envelope.files as Record<string, string>)) {
-        const full = path.join(tmpDir, rel);
-        if (path.relative(tmpDir, full).startsWith('..')) {
-          throw new Error('Path traversal blocked: ' + rel);
-        }
-        fs.mkdirSync(path.dirname(full), { recursive: true });
-        fs.writeFileSync(full, Buffer.from(b64, 'base64'));
-      }
-      // Ensure manifest.json exists at root
-      const manifestPath = path.join(tmpDir, 'manifest.json');
-      if (!fs.existsSync(manifestPath)) {
-        fs.writeFileSync(manifestPath, JSON.stringify(envelope.manifest, null, 2), 'utf-8');
-      }
-      return this.installPlugin(tmpDir);
+      return this.installVerifiedEnvelope(envelope);
     });
+
+    // Install a signed .dexplug package from a local file (sanctioned local path).
+    ipcMain.handle('plugins:installSignedPackage', async (_, filePath: string) => {
+      const { parseEnvelope } = await import('../plugins/PluginPublisher.js');
+      return this.installVerifiedEnvelope(parseEnvelope(fs.readFileSync(filePath, 'utf-8')));
+    });
+
+    // Verify a package WITHOUT installing it (precise allow/deny + reason).
+    ipcMain.handle('plugins:verifyPackage', async (_, source: string | any) => {
+      const { parseEnvelope } = await import('../plugins/PluginPublisher.js');
+      const { verifySignedPackage } = await import('../security/codeSigningGate.js');
+      const { loadTrustStore } = await import('../security/trustStore.js');
+      const env = typeof source === 'string' ? parseEnvelope(fs.readFileSync(source, 'utf-8')) : source;
+      return verifySignedPackage(env, loadTrustStore(this.trustStorePath()));
+    });
+
+    // ----- Trust store: list / add / revoke / rotate trusted DEX keys --------
+    ipcMain.handle('trust:list', async () => {
+      const { loadTrustStore } = await import('../security/trustStore.js');
+      return loadTrustStore(this.trustStorePath());
+    });
+    ipcMain.handle('trust:add', async (_, publicKeyHex: string, label?: string) => {
+      const { loadTrustStore, addKey, saveTrustStore } = await import('../security/trustStore.js');
+      const next = addKey(loadTrustStore(this.trustStorePath()), publicKeyHex, { label });
+      saveTrustStore(this.trustStorePath(), next);
+      return next;
+    });
+    ipcMain.handle('trust:revoke', async (_, keyId: string) => {
+      const { loadTrustStore, revokeKey, saveTrustStore } = await import('../security/trustStore.js');
+      const next = revokeKey(loadTrustStore(this.trustStorePath()), keyId);
+      saveTrustStore(this.trustStorePath(), next);
+      return next;
+    });
+    ipcMain.handle('trust:rotate', async (_, oldKeyId: string, newPublicKeyHex: string, label?: string) => {
+      const { loadTrustStore, rotateKey, saveTrustStore } = await import('../security/trustStore.js');
+      const next = rotateKey(loadTrustStore(this.trustStorePath()), oldKeyId, newPublicKeyHex, { label });
+      saveTrustStore(this.trustStorePath(), next);
+      return next;
+    });
+  }
+
+  private trustStorePath(): string {
+    return path.join(app.getPath('userData'), 'dex-trust-store.json');
+  }
+
+  /**
+   * The single mandatory install path. Verifies the code signature against the
+   * trust store BEFORE any unpack (don't materialize untrusted executables),
+   * then runs the existing integrity + forbidden-pattern scan, then installs.
+   * No bypass: a failed gate throws with a precise, user-facing reason.
+   */
+  private async installVerifiedEnvelope(envelope: any): Promise<InstalledPlugin> {
+    const { verifyEnvelope } = await import('../plugins/PluginPublisher.js');
+    const { verifySignedPackage, rejectionMessage } = await import('../security/codeSigningGate.js');
+    const { loadTrustStore } = await import('../security/trustStore.js');
+
+    const gate = verifySignedPackage(envelope, loadTrustStore(this.trustStorePath()));
+    if (!gate.ok) {
+      const reason = gate.reason ? rejectionMessage(gate.reason) : 'verification failed';
+      throw new Error(`Install rejected: ${reason}${gate.detail ? ' — ' + gate.detail : ''}`);
+    }
+
+    const verify = verifyEnvelope(envelope);
+    if (!verify.ok) throw new Error(`Envelope failed verification: ${verify.reason}`);
+
+    const tmpDir = path.join(app.getPath('temp'), 'dex-plug-' + crypto.randomBytes(4).toString('hex'));
+    fs.mkdirSync(tmpDir, { recursive: true });
+    for (const [rel, b64] of Object.entries(envelope.files as Record<string, string>)) {
+      const full = path.join(tmpDir, rel);
+      if (path.relative(tmpDir, full).startsWith('..')) throw new Error('Path traversal blocked: ' + rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, Buffer.from(b64, 'base64'));
+    }
+    const manifestPath = path.join(tmpDir, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      fs.writeFileSync(manifestPath, JSON.stringify(envelope.manifest, null, 2), 'utf-8');
+    }
+    return this.installPlugin(tmpDir);
   }
 
   // List all plugins
