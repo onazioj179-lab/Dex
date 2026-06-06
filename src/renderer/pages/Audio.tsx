@@ -18,6 +18,7 @@ import { loadAudioMetadata } from '../utils/id3Parser';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
+import { getAudioPlaybackService } from '../services/media/AudioPlaybackService';
 
 // ===========================================================================
 // TYPES
@@ -505,6 +506,9 @@ export const Audio: React.FC = () => {
     if (audioRef.current) {
       audioRef.current.volume = volume / 100;
     }
+    // ROADMAP-600 #551: keep the shared playback service's master level in sync
+    // so any surface adopting AudioPlaybackService tracks the user's volume.
+    getAudioPlaybackService().setVolume01(volume / 100);
   }, [volume]);
 
   // Respond to system volume from Control Center

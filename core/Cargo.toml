@@ -15,6 +15,7 @@ members = [
     "dex-vault",
     "dex-search",
     "dex-audio",
+    "dex-automation",
     "dex-rewind",
     "dex-scanner",
     "dex-ai-runtime",

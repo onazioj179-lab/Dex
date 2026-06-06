@@ -5,6 +5,8 @@
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
+import { enginePendingApplier } from '../../../shared/uki/creativeCommand';
 import { platform as _plat } from '../../utils';
 import { useRunningApps } from '../../store/runningApps';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
@@ -4892,6 +4894,16 @@ const Imosion: React.FC = () => {
   return (
     <div ref={containerRef} {...dropProps} className="imosion-root" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'linear-gradient(180deg, var(--color-bg-base) 0%, #0f1412 100%)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', userSelect: 'none', position: 'relative', transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style', minWidth: 0 } as React.CSSProperties}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop audio files to import</div>}
+      {/* ROADMAP-600 #095 — natural-language command bar */}
+      <div style={{ padding: 8, flex: '0 0 auto' }}>
+        <CreativeCommandBar
+          appId="imosion"
+          facts={{ trackId: selectedTrack ?? undefined }}
+          onApplyOp={enginePendingApplier('Imosion')}
+          examples={['detect tempo and key', 'separate stems', 'denoise the track', 'detect beats']}
+          placeholder="Tell Imosion what to do…"
+        />
+      </div>
       {/* Hidden file input for audio import */}
       <input 
         ref={fileInputRef}

@@ -196,7 +196,7 @@ const AiProviderSettings: React.FC = () => {
                   background: 'var(--color-accent)', color: '#fff', border: 'none', cursor: 'pointer',
                 }}
               >
-                {savedAt === p.id ? 'Saved ✓' : 'Save'}
+                {savedAt === p.id ? 'Saved' : 'Save'}
               </button>
               {connected(p.id) && (
                 <button

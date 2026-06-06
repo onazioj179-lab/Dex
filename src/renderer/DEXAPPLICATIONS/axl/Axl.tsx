@@ -13,6 +13,9 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
+import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
+import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave } from '../../utils/useAutoSave';
@@ -214,6 +217,24 @@ const AXL: React.FC = () => {
       ui.addAIMessage({ role: 'assistant', content: response, timestamp: Date.now() });
     }, 300);
   }, [aiInput, aiAnalyze, ui]);
+
+  // ROADMAP-600 #095/#296-301 — real local handlers: route the read-only CAD
+  // analysis ops to Axl's own `aiAnalyze` (real volume/weight/tolerance compute,
+  // posted into the AI panel); engine ops (DFM, topology optimise) honestly skip.
+  const handleAxlOp = useCallback((op: CreativeOp): OpApplyResult | Promise<OpApplyResult> => {
+    const queryFor: Record<string, string> = {
+      massProperties: 'weight and mass breakdown',
+      gdtSuggest: 'tolerance and GD&T fit recommendations',
+      parametricSuggest: 'what can you do — feature guidance',
+    };
+    const q = queryFor[op.op];
+    if (q) {
+      const answer = aiAnalyze(q);
+      ui.addAIMessage({ role: 'assistant', content: answer, timestamp: Date.now() });
+      return { outcome: 'applied', note: answer.split('\n')[0].slice(0, 90) };
+    }
+    return enginePendingApplier('Axl')(op);
+  }, [aiAnalyze, ui]);
 
   // ─── Feature Creation ─────────────────────────────────────────────────
   const addFeatureToSelected = useCallback(() => {
@@ -1902,6 +1923,17 @@ const AXL: React.FC = () => {
                   {q}
                 </button>
               ))}
+            </div>
+
+            {/* ROADMAP-600 #095 — natural-language command bar */}
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+              <CreativeCommandBar
+                appId="axl"
+                facts={{ partId: selectedPartId ?? undefined }}
+                onApplyOp={handleAxlOp}
+                examples={['mass properties', 'check tolerances', 'parametric suggestions']}
+                placeholder="Tell Axl what to model…"
+              />
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
