@@ -14,6 +14,7 @@ import { useVinxStore } from './VinxStore';
 import type { ExportSettings, ExportJob, ExportPreset } from './VinxTypes';
 import { EXPORT_PRESETS, generateId, formatTimecode } from './VinxTypes';
 import { getDiskInfo } from '../../utils/nativeBridge';
+import { planExport } from '../../../shared/video/pipeline';
 
 // Track active export intervals for cleanup
 interface ActiveExport {
@@ -173,7 +174,32 @@ export const ExportDialog: React.FC = memo(() => {
   const handleExport = useCallback(() => {
     const isAudioOnly = settings.format === 'mp3' || settings.format === 'wav' || settings.format === 'flac';
     const ext = isAudioOnly ? settings.format : 'webm';
-    const isVideoFormat = !isAudioOnly;
+
+    // ROADMAP-600 #571-572: plan the export through the shared video pipeline.
+    // `settings.format` is a codec/format string (h264/h265/prores…/webm via the
+    // select cast); derive a pipeline codec + container from it.
+    const fmt = String(settings.format);
+    const videoCodec = (fmt === 'webm' ? 'vp9'
+      : fmt === 'h265' ? 'h265'
+      : (fmt === 'prores422' || fmt === 'prores4444' || fmt === 'mov') ? 'prores'
+      : fmt === 'dnxhd' ? 'dnxhd'
+      : 'h264') as 'vp9' | 'h265' | 'prores' | 'dnxhd' | 'h264';
+    const container = (videoCodec === 'vp9' ? 'webm'
+      : (videoCodec === 'prores' || videoCodec === 'dnxhd') ? 'mov'
+      : 'mp4') as 'webm' | 'mov' | 'mp4';
+    const planFps = settings.frameRate || frameRate || 30;
+    const planTotalFrames = duration || 1;
+    const exportPlan = planExport(planTotalFrames, {
+      container,
+      videoCodec,
+      width: settings.width || projectWidth || 1920,
+      height: settings.height || projectHeight || 1080,
+      fps: planFps,
+      bitrateKbps: (settings.bitrateMbps || 8) * 1000,
+      audio: { codec: isAudioOnly ? 'pcm' : 'opus', sampleRate: 48000, channels: 2 },
+    });
+    // Native containers (MP4/MOV) fall back to the in-app WebM encoder.
+    const isVideoFormat = exportPlan.engine === 'native';
     const job: ExportJob = {
       id: generateId('export'),
       projectId: '',
@@ -234,9 +260,8 @@ export const ExportDialog: React.FC = memo(() => {
 
     // Real export: capture the program viewer canvas via MediaRecorder
     const programCanvas = document.querySelector('[data-vinx-program-canvas] canvas, [data-vinx-program-canvas] video') as HTMLCanvasElement | HTMLVideoElement | null;
-    const targetFps = settings.frameRate || frameRate || 30;
-    const totalFrames = duration || 1;
-    const durationMs = (totalFrames / targetFps) * 1000;
+    const targetFps = planFps;
+    const totalFrames = planTotalFrames;
 
     // Create an offscreen canvas to composite the output
     const offscreen = document.createElement('canvas');
@@ -250,12 +275,13 @@ export const ExportDialog: React.FC = memo(() => {
 
     // Set up MediaRecorder capture from the offscreen canvas
     const stream = (offscreen as any).captureStream(targetFps) as MediaStream;
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
+    const planMime = (exportPlan.mimeType || 'video/webm;codecs=vp9').split(',')[0];
+    const mimeType = MediaRecorder.isTypeSupported(planMime)
+      ? planMime
       : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
         ? 'video/webm;codecs=vp8'
         : 'video/webm';
-    const bitrate = (settings.bitrateMbps || 8) * 1_000_000;
+    const bitrate = exportPlan.bitrateKbps * 1000;
     const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitrate });
     const chunks: Blob[] = [];
 

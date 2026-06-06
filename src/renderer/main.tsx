@@ -14,6 +14,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/globals.css';
 import './styles/design-system.css';
+import './styles/design-tokens.css'; // canonical token layer — load last (authoritative)
 import './styles/print.css';
 
 // Electron->Tauri migration (GOAL-6A): install the window.dex / window.electron

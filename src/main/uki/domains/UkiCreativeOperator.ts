@@ -10,7 +10,14 @@
 // dispatches them with a confidence gate, a per-app whitelist of action
 // types, and an audit trail for undo. No filesystem / IPC at module load
 // time -- the dispatcher is a pure function that takes an `invoker`.
+//
+// ROADMAP-600 #094: also accepts granular `CreativeOp` descriptors emitted by
+// the UKI action executor (shared/uki/creativeActions) and routes them through
+// the same confidence/whitelist/audit path, carrying the specific op name in
+// the payload so per-app IPC handlers can branch on it.
 // ===========================================================================
+
+import type { CreativeOp } from '../../../shared/uki/creativeActions';
 
 export type CreativeAppId = 'imosion' | 'vinx' | 'prism' | 'flux' | 'forge' | 'axl';
 
@@ -96,6 +103,13 @@ const DEFAULT_WHITELIST: Record<CreativeAppId, Partial<Record<CreativeActionType
   },
 };
 
+/** Creative op names that are synthesis/generation (prefer the 'generate' type). */
+const GENERATE_OPS = new Set<string>([
+  'generativeFill', 'generativeExpand', 'replaceSky', 'styleTransfer',
+  'textToMotion', 'generateCameraPath', 'melodyToChords', 'suggestBRoll',
+  'suggestAnimation', 'autoHighlight', 'lookupStandardPart',
+]);
+
 export class UkiCreativeOperator {
   private minConfidence: number;
   private whitelist: Record<CreativeAppId, Partial<Record<CreativeActionType, string>>>;
@@ -154,6 +168,50 @@ export class UkiCreativeOperator {
   /** Locate an audit entry by id (for undo lookups). */
   findAudit(actionId: string): AuditEntry | undefined {
     return this.audit.find(a => a.actionId === actionId);
+  }
+
+  /**
+   * Dispatch a granular `CreativeOp` (from the action executor) by mapping it to
+   * the coarse CreativeActionType this app whitelists, then routing through
+   * `dispatch`. The concrete op name + params travel in the payload.
+   */
+  async dispatchCreativeOp(
+    op: CreativeOp,
+    invoker: Invoker,
+    opts: { confidence?: number; label?: string } = {},
+  ): Promise<DispatchResult> {
+    const appId = op.app as CreativeAppId;
+    const type = this.typeForOp(appId, op);
+    if (!type) {
+      const actionId = `act-${Date.now()}-${this.counter++}`;
+      const res: DispatchResult = { ok: false, actionId, reason: `no-type-for-op:${op.op}` };
+      this.recordAudit(
+        { appId, type: 'transform', confidence: opts.confidence ?? 1, payload: { ...op.params }, label: opts.label ?? op.op },
+        res,
+      );
+      return res;
+    }
+    const action: CreativeAction = {
+      appId,
+      type,
+      confidence: opts.confidence ?? 1,
+      payload: { op: op.op, mutates: op.mutates, ...op.params },
+      label: opts.label ?? op.op,
+    };
+    return this.dispatch(action, invoker);
+  }
+
+  /** Pick the best whitelisted action type for a creative op (generate-first
+   *  for synthesis ops, otherwise effect/transform by mutation). */
+  private typeForOp(appId: CreativeAppId, op: CreativeOp): CreativeActionType | undefined {
+    const available = this.whitelist[appId] ?? {};
+    const pref: CreativeActionType[] = GENERATE_OPS.has(op.op)
+      ? ['generate', 'transform', 'apply-effect']
+      : op.mutates
+        ? ['apply-effect', 'transform', 'generate']
+        : ['transform', 'apply-effect', 'generate'];
+    for (const t of pref) if (available[t]) return t;
+    return undefined;
   }
 
   // ---- Internals --------------------------------------------------------
