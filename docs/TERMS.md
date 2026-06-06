@@ -7,8 +7,9 @@
 
 1. You buy a licence to use DEX. The software stays ours. You may use it
    on the devices and for the purposes the plan you bought allows.
-2. Your data stays yours. We do not sell it, ever. If you do not turn on
-   cloud sync, your data never leaves your device.
+2. Your data stays on your device unless you turn on cloud sync. How we use
+   and share data -- including analytics, advertising in ad-supported features,
+   and partner integrations -- is described in our [Privacy Policy](../PRIVACY.md).
 3. The cloud sync, account, and storage features are **optional**. You
    can use DEX fully without an account.
 4. You may cancel any subscription any time. Refund window: 14 days from
@@ -111,7 +112,8 @@ We do warrant that:
 - We will not knowingly ship malware.
 - We will fix critical security issues in a reasonable time and disclose
   them publicly per [SECURITY.md](SECURITY.md).
-- We will not sell, rent, or trade your data.
+- We handle your data as described in our [Privacy Policy](../PRIVACY.md),
+  including your choices and opt-outs.
 
 ## 8. Changes
 
