@@ -30,6 +30,7 @@ import {
   type PlanResult,
   type InstalledApp,
 } from '../../shared/store/catalog';
+import { explainCapabilities, type CapabilityExplanation } from '../../shared/store/capabilityExplain';
 import {
   runInstall,
   type InstallerHooks,
@@ -109,6 +110,23 @@ function persistInstalled(): void {
 
 export function getCatalog(): CatalogEntry[] { return [...loadCatalog()]; }
 export function getInstalled(): InstalledApp[] { return [...loadInstalled()]; }
+
+/** Insert or replace a catalog entry (used by the publish flow) and persist it. */
+export function upsertCatalogEntry(entry: CatalogEntry): void {
+  const list = loadCatalog();
+  const idx = list.findIndex((e) => e.manifest.packageId === entry.manifest.packageId);
+  if (idx >= 0) list[idx] = entry; else list.push(entry);
+  catalogCache = list;
+  try { ensureDir(STORE_DIR()); fs.writeFileSync(CATALOG_FILE(), JSON.stringify(list, null, 2), 'utf8'); }
+  catch (e) { log.warn('[AppStore] persist catalog failed', e); }
+}
+
+/** Plain-English explanation of what an app can do (its declared capabilities). */
+export function appCapabilities(packageId: string): CapabilityExplanation[] {
+  const entry = loadCatalog().find((e) => e.manifest.packageId === packageId);
+  const caps = entry && Array.isArray(entry.manifest.capabilities) ? entry.manifest.capabilities : [];
+  return explainCapabilities(caps as string[]);
+}
 
 function buildPlanContext(): PlanContext {
   return { hostRuntime: app.getVersion(), installed: loadInstalled() };
@@ -333,4 +351,5 @@ export function registerAppStoreIpc(): void {
   ipcMain.handle('store:plan', (_e, id: string) => plan(id));
   ipcMain.handle('store:install', (_e, id: string) => install(id));
   ipcMain.handle('store:uninstall', (_e, id: string) => uninstall(id));
+  ipcMain.handle('store:app:capabilities', (_e, id: string) => appCapabilities(id));
 }

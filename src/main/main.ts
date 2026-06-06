@@ -293,6 +293,7 @@ import { registerPermissionsIpc } from './services/PermissionsService';
 import { registerCreatorAccessIpc } from './services/CreatorAccessService';
 import { registerAppStoreIpc } from './services/AppStoreService';
 import { registerPublisherIpc } from './services/PublisherService';
+import { registerPublishIpc } from './services/PublishService';
 import { registerEmbeddingIpc } from './services/EmbeddingService';
 import { registerGamesIpc } from './services/GamesService';
 import { registerCapabilityBrokerIpc } from './services/CapabilityBrokerService';
@@ -3617,6 +3618,8 @@ class DexApp {
     catch (err) { log.error('[DEX] AppStore IPC failed:', err); }
     try { registerPublisherIpc(); log.info('[DEX] Publisher IPC registered'); }
     catch (err) { log.error('[DEX] Publisher IPC failed:', err); }
+    try { registerPublishIpc(); log.info('[DEX] Publish IPC registered'); }
+    catch (err) { log.error('[DEX] Publish IPC failed:', err); }
     try { registerEmbeddingIpc(); }
     catch (err) { log.error('[DEX] Embedding IPC failed:', err); }
     try { registerGamesIpc(); log.info('[DEX] Games IPC registered'); }
