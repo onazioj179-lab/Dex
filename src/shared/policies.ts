@@ -12,8 +12,8 @@
 
 export const POLICY_CONTACT_EMAIL = 'onazi75@gmail.com';
 export const POLICY_REPOSITORY_URL = 'https://github.com/onazioj179-lab/Dex';
-export const POLICY_EFFECTIVE_DATE = '2026-05-06';
-export const DATA_POLICY_VERSION = '2.0.0';
+export const POLICY_EFFECTIVE_DATE = '2026-06-06';
+export const DATA_POLICY_VERSION = '2.1.0';
 
 export type PolicySlug = 'terms' | 'privacy' | 'security' | 'thirdParty' | 'plugins';
 export type DataCategoryId =
@@ -52,7 +52,7 @@ export const POLICY_METADATA: readonly PolicyMetadata[] = [
   {
     slug: 'terms',
     title: 'Terms of Use',
-    version: '2.0.0',
+    version: '2.1.0',
     effectiveDate: POLICY_EFFECTIVE_DATE,
     requiredForUse: true,
     summary: 'Sharp use rules, DEX ownership rights, automation responsibility, plugin risk, updates, warranties, liability limits, and permitted data use for product improvement and model/system training.',
@@ -60,7 +60,7 @@ export const POLICY_METADATA: readonly PolicyMetadata[] = [
   {
     slug: 'privacy',
     title: 'Privacy Policy',
-    version: '2.0.0',
+    version: '2.1.0',
     effectiveDate: POLICY_EFFECTIVE_DATE,
     requiredForUse: true,
     summary: 'Explains required diagnostics, optional analytics, local personalization, feedback submissions, user content samples, sensitive-content limits, and user controls.',
@@ -68,7 +68,7 @@ export const POLICY_METADATA: readonly PolicyMetadata[] = [
   {
     slug: 'security',
     title: 'Security Policy',
-    version: '2.0.0',
+    version: '2.1.0',
     effectiveDate: POLICY_EFFECTIVE_DATE,
     requiredForUse: false,
     summary: 'Covers DEX security posture, supported versions, local vault/audit model, plugin risks, responsible disclosure, and diagnostic security signals.',
@@ -76,7 +76,7 @@ export const POLICY_METADATA: readonly PolicyMetadata[] = [
   {
     slug: 'thirdParty',
     title: 'Third-Party Notices',
-    version: '2.0.0',
+    version: '2.1.0',
     effectiveDate: POLICY_EFFECTIVE_DATE,
     requiredForUse: false,
     summary: 'Acknowledges major open-source dependencies and clarifies third-party licensing responsibilities.',

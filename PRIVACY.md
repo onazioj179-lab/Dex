@@ -1,11 +1,13 @@
 # DEX -- Privacy Policy
 
-**Effective date:** 2026-05-06  
-**Version:** 2.0.0  
+**Effective date:** 2026-06-06  
+**Version:** 2.1.0  
 **Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
-DEX is designed to feel powerful without being sneaky. The default model is local-first, with required minimal diagnostics for reliability/security and optional product analytics for richer product improvement.
+> This document is a working draft and is not a substitute for professional legal advice. It should be reviewed and finalized by qualified counsel before public commercial release.
+
+DEX is designed to feel powerful without being sneaky. The default model is local-first, with required minimal diagnostics for reliability/security and optional product analytics for richer product improvement. Some features may be ad-supported or connect third-party partners, as described below.
 
 This policy explains what DEX may process, why, and what controls users should have.
 
@@ -23,6 +25,8 @@ This policy explains what DEX may process, why, and what controls users should h
 | Sensitive content | Never by default | Protect secrets and private material | Warning before diagnostic capture when risk exists |
 | Plugin data | Feature-controlled | Plugin operation | Review/revoke plugin permissions |
 | Cloud/sync data | Off by default | Sync, backup, cloud features | Enable/disable and delete where supported |
+| Advertising data | Free tier / select features | Deliver and measure ads in ad-supported features (paid plans are ad-free) | Opt out of personalized ads; upgrade to a paid plan |
+| Partner/service-provider sharing | As needed | Operate hosting, analytics, payments, integrations, ads | Disable connected integrations; California opt-out of sale/sharing |
 
 ## 2. Required Diagnostics
 
@@ -79,21 +83,34 @@ DEX may use permitted data to:
 - Train, evaluate, tune, test, and improve models and automation systems.
 - Detect abuse, protect users, enforce policies, and investigate security incidents.
 - Respond to requests and operate the product/business.
+- Deliver, personalize, and measure advertising in ad-supported features.
+
+### Advertising and supported features
+
+Some parts of DEX -- for example, the free tier, in-app games, or other clearly marked features -- may show advertising or sponsored content. **Paid plans are ad-free.** Advertising partners may receive only the limited information needed to deliver and measure ads (such as a device or advertising identifier, coarse region, and non-content interaction signals). DEX does not share your private files, notes, vault contents, or message contents with advertisers.
+
+### Sharing with service providers and partners
+
+DEX may share data with service providers who process it on our behalf (hosting, analytics, crash reporting, payments, customer support), with integration partners you choose to connect, with advertising partners for ad-supported features, and where required for legal, safety, or business-transfer reasons. Providers and partners may use the data only for the purposes DEX authorizes.
 
 ## 9. Data Storage and Retention
 
 Local app data may be stored on your device in application storage, IndexedDB, SQLite catalogs, caches, logs, plugin storage, and encrypted stores. Retention depends on the feature and your settings. Optional submissions may be retained as needed for support, security, legal, product improvement, and model/system development unless deletion is required by law or honored through available controls.
 
-## 10. User Controls
+## 10. Your Choices and Rights
 
 DEX should provide controls to:
 
 - View data categories.
 - Toggle optional analytics.
+- Opt out of personalized advertising.
+- Disable cloud/sync.
 - Export local data.
 - Delete local data.
 - Review policy versions and acceptance state.
 - Contact DEX at onazi75@gmail.com for privacy requests.
+
+Depending on where you live, you may have additional rights under laws such as the **GDPR** (EU/UK) and the **CCPA/CPRA** (California) -- including access, correction, deletion, and portability. **California residents** may exercise the right to opt out of the "sale" or "sharing" of personal information by contacting onazi75@gmail.com; DEX honors recognized opt-out preference signals where required by law.
 
 Some minimum diagnostics may be required for reliability, security, compatibility, and updates.
 
