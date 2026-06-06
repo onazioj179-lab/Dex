@@ -35,6 +35,9 @@ export interface CatalogEntry {
   publisherId?: string;
   validationStatus?: ValidationStatus;
   validationReport?: ValidationReport;
+  /** True for entries created by a local developer sideload (no remote bundle).
+   *  Cleaned up on uninstall since there is nothing to re-download. */
+  local?: boolean;
 }
 
 /** True when an entry passed the pre-publish validation gate (safe to surface as approved). */
@@ -59,6 +62,14 @@ export interface InstalledApp {
   description?: string;
   iconUrl?: string;
   categories?: string[];
+  /** Where the install came from. 'local' = developer sideload of a signed .dexplug. */
+  source?: 'store' | 'local';
+  /** How DEX runs this app: a web bundle in its webview, or a native binary it launches. */
+  runtime?: 'web' | 'native';
+  /** Entry point: index.html (web) or the executable/main file (native). */
+  entry?: string;
+  /** sha256 of the installed bundle contents (envelope.published.sha256). */
+  bundleSha256?: string;
 }
 
 /** True when a catalog entry can actually be installed (has a published bundle). */
