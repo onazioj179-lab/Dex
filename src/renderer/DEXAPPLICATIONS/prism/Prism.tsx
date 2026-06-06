@@ -18,6 +18,8 @@ import { capHistoryTail } from '../../../shared/creative/history';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { upscaleByFactor } from '../../../shared/creative/resample';
+import { denoiseImage } from '../../../shared/creative/denoise';
+import { autoLevels } from '../../../shared/creative/autoLevels';
 import {
   ADJUSTMENT_PRESETS,
   QUICK_EXPORT_PRESETS,
@@ -445,48 +447,85 @@ const Prism: React.FC = () => {
   // map to Prism's real adjustment pipeline run for real (and are undoable via
   // pushHistory); ops that need an AI engine not present in this build fail
   // honestly with a clear note rather than pretending to have run.
+  // Decode the selected image layer's data URL into ImageData (offscreen canvas).
+  const decodeLayerImage = (dataUrl: string): Promise<ImageData> => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const cx = c.getContext('2d');
+      if (!cx) { reject(new Error('no 2d context')); return; }
+      cx.drawImage(img, 0, 0);
+      resolve(cx.getImageData(0, 0, c.width, c.height));
+    };
+    img.onerror = () => reject(new Error('image decode failed'));
+    img.src = dataUrl;
+  });
+  // Pack an RGBA buffer back into a data URL (null if no canvas context).
+  const pixelsToDataURL = (data: Uint8ClampedArray, w: number, h: number): string | null => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const cx = c.getContext('2d');
+    if (!cx) return null;
+    const id = cx.createImageData(w, h);
+    id.data.set(data);
+    cx.putImageData(id, 0, 0);
+    return c.toDataURL();
+  };
+  // The selected layer if it is an image layer with pixels, else undefined.
+  const selectedImageLayer = () => {
+    const l = selectedLayerId ? layers.find(x => x.id === selectedLayerId) : undefined;
+    return l && l.type === 'image' && l.imageData ? l : undefined;
+  };
+
+  // ROADMAP-600 #095 — apply a UKI CreativeOp to Prism's live document. Pixel ops
+  // run on the selected image layer through real, tested shared engines (resample
+  // #167, denoise #170, auto-levels #174) and are undoable via pushHistory. Ops
+  // that need an AI engine not present in this build skip honestly with a clear
+  // note rather than pretending to have run.
   const applyCreativeOp = async (op: CreativeOp): Promise<{ outcome: 'applied' | 'skipped'; note?: string }> => {
     switch (op.op) {
-      case 'autoEnhance':
+      case 'autoEnhance': {
+        const layer = selectedImageLayer();
+        if (layer) {
+          const src = await decodeLayerImage(layer.imageData as string);
+          const leveled = autoLevels(src.data, src.width, src.height, { clipPercent: 0.5 });
+          const url = pixelsToDataURL(leveled, src.width, src.height);
+          if (!url) return { outcome: 'skipped', note: 'no canvas context' };
+          pushHistory('UKI: auto-enhance');
+          setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: url } : l));
+          return { outcome: 'applied', note: 'auto-enhanced via per-channel histogram auto-levels (real)' };
+        }
         pushHistory('UKI: auto-enhance');
         setExposure(4); setBrightness(6); setContrast(12); setSaturation(8); setVibrance(15);
-        return { outcome: 'applied', note: 'auto-enhanced via live adjustments (exposure, contrast, vibrance)' };
+        return { outcome: 'applied', note: 'auto-enhanced via live adjustments (no image layer selected)' };
+      }
       case 'colorGrade':
         pushHistory('UKI: color grade');
         setTemperature(15); setTint(-5); setSaturation(8); setContrast(6);
         return { outcome: 'applied', note: 'applied a warm cinematic grade (temperature, tint, saturation)' };
       case 'upscale': {
-        // Real Lanczos-3 resample (#167). Not ML super-res — honest interpolation.
-        const layer = selectedLayerId ? layers.find(l => l.id === selectedLayerId) : undefined;
-        if (!layer || layer.type !== 'image' || !layer.imageData) {
-          return { outcome: 'skipped', note: 'select an image layer to upscale' };
-        }
+        const layer = selectedImageLayer();
+        if (!layer) return { outcome: 'skipped', note: 'select an image layer to upscale' };
         const factor = typeof op.params.factor === 'number' ? op.params.factor : 2;
-        const srcId = await new Promise<ImageData>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            const c = document.createElement('canvas');
-            c.width = img.naturalWidth; c.height = img.naturalHeight;
-            const cx = c.getContext('2d');
-            if (!cx) { reject(new Error('no 2d context')); return; }
-            cx.drawImage(img, 0, 0);
-            resolve(cx.getImageData(0, 0, c.width, c.height));
-          };
-          img.onerror = () => reject(new Error('image decode failed'));
-          img.src = layer.imageData as string;
-        });
-        const { data, width, height } = upscaleByFactor(srcId.data, srcId.width, srcId.height, factor);
-        const out = document.createElement('canvas');
-        out.width = width; out.height = height;
-        const octx = out.getContext('2d');
-        if (!octx) return { outcome: 'skipped', note: 'no canvas context for upscale' };
-        const id = octx.createImageData(width, height);
-        id.data.set(data);
-        octx.putImageData(id, 0, 0);
-        const url = out.toDataURL();
+        const src = await decodeLayerImage(layer.imageData as string);
+        const { data, width, height } = upscaleByFactor(src.data, src.width, src.height, factor);
+        const url = pixelsToDataURL(data, width, height);
+        if (!url) return { outcome: 'skipped', note: 'no canvas context for upscale' };
         pushHistory(`UKI: upscale ${factor}x`);
         setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: url, width, height } : l));
-        return { outcome: 'applied', note: `upscaled to ${width}×${height} (${factor}× Lanczos resample, not ML super-res)` };
+        return { outcome: 'applied', note: `upscaled to ${width}x${height} (${factor}x Lanczos resample, not ML super-res)` };
+      }
+      case 'denoise': {
+        const layer = selectedImageLayer();
+        if (!layer) return { outcome: 'skipped', note: 'select an image layer to denoise' };
+        const src = await decodeLayerImage(layer.imageData as string);
+        const filtered = denoiseImage(src.data, src.width, src.height, { radius: 1, passes: 1 });
+        const url = pixelsToDataURL(filtered, src.width, src.height);
+        if (!url) return { outcome: 'skipped', note: 'no canvas context for denoise' };
+        pushHistory('UKI: denoise');
+        setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: url } : l));
+        return { outcome: 'applied', note: 'denoised via 3x3 median filter (edge-preserving, not ML)' };
       }
       default:
         return { outcome: 'skipped', note: `${op.op}: needs an AI engine not installed in this build` };
