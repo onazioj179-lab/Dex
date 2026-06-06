@@ -80,6 +80,30 @@ function hashFiles(files) {
   return h.digest('hex');
 }
 
+// Forbidden code patterns — mirror src/main/plugins/PluginPublisher.ts.
+const FORBIDDEN_PATTERNS = [
+  [/\beval\s*\(/, 'eval() is forbidden'],
+  [/\bnew\s+Function\s*\(/, 'new Function() is forbidden'],
+  [/child_process/, 'child_process is not allowed'],
+  [/process\.binding\s*\(/, 'process.binding() is not allowed'],
+  [/__proto__\s*=/, 'prototype mutation is not allowed'],
+  [/Object\.setPrototypeOf\s*\(/, 'setPrototypeOf is not allowed'],
+];
+function isTextFile(p) { return /\.(js|ts|tsx|jsx|json|md|css|html|txt|yml|yaml)$/i.test(p); }
+function scanFiles(files) {
+  const issues = [];
+  for (const [p, b64] of Object.entries(files)) {
+    if (!isTextFile(p)) continue;
+    let text = '';
+    try { text = Buffer.from(b64, 'base64').toString('utf8'); } catch { continue; }
+    const lines = text.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      for (const [re, reason] of FORBIDDEN_PATTERNS) if (re.test(lines[i])) issues.push({ file: p, line: i + 1, reason });
+    }
+  }
+  return issues;
+}
+
 function collectFiles(rootDir, relPrefix, out) {
   const dir = relPrefix ? path.join(rootDir, relPrefix) : rootDir;
   for (const name of fs.readdirSync(dir)) {
@@ -187,6 +211,97 @@ function cmdVerify(pkgPath, flags) {
   console.log('OK: signature valid. keyId', block.keyId, ' app', (env.manifest && env.manifest.id) || '?', (env.manifest && env.manifest.version) || '');
 }
 
+// Developer pre-flight: the publish checklist a package must pass. Mirrors the
+// in-app gate (src/shared/store/validationGate.ts) — block fail => rejected.
+// Shared checklist evaluation — used by both `validate` and `publish`.
+function evaluateEnvelopeCli(env, flags) {
+  const block = env && env.signature;
+  const manifest = env && env.manifest;
+  const files = (env && env.files) || {};
+  const checks = [];
+
+  let sigOk = false; let sigReason = '';
+  if (!block || !block.signature || !block.keyId) { sigReason = 'no signature block'; }
+  else {
+    let pubHex = flags['--pub'];
+    if (!pubHex && flags['--trust']) {
+      try {
+        const trust = JSON.parse(fs.readFileSync(flags['--trust'], 'utf8'));
+        const entry = (trust.keys || []).find((k) => k.keyId === block.keyId);
+        if (!entry) sigReason = `key ${block.keyId} not in trust store`;
+        else if (entry.status === 'revoked') sigReason = `key ${block.keyId} revoked`;
+        else pubHex = entry.publicKey;
+      } catch { sigReason = 'trust file unreadable'; }
+    }
+    if (pubHex && !sigReason) {
+      const digest = computeBundleDigest(manifest, files);
+      if (digest !== block.digest) sigReason = 'digest mismatch (tampered)';
+      else {
+        try { sigOk = crypto.verify(null, Buffer.from(digest, 'hex'), publicKeyFromHex(pubHex), Buffer.from(block.signature, 'hex')); } catch { sigOk = false; }
+        if (!sigOk) sigReason = 'signature does not verify';
+      }
+    } else if (!sigReason) { sigReason = 'no key (pass --pub or --trust)'; }
+  }
+  checks.push(['signed by a trusted key', sigOk, 'block', sigReason]);
+
+  const integrityOk = !!block && hashFiles(files) === (env.published && env.published.sha256);
+  checks.push(['bundle integrity (sha256)', integrityOk, 'block', integrityOk ? '' : 'file hash mismatch']);
+
+  const issues = scanFiles(files);
+  checks.push(['no forbidden code patterns', issues.length === 0, 'block', issues[0] ? `${issues[0].file}:${issues[0].line} ${issues[0].reason}` : '']);
+
+  const manifestOk = !!(manifest && manifest.id && manifest.name && manifest.version);
+  checks.push(['manifest fields (id/name/version)', manifestOk, 'block', manifestOk ? '' : 'missing fields']);
+
+  const totalBytes = Object.values(files).reduce((n, b) => n + Buffer.from(b, 'base64').length, 0);
+  const maxMb = Number(flags['--max-mb'] || 50);
+  const sizeOk = totalBytes <= maxMb * 1024 * 1024;
+  checks.push([`bundle <= ${maxMb}MB`, sizeOk, 'block', sizeOk ? '' : `${(totalBytes / 1048576).toFixed(1)}MB`]);
+
+  checks.push(['has description', !!(manifest && manifest.description), 'warn', '']);
+
+  let blocked = false; let warned = false;
+  for (const [, passed, sev] of checks) {
+    if (!passed && sev === 'block') blocked = true;
+    if (!passed && sev === 'warn') warned = true;
+  }
+  return { checks, status: blocked ? 'rejected' : warned ? 'pending' : 'approved', manifest, totalBytes };
+}
+
+function cmdValidate(pkgPath, flags) {
+  if (!pkgPath) throw new Error('usage: validate <app.dexplug> [--pub <hex> | --trust trust.json] [--max-mb N]');
+  const env = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const { checks, status, manifest } = evaluateEnvelopeCli(env, flags);
+  console.log('Validation:', (manifest && manifest.id) || pkgPath);
+  for (const [label, passed, sev, detail] of checks) {
+    const mark = passed ? 'PASS' : sev === 'block' ? 'FAIL' : 'WARN';
+    console.log(`  [${mark}] ${label}${detail ? ' - ' + detail : ''}`);
+  }
+  console.log('STATUS:', status);
+  if (status === 'rejected') process.exitCode = 1;
+}
+
+// Emit a store catalog-entry stub for a validated package. The in-app
+// PublishService is the authoritative path; this is the publisher-side helper.
+function cmdPublish(pkgPath, flags) {
+  if (!pkgPath) throw new Error('usage: publish <app.dexplug> [--pub <hex> | --trust trust.json] [--bundle-url URL] [--out entry.json]');
+  const env = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const { status, manifest, totalBytes } = evaluateEnvelopeCli(env, flags);
+  if (status === 'rejected') { fail('cannot publish: validation rejected (run `validate` for details)'); return; }
+  const entry = {
+    manifest,
+    bundleUrl: flags['--bundle-url'] || '',
+    bundleBytes: totalBytes,
+    bundleSha256: (env.published && env.published.sha256) || '',
+    publisherId: manifest && manifest.publisherId,
+    validationStatus: status,
+  };
+  const out = flags['--out'] || path.join(process.cwd(), `${(manifest && manifest.id) || 'app'}-catalog-entry.json`);
+  fs.writeFileSync(out, JSON.stringify(entry, null, 2), 'utf8');
+  console.log('Catalog entry written to', out, '(status:', status + ')');
+  if (!flags['--bundle-url']) console.log('  note: no --bundle-url; entry is validated but not installable until a bundle is hosted.');
+}
+
 function fail(msg) {
   console.error('REJECTED ->', msg);
   process.exitCode = 1;
@@ -199,10 +314,14 @@ function main() {
     if (cmd === 'keygen') return cmdKeygen(flags);
     if (cmd === 'sign') return cmdSign(positional[0], flags);
     if (cmd === 'verify') return cmdVerify(positional[0], flags);
+    if (cmd === 'validate') return cmdValidate(positional[0], flags);
+    if (cmd === 'publish') return cmdPublish(positional[0], flags);
     console.log('dex-codesign — DEX publisher signing tool');
-    console.log('  keygen [--out priv.key]');
-    console.log('  sign  <appdir> [--key priv.key] [--out app.dexplug]   (or DEX_SIGNING_KEY[_FILE] env)');
-    console.log('  verify <app.dexplug> [--pub <hex> | --trust trust.json]');
+    console.log('  keygen   [--out priv.key]');
+    console.log('  sign     <appdir> [--key priv.key] [--out app.dexplug]   (or DEX_SIGNING_KEY[_FILE] env)');
+    console.log('  verify   <app.dexplug> [--pub <hex> | --trust trust.json]');
+    console.log('  validate <app.dexplug> [--pub <hex> | --trust trust.json] [--max-mb N]   (publish pre-flight)');
+    console.log('  publish  <app.dexplug> [--pub <hex> | --trust trust.json] [--bundle-url URL] [--out entry.json]');
   } catch (e) {
     console.error('error:', e && e.message ? e.message : String(e));
     process.exitCode = 1;
