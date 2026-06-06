@@ -221,6 +221,7 @@ export default function Store(): React.ReactElement {
                   <div style={styles.rowTopLine}>
                     <span style={styles.appName}>{name}</span>
                     {installedEntry && <span style={styles.installedBadge}>Installed</span>}
+                    {entry.comingSoon && !installedEntry && <span style={styles.soonBadge}>Coming soon</span>}
                   </div>
                   <div style={styles.appMeta}>
                     <span>{id}</span>
@@ -249,6 +250,11 @@ export default function Store(): React.ReactElement {
                     >
                       <DexIcon name="trash" size={14} />
                       <span>{busy === id ? 'Removing...' : 'Uninstall'}</span>
+                    </button>
+                  ) : entry.comingSoon ? (
+                    <button style={buttonStyle('muted')} disabled title={`${name} is not yet available`}>
+                      <DexIcon name="info" size={14} />
+                      <span>Coming soon</span>
                     </button>
                   ) : (
                     <button
@@ -399,6 +405,16 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(48,209,88,0.12)',
     border: '1px solid rgba(48,209,88,0.28)',
     color: 'var(--color-success)',
+    fontSize: 10.5,
+    fontWeight: 700,
+    flexShrink: 0,
+  },
+  soonBadge: {
+    padding: '2px 7px',
+    borderRadius: 999,
+    background: 'rgba(10,132,255,0.12)',
+    border: '1px solid rgba(10,132,255,0.28)',
+    color: 'var(--color-accent)',
     fontSize: 10.5,
     fontWeight: 700,
     flexShrink: 0,

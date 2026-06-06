@@ -23,6 +23,8 @@ import * as os from 'os';
 import log from 'electron-log';
 import {
   planInstall,
+  isInstallable,
+  enrichInstalledApp,
   type CatalogEntry,
   type PlanContext,
   type PlanResult,
@@ -59,15 +61,31 @@ function ensureDir(dir: string): void {
   try { fs.mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
 }
 
+/** Bundled default catalog (ships with DEX) so the store is never empty out of
+ *  the box — e.g. shows "Magnify (coming soon)". Best-effort across dev + packaged. */
+function loadBundledCatalog(): CatalogEntry[] {
+  const candidates = [
+    path.join(__dirname, '..', '..', '..', 'assets', 'config', 'dex-store-catalog.json'),
+    path.join(process.resourcesPath ?? '', 'assets', 'config', 'dex-store-catalog.json'),
+  ];
+  for (const p of candidates) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (Array.isArray(parsed)) return parsed as CatalogEntry[];
+    } catch { /* try next candidate */ }
+  }
+  return [];
+}
+
 function loadCatalog(): CatalogEntry[] {
   if (catalogCache) return catalogCache;
   ensureDir(STORE_DIR());
   try {
     const raw = fs.readFileSync(CATALOG_FILE(), 'utf8');
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) { catalogCache = parsed as CatalogEntry[]; return catalogCache; }
-  } catch { /* first run */ }
-  catalogCache = [];
+    if (Array.isArray(parsed) && parsed.length > 0) { catalogCache = parsed as CatalogEntry[]; return catalogCache; }
+  } catch { /* first run — fall through to the bundled default */ }
+  catalogCache = loadBundledCatalog();
   return catalogCache;
 }
 
@@ -226,9 +244,13 @@ function defaultHooks(): InstallerHooks {
       log.warn('[AppStore] rollback', packageId, snapshotId);
     },
     register: async (appEntry) => {
+      // Capture storefront metadata (name/icon/category) onto the installed
+      // record so the app renders properly in the grid, not just an id.
+      const catalogEntry = loadCatalog().find(e => e.manifest.packageId === appEntry.packageId);
+      const enriched = catalogEntry ? enrichInstalledApp(appEntry, catalogEntry) : appEntry;
       const installed = loadInstalled();
-      const idx = installed.findIndex(a => a.packageId === appEntry.packageId);
-      if (idx >= 0) installed[idx] = appEntry; else installed.push(appEntry);
+      const idx = installed.findIndex(a => a.packageId === enriched.packageId);
+      if (idx >= 0) installed[idx] = enriched; else installed.push(enriched);
       installedCache = installed;
       persistInstalled();
     },
@@ -276,6 +298,9 @@ function defaultHooks(): InstallerHooks {
 export async function install(packageId: string): Promise<InstallResult> {
   const entry = loadCatalog().find(e => e.manifest.packageId === packageId);
   if (!entry) return { ok: false, packageId, error: 'unknown-package' };
+  if (!isInstallable(entry)) {
+    return { ok: false, packageId, error: entry.comingSoon ? 'coming-soon' : 'no-bundle' };
+  }
   return runInstall(entry, buildPlanContext(), defaultHooks(), (p: InstallProgress) => {
     log.info('[AppStore] install progress', p.index, '/', p.total, p.step.kind);
   });
@@ -288,6 +313,17 @@ export function uninstall(packageId: string): boolean {
   installed.splice(idx, 1);
   installedCache = installed;
   persistInstalled();
+  // Clean removal: delete the app's unpacked files, scoped strictly to the
+  // store dir so a malformed id can never escape it.
+  try {
+    const appDir = path.resolve(path.join(STORE_DIR(), 'apps', packageId));
+    const storeRoot = path.resolve(STORE_DIR());
+    if (appDir.startsWith(storeRoot + path.sep) && fs.existsSync(appDir)) {
+      fs.rmSync(appDir, { recursive: true, force: true });
+    }
+  } catch (e) {
+    log.warn('[AppStore] uninstall cleanup failed', e);
+  }
   return true;
 }
 

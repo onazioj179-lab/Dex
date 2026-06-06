@@ -5,7 +5,10 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 import { describe, it, expect } from 'vitest';
-import { planInstall, searchCatalog, type CatalogEntry, type StoreCatalog } from '../../src/shared/store/catalog';
+import {
+  planInstall, searchCatalog, isInstallable, enrichInstalledApp,
+  type CatalogEntry, type StoreCatalog, type InstalledApp,
+} from '../../src/shared/store/catalog';
 import type { DexPkgManifestV2 } from '../../src/shared/dexpkg/manifestV2';
 
 function manifest(over: Partial<DexPkgManifestV2> = {}): DexPkgManifestV2 {
@@ -62,5 +65,27 @@ describe('store install planner', () => {
       { ...entry, manifest: manifest({ packageId: 'com.example.adult', contentRating: 'adult' }) },
     ]};
     expect(searchCatalog(cat, { maxRating: 'teen' }).length).toBe(1);
+  });
+});
+
+describe('store catalog: coming-soon + install metadata', () => {
+  it('isInstallable: real bundle yes; coming-soon or missing bundle no', () => {
+    expect(isInstallable(entry)).toBe(true);
+    expect(isInstallable({ ...entry, comingSoon: true })).toBe(false);
+    expect(isInstallable({ ...entry, bundleUrl: '' })).toBe(false);
+  });
+
+  it('enrichInstalledApp captures storefront metadata and preserves base fields', () => {
+    const base: InstalledApp = { packageId: 'com.example.x', version: '1.0.0', installedAt: 1, grantedCaps: [] };
+    const out = enrichInstalledApp(base, { ...entry, iconUrl: 'https://example/icon.png' });
+    expect(out).toMatchObject({ name: 'X', iconUrl: 'https://example/icon.png', categories: ['utility'] });
+    expect(out.packageId).toBe('com.example.x');
+    expect(out.grantedCaps).toEqual([]);
+  });
+
+  it('enrichInstalledApp falls back to the package id when no name is present', () => {
+    const base: InstalledApp = { packageId: 'com.example.y', version: '1', installedAt: 1, grantedCaps: [] };
+    const e: CatalogEntry = { ...entry, manifest: manifest({ packageId: 'com.example.y', name: '' }) };
+    expect(enrichInstalledApp(base, e).name).toBe('com.example.y');
   });
 });
