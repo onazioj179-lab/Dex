@@ -34,15 +34,42 @@ export function isTauri(): boolean {
   return tauriInvoke() !== null;
 }
 
+/**
+ * Migration telemetry: which channels get hit at runtime and how often they
+ * degrade to `null` (unported on the Rust side). This is the data that orders
+ * the port backlog — port what real usage actually touches, not guesses. Read it
+ * live from devtools via `window.__dexDegradeReport()`.
+ */
+const degradeLog = new Map<string, { calls: number; nulls: number }>();
+function recordChannel(channel: string, degraded: boolean): void {
+  const e = degradeLog.get(channel) ?? { calls: 0, nulls: 0 };
+  e.calls += 1;
+  if (degraded) e.nulls += 1;
+  degradeLog.set(channel, e);
+}
+
+/** Snapshot of channel usage, most-degraded first. Feeds the migration priority. */
+export function dexDegradeReport(): Array<{ channel: string; calls: number; nulls: number }> {
+  return [...degradeLog.entries()]
+    .map(([channel, v]) => ({ channel, ...v }))
+    .sort((a, b) => b.nulls - a.nulls || b.calls - a.calls);
+}
+
 /** Route one IPC channel call to the native `dex_ipc` dispatcher. */
 function dexIpc(channel: string, args: unknown[]): Promise<unknown> {
   const invoke = tauriInvoke();
   if (!invoke) return Promise.resolve(null);
-  return invoke('dex_ipc', { channel, args }).catch((err) => {
-    // Never let a backend gap throw into the UI during the migration.
-    console.warn(`[dex-ipc] ${channel} failed:`, err);
-    return null;
-  });
+  return invoke('dex_ipc', { channel, args })
+    .then((res) => {
+      recordChannel(channel, res === null || res === undefined);
+      return res;
+    })
+    .catch((err) => {
+      // Never let a backend gap throw into the UI during the migration.
+      console.warn(`[dex-ipc] ${channel} failed:`, err);
+      recordChannel(channel, true);
+      return null;
+    });
 }
 
 /** Static platform info (Electron exposed this synchronously as `dex.platform`). */
@@ -114,5 +141,7 @@ export function installTauriCompat(): void {
   w.dex = root;
   // Several call sites use window.electron.invoke(channel, payload) directly.
   w.electron = { invoke: (channel: string, ...args: unknown[]) => dexIpc(channel, args) };
-  console.info('[dex] Tauri IPC compatibility layer installed (degraded backend; channels port incrementally).');
+  // Expose the migration telemetry for live inspection from devtools.
+  w.__dexDegradeReport = dexDegradeReport;
+  console.info('[dex] Tauri IPC compatibility layer installed (degraded backend; channels port incrementally). Run __dexDegradeReport() to see what to port next.');
 }
