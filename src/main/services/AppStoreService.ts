@@ -15,7 +15,7 @@
  * step-runner come from src/shared/store and src/shared/dexpkg.
  */
 
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -31,6 +31,10 @@ import {
   type InstalledApp,
 } from '../../shared/store/catalog';
 import { explainCapabilities, type CapabilityExplanation } from '../../shared/store/capabilityExplain';
+import type { ValidationReport, ValidationStatus } from '../../shared/store/validationGate';
+import { planUnpack, detectRuntime, canLocallyInstall, refusalHeadline } from '../../shared/store/localInstall';
+import { validateEnvelope, bundleBytes, MAX_BUNDLE_BYTES } from './envelopeGate';
+import { publisherByKeyId } from './PublisherService';
 import {
   runInstall,
   type InstallerHooks,
@@ -119,6 +123,18 @@ export function upsertCatalogEntry(entry: CatalogEntry): void {
   catalogCache = list;
   try { ensureDir(STORE_DIR()); fs.writeFileSync(CATALOG_FILE(), JSON.stringify(list, null, 2), 'utf8'); }
   catch (e) { log.warn('[AppStore] persist catalog failed', e); }
+}
+
+/** Remove a catalog entry (used to drop synthetic local-install entries on uninstall). */
+export function removeCatalogEntry(packageId: string): boolean {
+  const list = loadCatalog();
+  const idx = list.findIndex((e) => e.manifest.packageId === packageId);
+  if (idx < 0) return false;
+  list.splice(idx, 1);
+  catalogCache = list;
+  try { ensureDir(STORE_DIR()); fs.writeFileSync(CATALOG_FILE(), JSON.stringify(list, null, 2), 'utf8'); }
+  catch (e) { log.warn('[AppStore] persist catalog (remove) failed', e); }
+  return true;
 }
 
 /** Plain-English explanation of what an app can do (its declared capabilities). */
@@ -342,7 +358,206 @@ export function uninstall(packageId: string): boolean {
   } catch (e) {
     log.warn('[AppStore] uninstall cleanup failed', e);
   }
+  // A local developer sideload has only a synthetic catalog entry (no remote
+  // bundle to re-download). If it overwrote a bundled (coming-soon) tile, revert
+  // to that bundled entry so the storefront default is never lost; otherwise drop
+  // the synthetic entry so it doesn't linger as an un-installable ghost row.
+  const catEntry = loadCatalog().find((e) => e.manifest.packageId === packageId);
+  if (catEntry?.local) {
+    const bundled = loadBundledCatalog().find((e) => e.manifest.packageId === packageId);
+    if (bundled) upsertCatalogEntry(bundled); else removeCatalogEntry(packageId);
+  }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Local developer install — push a signed .dexplug from disk through the FULL
+// production validation gate, then lay its files down and register it. This is
+// how a separately-built app (e.g. Magnify) gets installed locally to test the
+// store without relaxing any security check.
+// ---------------------------------------------------------------------------
+
+export interface LocalInstallResult {
+  ok: boolean;
+  packageId?: string;
+  version?: string;
+  runtime?: 'web' | 'native';
+  status: ValidationStatus;
+  report: ValidationReport;
+  error?: string;
+}
+
+export interface LocalPickResult {
+  filePath: string;
+  fileName: string;
+  report: ValidationReport;
+  summary: { packageId: string; name: string; version: string; runtime: 'web' | 'native'; signed: boolean };
+}
+
+/** Validate a signed envelope through the same gate publishing uses. */
+export function validateLocalEnvelope(envelope: unknown): ValidationReport {
+  return validateEnvelope(envelope);
+}
+
+function rejectionReport(detail: string): ValidationReport {
+  return {
+    status: 'rejected',
+    checks: [{ id: 'envelope', label: 'Readable .dexplug envelope', passed: false, severity: 'block', detail }],
+    reasons: [detail],
+    evaluatedAt: Date.now(),
+  };
+}
+
+function readEnvelopeFile(filePath: string): { ok: true; envelope: any } | { ok: false; error: string } {
+  try {
+    if (!/\.(dexplug|json)$/i.test(filePath)) return { ok: false, error: 'not a .dexplug file' };
+    const st = fs.statSync(filePath);
+    if (!st.isFile()) return { ok: false, error: 'not a file' };
+    if (st.size > MAX_BUNDLE_BYTES * 2) return { ok: false, error: 'file too large' };
+    const env = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (!env || typeof env !== 'object' || !env.manifest || !env.files) {
+      return { ok: false, error: 'not a .dexplug envelope (missing manifest/files)' };
+    }
+    return { ok: true, envelope: env };
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message ?? 'unreadable file' };
+  }
+}
+
+async function pickDexplug(): Promise<string | null> {
+  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+  const opts = {
+    title: 'Install DEX app from file',
+    properties: ['openFile' as const],
+    filters: [{ name: 'DEX package', extensions: ['dexplug', 'json'] }],
+  };
+  const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+  if (res.canceled || !res.filePaths[0]) return null;
+  return res.filePaths[0];
+}
+
+/** Validate a `.dexplug` at a known path (no dialog) so the UI can re-check after trusting a key. */
+export function validateLocalFile(filePath: string): LocalPickResult {
+  const fileName = path.basename(filePath);
+  const read = readEnvelopeFile(filePath);
+  if (!read.ok) {
+    return { filePath, fileName, report: rejectionReport(read.error), summary: { packageId: '', name: fileName, version: '', runtime: 'web', signed: false } };
+  }
+  const env = read.envelope;
+  const manifest = env.manifest || {};
+  const { runtime } = detectRuntime(manifest, env.files || {});
+  return {
+    filePath, fileName,
+    report: validateEnvelope(env),
+    summary: {
+      packageId: typeof manifest.packageId === 'string' ? manifest.packageId : (typeof manifest.id === 'string' ? manifest.id : ''),
+      name: typeof manifest.name === 'string' ? manifest.name : fileName,
+      version: typeof manifest.packageVersion === 'string' ? manifest.packageVersion : (typeof manifest.version === 'string' ? manifest.version : ''),
+      runtime,
+      signed: !!(env.signature && env.signature.signature),
+    },
+  };
+}
+
+/** Open a file picker, then validate (not install) so the UI can show the gate checklist first. */
+export async function pickAndValidateLocal(): Promise<LocalPickResult | null> {
+  const filePath = await pickDexplug();
+  if (!filePath) return null;
+  return validateLocalFile(filePath);
+}
+
+/** Install a signed envelope read from disk. Re-runs the full gate (never trusts the prior check). */
+export async function installLocalFile(filePath: string): Promise<LocalInstallResult> {
+  const read = readEnvelopeFile(filePath);
+  if (!read.ok) return { ok: false, status: 'rejected', report: rejectionReport(read.error), error: read.error };
+  return installLocalEnvelope(read.envelope);
+}
+
+export async function installLocalEnvelope(envelope: any): Promise<LocalInstallResult> {
+  const report = validateEnvelope(envelope);
+  const manifest = (envelope && envelope.manifest) || {};
+  // Accept either v2 (packageId/packageVersion) or v1 (id/version) field names,
+  // mirroring the fallback PublishService.submit already uses, so a single v2
+  // manifest flows through sign -> validate -> install end to end.
+  const packageId: string = typeof manifest.packageId === 'string' ? manifest.packageId
+    : typeof manifest.id === 'string' ? manifest.id : '';
+  const version: string = typeof manifest.packageVersion === 'string' ? manifest.packageVersion
+    : typeof manifest.version === 'string' ? manifest.version : '';
+
+  // Full production gate: refuse anything not fully approved.
+  if (!canLocallyInstall(report)) {
+    return { ok: false, status: report.status, report, packageId, version, error: refusalHeadline(report.status) };
+  }
+
+  const files: Record<string, string> = (envelope && envelope.files) || {};
+  const plan = planUnpack(files);
+  if (!plan.ok) return { ok: false, status: report.status, report, packageId, version, error: plan.reason };
+
+  // Resolve the install dir, strictly contained to apps/<id>/<version>.
+  const appRoot = path.resolve(path.join(STORE_DIR(), 'apps', packageId, version));
+  const storeRoot = path.resolve(STORE_DIR());
+  if (!appRoot.startsWith(storeRoot + path.sep)) {
+    return { ok: false, status: report.status, report, packageId, version, error: 'install path escapes store dir' };
+  }
+
+  // Settle capability consent BEFORE writing anything to disk — a denial must
+  // never leave orphaned, un-installable bytes behind (matches planInstall's
+  // request-caps-before-unpack ordering).
+  const caps = Array.isArray(manifest.capabilities) ? (manifest.capabilities as string[]) : [];
+  const capResult = await defaultHooks().requestCapabilities(packageId, caps);
+  if (capResult.denied.length > 0) {
+    return { ok: false, status: report.status, report, packageId, version, error: `caps-denied:${capResult.denied.join(',')}` };
+  }
+
+  // Lay the files down.
+  try { fs.rmSync(appRoot, { recursive: true, force: true }); } catch { /* fresh install */ }
+  ensureDir(appRoot);
+  for (const e of plan.entries) {
+    const dest = path.resolve(path.join(appRoot, e.relPath));
+    if (dest !== appRoot && !dest.startsWith(appRoot + path.sep)) continue; // defense in depth
+    ensureDir(path.dirname(dest));
+    fs.writeFileSync(dest, Buffer.from(e.base64, 'base64'));
+  }
+
+  const { runtime, entry } = detectRuntime(manifest, files);
+  const block = envelope && envelope.signature;
+  const publisher = block && block.keyId ? publisherByKeyId(block.keyId) : undefined;
+
+  // Register the install with runtime + provenance.
+  const rec: InstalledApp = {
+    packageId, version,
+    installedAt: Date.now(),
+    grantedCaps: capResult.granted,
+    name: manifest.name || packageId,
+    description: typeof manifest.description === 'string' ? manifest.description : undefined,
+    iconUrl: typeof manifest.icon === 'string' ? manifest.icon : undefined,
+    categories: Array.isArray(manifest.categories) ? manifest.categories : undefined,
+    source: 'local',
+    runtime, entry,
+    bundleSha256: envelope.published?.sha256,
+  };
+  const installed = loadInstalled();
+  const idx = installed.findIndex((a) => a.packageId === packageId);
+  if (idx >= 0) installed[idx] = rec; else installed.push(rec);
+  installedCache = installed;
+  persistInstalled();
+
+  // Surface it in the store as an installed (local) app.
+  const catEntry: CatalogEntry = {
+    manifest: manifest as DexPkgManifestV2,
+    bundleUrl: '',
+    bundleBytes: bundleBytes(files),
+    bundleSha256: envelope.published?.sha256 ?? '',
+    iconUrl: typeof manifest.icon === 'string' ? manifest.icon : '',
+    publisherId: publisher?.id,
+    validationStatus: report.status,
+    validationReport: report,
+    local: true,
+  };
+  upsertCatalogEntry(catEntry);
+
+  log.info('[AppStore] local install ok', packageId, version, 'runtime=', runtime);
+  return { ok: true, status: report.status, report, packageId, version, runtime };
 }
 
 export function registerAppStoreIpc(): void {
@@ -352,4 +567,10 @@ export function registerAppStoreIpc(): void {
   ipcMain.handle('store:install', (_e, id: string) => install(id));
   ipcMain.handle('store:uninstall', (_e, id: string) => uninstall(id));
   ipcMain.handle('store:app:capabilities', (_e, id: string) => appCapabilities(id));
+  // Local developer install (full production gate).
+  ipcMain.handle('store:local:pick', () => pickAndValidateLocal());
+  ipcMain.handle('store:local:validateFile', (_e, filePath: string) => validateLocalFile(filePath));
+  ipcMain.handle('store:local:install', (_e, filePath: string) => installLocalFile(filePath));
+  ipcMain.handle('store:local:validate', (_e, envelope: unknown) => validateLocalEnvelope(envelope));
+  ipcMain.handle('store:local:installEnvelope', (_e, envelope: unknown) => installLocalEnvelope(envelope));
 }

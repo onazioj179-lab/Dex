@@ -163,8 +163,12 @@ function cmdSign(appdir, flags) {
   const keyId = keyIdForPublicKey(pubHex);
 
   const manifest = loadManifest(appdir);
-  if (!manifest.id || !manifest.name || !manifest.version) {
-    throw new Error('Manifest must include id, name, and version');
+  // Accept either v1 (id/version) or v2 (packageId/packageVersion) manifests so a
+  // DexPkgManifestV2 (formatVersion 2) signs without aliasing fields by hand.
+  const mfId = manifest.id || manifest.packageId;
+  const mfVersion = manifest.version || manifest.packageVersion;
+  if (!mfId || !manifest.name || !mfVersion) {
+    throw new Error('Manifest must include id/packageId, name, and version/packageVersion');
   }
   const files = {};
   collectFiles(appdir, '', files);
@@ -177,11 +181,11 @@ function cmdSign(appdir, flags) {
     format: 'dexplug-v1',
     manifest,
     files,
-    published: { author, version: manifest.version, sha256: hashFiles(files), publishedAt: Date.now(), downloads: 0 },
+    published: { author, version: mfVersion, sha256: hashFiles(files), publishedAt: Date.now(), downloads: 0 },
     signature: { keyId, algorithm: 'ed25519', digest, signature, signedAt: Date.now() },
   };
 
-  const out = flags['--out'] || path.join(process.cwd(), `${manifest.id}-${manifest.version}.dexplug`);
+  const out = flags['--out'] || path.join(process.cwd(), `${mfId}-${mfVersion}.dexplug`);
   fs.writeFileSync(out, JSON.stringify(envelope), 'utf8');
   console.log('Signed package written to', out);
   console.log('  keyId:', keyId, ' files:', Object.keys(files).length, ' digest:', digest.slice(0, 16) + '...');
@@ -208,7 +212,7 @@ function cmdVerify(pkgPath, flags) {
   let ok = false;
   try { ok = crypto.verify(null, Buffer.from(digest, 'hex'), publicKeyFromHex(pubHex), Buffer.from(block.signature, 'hex')); } catch { ok = false; }
   if (!ok) { fail('bad-signature: signature does not verify'); return; }
-  console.log('OK: signature valid. keyId', block.keyId, ' app', (env.manifest && env.manifest.id) || '?', (env.manifest && env.manifest.version) || '');
+  console.log('OK: signature valid. keyId', block.keyId, ' app', (env.manifest && (env.manifest.id || env.manifest.packageId)) || '?', (env.manifest && (env.manifest.version || env.manifest.packageVersion)) || '');
 }
 
 // Developer pre-flight: the publish checklist a package must pass. Mirrors the
@@ -244,13 +248,16 @@ function evaluateEnvelopeCli(env, flags) {
   }
   checks.push(['signed by a trusted key', sigOk, 'block', sigReason]);
 
-  const integrityOk = !!block && hashFiles(files) === (env.published && env.published.sha256);
-  checks.push(['bundle integrity (sha256)', integrityOk, 'block', integrityOk ? '' : 'file hash mismatch']);
+  // Integrity is a function of the bundle bytes alone — independent of whether a
+  // signature is present (the signature check above reports that separately).
+  const haveSha = !!(env.published && env.published.sha256);
+  const integrityOk = haveSha && hashFiles(files) === env.published.sha256;
+  checks.push(['bundle integrity (sha256)', integrityOk, 'block', integrityOk ? '' : (haveSha ? 'file hash mismatch' : 'no published.sha256 to compare')]);
 
   const issues = scanFiles(files);
   checks.push(['no forbidden code patterns', issues.length === 0, 'block', issues[0] ? `${issues[0].file}:${issues[0].line} ${issues[0].reason}` : '']);
 
-  const manifestOk = !!(manifest && manifest.id && manifest.name && manifest.version);
+  const manifestOk = !!(manifest && (manifest.id || manifest.packageId) && manifest.name && (manifest.version || manifest.packageVersion));
   checks.push(['manifest fields (id/name/version)', manifestOk, 'block', manifestOk ? '' : 'missing fields']);
 
   const totalBytes = Object.values(files).reduce((n, b) => n + Buffer.from(b, 'base64').length, 0);

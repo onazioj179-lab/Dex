@@ -2,6 +2,127 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
+> **REMOTE ULTRA-REVIEW FIXES (2026-06-06).** A cloud ultra code-review of the branch flagged 18
+> candidates, confirmed 8, refuted 10. Triaged and fixed the 6 real ones; the 8th (`merged_bug_001`,
+> "modules missing from working tree") is a **false positive vs. the local tree** — the review clones the
+> *pushed* commit, which lacks our uncommitted new files (localInstall, envelopeGate, ReviewService,
+> pages/store/*, tabReorder); they exist locally and tsc=0 proves it. It resolves when the branch is
+> committed. Fixes:
+> • **bug_003** (headline Magnify flow): `dex-codesign.cjs` `sign`/`validate` only accepted v1
+>   `id`/`version`; a v2 `DexPkgManifestV2` (formatVersion 2, packageId/packageVersion) couldn't even be
+>   signed. Added `id||packageId` / `version||packageVersion` fallbacks in `cmdSign`, `evaluateEnvelopeCli`,
+>   `cmdVerify`, and `installLocalEnvelope`/`validateLocalFile`. **Smoke-tested end to end**: keygen → sign
+>   v2 → verify → validate = STATUS approved.
+> • **bug_013**: `installLocalEnvelope` wrote files before `requestCapabilities`; a denial left orphaned
+>   bytes with no uninstall path. Reordered caps-consent BEFORE any disk write (matches planInstall).
+> • **bug_006**: locally installing an app whose id matched a bundled coming-soon tile (e.g.
+>   `dex.app.magnify`) then uninstalling permanently erased the bundled tile. Uninstall now restores the
+>   bundled entry instead of removing it when one exists.
+> • **bug_015**: `verifyPublisher` accepted any renderer-supplied `recognition` string (first-party badge
+>   spoofing vector). Now whitelisted against `recognized|partner|first-party`. (Kept the recognition
+>   param functional — the Developer panel legitimately uses it for local testing; barring renderer-set
+>   first-party entirely is a product decision flagged for the owner.)
+> • **bug_012** (introduced by this session's ghost-drag): the tab ref callback never deleted on unmount,
+>   leaking detached nodes whose `getBoundingClientRect()` returned 0 and skewed the drop index. Ref now
+>   deletes on null.
+> • **bug_011** (nit): `evaluateEnvelopeCli` integrity was gated on `!!block`, so an unsigned envelope
+>   printed a false "file hash mismatch". Integrity now stands on the bundle bytes alone.
+> • **Verify:** `tsc --noEmit` = 0; codesign + store + tab suites 32/32 green; CLI v2 smoke test approved;
+>   watermark OK (2519).
+>
+> **GALLERY SELECTION + RIGHT-CLICK REMOVE + SHORTCUTS (2026-06-06).** `src/renderer/pages/Gallery.tsx`
+> already had selection mode, `batchDelete`/`batchExport`, a context menu, and lightbox keys — the gaps
+> were that none of it was selection-aware or keyboard-driven. Added: (1) a unified `handleItemActivate`
+> for grid + list items — Ctrl/Cmd-click toggles, Shift-click extends a range from the last anchor
+> (`lastSelectedIndexRef`, indices resolved against `sortedMedia`), plain click opens; (2) a
+> **selection-aware right-click menu** — right-clicking inside a multi-selection shows "Export N items" /
+> "Clear selection" / "Delete N items" instead of single-item actions, and the single-item menu gained a
+> Select/Deselect entry; (3) **grid-level shortcuts** — Ctrl/Cmd+A select-all, Delete/Backspace remove
+> selection, Escape clear — all suppressed while the lightbox or a text input is focused so they never eat
+> typing. `tsc --noEmit` = 0; touched logic suites 24/24 green; watermark OK (2519). UI interactions
+> (drag, right-click) still want eyes-on in the running app.
+>
+> **CREATIVE ZOOM PARITY (2026-06-06, partial — creative-app cleanup slice).** Closed a real keyboard-zoom
+> gap between the named creative apps. **Prism** (`DEXAPPLICATIONS/prism/Prism.tsx`) had wheel + button +
+> slider zoom but NO keyboard shortcuts — added Ctrl/Cmd `=`/`+` (in), `-`/`_` (out), `0` (reset to 100%),
+> matching its multiplicative wheel feel and `[10,500]` clamp. **Imosion** (`DEXAPPLICATIONS/imosion/
+> Imosion.tsx`) had `+`/`-` zoom but no reset key — added Ctrl/Cmd `0` -> `setZoom(40)` (matches its 1:1
+> button). `tsc --noEmit` = 0. **NOT done (needs eyes-on, intentionally not guessed):** removing empty
+> visual placeholders, fixing control overlap, and icon/alignment in the creative apps — those are runtime-
+> visual and unsafe to change blind in 6k-line working files. Grep confirmed the "placeholder" hits are
+> legitimate input `placeholder=` attrs + backend engine stubs, not removable empty UI. Awaiting
+> screenshots / specific pointers to continue safely.
+>
+> **GHOST DRAG-TO-PLACE TABS (2026-06-06, Phase 4 slice).** Reworked the App Tab Bar drag in
+> `src/renderer/components/AppManager.tsx` from dragging the live element (jumpy "torn out" feel) to a
+> ghost-drag: the dragged tab stays in the strip as a dimmed dashed placeholder that settles into the
+> drop slot, while a lifted "ghost" copy follows the cursor (fixed-position, shadowed, scaled). Drop
+> placement uses real measured tab centres (handles variable-width tabs) instead of a fixed 110px guess.
+> • **Pure, tested math:** `src/shared/shell/tabReorder.ts` — `computeTabDropIndex(centers, draggingId,
+>   pointerX)` (counts other tabs left of the pointer, ignoring the dragged tab's own slot), `moveTab`
+>   (clamped relocate), `sameOrder` (skip no-op mid-drag state updates). 8 vitest cases
+>   (`tests/unit/tab-reorder.test.ts`), all green. Order still persists to `localStorage['dex-tab-order']`.
+> • **Verify:** `tsc --noEmit` = 0; tab-reorder 8/8 green; watermark OK (2519). Eyes-on the live drag
+>   feel still needs the running Electron app (pointer drag can't be exercised headlessly); the placement
+>   logic is proven by the unit tests. Window-level ghost tiling is NOT done yet — only the tab bar.
+>
+> **LOCAL APP INSTALL + FULL-PRODUCTION VALIDATION (2026-06-06).** Built the developer path to push a
+> separately-built app (e.g. Magnify) into DEX locally and test the store install/uninstall loop, WITHOUT
+> relaxing the gate. Owner directive: support all runtime kinds, full production gate (no unsigned bypass).
+> • **The gap that existed:** install was remote-HTTPS-only (`fetch(bundleUrl)`), `unpack` was a stub that
+>   wrote nothing runnable, and there was no path to validate/install a local file. A locally-submitted app
+>   got `bundleUrl: ''` -> `isInstallable` false -> could never install.
+> • **Pure, tested core** `src/shared/store/localInstall.ts` — `isSafeRelPath`/`planUnpack` (load-bearing
+>   containment over the envelope's attacker-controlled file keys: rejects traversal/absolute/drive/backslash/
+>   empty), `detectRuntime` (web vs native + entry, honours manifest then infers from index.html),
+>   `canLocallyInstall` (approved-only = same strictness as publishing). +8 tests
+>   (`tests/unit/store-local-install.test.ts`).
+> • **Gate reuse without a cycle:** extracted `validateEnvelope` into `src/main/services/envelopeGate.ts`
+>   (shared by PublishService + AppStoreService; PublishService re-exports for compat).
+> • **Main** `AppStoreService`: `store:local:pick` (open dialog -> read .dexplug -> run FULL gate -> return
+>   checklist), `store:local:validateFile`, `store:local:install` (re-runs the gate, then a REAL unpack to
+>   `apps/<id>/<version>/` with double path-containment, routes declared caps through PermissionsService,
+>   registers the install with `source:'local'` + `runtime`/`entry`, upserts a `local:true` catalog entry).
+>   Uninstall now also drops the synthetic local catalog entry. Types extended in `catalog.ts`
+>   (`InstalledApp.source/runtime/entry/bundleSha256`, `CatalogEntry.local`).
+> • **UI** `src/renderer/pages/store/DeveloperPanel.tsx` (terminal button in the Store header): (1) Trust a
+>   publisher key -> `store:publisher:verify` (adds it to the trust store), (2) Install from file -> shows the
+>   gate's checklist verbatim (each block/warn check, pass/fail, detail) + status banner; Install enables only
+>   when `approved`; trusting a key auto-re-validates the picked file.
+> • **The Magnify loop (full production gate):** `node scripts/dex-codesign.cjs keygen` -> in DEX Store ->
+>   Developer -> paste the PUBLIC KEY (Trust) -> `dex-codesign sign <magnifyDir>` (its `manifest.json` MUST be
+>   a valid DexPkgManifestV2: formatVersion 2, reverse-DNS packageId, semver packageVersion/minRuntime,
+>   capabilities/dependencies/signatures/deltas/categories arrays) -> Developer -> Choose the .dexplug ->
+>   checklist shows approved -> Install.
+> • **Honest limit:** install lays files down + records `runtime`(web|native)+`entry`, but actually LAUNCHING
+>   an installed app is still Phase 6 (app-container runtime) — captured, not yet executed. Verify: `tsc`=0;
+>   33 store tests green (incl. the codesign signature vector); watermark OK (2517); `vite build` green. The
+>   real install flow uses Electron IPC + a native file dialog, so it must be exercised in the packaged app.
+>
+> **PHASE 3 — STOREFRONT UI + REVIEWS WIRED (2026-06-06).** Completed the Phase 3 "big one":
+> the Apple-style DEX Store and the anti-fake review backend are now live end-to-end.
+> • **Review backend un-orphaned:** `ReviewService` (store:review:list/submit/flag) existed but
+>   `registerReviewIpc()` was never called. Wired it into `src/main/main.ts` next to the other Phase 3
+>   host bridges. The `store:` channel prefix is already in the preload allowlist, so the renderer reaches it.
+> • **Storefront UI rebuilt** (`src/renderer/pages/Store.tsx` + new `src/renderer/pages/store/*`): the
+>   flat list became a two-surface storefront in DEX premium-glass —
+>   - `storeKit.tsx` — IPC accessor, formatters, category labels, glass/button atoms, a fractional
+>     `StarRating` (display + interactive), `AppIcon`, recognition/state badges, and the reusable `AppTile`.
+>   - `StoreHome.tsx` — featured hero, horizontal category rails grouped by `StoreCategory`,
+>     search-results grid, installed-only grid.
+>   - `AppDetail.tsx` — hero with install/uninstall/plan, screenshot gallery (graceful placeholders),
+>     full description, a "What this app can do" capability panel (sensitive caps flagged) via
+>     `explainCapabilities`, a publisher card with the recognition badge, and the reviews section.
+>   - `ReviewsPanel.tsx` — live `store:review:*`: visible-only average + 1-5 histogram, a count of
+>     reviews held by integrity checks, a write-review form, and per-review report/flag.
+> • **Integrity honesty:** the public average counts ONLY `visible` reviews (engine in
+>   `shared/store/reviewIntegrity`), and a review the engine flags/hides is reported to the author as
+>   "held for integrity review", never "posted" — the UI surfaces the held count rather than hiding it.
+> • **Verify:** `tsc --noEmit` = 0; `vitest` store suites 16/16 green (review-integrity 8 + catalog 8);
+>   watermark check OK (2513); `vite build` green (Store bundles cleanly). Eyes-on is NOT possible
+>   headlessly — the Store needs `window.dex` IPC (absent in the browser preview), so the live
+>   storefront must be verified in the packaged Electron app.
+>
 > **MEDIA DSP ENGINES WIRED + SILENCE DE-DUPLICATED (2026-06-05).** Finished and verified the
 > ROADMAP-600 #198/#199/#233/#241 media slice: the shared, unit-tested DSP engines now drive real
 > creative-app behaviour end-to-end, and the one duplicate silence path was folded onto the shared
