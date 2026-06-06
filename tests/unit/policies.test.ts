@@ -18,7 +18,7 @@ import { POLICY_DOCUMENTS, getPolicyDocument } from '../../src/shared/policyDocu
 describe('DEX policy metadata', () => {
   it('declares required terms and privacy policies', () => {
     expect(REQUIRED_POLICY_SLUGS).toEqual(['terms', 'privacy']);
-    expect(getRequiredPolicyVersions()).toMatchObject({ terms: '2.0.0', privacy: '2.0.0' });
+    expect(getRequiredPolicyVersions()).toMatchObject({ terms: '2.1.0', privacy: '2.1.0' });
   });
 
   it('keeps every metadata entry backed by bundled policy text', () => {
@@ -51,6 +51,6 @@ describe('DEX policy metadata', () => {
 
   it('uses the approved contact and data policy version', () => {
     expect(POLICY_CONTACT_EMAIL).toBe('onazi75@gmail.com');
-    expect(DATA_POLICY_VERSION).toBe('2.0.0');
+    expect(DATA_POLICY_VERSION).toBe('2.1.0');
   });
 });

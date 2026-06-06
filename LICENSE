@@ -68,8 +68,10 @@ authors to the Licensor under the Developer Certificate of Origin (DCO).
 
 The Software stores user data on the Licensee's local device by default.
 Optional cloud, sync, and analytics features are clearly opt-in and
-disabled by default. The Licensor does not sell, rent, or share Licensee
-data with third parties. See the in-app Privacy section for details.
+disabled by default. The Licensor's collection, use, and sharing of data --
+including any analytics, advertising, and partner integrations -- are
+governed by the DEX Privacy Policy. See the in-app Privacy section and
+PRIVACY.md for details, including how to exercise your privacy choices.
 
 ------------------------------------------------------------------------------
 6. UPDATES
