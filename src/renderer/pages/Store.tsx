@@ -17,6 +17,7 @@ import {
 } from '../styles/glassMenu';
 import type { CatalogEntry, InstalledApp, PlanResult } from '../../shared/store/catalog';
 import type { InstallResult } from '../../shared/store/installer';
+import { recognitionBadge, type PublisherProfile } from '../../shared/store/publisher';
 
 type IpcBridge = { invoke: (c: string, ...a: any[]) => Promise<any> };
 
@@ -64,15 +65,18 @@ export default function Store(): React.ReactElement {
   const [last, setLast] = useState<string>('');
   const [query, setQuery] = useState('');
   const [installedOnly, setInstalledOnly] = useState(false);
+  const [publishers, setPublishers] = useState<PublisherProfile[]>([]);
 
   const refresh = useCallback(async () => {
     try {
-      const [c, i] = await Promise.all([
+      const [c, i, p] = await Promise.all([
         ipc().invoke('store:list'),
         ipc().invoke('store:installed'),
+        ipc().invoke('store:publisher:list').catch(() => []),
       ]);
       setCatalog(Array.isArray(c) ? c : []);
       setInstalled(Array.isArray(i) ? i : []);
+      setPublishers(Array.isArray(p) ? p : []);
     } catch (e) {
       setLast(`Refresh failed: ${toMessage(e)}`);
     }
@@ -222,6 +226,14 @@ export default function Store(): React.ReactElement {
                     <span style={styles.appName}>{name}</span>
                     {installedEntry && <span style={styles.installedBadge}>Installed</span>}
                     {entry.comingSoon && !installedEntry && <span style={styles.soonBadge}>Coming soon</span>}
+                    {(() => {
+                      const badge = recognitionBadge(publishers.find(p => p.id === entry.publisherId));
+                      return badge ? (
+                        <span style={styles.verifiedBadge} title={`${badge.label} publisher`}>
+                          <DexIcon name="check-circle" size={11} />{badge.label}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                   <div style={styles.appMeta}>
                     <span>{id}</span>
@@ -415,6 +427,19 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(10,132,255,0.12)',
     border: '1px solid rgba(10,132,255,0.28)',
     color: 'var(--color-accent)',
+    fontSize: 10.5,
+    fontWeight: 700,
+    flexShrink: 0,
+  },
+  verifiedBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 3,
+    padding: '2px 7px',
+    borderRadius: 999,
+    background: 'rgba(94,92,230,0.14)',
+    border: '1px solid rgba(94,92,230,0.32)',
+    color: '#a7a4ff',
     fontSize: 10.5,
     fontWeight: 700,
     flexShrink: 0,
