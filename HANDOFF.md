@@ -2,6 +2,25 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
+> **TAURI MIGRATION — FULL SWITCH STARTED (2026-06-06).** Owner directed a **full
+> Electron -> Tauri migration**: Electron is now the temporary bridge, to be retired
+> once Tauri reaches parity (target: ~4 MB vs ~88 MB installer, lighter/faster).
+> **The living checkpoint is `docs/TAURI-MIGRATION.md` — START THERE.** It has the
+> goal, the phase plan (P0 boot/shell parity ✅ -> P1 everyday gaps -> P2 heavy
+> engines -> P3 big controllers -> P4 flip default + retire Electron), an honest
+> per-subsystem status table (~24 namespaces native; ~3% of ~2,369 raw channels, but
+> most state is localStorage which already works under WebView2), the repeatable
+> "how to port a subsystem" recipe, and a **RESUME HERE** pointer (next slice =
+> notifications, wired in BOTH shells so it isn't orphaned).
+> • **Baseline verified green:** `cd core && cargo test` (native core crates) exit 0.
+>   Tauri work is **additive** (`src-tauri/`, `core/`, `services/platform/*`) so the
+>   shipping Electron build cannot be broken by a migration slice.
+> • **First slice this session:** added migration telemetry to
+>   `src/renderer/services/platform/tauriCompat.ts` — a degrade-log recording which
+>   unported channels get hit at runtime, exposed as `window.__dexDegradeReport()`
+>   (+ exported `dexDegradeReport()`). This orders the P3 backlog by REAL usage
+>   instead of guesses. No-op under Electron. `tsc --noEmit` = 0.
+>
 > **PRIVACY + MONETIZATION STANCE UPDATE (2026-06-06).** Owner direction: stop making absolute
 > "never sell / no ads ever" promises so future ads, partners, and data-use are not contradicted.
 > Removed those promises across README, docs/PRICING.md, LICENSE (data clause now points to the
