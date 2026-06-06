@@ -17,6 +17,7 @@ import { useFileDrop } from '../../utils/useFileDrop';
 import { capHistoryTail } from '../../../shared/creative/history';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
+import { upscaleByFactor } from '../../../shared/creative/resample';
 import {
   ADJUSTMENT_PRESETS,
   QUICK_EXPORT_PRESETS,
@@ -444,7 +445,7 @@ const Prism: React.FC = () => {
   // map to Prism's real adjustment pipeline run for real (and are undoable via
   // pushHistory); ops that need an AI engine not present in this build fail
   // honestly with a clear note rather than pretending to have run.
-  const applyCreativeOp = (op: CreativeOp): { outcome: 'applied' | 'skipped'; note?: string } => {
+  const applyCreativeOp = async (op: CreativeOp): Promise<{ outcome: 'applied' | 'skipped'; note?: string }> => {
     switch (op.op) {
       case 'autoEnhance':
         pushHistory('UKI: auto-enhance');
@@ -454,6 +455,39 @@ const Prism: React.FC = () => {
         pushHistory('UKI: color grade');
         setTemperature(15); setTint(-5); setSaturation(8); setContrast(6);
         return { outcome: 'applied', note: 'applied a warm cinematic grade (temperature, tint, saturation)' };
+      case 'upscale': {
+        // Real Lanczos-3 resample (#167). Not ML super-res — honest interpolation.
+        const layer = selectedLayerId ? layers.find(l => l.id === selectedLayerId) : undefined;
+        if (!layer || layer.type !== 'image' || !layer.imageData) {
+          return { outcome: 'skipped', note: 'select an image layer to upscale' };
+        }
+        const factor = typeof op.params.factor === 'number' ? op.params.factor : 2;
+        const srcId = await new Promise<ImageData>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth; c.height = img.naturalHeight;
+            const cx = c.getContext('2d');
+            if (!cx) { reject(new Error('no 2d context')); return; }
+            cx.drawImage(img, 0, 0);
+            resolve(cx.getImageData(0, 0, c.width, c.height));
+          };
+          img.onerror = () => reject(new Error('image decode failed'));
+          img.src = layer.imageData as string;
+        });
+        const { data, width, height } = upscaleByFactor(srcId.data, srcId.width, srcId.height, factor);
+        const out = document.createElement('canvas');
+        out.width = width; out.height = height;
+        const octx = out.getContext('2d');
+        if (!octx) return { outcome: 'skipped', note: 'no canvas context for upscale' };
+        const id = octx.createImageData(width, height);
+        id.data.set(data);
+        octx.putImageData(id, 0, 0);
+        const url = out.toDataURL();
+        pushHistory(`UKI: upscale ${factor}x`);
+        setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: url, width, height } : l));
+        return { outcome: 'applied', note: `upscaled to ${width}×${height} (${factor}× Lanczos resample, not ML super-res)` };
+      }
       default:
         return { outcome: 'skipped', note: `${op.op}: needs an AI engine not installed in this build` };
     }
