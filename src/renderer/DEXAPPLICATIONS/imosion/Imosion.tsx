@@ -6,7 +6,10 @@
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
-import { enginePendingApplier } from '../../../shared/uki/creativeCommand';
+import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
+import type { CreativeOp } from '../../../shared/uki/creativeActions';
+import { detectTempo, detectOnsets } from '../../../shared/media/beatDetect';
+import { decodeAudioToMono } from '../../services/media/decodeAudio';
 import { platform as _plat } from '../../utils';
 import { useRunningApps } from '../../store/runningApps';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
@@ -2315,6 +2318,27 @@ const Imosion: React.FC = () => {
   const [tracks, setTracks] = useState<AudioTrack[]>(() => []);
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
+
+  // ROADMAP-600 #233/#241 — UKI creative-op handler. Tempo/beat detection runs
+  // for real: decode the selected track's clip audio and analyse it with the
+  // shared beatDetect engine (read-only). Other ops skip honestly.
+  const handleImosionOp = useCallback(async (op: CreativeOp): Promise<OpApplyResult> => {
+    if (op.op === 'detectTempoKey' || op.op === 'detectBeats') {
+      const track = tracks.find(t => t.id === selectedTrack) ?? tracks[0];
+      const clip = track?.clips?.find(c => c.url);
+      if (!clip?.url) return { outcome: 'skipped', note: 'add or select an audio track with a clip first' };
+      const decoded = await decodeAudioToMono(clip.url);
+      if (!decoded) return { outcome: 'skipped', note: 'could not decode the track audio' };
+      if (op.op === 'detectTempoKey') {
+        const { bpm, confidence } = detectTempo(decoded.pcm, decoded.sampleRate);
+        if (bpm <= 0) return { outcome: 'skipped', note: 'could not estimate a tempo from this audio' };
+        return { outcome: 'applied', note: `detected tempo ~${bpm} BPM (confidence ${Math.round(confidence * 100)}%)` };
+      }
+      const onsets = detectOnsets(decoded.pcm, decoded.sampleRate);
+      return { outcome: 'applied', note: `detected ${onsets.length} beats/onsets` };
+    }
+    return enginePendingApplier('Imosion')(op);
+  }, [tracks, selectedTrack]);
 
   // Keep MIDI ref in sync with selectedTrack state
   useEffect(() => { selectedTrackRef.current = selectedTrack; }, [selectedTrack]);
@@ -4899,7 +4923,7 @@ const Imosion: React.FC = () => {
         <CreativeCommandBar
           appId="imosion"
           facts={{ trackId: selectedTrack ?? undefined }}
-          onApplyOp={enginePendingApplier('Imosion')}
+          onApplyOp={handleImosionOp}
           examples={['detect tempo and key', 'separate stems', 'denoise the track', 'detect beats']}
           placeholder="Tell Imosion what to do…"
         />

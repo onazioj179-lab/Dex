@@ -12,7 +12,11 @@
 
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
 import CreativeCommandBar from '../../components/CreativeCommandBar';
-import { enginePendingApplier } from '../../../shared/uki/creativeCommand';
+import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
+import type { CreativeOp } from '../../../shared/uki/creativeActions';
+import { planSilenceRemoval } from '../../../shared/media/silenceDetect';
+import { planSilenceClips } from '../../../shared/media/silenceTimeline';
+import { decodeAudioToMono, slicePCM } from '../../services/media/decodeAudio';
 import { platform as _plat } from '../../utils';
 import { sharedTick } from '../../services/SharedTick';
 import { useVinxStore } from './VinxStore';
@@ -392,6 +396,45 @@ const VinxEditor: React.FC = () => {
   const toggleSnap = useVinxStore(s => s.toggleSnap);
   const setTool = useVinxStore(s => s.setTool);
   const _removeClip = useVinxStore(s => s._removeClip);
+  const _addClip = useVinxStore(s => s._addClip);
+
+  // ROADMAP-600 #199 — UKI creative-op handler. speedRamp + silence removal run
+  // for real against the timeline; everything else skips honestly. Silence
+  // removal decodes the clip's media, detects silence (shared engine), maps the
+  // kept spans to rippled clips (pure planSilenceClips), and rebuilds the clip.
+  const handleVinxOp = useCallback(async (op: CreativeOp): Promise<OpApplyResult> => {
+    const clipId = selectedClipIds[0];
+    if (op.op === 'speedRamp') {
+      if (!clipId) return { outcome: 'skipped', note: 'select a clip first' };
+      _updateClip(clipId, { speed: 0.5 });
+      return { outcome: 'applied', note: 'set clip to 0.5x slow-motion (constant; a true keyframed ramp needs the engine)' };
+    }
+    if (op.op === 'removeSilence' || op.op === 'smartCuts') {
+      const clip = clipId ? getClipById(clipId) : null;
+      if (!clip) return { outcome: 'skipped', note: 'select a clip first' };
+      const media = clip.mediaId ? project.mediaBin.find(m => m.id === clip.mediaId) : undefined;
+      if (!media || !media.path) return { outcome: 'skipped', note: 'clip has no decodable media' };
+      const decoded = await decodeAudioToMono(media.path);
+      if (!decoded) return { outcome: 'skipped', note: 'could not decode clip audio (needs the desktop app with media loaded)' };
+      const fr = project.frameRate || 30;
+      const region = slicePCM(decoded.pcm, decoded.sampleRate, clip.mediaInFrame / fr, clip.mediaOutFrame / fr);
+      const plan = planSilenceRemoval(region, decoded.sampleRate, { thresholdDb: -40, minSilenceSec: 0.3, paddingSec: 0.05 });
+      if (plan.removedSec <= 0 || plan.keep.length === 0) return { outcome: 'skipped', note: 'no removable silence found in this clip' };
+      const specs = planSilenceClips(plan.keep, { startFrame: clip.startFrame, mediaInFrame: clip.mediaInFrame, speed: clip.speed }, fr);
+      if (specs.length === 0) return { outcome: 'skipped', note: 'nothing to keep after silence removal' };
+      _removeClip(clip.id);
+      specs.forEach((sp, i) => _addClip({
+        ...clip,
+        id: `${clip.id}_sil${i}_${Math.round(performance.now())}`,
+        startFrame: sp.startFrame,
+        endFrame: sp.endFrame,
+        mediaInFrame: sp.mediaInFrame,
+        mediaOutFrame: sp.mediaOutFrame,
+      }));
+      return { outcome: 'applied', note: `removed ${plan.removedSec.toFixed(1)}s of silence into ${specs.length} clip(s)` };
+    }
+    return enginePendingApplier('Vinx')(op);
+  }, [selectedClipIds, _updateClip, getClipById, _removeClip, _addClip, project]);
 
   const engineRef = useRef<PlaybackEngine | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -828,18 +871,8 @@ const VinxEditor: React.FC = () => {
         <CreativeCommandBar
           appId="vinx"
           facts={{ clipId: selectedClipIds[0], projectId: project?.id }}
-          onApplyOp={(op) => {
-            // Real local op: set the selected clip's speed (honest note — this is
-            // a constant slow-mo, not a keyframed ramp, which needs the engine).
-            if (op.op === 'speedRamp') {
-              const clipId = selectedClipIds[0];
-              if (!clipId) return { outcome: 'skipped', note: 'select a clip first' };
-              _updateClip(clipId, { speed: 0.5 });
-              return { outcome: 'applied', note: 'set clip to 0.5× slow-motion (constant; a true keyframed ramp needs the engine)' };
-            }
-            return enginePendingApplier('Vinx')(op);
-          }}
-          examples={['speed ramp to slow-mo', 'remove silences', 'add captions', 'stabilize']}
+          onApplyOp={handleVinxOp}
+          examples={['remove silences', 'speed ramp to slow-mo', 'add captions', 'stabilize']}
           placeholder="Tell Vinx what to edit…"
         />
       </div>
