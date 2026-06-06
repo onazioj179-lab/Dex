@@ -10,6 +10,8 @@
 // Items 401-425 of the 1000-item improvement plan
 // =============================================================================
 
+import { detectSilence as detectSilenceDsp, toMonoPCM } from '../../../shared/media/silenceDetect';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -736,35 +738,27 @@ export class AudioEditingEngine {
   detectSilence(clipId: string, threshold: number = -60, minDuration: number = 100): { start: number; end: number }[] {
     const clip = this.clips.get(clipId);
     if (!clip) return [];
-    
-    const silenceRegions: { start: number; end: number }[] = [];
-    const sourceData = clip.sourceBuffer.getChannelData(0);
-    const thresholdLinear = Math.pow(10, threshold / 20);
-    const minSamples = Math.round(minDuration / 1000 * this.sampleRate);
-    
-    let inSilence = false;
-    let silenceStart = 0;
-    
-    for (let i = 0; i < sourceData.length; i++) {
-      const isSilent = Math.abs(sourceData[i]) < thresholdLinear;
-      
-      if (isSilent && !inSilence) {
-        silenceStart = i;
-        inSilence = true;
-      } else if (!isSilent && inSilence) {
-        if (i - silenceStart >= minSamples) {
-          silenceRegions.push({ start: silenceStart, end: i });
-        }
-        inSilence = false;
-      }
-    }
-    
-    // Handle trailing silence
-    if (inSilence && sourceData.length - silenceStart >= minSamples) {
-      silenceRegions.push({ start: silenceStart, end: sourceData.length });
-    }
-    
-    return silenceRegions;
+
+    // Delegate to the shared, unit-tested silence DSP engine
+    // (src/shared/media/silenceDetect.ts) instead of a local peak-abs loop.
+    // Deliberate quality upgrade: windowed-RMS / dBFS detection over a full
+    // mono down-mix rather than channel-0 peak amplitude. Detection runs over
+    // the whole source buffer so the sample-index regions stay valid for
+    // stripSilence's offset-relative math; the public shape is unchanged.
+    const buffer = clip.sourceBuffer;
+    const channels: Float32Array[] = [];
+    for (let c = 0; c < buffer.numberOfChannels; c++) channels.push(buffer.getChannelData(c));
+    const mono = toMonoPCM(channels, buffer.length);
+
+    const regions = detectSilenceDsp(mono, this.sampleRate, {
+      thresholdDb: threshold,
+      minSilenceSec: minDuration / 1000,
+    });
+
+    return regions.map(r => ({
+      start: Math.round(r.startSec * this.sampleRate),
+      end: Math.round(r.endSec * this.sampleRate),
+    }));
   }
   
   stripSilence(clipId: string, threshold: number = -60, minDuration: number = 100): AudioClip[] {
