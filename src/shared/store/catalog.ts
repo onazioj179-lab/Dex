@@ -15,6 +15,7 @@ import {
   semverCompare,
   validateManifestV2,
 } from '../dexpkg/manifestV2';
+import type { ValidationStatus, ValidationReport } from './validationGate';
 
 export interface CatalogEntry {
   manifest: DexPkgManifestV2;
@@ -30,6 +31,15 @@ export interface CatalogEntry {
   reviewSummary?: { count: number; avg: number };
   /** Announced but not yet installable (no published bundle). Shown, not installable. */
   comingSoon?: boolean;
+  /** DEX Developer Platform: who published this and its pre-publish review state. */
+  publisherId?: string;
+  validationStatus?: ValidationStatus;
+  validationReport?: ValidationReport;
+}
+
+/** True when an entry passed the pre-publish validation gate (safe to surface as approved). */
+export function isPublishable(entry: CatalogEntry): boolean {
+  return entry.validationStatus === 'approved';
 }
 
 export interface StoreCatalog {
