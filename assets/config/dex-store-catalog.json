@@ -1,0 +1,68 @@
+[
+  {
+    "comingSoon": true,
+    "bundleUrl": "",
+    "bundleBytes": 0,
+    "bundleSha256": "",
+    "iconUrl": "",
+    "reviewSummary": { "count": 0, "avg": 0 },
+    "manifest": {
+      "formatVersion": 2,
+      "packageId": "dex.app.magnify",
+      "packageVersion": "1.0.0",
+      "name": "Magnify",
+      "description": "Pixel-precise screen magnifier and inspector. Zoom, measure, sample colors, and annotate anywhere on screen. Coming soon to the DEX Store.",
+      "minRuntime": "5.0.0",
+      "contentRating": "everyone",
+      "categories": ["utility", "productivity"],
+      "capabilities": ["capture"],
+      "dependencies": [],
+      "signatures": [],
+      "deltas": []
+    }
+  },
+  {
+    "comingSoon": true,
+    "bundleUrl": "",
+    "bundleBytes": 0,
+    "bundleSha256": "",
+    "iconUrl": "",
+    "reviewSummary": { "count": 0, "avg": 0 },
+    "manifest": {
+      "formatVersion": 2,
+      "packageId": "dex.app.clipdeck",
+      "packageVersion": "0.9.0",
+      "name": "ClipDeck",
+      "description": "A smart clipboard manager with history, pinned snippets, and quick paste. Coming soon.",
+      "minRuntime": "5.0.0",
+      "contentRating": "everyone",
+      "categories": ["productivity", "utility"],
+      "capabilities": ["clipboard"],
+      "dependencies": [],
+      "signatures": [],
+      "deltas": []
+    }
+  },
+  {
+    "comingSoon": true,
+    "bundleUrl": "",
+    "bundleBytes": 0,
+    "bundleSha256": "",
+    "iconUrl": "",
+    "reviewSummary": { "count": 0, "avg": 0 },
+    "manifest": {
+      "formatVersion": 2,
+      "packageId": "dex.app.metronome",
+      "packageVersion": "1.0.0",
+      "name": "Metronome",
+      "description": "A precise, low-latency metronome and tap-tempo tool for musicians. Coming soon.",
+      "minRuntime": "5.0.0",
+      "contentRating": "everyone",
+      "categories": ["media", "creative"],
+      "capabilities": ["audio.out"],
+      "dependencies": [],
+      "signatures": [],
+      "deltas": []
+    }
+  }
+]
