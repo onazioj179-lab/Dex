@@ -26,7 +26,7 @@ import { detectShell, type ShellKind } from './index';
 export const TAURI_NATIVE_SUBSYSTEMS: readonly string[] = [
   'window', 'files', 'fileSearch', 'search', 'fileIntel',
   'system', 'power', 'os', 'shell', 'media', 'audio',
-  'clipboard', 'vault', 'capability', 'storage',
+  'clipboard', 'vault', 'capability', 'storage', 'automation',
   'health', 'diagnostics', 'crashReporter',
   'connection', 'networkHygiene', 'app', 'data',
 ];

@@ -2,8 +2,127 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
+> 🟢 **NL CREATIVE COMMAND BAR — #095 wired live (2026-06-05).** Closed the biggest "built but
+> orphaned" gap: the whole NL→plan→op stack (executor + creativeActions + planSummary + confirmTier)
+> existed and was unit-green but **nothing in the UI drove it**. Now it does, end-to-end, in a real app.
+> • **`src/shared/uki/creativeCommand.ts`** — renderer-safe orchestrator: `buildCreativeCommand(goal)`
+>   runs the side-effect-free NL→op dry run and returns `{understood, plan, ops, summary, mutates, tier}`
+>   (preview #003 + confirm tier #018/#106); `applyCreativeCommand(ops, applier)` applies each op via a
+>   host callback and returns a per-op report; `tierForOps` = strictest-wins gate.
+>   **Correctness fix:** the planner scores a skill >0 when `requiredContext` is satisfied **even if the
+>   intent didn't match**, so with `layerId` present *any* text produced a spurious op. Added an **intent
+>   gate** — the bar only acts when the goal actually mentions a skill's intent, so it never invents an
+>   action for unrelated text (anti-fake).
+> • **`src/renderer/components/CreativeCommandBar.tsx`** — generic, host-agnostic command bar:
+>   type a goal → plan preview (op list + mutate/read-only badges + tier banner) → Apply/Run/Cancel →
+>   run report. Each creative app passes its `facts` (active layer/selection ids) + an `onApplyOp` that
+>   mutates its own document. Glyph-free (respects the design-token emoji guard).
+> • **Honest outcomes:** appliers may return a note (=applied), throw (=failed), or
+>   `{outcome:'skipped'}` — engine-pending is NOT an error. `enginePendingApplier(label)` is the
+>   reusable honest "needs the <app> engine" applier; the report headline shows applied/skipped/failed.
+> • **Wired into ALL 5 creative apps:** **Prism** (top of the Adjustments panel, facts
+>   `{layerId: selectedLayerId}`) runs `autoEnhance`/`colorGrade` **for real** via live, undoable
+>   adjustment sliders (`pushHistory`) and marks AI-only ops `skipped` (no faking). **Vinx / Imosion /
+>   Flux / Axl** each mount the bar (Axl inside its existing AI panel; the others as a top strip in the
+>   app root) with best-effort facts (clip/track/layer/part ids) + `enginePendingApplier(<App>)` until
+>   their engines land — real ops drop in per-op like Prism's.
+> • **Tests:** `tests/unit/creative-command.test.ts` (12 — orchestrator + intent/tier gates + skipped
+>   outcome + forbidden policy + `enginePendingApplier`) + `tests/unit/creative-command-bar.test.tsx`
+>   (3, full jsdom UI flow: plan→confirm→apply→report, honest-failure, not-understood). **All green.**
+>   `tsc --noEmit` = **0**; watermarks canonical (2471); `renderer-pages`/`app-shell` suites still green
+>   (no regression from the 5 app edits). The apps aren't launchable headlessly (no `window.dex`), so the
+>   UI flow is proven by the RTL component test, not a screenshot.
+>
+> 🗺️ **ROADMAP-600 + UKI CONTROL/MEDIA WIRING (2026-06-05).** Authored **`ROADMAP-600.md`** (repo
+> root) — 600 numbered, prioritized features: §1 UKI & Creative intelligence (400, incl. a 70-item
+> NL creative-control group benchmarked vs Photoshop/Premiere/Ableton/AE/Cursor), §2 Platform
+> (150: shell, terminal, DexCode, Dev Mode, microservices, Nexus, plugins), §3 Sound/Video I/O (50).
+> Single source of truth; status tags `[have]/[partial]/[missing]` + P0/P1/P2.
+> **First wiring slice landed (all unit-tested, `tsc --noEmit` = 0):**
+> • **UKI action executor** `src/shared/uki/actionExecutor.ts` — pure executor binding skill
+> `actionId`→handler with dependsOn/retries/optional + `{{var}}` interpolation, UndoLog-compatible
+> trail, `runGoal()` (decompose→execute). Closes the gap where `appSkills.ts` declared skills but
+> nothing ran them.
+> • **Creative action handlers** `src/shared/uki/creativeActions.ts` — 53 creative ops
+> (prism/vinx/imosion/flux/axl) emitting pure `CreativeOp{app,op,params,mutates}` descriptors.
+> • **+36 NL creative-control skills** in `shared/uki/appSkills.ts` (registry 41→**77**).
+> • **Sound I/O** `src/renderer/services/media/AudioPlaybackService.ts` — Web Audio playback OUT
+> (ctx→gain→analyser, `dbToGain` from `shared/audio/dsp`) + mic capture IN (MediaRecorder→Blob) +
+> level meter.
+> • **Video I/O** `shared/video/pipeline.ts` — pure `planExport()` (in-app WebM vs native MP4/ProRes
+> descriptor) + `probeFromMetadata()` import probe.
+> • **Nexus live ingest** `shared/nexus/ingest.ts` — pure ContextBus-event→`NexusModel` mapper
+> (upsert + contains/in links + co-occurrence) so the graph fills live.
+> **+30 vitest tests** (`action-executor`, `creative-actions`, `video-io`, `nexus-ingest`).
+>
+> **LIVE WIRING LANDED (same session) — #094/#502/#551-552/#571-572 (tsc=0, +6 tests):**
+> • **#094** `UkiCreativeOperator.dispatchCreativeOp()` maps a `CreativeOp`→whitelisted action
+> type→IPC channel (op name in payload, confidence gate + audit). `main/uki/creativeRunner.ts`
+> `runCreativeGoal(goal, invoker)` = full NL→decompose→execute→dispatch path.
+> • **#502** `renderer/services/nexus/nexusLiveStore.ts` — `installNexusIngest()` subscribes
+> ContextBus (project/file/note/app/asset) → `ingestEvent`, back-fills from the replay ring;
+> mounted from `standalone/Nexus.tsx`.
+> • **#551-552** `AudioPlaybackService` is now an app singleton (`getAudioPlaybackService`); the
+> Audio page syncs master volume into it. (Audio.tsx HTMLAudioElement player + ImosionRecording
+> MediaRecorder already provide working playback/capture; the service is the shared primitive.)
+> • **#571-572** Vinx `ExportDialog` routes codec/mime/bitrate/engine through shared `planExport`
+> (in-app WebM path; MP4/MOV flagged as native fallback).
+> **+6 tests** (`creative-runner`, `nexus-live-store`). Tests: `tests/unit/{action-executor,
+> creative-actions,video-io,nexus-ingest,creative-runner,nexus-live-store}.test.ts`.
+>
+> **ROADMAP P0/P1 BATCHES 2-3 (same session, +28 tests, tsc=0):**
+> • **#001** `shared/uki/agentLoop.ts` — iterative think→act→observe over the executor w/ fact
+> scratchpad + `next`/`reduceFacts` hooks + iteration budget.
+> • **#003/#049** `shared/uki/planSummary.ts` — `summarizePlan` (preview) + `summarizeResult` + counts.
+> • **#010/#011/#021** `shared/uki/budget.ts` — cost/latency/token guard (`charge`/`checkBudget`/`wouldExceed`).
+> • **#555** `shared/audio/levelMeter.ts` (peak/RMS/LUFS/true-peak + clip latch + peak-hold) wired into
+> `AudioPlaybackService.meter()`. **#559** loop region (`setLoop`/`clearLoop`).
+> • **#577** `video/pipeline.planThumbnails` (segment-centred frames+timecodes). **#135** `planSmartTrim`.
+> • **#592/#598/#600** `shared/media/jobQueue.ts` — priority queue w/ progress/cancel/history/counts.
+> Tests: `tests/unit/{agent-loop,plan-summary,budget,level-meter,job-queue}.test.ts` + extended `video-io`.
+>
+> **ROADMAP BATCH 4 (same session, +11 tests, tsc=0):** `shared/uki/resultCache.ts` (#041 LRU+TTL
+> +`hashKey`), `shared/uki/confirmTier.ts` (#018/#106 auto/confirm/forbidden + policy),
+> `shared/media/avSync.ts` (#591 offset cross-corr + drift slope + correctedTime),
+> `shared/uki/contextPack.ts` (#028 greedy token-budget packer). Tests:
+> `tests/unit/{result-cache,confirm-tier,av-sync,context-pack}.test.ts`.
+>
+> **Session totals:** ROADMAP-600 authored + **~33 roadmap items implemented** across **21 new
+> modules** + 6 wired app files, **86 new tests** (16 files). Full suite green; `tsc --noEmit`=0.
+>
+> 🛠️ **ENGINE + UI PATCH (same session).**
+> **Native (C++, real benchmarks via g++ 15.2 AVX2):** `src/native/dex-cpp/src/ringbuffer.h`
+> (lock-free SPSC, 0-alloc/0-lock, cache-line-split atomics) + `audio_kernels.h` (SIMD
+> `applyGain`/`mixAccumulate`/`peakAbs`, AVX2/SSE2/NEON + scalar fallback) + `bench/audio_bench.cpp`.
+> **Measured:** applyGain **6.66×**, mixAccumulate **5.40×**, 256-frame DSP **112.9 ns/block**,
+> ring buffer **19.4 ns/item** under 2-thread contention, SIMD==scalar PASS → `ENGINE_BENCHMARKS.md`.
+> C ABI contract + latency budgets → `docs/NATIVE_ABI.md` (audio ≤5ms, video ≤16.67ms @60fps).
+> **UI:** single canonical `src/renderer/styles/design-tokens.css` (system font stack, no-bounce
+> motion 150–220ms, hairline, focus ring, 16/20/24 icons, tabular nums, frameless titlebar/sidebar/
+> panel primitives, vibrancy) loaded last in `main.tsx`; mirrored in `tokens.ts` (`fontStack`/`motion`/
+> `hairline`/`focusRing`). Removed the one real dingbat (`✓` in AiProviderSettings). Reports:
+> `UI_GAP_REPORT.md` (9 gaps closed). Guard test `tests/unit/design-tokens.test.ts` (5, green). tsc=0.
+
 Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-gen phase, **13 slices**: Surface + Motion frameworks, dock excellence, project continuity bridge, UKI knowledge layer + operator, workflow templates, workload governor, comfort/a11y layer, **search & command unification, Nexus 2.0 memory-first model, Rewind memory timeline, and UKI operator→unified-search wiring** — **uncommitted, in working tree**; `tsc --noEmit` = 0, changed-area + new modules re-run green in isolation. See **HANDOFF-PREMIUM.md** next-gen section for the per-slice detail + the pending-UI-integration list.)
 
+> 🎨 **WORKSPACE REDESIGN — GOAL-6D foundations (2026-06-05).** Owner pasted the "Workspace &
+> Navigation Redesign" spec; it's ~90% visual (needs eyes-on — headless can't verify the look).
+> Captured as **`GOAL-6D-WORKSPACE-REDESIGN.md`** + built the **testable logic foundations** across its
+> sections (all green, on PR #7 / branch `feat/dex-6.0-tauri-native-engines`):
+> • **Reduced glass** (design tokens, `design-system.css`): `--blur-*` −60%, `--glass-opacity-*` −50%
+> transparency, `--pg-shadow-*` −40% (cascades; the ~247 hardcoded inline blurs are a follow-up
+> consolidation pass).
+> • **UKI 3.0** `shared/uki/contextEngine.ts` — live project/file/workspace/task + activity → summarize().
+> • **Dock 2.0** `shared/dock/appCategories.ts` — auto creative/dev/comm/utility grouping.
+> • **Linked windows** `shared/workspace/windowLinks.ts` (link graph) + `linkedLayout.ts` (smart-expansion tiling).
+> • **Plugin system** `shared/plugins/manifest.ts` — manifest validation.
+> • **Onboarding** `shared/onboarding/redesignFlow.ts` — 6-step <3min flow.
+> • **Integrations** `shared/integrations/registry.ts` — GitHub/Figma/Slack/Gmail/Drive/Notion framework.
+> • **Project-centered** `shared/project/projectModel.ts` — a project bundles notes/files/workflows/etc.
+> **+35 vitest tests.** These are the LOGIC; the **UI wiring + purely-visual sections (window chrome,
+> layouts, dock rendering, creative apps, dev-mode UI, design-system consolidation) need eyes-on** on the
+> running app. The foundation modules are **not yet wired into the renderer** — adopt incrementally.
+>
 > 🦀 **TAURI MIGRATION STARTED (2026-06-05) — owner approved "full Tauri".** Scope reality: the
 > renderer drives the whole backend through `window.dex.<ns>.<method>()` / `window.electron.invoke`,
 > all funnelling through `ipcRenderer.invoke('<ns>:<method>', ...)` — **~2,369 `ipcMain` handlers across
@@ -94,9 +213,16 @@ Current version: **4.60.5** · Branch: `main` · Last session: 2026-06-03 (next-
 > `audio:getMetadata`/`audio:getInfo` → metadata; `audio:getWaveform`/`audio:getPeaks`/`media:getWaveform`
 > → peaks. Capability list + test updated (`audio` now native; `automation` is the not-yet-ported
 > example). **Playback (a real output sink) is intentionally OUT of scope** — device-dependent +
-> untestable headlessly; analysis is the verified core. Core workspace cargo test now **29** (smart-router
-> 10 + vault 14 + search 2 + audio 3). Three native engines done (Vault, Search, Audio); remaining heavy:
-> automation/agents, transfer.
+> untestable headlessly; analysis is the verified core.
+> • **⚙️ AUTOMATION + 🔁 SCANNER ENGINES (GOAL-6C/6A, 2026-06-05):** `core/dex-automation` — workflow
+> execution (setVar/transform/concat/condition/log over a context with `${var}` interpolation; unknown
+> steps skipped; conditions gate the run) → `{success,context,log,stepsRun}`, **4 cargo tests**; wired
+> `automation:run`/`workflow:executeNew` (id-based `workflow:execute`/`automations:execute` need a native
+> store → graceful). `core/dex-scanner` — duplicate detection (size-group → streaming SHA-256), **3 cargo
+> tests**; wired `fileIntel:findDuplicates`. `automation` added to the capability native list (`transfer`
+> is now the not-yet-ported example). **Core workspace cargo test now 36** (smart-router 10 + vault 14 +
+> search 2 + audio 3 + automation 4 + scanner 3). **Five native engines done** (Vault, Search, Audio,
+> Automation, Scanner); remaining heavy: transfer (network) + audio playback (device).
 > **Next:** owner tests via `npm run dev:tauri` (live renderer + bridge; window buttons work; other
 > backend returns null until ported). Then port IPC subsystems — NOTE **localStorage-based state already
 > works under WebView2** (keystore, modelPrefs, perf tier, onboarding, most prefs), so only the

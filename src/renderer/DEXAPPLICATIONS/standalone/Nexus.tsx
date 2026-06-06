@@ -17,6 +17,7 @@ import { useUkiStore } from '../../store/ukiStore';
 import { getSecuritySummary, getAccessLog, ALL_PERMISSIONS, PERMISSION_LABELS, usePermissionStore } from '../../store/permissionStore';
 import { getStoredTier, getTierLabel } from '../../services/TierManager';
 import { createNexusGraphSimulation, type NexusGraphSimulation, type NexusGraphNode, type NexusGraphLink } from './nexusGraphSimulation';
+import { installNexusIngest } from '../../services/nexus/nexusLiveStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -679,6 +680,13 @@ const Nexus: React.FC = () => {
   const isAppActive = useAppActive();
   const isActiveRef = useRef(isAppActive);
   useEffect(() => { isActiveRef.current = isAppActive; }, [isAppActive]);
+
+  // ROADMAP-600 #502: subscribe the shared Nexus memory model to ContextBus so
+  // the graph fills live from real activity (back-filling from the replay ring).
+  useEffect(() => {
+    const off = installNexusIngest();
+    return off;
+  }, []);
 
   // -- UKI store bridge: sync reactive state into refs for the 60fps render loop --
   const ukiState = useUkiStore(s => s.state);

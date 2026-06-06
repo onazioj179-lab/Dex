@@ -40,20 +40,20 @@ describe('appSkills bundles - id presence', () => {
   it('forge exposes 4 skills', () => {
     expect(forgeSkills().skills).toHaveLength(4);
   });
-  it('vinx exposes 3 skills', () => {
-    expect(vinxSkills().skills).toHaveLength(3);
+  it('vinx exposes 12 skills', () => {
+    expect(vinxSkills().skills).toHaveLength(12);
   });
-  it('prism exposes 4 skills', () => {
-    expect(prismSkills().skills).toHaveLength(4);
+  it('prism exposes 15 skills', () => {
+    expect(prismSkills().skills).toHaveLength(15);
   });
-  it('flux exposes 3 skills', () => {
-    expect(fluxSkills().skills).toHaveLength(3);
+  it('flux exposes 8 skills', () => {
+    expect(fluxSkills().skills).toHaveLength(8);
   });
-  it('imosion exposes 4 skills', () => {
-    expect(imosionSkills().skills).toHaveLength(4);
+  it('imosion exposes 12 skills', () => {
+    expect(imosionSkills().skills).toHaveLength(12);
   });
-  it('axl exposes 3 skills', () => {
-    expect(axlSkills().skills).toHaveLength(3);
+  it('axl exposes 6 skills', () => {
+    expect(axlSkills().skills).toHaveLength(6);
   });
   it('rewind exposes 3 skills', () => {
     expect(rewindSkills().skills).toHaveLength(3);

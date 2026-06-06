@@ -11,6 +11,8 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
+import { enginePendingApplier } from '../../../shared/uki/creativeCommand';
 import { platform as _plat } from '../../utils';
 import { sharedTick } from '../../services/SharedTick';
 import { useVinxStore } from './VinxStore';
@@ -313,6 +315,7 @@ const VinxEditor: React.FC = () => {
   const showBatchExport = useVinxStore(s => s.showBatchExport);
   const createFreezeFrame = useVinxStore(s => s.createFreezeFrame);
   const selectedClipIds = useVinxStore(s => s.selectedClipIds);
+  const _updateClip = useVinxStore(s => s._updateClip);
   const renderPreviewStatus = useVinxStore(s => s.renderPreviewStatus);
   const startRenderPreview = useVinxStore(s => s.startRenderPreview);
   const cancelRenderPreview = useVinxStore(s => s.cancelRenderPreview);
@@ -820,6 +823,26 @@ const VinxEditor: React.FC = () => {
   return (
     <div style={appContainerStyle} className="vinx-app" {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop videos to import</div>}
+      {/* ROADMAP-600 #095 — natural-language command bar */}
+      <div style={{ padding: 8, flex: '0 0 auto' }}>
+        <CreativeCommandBar
+          appId="vinx"
+          facts={{ clipId: selectedClipIds[0], projectId: project?.id }}
+          onApplyOp={(op) => {
+            // Real local op: set the selected clip's speed (honest note — this is
+            // a constant slow-mo, not a keyframed ramp, which needs the engine).
+            if (op.op === 'speedRamp') {
+              const clipId = selectedClipIds[0];
+              if (!clipId) return { outcome: 'skipped', note: 'select a clip first' };
+              _updateClip(clipId, { speed: 0.5 });
+              return { outcome: 'applied', note: 'set clip to 0.5× slow-motion (constant; a true keyframed ramp needs the engine)' };
+            }
+            return enginePendingApplier('Vinx')(op);
+          }}
+          examples={['speed ramp to slow-mo', 'remove silences', 'add captions', 'stabilize']}
+          placeholder="Tell Vinx what to edit…"
+        />
+      </div>
       <style>{`
         /* === VINX - PROFESSIONAL NLE STYLES === */
         .vinx-app button { font-family: inherit; }

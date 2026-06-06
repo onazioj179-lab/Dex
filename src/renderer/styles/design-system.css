@@ -143,17 +143,17 @@
   --pg-gloss-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --pg-gloss-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.55);
 
-  /* Layered shadows */
-  --pg-shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --pg-shadow-overlay: 0 24px 80px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35);
-  --pg-shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 28px rgba(0, 0, 0, 0.35);
+  /* Layered shadows — DEX 6.0 reduced-glass redesign (GOAL-6D): intensity -40%. */
+  --pg-shadow-panel: 0 5px 18px rgba(0, 0, 0, 0.27), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --pg-shadow-overlay: 0 16px 52px rgba(0, 0, 0, 0.33), 0 3px 10px rgba(0, 0, 0, 0.21);
+  --pg-shadow-card: 0 1px 4px rgba(0, 0, 0, 0.21), 0 8px 18px rgba(0, 0, 0, 0.21);
   /* Additional surface tiers (added v4.57 -- token convergence) */
-  --pg-shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.4);
-  --pg-shadow-popover: 0 16px 48px rgba(0, 0, 0, 0.6);
-  --pg-shadow-popover-strong: 0 16px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.30);
-  --pg-shadow-context: 0 12px 40px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3);
-  --pg-shadow-tooltip: 0 4px 16px rgba(0, 0, 0, 0.35);
-  --pg-shadow-chip: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --pg-shadow-modal: 0 16px 52px rgba(0, 0, 0, 0.42), 0 5px 16px rgba(0, 0, 0, 0.24);
+  --pg-shadow-popover: 0 10px 30px rgba(0, 0, 0, 0.36);
+  --pg-shadow-popover-strong: 0 10px 40px rgba(0, 0, 0, 0.33), 0 3px 10px rgba(0, 0, 0, 0.18);
+  --pg-shadow-context: 0 8px 26px rgba(0, 0, 0, 0.33), 0 3px 8px rgba(0, 0, 0, 0.18);
+  --pg-shadow-tooltip: 0 3px 10px rgba(0, 0, 0, 0.21);
+  --pg-shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.18);
 
   /* Text hierarchy — alias the canonical color-text tokens into the pg namespace */
   --pg-text-primary: var(--color-text-primary, #FFFFFF);
@@ -302,10 +302,11 @@
      Glass/Blur Effects
      ───────────────────────────────────────────────────────────────────────── */
   
-  --blur-sm: blur(4px);
-  --blur-md: blur(10px);
-  --blur-lg: blur(20px);
-  --blur-xl: blur(32px);
+  /* DEX 6.0 reduced-glass redesign (GOAL-6D): blur -60% for clarity. */
+  --blur-sm: blur(2px);
+  --blur-md: blur(4px);
+  --blur-lg: blur(8px);
+  --blur-xl: blur(13px);
   --saturate: saturate(180%);
   
   /* ─────────────────────────────────────────────────────────────────────────
@@ -4221,10 +4222,10 @@ svg, img.icon, [data-icon] {
   --elevation-3: 0 8px 24px rgba(0,0,0,0.35), 0 4px 8px rgba(0,0,0,0.2);
   --elevation-4: 0 16px 48px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.25);
 
-  /* 22. Glass opacity levels */
-  --glass-opacity-subtle: 0.5;
-  --glass-opacity-medium: 0.72;
-  --glass-opacity-strong: 0.88;
+  /* 22. Glass opacity levels — DEX 6.0 reduced-glass (GOAL-6D): transparency -50%. */
+  --glass-opacity-subtle: 0.75;
+  --glass-opacity-medium: 0.86;
+  --glass-opacity-strong: 0.94;
 
   /* 23. Focus ring tokens */
   --focus-ring-width: 2px;

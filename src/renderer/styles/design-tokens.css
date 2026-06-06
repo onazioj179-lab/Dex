@@ -1,0 +1,180 @@
+/* =============================================================================
+ * DEX Platform
+ * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+ * Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+ * =============================================================================
+ * DEX DESIGN TOKENS — single source of truth for the UI.
+ *
+ * Goal: native OS feel, sharp at any DPI, restrained color, no emoji in chrome.
+ * Every panel/button/input MUST pull spacing, radius, color, motion and focus
+ * from these variables. No hardcoded colors, spacing or timings in components.
+ *
+ * Mirrored for inline styles in `tokens.ts`. Load this AFTER design-system.css
+ * so it is the authoritative layer.
+ * ========================================================================== */
+
+:root {
+  /* ---- Type: native system stack for chrome (never a web font) ---------- */
+  /* macOS → SF Pro, Windows → Segoe UI Variable, Linux → Inter/system.       */
+  --dex-font-ui: -apple-system, "Segoe UI Variable", "Segoe UI", system-ui, Inter, sans-serif;
+  --dex-font-mono: "SF Mono", "Cascadia Code", "Berkeley Mono", ui-monospace, "Roboto Mono", monospace;
+  /* Tabular numerals for any numeric / data display. */
+  --dex-numeric: "tnum" 1, "lnum" 1;
+
+  /* ---- Color: neutral grays + ONE accent ------------------------------- */
+  --dex-accent: #4a9eff;
+  --dex-accent-hover: #6cb2ff;
+  --dex-accent-soft: rgba(74, 158, 255, 0.08);
+
+  --dex-bg: #0c0c0e;
+  --dex-bg-surface: #161618;
+  --dex-bg-hover: #1e1e22;
+  --dex-bg-active: #252528;
+
+  --dex-text: #ffffff;
+  --dex-text-secondary: #b8b8bd;
+  --dex-text-tertiary: #8e8e93;
+  --dex-text-disabled: #58585d;
+
+  /* ---- Borders: hairline at low opacity, no heavy shadows -------------- */
+  --dex-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --dex-hairline-strong: 1px solid rgba(255, 255, 255, 0.14);
+  /* one restrained elevation, not a heavy drop shadow */
+  --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(0, 0, 0, 0.22);
+
+  /* ---- Spacing scale (4px grid) — no magic numbers --------------------- */
+  --dex-space-1: 4px;
+  --dex-space-2: 8px;
+  --dex-space-3: 12px;
+  --dex-space-4: 16px;
+  --dex-space-5: 20px;
+  --dex-space-6: 24px;
+  --dex-space-8: 32px;
+
+  /* ---- Radius: one scale, applied to every panel/button/input --------- */
+  --dex-radius-sm: 4px;
+  --dex-radius-md: 6px;
+  --dex-radius-lg: 8px;
+  --dex-radius-xl: 10px;
+
+  /* ---- Icon sizes: fixed set only (16 / 20 / 24) ---------------------- */
+  --dex-icon-sm: 16px;
+  --dex-icon-md: 20px;
+  --dex-icon-lg: 24px;
+  --dex-icon-stroke: 1.75px; /* Lucide 1.5–2px, pixel-aligned */
+
+  /* ---- Motion: 150–220ms, standard ease, NO bounce, NO slow fades ----- */
+  --dex-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dex-motion-fast: 150ms;
+  --dex-motion: 180ms;
+  --dex-motion-slow: 220ms;
+  --dex-transition: var(--dex-motion) var(--dex-ease);
+
+  /* ---- Focus: keyboard-accessible ring -------------------------------- */
+  --dex-focus-ring: 0 0 0 2px var(--dex-bg), 0 0 0 4px var(--dex-accent);
+}
+
+/* Reduced motion: honour the OS setting. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dex-motion-fast: 1ms;
+    --dex-motion: 1ms;
+    --dex-motion-slow: 1ms;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Utilities — opt-in classes that bind to the tokens above.
+ * ------------------------------------------------------------------------ */
+
+/* Tabular numerals for data / counters / timecodes. */
+.dex-tnum { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: var(--dex-numeric); }
+
+/* Crisp icons at high DPI — SVG, aligned stroke. */
+.dex-icon { width: var(--dex-icon-md); height: var(--dex-icon-md); stroke-width: var(--dex-icon-stroke); shape-rendering: geometricPrecision; }
+.dex-icon-sm { width: var(--dex-icon-sm); height: var(--dex-icon-sm); }
+.dex-icon-lg { width: var(--dex-icon-lg); height: var(--dex-icon-lg); }
+
+/* Keyboard focus ring — applies only for keyboard nav, never mouse. */
+.dex-focusable:focus-visible { outline: none; box-shadow: var(--dex-focus-ring); }
+
+/* --------------------------------------------------------------------------
+ * Shell primitives — title bar, sidebar, panel share ONE visual language.
+ * Frameless window: the title bar is app chrome, not a browser box.
+ * ------------------------------------------------------------------------ */
+
+.dex-titlebar {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--dex-space-2);
+  padding: 0 var(--dex-space-3);
+  font-family: var(--dex-font-ui);
+  color: var(--dex-text-secondary);
+  background: var(--dex-bg-surface);
+  border-bottom: var(--dex-hairline);
+  -webkit-app-region: drag; /* frameless drag region */
+  user-select: none;
+}
+.dex-titlebar button,
+.dex-titlebar .dex-no-drag { -webkit-app-region: no-drag; }
+
+.dex-sidebar {
+  font-family: var(--dex-font-ui);
+  background: var(--dex-bg-surface);
+  border-right: var(--dex-hairline);
+  padding: var(--dex-space-3);
+}
+
+.dex-panel {
+  font-family: var(--dex-font-ui);
+  background: var(--dex-bg-surface);
+  border: var(--dex-hairline);
+  border-radius: var(--dex-radius-lg);
+  box-shadow: var(--dex-elevation);
+}
+
+/* Window vibrancy/blur where the OS supports it (macOS vibrancy, Win11 Mica). */
+@supports (backdrop-filter: blur(1px)) {
+  .dex-vibrancy { backdrop-filter: saturate(1.3) blur(20px); }
+}
+
+/* ==========================================================================
+ * GLOBAL APPLICATION LAYER — cascades the native feel across the WHOLE shell
+ * and all 20+ inner apps. Uses :where() (specificity 0) for focus/motion/
+ * numerals so it NEVER overrides a component's own styles — pure, additive,
+ * safe. The app-root font is set at element specificity and loads last, so the
+ * system stack becomes the default everywhere (code/mono areas set their own).
+ * ======================================================================== */
+
+html, body, #root {
+  font-family: var(--dex-font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Keyboard-only focus ring on every interactive element (mouse stays clean). */
+:where(button, [role="button"], a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--dex-focus-ring);
+  border-radius: var(--dex-radius-sm);
+}
+
+/* OS-feel micro-interactions: animate only non-layout properties, no bounce. */
+:where(button, [role="button"], a, input, select) {
+  transition:
+    background-color var(--dex-transition),
+    border-color var(--dex-transition),
+    color var(--dex-transition),
+    box-shadow var(--dex-transition),
+    transform var(--dex-transition);
+}
+
+/* Data/numeric elements align by default (tabular figures). */
+:where(time, [data-numeric], .tabular) {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Hairline default for generic separators (component borders still win). */
+:where(hr) { border: 0; border-top: var(--dex-hairline); }

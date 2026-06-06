@@ -14,7 +14,7 @@ use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::QueryParser;
 use tantivy::schema::{
-    Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, STORED, STRING,
+    Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, STORED, STRING, TEXT,
 };
 use tantivy::tokenizer::{LowerCaser, NgramTokenizer, TextAnalyzer};
 use tantivy::{doc, Index, IndexWriter, TantivyDocument};
@@ -37,8 +37,32 @@ pub struct SearchIndex {
     f_path: Field,
     f_name: Field,
     f_ext: Field,
+    f_content: Field,
     f_modified: Field,
     f_size: Field,
+}
+
+/// Text-ish extensions whose contents we full-text index (bounded size).
+const TEXT_EXTS: &[&str] = &[
+    "txt", "md", "markdown", "json", "csv", "tsv", "log", "rs", "ts", "tsx", "js", "jsx",
+    "py", "html", "htm", "css", "xml", "yml", "yaml", "toml", "ini", "cfg", "sh", "c", "h",
+    "cpp", "java", "go", "rb", "php", "sql",
+];
+const MAX_CONTENT_BYTES: u64 = 262_144; // 256 KB per file
+
+fn read_text_content(path: &Path, size: u64) -> String {
+    if size == 0 || size > MAX_CONTENT_BYTES {
+        return String::new();
+    }
+    let is_text = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| TEXT_EXTS.contains(&e.to_lowercase().as_str()))
+        .unwrap_or(false);
+    if !is_text {
+        return String::new();
+    }
+    std::fs::read_to_string(path).unwrap_or_default()
 }
 
 impl SearchIndex {
@@ -55,6 +79,8 @@ impl SearchIndex {
         );
         let f_name = sb.add_text_field("name", name_opts);
         let f_ext = sb.add_text_field("ext", STRING | STORED);
+        // Full-text file contents (default word tokenizer, indexed not stored).
+        let f_content = sb.add_text_field("content", TEXT);
         let f_modified = sb.add_u64_field("modified", STORED);
         let f_size = sb.add_u64_field("size", STORED);
         let schema = sb.build();
@@ -67,7 +93,7 @@ impl SearchIndex {
         .filter(LowerCaser)
         .build();
         index.tokenizers().register("dex_prefix", tokenizer);
-        Ok(Self { index, f_path, f_name, f_ext, f_modified, f_size })
+        Ok(Self { index, f_path, f_name, f_ext, f_content, f_modified, f_size })
     }
 
     /// Number of indexed documents.
@@ -99,11 +125,13 @@ impl SearchIndex {
                 .extension()
                 .map(|x| x.to_string_lossy().to_string())
                 .unwrap_or_default();
+            let content = read_text_content(&path, size);
             writer
                 .add_document(doc!(
                     self.f_path => path.to_string_lossy().to_string(),
                     self.f_name => name,
                     self.f_ext => ext,
+                    self.f_content => content,
                     self.f_modified => modified,
                     self.f_size => size,
                 ))
@@ -126,7 +154,7 @@ impl SearchIndex {
             Err(_) => return Vec::new(),
         };
         let searcher = reader.searcher();
-        let parser = QueryParser::for_index(&self.index, vec![self.f_name, self.f_path]);
+        let parser = QueryParser::for_index(&self.index, vec![self.f_name, self.f_content, self.f_path]);
         // The edge-ngram tokenizer on `name` handles prefix matching, so the raw
         // query is enough — "budg" tokenizes to prefixes that match "budget".
         let parsed = parser.parse_query(&q);
@@ -246,5 +274,21 @@ mod tests {
         assert_eq!(idx.count(), 1);
         idx.clear().unwrap();
         assert_eq!(idx.count(), 0);
+    }
+
+    #[test]
+    fn searches_inside_file_contents() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        std::fs::write(data_dir.path().join("notes.txt"), b"the quick brown fox jumps").unwrap();
+        std::fs::write(data_dir.path().join("other.txt"), b"nothing relevant in here").unwrap();
+
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        idx.index_path(data_dir.path(), 1000).unwrap();
+
+        // "brown" appears only in the file CONTENT, not in any filename.
+        let hits = idx.search("brown", 10);
+        assert!(hits.iter().any(|h| h.name == "notes.txt"), "content search should find notes.txt");
+        assert!(!hits.iter().any(|h| h.name == "other.txt"));
     }
 }

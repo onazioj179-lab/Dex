@@ -151,6 +151,33 @@ export const transition = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Native chrome tokens (mirror design-tokens.css — keep in sync)
+// ---------------------------------------------------------------------------
+
+/** System font stack for app chrome — never a web font. SF Pro / Segoe UI / Inter. */
+export const fontStack = {
+  ui: '-apple-system, "Segoe UI Variable", "Segoe UI", system-ui, Inter, sans-serif',
+  mono: '"SF Mono", "Cascadia Code", "Berkeley Mono", ui-monospace, "Roboto Mono", monospace',
+} as const;
+
+/** OS-feel motion: 150–220ms, standard ease, NO bounce, NO slow fades. */
+export const motion = {
+  ease: 'cubic-bezier(0.4, 0, 0.2, 1)',
+  fast: '150ms cubic-bezier(0.4, 0, 0.2, 1)',
+  base: '180ms cubic-bezier(0.4, 0, 0.2, 1)',
+  slow: '220ms cubic-bezier(0.4, 0, 0.2, 1)',
+} as const;
+
+/** Hairline borders at low opacity — kill heavy drop shadows. */
+export const hairline = {
+  default: '1px solid rgba(255, 255, 255, 0.08)',
+  strong: '1px solid rgba(255, 255, 255, 0.14)',
+} as const;
+
+/** Keyboard-accessible focus ring (use on :focus-visible only). */
+export const focusRing = '0 0 0 2px #0c0c0e, 0 0 0 4px #4a9eff';
+
+// ---------------------------------------------------------------------------
 // Colors (for use when CSS variables unavailable)
 // ---------------------------------------------------------------------------
 export const colors = {

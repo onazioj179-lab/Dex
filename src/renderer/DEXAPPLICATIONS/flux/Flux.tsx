@@ -4,6 +4,9 @@
  * Professional motion graphics and visual effects
  */
 import React, { useState, useRef, useCallback, useMemo, useEffect, memo } from 'react';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
+import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
+import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { useRunningApps } from '../../store/runningApps';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
@@ -1906,6 +1909,33 @@ const Flux: React.FC = () => {
     }));
   }, [selectedLayerId, currentTime]);
 
+  // ROADMAP-600 #095/#269 — real local handlers for the NL command bar. Motion
+  // preset writes actual keyframes (range-safe: ends at the layer's own values);
+  // synthesis/sim ops (text→motion, auto-rig, physics, lip-sync) honestly skip.
+  const handleFluxOp = useCallback((op: CreativeOp): OpApplyResult | Promise<OpApplyResult> => {
+    if (op.op === 'suggestAnimation') {
+      return { outcome: 'applied', note: 'Suggestion: a fade + rise-in (opacity 0→full, y −30→0) over ~0.5s with ease-out. Run “apply a motion preset” to add it.' };
+    }
+    if (op.op === 'applyMotionPreset') {
+      const layer = selectedLayerId ? layers.find(l => l.id === selectedLayerId) : undefined;
+      if (!layer) return { outcome: 'skipped', note: 'select a layer first' };
+      const t = layer.transform as unknown as Record<string, number>;
+      const endY = t.y ?? 0;
+      const endOpacity = t.opacity ?? 100;
+      const dur = Math.max(1, Math.round(fps * 0.5));
+      setLayers(prev => prev.map(l => {
+        if (l.id !== selectedLayerId) return l;
+        const anims = (l.animations || []).filter(a => a.property !== 'y' && a.property !== 'opacity');
+        anims.push({ property: 'opacity', keyframes: [{ time: 0, value: 0, easing: 'easeOut' }, { time: dur, value: endOpacity, easing: 'easeOut' }] });
+        anims.push({ property: 'y', keyframes: [{ time: 0, value: endY - 30, easing: 'easeOut' }, { time: dur, value: endY, easing: 'easeOut' }] });
+        return { ...l, animations: anims };
+      }));
+      setIsDirty(true);
+      return { outcome: 'applied', note: `added a fade + rise-in motion preset (~0.5s ease-out, ${dur} frames)` };
+    }
+    return enginePendingApplier('Flux')(op);
+  }, [selectedLayerId, layers, fps]);
+
   const getAnimatedValue = useCallback((layer: Layer, property: string, time: number): number | undefined => {
     const anim = (layer.animations || []).find(a => a.property === property);
     if (!anim || anim.keyframes.length === 0) return undefined;
@@ -2212,6 +2242,16 @@ const Flux: React.FC = () => {
   return (
     <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
+      {/* ROADMAP-600 #095 — natural-language command bar */}
+      <div style={{ padding: 8, flex: '0 0 auto' }}>
+        <CreativeCommandBar
+          appId="flux"
+          facts={{ layerId: selectedLayerId ?? undefined }}
+          onApplyOp={handleFluxOp}
+          examples={['animate this layer', 'apply a motion preset', 'add physics', 'rig this character']}
+          placeholder="Tell Flux what to animate…"
+        />
+      </div>
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
         button { font-family: inherit; transition: all 0.12s ease; }
