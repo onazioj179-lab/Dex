@@ -443,7 +443,7 @@ const PolicyAcceptanceScreen: React.FC<{
           style={{ marginTop: 2, accentColor: 'var(--color-accent, #4A9EFF)' }}
         />
         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>, including required diagnostics and the permitted product-improvement data use described in those policies.
+          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>, including required diagnostics, optional analytics, advertising in ad-supported features (paid plans are ad-free), and the partner data sharing described in those policies.
         </span>
       </label>
 

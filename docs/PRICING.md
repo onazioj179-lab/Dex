@@ -1,7 +1,7 @@
 # DEX Pricing
 
-Honest, user-first pricing. No ads, no data resale, no surprise bills.
-Cancel any time. All plans include every app in the suite.
+Honest, user-first pricing. Paid plans are ad-free, with clear opt-in data
+controls and no surprise bills. Cancel any time. All plans include every app in the suite.
 
 > Prices in USD. Local currency conversions shown at checkout.
 > Tax may apply in your region.
@@ -68,9 +68,10 @@ that keeps your data accessible.
 
 ## What we promise you
 
-- **No ads.** Ever. Anywhere in the app.
-- **No data resale.** We do not sell, rent, share, or train external
-  models on your data.
+- **Ad-free paid plans.** Ads, if any, appear only in the free tier and
+  select features like games -- never on a paid plan.
+- **Your data, your controls.** Optional, opt-in analytics; you can opt out
+  of personalized ads and partner data sharing. See the [Privacy Policy](../PRIVACY.md).
 - **Trial mode is real.** Every feature works during the 30-day trial,
   including ones added after you started.
 - **Read-only after expiry.** If you cancel, you keep read-only access to

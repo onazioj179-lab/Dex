@@ -7,7 +7,10 @@
 
 - DEX runs on your machine. Your files, notes, and commands do not
   leave your device unless you explicitly turn on cloud sync.
-- We do not sell your data. We never will.
+- How we use and share data -- including optional analytics, advertising in
+  ad-supported features (the free tier and games; paid plans are ad-free), and
+  partner integrations -- is described in our [Privacy Policy](../PRIVACY.md),
+  which also explains your choices and opt-outs.
 - The only personal data we hold for an account is: your email, your
   display name, your billing record (held by Stripe), and -- if you
   opted in -- the encrypted blobs you chose to back up.

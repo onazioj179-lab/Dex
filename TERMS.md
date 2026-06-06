@@ -1,7 +1,7 @@
 # DEX -- Terms of Use
 
-**Effective date:** 2026-05-06  
-**Version:** 2.0.0  
+**Effective date:** 2026-06-06  
+**Version:** 2.1.0  
 **Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
@@ -78,6 +78,8 @@ You are responsible for reviewing submissions before sending them and for ensuri
 Plugins are independent software. You are responsible for plugins you install, permissions you grant, and data you share with plugins. Plugin developers are responsible for their own code, data practices, licenses, and compliance.
 
 DEX may review, reject, block, quarantine, disable, delist, remove, rate-limit, or restrict plugins, integrations, accounts, features, workflows, or developers that create risk, violate policy, infringe rights, harm users, threaten infrastructure, or undermine DEX.
+
+DEX may include advertising, sponsored content, in-app purchases, or paid features in some tiers or components (for example, the free tier or games); paid plans are ad-free. As described in the Privacy Policy, DEX may share limited data with service providers, integration partners, and advertising partners to operate, measure, and support these features, and may add, change, or remove commercial features over time.
 
 ## 11. Updates, Changes, and Feature Control
 

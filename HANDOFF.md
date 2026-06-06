@@ -2,6 +2,21 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
+> **PRIVACY + MONETIZATION STANCE UPDATE (2026-06-06).** Owner direction: stop making absolute
+> "never sell / no ads ever" promises so future ads, partners, and data-use are not contradicted.
+> Removed those promises across README, docs/PRICING.md, LICENSE (data clause now points to the
+> Privacy Policy), `shared/license/proPerks.ts` (ad-free reframed as a paid-plan perk), and
+> `shared/license/pricing.ts`. New stance: **paid plans ad-free**; ads possible in the free tier /
+> games; optional opt-in analytics; may share with service providers and partners incl. for
+> advertising; **California Do-Not-Sell/Share opt-out + GDPR rights**. Added Advertising + Sharing +
+> "Your Choices and Rights" sections to the canonical privacy text (in-app `shared/policyDocuments.ts`
+> and root `PRIVACY.md`) and an advertising/commercial clause to terms; the older `docs/PRIVACY.md` /
+> `docs/TERMS.md` now defer to the canonical Privacy Policy. Bumped policy version **2.0.0 -> 2.1.0**
+> (effective 2026-06-06) in `shared/policies.ts`, which **forces re-consent** on the material change;
+> updated the onboarding consent copy; updated `policies.test.ts` + `policyConsent.test.ts`. Removed
+> stale pre-5.0 release-notes files. **DRAFT — needs counsel review before public release; deliberately
+> does NOT declare a data "sale".** Verify: tsc=0, policy tests 11/11, watermark OK (2519).
+>
 > **REMOTE ULTRA-REVIEW FIXES (2026-06-06).** A cloud ultra code-review of the branch flagged 18
 > candidates, confirmed 8, refuted 10. Triaged and fixed the 6 real ones; the 8th (`merged_bug_001`,
 > "modules missing from working tree") is a **false positive vs. the local tree** — the review clones the

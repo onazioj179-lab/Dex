@@ -254,8 +254,8 @@ export function canUse(plan: Plan, action: keyof PlanCapabilities): boolean {
 
 /** Public promises shown on the pricing page and the choose-plan dialog. */
 export const PRICING_PROMISES: readonly string[] = [
-  'No ads, ever.',
-  'We do not sell, rent, or share your data.',
+  'Ad-free on every paid plan.',
+  'Clear, opt-in controls over analytics, ads, and data sharing.',
   'Trial mode includes every feature, even ones we add later.',
   'If you cancel, you keep read-only access to every file.',
   '14-day no-questions-asked refund.',

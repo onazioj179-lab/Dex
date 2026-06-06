@@ -24,7 +24,7 @@ another tab. DEX folds all of that into **one window**.
 - Every tool — notes, files, drawing, video, music — lives **inside DEX** and
   shares context, so your work follows you instead of getting stranded in
   separate apps.
-- **Nothing leaves your machine** unless you say so. No required account. No ads.
+- **Nothing leaves your machine** unless you say so. No required account.
   Your data is yours.
 
 If you've ever wished your computer just felt like *one calm place to get things
@@ -74,7 +74,7 @@ Pick by **how many people** use it and **whether it's for work**:
 - **50% off** for students, educators, and registered non-profits.
 - **Free Pro** for open-source maintainers.
 - **One free year of Personal** if you switch from a paid competitor.
-- **No ads, ever. No data resale.** 14-day, no-questions refund.
+- **Paid plans are ad-free, with clear opt-in data controls.** 14-day, no-questions refund.
 - **Locked-in pricing** — active subscribers keep their price for at least 12
   months; changes only apply to new orders.
 
@@ -150,7 +150,7 @@ first for anything that changes your data.
   time.
 - **Permissions ask first.** Microphone, camera, screen capture, files, and the
   clipboard each prompt the first time, then remember your answer.
-- **We do not sell your data. No ads inside DEX. Ever.**
+- **You control your data with clear, opt-in settings. Paid plans are ad-free.**
 
 Details: [PRIVACY.md](PRIVACY.md) · [TERMS.md](TERMS.md) · in-app
 **Settings → Privacy & Security**.
