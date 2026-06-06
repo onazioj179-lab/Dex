@@ -54,6 +54,7 @@ import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWo
 import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
 import { CalmFocusEngine } from '../../shared/phase15/calmFocus';
 import { WorkspaceSnapshotStore } from '../../shared/phase15/workspaceSnapshot';
+import { computeTabDropIndex, moveTab, sameOrder, type TabCenter } from '../../shared/shell/tabReorder';
 import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
 
 // Module-level singletons — one engine per renderer process lifetime.
@@ -3629,14 +3630,17 @@ export const AppManager: React.FC = () => {
 
   // -- Title bar -----------------------------------------------------------
 
-  // -- App Tab Bar (persistent running-app tabs) with smooth drag-to-reorder --
+  // -- App Tab Bar (persistent running-app tabs) with ghost drag-to-place --
+  // The dragged tab stays in the strip as a dimmed placeholder that settles into
+  // the drop slot, while a floating "ghost" follows the cursor — so reordering
+  // reads as picking a tab up and setting it down, not the live tab being torn
+  // out of the row. Placement math lives in shared/shell/tabReorder (tested).
   const [tabOrder, setTabOrder] = useState<string[]>([]);
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const tabContainerRef = useRef<HTMLDivElement>(null);
-  const dragStartX = useRef(0);
-  const dragStartIndex = useRef(0);
+  const draggingTabRef = useRef<string | null>(null);
 
   // Sync tab order with running apps
   useEffect(() => {
@@ -3680,70 +3684,54 @@ export const AppManager: React.FC = () => {
     }
   }, [currentApp, tabOrder]);
 
+  const dragRafRef = useRef<number>(0);
+
   const handleTabDragStart = useCallback((e: React.PointerEvent, appId: string) => {
     e.preventDefault();
     e.stopPropagation();
     const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
-    // Apply will-change for GPU acceleration during drag
-    target.style.willChange = 'transform';
+    try { target.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+    draggingTabRef.current = appId;
     setDraggingTab(appId);
-    dragStartX.current = e.clientX;
-    dragStartIndex.current = tabOrder.indexOf(appId);
-    setDragOffset(0);
-  }, [tabOrder]);
+    setGhostPos({ x: e.clientX, y: e.clientY });
+  }, []);
 
-  const dragRafRef = useRef<number>(0);
-  const lastDeltaRef = useRef<number>(0);
   const handleTabDragMove = useCallback((e: React.PointerEvent) => {
-    if (!draggingTab) return;
-    const deltaX = e.clientX - dragStartX.current;
-    // Skip if delta hasn't changed enough (reduce repaints)
-    if (Math.abs(deltaX - lastDeltaRef.current) < 2) return;
-    lastDeltaRef.current = deltaX;
-    // Apply transform directly to DOM for 60fps performance
-    const target = e.currentTarget as HTMLElement;
-    target.style.transform = `translateX(${deltaX}px) scale(1.02)`;
-    // Throttle reorder calculation with RAF
+    if (!draggingTabRef.current) return;
+    const dragging = draggingTabRef.current;
+    const pointerX = e.clientX;
+    const pointerY = e.clientY;
+    // The ghost follows the cursor immediately for a fluid feel.
+    setGhostPos({ x: pointerX, y: pointerY });
+    // Recompute the drop slot off the real, measured tab centres (variable tab
+    // widths), throttled to one calc per frame.
     cancelAnimationFrame(dragRafRef.current);
     dragRafRef.current = requestAnimationFrame(() => {
-      setDragOffset(deltaX);
-      // Calculate new position based on drag distance
-      const tabWidth = 110;
-      const indexDelta = Math.round(deltaX / tabWidth);
-      const newIndex = Math.max(0, Math.min(tabOrder.length - 1, dragStartIndex.current + indexDelta));
-      
-      if (newIndex !== tabOrder.indexOf(draggingTab)) {
-        setTabOrder(prev => {
-          const arr = [...prev];
-          const oldIdx = arr.indexOf(draggingTab);
-          arr.splice(oldIdx, 1);
-          arr.splice(newIndex, 0, draggingTab);
-          return arr;
-        });
-        dragStartX.current = e.clientX;
-        dragStartIndex.current = newIndex;
-        lastDeltaRef.current = 0;
-        target.style.transform = 'translateX(0) scale(1.02)';
-      }
+      const centers: TabCenter[] = [];
+      tabRefs.current.forEach((el, id) => {
+        const r = el.getBoundingClientRect();
+        centers.push({ id, center: r.left + r.width / 2 });
+      });
+      centers.sort((a, b) => a.center - b.center); // visual left-to-right order
+      const target = computeTabDropIndex(centers, dragging, pointerX);
+      setTabOrder(prev => {
+        const next = moveTab(prev, dragging, target);
+        return sameOrder(prev, next) ? prev : next;
+      });
     });
-  }, [draggingTab, tabOrder]);
+  }, []);
 
   const handleTabDragEnd = useCallback((e: React.PointerEvent) => {
-    if (draggingTab) {
-      const target = e.currentTarget as HTMLElement;
-      target.releasePointerCapture(e.pointerId);
-      // Clean up GPU hints and reset transform
-      target.style.willChange = 'auto';
-      target.style.transform = 'translateX(0) scale(1)';
-      setDraggingTab(null);
-      setDragOffset(0);
-      lastDeltaRef.current = 0;
-      cancelAnimationFrame(dragRafRef.current);
-      // Persist tab order
-      try { localStorage.setItem('dex-tab-order', JSON.stringify(tabOrder)); } catch { /* intentional: tab order persistence is best-effort */ }
-    }
-  }, [draggingTab, tabOrder]);
+    if (!draggingTabRef.current) return;
+    const target = e.currentTarget as HTMLElement;
+    try { target.releasePointerCapture(e.pointerId); } catch { /* release is best-effort */ }
+    draggingTabRef.current = null;
+    setDraggingTab(null);
+    setGhostPos(null);
+    cancelAnimationFrame(dragRafRef.current);
+    // Persist tab order (best-effort).
+    setTabOrder(cur => { try { localStorage.setItem('dex-tab-order', JSON.stringify(cur)); } catch { /* best-effort */ } return cur; });
+  }, []);
 
   // Load persisted tab order
   useEffect(() => {
@@ -3766,7 +3754,10 @@ export const AppManager: React.FC = () => {
       return aIdx - bIdx;
     });
 
+    const ghostDef = draggingTab ? APP_DEFINITIONS[draggingTab as AppId] : null;
+
     return (
+      <>
       <div
         ref={tabContainerRef}
         style={{
@@ -3789,7 +3780,7 @@ export const AppManager: React.FC = () => {
           return (
             <div
               key={app.id}
-              ref={el => { if (el) tabRefs.current.set(app.id, el); }}
+              ref={el => { if (el) tabRefs.current.set(app.id, el); else tabRefs.current.delete(app.id); }}
               role="tab"
               aria-selected={isActive}
               aria-label={def?.name || app.id}
@@ -3809,17 +3800,18 @@ export const AppManager: React.FC = () => {
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0 10px 0 8px', height: 26, borderRadius: 6,
-                background: isActive ? 'rgba(74,158,255,0.16)' : isDragging ? 'var(--color-bg-glass-strong)' : 'transparent',
-                border: isActive ? '1px solid var(--color-border-subtle)' : isDragging ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
+                background: isActive ? 'rgba(74,158,255,0.16)' : isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+                border: isDragging ? '1px dashed var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
-                transform: isDragging ? `translateX(${dragOffset}px) scale(1.04)` : 'translateX(0) scale(1)',
-                transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.4,0,0.2,1), background 0.12s ease, border-color 0.12s ease',
-                zIndex: isDragging ? 100 : 1,
-                boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.04) inset' : 'none',
-                opacity: isDragging ? 0.97 : 1,
+                transform: 'none',
+                transition: isDragging ? 'none' : 'transform 0.18s cubic-bezier(0.4,0,0.2,1), background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease',
+                zIndex: 1,
+                boxShadow: 'none',
+                // The dragged tab becomes a dimmed drop-slot; the floating ghost carries the lift.
+                opacity: isDragging ? 0.38 : 1,
                 touchAction: 'none',
                 userSelect: 'none',
-                willChange: isDragging ? 'transform' : 'auto',
+                willChange: isDragging ? 'opacity' : 'auto',
               }}
               onMouseEnter={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -3859,6 +3851,35 @@ export const AppManager: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Floating ghost: a lifted copy of the dragged tab that tracks the cursor. */}
+      {draggingTab && ghostPos && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed', left: ghostPos.x, top: ghostPos.y,
+            transform: 'translate(10px, -50%) scale(1.06)',
+            pointerEvents: 'none', zIndex: 9999,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '0 10px 0 8px', height: 26, borderRadius: 6,
+            background: 'var(--color-bg-glass-strong, rgba(20,20,22,0.92))',
+            backdropFilter: 'blur(18px) saturate(180%)', WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+            border: '1px solid var(--color-border-subtle)',
+            boxShadow: '0 12px 28px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.06) inset',
+            opacity: 0.97,
+          }}
+        >
+          <span style={{ display: 'flex', color: ghostDef?.color || '#8E8E93', alignItems: 'center', flexShrink: 0 }}>
+            {AppIconPngs[draggingTab as AppId]
+              ? <AppIconImg appId={draggingTab as AppId} size={14} />
+              : (Icons[draggingTab as AppId] || <DexIcon name={ghostDef?.icon || draggingTab} size={14} color={ghostDef?.color || '#8E8E93'} />)}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
+            {ghostDef?.name || draggingTab}
+          </span>
+        </div>
+      )}
+      </>
     );
   };
 

@@ -1,71 +1,39 @@
 // =============================================================================
-// DEX Platform — Phase 4 renderer: Store
+// DEX Platform — Phase 3 renderer: Store
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 // =============================================================================
 /**
- * Minimal Store browser. Lists catalog entries from the AppStoreService
- * and lets the user install / uninstall. Real catalog fetch + rich UI
- * follow in a later pass.
+ * The DEX Store shell. Owns the catalog/installed/publisher data + the install,
+ * uninstall, and plan actions, and switches between two surfaces:
+ *   - StoreHome  — featured hero, category rails, search + installed grids,
+ *   - AppDetail  — screenshots, "what this app can do", publisher card, reviews.
+ * The Apple-style presentation lives in ./store/*; this file is the controller.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
-import {
-  premiumGlassCard,
-  premiumGlassPanel,
-  premiumGlassToolbar,
-} from '../styles/glassMenu';
+import { premiumGlassPanel, premiumGlassToolbar } from '../styles/glassMenu';
 import type { CatalogEntry, InstalledApp, PlanResult } from '../../shared/store/catalog';
 import type { InstallResult } from '../../shared/store/installer';
-import { recognitionBadge, type PublisherProfile } from '../../shared/store/publisher';
+import type { PublisherProfile } from '../../shared/store/publisher';
+import StoreHome from './store/StoreHome';
+import AppDetail from './store/AppDetail';
+import DeveloperPanel from './store/DeveloperPanel';
+import { ipc, toMessage } from './store/storeKit';
 
-type IpcBridge = { invoke: (c: string, ...a: any[]) => Promise<any> };
-
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 160,
-  maxWidth: 340,
-  padding: '8px 10px 8px 32px',
-  background: 'rgba(0,0,0,0.28)',
-  border: '1px solid var(--pg-border-strong)',
-  borderRadius: 8,
-  color: 'var(--color-text-primary)',
-  outline: 'none',
-  fontSize: 13,
-  boxSizing: 'border-box',
-};
-
-const formatBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return 'Size pending';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
-};
-
-const ipc = (): IpcBridge => {
-  const w = window as any;
-  const bridge = w.dexAPI ?? w.electronAPI ?? w.electron;
-  if (!bridge?.invoke) throw new Error('DEX IPC bridge is unavailable');
-  return bridge;
-};
-
-const toMessage = (error: unknown): string => {
-  return error instanceof Error ? error.message : String(error);
-};
+type View = { kind: 'home' } | { kind: 'detail'; packageId: string };
 
 export default function Store(): React.ReactElement {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [installed, setInstalled] = useState<InstalledApp[]>([]);
+  const [publishers, setPublishers] = useState<PublisherProfile[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
-  const [last, setLast] = useState<string>('');
+  const [last, setLast] = useState('');
   const [query, setQuery] = useState('');
   const [installedOnly, setInstalledOnly] = useState(false);
-  const [publishers, setPublishers] = useState<PublisherProfile[]>([]);
+  const [view, setView] = useState<View>({ kind: 'home' });
+  const [planText, setPlanText] = useState('');
+  const [devOpen, setDevOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -84,18 +52,25 @@ export default function Store(): React.ReactElement {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const isInstalled = useCallback((id: string) => installed.some(a => a.packageId === id), [installed]);
-  const installedIds = useMemo(() => new Set(installed.map(a => a.packageId)), [installed]);
-  const visibleCatalog = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return catalog.filter(entry => {
-      const id = entry.manifest.packageId;
-      if (installedOnly && !installedIds.has(id)) return false;
-      if (!q) return true;
-      const haystack = `${id} ${entry.manifest.name} ${entry.manifest.description ?? ''} ${entry.manifest.categories.join(' ')}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [catalog, installedIds, installedOnly, query]);
+  const installedRecord = useCallback((id: string) => installed.find(a => a.packageId === id), [installed]);
+
+  const detailEntry = useMemo(
+    () => (view.kind === 'detail' ? catalog.find(e => e.manifest.packageId === view.packageId) : undefined),
+    [view, catalog],
+  );
+
+  const openDetail = useCallback((packageId: string) => {
+    setPlanText('');
+    setLast('');
+    setView({ kind: 'detail', packageId });
+  }, []);
+
+  const goHome = useCallback(() => setView({ kind: 'home' }), []);
+
+  const onSearchChange = useCallback((value: string) => {
+    setQuery(value);
+    if (value.trim() && view.kind !== 'home') setView({ kind: 'home' });
+  }, [view.kind]);
 
   const onInstall = useCallback(async (id: string) => {
     setBusy(id);
@@ -105,8 +80,6 @@ export default function Store(): React.ReactElement {
       setLast(r.ok ? `Installed ${r.packageId} ${r.version ?? ''}`.trim() : `Install failed: ${r.error}`);
       await refresh();
       if (r.ok) {
-        // Tell UKI a new app is now part of her world. Lazy-imported so the
-        // Store page doesn't pay the cost when the user only browses.
         try {
           const mod = await import('../uki/knowledgeFeeder');
           await mod.notifyAppInstalled({ packageId: r.packageId, version: r.version });
@@ -146,148 +119,138 @@ export default function Store(): React.ReactElement {
   }, [refresh]);
 
   const onPlan = useCallback(async (id: string) => {
+    setPlanText('');
     try {
       const p = (await ipc().invoke('store:plan', id)) as PlanResult | null;
-      if (!p) { setLast(`No plan for ${id}`); return; }
-      if (!p.ok) { setLast(`Plan blocked: ${p.reason}`); return; }
-      setLast(`Plan ${p.pathway}: ${p.steps.length} steps`);
+      if (!p) { setPlanText(`No install plan available for ${id}.`); return; }
+      if (!p.ok) { setPlanText(`Install blocked: ${p.reason}`); return; }
+      setPlanText(p.pathway === 'skip'
+        ? 'Already up to date — nothing to install.'
+        : `Plan ready (${p.pathway}): ${p.steps.length} step${p.steps.length === 1 ? '' : 's'} including download, signature verification, and rollback safety.`);
     } catch (e) {
-      setLast(`Error: ${toMessage(e)}`);
+      setPlanText(`Error: ${toMessage(e)}`);
     }
   }, []);
+
+  const inDetail = view.kind === 'detail';
+  const statusIsError = last.toLowerCase().includes('failed') || last.toLowerCase().startsWith('error');
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <div style={styles.titleBlock}>
-          <div style={styles.storeIcon} aria-hidden><DexIcon name="package" size={18} /></div>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={styles.title}>DEX Store</h1>
-            <div style={styles.subtitle}>{visibleCatalog.length} shown - {installed.length} installed</div>
-          </div>
+          {inDetail ? (
+            <button type="button" onClick={goHome} style={styles.backBtn} title="Back to store">
+              <DexIcon name="arrow-left" size={16} />
+              <span>Store</span>
+            </button>
+          ) : (
+            <>
+              <div style={styles.storeIcon} aria-hidden><DexIcon name="package" size={18} /></div>
+              <div style={{ minWidth: 0 }}>
+                <h1 style={styles.title}>DEX Store</h1>
+                <div style={styles.subtitle}>{catalog.length} app{catalog.length === 1 ? '' : 's'} · {installed.length} installed</div>
+              </div>
+            </>
+          )}
         </div>
 
         <div style={styles.controls}>
           <label style={styles.searchWrap}>
             <span style={styles.searchIcon} aria-hidden><DexIcon name="search" size={14} /></span>
             <input
-              aria-label="Search store catalog"
+              aria-label="Search the DEX Store"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search catalog"
+              onChange={e => onSearchChange(e.target.value)}
+              placeholder="Search apps"
               style={inputStyle}
             />
           </label>
-          <label style={styles.filterPill}>
-            <input
-              type="checkbox"
-              checked={installedOnly}
-              onChange={(event) => setInstalledOnly(event.target.checked)}
-              style={{ accentColor: 'var(--color-accent)' }}
-            />
-            <DexIcon name="check-circle" size={14} />
-            <span>Installed</span>
-          </label>
-          <button style={buttonStyle('muted')} onClick={refresh} disabled={busy !== null} title="Refresh catalog">
+          {!inDetail && (
+            <label style={styles.filterPill}>
+              <input
+                type="checkbox"
+                checked={installedOnly}
+                onChange={e => setInstalledOnly(e.target.checked)}
+                style={{ accentColor: 'var(--color-accent)' }}
+              />
+              <DexIcon name="check-circle" size={14} />
+              <span>Installed</span>
+            </label>
+          )}
+          <button type="button" style={styles.iconBtn} onClick={refresh} disabled={busy !== null} title="Refresh catalog">
             <DexIcon name="refresh" size={14} />
-            <span>Refresh</span>
+          </button>
+          <button type="button" style={styles.iconBtn} onClick={() => setDevOpen(true)} title="Developer: install an app from a signed file">
+            <DexIcon name="terminal" size={14} />
           </button>
         </div>
       </header>
 
       {last && (
         <div style={styles.status} role="status" aria-live="polite">
-          <DexIcon name={last.toLowerCase().includes('failed') || last.toLowerCase().startsWith('error') ? 'alert-triangle' : 'info'} size={14} />
+          <DexIcon name={statusIsError ? 'alert-triangle' : 'check-circle'} size={14} />
           <span>{last}</span>
         </div>
       )}
 
-      {catalog.length === 0 ? (
-        <div style={styles.emptyState}>
-          <DexIcon name="inbox" size={28} />
-          <span>Catalog is empty. Drop a catalog.json into the store dir or fetch from a registry.</span>
-        </div>
-      ) : visibleCatalog.length === 0 ? (
-        <div style={styles.emptyState}>
-          <DexIcon name="filter" size={28} />
-          <span>No catalog entries match the current filters.</span>
+      {inDetail && detailEntry ? (
+        <AppDetail
+          entry={detailEntry}
+          installedRecord={installedRecord(detailEntry.manifest.packageId)}
+          publisher={publishers.find(p => p.id === detailEntry.publisherId)}
+          busy={busy}
+          planText={planText}
+          onInstall={onInstall}
+          onUninstall={onUninstall}
+          onPlan={onPlan}
+        />
+      ) : inDetail ? (
+        <div style={styles.missing}>
+          <DexIcon name="x-circle" size={26} />
+          <span>That app is no longer in the catalog.</span>
+          <button type="button" style={styles.backBtn} onClick={goHome}><DexIcon name="arrow-left" size={14} /> Back to store</button>
         </div>
       ) : (
-        <ul style={styles.catalogList}>
-          {visibleCatalog.map(entry => {
-            const id = entry.manifest.packageId;
-            const name = entry.manifest.name ?? id;
-            const installedEntry = installedIds.has(id);
-            return (
-              <li key={id} style={styles.catalogRow}>
-                <div style={styles.appGlyph} aria-hidden><DexIcon name="package" size={18} /></div>
-                <div style={styles.rowContent}>
-                  <div style={styles.rowTopLine}>
-                    <span style={styles.appName}>{name}</span>
-                    {installedEntry && <span style={styles.installedBadge}>Installed</span>}
-                    {entry.comingSoon && !installedEntry && <span style={styles.soonBadge}>Coming soon</span>}
-                    {(() => {
-                      const badge = recognitionBadge(publishers.find(p => p.id === entry.publisherId));
-                      return badge ? (
-                        <span style={styles.verifiedBadge} title={`${badge.label} publisher`}>
-                          <DexIcon name="check-circle" size={11} />{badge.label}
-                        </span>
-                      ) : null;
-                    })()}
-                  </div>
-                  <div style={styles.appMeta}>
-                    <span>{id}</span>
-                    <span>v{entry.manifest.packageVersion}</span>
-                    <span>{formatBytes(entry.bundleBytes)}</span>
-                    <span>{entry.manifest.contentRating}</span>
-                    {entry.reviewSummary && <span>{entry.reviewSummary.avg.toFixed(1)} rating</span>}
-                  </div>
-                  {entry.manifest.description && <div style={styles.appDescription}>{entry.manifest.description}</div>}
-                  <div style={styles.categoryRow}>
-                    {entry.manifest.categories.slice(0, 4).map(category => <span key={category} style={styles.categoryPill}>{category}</span>)}
-                  </div>
-                </div>
+        <StoreHome
+          catalog={catalog}
+          installed={installed}
+          publishers={publishers}
+          query={query}
+          installedOnly={installedOnly}
+          busy={busy}
+          onOpen={openDetail}
+        />
+      )}
 
-                <div style={styles.actionGroup}>
-                  <button style={buttonStyle('muted')} disabled={busy !== null} onClick={() => onPlan(id)} title="Show install plan">
-                    <DexIcon name="clipboard" size={14} />
-                    <span>Plan</span>
-                  </button>
-                  {installedEntry ? (
-                    <button
-                      style={buttonStyle('danger')}
-                      disabled={busy !== null}
-                      onClick={() => onUninstall(id)}
-                      title={`Uninstall ${name}`}
-                    >
-                      <DexIcon name="trash" size={14} />
-                      <span>{busy === id ? 'Removing...' : 'Uninstall'}</span>
-                    </button>
-                  ) : entry.comingSoon ? (
-                    <button style={buttonStyle('muted')} disabled title={`${name} is not yet available`}>
-                      <DexIcon name="info" size={14} />
-                      <span>Coming soon</span>
-                    </button>
-                  ) : (
-                    <button
-                      style={buttonStyle('accent')}
-                      disabled={busy !== null}
-                      onClick={() => onInstall(id)}
-                      title={`Install ${name}`}
-                    >
-                      <DexIcon name="download" size={14} />
-                      <span>{busy === id ? 'Installing...' : 'Install'}</span>
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+      {devOpen && (
+        <DeveloperPanel
+          onClose={() => setDevOpen(false)}
+          onInstalled={async (packageId) => {
+            await refresh();
+            setDevOpen(false);
+            setLast(`Installed ${packageId} from file`);
+            if (packageId) openDetail(packageId);
+          }}
+        />
       )}
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 160,
+  maxWidth: 340,
+  padding: '8px 10px 8px 32px',
+  background: 'rgba(0,0,0,0.28)',
+  border: '1px solid var(--pg-border-strong)',
+  borderRadius: 9,
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  fontSize: 13,
+  boxSizing: 'border-box',
+};
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -307,6 +270,20 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 16px',
   },
   titleBlock: { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
+  backBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 34,
+    padding: '0 12px',
+    borderRadius: 9,
+    border: '1px solid var(--pg-border-strong)',
+    background: 'rgba(255,255,255,0.04)',
+    color: 'var(--color-text-primary)',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
   storeIcon: {
     width: 34,
     height: 34,
@@ -332,7 +309,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflowY: 'visible',
     scrollbarWidth: 'thin',
   },
-  searchWrap: { position: 'relative', display: 'flex', alignItems: 'center', minWidth: 180, flex: '1 1 260px' },
+  searchWrap: { position: 'relative', display: 'flex', alignItems: 'center', minWidth: 180, flex: '1 1 240px' },
   searchIcon: { position: 'absolute', left: 10, display: 'flex', color: 'var(--color-text-tertiary)', pointerEvents: 'none' },
   filterPill: {
     minHeight: 34,
@@ -341,11 +318,24 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 7,
     padding: '0 10px',
     border: '1px solid var(--pg-border-strong)',
-    borderRadius: 8,
+    borderRadius: 9,
     background: 'rgba(255,255,255,0.04)',
     color: 'var(--color-text-secondary)',
     fontSize: 12,
     whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  iconBtn: {
+    minHeight: 34,
+    minWidth: 34,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid var(--pg-border-strong)',
+    borderRadius: 9,
+    background: 'rgba(255,255,255,0.04)',
+    color: 'var(--color-text-primary)',
+    cursor: 'pointer',
     flexShrink: 0,
   },
   status: {
@@ -355,151 +345,21 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '12px 16px 0',
     padding: '10px 12px',
     border: '1px solid var(--pg-border)',
-    borderRadius: 8,
+    borderRadius: 9,
     background: 'rgba(255,255,255,0.04)',
     color: 'var(--color-text-secondary)',
     fontSize: 12,
     overflowWrap: 'anywhere',
   },
-  emptyState: {
-    ...premiumGlassCard,
-    margin: 16,
-    padding: 24,
-    minHeight: 160,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    textAlign: 'center',
-    color: 'var(--color-text-secondary)',
-  },
-  catalogList: {
-    listStyle: 'none',
-    margin: 0,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    minHeight: 0,
+  missing: {
     flex: 1,
-  },
-  catalogRow: {
-    ...premiumGlassCard,
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 0,
-    flexWrap: 'wrap',
-  },
-  appGlyph: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    color: 'var(--color-accent)',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid var(--pg-border)',
-  },
-  rowContent: { flex: '1 1 280px', minWidth: 0 },
-  rowTopLine: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
-  appName: { fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  installedBadge: {
-    padding: '2px 7px',
-    borderRadius: 999,
-    background: 'rgba(48,209,88,0.12)',
-    border: '1px solid rgba(48,209,88,0.28)',
-    color: 'var(--color-success)',
-    fontSize: 10.5,
-    fontWeight: 700,
-    flexShrink: 0,
-  },
-  soonBadge: {
-    padding: '2px 7px',
-    borderRadius: 999,
-    background: 'rgba(10,132,255,0.12)',
-    border: '1px solid rgba(10,132,255,0.28)',
-    color: 'var(--color-accent)',
-    fontSize: 10.5,
-    fontWeight: 700,
-    flexShrink: 0,
-  },
-  verifiedBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 3,
-    padding: '2px 7px',
-    borderRadius: 999,
-    background: 'rgba(94,92,230,0.14)',
-    border: '1px solid rgba(94,92,230,0.32)',
-    color: '#a7a4ff',
-    fontSize: 10.5,
-    fontWeight: 700,
-    flexShrink: 0,
-  },
-  appMeta: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '4px 10px',
-    marginTop: 4,
-    color: 'var(--color-text-tertiary)',
-    fontSize: 11,
-  },
-  appDescription: {
-    marginTop: 6,
     color: 'var(--color-text-secondary)',
-    fontSize: 12,
-    lineHeight: 1.4,
-    overflowWrap: 'anywhere',
+    padding: 24,
+    textAlign: 'center',
   },
-  categoryRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  categoryPill: {
-    padding: '2px 7px',
-    borderRadius: 999,
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid var(--pg-border)',
-    color: 'var(--color-text-secondary)',
-    fontSize: 10.5,
-    textTransform: 'capitalize',
-  },
-  actionGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-    flex: '0 1 auto',
-    minWidth: 0,
-    overflowX: 'auto',
-    scrollbarWidth: 'thin',
-  },
-};
-
-const buttonStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties => {
-  const base: React.CSSProperties = {
-    minHeight: 34,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: '0 12px',
-    borderRadius: 8,
-    border: '1px solid var(--pg-border-strong)',
-    color: 'var(--color-text-primary)',
-    background: 'rgba(255,255,255,0.04)',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  };
-  if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
-  if (variant === 'danger') return { ...base, background: 'rgba(255,69,58,0.14)', color: '#ff8a82', borderColor: 'rgba(255,69,58,0.36)' };
-  return base;
 };

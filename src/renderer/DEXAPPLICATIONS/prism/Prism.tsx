@@ -1973,6 +1973,10 @@ const Prism: React.FC = () => {
         if (e.key === 'd') { e.preventDefault(); setSelection(createEmptySelection()); }
         if (e.key === 'i' && e.shiftKey) { e.preventDefault(); if (selection.mask) setSelection(prev => ({ ...prev, mask: invertSelection(prev.mask!) })); }
         if (e.key === 't') { e.preventDefault(); const sel = layers.find(l => l.id === selectedLayerId); if (sel) { setTransformState({ active: true, bounds: { x: sel.x, y: sel.y, w: sel.width, h: sel.height }, rotation: 0, scaleX: 1, scaleY: 1, handle: null, startBounds: null, startMouse: null }); setActiveTool('move'); } }
+        // Zoom shortcuts (match the canvas wheel-zoom feel + clamp; parity with Imosion).
+        if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(z => Math.min(500, Math.round(z * 1.15))); }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(z => Math.max(10, Math.round(z / 1.15))); }
+        if (e.key === '0') { e.preventDefault(); setZoom(100); }
       }
       if (e.key === 'b') setActiveTool('brush');
       if (e.key === 'e') setActiveTool('eraser');

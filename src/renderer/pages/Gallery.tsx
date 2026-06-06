@@ -432,6 +432,8 @@ export const Gallery: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Anchor index (within sortedMedia) for shift-click range selection.
+  const lastSelectedIndexRef = useRef<number | null>(null);
 
   const toggleItemSelection = useCallback((id: string) => {
     setSelectedItems(prev => {
@@ -469,7 +471,34 @@ export const Gallery: React.FC = () => {
   const clearSelection = useCallback(() => {
     setSelectedItems(new Set());
     setSelectionMode(false);
+    lastSelectedIndexRef.current = null;
   }, []);
+
+  // Single entry point for clicking a grid/list item: Ctrl/Cmd or selection-mode
+  // toggles selection, Shift extends a range from the last anchor, otherwise it
+  // opens the item in the lightbox.
+  const handleItemActivate = useCallback((item: MediaItem, e: React.MouseEvent) => {
+    const additive = selectionMode || e.ctrlKey || e.metaKey || e.shiftKey;
+    if (additive) {
+      const index = sortedMedia.findIndex(m => m.id === item.id);
+      if (e.shiftKey && lastSelectedIndexRef.current !== null && index >= 0) {
+        const a = Math.min(lastSelectedIndexRef.current, index);
+        const b = Math.max(lastSelectedIndexRef.current, index);
+        setSelectedItems(prev => {
+          const next = new Set(prev);
+          for (let i = a; i <= b; i++) { const m = sortedMedia[i]; if (m) next.add(m.id); }
+          return next;
+        });
+      } else {
+        toggleItemSelection(item.id);
+        lastSelectedIndexRef.current = index;
+      }
+      if (!selectionMode) setSelectionMode(true);
+    } else {
+      setSelectedMedia(item);
+      window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'galleryItemsViewed', amount: 1 } }));
+    }
+  }, [selectionMode, sortedMedia, toggleItemSelection]);
 
   const batchDelete = useCallback(() => {
     if (selectedItems.size === 0) return;
@@ -847,8 +876,18 @@ export const Gallery: React.FC = () => {
   const { menuState, show: showCtxMenu, close: closeCtxMenu } = useContextMenu();
   const buildCtxItems = useCallback((item: MediaItem): ContextMenuItem[] => {
     const isFav = favorites.includes(item.id);
+    // Right-clicking inside a multi-selection acts on the whole selection.
+    if (selectedItems.has(item.id) && selectedItems.size > 1) {
+      const count = selectedItems.size;
+      return [
+        { id: 'export-sel', label: `Export ${count} items`, icon: Icons.download, onSelect: batchExport },
+        { id: 'deselect', label: 'Clear selection', icon: Icons.close, onSelect: clearSelection, dividerAfter: true },
+        { id: 'delete-sel', label: `Delete ${count} items`, icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: batchDelete },
+      ];
+    }
     return [
       { id: 'open', label: 'Open', icon: Icons.grid, onSelect: () => setSelectedMedia(item) },
+      { id: 'select', label: selectedItems.has(item.id) ? 'Deselect' : 'Select', icon: Icons.grid, onSelect: () => { setSelectionMode(true); toggleItemSelection(item.id); lastSelectedIndexRef.current = sortedMedia.findIndex(m => m.id === item.id); }, dividerAfter: true },
       { id: 'fav', label: isFav ? 'Unfavorite' : 'Favorite', icon: Icons.heart, onSelect: () => toggleFavorite(item.id), dividerAfter: true },
       { id: 'copy', label: 'Copy to Clipboard', shortcut: 'Ctrl+C', icon: Icons.copy, onSelect: () => { setSelectedMedia(item); setTimeout(() => copyImageToClipboard(), 50); } },
       ...(item.type === 'image' ? [
@@ -861,7 +900,7 @@ export const Gallery: React.FC = () => {
       { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { if ((window as any).electron?.invoke) (window as any).electron.invoke('shell:showItemInFolder', item.src); }, dividerAfter: true },
       { id: 'delete', label: 'Delete', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
-  }, [favorites, toggleFavorite, copyImageToClipboard, sendToApp, deleteMedia]);
+  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, clearSelection]);
 
   // Lightbox keyboard nav
   useEffect(() => {
@@ -874,6 +913,22 @@ export const Gallery: React.FC = () => {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [selectedMedia, navigateMedia]);
+
+  // Grid-level selection shortcuts: Ctrl/Cmd+A select all, Delete/Backspace remove
+  // the selection, Escape clears it. Suppressed while the lightbox or a text field
+  // is focused so it never eats typing.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (selectedMedia) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); setSelectionMode(true); selectAll(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedItems.size > 0) { e.preventDefault(); batchDelete(); } return; }
+      if (e.key === 'Escape') { if (selectionMode || selectedItems.size > 0) { e.preventDefault(); clearSelection(); } return; }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedMedia, selectionMode, selectedItems, selectAll, batchDelete, clearSelection]);
 
   const albumIcon = (id: string) => {
     switch (id) {
@@ -1063,7 +1118,7 @@ export const Gallery: React.FC = () => {
           ) : viewMode === 'grid' ? (
             (() => {
               const renderGridItem = (item: typeof visibleMedia[number]) => (
-                <div key={item.id} style={styles.gridItem} onClick={() => { if (selectionMode) { toggleItemSelection(item.id); } else { setSelectedMedia(item); window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'galleryItemsViewed', amount: 1 } })); } }} onContextMenu={(e) => showCtxMenu(e, buildCtxItems(item))}>
+                <div key={item.id} style={styles.gridItem} onClick={(e) => handleItemActivate(item, e)} onContextMenu={(e) => { if (!selectedItems.has(item.id)) lastSelectedIndexRef.current = sortedMedia.findIndex(m => m.id === item.id); showCtxMenu(e, buildCtxItems(item)); }}>
                   {selectionMode && (
                     <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 5, width: 22, height: 22, borderRadius: 6, background: selectedItems.has(item.id) ? 'var(--color-accent)' : 'rgba(0,0,0,0.5)', border: '2px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                       {selectedItems.has(item.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
@@ -1118,7 +1173,7 @@ export const Gallery: React.FC = () => {
           ) : (
             <div style={styles.list}>
               {visibleMedia.map(item => (
-                <div key={item.id} style={styles.listItem} onClick={() => setSelectedMedia(item)} onContextMenu={(e) => showCtxMenu(e, buildCtxItems(item))}>
+                <div key={item.id} style={styles.listItem} onClick={(e) => handleItemActivate(item, e)} onContextMenu={(e) => showCtxMenu(e, buildCtxItems(item))}>
                   <div style={{...styles.listThumb, background: getPlaceholderColor(item.id), overflow: 'hidden', position: 'relative'}}>
                     {item.src ? (
                       item.type === 'video' ? (
