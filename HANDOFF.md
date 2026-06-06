@@ -2,6 +2,35 @@
 
 Operational state of the DEX desktop platform. Update at the end of every session.
 
+> **MEDIA DSP ENGINES WIRED + SILENCE DE-DUPLICATED (2026-06-05).** Finished and verified the
+> ROADMAP-600 #198/#199/#233/#241 media slice: the shared, unit-tested DSP engines now drive real
+> creative-app behaviour end-to-end, and the one duplicate silence path was folded onto the shared
+> engine so there is a single source of truth.
+> • **`src/shared/media/silenceTimeline.ts`** (new) — pure, deterministic frame math turning the
+>   silence engine's "keep" regions into rippled NLE clip specs (`planSilenceClips`/`rippledLength`),
+>   honouring clip speed (timeline = media / speed) and media in-point. No store/editor dependency,
+>   so the correctness-critical seconds->media-frames->timeline-frames mapping is fully headless-testable.
+> • **`src/renderer/services/media/decodeAudio.ts`** (new) — thin renderer-only Web Audio adapter:
+>   `decodeAudioToMono(url)` (fetch -> `decodeAudioData` -> mono down-mix) + `slicePCM(...)`. Shared by
+>   Vinx and Imosion; side-effect-free beyond the AudioContext it opens/closes.
+> • **Vinx** (`handleVinxOp`) — `removeSilence`/`smartCuts` run **for real** against the timeline:
+>   decode the clip's media -> `planSilenceRemoval` (shared DSP) -> `planSilenceClips` -> ripple-rebuild
+>   the clip via `_removeClip`/`_addClip`. Honest skips when there is no media or no removable silence.
+> • **Imosion** (`handleImosionOp`) — `detectTempoKey`/`detectBeats` run **for real** via the shared
+>   `beatDetect` engine (decode -> `detectTempo`/`detectOnsets`, read-only). Other ops skip honestly
+>   through `enginePendingApplier`.
+> • **De-dup:** `src/renderer/DEXAPPLICATIONS/imosion/ImosionEditing.ts` `AudioEditingEngine.detectSilence`
+>   no longer hand-rolls a peak-abs, channel-0 loop — it now delegates to the shared
+>   `silenceDetect` engine (windowed-RMS / dBFS over a full mono down-mix). Public signature and
+>   sample-index return shape are unchanged, so `stripSilence` and the `'silence'` slice mode keep
+>   working; the swap is a deliberate quality upgrade. All ops already registered in `creativeActions.ts`.
+> • **Verify:** `tsc --noEmit` = **0**. Media suites **17/17 green** (`silence-timeline` 4,
+>   `silence-detect` 9, `beat-detect` 4). Full `vitest run` = **5536 passed / 7 skipped / 2 failed** —
+>   the 2 failures (`codesign-gate`, `trust-store`) belong to a **separate, unrelated in-flight
+>   code-signing feature** in the working tree (untracked `scripts/dex-codesign.cjs`,
+>   `src/main/security/*`), not to this media work. The apps aren't launchable headlessly, so the
+>   timeline-application logic is proven by the pure `silenceTimeline` unit tests.
+>
 > 🟢 **NL CREATIVE COMMAND BAR — #095 wired live (2026-06-05).** Closed the biggest "built but
 > orphaned" gap: the whole NL→plan→op stack (executor + creativeActions + planSummary + confirmTier)
 > existed and was unit-green but **nothing in the UI drove it**. Now it does, end-to-end, in a real app.

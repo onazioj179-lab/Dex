@@ -16,6 +16,7 @@
 // ===========================================================================
 
 import { createHash } from 'crypto';
+import type { SignatureBlock } from '../security/codesign';
 
 export interface PluginPublishedMeta {
   author: string;
@@ -46,6 +47,12 @@ export interface DexPlugEnvelope {
   /** path -> base64 contents */
   files: Record<string, string>;
   published: PluginPublishedMeta;
+  /**
+   * DEX code-signing block (added by `dex sign`). Trust comes from this, not the
+   * origin: the install gate verifies it against the trust store before any
+   * unpack. Absent => the package is unsigned and the gate rejects it.
+   */
+  signature?: SignatureBlock;
 }
 
 export interface FsLike {
