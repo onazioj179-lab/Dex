@@ -134,3 +134,141 @@ export function planRenderFarm(totalFrames: number, nodeCount: number, framesPer
   }
   return chunks;
 }
+
+// =============================================================================
+// Video I/O — "in and out" (ROADMAP-600 §3.T, items #571–#578)
+//
+// Pure planning for import (decode probe) and export (encode job). The renderer
+// runs the in-app path with canvas + MediaRecorder (WebM); native MP4/ProRes is
+// handed to the Tauri/ffmpeg shell as a descriptor. No DOM / IO here.
+// =============================================================================
+
+export type ExportContainer = 'webm' | 'mp4' | 'mov';
+export type ExportVideoCodec = 'vp9' | 'vp8' | 'h264' | 'h265' | 'prores' | 'dnxhd';
+export type ExportAudioCodec = 'opus' | 'aac' | 'pcm';
+/** 'inApp' = canvas + MediaRecorder (browser); 'native' = ffmpeg/Tauri shell. */
+export type ExportEngine = 'inApp' | 'native';
+
+export interface ExportAudio {
+  codec: ExportAudioCodec;
+  sampleRate: number;
+  channels: number;
+}
+
+export interface ExportTarget {
+  container: ExportContainer;
+  videoCodec: ExportVideoCodec;
+  width: number;
+  height: number;
+  fps: number;
+  /** Target video bitrate (kbps). Estimated from resolution×fps when omitted. */
+  bitrateKbps?: number;
+  audio?: ExportAudio;
+}
+
+export interface ExportJob {
+  engine: ExportEngine;
+  container: ExportContainer;
+  videoCodec: ExportVideoCodec;
+  width: number;
+  height: number;
+  fps: number;
+  bitrateKbps: number;
+  totalFrames: number;
+  audio?: ExportAudio;
+  /** MediaRecorder MIME when engine === 'inApp', else undefined. */
+  mimeType?: string;
+}
+
+/** The only codec/container combos the browser MediaRecorder path supports. */
+function isInAppEncodable(target: ExportTarget): boolean {
+  return target.container === 'webm' && (target.videoCodec === 'vp9' || target.videoCodec === 'vp8');
+}
+
+/**
+ * Plan an export job. Chooses the in-app WebM path when the target is
+ * browser-encodable, otherwise emits a descriptor for the native encoder.
+ */
+export function planExport(totalFrames: number, target: ExportTarget): ExportJob {
+  const inApp = isInAppEncodable(target);
+  const bitrate = target.bitrateKbps ?? Math.round((target.width * target.height * target.fps) / 100);
+  const job: ExportJob = {
+    engine: inApp ? 'inApp' : 'native',
+    container: target.container,
+    videoCodec: target.videoCodec,
+    width: target.width,
+    height: target.height,
+    fps: target.fps,
+    bitrateKbps: Math.max(1, bitrate),
+    totalFrames: Math.max(0, Math.floor(totalFrames)),
+    audio: target.audio ? { ...target.audio } : undefined,
+  };
+  if (inApp) {
+    let mime = target.videoCodec === 'vp9' ? 'video/webm;codecs=vp9' : 'video/webm;codecs=vp8';
+    if (target.audio?.codec === 'opus') mime += ',opus';
+    job.mimeType = mime;
+  }
+  return job;
+}
+
+export interface ImportProbe {
+  width: number;
+  height: number;
+  fps: number;
+  durationFrames: number;
+  codec: string;
+  hasAudio: boolean;
+}
+
+/**
+ * Trim a track's clips to a target timeline length (ROADMAP-600 #135). Clips
+ * starting at/after the target are dropped; a clip straddling the boundary is
+ * shortened. Pure — returns a new clip list, input untouched.
+ */
+export function planSmartTrim(clips: readonly Clip[], targetFrames: number): Clip[] {
+  const target = Math.max(0, Math.floor(targetFrames));
+  return [...clips]
+    .sort((a, b) => a.start - b.start)
+    .filter((c) => c.start < target)
+    .map((c) => ({ ...c, duration: Math.max(1, Math.min(c.duration, target - c.start)) }));
+}
+
+export interface Thumbnail {
+  frame: number;
+  timecode: string;
+}
+
+/**
+ * Plan evenly-spaced thumbnail frames across a clip (ROADMAP-600 #577). Each
+ * thumbnail is centred within its segment so the first/last aren't black frames.
+ */
+export function planThumbnails(totalFrames: number, count: number, fps: number): Thumbnail[] {
+  const n = Math.max(0, Math.floor(count));
+  const total = Math.max(0, Math.floor(totalFrames));
+  if (n === 0 || total === 0) return [];
+  const out: Thumbnail[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const frame = Math.min(total - 1, Math.floor(((i + 0.5) / n) * total));
+    out.push({ frame, timecode: timecodeFromFrames(frame, fps) });
+  }
+  return out;
+}
+
+/** Build an ImportProbe from raw decoded metadata (duration seconds → frames). */
+export function probeFromMetadata(
+  width: number,
+  height: number,
+  fps: number,
+  durationSec: number,
+  codec: string,
+  hasAudio: boolean,
+): ImportProbe {
+  return {
+    width,
+    height,
+    fps,
+    durationFrames: Math.round(Math.max(0, durationSec) * Math.max(0, fps)),
+    codec,
+    hasAudio,
+  };
+}

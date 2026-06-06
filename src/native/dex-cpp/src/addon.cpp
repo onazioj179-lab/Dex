@@ -32,6 +32,7 @@
 #include "scheduler.h"
 #include "ioengine.h"
 #include "profiler.h"
+#include "audio_napi.h"
 
 // ---------------------------------------------------------------------------
 // Module initialization -- register all exported functions
@@ -62,6 +63,12 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("signalNormalize", Napi::Function::New(env, SignalNormalize));
     exports.Set("signalRms",       Napi::Function::New(env, SignalRms));
     exports.Set("signalPeakDetect", Napi::Function::New(env, SignalPeakDetect));
+
+    // -- Audio SIMD kernels (real-time mixer math) ---------------------------
+    exports.Set("audioApplyGain",  Napi::Function::New(env, AudioApplyGain));
+    exports.Set("audioMix",        Napi::Function::New(env, AudioMix));
+    exports.Set("audioPeak",       Napi::Function::New(env, AudioPeak));
+    exports.Set("audioSimdIsa",    Napi::Function::New(env, AudioSimdIsa));
 
     // -- Matrix operations (4x4) ---------------------------------------------
     exports.Set("mat4Identity",    Napi::Function::New(env, Mat4Identity));

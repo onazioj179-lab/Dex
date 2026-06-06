@@ -15,6 +15,8 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { capHistoryTail } from '../../../shared/creative/history';
+import CreativeCommandBar from '../../components/CreativeCommandBar';
+import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import {
   ADJUSTMENT_PRESETS,
   QUICK_EXPORT_PRESETS,
@@ -437,6 +439,25 @@ const Prism: React.FC = () => {
 
   // Filter dialog
   const [activeFilter, setActiveFilter] = useState<FilterName | null>(null);
+
+  // ROADMAP-600 #095 — apply a UKI CreativeOp to Prism's live document. Ops that
+  // map to Prism's real adjustment pipeline run for real (and are undoable via
+  // pushHistory); ops that need an AI engine not present in this build fail
+  // honestly with a clear note rather than pretending to have run.
+  const applyCreativeOp = (op: CreativeOp): { outcome: 'applied' | 'skipped'; note?: string } => {
+    switch (op.op) {
+      case 'autoEnhance':
+        pushHistory('UKI: auto-enhance');
+        setExposure(4); setBrightness(6); setContrast(12); setSaturation(8); setVibrance(15);
+        return { outcome: 'applied', note: 'auto-enhanced via live adjustments (exposure, contrast, vibrance)' };
+      case 'colorGrade':
+        pushHistory('UKI: color grade');
+        setTemperature(15); setTint(-5); setSaturation(8); setContrast(6);
+        return { outcome: 'applied', note: 'applied a warm cinematic grade (temperature, tint, saturation)' };
+      default:
+        return { outcome: 'skipped', note: `${op.op}: needs an AI engine not installed in this build` };
+    }
+  };
   const [filterIntensity, setFilterIntensity] = useState(75);
 
   // Histogram
@@ -3096,6 +3117,16 @@ const Prism: React.FC = () => {
           {/* Adjustments Panel */}
           {activePanel === 'adjustments' && (
             <div style={styles.panelContent}>
+              {/* ROADMAP-600 #095 — natural-language command bar (NL -> plan -> apply) */}
+              <div style={{ marginBottom: 12 }}>
+                <CreativeCommandBar
+                  appId="prism"
+                  facts={{ layerId: selectedLayerId }}
+                  onApplyOp={applyCreativeOp}
+                  examples={['remove the background', 'upscale 2x', 'auto enhance', 'color grade']}
+                  placeholder="Tell Prism what to do…"
+                />
+              </div>
               <div style={styles.sliderRow}>
                 <span style={styles.sliderLabel}>Brightness</span>
                 <input aria-label="Brightness adjustment" type="range" min="-100" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} style={styles.slider} />
