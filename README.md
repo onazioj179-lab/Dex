@@ -1,6 +1,6 @@
 # DEX — your calm, all-in-one desktop
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 5.0.0 · Copyright (c) 2026 · DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 5.0.1 · Copyright (c) 2026 · DEX Software License Agreement v1.0
 
 **DEX is one app that replaces a dozen.** Notes, tasks, files, a browser, a
 calendar, drawing, photo and video editing, music, a knowledge graph, and a
@@ -84,14 +84,14 @@ Full breakdown: [docs/PRICING.md](docs/PRICING.md).
 
 ## Download DEX
 
-**Latest release: v5.0.0** ·
+**Latest release: v5.0.1** ·
 [All downloads & notes →](https://github.com/onazioj179-lab/Dex/releases/latest)
 
 | Platform | Download |
 |---|---|
-| **Windows 10/11 (64-bit)** — most people | [DEX-Setup-5.0.0-x64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v5.0.0/DEX-Setup-5.0.0-x64.exe) (~88 MB) |
-| **Windows on ARM** | [DEX-Setup-5.0.0-arm64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v5.0.0/DEX-Setup-5.0.0-arm64.exe) (~91 MB) |
-| **Windows — portable** (no install, runs from a folder) | [DEX-5.0.0-portable-x64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v5.0.0/DEX-5.0.0-portable-x64.exe) (~88 MB) |
+| **Windows 10/11 (64-bit)** — most people | [DEX-Setup-5.0.1-x64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v5.0.1/DEX-Setup-5.0.1-x64.exe) (~88 MB) |
+| **Windows on ARM** | [DEX-Setup-5.0.1-arm64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v5.0.1/DEX-Setup-5.0.1-arm64.exe) (~91 MB) |
+| **Windows — portable** (no install, runs from a folder) | [DEX-5.0.1-portable-x64.exe](https://github.com/onazioj179-lab/Dex/releases/download/v5.0.1/DEX-5.0.1-portable-x64.exe) (~88 MB) |
 | **macOS / Linux** | Coming in a future release |
 
 - The installer asks you to **read and accept the License** before any files are
