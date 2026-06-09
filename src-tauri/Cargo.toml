@@ -27,6 +27,7 @@ sysinfo = "0.30"   # system status + process list/kill
 open = "5"          # shell: open path / external url with the OS default
 arboard = "3"       # clipboard read/write
 trash = "5"         # move-to-recycle-bin (safe delete)
+rusqlite = { version = "0.31", features = ["bundled"] }  # native dex.db (shared by ~50 subsystems); bundled = no system sqlite needed
 
 [features]
 # Tauri's default release feature for the embedded asset protocol.

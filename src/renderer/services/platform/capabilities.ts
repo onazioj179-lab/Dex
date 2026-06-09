@@ -29,6 +29,23 @@ export const TAURI_NATIVE_SUBSYSTEMS: readonly string[] = [
   'clipboard', 'vault', 'capability', 'storage', 'automation',
   'health', 'diagnostics', 'crashReporter',
   'connection', 'networkHygiene', 'app', 'data',
+  // Notification center + SQLite-backed subsystems (shared dex.db), routed
+  // natively through dex_ipc -> db_dispatch in src-tauri/src/main.rs.
+  'notifications',
+  'activity-feed', 'changelog', 'color-labels', 'dashboard', 'goal-system',
+  'help', 'journal', 'layout', 'licensing', 'read-later', 'recycle-bin',
+  'time-tracking', 'word-count',
+  'content-expiry', 'daily-note', 'feedback', 'relationship-graph', 'reminder',
+  'scratchpad', 'search-history', 'smart-grouping', 'smart-rename',
+  'snapshot-comparison', 'stats-dashboard', 'version-history',
+  'bulk-metadata', 'daily-briefing', 'dependencies', 'duplication-detector',
+  'project-archiver', 'project-comparison', 'export-bundle', 'project-health',
+  'project-linker', 'project-lock', 'project-timeline', 'voice-memo',
+  'dexnotes', 'nl-task', 'theme-schedule', 'session-replay', 'media-library',
+  'vinx-presentation', 'i18n', 'keyboard-nav',
+  'notification-center', 'localization', 'global-search', 'fts', 'multiwindow',
+  'multimonitor', 'migration', 'link-preview', 'live-collab', 'file-watcher',
+  'backup',
 ];
 
 const TAURI_SET = new Set(TAURI_NATIVE_SUBSYSTEMS);
