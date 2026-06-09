@@ -12,27 +12,92 @@
 ## RESUME HERE  ← next session starts here
 
 **Status:** Electron is the shipping build (v5.0.1). Tauri shell boots and serves
-the same renderer; ~24 namespaces are natively backed; the rest degrade to `null`.
+the same renderer; **~80 namespaces are natively backed** (24 platform + 57
+SQLite subsystem modules sharing `dex.db`); the rest degrade to `null`.
 
-**Baseline (must stay green):**
+**SQLite subsystem sweep complete (2026-06-09).** All ~57 DatabaseManager-backed
+managers now have a native `src-tauri/src/<name>.rs` module (`ensure_schema` +
+`dispatch`), wired through `db_dispatch` by channel prefix. Each copies its
+Electron manager's CREATE TABLE verbatim and matches the IPC return shapes
+exactly. Handlers that are NOT pure DB (filesystem zip/backup, native dialogs,
+zlib BLOBs, live BrowserWindow/screen, networking/mDNS, fs watching, OS
+notifications, background timers, in-memory session state) **degrade honestly**
+(`{ success:false, error:"... (not ported)" }` or `null`) — they are the
+follow-up work for the Tauri command layer (see "Known hard cases"). `cargo
+check` green, zero warnings. Modules: activity-feed, changelog, color-labels,
+content-expiry, daily-note, daily-briefing, dashboard, dependencies,
+duplication-detector, bulk-metadata, feedback, goal-system, help, journal,
+keyboard-nav, layout, licensing, i18n, localization, notifications,
+notification-center, fts, global-search, link-preview, live-collab,
+file-watcher, migration, multiwindow, multimonitor, dexnotes, nl-task,
+project-archiver/comparison/health/linker/lock/timeline, export-bundle,
+read-later, recycle-bin, relationship-graph, reminder, scratchpad,
+search-history, session-replay, shared media-library, smart-grouping,
+smart-rename, snapshot-comparison, stats-dashboard, theme-schedule,
+time-tracking, vinx-presentation, version-history, voice-memo, word-count.
+
+**Latest slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
+share `dex.db` through the native `db.rs` connection and route via
+`db_dispatch` (one channel-prefix arm each) in [main.rs](src-tauri/src/main.rs):
+activity-feed, changelog, color-labels, dashboard, goal-system, help, journal,
+layout, licensing (+ telemetry/crash, self-contained SHA-256), read-later,
+recycle-bin, time-tracking, word-count. Each module copies its Electron
+manager's CREATE TABLE verbatim in `ensure_schema()` (registered in `setup()`)
+and matches the exact IPC return shapes; window-/dialog-/timer-only handlers
+degrade honestly. `cargo check` green. `TAURI_NATIVE_SUBSYSTEMS` updated.
+
+**Installer verified 2026-06-09:** `npm run build:tauri` (NSIS) produces
+`src-tauri/target/release/bundle/nsis/DEX_6.0.0_x64-setup.exe` (**15 MB**, vs
+Electron ~88 MB). The built `dex-tauri.exe` boots, opens the "DEX" window, and
+runs stably at ~35 MB working set — smoke-tested clean (no panic/stderr).
+
+**Baseline (must stay green) — verified 2026-06-06:**
 - `cd core && cargo test` — native core crates (smart-router, vault, search, audio,
-  automation, scanner). Run this before and after every Rust change.
+  automation, scanner). **green.** Run before and after every Rust change.
+- `cd src-tauri && cargo build` — the Tauri shell. **green (48s incremental).**
 - `npm run build:tauri` — produces the Tauri installer. Slow; run at slice end.
 - Electron is untouched by Tauri work (additive: `src-tauri/`, `core/`,
   `services/platform/*`), so the shipping app cannot be broken by a migration slice.
 
-**Next slice (P1 — pick up here):** port **notifications as a renderer-driven
-channel**. Current state: OS notifications are fired *internally* in the Electron
-main process (`src/main/automation/HumanCenteredAutomation.ts` via electron
-`Notification`), so there is no renderer IPC channel to mirror yet. Two options,
-in order:
-  1. Add a renderer notification IPC (`notifications:show` → main) on the Electron
-     side first, then mirror it in `dex_ipc` with the `notify-rust` crate. This
-     makes the feature wired in BOTH shells (no orphan).
-  2. If keeping notifications main-internal, port the internal trigger path instead.
-Then add `notifications` to `TAURI_NATIVE_SUBSYSTEMS` and update the table below.
+**HOW TO GO 100% WITHOUT MESS-UPS — data-driven porting.** The clean pure-Rust,
+JSON-friendly, renderer-wired channels are largely ported. The remainder is the
+heavy/plugin/binary tier, and porting it blind risks orphaned or shape-mismatched
+handlers. The correct path is data-driven:
+  1. Run `npm run dev:tauri`, exercise the app (open Home, Files, Notes, Settings,
+     a creative app, the Store…).
+  2. In devtools run `__dexDegradeReport()` — it lists every channel that was hit
+     and degraded to null, most-used first. That is the EXACT, prioritized port
+     list, with real call shapes to match.
+  3. Port those channels in `dex_ipc` (pure Rust) or a `core/` crate; re-run; repeat
+     until the report is empty. Then P4 (flip default + retire Electron).
+This converges to 100% deterministically and never ports a dead/guessed channel.
 
-After notifications, follow the **priority order** in the phase plan.
+**Known hard cases to handle during porting:**
+- **Binary over the bridge:** ArrayBuffer args/returns (e.g. `creativeApps:readFile/
+  saveFile`, `code:readFile`) don't survive the JSON `dex_ipc` bridge. Standardize
+  on base64 on both ends (add a small encode/decode in `tauriCompat` + Rust).
+- **Dialogs / notifications:** use the Tauri v2 plugins (`tauri-plugin-dialog`,
+  `tauri-plugin-notification`) + capability permissions — not raw blocking crates
+  (event-loop deadlock).
+- **Stateful engines** (Rewind capture, transfer, PTY, automation store): need a
+  native store/runtime; build as `core/` crates with `cargo test`, then thin-wire.
+
+**Next slice (P3 done for DB; pick up at the Tauri command layer):** the
+shared-`dex.db` subsystem sweep is complete — every DatabaseManager-backed
+manager is ported. What remains is the **non-DB tail** that the ported modules
+currently degrade honestly. These need real Tauri commands (not the pure-DB
+`dispatch` layer):
+  - **Filesystem + compression:** version-history / session-replay / project-archiver
+    zlib BLOB save/restore; export-bundle + backup/restore zip + native save dialog;
+    bulk-metadata / smart-rename on-disk writes; voice-memo + media-library file IO.
+  - **Native OS/UI:** dialogs (open/save), OS notifications (notification-center,
+    reminder firing), live BrowserWindow/screen (multiwindow, multimonitor, layout
+    apply, vinx presenter), theme apply.
+  - **Networking:** link-preview HTTP fetch, live-collab mDNS/peer sync.
+  - **Background runtimes:** file-watcher (fs.watch), reminder/expiry/theme timers,
+    scratchpad autosave buffer, migration runner.
+Use `__dexDegradeReport()` (see Verify) to order these by real usage. Then the
+non-DB engines from the phase plan: transfer/device, audio sink, PTY.
 
 ---
 
@@ -62,7 +127,13 @@ than 3%.
 | Scanner | findDuplicates | done (`core/dex-scanner`) |
 | Automation | run/executeNew | partial (id-based store-backed runs need a native store) |
 | AI router | `smart_router_route` (dedicated command) | done (`core/dex-smart-router`) |
-| **Notifications** | — | **todo (next slice)** |
+| Notifications | full `notifications:*` | done (`notifications.rs`, managed store) |
+| Activity feed | full `activity-feed:*` | done (`activity_feed.rs`, shared dex.db) |
+| Changelog / Color labels / Dashboard | full `*:*` | done (`changelog.rs`, `color_labels.rs`, `dashboard.rs`) |
+| Goal system / Help / Journal | full `*:*` | done (`goal_system.rs`, `help_system.rs` (FTS5), `journal.rs`) |
+| Layout / Read-later / Recycle bin | full `*:*` | done (`layout.rs`, `read_later.rs`, `recycle_bin.rs`) |
+| Time tracking / Word count | full `*:*` | done (`time_tracking.rs`, `word_count.rs`) |
+| Licensing / telemetry | full `licensing:*` | done (`licensing.rs`, self-contained SHA-256) |
 | **Dialogs (file/folder)** | — | todo (use Tauri dialog plugin to avoid event-loop deadlock) |
 | **Transfer / device / pairing** | — | todo (network protocols) |
 | **Audio playback sink** | — | todo (device output; analysis already native) |
