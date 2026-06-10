@@ -63,7 +63,8 @@ export const radius = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Font Sizes
+// Font Sizes — JS mirror of THE text scale (--text-* in design-system.css).
+// Keep values identical to that scale; `md` is a legacy alias of `base`.
 // ---------------------------------------------------------------------------
 export const fontSize = {
   xs: 11,
@@ -73,6 +74,8 @@ export const fontSize = {
   lg: 16,
   xl: 20,
   '2xl': 24,
+  '3xl': 28,
+  '4xl': 32,
 } as const;
 
 export const fontWeight = {
