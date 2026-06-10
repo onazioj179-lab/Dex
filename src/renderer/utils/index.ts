@@ -28,30 +28,11 @@ export const generateId = (prefix: string = 'id'): string => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export const debounce = <T extends (...args: any[]) => any>(
-  fn: T,
-  delay: number
-): ((...args: Parameters<T>) => void) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-};
-
-export const throttle = <T extends (...args: any[]) => any>(
-  fn: T,
-  limit: number
-): ((...args: Parameters<T>) => void) => {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= limit) {
-      lastCall = now;
-      fn(...args);
-    }
-  };
-};
+// Debounce / throttle: one canonical implementation for the whole codebase
+// (consolidation audit finding 6) — re-exported here for existing importers.
+// Note: the canonical throttle also fires a trailing call (the local copy it
+// replaces dropped the final call), which is the documented semantic.
+export { debounce, throttle } from '../../shared/perf/helpers';
 
 export const clamp = (value: number, min: number, max: number): number => {
   return Math.max(min, Math.min(max, value));

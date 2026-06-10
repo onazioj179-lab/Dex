@@ -6192,7 +6192,7 @@ const Imosion: React.FC = () => {
                 setPianoRollNotes(prev => [...prev, ...newNotes]);
               };
               return (
-                <div style={{ position: 'absolute', top: 56, right: 12, width: 250, background: 'rgba(12,12,14,0.96)', border: '1px solid #27272a', borderRadius: 8, padding: 10, zIndex: 20, boxShadow: 'var(--pg-shadow-context)', backdropFilter: 'blur(8px)' }}>
+                <div style={{ position: 'absolute', top: 56, right: 12, width: 250, background: 'rgba(12,12,14,0.96)', border: '1px solid #27272a', borderRadius: 8, padding: 10, zIndex: 20, boxShadow: 'var(--pg-shadow-context)', backdropFilter: 'var(--blur-md)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#64d2ff' }}>Chord Trigger</span>
                     <button aria-label="Close Chord Trigger" onClick={() => setShowChordTrigger(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>

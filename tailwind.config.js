@@ -22,21 +22,23 @@ export default {
         warning: 'var(--color-warning)',
         error: 'var(--color-error)',
       },
+      // Font stacks and text sizes are bound to the canonical tokens in
+      // design-system.css — never restate the values here.
       fontFamily: {
-        sans: ['Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-        mono: ['Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-family)'],
+        mono: ['var(--font-mono)'],
+        display: ['var(--font-sans)'],
       },
       fontSize: {
-        'xs': ['11px', '16px'],
-        'sm': ['12px', '18px'],
-        'base': ['14px', '22px'],
-        'md': ['14px', '22px'],
-        'lg': ['16px', '24px'],
-        'xl': ['20px', '28px'],
-        '2xl': ['24px', '32px'],
-        '3xl': ['28px', '36px'],
-        '4xl': ['32px', '40px'],
+        'xs': ['var(--text-xs)', '16px'],
+        'sm': ['var(--text-sm)', '18px'],
+        'base': ['var(--text-base)', '22px'],
+        'md': ['var(--text-md)', '22px'],
+        'lg': ['var(--text-lg)', '24px'],
+        'xl': ['var(--text-xl)', '28px'],
+        '2xl': ['var(--text-2xl)', '32px'],
+        '3xl': ['var(--text-3xl)', '36px'],
+        '4xl': ['var(--text-4xl)', '40px'],
       },
       boxShadow: {
         'depth-1': 'var(--shadow-depth-1)',
@@ -49,8 +51,10 @@ export default {
         'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
-        'window': '10px',
-        'dock': '14px',
+        // Bound to the canonical radius scale in design-system.css — never
+        // restate pixel values here.
+        'window': 'var(--radius-xl)',
+        'dock': 'var(--radius-2xl)',
       },
       animation: {
         'fade-in': 'fadeIn 0.06s ease-out',

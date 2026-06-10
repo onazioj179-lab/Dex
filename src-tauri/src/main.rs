@@ -36,8 +36,10 @@ mod smart_rename;
 mod snapshot_comparison;
 mod statistics_dashboard;
 mod time_tracking;
+mod util;
 mod version_history;
 mod word_count;
+mod zlib;
 // Wave 2 — project-* family + voice memo, daily briefing, dependency,
 // duplication detector, bulk metadata.
 mod bulk_metadata;
@@ -858,7 +860,14 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return duplication_detector::dispatch(conn, channel, args);
     }
     if channel.starts_with("project-archiver:") {
-        return project_archiver::dispatch(conn, channel, args);
+        // The archiver also touches the filesystem: `.dex-archive` files live
+        // under app_data_dir/archive (the Tauri analog of Electron userData).
+        let archive_dir = app
+            .path()
+            .app_data_dir()
+            .unwrap_or_default()
+            .join("archive");
+        return project_archiver::dispatch(conn, &archive_dir, channel, args);
     }
     if channel.starts_with("project-comparison:") {
         return project_comparison::dispatch(conn, channel, args);
@@ -879,7 +888,10 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return project_timeline::dispatch(conn, channel, args);
     }
     if channel.starts_with("voice-memo:") {
-        return voice_memo::dispatch(conn, channel, args);
+        // Voice memos write/read `.opus` files under app_data_dir/voice-memos
+        // (the Tauri analog of Electron userData) and probe for whisper.wasm.
+        let data_dir = app.path().app_data_dir().unwrap_or_default();
+        return voice_memo::dispatch(conn, &data_dir, channel, args);
     }
     if channel.starts_with("dexnotes:") {
         return notes::dispatch(conn, channel, args);
@@ -936,7 +948,10 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return file_watcher::dispatch(conn, channel, args);
     }
     if channel.starts_with("backup:") {
-        return backup_restore::dispatch(conn, channel, args);
+        // Backups read the database files from (and restore them to) the app
+        // data dir, writing `.dexbak` archives under data_dir/backups by default.
+        let data_dir = app.path().app_data_dir().unwrap_or_default();
+        return backup_restore::dispatch(conn, &data_dir, channel, args);
     }
     Value::Null
 }

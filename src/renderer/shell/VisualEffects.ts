@@ -67,8 +67,8 @@ function injectLowEndOverrides(): void {
     body.dex-medium-tier .dex-frosted-glass,
     body.dex-medium-tier .dex-frosted-glass::before,
     body.dex-medium-tier .dex-frosted-glass::after {
-      backdrop-filter: blur(12px) saturate(150%) !important;
-      -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+      backdrop-filter: var(--blur-md) saturate(150%) !important;
+      -webkit-backdrop-filter: var(--blur-md) saturate(150%) !important;
     }
   `;
   document.head.appendChild(style);
@@ -105,27 +105,27 @@ function injectFrostedStyles(): void {
   style.textContent = `
     .dex-frosted-glass {
       background: var(--color-border-subtle);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: var(--blur-lg) saturate(180%);
+      -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
       border: 1px solid var(--color-border);
       transition: backdrop-filter 0.3s ease;
     }
     .dex-frosted-glass--light {
       background: var(--color-text-secondary);
-      backdrop-filter: blur(24px) saturate(200%);
-      -webkit-backdrop-filter: blur(24px) saturate(200%);
+      backdrop-filter: var(--blur-lg) saturate(200%);
+      -webkit-backdrop-filter: var(--blur-lg) saturate(200%);
       border: 1px solid var(--color-text-tertiary);
     }
     .dex-frosted-glass--dark {
       background: rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(16px) saturate(150%);
-      -webkit-backdrop-filter: blur(16px) saturate(150%);
+      backdrop-filter: var(--blur-lg) saturate(150%);
+      -webkit-backdrop-filter: var(--blur-lg) saturate(150%);
       border: 1px solid var(--color-bg-hover);
     }
     .dex-frosted-glass--subtle {
       background: var(--color-border-subtle);
-      backdrop-filter: blur(8px) saturate(120%);
-      -webkit-backdrop-filter: blur(8px) saturate(120%);
+      backdrop-filter: var(--blur-md) saturate(120%);
+      -webkit-backdrop-filter: var(--blur-md) saturate(120%);
       border: 1px solid var(--color-bg-hover);
     }
     @media (prefers-reduced-motion: reduce) {

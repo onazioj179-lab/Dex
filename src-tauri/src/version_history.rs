@@ -6,23 +6,18 @@
 //! reading/writing the shared `dex.db` `version_history` table with the
 //! identical schema, queries, and return shapes as the Electron manager.
 //!
-//! IMPORTANT — snapshot compression: under Electron the `snapshot` BLOB is the
-//! project state JSON run through `zlib.deflateSync` (and read back with
-//! `zlib.inflateSync`). rusqlite 0.31 has no zlib, and no new crates may be
-//! added, so the three channels that depend on (de)compressing that BLOB —
-//! `save`, `getState`, and `restore` — degrade honestly here rather than write
-//! an incompatible BLOB or return corrupt state. The Tauri command layer is the
-//! right place to wire a real zlib implementation and call back into these DB
-//! helpers. Every pure-DB channel (`getVersions`, `delete`, `markDirty`,
-//! `getStats`) is ported faithfully.
+//! Snapshot compression: the `snapshot` BLOB is the project state JSON run
+//! through zlib deflate (and read back with inflate), via the shared
+//! [`crate::zlib`] helpers — byte-compatible with the Electron manager's
+//! `zlib.deflateSync`/`inflateSync`, so databases written by either shell
+//! round-trip in the other. All channels (`save`, `getState`, `restore`,
+//! `getVersions`, `delete`, `markDirty`, `getStats`) are ported faithfully.
 
+use crate::zlib;
 use rusqlite::{params, Connection, Row};
 use serde_json::{json, Value};
 
 /// Max versions retained per (app, project_id) — matches MAX_VERSIONS_PER_PROJECT.
-/// Used by the zlib-backed save path, which lives in the Tauri command layer
-/// (the BLOB deflate/inflate isn't done in this pure-DB module yet).
-#[allow(dead_code)]
 const MAX_VERSIONS_PER_PROJECT: i64 = 50;
 
 /// Create the version_history table + indexes (matches DatabaseManager schema).
@@ -73,6 +68,117 @@ fn get_versions(conn: &Connection, app: &str, project_id: &str) -> Value {
     };
     let out: Vec<Value> = rows.filter_map(|r| r.ok()).collect();
     json!(out)
+}
+
+/// version-history:save — saveVersion(appName, projectId, projectName, state,
+/// autoSaved). Deflates the state JSON into the snapshot BLOB, inserts the row,
+/// trims to MAX_VERSIONS_PER_PROJECT oldest-first, and returns the new row id
+/// (Electron returns Number(lastInsertRowid); -1 on failure).
+fn save_version(
+    conn: &Connection,
+    app: &str,
+    project_id: &str,
+    project_name: &str,
+    state: &Value,
+    auto_saved: bool,
+) -> i64 {
+    let json_str = state.to_string();
+    let compressed = zlib::deflate(json_str.as_bytes());
+    let size = compressed.len() as i64;
+    let now = current_millis();
+    let inserted = conn.execute(
+        "INSERT INTO version_history (app, project_id, project_name, snapshot, size, timestamp, auto_saved) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        params![app, project_id, project_name, compressed, size, now, if auto_saved { 1 } else { 0 }],
+    );
+    if inserted.is_err() {
+        return -1;
+    }
+    let id = conn.last_insert_rowid();
+    enforce_version_limit(conn, app, project_id);
+    id
+}
+
+/// Trim a project's history to MAX_VERSIONS_PER_PROJECT, deleting the oldest
+/// rows first (matches enforceVersionLimit).
+fn enforce_version_limit(conn: &Connection, app: &str, project_id: &str) {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM version_history WHERE app = ? AND project_id = ?",
+            params![app, project_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if count > MAX_VERSIONS_PER_PROJECT {
+        let excess = count - MAX_VERSIONS_PER_PROJECT;
+        let _ = conn.execute(
+            "DELETE FROM version_history WHERE id IN ( \
+                SELECT id FROM version_history WHERE app = ? AND project_id = ? \
+                ORDER BY timestamp ASC LIMIT ? \
+            )",
+            params![app, project_id, excess],
+        );
+    }
+}
+
+/// version-history:getState — getVersionState(versionId). Inflates the snapshot
+/// BLOB back to the state object; null when the row is missing or the BLOB does
+/// not decompress/parse (Electron logs and returns null on that path).
+fn get_version_state(conn: &Connection, version_id: i64) -> Value {
+    let blob: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT snapshot FROM version_history WHERE id = ?",
+            params![version_id],
+            |r| r.get(0),
+        )
+        .ok();
+    let blob = match blob {
+        Some(b) => b,
+        None => return Value::Null,
+    };
+    match zlib::inflate(&blob) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        Err(_) => Value::Null,
+    }
+}
+
+/// version-history:restore — restoreVersion(appName, projectId, versionId,
+/// currentState). Backs up the current state as a new (manual) version, then
+/// returns { restored, backupVersionId } with the decompressed snapshot — or
+/// null when the version row is missing (matches the TS flow, including taking
+/// the backup before attempting the decompress).
+fn restore_version(
+    conn: &Connection,
+    app: &str,
+    project_id: &str,
+    version_id: i64,
+    current_state: &Value,
+) -> Value {
+    let record: Option<(String, Vec<u8>)> = conn
+        .query_row(
+            "SELECT project_name, snapshot FROM version_history WHERE id = ?",
+            params![version_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .ok();
+    let (project_name, snapshot) = match record {
+        Some(r) => r,
+        None => return Value::Null,
+    };
+    let backup_version_id = save_version(conn, app, project_id, &project_name, current_state, false);
+    let restored = match zlib::inflate(&snapshot) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        Err(_) => Value::Null,
+    };
+    json!({ "restored": restored, "backupVersionId": backup_version_id })
+}
+
+/// Wall-clock milliseconds since the Unix epoch (Date.now() equivalent).
+fn current_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// version-history:delete — deleteVersion(versionId). Returns boolean. The TS
@@ -135,27 +241,27 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
 
         "version-history:getStats" => get_stats(conn, &s(0), &s(1)),
 
-        // The next three depend on zlib (de)compression of the snapshot BLOB,
-        // which rusqlite 0.31 cannot do without a new crate. Faking the BLOB
-        // would corrupt the on-disk format and round-trips, so they degrade
-        // honestly. The Tauri command layer should perform the zlib step and
-        // persist/read the snapshot itself.
-        //
-        // save -> returns number (lastInsertRowid) in Electron.
-        "version-history:save" => json!({
-            "success": false,
-            "error": "snapshot zlib compression not available in DB layer (not ported)"
-        }),
-        // getState -> returns the decompressed state object or null in Electron.
-        "version-history:getState" => json!({
-            "success": false,
-            "error": "snapshot zlib decompression not available in DB layer (not ported)"
-        }),
-        // restore -> returns { restored, backupVersionId } or null in Electron.
-        "version-history:restore" => json!({
-            "success": false,
-            "error": "snapshot zlib (de)compression not available in DB layer (not ported)"
-        }),
+        // save(appName, projectId, projectName, state, autoSaved) -> number
+        // (the new row id; -1 on failure), matching the Electron return.
+        "version-history:save" => {
+            let state = args.get(3).cloned().unwrap_or(Value::Null);
+            let auto_saved = args.get(4).and_then(|v| v.as_bool()).unwrap_or(false);
+            json!(save_version(conn, &s(0), &s(1), &s(2), &state, auto_saved))
+        }
+
+        // getState(versionId) -> the decompressed state object, or null.
+        "version-history:getState" => {
+            let version_id = args.get(0).and_then(|v| v.as_i64()).unwrap_or(0);
+            get_version_state(conn, version_id)
+        }
+
+        // restore(appName, projectId, versionId, currentState) ->
+        // { restored, backupVersionId } or null.
+        "version-history:restore" => {
+            let version_id = args.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
+            let current_state = args.get(3).cloned().unwrap_or(Value::Null);
+            restore_version(conn, &s(0), &s(1), version_id, &current_state)
+        }
 
         _ => Value::Null,
     }
