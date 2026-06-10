@@ -5,6 +5,12 @@
 > git history. Anything still pending is captured here. The detailed, actively
 > maintained migration checkpoint is [TAURI-MIGRATION.md](TAURI-MIGRATION.md) —
 > start there to resume engineering work.
+>
+> **Release theme (2026-06-10): Refinement & Consolidation.** No major feature
+> expansion — performance, consistency, reliability, clarity, fluidity,
+> stability, discoverability, maintainability. The full program and its live
+> status are in [REFINEMENT.md](REFINEMENT.md); the Tauri migration below is
+> its Priority 1 engine.
 
 ## Where DEX is
 

@@ -49,8 +49,10 @@
   --color-bg-hover: #1E1E22;
   --color-bg-active: #252528;
   --color-bg-overlay: #0E0E10;
-  --color-bg-glass: rgba(22, 22, 24, 0.72);
-  --color-bg-glass-strong: rgba(26, 26, 30, 0.85);
+  /* Glass fills — DEX 6.0 reduced-glass redesign (GOAL-6D): transparency -50%
+     for readability (alpha raised so surfaces read closer to solid). */
+  --color-bg-glass: rgba(22, 22, 24, 0.86);
+  --color-bg-glass-strong: rgba(26, 26, 30, 0.93);
   --color-bg-blur: #121214;
   --color-bg-secondary: #121214;
   --color-bg-elevated: #1A1A1E;
@@ -105,34 +107,37 @@
   --color-border-glass: rgba(255, 255, 255, 0.16);
   --color-border-highlight: rgba(255, 255, 255, 0.18);
 
-  /* Shadows -- Rich elevation with accent soul */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.40), 0 4px 16px rgba(0, 0, 0, 0.30);
-  --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.40), 0 8px 32px rgba(0, 0, 0, 0.45);
-  --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.40), 0 16px 56px rgba(0, 0, 0, 0.50);
-  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 12px 44px rgba(0, 0, 0, 0.45), inset 0 0.5px 0 rgba(255,255,255,0.06);
-  --shadow-glow: 0 0 16px rgba(74, 158, 255, 0.25);
-  --shadow-glow-sm: 0 0 8px rgba(74, 158, 255, 0.15);
-  --shadow-glow-accent: 0 0 20px rgba(74, 158, 255, 0.30);
-  --shadow-depth-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
-  --shadow-depth-2: 0 2px 4px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.30);
-  --shadow-depth-3: 0 2px 6px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-depth-4: 0 4px 10px rgba(0, 0, 0, 0.30), 0 16px 48px rgba(0, 0, 0, 0.40);
-  --shadow-inset: inset 0 1px 4px rgba(0, 0, 0, 0.30);
-  --shadow-dock: 0 -4px 32px rgba(0, 0, 0, 0.50), 0 0 12px rgba(74, 158, 255, 0.08);
+  /* Shadows — DEX 6.0 reduced-glass redesign (GOAL-6D): intensity -40%, same
+     pass the --pg-shadow-* tier got. Highlights (inset white gloss) and the
+     focus ring keep full strength — they are affordances, not elevation. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.24), 0 4px 16px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.24), 0 8px 32px rgba(0, 0, 0, 0.27);
+  --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.24), 0 16px 56px rgba(0, 0, 0, 0.30);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.21), 0 12px 44px rgba(0, 0, 0, 0.27), inset 0 0.5px 0 rgba(255,255,255,0.06);
+  --shadow-glow: 0 0 16px rgba(74, 158, 255, 0.15);
+  --shadow-glow-sm: 0 0 8px rgba(74, 158, 255, 0.09);
+  --shadow-glow-accent: 0 0 20px rgba(74, 158, 255, 0.18);
+  --shadow-depth-1: 0 1px 2px rgba(0, 0, 0, 0.21), 0 2px 6px rgba(0, 0, 0, 0.15);
+  --shadow-depth-2: 0 2px 4px rgba(0, 0, 0, 0.21), 0 4px 14px rgba(0, 0, 0, 0.18);
+  --shadow-depth-3: 0 2px 6px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(0, 0, 0, 0.21);
+  --shadow-depth-4: 0 4px 10px rgba(0, 0, 0, 0.18), 0 16px 48px rgba(0, 0, 0, 0.24);
+  --shadow-inset: inset 0 1px 4px rgba(0, 0, 0, 0.18);
+  --shadow-dock: 0 -4px 32px rgba(0, 0, 0, 0.30), 0 0 12px rgba(74, 158, 255, 0.05);
   --shadow-focus: 0 0 0 2.5px rgba(74, 158, 255, 0.40);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.45), 0 8px 28px rgba(0, 0, 0, 0.35), 0 0 8px rgba(74, 158, 255, 0.10);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.27), 0 8px 28px rgba(0, 0, 0, 0.21), 0 0 8px rgba(74, 158, 255, 0.06);
 
   /* ─────────────────────────────────────────────────────────────────────────
      Premium Glass v1 — Sharp dark translucent surfaces (UI polish pass)
      ───────────────────────────────────────────────────────────────────────── */
 
     /* Surface fills -- adaptive shell glass. The actual alpha/blur is governed
-      by Settings > Shell & Dock > Liquid Glass and low-end accessibility mode. */
-    --pg-surface: var(--color-bg-glass, rgba(14, 14, 17, 0.82));
-    --pg-surface-strong: var(--color-bg-glass-strong, rgba(12, 12, 14, 0.92));
-    --pg-sidebar: var(--color-bg-glass, rgba(10, 10, 12, 0.82));
-    --pg-toolbar: var(--color-bg-glass, rgba(18, 18, 22, 0.78));
+      by Settings > Shell & Dock > Liquid Glass and low-end accessibility mode.
+      Fallback alphas carry the GOAL-6D transparency -50% pass. */
+    --pg-surface: var(--color-bg-glass, rgba(14, 14, 17, 0.91));
+    --pg-surface-strong: var(--color-bg-glass-strong, rgba(12, 12, 14, 0.96));
+    --pg-sidebar: var(--color-bg-glass, rgba(10, 10, 12, 0.91));
+    --pg-toolbar: var(--color-bg-glass, rgba(18, 18, 22, 0.89));
   --pg-row-hover: rgba(255, 255, 255, 0.05);
   --pg-row-active: rgba(74, 158, 255, 0.12);
 
@@ -371,12 +376,15 @@
   /* ─────────────────────────────────────────────────────────────────────────
      Translucency Scale (M3) — opacity rungs for glass / popover / panel layers
      Use as `background: rgba(22,22,24, var(--pg-translucency-3))` etc.
+     GOAL-6D transparency -50% pass applied (alpha = 1 - (1 - old) / 2).
+     Not yet consumed anywhere — adopt these rungs (instead of new rgba
+     literals) during the component glass sweep.
      ───────────────────────────────────────────────────────────────────────── */
-  --pg-translucency-1: 0.40;  /* whisper — barely-there scrim */
-  --pg-translucency-2: 0.55;  /* subtle — drop-down menus */
-  --pg-translucency-3: 0.72;  /* default — popovers, sheets */
-  --pg-translucency-4: 0.85;  /* strong — modals, blur-heavy panels */
-  --pg-translucency-5: 0.94;  /* near-solid — toolbars over busy bg */
+  --pg-translucency-1: 0.70;  /* whisper — lightest glass rung */
+  --pg-translucency-2: 0.78;  /* subtle — drop-down menus */
+  --pg-translucency-3: 0.86;  /* default — popovers, sheets */
+  --pg-translucency-4: 0.93;  /* strong — modals, blur-heavy panels */
+  --pg-translucency-5: 0.97;  /* near-solid — toolbars over busy bg */
 
   /* ─────────────────────────────────────────────────────────────────────────
      Z-Index Scale — Unified Shell Layering
@@ -682,8 +690,8 @@
    stripped automatically on low tier (backdrop-filter disabled there). */
 .dex-glass-panel {
   background: var(--surface-glass);
-  backdrop-filter: blur(24px) saturate(185%);
-  -webkit-backdrop-filter: blur(24px) saturate(185%);
+  backdrop-filter: var(--blur-lg) saturate(185%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(185%);
   border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-premium-md), var(--pg-gloss-top);
@@ -692,8 +700,8 @@
 /* Frosted surface */
 .dex-frosted {
   background: var(--surface-frosted);
-  backdrop-filter: blur(32px) saturate(160%);
-  -webkit-backdrop-filter: blur(32px) saturate(160%);
+  backdrop-filter: var(--blur-xl) saturate(160%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(160%);
   border: 1px solid var(--color-border-glass);
   box-shadow: var(--pg-gloss-top);
 }
@@ -701,8 +709,8 @@
 /* Tinted overlay */
 .dex-tinted {
   background: var(--surface-tinted);
-  backdrop-filter: blur(20px) saturate(130%);
-  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  backdrop-filter: var(--blur-lg) saturate(130%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(130%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -729,24 +737,24 @@
   border: 1px solid var(--pg-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-contact-2), var(--pg-gloss-top);
-  backdrop-filter: blur(10px) saturate(150%);
-  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: var(--blur-md) saturate(150%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(150%);
 }
 .dex-surface-glass {
   background: var(--surface-glass);
   border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-lg);
   box-shadow: var(--pg-shadow-panel), var(--pg-gloss-top);
-  backdrop-filter: blur(24px) saturate(185%);
-  -webkit-backdrop-filter: blur(24px) saturate(185%);
+  backdrop-filter: var(--blur-lg) saturate(185%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(185%);
 }
 .dex-surface-overlay {
   background: var(--pg-surface-strong);
   border: 1px solid var(--pg-border-strong);
   border-radius: var(--radius-md);
   box-shadow: var(--pg-shadow-context), var(--pg-gloss-top);
-  backdrop-filter: blur(16px) saturate(170%);
-  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: var(--blur-lg) saturate(170%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(170%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -882,8 +890,8 @@ html[data-contrast="high"] *:focus-visible {
 /* Creative app panels -- flat, bordered */
 .creative-panel {
   background: rgba(22, 22, 26, 0.95);
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: var(--blur-md) saturate(150%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(150%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -921,8 +929,8 @@ html[data-contrast="high"] *:focus-visible {
   height: 38px;
   padding: 0 12px;
   background: rgba(30, 30, 34, 0.90);
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: var(--blur-md) saturate(150%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(150%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
   gap: 6px;
@@ -1050,8 +1058,9 @@ html[data-contrast="high"] *:focus-visible {
   --color-bg-hover: #E2E2E5;
   --color-bg-active: #D8D8DC;
   --color-bg-overlay: #F7F7F9;
-  --color-bg-glass: rgba(245, 245, 248, 0.85);
-  --color-bg-glass-strong: rgba(240, 240, 243, 0.92);
+  /* GOAL-6D transparency -50% pass (light theme). */
+  --color-bg-glass: rgba(245, 245, 248, 0.93);
+  --color-bg-glass-strong: rgba(240, 240, 243, 0.96);
   --color-bg-blur: #F2F2F4;
   --color-bg-secondary: #EDEDED;
   --color-bg-elevated: #FFFFFF;
@@ -2253,39 +2262,39 @@ img, svg {
 /* Vibrancy / Glass System -- Liquid Glass */
 .vibrancy-panel {
   background: rgba(22, 22, 22, 0.82);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
 
 .vibrancy-dock {
   background: rgba(18, 18, 20, 0.72);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  backdrop-filter: var(--blur-xl) saturate(200%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
 }
 
 .vibrancy-menu {
   background: rgba(20, 20, 22, 0.85);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
 
 .vibrancy-toolbar {
   background: rgba(22, 22, 22, 0.78);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .vibrancy-sidebar {
   background: rgba(22, 22, 22, 0.80);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   position: relative;
 }
@@ -2424,8 +2433,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* --- Base Liquid Glass --- */
 .liquid-glass {
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
 }
@@ -2433,8 +2442,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Strong glass -- more opaque for panels/menus */
 .liquid-glass-strong {
   background: rgba(22, 22, 22, 0.82);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
@@ -2442,8 +2451,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Subtle glass -- lighter for buttons and toggles */
 .liquid-glass-subtle {
   background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: var(--blur-md) saturate(160%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
@@ -2451,8 +2460,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass button */
 .liquid-glass-btn {
   background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: var(--blur-md) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
   transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out), transform 0.15s var(--ease-spring);
@@ -2473,8 +2482,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass input */
 .liquid-glass-input {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: var(--blur-md) saturate(160%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
   transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
@@ -2489,8 +2498,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass toggle */
 .liquid-glass-toggle {
   background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px) saturate(160%);
-  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  backdrop-filter: var(--blur-md) saturate(160%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   transition: background 0.25s var(--ease-out), border-color 0.25s var(--ease-out);
 }
@@ -2503,8 +2512,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass dropdown/select */
 .liquid-glass-dropdown {
   background: rgba(22, 22, 22, 0.85);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
@@ -2512,8 +2521,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass card */
 .liquid-glass-card {
   background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
@@ -2528,8 +2537,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass dock */
 .liquid-glass-dock {
   background: rgba(18, 18, 20, 0.75);
-  backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  backdrop-filter: var(--blur-lg) saturate(200%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
 }
@@ -2537,8 +2546,8 @@ button, a, [role="button"], [role="menuitem"], input[type="range"], [data-tip] {
 /* Liquid glass overlay (for modals/menus backdrop) */
 .liquid-glass-overlay {
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px) saturate(150%);
-  -webkit-backdrop-filter: blur(8px) saturate(150%);
+  backdrop-filter: var(--blur-md) saturate(150%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(150%);
 }
 
 /* Legacy solid fallbacks */
@@ -2731,8 +2740,8 @@ html[data-perf-tier="low"] .btn {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-default);
   box-shadow: var(--shadow-md), inset 0 0.5px 0 rgba(255,255,255,0.05);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: var(--blur-md) saturate(160%);
+  -webkit-backdrop-filter: var(--blur-md) saturate(160%);
 }
 
 /* Elevated card with stronger emphasis */
@@ -3356,8 +3365,8 @@ button[aria-disabled="true"],
 /* --- Tahoe Context Menu --- */
 .tahoe-context-menu {
   background: var(--color-bg-surface);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-default);
   box-shadow: var(--shadow-xl);
@@ -3428,8 +3437,8 @@ button[aria-disabled="true"],
   right: 12px;
   padding: 10px 16px;
   background: var(--color-bg-surface);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
@@ -3618,8 +3627,8 @@ button[aria-disabled="true"],
   min-width: 180px;
   padding: 4px;
   background: var(--color-bg-surface);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
@@ -3663,8 +3672,8 @@ button[aria-disabled="true"],
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
   z-index: var(--z-modal);
   animation: fadeIn 200ms var(--ease-out);
 }
@@ -3676,8 +3685,8 @@ button[aria-disabled="true"],
   width: min(480px, 90vw);
   padding: 24px;
   background: var(--color-bg-surface);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--blur-xl) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: var(--shadow-xl);
@@ -3694,8 +3703,8 @@ button[aria-disabled="true"],
   width: min(360px, 85vw);
   padding: 24px;
   background: var(--color-bg-surface);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--blur-xl) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
@@ -3923,8 +3932,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
   display: inline-flex;
   flex-direction: column;
   background: var(--glass-bg, rgba(28,28,30,0.72));
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
   padding: 12px;
@@ -4633,7 +4642,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 /* Acrylic blur */
 .acrylic {
   background: rgba(22, 22, 26, 0.72);
-  backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--blur-xl) saturate(180%); -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 [data-theme="light"] .acrylic { background: rgba(255, 255, 255, 0.72); border-color: rgba(0, 0, 0, 0.08); }
@@ -4985,8 +4994,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 /* --- Frosted Panel (translucent with strong blur) --- */
 .tahoe-frosted-panel {
   background: rgba(28, 28, 32, 0.78);
-  backdrop-filter: blur(40px) saturate(190%);
-  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  backdrop-filter: var(--blur-xl) saturate(190%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45),
@@ -4997,8 +5006,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 /* --- Frosted Toolbar (app header bars) --- */
 .tahoe-frosted-toolbar {
   background: rgba(26, 26, 30, 0.82);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: var(--blur-xl) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: inset 0 -0.5px 0 rgba(0, 0, 0, 0.3);
 }
@@ -5006,8 +5015,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 /* --- Frosted Sidebar --- */
 .tahoe-frosted-sidebar {
   background: rgba(18, 18, 22, 0.85);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: var(--blur-xl) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -5030,8 +5039,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   padding: 0 14px;
   gap: 8px;
   background: var(--color-bg-elevated, rgba(26, 26, 30, 0.95));
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: var(--blur-lg) saturate(150%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(150%);
   border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
   user-select: none;
   -webkit-user-select: none;
@@ -5086,8 +5095,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 /* --- Tahoe Context Menu (frosted dropdown) --- */
 .tahoe-menu {
   background: rgba(30, 30, 34, 0.88);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  backdrop-filter: var(--blur-xl) saturate(200%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5),
@@ -5861,8 +5870,8 @@ html, body {
   max-width: 280px;
   padding: 12px 16px;
   background: var(--surface-glass);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
   box-shadow: var(--shadow-lg);
@@ -5921,8 +5930,8 @@ html, body {
   max-width: 340px;
   padding: 20px;
   background: var(--surface-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: var(--blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 14px;
   box-shadow: var(--shadow-xl);
@@ -6624,8 +6633,8 @@ html, body {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
   z-index: var(--z-modal);
   pointer-events: auto;
 }
@@ -6937,8 +6946,8 @@ input[type="search"]:focus-visible {
   padding: 0 var(--dex-toolbar-pad-x);
   border-bottom: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06));
   background: var(--color-bg-glass, rgba(22,22,24,0.72));
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: var(--blur-lg) saturate(160%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(160%);
   flex-shrink: 0;
 }
 .dex-toolbar-spacer { flex: 1; min-width: 0; }
@@ -6983,8 +6992,8 @@ input[type="search"]:focus-visible {
   padding: 6px;
   border-radius: 12px;
   background: var(--color-bg-elevated, rgba(26,26,30,0.92));
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: var(--blur-xl) saturate(180%);
+  -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
   border: 1px solid var(--color-border, rgba(255,255,255,0.10));
   box-shadow: 0 16px 50px rgba(0,0,0,0.55), 0 4px 14px rgba(0,0,0,0.35),
               inset 0 0.5px 0 rgba(255,255,255,0.08);
