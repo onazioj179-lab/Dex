@@ -35,7 +35,9 @@ describe('Pricing - constants', () => {
 
   it('publishes user-first promises', () => {
     expect(PRICING_PROMISES.length).toBeGreaterThanOrEqual(5);
-    expect(PRICING_PROMISES.join(' ')).toMatch(/no ads/i);
+    // The absolute "no ads" promise was intentionally dropped (free tier may show
+    // ads); the current user-first ad promise is "ad-free on every paid plan".
+    expect(PRICING_PROMISES.join(' ')).toMatch(/ad-free/i);
   });
 });
 

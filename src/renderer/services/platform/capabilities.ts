@@ -28,7 +28,7 @@ export const TAURI_NATIVE_SUBSYSTEMS: readonly string[] = [
   'system', 'power', 'os', 'shell', 'media', 'audio',
   'clipboard', 'vault', 'capability', 'storage', 'automation',
   'health', 'diagnostics', 'crashReporter',
-  'connection', 'networkHygiene', 'app', 'data',
+  'connection', 'networkHygiene', 'app', 'data', 'dialog',
   // Notification center + SQLite-backed subsystems (shared dex.db), routed
   // natively through dex_ipc -> db_dispatch in src-tauri/src/main.rs.
   'notifications',
@@ -45,7 +45,7 @@ export const TAURI_NATIVE_SUBSYSTEMS: readonly string[] = [
   'vinx-presentation', 'i18n', 'keyboard-nav',
   'notification-center', 'localization', 'global-search', 'fts', 'multiwindow',
   'multimonitor', 'migration', 'link-preview', 'live-collab', 'file-watcher',
-  'backup',
+  'backup', 'uki-chat',
 ];
 
 const TAURI_SET = new Set(TAURI_NATIVE_SUBSYSTEMS);

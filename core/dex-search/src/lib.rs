@@ -7,6 +7,7 @@
 //! instantly (`search`). Schema: path/name/ext (stored) + modified/size (stored
 //! u64). Queries are prefix-friendly so "rep" matches "report.pdf".
 
+use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -32,6 +33,10 @@ pub struct FileHit {
     pub score: f32,
 }
 
+/// Cheap to clone — `Index` is Arc-backed and `Field` is `Copy`, so a clone
+/// shares the same underlying index. This lets callers clone the handle out of a
+/// `Mutex` guard and run long operations (rebuild) WITHOUT holding the lock.
+#[derive(Clone)]
 pub struct SearchIndex {
     index: Index,
     f_path: Field,
@@ -115,20 +120,30 @@ impl SearchIndex {
     /// Walk `root` (bounded) and index every file. Returns the count indexed.
     pub fn index_path(&self, root: &Path, max: usize) -> Result<usize, String> {
         let mut writer: IndexWriter = self.index.writer(50_000_000).map_err(|e| e.to_string())?;
-        let mut n = 0usize;
-        for (path, modified, size) in walk(root, max) {
-            let name = path
-                .file_name()
-                .map(|x| x.to_string_lossy().to_string())
-                .unwrap_or_default();
-            let ext = path
-                .extension()
-                .map(|x| x.to_string_lossy().to_string())
-                .unwrap_or_default();
-            let content = read_text_content(&path, size);
+        // Read file contents (the I/O-bound part) in parallel, then feed the
+        // single IndexWriter sequentially (the writer isn't Sync for concurrent
+        // adds). Preserves the same documents, just overlaps the per-file reads.
+        let prepared: Vec<(String, String, String, u64, u64, String)> = walk(root, max)
+            .into_par_iter()
+            .map(|(path, modified, size)| {
+                let name = path
+                    .file_name()
+                    .map(|x| x.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let ext = path
+                    .extension()
+                    .map(|x| x.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let content = read_text_content(&path, size);
+                (path.to_string_lossy().to_string(), name, ext, modified, size, content)
+            })
+            .collect();
+
+        let n = prepared.len();
+        for (path, name, ext, modified, size, content) in prepared {
             writer
                 .add_document(doc!(
-                    self.f_path => path.to_string_lossy().to_string(),
+                    self.f_path => path,
                     self.f_name => name,
                     self.f_ext => ext,
                     self.f_content => content,
@@ -136,7 +151,6 @@ impl SearchIndex {
                     self.f_size => size,
                 ))
                 .map_err(|e| e.to_string())?;
-            n += 1;
         }
         writer.commit().map_err(|e| e.to_string())?;
         Ok(n)

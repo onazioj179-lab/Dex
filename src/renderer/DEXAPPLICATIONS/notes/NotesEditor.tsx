@@ -24,6 +24,9 @@ import {
   UndoManager,
   countWords,
 } from './NotesDocumentModel';
+import { askConfiguredLLM, hasConfiguredProvider } from '../../uki/providers/connect';
+import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemplates';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,6 +84,55 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'inlinecode', label: 'Inline Code', icon: '`', command: 'inlineCode' },
     { id: 'link', label: 'Link', icon: 'LK', command: 'link' },
   ],
+];
+
+// ---------------------------------------------------------------------------
+// uki AI writing actions (roadmap: "Writing assistance in Notes")
+// ---------------------------------------------------------------------------
+// Each runs a one-shot through the user's configured provider on the current
+// selection (or the whole note when nothing is selected). Prompts are built
+// injection-safe via promptTemplates. 'replace' swaps the selection in place;
+// 'append' (Continue) and any whole-note run add at the end, never destroying
+// existing text. Degrades to a status hint when no provider key is set.
+
+const AI_SYSTEM =
+  'You are a writing assistant inside DEX Notes. Return ONLY the resulting text — ' +
+  "no preamble, commentary, or surrounding quotes. Preserve the author's meaning.";
+
+interface AiAction {
+  id: string;
+  label: string;
+  mode: 'replace' | 'append';
+  build: (text: string) => string;
+}
+
+const AI_ACTIONS: AiAction[] = [
+  {
+    id: 'ai-improve',
+    label: 'Improve',
+    mode: 'replace',
+    build: (t) => renderPrompt(STANDARD_TEMPLATES.rewrite_tone, { tone: 'clear, polished, and professional', text: t }),
+  },
+  {
+    id: 'ai-summarise',
+    label: 'Summarise',
+    mode: 'replace',
+    build: (t) => renderPrompt(STANDARD_TEMPLATES.summarise, { maxSentences: '3', text: t }),
+  },
+  {
+    id: 'ai-bullets',
+    label: 'Bullets',
+    mode: 'replace',
+    build: (t) => renderPrompt(STANDARD_TEMPLATES.bullet_points, { count: '5', text: t }),
+  },
+  {
+    id: 'ai-extend',
+    label: 'Continue',
+    mode: 'append',
+    build: (t) =>
+      'Continue writing the following text naturally, matching its tone and style. ' +
+      'Return only the continuation (do not repeat the existing text):\n\n' + t,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -198,6 +250,31 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 auto',
     padding: '48px 32px',
   },
+  aiBtn: {
+    height: 28,
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 10px',
+    border: 'none',
+    borderRadius: 6,
+    background: 'transparent',
+    color: 'var(--color-accent)',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  aiBtnDisabled: {
+    opacity: 0.5,
+    cursor: 'default',
+  },
+  aiStatus: {
+    color: 'var(--color-accent)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    maxWidth: '60%',
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -221,6 +298,25 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   const [isEmpty, setIsEmpty] = useState(true);
   const [charCount, setCharCount] = useState(0);
   const [wdCount, setWdCount] = useState(0);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiStatus, setAiStatus] = useState('');
+
+  // Feed uki's app-context registry: answer "what note is open?" (first line as
+  // a title + the live selection) so the assistant is aware of the active note.
+  // Reads live DOM at call time, so a one-time registration is enough.
+  useEffect(() => {
+    registerUkiAppContext('notes', () => {
+      const text = (editorRef.current?.textContent || '').trim();
+      if (!text) return undefined;
+      const selection = window.getSelection()?.toString().trim();
+      return {
+        appId: 'notes',
+        currentFile: text.split('\n')[0]?.slice(0, 80) || undefined,
+        selectionText: selection || undefined,
+      };
+    });
+    return () => unregisterUkiAppContext('notes');
+  }, []);
 
   // Initial render: set editor HTML
   useEffect(() => {
@@ -303,6 +399,73 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     editorRef.current?.focus();
     emitChange();
   }, [pushUndo, emitChange]);
+
+  // -- uki AI writing actions --------------------------------------------
+
+  const setCaretToEnd = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const s = window.getSelection();
+    s?.removeAllRanges();
+    s?.addRange(range);
+  }, []);
+
+  const runAiAction = useCallback(async (action: AiAction) => {
+    if (readOnly || aiBusy) return;
+    const sel = window.getSelection();
+    const hasSelection = !!sel && sel.rangeCount > 0 && !sel.isCollapsed && !!sel.toString().trim();
+    const selectedText = hasSelection ? sel!.toString().trim() : '';
+    const fullText = (editorRef.current?.textContent || '').trim();
+    const source = selectedText || fullText;
+    if (!source) {
+      setAiStatus('Nothing to work with — write or select some text first.');
+      return;
+    }
+    if (!hasConfiguredProvider()) {
+      setAiStatus('Add an AI provider key in Settings to use AI actions.');
+      return;
+    }
+    // Preserve the selection across the await so a 'replace' lands in the right spot.
+    const savedRange = hasSelection && sel ? sel.getRangeAt(0).cloneRange() : null;
+
+    setAiBusy(true);
+    setAiStatus('uki is working…');
+    let result: string | null = null;
+    try {
+      result = await askConfiguredLLM(action.build(source), AI_SYSTEM, {
+        chatOptions: { temperature: 0.5, maxTokens: 900 },
+      });
+    } catch {
+      result = null;
+    }
+    setAiBusy(false);
+    if (!result) {
+      setAiStatus('uki could not complete that — check your provider key and connection.');
+      return;
+    }
+    setAiStatus('');
+
+    pushUndo();
+    editorRef.current?.focus();
+    const replace = action.mode === 'replace' && hasSelection;
+    if (replace) {
+      if (savedRange) {
+        const s = window.getSelection();
+        s?.removeAllRanges();
+        s?.addRange(savedRange);
+      }
+      document.execCommand('insertText', false, result);
+    } else {
+      // Append at the end — non-destructive (whole-note runs never overwrite).
+      setCaretToEnd();
+      document.execCommand('insertText', false, (fullText ? '\n\n' : '') + result);
+    }
+    emitChange();
+  }, [readOnly, aiBusy, pushUndo, emitChange, setCaretToEnd]);
 
   // -- Custom Commands ---------------------------------------------------
 
@@ -614,6 +777,22 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               {gi < TOOLBAR_GROUPS.length - 1 && <div style={styles.toolbarSep} />}
             </React.Fragment>
           ))}
+          {/* uki AI writing actions */}
+          <div style={styles.toolbarSep} />
+          <div style={styles.toolbarGroup}>
+            {AI_ACTIONS.map(action => (
+              <button
+                key={action.id}
+                aria-label={`uki: ${action.label}`}
+                title={`uki: ${action.label} (uses your configured AI provider)`}
+                style={{ ...styles.aiBtn, ...(aiBusy ? styles.aiBtnDisabled : {}) }}
+                disabled={aiBusy}
+                onMouseDown={e => { e.preventDefault(); void runAiAction(action); }}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -659,6 +838,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       {/* Status Bar */}
       <div style={styles.statusBar}>
         <span>{wdCount} words, {charCount} characters</span>
+        {aiStatus && <span style={styles.aiStatus}>{aiStatus}</span>}
         <span>{editorMode === 'edit' ? 'Editing' : editorMode === 'preview' ? 'Preview' : 'Split View'}</span>
       </div>
     </div>

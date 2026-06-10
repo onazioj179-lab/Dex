@@ -176,6 +176,18 @@ export const APP_REGISTRY: AppDefinition[] = [
     category: 'productivity',
   },
   {
+    id: 'uki',
+    name: 'uki',
+    icon: 'sparkle',
+    color: 'var(--color-accent)',
+    description: 'AI assistant with persistent conversation history',
+    version: APP_VERSION,
+    permissions: ['network.fetch', 'clipboard.read', 'clipboard.write'],
+    singleton: true,
+    supportsMultiWindow: false,
+    category: 'productivity',
+  },
+  {
     id: 'notes',
     name: 'Notes',
     icon: 'note',

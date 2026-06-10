@@ -21,6 +21,17 @@ import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/Cont
 // TYPES
 // ===========================================================================
 
+/** Native bridge invoke; resolves null off-platform (web shell) so callers degrade. */
+async function dexInvoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T | null> {
+  const d = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<T> } }).dex;
+  if (!d?.invoke) return null;
+  try {
+    return await d.invoke(channel, ...args);
+  } catch {
+    return null;
+  }
+}
+
 interface Task {
   id: string;
   title: string;
@@ -309,14 +320,39 @@ export const Tasks: React.FC = () => {
     }
   };
 
-  const addTask = () => {
-    if (!newTaskTitle.trim()) return;
+  const addTask = async () => {
+    const raw = newTaskTitle.trim();
+    if (!raw) return;
+
+    // Natural-language parse via the native nl-task engine: e.g. "Submit report
+    // tomorrow high priority" -> clean title + due date + priority. Pure + safe;
+    // falls back to the raw title off-platform or when nothing is detected.
+    let title = raw;
+    let parsedDue: Date | null = null;
+    let parsedPriority: Task['priority'] | null = null;
+    try {
+      const parsed = await dexInvoke<{ title?: string; dueDate?: string | null; priority?: string }>('nl-task:parse', raw);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.title && parsed.title.trim()) title = parsed.title.trim();
+        if (parsed.dueDate) {
+          const d = new Date(parsed.dueDate);
+          if (!isNaN(d.getTime())) parsedDue = d;
+        }
+        if (parsed.priority === 'high' || parsed.priority === 'low') parsedPriority = parsed.priority;
+        else if (parsed.priority === 'normal') parsedPriority = 'medium';
+      }
+    } catch {
+      /* fall back to the raw title */
+    }
+
     const newTask: Task = {
       id: crypto.randomUUID(),
-      title: newTaskTitle,
+      title,
       completed: false,
-      priority: 'medium',
-      dueDate: newTaskDue ? new Date(newTaskDue) : (selectedList === 'today' || selectedList === 'scheduled' ? new Date() : null),
+      priority: parsedPriority ?? 'medium',
+      dueDate: newTaskDue
+        ? new Date(newTaskDue)
+        : (parsedDue ?? (selectedList === 'today' || selectedList === 'scheduled' ? new Date() : null)),
       list: ['personal', 'work'].includes(selectedList) ? selectedList : 'personal',
       notes: '',
     };
@@ -609,7 +645,7 @@ export const Tasks: React.FC = () => {
           <div style={styles.checkbox} />
           <input
             type="text"
-            placeholder="Add a task..."
+            placeholder="Add a task...  (try: Email Sam tomorrow high priority)"
             ref={newTaskInputRef}
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}

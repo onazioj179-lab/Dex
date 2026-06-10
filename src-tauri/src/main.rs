@@ -14,6 +14,7 @@
 mod activity_feed;
 mod changelog;
 mod color_labels;
+mod compress;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -24,6 +25,13 @@ mod help_system;
 mod journal;
 mod layout;
 mod licensing;
+mod native_ops;
+// Command-layer modules (app/OS-bound channels, reuse native_ops helpers).
+mod cmd_export_bundle;
+mod cmd_file_watcher;
+mod cmd_link_preview;
+mod cmd_scratchpad;
+mod cmd_window_monitor;
 mod notifications;
 mod read_later;
 mod recycle_bin;
@@ -36,6 +44,7 @@ mod smart_rename;
 mod snapshot_comparison;
 mod statistics_dashboard;
 mod time_tracking;
+mod uki_chat;
 mod version_history;
 mod word_count;
 // Wave 2 — project-* family + voice memo, daily briefing, dependency,
@@ -593,9 +602,10 @@ fn audio_waveform(path: &str, buckets: usize) -> Value {
 /// Query the index; `None` when the index is empty so the caller falls back to
 /// the bounded filesystem walk.
 fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Value> {
+    // Clone the (Arc-backed) index handle out of the guard and release the lock
+    // immediately, so a concurrent rebuild can't block this search.
     let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let guard = state.lock().ok()?;
-    let idx = guard.as_ref()?;
+    let idx = { state.lock().ok()?.as_ref()?.clone() };
     if idx.count() == 0 {
         return None;
     }
@@ -604,15 +614,21 @@ fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Val
 
 /// Clear + rebuild the index from the user's document folders.
 fn index_rebuild(app: &tauri::AppHandle) -> Value {
+    // Take a clone of the index handle, then DROP the lock before the multi-second
+    // clear + walk so searches stay responsive during a rebuild. The clone shares
+    // the same underlying Tantivy index (internally synchronized).
     let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let guard = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "index busy" }),
-    };
-    let idx = match guard.as_ref() {
-        Some(i) => i,
-        None => return json!({ "success": false, "error": "index unavailable" }),
-    };
+    let idx = {
+        let guard = match state.lock() {
+            Ok(g) => g,
+            Err(_) => return json!({ "success": false, "error": "index busy" }),
+        };
+        match guard.as_ref() {
+            Some(i) => i.clone(),
+            None => return json!({ "success": false, "error": "index unavailable" }),
+        }
+    }; // lock released here
+
     if let Err(e) = idx.clear() {
         return json!({ "success": false, "error": e });
     }
@@ -938,6 +954,9 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     if channel.starts_with("backup:") {
         return backup_restore::dispatch(conn, channel, args);
     }
+    if channel.starts_with("uki-chat:") {
+        return uki_chat::dispatch(conn, channel, args);
+    }
     Value::Null
 }
 
@@ -1045,6 +1064,53 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
 
         // --- Shell ----------------------------------------------------------
         "shell:openExternal" | "shell:openPath" => shell_open(&arg_str(0).unwrap_or_default()),
+
+        // --- Native dialogs (Tauri dialog plugin) --------------------------
+        // Electron dialog.showOpenDialog parity: { canceled, filePaths }.
+        "dialog:showOpenDialog" | "files:openDialog" => native_ops::show_open_dialog(&app, &args),
+
+        // --- Filesystem command layer (need app paths/dialog + the db) -----
+        "project-archiver:archive" => native_ops::archiver_archive(&app, &args),
+        "project-archiver:unarchive" => native_ops::archiver_unarchive(&app, &args),
+        "project-archiver:getArchiveDir" => native_ops::archiver_get_dir(&app),
+        "media-library:import" => native_ops::media_import(&app, &args),
+        "changelog:export" => native_ops::changelog_export(&app, &args),
+        "dexnotes:addAttachment" => native_ops::note_add_attachment(&app, &args),
+        "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
+        "dexnotes:openAttachment" => native_ops::note_open_attachment(&app, &args),
+        "backup:create" => native_ops::backup_create(&app, &args),
+        "backup:verify" => native_ops::backup_verify(&app, &args),
+        "backup:restore" => native_ops::backup_restore(&app, &args),
+        "export-bundle:create" => cmd_export_bundle::create(&app, &args),
+        "link-preview:fetch" => cmd_link_preview::fetch(&app, &args),
+        ch @ ("scratchpad:updateContent" | "scratchpad:saveNow") => {
+            cmd_scratchpad::dispatch(&app, ch, &args)
+        }
+        ch @ ("file-watcher:addFolder" | "file-watcher:importFile") => {
+            cmd_file_watcher::dispatch(&app, ch, &args)
+        }
+        ch @ ("multimonitor:get-displays"
+        | "multimonitor:get-current-display"
+        | "multimonitor:get-scale-factor") => cmd_window_monitor::dispatch(&window, ch, &args),
+
+        // --- Notification center: DB insert + OS toast ---------------------
+        // The DB record (read by the in-app notification center) is written by
+        // the hub module; additionally raise an OS notification, matching the
+        // Electron `send` which also fired a native Notification. Skip the toast
+        // when the hub returns -1 (the app's notifications are disabled).
+        "notification-center:send" => {
+            let res = db_dispatch(&app, "notification-center:send", &args);
+            if res.as_i64().map(|n| n >= 0).unwrap_or(false) {
+                if let Some(p) = args.get(0) {
+                    let title = p.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                    let body = p.get("body").and_then(|v| v.as_str()).unwrap_or("");
+                    if !title.is_empty() || !body.is_empty() {
+                        native_ops::notify(&app, title, body);
+                    }
+                }
+            }
+            res
+        }
 
         // --- OS controls (lock only; shutdown/restart/sleep deferred until
         //     tested, to avoid an accidental shutdown during migration) ------
@@ -1275,7 +1341,8 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
             || ch.starts_with("link-preview:")
             || ch.starts_with("live-collab:")
             || ch.starts_with("file-watcher:")
-            || ch.starts_with("backup:") =>
+            || ch.starts_with("backup:")
+            || ch.starts_with("uki-chat:") =>
         {
             db_dispatch(&app, ch, &args)
         }
@@ -1305,8 +1372,73 @@ fn smart_router_route(
     route_for_prompt(RoutingGoal::parse(&goal), &user_text, &candidates)
 }
 
+/// Run every subsystem's `ensure_schema` against the shared connection. Called
+/// at startup and again by `backup:restore` after swapping in a snapshot. All
+/// calls are idempotent (CREATE TABLE IF NOT EXISTS + seeds).
+pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
+    activity_feed::ensure_schema(c);
+    changelog::ensure_schema(c);
+    color_labels::ensure_schema(c);
+    content_expiry::ensure_schema(c);
+    daily_note::ensure_schema(c);
+    dashboard::ensure_schema(c);
+    feedback_collector::ensure_schema(c);
+    goal_system::ensure_schema(c);
+    help_system::ensure_schema(c);
+    journal::ensure_schema(c);
+    layout::ensure_schema(c);
+    licensing::ensure_schema(c);
+    read_later::ensure_schema(c);
+    recycle_bin::ensure_schema(c);
+    relationship_graph::ensure_schema(c);
+    reminder::ensure_schema(c);
+    scratchpad::ensure_schema(c);
+    search_history::ensure_schema(c);
+    smart_grouping::ensure_schema(c);
+    smart_rename::ensure_schema(c);
+    snapshot_comparison::ensure_schema(c);
+    statistics_dashboard::ensure_schema(c);
+    time_tracking::ensure_schema(c);
+    version_history::ensure_schema(c);
+    word_count::ensure_schema(c);
+    bulk_metadata::ensure_schema(c);
+    daily_briefing::ensure_schema(c);
+    dependency::ensure_schema(c);
+    duplication_detector::ensure_schema(c);
+    project_archiver::ensure_schema(c);
+    project_comparison::ensure_schema(c);
+    project_export_bundle::ensure_schema(c);
+    project_health::ensure_schema(c);
+    project_linker::ensure_schema(c);
+    project_lock::ensure_schema(c);
+    project_timeline::ensure_schema(c);
+    voice_memo::ensure_schema(c);
+    keyboard_navigation::ensure_schema(c);
+    localization::ensure_schema(c);
+    nl_task::ensure_schema(c);
+    notes::ensure_schema(c);
+    session_replay::ensure_schema(c);
+    shared_media_library::ensure_schema(c);
+    theme_schedule::ensure_schema(c);
+    vinx_presentation::ensure_schema(c);
+    backup_restore::ensure_schema(c);
+    file_watcher::ensure_schema(c);
+    full_text_index::ensure_schema(c);
+    global_content_search::ensure_schema(c);
+    link_preview::ensure_schema(c);
+    live_collaboration::ensure_schema(c);
+    localization_engine::ensure_schema(c);
+    migration::ensure_schema(c);
+    multi_monitor::ensure_schema(c);
+    multi_window::ensure_schema(c);
+    unified_notification_hub::ensure_schema(c);
+    uki_chat::ensure_schema(c);
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Vault state lives for the app lifetime; the key is only set while
             // unlocked. File is stored in the app config dir.
@@ -1347,66 +1479,19 @@ fn main() {
             if let Some(ref c) = conn {
                 // Each subsystem ensures its own tables (CREATE TABLE IF NOT
                 // EXISTS), mirroring how the Electron managers init on the shared
-                // DatabaseManager. Order is irrelevant; all are idempotent.
-                activity_feed::ensure_schema(c);
-                changelog::ensure_schema(c);
-                color_labels::ensure_schema(c);
-                content_expiry::ensure_schema(c);
-                daily_note::ensure_schema(c);
-                dashboard::ensure_schema(c);
-                feedback_collector::ensure_schema(c);
-                goal_system::ensure_schema(c);
-                help_system::ensure_schema(c);
-                journal::ensure_schema(c);
-                layout::ensure_schema(c);
-                licensing::ensure_schema(c);
-                read_later::ensure_schema(c);
-                recycle_bin::ensure_schema(c);
-                relationship_graph::ensure_schema(c);
-                reminder::ensure_schema(c);
-                scratchpad::ensure_schema(c);
-                search_history::ensure_schema(c);
-                smart_grouping::ensure_schema(c);
-                smart_rename::ensure_schema(c);
-                snapshot_comparison::ensure_schema(c);
-                statistics_dashboard::ensure_schema(c);
-                time_tracking::ensure_schema(c);
-                version_history::ensure_schema(c);
-                word_count::ensure_schema(c);
-                bulk_metadata::ensure_schema(c);
-                daily_briefing::ensure_schema(c);
-                dependency::ensure_schema(c);
-                duplication_detector::ensure_schema(c);
-                project_archiver::ensure_schema(c);
-                project_comparison::ensure_schema(c);
-                project_export_bundle::ensure_schema(c);
-                project_health::ensure_schema(c);
-                project_linker::ensure_schema(c);
-                project_lock::ensure_schema(c);
-                project_timeline::ensure_schema(c);
-                voice_memo::ensure_schema(c);
-                keyboard_navigation::ensure_schema(c);
-                localization::ensure_schema(c);
-                nl_task::ensure_schema(c);
-                notes::ensure_schema(c);
-                session_replay::ensure_schema(c);
-                shared_media_library::ensure_schema(c);
-                theme_schedule::ensure_schema(c);
-                vinx_presentation::ensure_schema(c);
-                backup_restore::ensure_schema(c);
-                file_watcher::ensure_schema(c);
-                full_text_index::ensure_schema(c);
-                global_content_search::ensure_schema(c);
-                link_preview::ensure_schema(c);
-                live_collaboration::ensure_schema(c);
-                localization_engine::ensure_schema(c);
-                migration::ensure_schema(c);
-                multi_monitor::ensure_schema(c);
-                multi_window::ensure_schema(c);
-                unified_notification_hub::ensure_schema(c);
+                // DatabaseManager. Factored out so backup:restore can re-run it
+                // after swapping in a snapshot. Order is irrelevant; all idempotent.
+                ensure_all_schemas(c);
             }
             let db_state: db::DbState = std::sync::Mutex::new(conn);
             app.manage(db_state);
+            // File-swap gate for backup:restore vs out-of-band dex.db connections.
+            app.manage(db::DbGate::new(()));
+            // Background reminder scheduler — polls due reminders every 30s and
+            // fires OS notifications (mirrors ReminderManager's interval).
+            native_ops::start_reminder_scheduler(app.handle().clone());
+            // Automatic backup scheduler (honors backup_settings; catchup on boot).
+            native_ops::start_autobackup_scheduler(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![smart_router_route, dex_ipc])
