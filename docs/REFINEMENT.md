@@ -76,6 +76,25 @@
 - **tokens.ts radius mirror** documented as bound to the canonical scale
   (values already matched).
 
+**Also done (2026-06-10, fourth batch — typography + token closeout):**
+- **One text vocabulary (P2/P4):** deleted the unused "M1 per-region" semantic
+  size/leading set (zero consumers — a dead parallel vocabulary);
+  `--text-md` is now an alias of `--text-base`; `--leading-normal` aliases
+  `--leading-base`; `--tracking-tight/normal` alias their value-identical
+  `--ls-*` rungs; unused `--leading-tight` deleted. Zero visual change —
+  aliases are value-identical, deletions had no consumers.
+- **Font stacks documented as the complete set** (mono identity
+  `--font-family` for code/data surfaces vs `--dex-font-ui` chrome default);
+  tailwind fontFamily/fontSize now bind to the CSS tokens instead of
+  restating them; tokens.ts fontSize mirror completed (3xl/4xl) + documented.
+- **Radius closeout:** all scale-exact `border-radius` literals in
+  design-system.css/globals.css swept to tokens (~90 sites incl. pill
+  idioms 100px/999px/9999px -> --radius-full); `--pg-row-radius` bound to the
+  scale. Remaining off-scale literals flagged for visual review: 4x 14px,
+  1x 16px, 1x 5px, 1x 7px (plus sub-scale 1-2px hairlines, intentional).
+  Component inline borderRadius numbers remain (JS numbers; sweep later
+  with visual sign-off).
+
 **Next batches (in order):**
 1. **Rewire FileIntelligenceController -> FileWatcherManager and
    WorkflowController -> TaskQueueManager** (finding 13), then retire
