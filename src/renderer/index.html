@@ -27,48 +27,53 @@
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Dex - Control Hub</title>
     <style>
-      /* DEX Design Tokens (inlined to prevent FOUC) */
+      /* DEX Design Tokens (inlined to prevent FOUC).
+         Boot-time fallbacks — every value here MUST equal the runtime
+         definition in design-system.css / design-tokens.css, or the app
+         flashes the wrong look on every launch (--color-danger mirrors the
+         dark-theme --color-error). Only --space-unit is boot-only. */
       :root {
-        --color-bg-base: #0a0a14;
-        --color-bg-surface: #0A0A0A;
-        --color-bg-elevated: #111111;
-        --color-bg-secondary: #0D0D0D;
-        --color-bg-hover: rgba(255,255,255,0.04);
-        --color-bg-glass: rgba(10,10,10,0.93);
-        --color-text-primary: #F2F2F2;
-        --color-text-secondary: #A0A0A0;
-        --color-text-muted: #5A5A5A;
-        --color-text-tertiary: #404040;
+        --color-bg-base: #0C0C0E;
+        --color-bg-surface: #161618;
+        --color-bg-elevated: #1A1A1E;
+        --color-bg-secondary: #121214;
+        --color-bg-hover: #1E1E22;
+        --color-bg-glass: rgba(22, 22, 24, 0.86);
+        --color-text-primary: #FFFFFF;
+        --color-text-secondary: #B8B8BD;
+        --color-text-muted: #A0A0A5;
+        --color-text-tertiary: #8E8E93;
         --color-accent: #4A9EFF;
         --color-accent-text: #FFFFFF;
-        --color-accent-hover: #68B2FF;
-        --color-accent-subtle: rgba(74,158,255,0.12);
-        --color-border: rgba(255,255,255,0.08);
-        --color-border-subtle: rgba(255,255,255,0.04);
-        --color-success: #30D158;
-        --color-warning: #FFD60A;
+        --color-accent-hover: #6CB2FF;
+        --color-accent-subtle: rgba(74, 158, 255, 0.12);
+        --color-border: rgba(255, 255, 255, 0.14);
+        --color-border-subtle: rgba(255, 255, 255, 0.08);
+        --color-success: #34C759;
+        --color-warning: #FF9F0A;
         --color-danger: #FF453A;
-        --color-shadow-soft: rgba(0,0,0,0.3);
-        --color-shadow-strong: rgba(0,0,0,0.5);
-        --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-        --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace;
+        --color-shadow-soft: rgba(0, 0, 0, 0.18);
+        --color-shadow-strong: rgba(0, 0, 0, 0.30);
+        --font-family: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
+        --dex-font-ui: -apple-system, "Segoe UI Variable", "Segoe UI", system-ui, Inter, sans-serif;
+        --font-mono: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
         --space-unit: 4px;
-        /* Boot-time fallbacks — MUST match the canonical radius scale in
-           design-system.css (one scale everywhere, no flash on load). */
         --radius-sm: 4px;
         --radius-md: 6px;
         --radius-lg: 8px;
         --radius-xl: 10px;
       }
-      /* Critical fallback styles - ensures app is visible even if CSS fails */
+      /* Critical fallback styles - ensures app is visible even if CSS fails.
+         Body chrome uses the native UI stack (--dex-font-ui), matching the
+         runtime rule in design-tokens.css. */
       html, body, #root {
         margin: 0;
         padding: 0;
         width: 100%;
         height: 100vh;
         overflow: hidden;
-        font-family: var(--font-family);
-        color: #F2F2F2;
+        font-family: var(--dex-font-ui);
+        color: #FFFFFF;
       }
       html { background: #0C0C0E; }
       body, #root { background: transparent; }
@@ -84,12 +89,12 @@
       /* Dark mode (default) */
       html[data-theme="dark"] {
         background: #0C0C0E !important;
-        color: #fafafa !important;
+        color: #FFFFFF !important;
       }
       html[data-theme="dark"] body, html[data-theme="dark"] #root,
       html:not([data-theme]) body, html:not([data-theme]) #root {
         background: transparent !important;
-        color: #fafafa !important;
+        color: #FFFFFF !important;
       }
       #root:empty::before {
         content: '';
