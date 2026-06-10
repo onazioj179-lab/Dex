@@ -47,7 +47,9 @@ export const gap = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Border Radius
+// Border Radius — JS mirror of the ONE canonical scale (--radius-* in
+// design-system.css). Keep these values identical to that scale; never add
+// ad-hoc rungs here.
 // ---------------------------------------------------------------------------
 export const radius = {
   none: 0,
