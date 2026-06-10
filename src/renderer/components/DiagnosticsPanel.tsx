@@ -87,8 +87,8 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: 'var(--blur-lg)',
+        WebkitBackdropFilter: 'var(--blur-lg)',
       }}
     >
       {/* Header */}

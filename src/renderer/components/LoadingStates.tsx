@@ -372,7 +372,7 @@ export const LoadingOverlay = memo<LoadingOverlayProps>(({
         gap: 12,
         background,
         zIndex,
-        backdropFilter: 'blur(4px)',
+        backdropFilter: 'var(--blur-sm)',
       }}
     >
       {children || <Spinner size={40} />}

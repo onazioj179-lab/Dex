@@ -1690,8 +1690,8 @@ const UkiOverlay: React.FC = () => {
 
       <div onMouseDown={handleDragStart} style={{
         background: 'rgba(255,255,255,0.06)',
-        backdropFilter: 'blur(34px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+        backdropFilter: 'var(--blur-xl) saturate(180%)',
+        WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
         border: '1px solid rgba(255,255,255,0.10)',
         borderRadius: 16,
         boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',

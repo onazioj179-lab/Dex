@@ -7,19 +7,30 @@
 //! queries, and return shapes as the Electron manager. The renderer-facing
 //! surface is the seven handlers below.
 //!
-//! Only the DB-persisted CRUD is ported faithfully here: `backup:list` (backup
-//! history), `backup:get-settings` / `backup:update-settings` (schedule + path
-//! config). The handlers that perform real file I/O — copying/zipping the on-disk
-//! databases, computing checksums, native save/open dialogs, and writing/reading
-//! the `.dexbak` archive — live in the OS layer, not in these pure DB functions,
-//! so they degrade honestly (`{ "success": false, "error": "... (not ported)" }`)
-//! rather than fabricating file paths or running a real backup/restore. The Tauri
-//! command layer should wire the real fs/dialog work and reuse the metadata CRUD
-//! below to record/list/prune history.
+//! Fully ported: `backup:create` gathers the on-disk database files +
+//! `settings.json` from the app data dir (the Tauri analog of Electron's
+//! userData), builds the base64 JSON archive, gzips it at level 6, writes the
+//! `.dexbak` file (under the configured backup_path, or `data_dir/backups`
+//! when unset), records the row with a SHA-256 checksum, and prunes old
+//! automatic backups. `backup:verify` re-reads the file, re-checks the
+//! checksum, and validates the manifest; `backup:restore` takes a pre-restore
+//! safety backup and writes the selected databases back to disk — all with the
+//! exact `.dexbak` format and return shapes of the Electron manager, so backup
+//! files round-trip between the shells. The auto-backup interval timer is an
+//! Electron-runtime concern with no IPC surface and is not replicated here.
 
+use crate::licensing::sha256_hex;
+use crate::{util, zlib};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection, Row};
 use serde_json::{json, Value};
+use std::path::{Path, PathBuf};
+
+/// The database files the Electron manager includes in every backup, relative
+/// to the app data dir (absent files are skipped, as the TS does).
+const DATABASE_FILES: [&str; 3] = ["dex-core.db", "dex-notes.db", "help.db"];
 
 /// Create the backups + backup_settings tables and seed the singleton settings
 /// row (matches BackupRestoreManager.initialize). The TS seeds `backup_path` with
@@ -181,22 +192,348 @@ fn update_settings(conn: &Connection, partial: &Value) -> Value {
     get_settings(conn)
 }
 
-/// backup:delete — deleteBackup(id). The TS unlinks the on-disk `.dexbak` file
-/// (an fs op unavailable here) AND removes the metadata row, returning boolean.
-/// We faithfully port the DB-metadata removal (the persisted half) and return
-/// whether a row was removed; the OS layer is responsible for deleting the file.
+/// backup:delete — deleteBackup(id). Unlinks the on-disk `.dexbak` file
+/// (best-effort, missing file tolerated as in the TS existsSync guard) and
+/// removes the metadata row. Returns false when the backup row is absent.
 fn delete_backup(conn: &Connection, args: &Value) -> Value {
     let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-    // Mirror the TS `if (!row) return false` guard via the affected-row count.
-    let changes = conn
-        .execute("DELETE FROM backups WHERE id = ?", params![id])
-        .unwrap_or(0);
-    json!(changes > 0)
+    let filepath: Option<String> = conn
+        .query_row(
+            "SELECT filepath FROM backups WHERE id = ?",
+            params![id],
+            |r| r.get(0),
+        )
+        .ok();
+    let filepath = match filepath {
+        Some(p) => p,
+        None => return json!(false),
+    };
+    let _ = std::fs::remove_file(filepath);
+    let _ = conn.execute("DELETE FROM backups WHERE id = ?", params![id]);
+    json!(true)
 }
 
-pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
+/// The directory `.dexbak` files are written to: the configured backup_path,
+/// or `data_dir/backups` when unset (the same default the TS seeds at init).
+fn backup_dir(conn: &Connection, data_dir: &Path) -> PathBuf {
+    let configured = get_settings(conn)
+        .get("backup_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if configured.is_empty() {
+        data_dir.join("backups")
+    } else {
+        PathBuf::from(configured)
+    }
+}
+
+/// backup:create — createBackup(type='manual', description=''). Returns the
+/// BackupRecord, or null on a filesystem failure (where the TS would reject).
+fn create_backup(conn: &Connection, data_dir: &Path, backup_type: &str, description: &str) -> Value {
+    let dir = backup_dir(conn, data_dir);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Value::Null;
+    }
+
+    let id = util::pseudo_uuid_v4();
+    let iso = util::iso_utc_now();
+    // `toISOString().replace(/[:.]/g, '-').substring(0, 19)`
+    let timestamp: String = iso
+        .chars()
+        .map(|c| if c == ':' || c == '.' { '-' } else { c })
+        .take(19)
+        .collect();
+    let filename = format!("dex-backup-{}-{}.dexbak", timestamp, backup_type);
+    let filepath = dir.join(&filename);
+
+    // Gather the database files + settings.json that exist on disk.
+    let mut backup_data: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut included: Vec<String> = Vec::new();
+    for db_file in DATABASE_FILES {
+        if let Ok(bytes) = std::fs::read(data_dir.join(db_file)) {
+            backup_data.push((db_file.to_string(), bytes));
+            included.push(db_file.to_string());
+        }
+    }
+    if let Ok(bytes) = std::fs::read(data_dir.join("settings.json")) {
+        backup_data.push(("settings.json".to_string(), bytes));
+    }
+
+    // Manifest lists the data files (not itself), exactly as the TS builds it.
+    let files: Vec<String> = backup_data.iter().map(|(k, _)| k.clone()).collect();
+    let manifest = json!({
+        "version": 1,
+        "type": backup_type,
+        "created_at": iso,
+        "app_version": env!("CARGO_PKG_VERSION"),
+        "databases": included,
+        "files": files,
+    });
+    let manifest_bytes = serde_json::to_string_pretty(&manifest)
+        .unwrap_or_default()
+        .into_bytes();
+    backup_data.push(("manifest.json".to_string(), manifest_bytes));
+
+    // Archive = JSON object of base64 entries, gzipped at level 6 (.dexbak).
+    let mut obj = serde_json::Map::new();
+    for (k, v) in &backup_data {
+        obj.insert(k.clone(), json!(BASE64.encode(v)));
+    }
+    let archive = Value::Object(obj).to_string();
+    let compressed = zlib::gzip(archive.as_bytes());
+    if std::fs::write(&filepath, &compressed).is_err() {
+        return Value::Null;
+    }
+
+    let checksum = sha256_hex(&compressed);
+    let size_bytes = compressed.len() as i64;
+    let filepath_str = filepath.to_string_lossy().to_string();
+    let _ = conn.execute(
+        "INSERT INTO backups (id, filename, filepath, size_bytes, type, description, databases, checksum, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        params![
+            id,
+            filename,
+            filepath_str,
+            size_bytes,
+            backup_type,
+            description,
+            json!(included).to_string(),
+            checksum
+        ],
+    );
+    if backup_type == "automatic" {
+        let _ = conn.execute(
+            "UPDATE backup_settings SET last_auto_backup = datetime('now') WHERE id = 1",
+            [],
+        );
+    }
+    prune_old_backups(conn);
+
+    json!({
+        "id": id,
+        "filename": filename,
+        "filepath": filepath_str,
+        "size_bytes": size_bytes,
+        "type": backup_type,
+        "description": description,
+        "databases": included,
+        "checksum": checksum,
+        "created_at": iso,
+    })
+}
+
+/// Keep at most max_backups automatic backups, unlinking the pruned files
+/// (matches pruneOldBackups, including swallowing per-file errors).
+fn prune_old_backups(conn: &Connection) {
+    let max_backups = get_settings(conn)
+        .get("max_backups")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(10)
+        .max(0) as usize;
+    let mut stmt = match conn.prepare(
+        "SELECT id, filepath FROM backups WHERE type = 'automatic' ORDER BY created_at DESC",
+    ) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let rows: Vec<(String, String)> = match stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))) {
+        Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+        Err(_) => return,
+    };
+    for (id, filepath) in rows.into_iter().skip(max_backups) {
+        let _ = std::fs::remove_file(&filepath);
+        let _ = conn.execute("DELETE FROM backups WHERE id = ?", params![id]);
+    }
+}
+
+/// Read + parse a `.dexbak` archive into (archive object, manifest). Errors are
+/// returned as the human-readable strings the TS verify path produces.
+fn read_archive(filepath: &str) -> Result<(serde_json::Map<String, Value>, Value), String> {
+    let file_data =
+        std::fs::read(filepath).map_err(|e| format!("Verification failed: {}", e))?;
+    let decompressed =
+        zlib::gunzip(&file_data).map_err(|e| format!("Verification failed: {}", e))?;
+    let archive: Value = serde_json::from_slice(&decompressed)
+        .map_err(|e| format!("Verification failed: {}", e))?;
+    let archive = match archive {
+        Value::Object(m) => m,
+        _ => return Err("Verification failed: archive is not an object".to_string()),
+    };
+    let manifest_b64 = match archive.get("manifest.json").and_then(|v| v.as_str()) {
+        Some(m) => m,
+        None => return Err("Backup is missing manifest.".to_string()),
+    };
+    let manifest_bytes = BASE64
+        .decode(manifest_b64)
+        .map_err(|e| format!("Verification failed: {}", e))?;
+    let manifest: Value = serde_json::from_slice(&manifest_bytes)
+        .map_err(|e| format!("Verification failed: {}", e))?;
+    Ok((archive, manifest))
+}
+
+/// backup:verify — verifyBackup(id). Returns { valid, details } with the same
+/// detail strings as the TS for every branch.
+fn verify_backup(conn: &Connection, backup_id: &str) -> Value {
+    let row: Option<(String, String)> = conn
+        .query_row(
+            "SELECT filepath, checksum FROM backups WHERE id = ?",
+            params![backup_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .ok();
+    let (filepath, checksum) = match row {
+        Some(r) => r,
+        None => return json!({ "valid": false, "details": "Backup not found" }),
+    };
+    if !Path::new(&filepath).exists() {
+        return json!({ "valid": false, "details": "Backup file is missing from disk" });
+    }
+    let file_data = match std::fs::read(&filepath) {
+        Ok(d) => d,
+        Err(e) => return json!({ "valid": false, "details": format!("Verification failed: {}", e) }),
+    };
+    if sha256_hex(&file_data) != checksum {
+        return json!({
+            "valid": false,
+            "details": "Checksum mismatch. Backup file may be corrupted."
+        });
+    }
+    let (_, manifest) = match read_archive(&filepath) {
+        Ok(a) => a,
+        Err(details) => return json!({ "valid": false, "details": details }),
+    };
+    let version_ok = manifest.get("version").map(truthy).unwrap_or(false);
+    let databases = manifest.get("databases").and_then(|v| v.as_array()).cloned();
+    if !version_ok || databases.is_none() {
+        return json!({ "valid": false, "details": "Manifest is malformed." });
+    }
+    let created_at = manifest
+        .get("created_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    json!({
+        "valid": true,
+        "details": format!(
+            "Backup valid. Contains {} databases, created at {}.",
+            databases.map(|d| d.len()).unwrap_or(0),
+            created_at
+        )
+    })
+}
+
+/// JS truthiness for the manifest `version` field check.
+fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().map(|f| f != 0.0).unwrap_or(true),
+        Value::String(s) => !s.is_empty(),
+        _ => true,
+    }
+}
+
+/// backup:restore — restoreBackup(id, selectedDatabases?). Verifies, takes the
+/// pre-restore safety backup, then writes the selected database files (and
+/// settings.json when present) back into the app data dir. The Electron close/
+/// reopen of its `dex-core.db` handle is not needed here — this module does not
+/// hold those files open.
+fn restore_backup(conn: &Connection, data_dir: &Path, args: &Value) -> Value {
+    let backup_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+    let selected: Option<Vec<String>> = args.get(1).and_then(|v| v.as_array()).map(|a| {
+        a.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    });
+
+    let filepath: Option<String> = conn
+        .query_row(
+            "SELECT filepath FROM backups WHERE id = ?",
+            params![backup_id],
+            |r| r.get(0),
+        )
+        .ok();
+    let filepath = match filepath {
+        Some(p) => p,
+        None => {
+            return json!({ "success": false, "restoredDatabases": [], "errors": ["Backup not found"] })
+        }
+    };
+
+    let verification = verify_backup(conn, backup_id);
+    if !verification.get("valid").and_then(|v| v.as_bool()).unwrap_or(false) {
+        let details = verification
+            .get("details")
+            .and_then(|v| v.as_str())
+            .unwrap_or("invalid backup")
+            .to_string();
+        return json!({ "success": false, "restoredDatabases": [], "errors": [details] });
+    }
+
+    let _ = create_backup(conn, data_dir, "pre_restore", "Pre-restore safety backup");
+
+    let (archive, manifest) = match read_archive(&filepath) {
+        Ok(a) => a,
+        Err(details) => {
+            return json!({ "success": false, "restoredDatabases": [], "errors": [details] })
+        }
+    };
+    let databases_to_restore: Vec<String> = selected.unwrap_or_else(|| {
+        manifest
+            .get("databases")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    });
+
+    let mut restored: Vec<String> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+    for db_file in &databases_to_restore {
+        let entry = match archive.get(db_file).and_then(|v| v.as_str()) {
+            Some(e) => e,
+            None => {
+                errors.push(format!("Database {} not found in backup", db_file));
+                continue;
+            }
+        };
+        let result = BASE64
+            .decode(entry)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| {
+                std::fs::write(data_dir.join(db_file), bytes).map_err(|e| e.to_string())
+            });
+        match result {
+            Ok(()) => restored.push(db_file.clone()),
+            Err(e) => errors.push(format!("Failed to restore {}: {}", db_file, e)),
+        }
+    }
+    if let Some(settings_b64) = archive.get("settings.json").and_then(|v| v.as_str()) {
+        let result = BASE64
+            .decode(settings_b64)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| {
+                std::fs::write(data_dir.join("settings.json"), bytes).map_err(|e| e.to_string())
+            });
+        if let Err(e) = result {
+            errors.push(format!("Failed to restore settings: {}", e));
+        }
+    }
+
+    json!({
+        "success": errors.is_empty(),
+        "restoredDatabases": restored,
+        "errors": errors,
+    })
+}
+
+pub fn dispatch(conn: &Connection, data_dir: &Path, channel: &str, args: &Value) -> Value {
     match channel {
-        // ---- DB-persisted CRUD, ported faithfully -------------------------
         "backup:list" => list_backups(conn),
         "backup:get-settings" => get_settings(conn),
         "backup:update-settings" => {
@@ -204,31 +541,16 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
             update_settings(conn, &partial)
         }
         "backup:delete" => delete_backup(conn, args),
-
-        // ---- Real file I/O — degrade honestly -----------------------------
-        // backup:create copies every database file, builds + gzips an archive,
-        // computes a sha256 checksum, and writes a `.dexbak` file to disk. All of
-        // that is OS-level fs work that lives in the Tauri layer, not in these
-        // pure DB functions, so we degrade rather than fabricate a backup record.
-        "backup:create" => json!({
-            "success": false,
-            "error": "backup file creation requires filesystem access (not ported)"
-        }),
-        // backup:verify reads the `.dexbak` file from disk, recomputes its
-        // checksum, and gunzips/parses the manifest — all fs/decompression work
-        // unavailable in the DB layer.
-        "backup:verify" => json!({
-            "success": false,
-            "error": "backup verification requires filesystem access (not ported)"
-        }),
-        // backup:restore reads + decompresses the archive and overwrites the
-        // on-disk database files (closing/reopening the connection). This is
-        // destructive fs work owned by the OS layer; never run it from here.
-        "backup:restore" => json!({
-            "success": false,
-            "error": "backup restore requires filesystem access (not ported)"
-        }),
-
+        "backup:create" => {
+            let backup_type = args.get(0).and_then(|v| v.as_str()).unwrap_or("manual");
+            let description = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+            create_backup(conn, data_dir, backup_type, description)
+        }
+        "backup:verify" => {
+            let backup_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            verify_backup(conn, backup_id)
+        }
+        "backup:restore" => restore_backup(conn, data_dir, args),
         _ => Value::Null,
     }
 }

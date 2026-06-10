@@ -33,21 +33,41 @@
   (backdrop-filter: blur(1px))` probe intentionally kept). Perf-tier and
   thermal caps in `globals.css` tightened proportionally.
 
-**Next batches (in order):**
-1. **Component glass sweep (P2/P4):** 37 renderer component files still set
-   inline `backdropFilter` literals; route them through `tokens.ts` mirrors of
-   the blur tokens and the now-retuned `--pg-translucency-*` rungs (currently
-   unconsumed). Same recipe as the ADR-0006 shadow sweep.
-2. **Tauri migration, filesystem tail (P1):** bulk-metadata / smart-rename
-   on-disk writes, voice-memo + media-library file IO, export-bundle +
-   backup/restore zip. See TAURI-MIGRATION.md "RESUME HERE".
-3. **Radius standardization (P2):** two scales exist (`--radius-*` in
-   design-system.css and `--dex-radius-*` in design-tokens.css, plus a third
-   inline set in `index.html` and tailwind's `window`/`dock` radii). Converge
-   on ONE scale, alias the rest, then sweep literals.
-4. **Duplicate-system audit (P1/P9):** map duplicate processing/storage/
-   indexing/rendering across Rewind, UKI, Notes, Canvas, Search, Dock,
-   Notifications, Workflows, Plugins, Memory. Output: a kill-list with owners.
+**Also done (2026-06-10, second batch):**
+- **Component glass sweep (P2/P4):** all inline `backdropFilter` blur literals
+  in renderer components now route through the reduced `--blur-*` tokens; the
+  shared `glassMenu.ts` module applies the GOAL-6D -60% factor once inside
+  `adaptiveBlur`/`liquidGlass` (call sites keep their historical numbers) and
+  its shadow/glass-fallback literals carry the -40%/-50% passes. Only the
+  deliberate 1-2px minimal blurs remain literal.
+- **Radius standardization (P2):** ONE canonical scale (`--radius-*`,
+  design-system.css). `--dex-radius-*` aliases it, the `index.html` boot
+  fallbacks now match it (previously a conflicting third scale that flashed on
+  load), and tailwind's window/dock radii bind to the vars. Remaining: the
+  `tokens.ts` JS radius mirror + the per-component literal sweep.
+- **Tauri migration, filesystem tail (P1):** voice-memo save (base64 audio ->
+  `.opus` under data_dir/voice-memos) + whisper probe, media-library new-file
+  import (fs stat + type detection) + thumbnail unlink on remove,
+  backup:create/verify/restore/delete (full `.dexbak` gzip format parity).
+  bulk-metadata / smart-rename turned out to be already fully ported (the
+  checkpoint entry was stale). New shared `src-tauri/src/util.rs` (uuid, ISO
+  timestamp) — one implementation each, used by session-replay/backup.
+- **Duplicate-system audit (P1/P9) complete:** 15 confirmed findings with
+  evidence, survivors, risk, and sequencing in
+  [CONSOLIDATION-AUDIT.md](CONSOLIDATION-AUDIT.md). Headlines: 6+ parallel
+  search indexers, 3-4 notification systems, 5 motion engines, 5x duplicate
+  debounce/throttle, two file-watchers, two task-queues, three undo systems.
+
+**Next batches (in order, from the audit's sequencing):**
+1. **Debounce/throttle merge (audit finding 6):** survivor
+   `src/shared/perf/helpers.ts`; re-export from the other four, delete bodies.
+2. **Duplicate detectors (finding 10):** retire two of the three JS detectors
+   in favor of `core/dex-scanner` + at most one content-similarity JS detector.
+3. **Newer-replaces-older deletions (findings 3, 13, 12):** NotesSystem,
+   FileWatcher (Phase 38), TaskQueue (Phase 19), ContextMenu.tsx — after
+   confirming registration/usage.
+4. **tokens.ts radius/blur JS mirrors** aligned with the canonical CSS scales.
+5. Then the storage-migration tier (findings 2, 5, 8, 9, 11) per the audit.
 
 ---
 
