@@ -36,7 +36,52 @@ search-history, session-replay, shared media-library, smart-grouping,
 smart-rename, snapshot-comparison, stats-dashboard, theme-schedule,
 time-tracking, vinx-presentation, version-history, voice-memo, word-count.
 
-**Latest slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
+**Latest slice (2026-06-10, second pass): filesystem tail ported.** Now native:
+  - **voice-memo**: `save` decodes the base64 audio and writes the `.opus` file
+    under `data_dir/voice-memos`, inserts + returns the VoiceMemo shape;
+    `isWhisperAvailable` probes `data_dir/whisper/whisper.wasm`; delete gates
+    its recycle-bin entry on the file existing (dispatch now takes data_dir).
+  - **media-library**: new-file `import` branch (fs stat, extension type
+    detection, insert + return row); `remove` unlinks the cached thumbnail.
+    Thumbnail generation stays absent (best-effort optional sharp/ffmpeg in
+    Electron; NULL thumbnail either way).
+  - **backup**: `create`/`verify`/`restore`/`delete` fully ported with exact
+    `.dexbak` parity (base64 JSON archive, gzip level 6, SHA-256 checksum,
+    manifest) — backups round-trip between shells. Auto-backup interval timer
+    remains an Electron-runtime concern (no IPC surface).
+  - **Correction:** bulk-metadata and smart-rename on-disk writes were listed
+    as remaining, but those modules were already fully ported (their notes
+    refer to Electron-internal event-bus side effects only).
+  - New shared `src-tauri/src/util.rs` (pseudo uuid v4, ISO-8601 UTC now) and
+    gzip/gunzip added to `zlib.rs`; licensing's SHA-256 is now crate-shared.
+  What remains of the non-DB tail: native dialogs + OS notifications (Tauri
+  plugins), live window/screen (multiwindow, multimonitor, layout, vinx),
+  networking (link-preview fetch, live-collab mDNS), background runtimes
+  (file-watcher, reminder/expiry/theme timers, scratchpad autosave buffer,
+  migration runner), notes attachments file copy/remove, export-bundle native
+  save dialog, zlib BLOB tails in feedback file write.
+
+**Earlier slice (2026-06-10): zlib tier ported (start of the non-DB tail).**
+Added `flate2` (zlib, Node `deflateSync`/`inflateSync` byte parity) + `base64`
+to `src-tauri`, with a shared [src-tauri/src/zlib.rs](src-tauri/src/zlib.rs)
+helper. Three subsystems went from degrade to fully native:
+  - **version-history**: `save`/`getState`/`restore` now deflate/inflate the
+    snapshot BLOB (+ 50-version trim), interoperable with Electron-written DBs.
+  - **session-replay**: `recordAction` (deflate+base64 states), live per-process
+    `{ sessionId, startTime }` for `getCurrentSession`, decompression in
+    `getSessionActions`, and the 7-session cleanup at init.
+  - **project-archiver**: `archive`/`unarchive` write/read/unlink real
+    `.dex-archive` files under `app_data_dir/archive`, `getArchiveDir` returns
+    that path (dispatch now takes the archive dir).
+Also fixed: `assets/icon.png` converted palette -> RGBA (Tauri's
+`generate_context!` codegen rejects non-RGBA PNGs; required for Linux builds,
+harmless elsewhere). Note for Linux dev boxes: `cargo check` needs
+`libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev` — and beware
+`cargo check | tail` masking the exit code. `cargo check` green, zero warnings;
+`core` tests green. `docs/RELEASE_NOTES.md` was cleared ahead of the next
+release line (publish new notes there once the migrated build ships).
+
+**Earlier slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
 share `dex.db` through the native `db.rs` connection and route via
 `db_dispatch` (one channel-prefix arm each) in [main.rs](src-tauri/src/main.rs):
 activity-feed, changelog, color-labels, dashboard, goal-system, help, journal,
@@ -87,9 +132,12 @@ shared-`dex.db` subsystem sweep is complete — every DatabaseManager-backed
 manager is ported. What remains is the **non-DB tail** that the ported modules
 currently degrade honestly. These need real Tauri commands (not the pure-DB
 `dispatch` layer):
-  - **Filesystem + compression:** version-history / session-replay / project-archiver
-    zlib BLOB save/restore; export-bundle + backup/restore zip + native save dialog;
-    bulk-metadata / smart-rename on-disk writes; voice-memo + media-library file IO.
+  - **Filesystem + compression: DONE 2026-06-10** (see latest slices) —
+    version-history / session-replay / project-archiver zlib BLOBs, voice-memo
+    + media-library file IO, backup create/verify/restore (.dexbak gzip);
+    bulk-metadata / smart-rename were already ported. Remaining here: the
+    export-bundle / changelog native save dialogs (dialog plugin) and notes
+    attachments file copy/remove.
   - **Native OS/UI:** dialogs (open/save), OS notifications (notification-center,
     reminder firing), live BrowserWindow/screen (multiwindow, multimonitor, layout
     apply, vinx presenter), theme apply.

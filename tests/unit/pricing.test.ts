@@ -35,7 +35,9 @@ describe('Pricing - constants', () => {
 
   it('publishes user-first promises', () => {
     expect(PRICING_PROMISES.length).toBeGreaterThanOrEqual(5);
-    expect(PRICING_PROMISES.join(' ')).toMatch(/no ads/i);
+    // The legal pass (v5.0.1) replaced the absolute "no ads" promise with the
+    // scoped ad-free-on-paid-plans promise; assert the current wording.
+    expect(PRICING_PROMISES.join(' ')).toMatch(/ad-free on every paid plan/i);
   });
 });
 

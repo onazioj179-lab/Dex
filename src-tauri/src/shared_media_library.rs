@@ -8,16 +8,14 @@
 //! (distinct from the bare `media:` prefix handled elsewhere), so there is no
 //! channel collision. The pure DB CRUD/metadata channels are ported faithfully.
 //!
-//! Some Electron behaviour reaches outside SQLite: `importFile` stats a file on
-//! disk (`fs.statSync`), detects its type from the extension, then enqueues
-//! thumbnail generation via `sharp`/`ffmpeg`; `removeFromLibrary` unlinks the
-//! cached thumbnail JPEG. Those filesystem/decoder/subprocess capabilities live
-//! in the Tauri command layer, not in these pure DB functions. The DB-only path
-//! of `import` (the dedupe branch that bumps an existing row's use_count) is
-//! ported faithfully; the on-disk new-file branch degrades honestly (returns
-//! null, exactly as the TS does when `fs.existsSync(filepath)` is false). The
-//! thumbnail unlink in `remove` is a best-effort side effect, not part of the
-//! IPC return value, so `remove` still returns true as in the TS.
+//! `importFile` is fully ported: the dedupe branch bumps an existing row's
+//! use_count; the new-file branch stats the file on disk, detects its type from
+//! the extension sets (verbatim from the TS), and inserts the row. Thumbnail
+//! generation in Electron is best-effort via optional `sharp`/`ffmpeg` and
+//! silently yields no thumbnail when those are absent — the same no-thumbnail
+//! result this native port produces (thumbnail stays NULL; a future media
+//! pipeline can backfill). `removeFromLibrary` best-effort unlinks the cached
+//! thumbnail before deleting the row, as the TS does.
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection, Row};
@@ -108,18 +106,36 @@ fn fetch_by_filepath(conn: &Connection, filepath: &str) -> Value {
     }
 }
 
+/// detectType(filepath) — extension sets copied verbatim from the TS; anything
+/// unrecognized is a document.
+fn detect_type(filepath: &str) -> &'static str {
+    let ext = std::path::Path::new(filepath)
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+        .unwrap_or_default();
+    const VIDEO: [&str; 8] = [".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v"];
+    const AUDIO: [&str; 8] = [".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a", ".opus"];
+    const IMAGE: [&str; 9] = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".tiff", ".ico"];
+    if VIDEO.contains(&ext.as_str()) {
+        "video"
+    } else if AUDIO.contains(&ext.as_str()) {
+        "audio"
+    } else if IMAGE.contains(&ext.as_str()) {
+        "image"
+    } else {
+        "document"
+    }
+}
+
 /// media-library:import -> importFile(filepath, importedBy). Returns a MediaRecord
-/// or null. The DB dedupe branch is ported faithfully: when a row already exists
-/// for `filepath`, bump use_count and last_used and return the refreshed row.
-/// The new-file branch in the TS stats the file on disk, derives metadata, and
-/// enqueues thumbnail generation (sharp/ffmpeg) — filesystem + decoder/subprocess
-/// capabilities that live in the Tauri command layer, not in this pure DB
-/// function. When the file does not already exist in the library, the TS itself
-/// returns null if `fs.existsSync(filepath)` is false; here we mirror that null
-/// for any non-deduped import (the disk-backed insert is not ported, by design).
+/// or null. Dedupe branch: when a row already exists for `filepath`, bump
+/// use_count and last_used and return the refreshed row. New-file branch: stat
+/// the file on disk (null when absent, matching the TS), detect the type, insert
+/// the row, and return it. Thumbnails are best-effort in Electron (optional
+/// sharp/ffmpeg) and stay NULL here.
 fn import_file(conn: &Connection, args: &Value) -> Value {
     let filepath = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-    // importedBy (args[1]) is only consumed by the unported disk-insert branch.
+    let imported_by = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
 
     // Dedupe branch (pure DB): SELECT existing, bump counters, return refreshed row.
     let existing_id: Option<i64> = conn
@@ -139,11 +155,26 @@ fn import_file(conn: &Connection, args: &Value) -> Value {
         return fetch_by_id(conn, id);
     }
 
-    // New-file import depends on fs.statSync + on-disk thumbnail generation, which
-    // are not available in this pure DB layer. The TS returns null when the file
-    // is not on disk; we degrade to null here (the insert-from-disk path is not
-    // ported — the Tauri command layer should stat the file and call back in).
-    Value::Null
+    // New-file branch: `if (!fs.existsSync(filepath)) return null`.
+    let meta = match std::fs::metadata(filepath) {
+        Ok(m) => m,
+        Err(_) => return Value::Null,
+    };
+    let filename = std::path::Path::new(filepath)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let media_type = detect_type(filepath);
+    let now = now_ms();
+    let inserted = conn.execute(
+        "INSERT INTO media_library (filepath, filename, type, size, duration, width, height, imported_by, last_used, use_count, thumbnail, timestamp) \
+         VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, 1, NULL, ?)",
+        params![filepath, filename, media_type, meta.len() as i64, imported_by, now, now],
+    );
+    if inserted.is_err() {
+        return Value::Null;
+    }
+    fetch_by_id(conn, conn.last_insert_rowid())
 }
 
 /// media-library:getAll -> getAll(typeFilter?, sortBy='date', search?). Returns
@@ -259,11 +290,22 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
             let filepath = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             fetch_by_filepath(conn, filepath)
         }
-        // removeFromLibrary deletes the row (and best-effort unlinks the cached
-        // thumbnail file on disk — a filesystem side effect not part of the IPC
-        // return value, so it is intentionally not replicated). Returns true.
+        // removeFromLibrary: best-effort unlink the cached thumbnail on disk
+        // (errors swallowed, as the TS try/catch does), then delete the row.
+        // Returns true.
         "media-library:remove" => {
             let id = args.get(0).and_then(|v| v.as_i64()).unwrap_or(-1);
+            let thumbnail: Option<String> = conn
+                .query_row(
+                    "SELECT thumbnail FROM media_library WHERE id = ?",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .ok()
+                .flatten();
+            if let Some(thumb) = thumbnail {
+                let _ = std::fs::remove_file(thumb);
+            }
             let _ = conn.execute("DELETE FROM media_library WHERE id = ?", params![id]);
             json!(true)
         }

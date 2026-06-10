@@ -28,6 +28,8 @@ open = "5"          # shell: open path / external url with the OS default
 arboard = "3"       # clipboard read/write
 trash = "5"         # move-to-recycle-bin (safe delete)
 rusqlite = { version = "0.31", features = ["bundled"] }  # native dex.db (shared by ~50 subsystems); bundled = no system sqlite needed
+flate2 = "1"        # zlib deflate/inflate (Node zlib parity for snapshot/archive BLOBs); pure-Rust miniz_oxide
+base64 = "0.22"     # Node Buffer base64 parity (session-replay states, binary-over-bridge standard)
 
 [features]
 # Tauri's default release feature for the embedded asset protocol.

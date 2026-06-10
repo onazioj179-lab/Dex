@@ -4,17 +4,18 @@
 // =============================================================================
 //! SQLite-backed project archiver (project-archiver:* channels, Feature 11),
 //! reading/writing the shared `dex.db` `project_archive` table with the identical
-//! schema, queries, and return shapes as the Electron manager. The archive/
-//! unarchive flows compress project JSON to a `.dex-archive` file under the
-//! Electron userData `archive` dir (zlib deflate/inflate + fs read/write/unlink)
-//! and getArchiveDir returns that native path — OS/filesystem capabilities that
-//! live in the Tauri layer, not these pure DB functions — so they degrade
-//! honestly. The pure DB read (getAll) and the pure in-memory eligibility filter
-//! (getEligible) are ported faithfully.
+//! schema, queries, and return shapes as the Electron manager. Fully ported:
+//! archive/unarchive compress project JSON to a `.dex-archive` file under the
+//! app data `archive` dir (the Tauri analog of Electron's userData) via the
+//! shared [`crate::zlib`] helpers — files written by either shell round-trip in
+//! the other — and getArchiveDir returns that native path. The dispatcher passes
+//! the archive dir in alongside the shared connection.
 
+use crate::zlib;
 use rusqlite::types::Value as SqlValue;
-use rusqlite::{Connection, Row};
+use rusqlite::{params, Connection, Row};
 use serde_json::{json, Value};
+use std::path::Path;
 
 /// Create the project_archive table + index (matches ProjectArchiverManager.createTables).
 pub fn ensure_schema(conn: &Connection) {
@@ -115,34 +116,110 @@ fn current_millis() -> i64 {
         .unwrap_or(0)
 }
 
-pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
+/// project-archiver:archive -> archiveProject(appName, projectName, projectData):
+/// deflate the project JSON to `<app>_<safeName>_<now>.dex-archive` under the
+/// archive dir, record the row, and return the ArchiveRecord — or null on any
+/// write/insert failure (the TS catch path).
+fn archive_project(
+    conn: &Connection,
+    archive_dir: &Path,
+    app: &str,
+    project_name: &str,
+    project_data: &Value,
+) -> Value {
+    let compressed = zlib::deflate(project_data.to_string().as_bytes());
+    let safe_name: String = project_name
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .take(50)
+        .collect();
+    let now = current_millis();
+    let filename = format!("{}_{}_{}.dex-archive", app, safe_name, now);
+    if std::fs::create_dir_all(archive_dir).is_err() {
+        return Value::Null;
+    }
+    let archive_path = archive_dir.join(filename);
+    if std::fs::write(&archive_path, &compressed).is_err() {
+        return Value::Null;
+    }
+    let archive_path_str = archive_path.to_string_lossy().to_string();
+    let size = compressed.len() as i64;
+    let inserted = conn.execute(
+        "INSERT INTO project_archive (app, project_name, archive_path, original_data, archived_at, size) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+        params![app, project_name, archive_path_str, "compressed-file", now, size],
+    );
+    if inserted.is_err() {
+        return Value::Null;
+    }
+    json!({
+        "id": conn.last_insert_rowid(),
+        "app": app,
+        "project_name": project_name,
+        "archive_path": archive_path_str,
+        "original_data": "compressed-file",
+        "archived_at": now,
+        "size": size,
+    })
+}
+
+/// project-archiver:unarchive -> unarchiveProject(archiveId): read + inflate the
+/// `.dex-archive` file, unlink it, delete the row, and return
+/// { app, projectName, data }. A row whose file is gone is cleaned up and yields
+/// null; missing rows and read/inflate failures yield null (the TS catch path).
+fn unarchive_project(conn: &Connection, archive_id: i64) -> Value {
+    let record: Option<(String, String, String)> = conn
+        .query_row(
+            "SELECT app, project_name, archive_path FROM project_archive WHERE id = ?",
+            params![archive_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .ok();
+    let (app, project_name, archive_path) = match record {
+        Some(r) => r,
+        None => return Value::Null,
+    };
+    let path = Path::new(&archive_path);
+    if !path.exists() {
+        let _ = conn.execute("DELETE FROM project_archive WHERE id = ?", params![archive_id]);
+        return Value::Null;
+    }
+    let project_data = match std::fs::read(path)
+        .ok()
+        .and_then(|compressed| zlib::inflate(&compressed).ok())
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+    {
+        Some(v) => v,
+        None => return Value::Null,
+    };
+    let _ = std::fs::remove_file(path);
+    let _ = conn.execute("DELETE FROM project_archive WHERE id = ?", params![archive_id]);
+    json!({
+        "app": app,
+        "projectName": project_name,
+        "data": project_data,
+    })
+}
+
+pub fn dispatch(conn: &Connection, archive_dir: &Path, channel: &str, args: &Value) -> Value {
     match channel {
-        // archive opens the userData `archive` dir, zlib-deflates the project
-        // JSON, and fs-writes a `.dex-archive` file before recording the row —
-        // a compression + filesystem capability that lives in the Tauri layer,
-        // not these pure DB functions. Degrade honestly rather than insert a
-        // row pointing at a file that was never written.
-        "project-archiver:archive" => json!({
-            "success": false,
-            "error": "zlib compression + archive file write not available in DB layer (not ported)"
-        }),
-        // unarchive fs-reads + inflates the `.dex-archive` file and unlinks it
-        // before deleting the row — the same filesystem/decompression capability.
-        // Degrade honestly rather than fabricate the restored project data.
-        "project-archiver:unarchive" => json!({
-            "success": false,
-            "error": "archive file read + zlib decompression not available in DB layer (not ported)"
-        }),
+        "project-archiver:archive" => {
+            let app = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let project_name = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+            let project_data = args.get(2).cloned().unwrap_or(Value::Null);
+            archive_project(conn, archive_dir, app, project_name, &project_data)
+        }
+        "project-archiver:unarchive" => {
+            let archive_id = args.get(0).and_then(|v| v.as_i64()).unwrap_or(0);
+            unarchive_project(conn, archive_id)
+        }
         "project-archiver:getAll" => {
             get_all(conn, args.get(0).and_then(|v| v.as_str()))
         }
         "project-archiver:getEligible" => get_eligible(args),
-        // getArchiveDir returns the native Electron userData/archive path, which
-        // is resolved by the OS shell rather than the DB layer. Degrade honestly.
-        "project-archiver:getArchiveDir" => json!({
-            "success": false,
-            "error": "native archive directory path not available in DB layer (not ported)"
-        }),
+        // getArchiveDir -> the native archive dir path (Electron: userData/archive;
+        // Tauri: app_data_dir/archive).
+        "project-archiver:getArchiveDir" => json!(archive_dir.to_string_lossy()),
         _ => Value::Null,
     }
 }
