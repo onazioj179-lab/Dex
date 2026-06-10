@@ -79,8 +79,8 @@ html[data-perf-tier="low"] * {
 }
 html[data-perf-tier="low"] [style*="backdrop-filter"],
 html[data-perf-tier="low"] [style*="backdropFilter"] {
-  backdrop-filter: blur(10px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(140%) !important;
+  backdrop-filter: var(--blur-md) saturate(140%) !important;
+  -webkit-backdrop-filter: var(--blur-md) saturate(140%) !important;
 }
 
 /* Mid-tier: reduce blur radius globally for all elements */
@@ -88,8 +88,8 @@ html[data-perf-tier="mid"] * {
   --dex-blur: 8px;
 }
 html[data-perf-tier="mid"] [style*="backdrop-filter"] {
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: var(--blur-md) !important;
+  -webkit-backdrop-filter: var(--blur-md) !important;
 }
 
 /* Reduce infinite animations on low-tier to prevent battery/CPU drain */
@@ -115,8 +115,8 @@ html[data-perf-tier="low"] .dex-skeleton {
    ───────────────────────────────────────────────────────────────────────── */
 html[data-thermal-state="warm"] [style*="backdrop-filter"],
 html[data-thermal-state="warm"] [style*="backdropFilter"] {
-  backdrop-filter: blur(16px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+  backdrop-filter: var(--blur-lg) saturate(140%) !important;
+  -webkit-backdrop-filter: var(--blur-lg) saturate(140%) !important;
 }
 /* Warm: also cap class/token glass blur so the heaviest surfaces ease off
    before the machine reaches the "hot" cutoff. */
@@ -124,8 +124,8 @@ html[data-thermal-state="warm"] .dex-glass-panel,
 html[data-thermal-state="warm"] .dex-frosted,
 html[data-thermal-state="warm"] .liquid-glass-dock,
 html[data-thermal-state="warm"] .liquid-glass-overlay {
-  backdrop-filter: blur(14px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+  backdrop-filter: var(--blur-md) saturate(140%) !important;
+  -webkit-backdrop-filter: var(--blur-md) saturate(140%) !important;
 }
 html[data-thermal-state="warm"] .animate-float,
 html[data-thermal-state="warm"] .animate-pulse {
@@ -134,8 +134,8 @@ html[data-thermal-state="warm"] .animate-pulse {
 
 html[data-thermal-state="hot"] [style*="backdrop-filter"],
 html[data-thermal-state="hot"] [style*="backdropFilter"] {
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: var(--blur-md) !important;
+  -webkit-backdrop-filter: var(--blur-md) !important;
 }
 /* When sustained-hot, kill ALL backdrop-filter — not just inline-styled
    elements. Class/token glass (.dex-glass-panel, .dex-frosted, .liquid-glass-*,
@@ -523,8 +523,8 @@ html[data-perf-tier="low"] .card, html[data-perf-tier="low"] .panel {
 }
 /* Mid: cap all backdrop-filter blur at 8px for performance */
 [data-perf-tier="mid"] [style*="backdrop-filter"] {
-  backdrop-filter: blur(8px) saturate(120%) !important;
-  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+  backdrop-filter: var(--blur-md) saturate(120%) !important;
+  -webkit-backdrop-filter: var(--blur-md) saturate(120%) !important;
 }
 /* Mid: reduce heavy shadows */
 [data-perf-tier="mid"] [style*="box-shadow"] {
@@ -3803,8 +3803,8 @@ select:focus {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 0.5px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -4999,7 +4999,7 @@ button:not(:disabled) {
 [role="dialog"]::backdrop,
 dialog::backdrop {
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  backdrop-filter: var(--blur-sm);
 }
 
 /* Alert styling */
@@ -6102,13 +6102,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 :root[style*="--dex-blur-tier: eco"] .dex-glass,
 :root[style*="--dex-blur-tier: eco"] [data-glass] {
-  backdrop-filter: blur(6px) saturate(1.05) !important;
-  -webkit-backdrop-filter: blur(6px) saturate(1.05) !important;
+  backdrop-filter: var(--blur-sm) saturate(1.05) !important;
+  -webkit-backdrop-filter: var(--blur-sm) saturate(1.05) !important;
 }
 :root[style*="--dex-blur-tier: standard"] .dex-glass,
 :root[style*="--dex-blur-tier: standard"] [data-glass] {
-  backdrop-filter: blur(14px) saturate(1.15) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
+  backdrop-filter: var(--blur-md) saturate(1.15) !important;
+  -webkit-backdrop-filter: var(--blur-md) saturate(1.15) !important;
 }
 /* high tier uses each surface's own per-component blur (no override). */
 
