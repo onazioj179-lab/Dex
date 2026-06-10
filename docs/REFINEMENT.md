@@ -95,6 +95,20 @@
   Component inline borderRadius numbers remain (JS numbers; sweep later
   with visual sign-off).
 
+**Also done (2026-06-10, fifth batch — boot token parity):**
+- **Every boot-fallback token in index.html now equals its runtime value.**
+  A scripted diff found 17 drifted tokens (every surface/text/border color,
+  success/warning hues, both font stacks, glass alpha) — the app flashed the
+  wrong look on every launch since whenever these diverged. All aligned;
+  the boot body now uses --dex-font-ui like the runtime rule.
+- **Boot-only tokens given runtime owners:** --color-danger (alias of
+  --color-error), --color-accent-text/-subtle, --color-shadow-soft/-strong
+  were defined ONLY in the boot HTML while runtime components consumed them.
+  Now owned by design-system.css; shadow-color alphas carry the GOAL-6D -40%
+  pass (Browser.tsx shadows had escaped the sweep behind these vars).
+- Parity is scripted (see git history of this batch) — rerun it after any
+  index.html or token edit.
+
 **Next batches (in order):**
 1. **Rewire FileIntelligenceController -> FileWatcherManager and
    WorkflowController -> TaskQueueManager** (finding 13), then retire

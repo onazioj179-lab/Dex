@@ -81,6 +81,16 @@
   --color-warning-muted: rgba(255, 159, 10, 0.14);
   --color-error: #FF453A;
   --color-error-muted: rgba(255, 69, 58, 0.14);
+  --color-danger: var(--color-error); /* legacy alias — prefer --color-error */
+
+  /* Accent companions + shadow colors. Previously defined ONLY in the
+     index.html boot block, which runtime components depended on — now owned
+     here (the boot block mirrors these values). Shadow alphas carry the
+     GOAL-6D intensity -40% pass. */
+  --color-accent-text: #FFFFFF;
+  --color-accent-subtle: rgba(74, 158, 255, 0.12);
+  --color-shadow-soft: rgba(0, 0, 0, 0.18);
+  --color-shadow-strong: rgba(0, 0, 0, 0.30);
 
   /* Tag / Label colors — Finder-style file labeling */
   --color-tag-red: #FF3B30;
