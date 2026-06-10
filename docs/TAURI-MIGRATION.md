@@ -36,7 +36,27 @@ search-history, session-replay, shared media-library, smart-grouping,
 smart-rename, snapshot-comparison, stats-dashboard, theme-schedule,
 time-tracking, vinx-presentation, version-history, voice-memo, word-count.
 
-**Latest slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
+**Latest slice (2026-06-10): zlib tier ported (start of the non-DB tail).**
+Added `flate2` (zlib, Node `deflateSync`/`inflateSync` byte parity) + `base64`
+to `src-tauri`, with a shared [src-tauri/src/zlib.rs](src-tauri/src/zlib.rs)
+helper. Three subsystems went from degrade to fully native:
+  - **version-history**: `save`/`getState`/`restore` now deflate/inflate the
+    snapshot BLOB (+ 50-version trim), interoperable with Electron-written DBs.
+  - **session-replay**: `recordAction` (deflate+base64 states), live per-process
+    `{ sessionId, startTime }` for `getCurrentSession`, decompression in
+    `getSessionActions`, and the 7-session cleanup at init.
+  - **project-archiver**: `archive`/`unarchive` write/read/unlink real
+    `.dex-archive` files under `app_data_dir/archive`, `getArchiveDir` returns
+    that path (dispatch now takes the archive dir).
+Also fixed: `assets/icon.png` converted palette -> RGBA (Tauri's
+`generate_context!` codegen rejects non-RGBA PNGs; required for Linux builds,
+harmless elsewhere). Note for Linux dev boxes: `cargo check` needs
+`libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev` — and beware
+`cargo check | tail` masking the exit code. `cargo check` green, zero warnings;
+`core` tests green. `docs/RELEASE_NOTES.md` was cleared ahead of the next
+release line (publish new notes there once the migrated build ships).
+
+**Earlier slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
 share `dex.db` through the native `db.rs` connection and route via
 `db_dispatch` (one channel-prefix arm each) in [main.rs](src-tauri/src/main.rs):
 activity-feed, changelog, color-labels, dashboard, goal-system, help, journal,
@@ -87,9 +107,11 @@ shared-`dex.db` subsystem sweep is complete — every DatabaseManager-backed
 manager is ported. What remains is the **non-DB tail** that the ported modules
 currently degrade honestly. These need real Tauri commands (not the pure-DB
 `dispatch` layer):
-  - **Filesystem + compression:** version-history / session-replay / project-archiver
-    zlib BLOB save/restore; export-bundle + backup/restore zip + native save dialog;
-    bulk-metadata / smart-rename on-disk writes; voice-memo + media-library file IO.
+  - **Filesystem + compression:** ~~version-history / session-replay /
+    project-archiver zlib BLOB save/restore~~ (DONE 2026-06-10, see latest
+    slice); export-bundle + backup/restore zip + native save dialog;
+    bulk-metadata / smart-rename on-disk writes; voice-memo + media-library
+    file IO.
   - **Native OS/UI:** dialogs (open/save), OS notifications (notification-center,
     reminder firing), live BrowserWindow/screen (multiwindow, multimonitor, layout
     apply, vinx presenter), theme apply.
