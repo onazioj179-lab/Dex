@@ -53,10 +53,12 @@
         --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
         --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace;
         --space-unit: 4px;
-        --radius-sm: 6px;
-        --radius-md: 10px;
-        --radius-lg: 16px;
-        --radius-xl: 24px;
+        /* Boot-time fallbacks — MUST match the canonical radius scale in
+           design-system.css (one scale everywhere, no flash on load). */
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --radius-xl: 10px;
       }
       /* Critical fallback styles - ensures app is visible even if CSS fails */
       html, body, #root {

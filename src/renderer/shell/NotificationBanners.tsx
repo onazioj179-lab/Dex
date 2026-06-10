@@ -602,13 +602,13 @@ export const NotificationCenter: React.FC<{
         boxShadow: 'var(--pg-shadow-popover-strong)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
-        backdropFilter: 'blur(40px)',
+        backdropFilter: 'var(--blur-xl)',
         animation: isReduceMotion() ? 'none' : 'notifCenterIn 0.28s cubic-bezier(0.23,1,0.32,1)',
       }}>
         <style>{`
           @keyframes notifBackdropIn {
             from { opacity: 0; backdrop-filter: blur(0); }
-            to { opacity: 1; backdrop-filter: blur(8px); }
+            to { opacity: 1; backdrop-filter: var(--blur-md); }
           }
           @keyframes notifCenterIn {
             from { opacity: 0; transform: translateX(24px) scale(0.96); }

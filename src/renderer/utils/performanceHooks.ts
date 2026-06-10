@@ -509,8 +509,8 @@ export const DEX_THEME = {
   shadowInset: 'inset 0 1px 0 var(--color-bg-hover)',
   
   // Glass effect
-  glass: 'backdrop-filter: blur(40px) saturate(180%)',
-  glassLight: 'backdrop-filter: blur(20px)',
+  glass: 'backdrop-filter: var(--blur-xl) saturate(180%)',
+  glassLight: 'backdrop-filter: var(--blur-lg)',
   
   // Transitions
   transitionFast: 'all 0.08s cubic-bezier(0.4, 0, 0.2, 1)',

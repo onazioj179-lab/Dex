@@ -52,11 +52,12 @@
   --dex-space-6: 24px;
   --dex-space-8: 32px;
 
-  /* ---- Radius: one scale, applied to every panel/button/input --------- */
-  --dex-radius-sm: 4px;
-  --dex-radius-md: 6px;
-  --dex-radius-lg: 8px;
-  --dex-radius-xl: 10px;
+  /* ---- Radius: alias of the ONE canonical scale (design-system.css).
+     Never restate values here — there is exactly one radius scale. -------- */
+  --dex-radius-sm: var(--radius-sm);
+  --dex-radius-md: var(--radius-md);
+  --dex-radius-lg: var(--radius-lg);
+  --dex-radius-xl: var(--radius-xl);
 
   /* ---- Icon sizes: fixed set only (16 / 20 / 24) ---------------------- */
   --dex-icon-sm: 16px;

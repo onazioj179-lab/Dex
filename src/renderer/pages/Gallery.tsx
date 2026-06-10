@@ -1925,8 +1925,8 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%', height: '100%', display: 'flex',
     background: 'var(--pg-surface)',
-    backdropFilter: 'blur(28px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+    backdropFilter: 'var(--blur-xl) saturate(180%)',
+    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)', fontSize: 13, position: 'relative', overflow: 'hidden',
   },
@@ -1942,7 +1942,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Main
   main: { flex: 1, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
-  toolbar: { height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-toolbar)', backdropFilter: 'blur(18px) saturate(170%)', WebkitBackdropFilter: 'blur(18px) saturate(170%)' },
+  toolbar: { height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-toolbar)', backdropFilter: 'var(--blur-lg) saturate(170%)', WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)' },
   title: { fontSize: 14, fontWeight: 700 },
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 16 },
   itemCount: { fontSize: 13, color: 'var(--color-text-muted)' },

@@ -262,7 +262,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
             borderRadius: 12,
             boxShadow: 'var(--pg-shadow-popover)',
             padding: 16,
-            backdropFilter: 'blur(20px)',
+            backdropFilter: 'var(--blur-lg)',
           }}
         >
           {hasUpdate && info && (

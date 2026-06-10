@@ -683,7 +683,8 @@ fn telemetry_week_start(now: i64) -> i64 {
 // matching Node's crypto.createHash('sha256')...digest('hex').
 // =============================================================================
 
-fn sha256_hex(data: &[u8]) -> String {
+/// Shared with backup_restore (one SHA-256 implementation in the shell).
+pub(crate) fn sha256_hex(data: &[u8]) -> String {
     let digest = sha256(data);
     let mut out = String::with_capacity(64);
     for byte in digest.iter() {

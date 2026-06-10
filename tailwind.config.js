@@ -49,8 +49,10 @@ export default {
         'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
-        'window': '10px',
-        'dock': '14px',
+        // Bound to the canonical radius scale in design-system.css — never
+        // restate pixel values here.
+        'window': 'var(--radius-xl)',
+        'dock': 'var(--radius-2xl)',
       },
       animation: {
         'fade-in': 'fadeIn 0.06s ease-out',
