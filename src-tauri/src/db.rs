@@ -31,3 +31,13 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
 
 /// Managed-state alias: the shared connection, or `None` when SQLite is absent.
 pub type DbState = std::sync::Mutex<Option<Connection>>;
+
+/// Restore gate: a process-wide RwLock guarding the dex.db FILE against
+/// concurrent access during a `backup:restore` file swap. Normal work that opens
+/// a SEPARATE connection to dex.db (the backup `VACUUM INTO` snapshot) takes the
+/// read side; `backup:restore` takes the write side before swapping the file, so
+/// it waits until no other connection holds dex.db open (critical on Windows,
+/// where renaming over an open file fails). Operations on the managed `DbState`
+/// connection are already serialized against restore by the `DbState` mutex
+/// itself, so they don't need this gate — only out-of-band connections do.
+pub type DbGate = std::sync::RwLock<()>;

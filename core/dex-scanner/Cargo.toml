@@ -9,6 +9,7 @@ authors.workspace = true
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
+rayon = "1"   # parallel SHA-256 hashing of same-size duplicate candidates
 
 [dev-dependencies]
 tempfile = "3"
