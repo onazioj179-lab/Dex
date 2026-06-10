@@ -50,19 +50,13 @@ Survivor: `UnifiedNotificationHub` (SQLite, the self-declared single path) -> it
 
 Risk: medium (storage migration from the JSON store into SQLite; UI re-pointing is mechanical).
 
-## 3. Duplicate NOTES backend (SQLite manager vs legacy FS system, + localStorage fallback)
+## 3. Duplicate NOTES backend — RESOLVED 2026-06-10 (deletion half)
 
-Systems involved:
-- `src/main/core/NotesManager.ts:13` — "SQLite + FTS5 ... Replaces existing NotesSystem with a proper database-backed implementation."
-- `src/main/core/NotesSystem.ts:8` — older "Notes System" persisting markdown/rich text to the filesystem.
-- `src/renderer/store/notesStore.ts:19-24` — Zustand store that talks to `dexnotes:*` but also keeps a `dex-notes-fallback-v1` localStorage copy.
-- `src-tauri/src/notes.rs` — Rust port of NotesManager only (correctly ignores NotesSystem).
-
-Evidence: `NotesManager.ts:13` states it "Replaces existing NotesSystem," yet `NotesSystem.ts` still exists. `notesStore.ts:19-24` adds a third persistence path (localStorage fallback) for the same note data.
-
-Survivor: `NotesManager` -> `notes.rs` (SQLite/FTS5, already ported). Delete `NotesSystem.ts`. Keep the localStorage fallback only as a transient dev/no-DB shim, not a parallel store.
-
-Risk: low-medium (confirm `NotesSystem` is no longer registered in `main.ts` before deletion).
+Usage verification confirmed `NotesSystem.ts` was never initialized in
+`src/main/main.ts` (only `notesManager` is); its only references were its own
+barrel export and a comment in NotesManager. Deleted, with its core/index.ts
+barrel block. Remaining: decide whether the `notesStore.ts` localStorage
+fallback (`dex-notes-fallback-v1`) stays as a no-DB shim or is retired.
 
 ## 4. Multiple MOTION / animation engines (5+ JS spring systems)
 
@@ -94,20 +88,15 @@ Survivor: `DatabaseManager` (`dex.db`) for structured/subsystem data — the one
 
 Risk: high (data lives in these; needs migration, not just deletion).
 
-## 6. Duplicate DEBOUNCE / THROTTLE utilities (5 each)
+## 6. Duplicate DEBOUNCE / THROTTLE utilities — RESOLVED 2026-06-10
 
-Systems involved (all exported):
-- `src/renderer/utils/performance.ts:84,111`
-- `src/renderer/utils/infrastructure.ts:188,260`
-- `src/renderer/utils/index.ts:31,42`
-- `src/renderer/utils/PerformanceUtils.ts:21,36`
-- `src/shared/perf/helpers.ts:17,27` + `src/renderer/improvements500/throttle.ts:26`
-
-Evidence: five independent debounce and five independent throttle implementations across renderer/shared utils, each with slightly different signatures (with/without `.cancel`).
-
-Survivor: `src/shared/perf/helpers.ts` (shared, has `.cancel`). Re-export from the others and delete the bodies.
-
-Risk: low (pure functions; mechanical import rewrite).
+`src/shared/perf/helpers.ts` is now THE canonical implementation (upgraded to
+the superset: optional leading/trailing/maxWait, cancel()/flush(), with the
+same defaults every copy used). `utils/performance.ts`,
+`utils/infrastructure.ts`, `utils/index.ts`, and `utils/PerformanceUtils.ts`
+re-export from it; their local bodies are deleted. `improvements500/throttle.ts`
+is intentionally kept: it is part of the versioned, test-pinned
+improvement-wave library, not an ad-hoc copy.
 
 ## 7. Three+ DESIGN-TOKEN radius scales — PARTIALLY RESOLVED (see status note)
 
@@ -146,17 +135,15 @@ Survivor: `semanticSearch.ts` as the facade, backed by `EmbeddingService` for ve
 
 Risk: medium.
 
-## 10. Duplicate DUPLICATE-DETECTION — 3 JS + 1 Rust
+## 10. Duplicate DUPLICATE-DETECTION — RESOLVED 2026-06-10
 
-Systems involved:
-- `src/main/core/DuplicateContentFinder.ts:9` — idle-time background duplicate detection.
-- `src/main/core/DuplicationDetectorManager.ts` — "Feature 9 ... Jaccard similarity and hash matching."
-- `src/main/core/SmartDuplicateDetector.ts` — "Smart duplicate detection (suggest-only)."
-- `core/dex-scanner/src/lib.rs:6` — native duplicate-file detection (size + SHA-256, already wired).
-
-Survivor: `core/dex-scanner` for file duplicates. Keep at most one JS detector for cross-app content (Jaccard) if genuinely a different feature; retire the other two.
-
-Risk: low-medium.
+Usage verification showed `DuplicateContentFinder.ts` had zero importers and
+`SmartDuplicateDetector.ts` was never instantiated (its IPC registration lived
+in a constructor nothing called; the renderer has zero `duplicates:*` callers).
+Both deleted. Survivors: `DuplicationDetectorManager` (live, registered in
+main.ts, renderer calls `duplication-detector:*`, already ported to
+`src-tauri/src/duplication_detector.rs`) for content similarity, and
+`core/dex-scanner` for native file duplicates.
 
 ## 11. Redundant CACHE layers
 
@@ -170,27 +157,36 @@ Survivor: `CacheCoordinator` as the main-process owner with one disk tier (merge
 
 Risk: medium.
 
-## 12. Two CONTEXT-MENU systems and scattered MODAL implementations
+## 12. Context menus — RESOLVED 2026-06-10 (survivor reversed); MODALS open
 
-Systems involved:
-- `src/renderer/components/ContextMenu.tsx:8` — "Shared right-click context menu component."
-- `src/renderer/shell/EnhancedContextMenu.tsx:8` — "Enhanced Context Menu. Spring-animated ... frosted glass."
-- `src/renderer/components/ToolContextMenu.tsx` — a third, tool-specific menu.
-- No `ModalProvider`/`useModal`/`modalStore` exists; ~15 components hand-roll `createPortal` dialogs (`ConfirmDialog.tsx`, `ShareDialog.tsx`, `WhatsNewModal.tsx`, `PolicyViewer.tsx`, `DiagnosticsPanel.tsx`, `PiiGuardDialog.tsx`, ...).
+Usage verification REVERSED the original recommendation: `ContextMenu.tsx` is
+the live one (imported by 6 pages: Workflows, Transfers, Audio, Gallery,
+Tasks, NotesComponents), while `EnhancedContextMenu.tsx` had zero importers
+and `ToolContextMenu.tsx` existed only in the components barrel. Both dead
+files deleted; `ContextMenu.tsx` is the single context-menu system.
 
-Survivor: `EnhancedContextMenu` as the single menu; fold `ToolContextMenu` into it via props; delete `ContextMenu.tsx`. Introduce one modal host/`useModal` and migrate dialogs incrementally.
+Still open from this finding: no `ModalProvider`/`useModal`/`modalStore`
+exists; ~15 components hand-roll `createPortal` dialogs (`ConfirmDialog.tsx`,
+`ShareDialog.tsx`, `WhatsNewModal.tsx`, `PolicyViewer.tsx`,
+`DiagnosticsPanel.tsx`, `PiiGuardDialog.tsx`, ...). Introduce one modal host
+and migrate incrementally.
 
-Risk: medium.
+Risk (modal host): medium.
 
-## 13. Two FILE-WATCHER managers and two TASK-QUEUE systems
+## 13. Two FILE-WATCHER managers and two TASK-QUEUE systems — CORRECTED
 
-Systems involved:
-- `src/main/core/FileWatcher.ts:8` (Phase 38) vs `src/main/core/FileWatcherManager.ts:8` (Feature 22, auto-import).
-- `src/main/core/TaskQueue.ts:8` (Phase 19) vs `src/main/core/TaskQueueManager.ts:8` — "Single path for all background operations."
+Usage verification showed the originally proposed deletions are NOT dead:
+- `FileWatcher.ts` is imported by `FileIntelligenceController.ts:18`, and that
+  controller IS live (`initFileIntelligenceController` at main.ts:975).
+- `TaskQueue.ts` is imported by `WorkflowController.ts:24`, and
+  `workflowController` IS live (imported at main.ts:60).
 
-Survivor: `FileWatcherManager` (superset) and `TaskQueueManager` (self-declared single path). Retire `FileWatcher.ts` and `TaskQueue.ts`.
+So this is a real consolidation, not a deletion: migrate
+FileIntelligenceController onto `FileWatcherManager` (registered at
+main.ts:1173) and WorkflowController onto `TaskQueueManager` (initialized at
+main.ts:1117), then retire the old modules.
 
-Risk: low-medium.
+Risk: medium (live controllers must be rewired and behavior-checked).
 
 ## 14. Proliferating PERFORMANCE-TIER / monitor systems (renderer)
 

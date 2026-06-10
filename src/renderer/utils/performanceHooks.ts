@@ -145,7 +145,7 @@ export function useThrottledCallback<T extends (...args: unknown[]) => void>(
   callbackRef.current = callback;
   
   return useMemo(
-    () => throttle((...args: any[]) => callbackRef.current(...args), intervalMs) as T,
+    () => throttle((...args: any[]) => callbackRef.current(...args), intervalMs) as unknown as T,
     [intervalMs, ...deps]
   );
 }
@@ -162,7 +162,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
   callbackRef.current = callback;
   
   const debounced = useMemo(
-    () => debounce((...args: any[]) => callbackRef.current(...args), delayMs) as T & { cancel: () => void },
+    () => debounce((...args: any[]) => callbackRef.current(...args), delayMs) as unknown as T & { cancel: () => void },
     [delayMs, ...deps]
   );
   

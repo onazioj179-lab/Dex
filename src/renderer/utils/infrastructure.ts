@@ -183,134 +183,13 @@ export function createRAFBatcher(): RAFBatcher {
 
 // ---------------------------------------------------------------------------
 // 1032-1034. Debounce & Throttle Utilities
+// One canonical implementation for the whole codebase (consolidation audit
+// finding 6) — re-exported here for existing importers. The canonical
+// versions carry the same leading/trailing/maxWait options and
+// cancel()/flush() this module's local copies had.
 // ---------------------------------------------------------------------------
 
-export function debounce<T extends (...args: unknown[]) => unknown>(
-  fn: T,
-  delay: number,
-  options: { leading?: boolean; trailing?: boolean; maxWait?: number } = {}
-): T & { cancel: () => void; flush: () => void } {
-  const { leading = false, trailing = true, maxWait } = options;
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let maxTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  let lastArgs: Parameters<T> | null = null;
-  let lastThis: unknown = null;
-  let result: ReturnType<T>;
-  
-  const invokeFunc = () => {
-    if (lastArgs) {
-      result = fn.apply(lastThis, lastArgs) as ReturnType<T>;
-      lastArgs = null;
-      lastThis = null;
-    }
-    return result;
-  };
-  
-  const startTimer = () => {
-    timeoutId = setTimeout(() => {
-      timeoutId = null;
-      if (trailing && lastArgs) {
-        invokeFunc();
-      }
-    }, delay);
-  };
-  
-  const debounced = function(this: unknown, ...args: Parameters<T>) {
-    lastArgs = args;
-    lastThis = this;
-    
-    if (leading && !timeoutId) {
-      result = invokeFunc();
-    }
-    
-    if (timeoutId) clearTimeout(timeoutId);
-    startTimer();
-    
-    if (maxWait && !maxTimeoutId) {
-      maxTimeoutId = setTimeout(() => {
-        maxTimeoutId = null;
-        if (timeoutId) clearTimeout(timeoutId);
-        invokeFunc();
-        startTimer();
-      }, maxWait);
-    }
-    
-    return result;
-  } as T & { cancel: () => void; flush: () => void };
-  
-  debounced.cancel = () => {
-    if (timeoutId) clearTimeout(timeoutId);
-    if (maxTimeoutId) clearTimeout(maxTimeoutId);
-    timeoutId = null;
-    maxTimeoutId = null;
-    lastArgs = null;
-  };
-  
-  debounced.flush = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-    return invokeFunc();
-  };
-  
-  return debounced;
-}
-
-export function throttle<T extends (...args: unknown[]) => unknown>(
-  fn: T,
-  limit: number,
-  options: { leading?: boolean; trailing?: boolean } = {}
-): T & { cancel: () => void } {
-  const { leading = true, trailing = true } = options;
-  let lastArgs: Parameters<T> | null = null;
-  let lastThis: unknown = null;
-  let result: ReturnType<T>;
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let lastCallTime = 0;
-  
-  const throttled = function(this: unknown, ...args: Parameters<T>) {
-    const now = Date.now();
-    const remaining = limit - (now - lastCallTime);
-    
-    lastArgs = args;
-    lastThis = this;
-    
-    if (remaining <= 0 || remaining > limit) {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      lastCallTime = now;
-      if (leading) {
-        result = fn.apply(lastThis, lastArgs) as ReturnType<T>;
-        lastArgs = null;
-        lastThis = null;
-      }
-    } else if (!timeoutId && trailing) {
-      timeoutId = setTimeout(() => {
-        lastCallTime = Date.now();
-        timeoutId = null;
-        if (trailing && lastArgs) {
-          result = fn.apply(lastThis, lastArgs) as ReturnType<T>;
-          lastArgs = null;
-          lastThis = null;
-        }
-      }, remaining);
-    }
-    
-    return result;
-  } as T & { cancel: () => void };
-  
-  throttled.cancel = () => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = null;
-    lastArgs = null;
-    lastCallTime = 0;
-  };
-  
-  return throttled;
-}
+export { debounce, throttle } from '../../shared/perf/helpers';
 
 // ---------------------------------------------------------------------------
 // 1035-1037. Intersection Observer Pool

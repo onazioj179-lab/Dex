@@ -58,16 +58,34 @@
   search indexers, 3-4 notification systems, 5 motion engines, 5x duplicate
   debounce/throttle, two file-watchers, two task-queues, three undo systems.
 
-**Next batches (in order, from the audit's sequencing):**
-1. **Debounce/throttle merge (audit finding 6):** survivor
-   `src/shared/perf/helpers.ts`; re-export from the other four, delete bodies.
-2. **Duplicate detectors (finding 10):** retire two of the three JS detectors
-   in favor of `core/dex-scanner` + at most one content-similarity JS detector.
-3. **Newer-replaces-older deletions (findings 3, 13, 12):** NotesSystem,
-   FileWatcher (Phase 38), TaskQueue (Phase 19), ContextMenu.tsx — after
-   confirming registration/usage.
-4. **tokens.ts radius/blur JS mirrors** aligned with the canonical CSS scales.
-5. Then the storage-migration tier (findings 2, 5, 8, 9, 11) per the audit.
+**Also done (2026-06-10, third batch — consolidation tier 1):**
+- **Debounce/throttle merged (finding 6):** `src/shared/perf/helpers.ts` is
+  the canonical superset implementation (leading/trailing/maxWait +
+  cancel/flush); the four renderer copies are now re-exports.
+- **Dead duplicate detectors deleted (finding 10):** `DuplicateContentFinder`
+  (zero importers) and `SmartDuplicateDetector` (never instantiated, zero
+  renderer callers). Survivors: `DuplicationDetectorManager` + `dex-scanner`.
+- **NotesSystem deleted (finding 3):** never initialized; NotesManager is the
+  system of record.
+- **Context menus consolidated (finding 12, survivor REVERSED by evidence):**
+  `ContextMenu.tsx` is live in 6 pages and stays; `EnhancedContextMenu.tsx`
+  and `ToolContextMenu.tsx` had zero consumers and are deleted.
+- **Finding 13 corrected, not executed:** FileWatcher (Phase 38) and TaskQueue
+  (Phase 19) are LIVE via FileIntelligenceController / WorkflowController —
+  retiring them requires rewiring those controllers first (see audit).
+- **tokens.ts radius mirror** documented as bound to the canonical scale
+  (values already matched).
+
+**Next batches (in order):**
+1. **Rewire FileIntelligenceController -> FileWatcherManager and
+   WorkflowController -> TaskQueueManager** (finding 13), then retire
+   FileWatcher.ts / TaskQueue.ts.
+2. **Single modal host (finding 12 remainder):** one `useModal`/host, migrate
+   the ~15 hand-rolled createPortal dialogs incrementally.
+3. **Notifications consolidation (finding 2):** UnifiedNotificationHub as the
+   single path; migrate the JSON NotificationCenter store; retire
+   `notifications.rs` in favor of `unified_notification_hub.rs`.
+4. Then the storage-migration tier (findings 5, 8, 9, 11) per the audit.
 
 ---
 

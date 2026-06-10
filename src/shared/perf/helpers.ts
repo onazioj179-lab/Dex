@@ -14,36 +14,110 @@
 
 // DEX v3.8.9 - perf helpers
 
-export function debounce<F extends (...args: unknown[]) => void>(fn: F, ms: number): F & { cancel: () => void } {
+// THE canonical debounce/throttle for the whole codebase (Refinement
+// initiative, consolidation audit finding 6). The four former renderer copies
+// (utils/performance.ts, utils/infrastructure.ts, utils/index.ts,
+// utils/PerformanceUtils.ts) re-export from here — do not add new local
+// implementations. This is the superset of all of them: optional
+// leading/trailing/maxWait plus cancel()/flush(), with the same defaults
+// every copy used (debounce: trailing only; throttle: leading + trailing).
+
+export interface DebounceOptions {
+  leading?: boolean;
+  trailing?: boolean;
+  /** Guarantee an invocation at least every maxWait ms while calls keep coming. */
+  maxWait?: number;
+}
+
+export function debounce<F extends (...args: any[]) => any>(
+  fn: F,
+  ms: number,
+  options: DebounceOptions = {},
+): F & { cancel: () => void; flush: () => void } {
+  const { leading = false, trailing = true, maxWait } = options;
   let h: ReturnType<typeof setTimeout> | null = null;
-  const wrapped = ((...args: unknown[]) => {
+  let maxH: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: Parameters<F> | null = null;
+
+  const invoke = () => {
+    if (lastArgs) {
+      const args = lastArgs;
+      lastArgs = null;
+      fn(...args);
+    }
+  };
+  const startTimer = () => {
+    h = setTimeout(() => {
+      h = null;
+      if (trailing) invoke();
+    }, ms);
+  };
+
+  const wrapped = ((...args: Parameters<F>) => {
+    lastArgs = args;
+    if (leading && !h) invoke();
     if (h) clearTimeout(h);
-    h = setTimeout(() => { h = null; fn(...args); }, ms);
-  }) as F & { cancel: () => void };
-  wrapped.cancel = () => { if (h) { clearTimeout(h); h = null; } };
+    startTimer();
+    if (maxWait && !maxH) {
+      maxH = setTimeout(() => {
+        maxH = null;
+        if (h) { clearTimeout(h); h = null; }
+        invoke();
+      }, maxWait);
+    }
+  }) as F & { cancel: () => void; flush: () => void };
+
+  wrapped.cancel = () => {
+    if (h) { clearTimeout(h); h = null; }
+    if (maxH) { clearTimeout(maxH); maxH = null; }
+    lastArgs = null;
+  };
+  wrapped.flush = () => {
+    if (h) { clearTimeout(h); h = null; }
+    invoke();
+  };
   return wrapped;
 }
 
-export function throttle<F extends (...args: unknown[]) => void>(fn: F, ms: number): F {
+export interface ThrottleHelperOptions {
+  leading?: boolean;
+  trailing?: boolean;
+}
+
+export function throttle<F extends (...args: any[]) => any>(
+  fn: F,
+  ms: number,
+  options: ThrottleHelperOptions = {},
+): F & { cancel: () => void } {
+  const { leading = true, trailing = true } = options;
   let lastCall = 0;
   let pending: ReturnType<typeof setTimeout> | null = null;
-  let lastArgs: unknown[] | null = null;
-  return ((...args: unknown[]) => {
+  let lastArgs: Parameters<F> | null = null;
+
+  const wrapped = ((...args: Parameters<F>) => {
     const now = Date.now();
+    if (lastCall === 0 && !leading) lastCall = now;
     const remaining = ms - (now - lastCall);
     lastArgs = args;
     if (remaining <= 0) {
       lastCall = now;
       if (pending) { clearTimeout(pending); pending = null; }
       fn(...args);
-    } else if (!pending) {
+    } else if (!pending && trailing) {
       pending = setTimeout(() => {
         lastCall = Date.now();
         pending = null;
         if (lastArgs) fn(...lastArgs);
       }, remaining);
     }
-  }) as F;
+  }) as F & { cancel: () => void };
+
+  wrapped.cancel = () => {
+    if (pending) { clearTimeout(pending); pending = null; }
+    lastArgs = null;
+    lastCall = 0;
+  };
+  return wrapped;
 }
 
 export interface RetryOptions {

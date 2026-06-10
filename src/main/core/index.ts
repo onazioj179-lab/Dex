@@ -714,16 +714,6 @@ export {
   type FolderDiffResult,
 } from './FileChangeTimeline';
 
-// Smart Duplicate Detector - Safe duplicate detection
-export {
-  SmartDuplicateDetector,
-  type DuplicateType,
-  type DuplicateFile,
-  type DuplicateGroup,
-  type ScanResult,
-  type ScanConfig,
-} from './SmartDuplicateDetector';
-
 // Secure Vault System - Encrypted folder isolation
 export {
   SecureVaultSystem,
@@ -785,20 +775,6 @@ export {
   type PaneState,
 } from './SplitViewSystem';
 
-// Notes System - Built-in notes with folders & attachments
-export {
-  NotesSystem,
-  type NoteType,
-  type NoteStatus,
-  type Note,
-  type NoteFolder,
-  type NoteAttachment,
-  type ChecklistItem,
-  type NoteVersion,
-  type NotesConfig,
-  type NoteFilter,
-  type NotesStats,
-} from './NotesSystem';
 
 // Task & Reminder System - OS-level task management
 export {
