@@ -38,6 +38,7 @@ mod statistics_dashboard;
 mod time_tracking;
 mod version_history;
 mod word_count;
+mod zlib;
 // Wave 2 — project-* family + voice memo, daily briefing, dependency,
 // duplication detector, bulk metadata.
 mod bulk_metadata;
@@ -858,7 +859,14 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return duplication_detector::dispatch(conn, channel, args);
     }
     if channel.starts_with("project-archiver:") {
-        return project_archiver::dispatch(conn, channel, args);
+        // The archiver also touches the filesystem: `.dex-archive` files live
+        // under app_data_dir/archive (the Tauri analog of Electron userData).
+        let archive_dir = app
+            .path()
+            .app_data_dir()
+            .unwrap_or_default()
+            .join("archive");
+        return project_archiver::dispatch(conn, &archive_dir, channel, args);
     }
     if channel.starts_with("project-comparison:") {
         return project_comparison::dispatch(conn, channel, args);
