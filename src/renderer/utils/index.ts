@@ -181,7 +181,9 @@ export const platform = {
   isWindows: /Win/i.test(_ua),
   isLinux: /Linux/i.test(_ua),
   isMobile: typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/.test(navigator.userAgent),
-  isTouchDevice: typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0),
+  isTouchDevice:
+    typeof window !== 'undefined' &&
+    ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0)),
 };
 
 // Keyboard helpers
