@@ -13,6 +13,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useCollaborationStore, CollaboratorRole, Collaborator } from '../services/CollaborationSystem';
 import { useFocusTrap } from '../utils/useFocusTrap';
 import { Z_PANEL } from '../../shared/zIndex';
+import { radius } from '../styles/tokens';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -34,7 +35,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     maxWidth: 520,
     background: 'var(--color-bg-elevated)',
-    borderRadius: 16,
+    // Canonical top rung (was an off-scale 16px); matches the rest of the modal family.
+    borderRadius: radius['2xl'],
     boxShadow: 'var(--pg-shadow-modal), 0 0 1px rgba(255,255,255,0.1) inset',
     overflow: 'hidden',
     animation: 'slideUp 0.2s ease',
@@ -60,7 +62,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: radius.md,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -91,7 +93,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     background: 'var(--color-bg-base)',
     border: '1px solid var(--color-border)',
-    borderRadius: 10,
+    borderRadius: radius.xl,
     color: 'var(--color-text-primary)',
     outline: 'none',
     transition: 'border-color 0.15s ease',
@@ -101,7 +103,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     background: 'var(--color-bg-base)',
     border: '1px solid var(--color-border)',
-    borderRadius: 10,
+    borderRadius: radius.xl,
     color: 'var(--color-text-primary)',
     outline: 'none',
     cursor: 'pointer',
@@ -114,7 +116,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent)',
     color: '#fff',
     border: 'none',
-    borderRadius: 10,
+    borderRadius: radius.xl,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     whiteSpace: 'nowrap',
@@ -130,7 +132,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     padding: '10px 12px',
     background: 'var(--color-bg-base)',
-    borderRadius: 10,
+    borderRadius: radius.xl,
   },
   avatar: {
     width: 36,
@@ -168,7 +170,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)',
-    borderRadius: 6,
+    borderRadius: radius.md,
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
   },
@@ -180,7 +182,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: radius.md,
     color: 'var(--color-text-muted)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -191,14 +193,14 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     padding: '12px 14px',
     background: 'var(--color-bg-base)',
-    borderRadius: 10,
+    borderRadius: radius.xl,
   },
   linkToggle: {
     position: 'relative',
     width: 44,
     height: 24,
     background: 'var(--color-border)',
-    borderRadius: 12,
+    borderRadius: radius['2xl'],
     cursor: 'pointer',
     transition: 'background 0.2s ease',
   },
@@ -230,7 +232,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)',
-    borderRadius: 6,
+    borderRadius: radius.md,
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -249,7 +251,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '2px 6px',
     fontSize: 10,
     fontWeight: 600,
-    borderRadius: 4,
+    borderRadius: radius.sm,
     background: 'rgba(255,255,255,0.1)',
     color: 'var(--color-text-muted)',
     marginLeft: 6,
@@ -265,7 +267,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 14px',
     background: 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))',
     border: '1px solid rgba(255,159,10,0.2)',
-    borderRadius: 10,
+    borderRadius: radius.xl,
     marginBottom: 8,
   },
   accessRequestActions: {
@@ -279,7 +281,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#30d158',
     color: '#fff',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: radius.md,
     cursor: 'pointer',
   },
   denyBtn: {
@@ -289,7 +291,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     color: '#ff453a',
     border: '1px solid rgba(255,69,58,0.3)',
-    borderRadius: 6,
+    borderRadius: radius.md,
     cursor: 'pointer',
   },
 };
