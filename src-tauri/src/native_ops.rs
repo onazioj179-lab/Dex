@@ -118,103 +118,13 @@ pub fn notify(app: &tauri::AppHandle, title: &str, body: &str) {
     let _ = b.show();
 }
 
-// --- Project archiver (filesystem + zlib, app data dir) --------------------
-// Mirrors ProjectArchiverManager: archives live under <appData>/archive as
-// `<app>_<safeName>_<ts>.dex-archive` holding zlib-deflated JSON.
-
-fn archive_dir(app: &tauri::AppHandle) -> std::path::PathBuf {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-        .join("archive");
-    let _ = std::fs::create_dir_all(&dir);
-    dir
-}
-
-/// `project-archiver:getArchiveDir` — the archive directory path.
-pub fn archiver_get_dir(app: &tauri::AppHandle) -> Value {
-    json!(archive_dir(app).to_string_lossy())
-}
-
-/// `project-archiver:archive` — archiveProject(app, projectName, projectData):
-/// deflate JSON -> write .dex-archive file -> insert the project_archive row ->
-/// return the ArchiveRecord (or null on any failure, matching the TS try/catch).
-pub fn archiver_archive(app: &tauri::AppHandle, args: &Value) -> Value {
-    let app_name = args.get(0).and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let project_name = args.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let project_data = args.get(2).cloned().unwrap_or(Value::Null);
-
-    let json_str = serde_json::to_string(&project_data).unwrap_or_else(|_| "null".to_string());
-    let compressed = crate::compress::deflate_str(&json_str);
-    // safeName = projectName.replace(/[^a-zA-Z0-9_-]/g,'_').substring(0,50)
-    let safe: String = project_name
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
-        .take(50)
-        .collect();
-    let now = now_ms();
-    let path = archive_dir(app).join(format!("{}_{}_{}.dex-archive", app_name, safe, now));
-    if std::fs::write(&path, &compressed).is_err() {
-        return Value::Null;
-    }
-    let path_str = path.to_string_lossy().to_string();
-    let size = compressed.len() as i64;
-
-    with_conn(app, |conn| {
-        let inserted = conn.execute(
-            "INSERT INTO project_archive (app, project_name, archive_path, original_data, archived_at, size)
-             VALUES (?, ?, ?, ?, ?, ?)",
-            params![app_name, project_name, path_str, "compressed-file", now, size],
-        );
-        if inserted.is_err() {
-            return Value::Null;
-        }
-        json!({
-            "id": conn.last_insert_rowid(),
-            "app": app_name,
-            "project_name": project_name,
-            "archive_path": path_str,
-            "original_data": "compressed-file",
-            "archived_at": now,
-            "size": size,
-        })
-    })
-}
-
-/// `project-archiver:unarchive` — unarchiveProject(archiveId): read+inflate the
-/// file, delete it and the row, return { app, projectName, data } (or null).
-pub fn archiver_unarchive(app: &tauri::AppHandle, args: &Value) -> Value {
-    let id = args.get(0).and_then(|v| v.as_i64()).unwrap_or(-1);
-    with_conn(app, |conn| {
-        let row: Option<(String, String, String)> = conn
-            .query_row(
-                "SELECT app, project_name, archive_path FROM project_archive WHERE id = ?",
-                params![id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .ok();
-        let (app_name, project_name, archive_path) = match row {
-            Some(t) => t,
-            None => return Value::Null,
-        };
-        if std::path::Path::new(&archive_path).exists() {
-            let data = std::fs::read(&archive_path)
-                .ok()
-                .and_then(|bytes| crate::compress::inflate_to_string(&bytes))
-                .and_then(|s| serde_json::from_str::<Value>(&s).ok());
-            let _ = std::fs::remove_file(&archive_path);
-            let _ = conn.execute("DELETE FROM project_archive WHERE id = ?", params![id]);
-            match data {
-                Some(d) => json!({ "app": app_name, "projectName": project_name, "data": d }),
-                None => Value::Null,
-            }
-        } else {
-            // File gone -> drop the dangling row, return null (matches the TS).
-            let _ = conn.execute("DELETE FROM project_archive WHERE id = ?", params![id]);
-            Value::Null
-        }
-    })
+/// Push one renderer event — the Tauri analog of Electron's
+/// `mainWindow.webContents.send(channel, payload)`. The tauriCompat bridge
+/// subscribes with `dex.on(channel, cb)` and hands the payload to the callback.
+/// One payload value per event, exactly like the webContents.send call sites.
+pub fn emit_event(app: &tauri::AppHandle, channel: &str, payload: &Value) {
+    use tauri::Emitter;
+    let _ = app.emit(channel, payload);
 }
 
 // --- Media library import (filesystem stat + insert) -----------------------
@@ -238,78 +148,6 @@ pub(crate) fn detect_media_type(filepath: &str) -> &'static str {
     } else {
         "document"
     }
-}
-
-/// Read one media_library row by id into the MediaRecord shape (snake_case,
-/// SELECT * column order), matching shared_media_library's row mapping.
-fn media_row(conn: &Connection, id: i64) -> Value {
-    conn.query_row(
-        "SELECT id, filepath, filename, type, size, duration, width, height, imported_by, last_used, use_count, thumbnail, timestamp
-         FROM media_library WHERE id = ?",
-        params![id],
-        |r| {
-            Ok(json!({
-                "id": r.get::<_, i64>(0)?,
-                "filepath": r.get::<_, String>(1)?,
-                "filename": r.get::<_, String>(2)?,
-                "type": r.get::<_, String>(3)?,
-                "size": r.get::<_, i64>(4)?,
-                "duration": r.get::<_, Option<i64>>(5)?,
-                "width": r.get::<_, Option<i64>>(6)?,
-                "height": r.get::<_, Option<i64>>(7)?,
-                "imported_by": r.get::<_, String>(8)?,
-                "last_used": r.get::<_, Option<i64>>(9)?,
-                "use_count": r.get::<_, i64>(10)?,
-                "thumbnail": r.get::<_, Option<String>>(11)?,
-                "timestamp": r.get::<_, i64>(12)?,
-            }))
-        },
-    )
-    .unwrap_or(Value::Null)
-}
-
-/// `media-library:import` — importFile(filepath, importedBy). Dedupe by filepath
-/// (bump use_count), else stat the file + insert. Thumbnail generation is a
-/// separate decoder concern and is intentionally skipped (not part of the return).
-pub fn media_import(app: &tauri::AppHandle, args: &Value) -> Value {
-    let filepath = args.get(0).and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let imported_by = args.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
-
-    with_conn(app, |conn| {
-        let existing: Option<i64> = conn
-            .query_row(
-                "SELECT id FROM media_library WHERE filepath = ?",
-                params![filepath],
-                |r| r.get(0),
-            )
-            .ok();
-        if let Some(id) = existing {
-            let _ = conn.execute(
-                "UPDATE media_library SET use_count = use_count + 1, last_used = ? WHERE id = ?",
-                params![now_ms(), id],
-            );
-            return media_row(conn, id);
-        }
-        if !std::path::Path::new(&filepath).exists() {
-            return Value::Null;
-        }
-        let size = std::fs::metadata(&filepath).map(|m| m.len() as i64).unwrap_or(0);
-        let filename = std::path::Path::new(&filepath)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let typ = detect_media_type(&filepath);
-        let now = now_ms();
-        let inserted = conn.execute(
-            "INSERT INTO media_library (filepath, filename, type, size, duration, width, height, imported_by, last_used, use_count, thumbnail, timestamp)
-             VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, 1, NULL, ?)",
-            params![filepath, filename, typ, size, imported_by, now, now],
-        );
-        if inserted.is_err() {
-            return Value::Null;
-        }
-        media_row(conn, conn.last_insert_rowid())
-    })
 }
 
 // --- Changelog export (render markdown -> save dialog -> write) ------------
@@ -810,9 +648,12 @@ fn process_due_reminders(app: &tauri::AppHandle) {
         let now: String = conn
             .query_row("SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')", [], |r| r.get(0))
             .unwrap_or_default();
-        let due: Vec<(i64, String, String, String, String)> = {
+        // Full `SELECT *` row shape — Electron pushes the whole reminder row
+        // with its `reminder:fired` webContents.send, so the emit below must too.
+        let due: Vec<Value> = {
             let mut stmt = match conn.prepare(
-                "SELECT id, title, body, repeat, remind_at FROM reminders
+                "SELECT id, app, title, body, item_type, item_id, remind_at, repeat,
+                        completed, snoozed_until, created_at FROM reminders
                  WHERE completed = 0 AND remind_at <= ?1
                  AND (snoozed_until IS NULL OR snoozed_until <= ?1)
                  ORDER BY remind_at ASC LIMIT 20",
@@ -821,7 +662,19 @@ fn process_due_reminders(app: &tauri::AppHandle) {
                 Err(_) => return Value::Null,
             };
             let mapped = stmt.query_map(params![now], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+                Ok(json!({
+                    "id": r.get::<_, i64>(0)?,
+                    "app": r.get::<_, String>(1)?,
+                    "title": r.get::<_, String>(2)?,
+                    "body": r.get::<_, String>(3)?,
+                    "item_type": r.get::<_, String>(4)?,
+                    "item_id": r.get::<_, String>(5)?,
+                    "remind_at": r.get::<_, String>(6)?,
+                    "repeat": r.get::<_, String>(7)?,
+                    "completed": r.get::<_, i64>(8)?,
+                    "snoozed_until": r.get::<_, Option<String>>(9)?,
+                    "created_at": r.get::<_, String>(10)?,
+                }))
             });
             match mapped {
                 Ok(rs) => rs.filter_map(|x| x.ok()).collect(),
@@ -829,15 +682,22 @@ fn process_due_reminders(app: &tauri::AppHandle) {
             }
         };
 
-        for (id, title, body, repeat, remind_at) in &due {
-            let body_text = if body.is_empty() { "Reminder due" } else { body.as_str() };
+        for reminder in &due {
+            let id = reminder.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+            let title = reminder.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let body = reminder.get("body").and_then(|v| v.as_str()).unwrap_or("");
+            let repeat = reminder.get("repeat").and_then(|v| v.as_str()).unwrap_or("none");
+            let remind_at = reminder.get("remind_at").and_then(|v| v.as_str()).unwrap_or("");
+            let body_text = if body.is_empty() { "Reminder due" } else { body };
             notify(app, title, body_text);
+            // In-app push (Electron: webContents.send('reminder:fired', reminder)).
+            emit_event(app, "reminder:fired", reminder);
 
             if repeat == "none" || repeat.is_empty() {
                 let _ = conn.execute("UPDATE reminders SET completed = 1 WHERE id = ?", params![id]);
             } else {
                 // computeNextRemindAt: daily +1d, weekly +7d, monthly +1mo, else +1d.
-                let modifier = match repeat.as_str() {
+                let modifier = match repeat {
                     "daily" => "+1 day",
                     "weekly" => "+7 days",
                     "monthly" => "+1 month",

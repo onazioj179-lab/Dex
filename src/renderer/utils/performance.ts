@@ -78,59 +78,9 @@ function processIdleQueue(deadline: IdleDeadline): void {
 // THROTTLING & DEBOUNCING
 // -----------------------------------------------------------------------------
 
-/**
- * Throttle function calls - max one call per interval
- */
-export function throttle<T extends (...args: unknown[]) => void>(
-  fn: T,
-  intervalMs: number
-): T {
-  let lastCall = 0;
-  let scheduledCall: ReturnType<typeof setTimeout> | null = null;
-  
-  return ((...args: unknown[]) => {
-    const now = performance.now();
-    const timeSinceLastCall = now - lastCall;
-    
-    if (timeSinceLastCall >= intervalMs) {
-      lastCall = now;
-      fn(...args);
-    } else if (!scheduledCall) {
-      scheduledCall = setTimeout(() => {
-        lastCall = performance.now();
-        scheduledCall = null;
-        fn(...args);
-      }, intervalMs - timeSinceLastCall);
-    }
-  }) as T;
-}
-
-/**
- * Debounce function calls - only call after pause in invocations
- */
-export function debounce<T extends (...args: unknown[]) => void>(
-  fn: T,
-  delayMs: number
-): T & { cancel: () => void } {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  
-  const debounced = ((...args: unknown[]) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      timeoutId = null;
-      fn(...args);
-    }, delayMs);
-  }) as T & { cancel: () => void };
-  
-  debounced.cancel = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-  };
-  
-  return debounced;
-}
+// Debounce / throttle: one canonical implementation for the whole codebase
+// (consolidation audit finding 6) — re-exported here for existing importers.
+export { debounce, throttle } from '../../shared/perf/helpers';
 
 // -----------------------------------------------------------------------------
 // FRAME BUDGET MANAGEMENT

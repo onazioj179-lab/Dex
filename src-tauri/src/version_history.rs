@@ -6,28 +6,19 @@
 //! reading/writing the shared `dex.db` `version_history` table with the
 //! identical schema, queries, and return shapes as the Electron manager.
 //!
-//! snapshot compression: under Electron the `snapshot` BLOB is the project state
-//! JSON run through `zlib.deflateSync` (and read back with `zlib.inflateSync`).
-//! The shared `crate::compress` helper mirrors that byte-for-byte (flate2 zlib
-//! stream), so `save` deflates `JSON.stringify(state)` into the BLOB and
-//! `getState` / `restore` inflate it back and `JSON.parse` it — the on-disk
-//! format matches Electron exactly and round-trips both ways. Every channel
-//! (`save`, `getVersions`, `getState`, `restore`, `delete`, `markDirty`,
-//! `getStats`) is ported faithfully.
+//! Snapshot compression: the `snapshot` BLOB is the project state JSON run
+//! through zlib deflate (and read back with inflate), via the shared
+//! [`crate::zlib`] helpers — byte-compatible with the Electron manager's
+//! `zlib.deflateSync`/`inflateSync`, so databases written by either shell
+//! round-trip in the other. All channels (`save`, `getState`, `restore`,
+//! `getVersions`, `delete`, `markDirty`, `getStats`) are ported faithfully.
 
+use crate::zlib;
 use rusqlite::{params, Connection, Row};
 use serde_json::{json, Value};
 
 /// Max versions retained per (app, project_id) — matches MAX_VERSIONS_PER_PROJECT.
 const MAX_VERSIONS_PER_PROJECT: i64 = 50;
-
-/// Current wall-clock time in epoch milliseconds (mirrors Date.now()).
-fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
-}
 
 /// Create the version_history table + indexes (matches DatabaseManager schema).
 pub fn ensure_schema(conn: &Connection) {
@@ -79,6 +70,117 @@ fn get_versions(conn: &Connection, app: &str, project_id: &str) -> Value {
     json!(out)
 }
 
+/// version-history:save — saveVersion(appName, projectId, projectName, state,
+/// autoSaved). Deflates the state JSON into the snapshot BLOB, inserts the row,
+/// trims to MAX_VERSIONS_PER_PROJECT oldest-first, and returns the new row id
+/// (Electron returns Number(lastInsertRowid); -1 on failure).
+fn save_version(
+    conn: &Connection,
+    app: &str,
+    project_id: &str,
+    project_name: &str,
+    state: &Value,
+    auto_saved: bool,
+) -> i64 {
+    let json_str = state.to_string();
+    let compressed = zlib::deflate(json_str.as_bytes());
+    let size = compressed.len() as i64;
+    let now = current_millis();
+    let inserted = conn.execute(
+        "INSERT INTO version_history (app, project_id, project_name, snapshot, size, timestamp, auto_saved) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        params![app, project_id, project_name, compressed, size, now, if auto_saved { 1 } else { 0 }],
+    );
+    if inserted.is_err() {
+        return -1;
+    }
+    let id = conn.last_insert_rowid();
+    enforce_version_limit(conn, app, project_id);
+    id
+}
+
+/// Trim a project's history to MAX_VERSIONS_PER_PROJECT, deleting the oldest
+/// rows first (matches enforceVersionLimit).
+fn enforce_version_limit(conn: &Connection, app: &str, project_id: &str) {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM version_history WHERE app = ? AND project_id = ?",
+            params![app, project_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if count > MAX_VERSIONS_PER_PROJECT {
+        let excess = count - MAX_VERSIONS_PER_PROJECT;
+        let _ = conn.execute(
+            "DELETE FROM version_history WHERE id IN ( \
+                SELECT id FROM version_history WHERE app = ? AND project_id = ? \
+                ORDER BY timestamp ASC LIMIT ? \
+            )",
+            params![app, project_id, excess],
+        );
+    }
+}
+
+/// version-history:getState — getVersionState(versionId). Inflates the snapshot
+/// BLOB back to the state object; null when the row is missing or the BLOB does
+/// not decompress/parse (Electron logs and returns null on that path).
+fn get_version_state(conn: &Connection, version_id: i64) -> Value {
+    let blob: Option<Vec<u8>> = conn
+        .query_row(
+            "SELECT snapshot FROM version_history WHERE id = ?",
+            params![version_id],
+            |r| r.get(0),
+        )
+        .ok();
+    let blob = match blob {
+        Some(b) => b,
+        None => return Value::Null,
+    };
+    match zlib::inflate(&blob) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        Err(_) => Value::Null,
+    }
+}
+
+/// version-history:restore — restoreVersion(appName, projectId, versionId,
+/// currentState). Backs up the current state as a new (manual) version, then
+/// returns { restored, backupVersionId } with the decompressed snapshot — or
+/// null when the version row is missing (matches the TS flow, including taking
+/// the backup before attempting the decompress).
+fn restore_version(
+    conn: &Connection,
+    app: &str,
+    project_id: &str,
+    version_id: i64,
+    current_state: &Value,
+) -> Value {
+    let record: Option<(String, Vec<u8>)> = conn
+        .query_row(
+            "SELECT project_name, snapshot FROM version_history WHERE id = ?",
+            params![version_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .ok();
+    let (project_name, snapshot) = match record {
+        Some(r) => r,
+        None => return Value::Null,
+    };
+    let backup_version_id = save_version(conn, app, project_id, &project_name, current_state, false);
+    let restored = match zlib::inflate(&snapshot) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        Err(_) => Value::Null,
+    };
+    json!({ "restored": restored, "backupVersionId": backup_version_id })
+}
+
+/// Wall-clock milliseconds since the Unix epoch (Date.now() equivalent).
+fn current_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
 /// version-history:delete — deleteVersion(versionId). Returns boolean. The TS
 /// returns `true` unconditionally when a DB is present.
 fn delete_version(conn: &Connection, version_id: i64) -> Value {
@@ -121,143 +223,6 @@ fn get_stats(conn: &Connection, app: &str, project_id: &str) -> Value {
     }
 }
 
-/// enforceVersionLimit(appName, projectId) — keep at most MAX_VERSIONS_PER_PROJECT
-/// rows per (app, project_id); delete the oldest excess by timestamp ASC.
-fn enforce_version_limit(conn: &Connection, app: &str, project_id: &str) {
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM version_history WHERE app = ? AND project_id = ?",
-            params![app, project_id],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    if count > MAX_VERSIONS_PER_PROJECT {
-        let excess = count - MAX_VERSIONS_PER_PROJECT;
-        let _ = conn.execute(
-            "DELETE FROM version_history WHERE id IN (
-                SELECT id FROM version_history WHERE app = ? AND project_id = ?
-                ORDER BY timestamp ASC LIMIT ?
-            )",
-            params![app, project_id, excess],
-        );
-    }
-}
-
-/// saveVersion(appName, projectId, projectName, state, autoSaved) — compress the
-/// state JSON to the `snapshot` BLOB (zlib, byte-compatible with Electron),
-/// insert the row, enforce the 50-version cap, and return the new rowid
-/// (Number(result.lastInsertRowid)). Returns -1 when the insert fails, mirroring
-/// the TS `if (!db) return -1` no-persistence path.
-fn save_version(
-    conn: &Connection,
-    app: &str,
-    project_id: &str,
-    project_name: &str,
-    state: &Value,
-    auto_saved: bool,
-) -> i64 {
-    // JSON.stringify(state) -> zlib.deflateSync(Buffer.from(json,'utf8')).
-    let json_str = serde_json::to_string(state).unwrap_or_else(|_| "null".to_string());
-    let compressed = crate::compress::deflate_str(&json_str);
-    let size = compressed.len() as i64;
-    let now = now_ms();
-    let auto = if auto_saved { 1 } else { 0 };
-
-    let inserted = conn.execute(
-        "INSERT INTO version_history (app, project_id, project_name, snapshot, size, timestamp, auto_saved)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
-        params![app, project_id, project_name, compressed, size, now, auto],
-    );
-    if inserted.is_err() {
-        return -1;
-    }
-    let id = conn.last_insert_rowid();
-
-    enforce_version_limit(conn, app, project_id);
-    // (dirtyProjects.delete(key) is in-memory Electron state — no DB side effect.)
-    id
-}
-
-/// version-history:save — saveVersion(...). Returns the new rowid (number).
-fn save(conn: &Connection, args: &Value) -> Value {
-    let app = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-    let project_id = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
-    let project_name = args.get(2).and_then(|v| v.as_str()).unwrap_or("");
-    let state = args.get(3).cloned().unwrap_or(Value::Null);
-    let auto_saved = args.get(4).and_then(|v| v.as_bool()).unwrap_or(false);
-    json!(save_version(conn, app, project_id, project_name, &state, auto_saved))
-}
-
-/// version-history:getState — getVersionState(versionId). Reads the snapshot
-/// BLOB, inflates it, and JSON.parses it; returns the decompressed state object
-/// or null (missing row, empty/missing blob, or inflate/parse failure).
-fn get_state(conn: &Connection, version_id: i64) -> Value {
-    let blob: Option<Vec<u8>> = conn
-        .query_row(
-            "SELECT snapshot FROM version_history WHERE id = ?",
-            params![version_id],
-            |r| r.get::<_, Option<Vec<u8>>>(0),
-        )
-        .ok()
-        .flatten();
-
-    // !row || !row.snapshot -> null
-    let bytes = match blob {
-        Some(b) if !b.is_empty() => b,
-        _ => return Value::Null,
-    };
-
-    // inflateSync(...).toString('utf8') then JSON.parse; any failure -> null.
-    match crate::compress::inflate_to_string(&bytes) {
-        Some(s) => serde_json::from_str::<Value>(&s).unwrap_or(Value::Null),
-        None => Value::Null,
-    }
-}
-
-/// version-history:restore — restoreVersion(appName, projectId, versionId,
-/// currentState). Reads `SELECT *` for the target version; if missing, returns
-/// null. Otherwise backs up the current state first (saveVersion with the target
-/// row's project_name, autoSaved=false), decompresses the target snapshot, and
-/// returns { restored, backupVersionId }.
-fn restore(conn: &Connection, args: &Value) -> Value {
-    let app = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-    let project_id = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
-    let version_id = args.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
-    let current_state = args.get(3).cloned().unwrap_or(Value::Null);
-
-    // SELECT * — we need project_name and snapshot off the target record.
-    let record: Option<(String, Vec<u8>)> = conn
-        .query_row(
-            "SELECT project_name, snapshot FROM version_history WHERE id = ?",
-            params![version_id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, Vec<u8>>(1)?)),
-        )
-        .ok();
-
-    let (project_name, snapshot) = match record {
-        Some(t) => t,
-        None => return Value::Null,
-    };
-
-    // Backup-before-restore: save the current state under the record's name.
-    let backup_version_id =
-        save_version(conn, app, project_id, &project_name, &current_state, false);
-
-    // Decompress the target snapshot. The TS lets a decompress throw propagate
-    // (no catch here); we mirror by returning null on inflate/parse failure
-    // rather than panicking — same observable "no restore" outcome.
-    let restored = match crate::compress::inflate_to_string(&snapshot) {
-        Some(s) => serde_json::from_str::<Value>(&s).unwrap_or(Value::Null),
-        None => Value::Null,
-    };
-
-    json!({
-        "restored": restored,
-        "backupVersionId": backup_version_id,
-    })
-}
-
 pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
     let s = |i: usize| args.get(i).and_then(|v| v.as_str()).unwrap_or("").to_string();
     match channel {
@@ -276,18 +241,27 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
 
         "version-history:getStats" => get_stats(conn, &s(0), &s(1)),
 
-        // The snapshot BLOB is zlib-compressed JSON; crate::compress mirrors
-        // Node's zlib byte-for-byte, so these now (de)compress for real.
-        //
-        // save -> returns number (lastInsertRowid).
-        "version-history:save" => save(conn, args),
-        // getState -> returns the decompressed state object or null.
+        // save(appName, projectId, projectName, state, autoSaved) -> number
+        // (the new row id; -1 on failure), matching the Electron return.
+        "version-history:save" => {
+            let state = args.get(3).cloned().unwrap_or(Value::Null);
+            let auto_saved = args.get(4).and_then(|v| v.as_bool()).unwrap_or(false);
+            json!(save_version(conn, &s(0), &s(1), &s(2), &state, auto_saved))
+        }
+
+        // getState(versionId) -> the decompressed state object, or null.
         "version-history:getState" => {
             let version_id = args.get(0).and_then(|v| v.as_i64()).unwrap_or(0);
-            get_state(conn, version_id)
+            get_version_state(conn, version_id)
         }
-        // restore -> returns { restored, backupVersionId } or null.
-        "version-history:restore" => restore(conn, args),
+
+        // restore(appName, projectId, versionId, currentState) ->
+        // { restored, backupVersionId } or null.
+        "version-history:restore" => {
+            let version_id = args.get(2).and_then(|v| v.as_i64()).unwrap_or(0);
+            let current_state = args.get(3).cloned().unwrap_or(Value::Null);
+            restore_version(conn, &s(0), &s(1), version_id, &current_state)
+        }
 
         _ => Value::Null,
     }

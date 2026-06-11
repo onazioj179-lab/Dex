@@ -44,7 +44,7 @@ pub fn ensure_schema(conn: &Connection) {
 /// The `snapshot` column is a zlib BLOB written by DatabaseManager via Node
 /// `zlib.deflateSync(JSON.stringify(state))`, so it must be inflated before
 /// parsing — decoding the BLOB bytes directly as UTF-8/JSON (as the TS literally
-/// does) garbles the compressed stream. We inflate via crate::compress (the
+/// does) garbles the compressed stream. We inflate via crate::zlib (the
 /// byte-compatible mirror of `zlib.inflateSync(...).toString()`) and then
 /// JSON.parse the result. On JSON parse failure we fall back to
 /// `{ raw: <inflated string> }`, mirroring the TS catch's `{ raw: ... }` shape;
@@ -83,7 +83,7 @@ fn get_snapshot(conn: &Connection, snapshot_id: i64) -> Value {
     // side fed to JSON.stringify before compressing). If inflate fails the BLOB
     // is not a valid zlib stream, so degrade to a lossy UTF-8 view of the raw
     // bytes — the same last-resort string the TS `String(row.snapshot)` yields.
-    let raw = crate::compress::inflate_to_string(&snapshot_bytes)
+    let raw = crate::zlib::inflate_to_string(&snapshot_bytes)
         .unwrap_or_else(|| String::from_utf8_lossy(&snapshot_bytes).into_owned());
     let data = match serde_json::from_str::<Value>(&raw) {
         Ok(v) => v,

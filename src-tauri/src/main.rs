@@ -14,7 +14,6 @@
 mod activity_feed;
 mod changelog;
 mod color_labels;
-mod compress;
 mod content_expiry;
 mod daily_note;
 mod dashboard;
@@ -45,8 +44,10 @@ mod snapshot_comparison;
 mod statistics_dashboard;
 mod time_tracking;
 mod uki_chat;
+mod util;
 mod version_history;
 mod word_count;
+mod zlib;
 // Wave 2 — project-* family + voice memo, daily briefing, dependency,
 // duplication detector, bulk metadata.
 mod bulk_metadata;
@@ -874,7 +875,14 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return duplication_detector::dispatch(conn, channel, args);
     }
     if channel.starts_with("project-archiver:") {
-        return project_archiver::dispatch(conn, channel, args);
+        // The archiver also touches the filesystem: `.dex-archive` files live
+        // under app_data_dir/archive (the Tauri analog of Electron userData).
+        let archive_dir = app
+            .path()
+            .app_data_dir()
+            .unwrap_or_default()
+            .join("archive");
+        return project_archiver::dispatch(conn, &archive_dir, channel, args);
     }
     if channel.starts_with("project-comparison:") {
         return project_comparison::dispatch(conn, channel, args);
@@ -895,7 +903,10 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return project_timeline::dispatch(conn, channel, args);
     }
     if channel.starts_with("voice-memo:") {
-        return voice_memo::dispatch(conn, channel, args);
+        // Voice memos write/read `.opus` files under app_data_dir/voice-memos
+        // (the Tauri analog of Electron userData) and probe for whisper.wasm.
+        let data_dir = app.path().app_data_dir().unwrap_or_default();
+        return voice_memo::dispatch(conn, &data_dir, channel, args);
     }
     if channel.starts_with("dexnotes:") {
         return notes::dispatch(conn, channel, args);
@@ -952,6 +963,8 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         return file_watcher::dispatch(conn, channel, args);
     }
     if channel.starts_with("backup:") {
+        // Metadata/settings only — create/verify/restore are explicit
+        // native_ops arms in dex_ipc (they manage the live connection).
         return backup_restore::dispatch(conn, channel, args);
     }
     if channel.starts_with("uki-chat:") {
@@ -1070,10 +1083,8 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
         "dialog:showOpenDialog" | "files:openDialog" => native_ops::show_open_dialog(&app, &args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----
-        "project-archiver:archive" => native_ops::archiver_archive(&app, &args),
-        "project-archiver:unarchive" => native_ops::archiver_unarchive(&app, &args),
-        "project-archiver:getArchiveDir" => native_ops::archiver_get_dir(&app),
-        "media-library:import" => native_ops::media_import(&app, &args),
+        // (project-archiver:* and media-library:* run their fs work inside
+        // their db modules, which receive the app data dir via db_dispatch.)
         "changelog:export" => native_ops::changelog_export(&app, &args),
         "dexnotes:addAttachment" => native_ops::note_add_attachment(&app, &args),
         "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
@@ -1100,7 +1111,7 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
         // when the hub returns -1 (the app's notifications are disabled).
         "notification-center:send" => {
             let res = db_dispatch(&app, "notification-center:send", &args);
-            if res.as_i64().map(|n| n >= 0).unwrap_or(false) {
+            if let Some(id) = res.as_i64().filter(|n| *n >= 0) {
                 if let Some(p) = args.get(0) {
                     let title = p.get("title").and_then(|v| v.as_str()).unwrap_or("");
                     let body = p.get("body").and_then(|v| v.as_str()).unwrap_or("");
@@ -1108,7 +1119,33 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
                         native_ops::notify(&app, title, body);
                     }
                 }
+                // Electron also pushes the inserted record + the unread count
+                // (broadcastNewNotification / broadcastUnreadCount).
+                let _ = native_ops::with_conn(&app, |conn| {
+                    let record = unified_notification_hub::record_by_id(conn, id);
+                    if !record.is_null() {
+                        native_ops::emit_event(&app, "notification-center:new", &record);
+                    }
+                    let count = unified_notification_hub::get_unread_count(conn);
+                    native_ops::emit_event(&app, "notification-center:unread-count", &count);
+                    Value::Null
+                });
             }
+            res
+        }
+
+        // markRead/markAllRead/clearAll/delete change the unread set; Electron
+        // broadcasts the new unread count after each (broadcastUnreadCount).
+        ch @ ("notification-center:markRead"
+        | "notification-center:markAllRead"
+        | "notification-center:clearAll"
+        | "notification-center:delete") => {
+            let res = db_dispatch(&app, ch, &args);
+            let _ = native_ops::with_conn(&app, |conn| {
+                let count = unified_notification_hub::get_unread_count(conn);
+                native_ops::emit_event(&app, "notification-center:unread-count", &count);
+                Value::Null
+            });
             res
         }
 

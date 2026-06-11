@@ -91,8 +91,8 @@ const WhatsNewModal: React.FC = () => {
           boxShadow: 'var(--shadow-md)',
           padding: 24,
           color: 'var(--color-text-primary)',
-          backdropFilter: 'blur(20px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+          backdropFilter: 'var(--blur-lg) saturate(160%)',
+          WebkitBackdropFilter: 'var(--blur-lg) saturate(160%)',
         }}
       >
         <h2

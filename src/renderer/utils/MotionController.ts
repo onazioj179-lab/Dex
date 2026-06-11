@@ -804,7 +804,7 @@ export function injectScrollbarStyles(): void {
       border-radius: 6px;
       background: rgba(0,0,0,0.75);
       color: #30d158;
-      backdrop-filter: blur(10px);
+      backdrop-filter: var(--blur-md);
     }
     .dex-perf-overlay .warn { color: #ff9f0a; }
     .dex-perf-overlay .danger { color: #ff453a; }

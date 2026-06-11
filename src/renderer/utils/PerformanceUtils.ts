@@ -15,47 +15,11 @@ import { useRef, useMemo, useEffect, DependencyList } from 'react';
 // DEBOUNCE & THROTTLE
 // -------------------------------------------------------------------------
 
-/**
- * Debounce a function - only call after a delay since last invocation
- */
-export function debounce<T extends (...args: any[]) => any>(
-  fn: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  
-  return (...args: Parameters<T>) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-}
-
-/**
- * Throttle a function - only call once per interval
- */
-export function throttle<T extends (...args: any[]) => any>(
-  fn: T,
-  interval: number
-): (...args: Parameters<T>) => void {
-  let lastCall = 0;
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    const timeSinceLastCall = now - lastCall;
-    
-    if (timeSinceLastCall >= interval) {
-      lastCall = now;
-      fn(...args);
-    } else {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        lastCall = Date.now();
-        fn(...args);
-      }, interval - timeSinceLastCall);
-    }
-  };
-}
+// Debounce / throttle: one canonical implementation for the whole codebase
+// (consolidation audit finding 6) — re-exported here for existing importers
+// and used by the hooks below.
+import { debounce, throttle } from '../../shared/perf/helpers';
+export { debounce, throttle };
 
 // -------------------------------------------------------------------------
 // REACT HOOKS FOR PERFORMANCE

@@ -81,7 +81,52 @@ search-history, session-replay, shared media-library, smart-grouping,
 smart-rename, snapshot-comparison, stats-dashboard, theme-schedule,
 time-tracking, vinx-presentation, version-history, voice-memo, word-count.
 
-**Latest slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
+**Latest slice (2026-06-10, second pass): filesystem tail ported.** Now native:
+  - **voice-memo**: `save` decodes the base64 audio and writes the `.opus` file
+    under `data_dir/voice-memos`, inserts + returns the VoiceMemo shape;
+    `isWhisperAvailable` probes `data_dir/whisper/whisper.wasm`; delete gates
+    its recycle-bin entry on the file existing (dispatch now takes data_dir).
+  - **media-library**: new-file `import` branch (fs stat, extension type
+    detection, insert + return row); `remove` unlinks the cached thumbnail.
+    Thumbnail generation stays absent (best-effort optional sharp/ffmpeg in
+    Electron; NULL thumbnail either way).
+  - **backup**: `create`/`verify`/`restore`/`delete` fully ported with exact
+    `.dexbak` parity (base64 JSON archive, gzip level 6, SHA-256 checksum,
+    manifest) — backups round-trip between shells. Auto-backup interval timer
+    remains an Electron-runtime concern (no IPC surface).
+  - **Correction:** bulk-metadata and smart-rename on-disk writes were listed
+    as remaining, but those modules were already fully ported (their notes
+    refer to Electron-internal event-bus side effects only).
+  - New shared `src-tauri/src/util.rs` (pseudo uuid v4, ISO-8601 UTC now) and
+    gzip/gunzip added to `zlib.rs`; licensing's SHA-256 is now crate-shared.
+  What remains of the non-DB tail: native dialogs + OS notifications (Tauri
+  plugins), live window/screen (multiwindow, multimonitor, layout, vinx),
+  networking (link-preview fetch, live-collab mDNS), background runtimes
+  (file-watcher, reminder/expiry/theme timers, scratchpad autosave buffer,
+  migration runner), notes attachments file copy/remove, export-bundle native
+  save dialog, zlib BLOB tails in feedback file write.
+
+**Earlier slice (2026-06-10): zlib tier ported (start of the non-DB tail).**
+Added `flate2` (zlib, Node `deflateSync`/`inflateSync` byte parity) + `base64`
+to `src-tauri`, with a shared [src-tauri/src/zlib.rs](src-tauri/src/zlib.rs)
+helper. Three subsystems went from degrade to fully native:
+  - **version-history**: `save`/`getState`/`restore` now deflate/inflate the
+    snapshot BLOB (+ 50-version trim), interoperable with Electron-written DBs.
+  - **session-replay**: `recordAction` (deflate+base64 states), live per-process
+    `{ sessionId, startTime }` for `getCurrentSession`, decompression in
+    `getSessionActions`, and the 7-session cleanup at init.
+  - **project-archiver**: `archive`/`unarchive` write/read/unlink real
+    `.dex-archive` files under `app_data_dir/archive`, `getArchiveDir` returns
+    that path (dispatch now takes the archive dir).
+Also fixed: `assets/icon.png` converted palette -> RGBA (Tauri's
+`generate_context!` codegen rejects non-RGBA PNGs; required for Linux builds,
+harmless elsewhere). Note for Linux dev boxes: `cargo check` needs
+`libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev` — and beware
+`cargo check | tail` masking the exit code. `cargo check` green, zero warnings;
+`core` tests green. `docs/RELEASE_NOTES.md` was cleared ahead of the next
+release line (publish new notes there once the migrated build ships).
+
+**Earlier slice (2026-06-09): 13 SQLite-backed subsystems wired native.** All
 share `dex.db` through the native `db.rs` connection and route via
 `db_dispatch` (one channel-prefix arm each) in [main.rs](src-tauri/src/main.rs):
 activity-feed, changelog, color-labels, dashboard, goal-system, help, journal,
@@ -128,11 +173,12 @@ This converges to 100% deterministically and never ports a dead/guessed channel.
   native store/runtime; build as `core/` crates with `cargo test`, then thin-wire.
 
 **Command-layer tier 1 DONE (2026-06-09): zlib BLOBs.** Added the `flate2` dep +
-shared `src-tauri/src/compress.rs` (byte-compatible with Node `zlib.deflateSync`/
-`inflateSync`). Now fully functional (no longer degraded): `version-history:save/
+a shared zlib helper, byte-compatible with Node `zlib.deflateSync`/`inflateSync`
+(today `src-tauri/src/zlib.rs`; see the merge-consolidation entry below). Now
+fully functional (no longer degraded): `version-history:save/
 getState/restore` (deflate→BLOB, inflate→JSON, 50-version cap), `session-replay:
-recordAction/getSessionActions/getCurrentSession` (compression + DB-persisted
-per-run session id), and `snapshot-comparison:getSnapshot` (fixed: was reading the
+recordAction/getSessionActions/getCurrentSession`, and
+`snapshot-comparison:getSnapshot` (fixed: was reading the
 compressed BLOB as raw UTF-8). `cargo check` green.
 
 **Command-layer tier 2 DONE (2026-06-09): native dialogs + OS notifications.**
@@ -213,27 +259,58 @@ arms before the db guard:
     (cmd_file_watcher.rs). LIVE fs-watch events deferred (need the renderer event
     bridge). `cargo check` green (first try).
 
+**Merge consolidation DONE (2026-06-10): local command layer + cloud refinement
+(PR #19) reconciled.** Both lines of work landed in one merge. The cloud PR
+contributed the shared helpers `src-tauri/src/zlib.rs` (deflate/inflate/gzip/
+gunzip + string conveniences; supersedes the earlier compress.rs, now deleted)
+and `src-tauri/src/util.rs` (pseudo_uuid_v4, iso_utc_now), plus fs-capable db
+modules. Where both sides implemented the same channels, exactly one
+implementation now serves each:
+  - **session-replay:** cloud version adopted — states stored as zlib+base64
+    TEXT exactly like Electron's compressJson (the local raw-BLOB port did not
+    round-trip Electron-written rows), and per-process session identity via
+    OnceLock (the local meta-table port wrongly reused one session id across runs).
+  - **version-history:** cloud version adopted (same raw zlib BLOB format,
+    crate::zlib helpers).
+  - **project-archiver / media-library:import:** cloud db-module implementations
+    adopted (db_dispatch passes the app data dir in); the duplicate native_ops
+    fns + explicit dex_ipc arms were removed.
+  - **backup:create/verify/restore:** local native_ops kept — VACUUM INTO
+    snapshot of the Tauri-native dex.db + atomic-swap restore, both
+    runtime-verified. The cloud's Electron-file-format trio was removed from
+    backup_restore.rs: it archived dex-core.db/dex-notes.db/help.db, which do
+    not exist in the Tauri data dir, so it would have backed up nothing.
+    backup_restore.rs keeps list/get-settings/update-settings/delete.
+  - **voice-memo:save DONE (cloud):** base64 audio -> `.opus` under
+    <appData>/voice-memos + DB row, matching Electron's audioBase64 contract.
+    Renderer store fixed: loadMemos now calls the real `voice-memo:getForParent`
+    channel (`voice-memo:get` never existed in either shell) and saveMemo
+    base64-encodes the ArrayBuffer before crossing the JSON bridge.
+
+**Renderer event bridge DONE (2026-06-10).** The generic push path now works
+end to end: Rust pushes with `native_ops::emit_event(app, channel, payload)`
+(Tauri `Emitter`, one payload value per event — the analog of Electron's
+`webContents.send`), and tauriCompat implements the preload's generic
+`dex.on(channel, cb)` / `dex.off(channel, cb)` (plus `window.electron.on/off`)
+over `__TAURI__.event.listen` (withGlobalTauri is on). Callbacks receive the
+payload directly, matching the preload wrappers that strip the IPC event arg.
+Namespaced `dex.x.onY(cb)` subscriptions still return no-op unsubscribes (their
+channel mapping under Electron is irregular). Wired emit sites, mirroring the
+Electron broadcasts: `reminder:fired` (full reminder row, from the scheduler
+thread), `notification-center:new` (inserted record) +
+`notification-center:unread-count` after send, and `unread-count` after
+markRead/markAllRead/clearAll/delete. `cargo check` + `tsc` green; renderer
+delivery still needs an in-app smoke test (subscriptions are UI-triggered).
+
 **Remaining non-DB items:**
-  - **voice-memo save** — the one genuine cross-cutting item: needs a base64 audio
-    contract in `tauriCompat` + the renderer recorder (binary over the JSON bridge),
-    then write the `.opus`. Renderer + bridge + Rust.
-  - **Renderer event bridge** — make `onX` subscriptions in tauriCompat deliver
-    Tauri events (would light up file-watcher live events, reminder:fired push,
-    notification push). Infra change, enables several deferred pushes at once.
-  - Live multiwindow detach, live theme apply — BrowserWindow/OS-theme bound.
-  - **voice-memo save** — the "binary over the bridge" case: needs a base64 audio
-    contract in tauriCompat + the renderer recorder, then write the .opus file.
-  - **link-preview fetch** (HTTP+TLS dep), **file-watcher** (`notify` + state +
-    events), **timers** (reminder/expiry/theme/scratchpad; async tasks + events),
-    **live window/monitor** (Tauri APIs; Electron Display shape is approximate).
-  - **Native OS/UI:** dialogs (open/save), OS notifications (notification-center,
-    reminder firing), live BrowserWindow/screen (multiwindow, multimonitor, layout
-    apply, vinx presenter), theme apply.
-  - **Networking:** link-preview HTTP fetch, live-collab mDNS/peer sync.
-  - **Background runtimes:** file-watcher (fs.watch), reminder/expiry/theme timers,
-    scratchpad autosave buffer, migration runner.
+  - **file-watcher live fs events** — `notify` crate + emit
+    `file-watcher:detected` through the (now live) event bridge.
+  - Live multiwindow detach, live theme apply + theme-schedule timer —
+    BrowserWindow/OS-theme bound.
+  - **Networking:** live-collab mDNS/peer sync.
 Use `__dexDegradeReport()` (see Verify) to order these by real usage. Then the
-non-DB engines from the phase plan: transfer/device, audio sink, PTY.
+non-DB engines from the phase plan: transfer/device, audio sink, PTY, rewind
+capture.
 
 ---
 

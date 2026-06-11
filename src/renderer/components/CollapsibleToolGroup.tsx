@@ -395,7 +395,7 @@ export const AdaptiveToolbar: React.FC<AdaptiveToolbarProps> = ({
     },
     glass: {
       background: 'rgba(22, 22, 26, 0.85)',
-      backdropFilter: 'blur(12px) saturate(150%)',
+      backdropFilter: 'var(--blur-md) saturate(150%)',
       borderBottom: `1px solid ${colors.border.default}`,
     },
     transparent: {

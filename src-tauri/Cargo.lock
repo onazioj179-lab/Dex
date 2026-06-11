@@ -930,6 +930,7 @@ name = "dex-tauri"
 version = "6.0.0"
 dependencies = [
  "arboard",
+ "base64 0.22.1",
  "dex-audio",
  "dex-automation",
  "dex-scanner",

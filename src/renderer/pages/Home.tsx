@@ -597,8 +597,8 @@ export const Home: React.FC = () => {
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
           padding: '10px 24px',
           background: 'rgba(12, 12, 14, 0.34)',
-          backdropFilter: 'blur(34px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+          backdropFilter: 'var(--blur-xl) saturate(180%)',
+          WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex', justifyContent: 'center',
           animation: 'fadeIn 0.15s ease-out',
@@ -677,8 +677,8 @@ export const Home: React.FC = () => {
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '10px 14px',
                     background: 'rgba(255,255,255,0.06)',
-                    backdropFilter: 'blur(34px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+                    backdropFilter: 'var(--blur-xl) saturate(180%)',
+                    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
                     border: '1px solid rgba(255,255,255,0.10)',
                     borderRadius: 16, cursor: 'pointer',
                     color: 'var(--color-text-primary)', fontSize: 12,
@@ -1010,8 +1010,8 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
           width: 76px; min-width: 76px; height: 80px;
           padding: 10px 6px 8px;
           background: rgba(255,255,255,0.06);
-          backdrop-filter: blur(34px) saturate(180%);
-          -webkit-backdrop-filter: blur(34px) saturate(180%);
+          backdrop-filter: var(--blur-xl) saturate(180%);
+          -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
           border: 1px solid rgba(255,255,255,0.10);
           border-radius: 18px;
           cursor: pointer;
@@ -1084,8 +1084,8 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
               borderRadius: 12,
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
-              backdropFilter: 'blur(24px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+              backdropFilter: 'var(--blur-lg) saturate(180%)',
+              WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
               animation: 'ctxFadeIn 0.15s cubic-bezier(0.23, 1, 0.32, 1)',
             }}
           >
@@ -1146,8 +1146,8 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 14px', borderRadius: 16,
       background: 'rgba(255,255,255,0.06)',
-      backdropFilter: 'blur(34px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(34px) saturate(180%)',
+      backdropFilter: 'var(--blur-xl) saturate(180%)',
+      WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
       border: '1px solid rgba(255,255,255,0.10)',
       boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
       opacity: done ? 0.6 : 1,
