@@ -275,7 +275,7 @@ const viewerTabStyle = (active: boolean): React.CSSProperties => ({
   padding: '0 12px', display: 'flex', alignItems: 'center', fontSize: 10, fontWeight: 600,
   letterSpacing: '0.02em', textTransform: 'uppercase',
   color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', cursor: 'pointer', userSelect: 'none',
-  borderBottom: active ? '1px solid #4A9EFF' : '1px solid transparent',
+  borderBottom: active ? '1px solid var(--color-accent, #4A9EFF)' : '1px solid transparent',
   whiteSpace: 'nowrap', flexShrink: 0,
 });
 

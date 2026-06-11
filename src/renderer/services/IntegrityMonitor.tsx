@@ -737,7 +737,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
   container: {
     padding: 12,
     background: 'var(--color-bg-surface)',
-    borderRadius: 8,
+    borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
   },
   header: {
@@ -774,7 +774,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 2,
     padding: '6px 8px',
-    borderRadius: 4,
+    borderRadius: 3,
     background: 'var(--color-bg-inset)',
     borderLeft: '2px solid',
   },
@@ -795,7 +795,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
   button: {
     flex: 1,
     padding: '6px 12px',
-    borderRadius: 6,
+    borderRadius: 4,
     border: '1px solid var(--color-border-default)',
     background: 'var(--color-bg-surface)',
     fontSize: 12,

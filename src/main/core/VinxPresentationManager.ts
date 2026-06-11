@@ -144,7 +144,7 @@ body { background: #000; overflow: hidden; display: flex; align-items: center; j
 video { max-width: 100vw; max-height: 100vh; }
 #controls { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; opacity: 0; transition: opacity 0.3s; }
 body:hover #controls { opacity: 1; }
-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 4px; }
+button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 3px; }
 button:hover { background: rgba(255,255,255,0.3); }
 #title { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 16px; font-family: sans-serif; opacity: 0; transition: opacity 0.3s; }
 body:hover #title { opacity: 0.8; }

@@ -78,6 +78,10 @@ function writeAccount(acc: CardAccount | null) {
   }
 }
 
+// ALL-FREE POLICY: payment and plan-compare surfaces are hidden, not removed.
+// Flip to true to restore subscription management UI.
+const PAYMENTS_ENABLED: boolean = false;
+
 export interface AccountSettingsCardProps {
   /** Override storage source for tests. */
   initialAccount?: CardAccount | null;
@@ -147,8 +151,7 @@ function SignedOutView({ onSignIn }: { onSignIn: () => void }) {
       <h3 style={cardHeading}>You are using DEX without an account</h3>
       <p style={bodyText}>
         That is totally fine. DEX runs fully on your machine. Sign in or create a free
-        account when you want cloud backup, cross-device sync, payments, or to publish
-        plugins.
+        account when you want cloud backup, cross-device sync, or to publish plugins.
       </p>
       <Button variant="primary" size="md" onClick={onSignIn}>Sign in or create account</Button>
     </div>
@@ -173,10 +176,10 @@ function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, p
         <h3 style={cardHeading}>{account.displayName ?? account.email}</h3>
         <p style={bodyText}>Signed in as {account.email}</p>
         <p style={bodyText}>
-          Plan: <strong style={{ color: 'var(--color-text-primary)' }}>{prettyPlan(account.plan)}</strong>
+          Plan: <strong style={{ color: 'var(--color-text-primary)' }}>{PAYMENTS_ENABLED ? prettyPlan(account.plan) : 'Free — all features included'}</strong>
         </p>
         <div style={{ display: 'flex', gap: space[2], flexWrap: 'wrap' }}>
-          <Button variant="secondary" size="sm" onClick={onManageBilling}>Manage subscription</Button>
+          {PAYMENTS_ENABLED && <Button variant="secondary" size="sm" onClick={onManageBilling}>Manage subscription</Button>}
           <Button variant="ghost" size="sm" onClick={onSignOut}>Sign out</Button>
         </div>
       </div>
@@ -187,20 +190,20 @@ function SignedInView({ account, onSignOut, onManageBilling, onCompare, panel, p
           <div style={{ width: `${Math.min(100, snap.fraction * 100)}%`, height: '100%', background: snap.full ? 'var(--color-error)' : snap.warn ? 'var(--color-warning, #FFC107)' : 'var(--color-accent, #4A9EFF)' }} />
         </div>
       </div>
-      {account.plan === 'free-viewer' && (
+      {PAYMENTS_ENABLED && account.plan === 'free-viewer' && (
         <UpgradePrompt currentPlan={account.plan} onCompare={onCompare} />
       )}
-      {panel === 'billing' && (
+      {PAYMENTS_ENABLED && panel === 'billing' && (
         <BillingPanel account={account} onClose={onClosePanel} />
       )}
-      {panel === 'compare' && (
+      {PAYMENTS_ENABLED && panel === 'compare' && (
         <PlanComparePanel
           currentPlan={account.plan}
           onClose={onClosePanel}
           onChoose={(planId, period, seats) => { onChoosePlan(planId, period, seats); }}
         />
       )}
-      {panel === 'pay' && pending && (
+      {PAYMENTS_ENABLED && panel === 'pay' && pending && (
         <PaymentMethodPicker
           planId={pending.planId}
           period={pending.period}

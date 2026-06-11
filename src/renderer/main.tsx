@@ -303,7 +303,7 @@ class RootErrorBoundary extends React.Component<
           height: '100vh', background: '#0a0a0f', color: '#e5e5ea', fontFamily: 'Inter, system-ui, sans-serif', gap: 16,
         }}>
           <div style={{
-            width: 64, height: 64, borderRadius: 16,
+            width: 64, height: 64, borderRadius: 12,
             background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
@@ -317,7 +317,7 @@ class RootErrorBoundary extends React.Component<
             onClick={() => window.location.reload()}
             style={{
               padding: '10px 28px', background: 'var(--color-accent)', color: '#fff',
-              border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
+              border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
               cursor: 'pointer', marginTop: 8,
               boxShadow: '0 4px 16px rgba(10,132,255,0.35)',
             }}

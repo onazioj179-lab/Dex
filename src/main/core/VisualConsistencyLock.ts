@@ -97,10 +97,10 @@ const LOCKED_TOKENS: DesignToken[] = [
   { name: '--line-height-relaxed', value: '1.75', category: 'typography', locked: true },
 
   // -- Border Radius -------------------------------------------------------
-  { name: '--radius-sm', value: '4px', category: 'radius', locked: true, description: 'Small radius' },
-  { name: '--radius-md', value: '6px', category: 'radius', locked: true, description: 'Medium radius' },
-  { name: '--radius-lg', value: '8px', category: 'radius', locked: true, description: 'Large radius' },
-  { name: '--radius-xl', value: '12px', category: 'radius', locked: true, description: 'Extra large radius' },
+  { name: '--radius-sm', value: '3px', category: 'radius', locked: true, description: 'Small radius' },
+  { name: '--radius-md', value: '4px', category: 'radius', locked: true, description: 'Medium radius' },
+  { name: '--radius-lg', value: '6px', category: 'radius', locked: true, description: 'Large radius' },
+  { name: '--radius-xl', value: '8px', category: 'radius', locked: true, description: 'Extra large radius' },
   { name: '--radius-full', value: '9999px', category: 'radius', locked: true, description: 'Full/pill radius' },
 
   // -- Shadows -------------------------------------------------------------

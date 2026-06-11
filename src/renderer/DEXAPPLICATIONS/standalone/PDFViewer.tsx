@@ -245,7 +245,7 @@ const PDFViewer: React.FC = () => {
 };
 
 const btn: React.CSSProperties = {
-  padding: '6px 10px', borderRadius: 6, fontSize: 12,
+  padding: '6px 10px', borderRadius: 4, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };

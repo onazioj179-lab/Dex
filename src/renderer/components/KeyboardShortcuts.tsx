@@ -190,7 +190,7 @@ const KeyboardShortcuts: React.FC = () => {
                   <kbd style={{
                     fontSize: 11, fontWeight: 600, fontFamily: '"SF Mono", monospace',
                     color: '#fff', background: 'var(--color-border)',
-                    padding: '3px 8px', borderRadius: 5,
+                    padding: '3px 8px', borderRadius: 4,
                     border: '1px solid var(--color-border)',
                     whiteSpace: 'nowrap',
                   }}>{s.keys}</kbd>
@@ -206,7 +206,7 @@ const KeyboardShortcuts: React.FC = () => {
           fontSize: 11, color: 'var(--color-text-tertiary)',
         }}>
           Click anywhere or press <kbd style={{
-            fontSize: 10, padding: '2px 6px', borderRadius: 4,
+            fontSize: 10, padding: '2px 6px', borderRadius: 3,
             background: 'var(--color-border)', border: '1px solid var(--color-border)',
           }}>{MOD}+/</kbd> to close
         </div>

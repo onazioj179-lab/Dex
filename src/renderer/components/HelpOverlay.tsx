@@ -114,7 +114,7 @@ const HelpCard: React.FC<{
     onClick={onClick}
     style={{
       background: 'rgba(255, 255, 255, 0.04)',
-      borderRadius: 10,
+      borderRadius: 8,
       padding: 14,
       cursor: 'pointer',
       transition: 'all 150ms ease',
@@ -158,7 +158,7 @@ const HelpSectionView: React.FC<{
         padding: '12px 14px',
         background: 'rgba(255, 255, 255, 0.04)',
         border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: 10,
+        borderRadius: 8,
         color: '#fff',
         cursor: 'pointer',
         transition: 'all 150ms ease',
@@ -202,7 +202,7 @@ const HelpSearch: React.FC<{
       gap: 10,
       padding: '10px 14px',
       background: 'rgba(255, 255, 255, 0.06)',
-      borderRadius: 10,
+      borderRadius: 8,
       border: '1px solid rgba(255, 255, 255, 0.1)',
       marginBottom: 16,
     }}
@@ -316,7 +316,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
           backdropFilter: 'var(--blur-lg)',
           WebkitBackdropFilter: 'var(--blur-lg)',
           border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: 16,
+          borderRadius: 12,
           boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5)',
           overflow: 'hidden',
           display: 'flex',
@@ -342,7 +342,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
             style={{
               background: 'rgba(255, 255, 255, 0.08)',
               border: 'none',
-              borderRadius: 6,
+              borderRadius: 4,
               padding: 6,
               cursor: 'pointer',
               display: 'flex',
@@ -379,7 +379,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
                 style={{
                   background: 'var(--color-accent-muted)',
                   border: '1px solid rgba(74, 158, 255, 0.2)',
-                  borderRadius: 10,
+                  borderRadius: 8,
                   padding: '14px 10px',
                   cursor: 'pointer',
                   display: 'flex',
@@ -395,7 +395,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
                 style={{
                   background: 'var(--color-success-muted)',
                   border: '1px solid rgba(52, 199, 89, 0.2)',
-                  borderRadius: 10,
+                  borderRadius: 8,
                   padding: '14px 10px',
                   cursor: 'pointer',
                   display: 'flex',
@@ -411,7 +411,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
                 style={{
                   background: 'var(--color-warning-muted)',
                   border: '1px solid rgba(255, 159, 10, 0.2)',
-                  borderRadius: 10,
+                  borderRadius: 8,
                   padding: '14px 10px',
                   cursor: 'pointer',
                   display: 'flex',
@@ -469,7 +469,7 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
           <span>Press <kbd style={{
             padding: '2px 6px',
             background: 'rgba(255,255,255,0.1)',
-            borderRadius: 4,
+            borderRadius: 3,
             fontFamily: 'var(--font-mono)',
           }}>?</kbd> to open help</span>
           <span>ESC to close</span>
@@ -539,7 +539,7 @@ export const HelpTooltip: React.FC<TooltipProps> = memo(({
             backdropFilter: 'var(--blur-md)',
             WebkitBackdropFilter: 'var(--blur-md)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: 8,
+            borderRadius: 6,
             padding: '8px 12px',
             fontSize: 12,
             color: '#fff',

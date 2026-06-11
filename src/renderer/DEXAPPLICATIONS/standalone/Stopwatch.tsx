@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  * Professional stopwatch with lap tracking
  */
-import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 
 const Stopwatch: React.FC = () => {
   const [elapsed, setElapsed] = useState(0);
@@ -51,8 +51,14 @@ const Stopwatch: React.FC = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
   };
 
-  const bestLap = laps.length > 1 ? Math.min(...laps.map((l, i) => i === 0 ? l - (laps[1] ?? 0) : l - (laps[i + 1] ?? 0))) : -1;
-  const worstLap = laps.length > 1 ? Math.max(...laps.map((l, i) => i === 0 ? l - (laps[1] ?? 0) : l - (laps[i + 1] ?? 0))) : -1;
+  // Lap deltas depend only on `laps`, but the component re-renders ~60x/sec
+  // via the RAF `elapsed` tick while running — memoize so the two passes over
+  // `laps` don't run every frame.
+  const { bestLap, worstLap } = useMemo(() => {
+    if (laps.length <= 1) return { bestLap: -1, worstLap: -1 };
+    const deltas = laps.map((l, i) => i === 0 ? l - (laps[1] ?? 0) : l - (laps[i + 1] ?? 0));
+    return { bestLap: Math.min(...deltas), worstLap: Math.max(...deltas) };
+  }, [laps]);
 
   return (
     <div style={s.container}>

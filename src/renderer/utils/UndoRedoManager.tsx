@@ -408,7 +408,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     background: 'var(--color-bg-secondary, #1e1e1e)',
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   header: {
@@ -433,7 +433,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     background: 'transparent',
     border: '1px solid var(--color-border, var(--color-text-tertiary))',
-    borderRadius: 4,
+    borderRadius: 3,
     color: 'var(--color-text-secondary, #999)',
     cursor: 'pointer',
   },

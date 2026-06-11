@@ -629,7 +629,7 @@ const uiStyles: Record<string, React.CSSProperties> = {
   },
   button: {
     padding: '8px 16px',
-    borderRadius: 6,
+    borderRadius: 4,
     border: 'none',
     fontSize: 13,
     fontWeight: 500,

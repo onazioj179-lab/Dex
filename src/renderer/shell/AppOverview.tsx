@@ -189,7 +189,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
           padding: '8px 16px',
           background: 'var(--color-border-subtle)',
           border: '1px solid var(--color-border)',
-          borderRadius: 10,
+          borderRadius: 8,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -252,7 +252,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
               <div style={{
                 width: '100%',
                 height: cardHeight,
-                borderRadius: 12,
+                borderRadius: 10,
                 background: app.id === activeAppId
                   ? 'rgba(74,158,255,0.12)'
                   : 'var(--color-border-subtle)',

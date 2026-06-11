@@ -155,7 +155,7 @@ export function useDropZone<T>(options: {
   const dropZoneStyle: React.CSSProperties = dropState.active ? {
     background: dropState.valid ? 'rgba(74,158,255,0.08)' : 'transparent',
     border: dropState.valid ? '2px solid var(--color-accent)' : '2px solid transparent',
-    borderRadius: 8,
+    borderRadius: 6,
     transition: isReduceMotion() ? 'none' : 'background 0.08s ease, border-color 0.08s ease',
     cursor: dropState.valid ? 'copy' : 'not-allowed',
   } : {};
@@ -202,7 +202,7 @@ export const DragGhost: React.FC<{
             <div style={{
               position: 'absolute', inset: 0,
               background: 'var(--color-border-subtle)',
-              borderRadius: 8,
+              borderRadius: 6,
               transform: 'translate(8px, 8px) rotate(4deg)',
               border: '1px solid var(--color-bg-hover)',
             }} />
@@ -210,7 +210,7 @@ export const DragGhost: React.FC<{
           <div style={{
             position: 'absolute', inset: 0,
             background: 'var(--color-border-subtle)',
-            borderRadius: 8,
+            borderRadius: 6,
             transform: 'translate(4px, 4px) rotate(2deg)',
             border: '1px solid var(--color-bg-hover)',
           }} />

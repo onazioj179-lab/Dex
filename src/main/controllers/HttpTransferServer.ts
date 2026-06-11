@@ -108,16 +108,16 @@ function generateWebUI(files: SharedFile[], hostName: string): string {
     .header { text-align: center; padding: 30px 0; }
     .header h1 { font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .header p { color: #71717a; margin-top: 8px; font-size: 14px; }
-    .file-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; margin-bottom: 10px; backdrop-filter: blur(10px); }
-    .file-icon { font-size: 28px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(59,130,246,0.1); border-radius: 10px; }
+    .file-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 10px; backdrop-filter: blur(10px); }
+    .file-icon { font-size: 28px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(59,130,246,0.1); border-radius: 8px; }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .file-size { color: #71717a; font-size: 12px; margin-top: 2px; }
-    .download-btn { padding: 8px 18px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 13px; white-space: nowrap; transition: all 0.2s; }
+    .download-btn { padding: 8px 18px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; white-space: nowrap; transition: all 0.2s; }
     .download-btn:hover { background: linear-gradient(135deg, #60a5fa, #3b82f6); box-shadow: 0 4px 16px rgba(59,130,246,0.4); }
-    .upload-section { margin-top: 30px; padding: 24px; background: rgba(255,255,255,0.03); border: 2px dashed rgba(255,255,255,0.1); border-radius: 16px; text-align: center; }
+    .upload-section { margin-top: 30px; padding: 24px; background: rgba(255,255,255,0.03); border: 2px dashed rgba(255,255,255,0.1); border-radius: 12px; text-align: center; }
     .upload-section h3 { margin-bottom: 12px; font-size: 16px; }
-    .upload-btn { display: inline-block; padding: 10px 24px; background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.3); color: #22c55e; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
+    .upload-btn { display: inline-block; padding: 10px 24px; background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.3); color: #22c55e; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
     .upload-btn:hover { background: rgba(34,197,94,0.3); }
     .empty { text-align: center; padding: 60px 20px; color: #52525b; }
     .footer { text-align: center; padding: 20px; color: #3f3f46; font-size: 11px; }

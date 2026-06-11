@@ -75,9 +75,9 @@ const INSTALL_HISTORY_FILE = 'update-install-history.json';
 
 const DEFAULT_CONFIG: UpdateConfig = {
   autoCheck: true, // Check for updates on startup
-  autoDownload: false, // Don't auto-download (user choice)
-  autoInstall: false, // Never auto-install (respect user)
-  checkInterval: 24, // Check daily
+  autoDownload: true, // Silent background download so updates land immediately
+  autoInstall: true, // Install on quit (never mid-session); rollback stays available
+  checkInterval: 4, // Check every 4 hours
   lastCheck: 0,
   skipVersion: null,
   channel: 'stable',
@@ -138,7 +138,16 @@ export class ReleaseManager {
     try {
       if (fs.existsSync(this.configPath)) {
         const data = fs.readFileSync(this.configPath, 'utf-8');
-        return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
+        return {
+          ...DEFAULT_CONFIG,
+          ...JSON.parse(data),
+          // autoDownload/autoInstall have no user-facing setting (setPreferences
+          // does not expose them), so persisted values are just stale defaults.
+          // Pin them to the current policy so existing installs get immediate
+          // updates too.
+          autoDownload: DEFAULT_CONFIG.autoDownload,
+          autoInstall: DEFAULT_CONFIG.autoInstall,
+        };
       }
     } catch (error) {
       log.error('[ReleaseManager] Failed to load config:', error);
@@ -288,8 +297,10 @@ export class ReleaseManager {
   private setupAutoUpdater(): void {
     // Configure auto-updater
     autoUpdater.logger = log;
-    autoUpdater.autoDownload = false; // We control downloads
-    autoUpdater.autoInstallOnAppQuit = false; // We control installs
+    autoUpdater.autoDownload = false; // We control downloads (config.autoDownload drives them)
+    // Install a downloaded update when the app quits — updates land without
+    // ever interrupting a session, and one-click rollback remains available.
+    autoUpdater.autoInstallOnAppQuit = this.config.autoInstall;
     autoUpdater.allowPrerelease = this.config.channel === 'beta';
     // Feed URL: by default electron-updater reads the `build.publish` block from
     // package.json (GitHub provider for DEX). Only override when an admin has

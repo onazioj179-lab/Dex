@@ -163,7 +163,25 @@ REMAINING (lower leverage / deferred):
 - **Renderer creative-shared chunk** + intra-app lazy-loading (vinx panels, export
   pipelines, axl/utils/export, flux 3D) to shrink app-axl(536K)/app-imosion(420K).
   MEDIUM; the creative-shared move carries eager-import risk — verify a renderer build.
-- **UI/UX** — the next major phase; needs specific screens/apps flagged (can't be inferred).
+- **UI/UX sharpening pass (2026-06-10, DONE)**: canonical radius scale tightened one rung
+  (xs2/sm3/md4/lg6/xl8/2xl10) in design-system.css and ALL mirrors (tokens.ts, index.html
+  boot CSS, VisualConsistencyLock, ThemeSystem — ThemeSystem had been overriding
+  --radius-md/lg to 8/12px at runtime and VisualConsistencyLock locked xl at 12px; both
+  now aligned; CleanUI.ts already matched the target scale). 2,223 hardcoded radii stepped
+  down across 150 files via scripts/sharpen-radius.mjs; 73 true circles/pills (toggles,
+  dots, knobs) restored via scripts/audit-radius-circles.mjs (radius >= half-box detection).
+  Tailwind rounded-* now bound to the --radius-* vars. Universal button press feedback
+  (scale 0.97 on :active, specificity-0 :where) added in design-tokens.css. Onboarding
+  buttons converted from dead inline styles to CSS classes with hover/press/disabled
+  states; onboarding card/modal radii put on canonical rungs. Per-app audit fixes:
+  vinx tab accents tokenized, axl invisible borders removed + 7 close buttons unified
+  (.axl-close with hover), notes folder-tree/color-swatch hover, uki delete-button hover,
+  imosion track color-dot hover, forge Tools button hover. Per-app accent identities
+  (prism pink, imosion green, forge cyan) deliberately KEPT — they are design, not drift.
+  Verified: tsc + watermark + full build green. NEXT UI candidates: snap remaining
+  off-rung radii (5/7px inherited from old off-scale values; must skip circle/pill lines),
+  per-app deep passes (vinx timeline tooling, imosion mixer), hover states on remaining
+  inline-styled buttons.
 
 ## Build / run
 

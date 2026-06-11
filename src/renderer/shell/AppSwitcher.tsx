@@ -40,7 +40,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
         alignItems: 'center',
         gap: 6,
         padding: '14px 18px',
-        borderRadius: 18,
+        borderRadius: 14,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border)',
         boxShadow: 'var(--pg-shadow-popover)',
@@ -63,7 +63,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
               alignItems: 'center',
               gap: 4,
               padding: '8px 10px',
-              borderRadius: 12,
+              borderRadius: 10,
               background: isSelected ? 'var(--color-border)' : 'transparent',
               border: isSelected ? '1.5px solid var(--color-text-tertiary)' : '1.5px solid transparent',
               transition: 'background 0.1s, border-color 0.1s',
@@ -71,7 +71,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
             }}
           >
             <div style={{
-              width: 40, height: 40, borderRadius: 10,
+              width: 40, height: 40, borderRadius: 8,
               background: color,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: isSelected ? `0 2px 10px ${color}66` : `0 1px 4px ${color}33`,

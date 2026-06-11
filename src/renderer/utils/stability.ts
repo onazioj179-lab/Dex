@@ -172,7 +172,7 @@ function showErrorNotification(message: string): void {
     padding: 12px 20px;
     background: rgba(239, 68, 68, 0.9);
     color: white;
-    border-radius: 8px;
+    border-radius: 6px;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 14px;
     z-index: var(--z-emergency, 50000);

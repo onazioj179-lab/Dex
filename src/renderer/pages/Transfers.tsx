@@ -201,7 +201,7 @@ const QRCodeCanvas: React.FC<{ url: string; size?: number }> = memo(({ url, size
     });
   }, [url, size]);
 
-  return <canvas ref={canvasRef} width={size} height={size} style={{ width: size, height: size, borderRadius: 8 }} />;
+  return <canvas ref={canvasRef} width={size} height={size} style={{ width: size, height: size, borderRadius: 6 }} />;
 });
 
 // Icons
@@ -673,7 +673,7 @@ const Transfers: React.FC = () => {
         <div style={{
           position: 'absolute', inset: 0, zIndex: 'var(--z-modal)',
           background: 'rgba(10,132,255,0.18)', border: '3px dashed rgba(10,132,255,0.5)',
-          borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-accent)' }}>Drop files to {activeTab === 'http' ? 'share via HTTP' : 'transfer'}</div>
         </div>
@@ -690,7 +690,7 @@ const Transfers: React.FC = () => {
           {discoveryRunning && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
-              padding: '3px 10px', borderRadius: 6,
+              padding: '3px 10px', borderRadius: 4,
               background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)',
               fontSize: 11, fontWeight: 500, color: 'var(--color-success)',
             }}>
@@ -700,7 +700,7 @@ const Transfers: React.FC = () => {
           )}
         </div>
         <button onClick={() => setShowSettings(v => !v)} style={{
-          padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+          padding: '6px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
           background: showSettings ? 'rgba(10,132,255,0.12)' : 'var(--color-bg-elevated)',
           color: showSettings ? 'var(--color-accent)' : 'var(--color-text-muted)',
           fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
@@ -726,7 +726,7 @@ const Transfers: React.FC = () => {
             {tab.label}
             {tab.badge !== undefined && tab.badge > 0 && (
               <span style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
                 background: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-muted)', color: 'var(--color-text-inverse)',
               }}>
                 {tab.badge}
@@ -745,7 +745,7 @@ const Transfers: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Nearby devices on your network</div>
               <button onClick={refreshDevices} style={{
-                padding: '6px 14px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+                padding: '6px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                 background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
                 fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
               }}>{Icons.refresh} Refresh</button>
@@ -762,12 +762,12 @@ const Transfers: React.FC = () => {
                 {devices.map(device => (
                   <div key={device.deviceId} onContextMenu={e => showCtxMenu(e, buildDeviceCtxItems(device))} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '14px 18px', borderRadius: 12,
+                    padding: '14px 18px', borderRadius: 10,
                     background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border-subtle)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{
-                        width: 40, height: 40, borderRadius: 10,
+                        width: 40, height: 40, borderRadius: 8,
                         background: 'rgba(100,210,255,0.1)', border: '1px solid rgba(100,210,255,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
                       }}>{getDeviceIcon(device.deviceType)}</div>
@@ -797,7 +797,7 @@ const Transfers: React.FC = () => {
                       </div>
                     </div>
                     <button onClick={() => sendToDevice(device)} disabled={sending} style={{
-                      padding: '8px 18px', borderRadius: 8, border: 'none',
+                      padding: '8px 18px', borderRadius: 6, border: 'none',
                       background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
                       fontSize: 12, fontWeight: 600, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: 6, opacity: sending ? 0.5 : 1,
@@ -818,7 +818,7 @@ const Transfers: React.FC = () => {
                 {pendingDevices.map(pd => (
                   <div key={pd.deviceId} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 16px', borderRadius: 10, marginBottom: 6,
+                    padding: '12px 16px', borderRadius: 8, marginBottom: 6,
                     background: 'rgba(255,159,10,0.08)', border: '1px solid rgba(255,159,10,0.2)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -830,12 +830,12 @@ const Transfers: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => approveDevice(pd.deviceId)} style={{
-                        padding: '6px 14px', borderRadius: 8, border: 'none',
+                        padding: '6px 14px', borderRadius: 6, border: 'none',
                         background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
                         fontSize: 12, fontWeight: 600, cursor: 'pointer',
                       }}>Accept</button>
                       <button onClick={() => denyDevice(pd.deviceId)} style={{
-                        padding: '6px 14px', borderRadius: 8, border: 'none',
+                        padding: '6px 14px', borderRadius: 6, border: 'none',
                         background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)',
                         fontSize: 12, fontWeight: 600, cursor: 'pointer',
                       }}>Deny</button>
@@ -847,7 +847,7 @@ const Transfers: React.FC = () => {
 
             {activeTransfers.length === 0 && pendingDevices.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(50,213,75,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(50,213,75,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                   <span style={{ fontSize: 24, color: '#32D54B' }}>{Icons.send}</span>
                 </div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>No active transfers</div>
@@ -859,13 +859,13 @@ const Transfers: React.FC = () => {
                       toast.success(`${result.filePaths.length} file(s) ready — select a device to send`);
                     }
                   } catch { /* dialog unavailable */ }
-                }} style={{ padding: '6px 16px', borderRadius: 8, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
+                }} style={{ padding: '6px 16px', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {activeTransfers.map(t => (
                   <div key={t.transferId} onContextMenu={e => showCtxMenu(e, buildTransferCtxItems(t))} style={{
-                    padding: '16px 18px', borderRadius: 12,
+                    padding: '16px 18px', borderRadius: 10,
                     background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border-subtle)',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -879,12 +879,12 @@ const Transfers: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => pauseTransfer(t.transferId)} title="Pause" aria-label="Pause transfer" style={{
-                          width: 28, height: 28, borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                          width: 28, height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)',
                           background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)',
                           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>{Icons.pause}</button>
                         <button onClick={() => cancelTransfer(t.transferId)} title="Cancel" aria-label="Cancel transfer" style={{
-                          width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(255,69,58,0.3)',
+                          width: 28, height: 28, borderRadius: 4, border: '1px solid rgba(255,69,58,0.3)',
                           background: 'rgba(255,69,58,0.08)', color: 'var(--color-error)',
                           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>{Icons.close}</button>
@@ -900,7 +900,7 @@ const Transfers: React.FC = () => {
                       )}
                     </div>
                     <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
-                      <div style={{ width: `${t.progress}%`, height: '100%', borderRadius: 3, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
+                      <div style={{ width: `${t.progress}%`, height: '100%', borderRadius: 2, background: 'var(--color-accent)', transition: 'width 0.3s ease' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{formatSize(t.sentBytes)} / {formatSize(t.totalBytes)}</span>
@@ -921,13 +921,13 @@ const Transfers: React.FC = () => {
                 <input
                   value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Search history..." style={{
-                    flex: 1, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+                    flex: 1, padding: '8px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                     background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
                     fontSize: 12, outline: 'none',
                   }}
                 />
                 <button onClick={clearHistory} style={{
-                  padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(255,69,58,0.2)',
+                  padding: '8px 14px', borderRadius: 6, border: '1px solid rgba(255,69,58,0.2)',
                   background: 'rgba(255,69,58,0.08)', color: 'var(--color-error)',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}>Clear All</button>
@@ -943,7 +943,7 @@ const Transfers: React.FC = () => {
                 {history.filter(h => !searchQuery || h.deviceName.toLowerCase().includes(searchQuery.toLowerCase())).map(h => (
                   <div key={h.id} onContextMenu={e => showCtxMenu(e, buildHistoryCtxItems(h))} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 16px', borderRadius: 10,
+                    padding: '12px 16px', borderRadius: 8,
                     background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-bg-hover)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -972,12 +972,12 @@ const Transfers: React.FC = () => {
               <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Share files via HTTP link for browser access</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={httpShareFiles} disabled={busy} style={{
-                  padding: '7px 16px', borderRadius: 10, border: '1px solid var(--color-border-subtle)',
+                  padding: '7px 16px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
                   fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 }}>{Icons.file} Add Files</button>
                 <button onClick={httpServerRunning ? stopHttpServer : startHttpServer} disabled={busy} style={{
-                  padding: '7px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
                   background: httpServerRunning ? 'rgba(255,69,58,0.15)' : 'rgba(48,209,88,0.15)',
                   color: httpServerRunning ? 'var(--color-error)' : 'var(--color-success)',
                   fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
@@ -988,18 +988,18 @@ const Transfers: React.FC = () => {
             {httpServerRunning && httpServerUrl ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{
-                  padding: '20px', borderRadius: 12,
+                  padding: '20px', borderRadius: 10,
                   background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border-subtle)', textAlign: 'center',
                 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Share URL</div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <div onClick={copyUrl} role="button" tabIndex={0} aria-label="Copy share URL" onKeyDown={e => e.key === 'Enter' && copyUrl()} style={{
                       fontSize: 13, color: 'var(--color-accent)', fontFamily: '"SF Mono", monospace', fontWeight: 600,
-                      padding: '8px 14px', background: 'var(--color-bg-elevated)', borderRadius: 8,
+                      padding: '8px 14px', background: 'var(--color-bg-elevated)', borderRadius: 6,
                       border: '1px solid var(--color-border-subtle)', cursor: 'pointer', userSelect: 'all',
                     }}>{httpServerUrl}</div>
                     <button onClick={copyUrl} style={{
-                      padding: '8px 14px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+                      padding: '8px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                       background: copied ? 'rgba(48,209,88,0.15)' : 'var(--color-bg-elevated)',
                       color: copied ? 'var(--color-success)' : 'var(--color-text-secondary)',
                       fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
@@ -1009,7 +1009,7 @@ const Transfers: React.FC = () => {
                     <QRCodeCanvas url={httpServerUrl} size={160} />
                     <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Scan to open on another device</span>
                     <button onClick={downloadQR} style={{
-                      marginTop: 6, padding: '5px 14px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+                      marginTop: 6, padding: '5px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                       background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
                       fontSize: 11, cursor: 'pointer', fontWeight: 500,
                     }}>Download QR</button>
@@ -1022,7 +1022,7 @@ const Transfers: React.FC = () => {
                     {httpSharedFiles.map(f => (
                       <div key={f.id} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 14px', borderRadius: 8, marginBottom: 4, background: 'var(--color-bg-elevated)',
+                        padding: '10px 14px', borderRadius: 6, marginBottom: 4, background: 'var(--color-bg-elevated)',
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ color: 'var(--color-text-muted)' }}>{Icons.file}</span>
@@ -1047,7 +1047,7 @@ const Transfers: React.FC = () => {
                     {pendingUploads.map(u => (
                       <div key={u.id} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 14px', borderRadius: 8, marginBottom: 4,
+                        padding: '10px 14px', borderRadius: 6, marginBottom: 4,
                         background: 'rgba(255,159,10,0.05)', border: '1px solid rgba(255,159,10,0.15)',
                       }}>
                         <div>
@@ -1056,12 +1056,12 @@ const Transfers: React.FC = () => {
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => acceptUpload(u.id, true)} style={{
-                            padding: '5px 12px', borderRadius: 6, border: 'none',
+                            padding: '5px 12px', borderRadius: 4, border: 'none',
                             background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)',
                             fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           }}>Accept</button>
                           <button onClick={() => acceptUpload(u.id, false)} style={{
-                            padding: '5px 12px', borderRadius: 6, border: 'none',
+                            padding: '5px 12px', borderRadius: 4, border: 'none',
                             background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)',
                             fontSize: 11, fontWeight: 600, cursor: 'pointer',
                           }}>Reject</button>
@@ -1087,7 +1087,7 @@ const Transfers: React.FC = () => {
         <div style={{
           position: 'absolute', right: 16, top: 56, width: 320, zIndex: 2000,
           background: 'var(--color-bg-surface-solid)',
-          borderRadius: 12, border: '1px solid var(--color-border)',
+          borderRadius: 10, border: '1px solid var(--color-border)',
           boxShadow: 'var(--pg-shadow-popover)', overflow: 'hidden',
         }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1099,7 +1099,7 @@ const Transfers: React.FC = () => {
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Auto-Accept</div>
               <button onClick={() => setAutoAccept(v => !v)} style={{
-                width: '100%', padding: '8px 12px', borderRadius: 8,
+                width: '100%', padding: '8px 12px', borderRadius: 6,
                 border: '1px solid ' + (autoAccept ? 'rgba(48,209,88,0.3)' : 'var(--color-border-subtle)'),
                 background: autoAccept ? 'rgba(48,209,88,0.08)' : 'var(--color-bg-elevated)',
                 color: autoAccept ? 'var(--color-success)' : 'var(--color-text-muted)',
@@ -1117,7 +1117,7 @@ const Transfers: React.FC = () => {
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Download Location</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <div style={{
-                  flex: 1, padding: '8px 12px', borderRadius: 8,
+                  flex: 1, padding: '8px 12px', borderRadius: 6,
                   border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)',
                   color: downloadLocation ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
@@ -1135,7 +1135,7 @@ const Transfers: React.FC = () => {
                     }
                   } catch { /* dialog unavailable */ }
                 }} style={{
-                  padding: '8px 12px', borderRadius: 8,
+                  padding: '8px 12px', borderRadius: 6,
                   border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)',
                   color: 'var(--color-accent)',
@@ -1166,7 +1166,7 @@ const Transfers: React.FC = () => {
                 onChange={e => setHttpPassword(e.target.value)}
                 placeholder="No password (open access)"
                 style={{
-                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+                  width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
                   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
                   fontSize: 12, outline: 'none',
                 }}
@@ -1182,7 +1182,7 @@ const Transfers: React.FC = () => {
               <div style={{ display: 'flex', gap: 4 }}>
                 {[0, 5, 15, 30, 60].map(v => (
                   <button key={v} onClick={() => setHttpExpiry(v)} style={{
-                    flex: 1, padding: '5px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                    flex: 1, padding: '5px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
                     border: '1px solid ' + (httpExpiry === v ? 'rgba(10,132,255,0.3)' : 'var(--color-border-subtle)'),
                     background: httpExpiry === v ? 'rgba(10,132,255,0.12)' : 'var(--color-bg-elevated)',
                     color: httpExpiry === v ? 'var(--color-accent)' : 'var(--color-text-muted)',

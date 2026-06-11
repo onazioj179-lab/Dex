@@ -401,23 +401,23 @@ const SystemMonitorPanel: React.FC = () => {
 
       {/* Live stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>CPU</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: totalCpu > 80 ? '#FF453A' : totalCpu > 50 ? '#FF9F0A' : '#30D158', fontVariantNumeric: 'tabular-nums' }}>{totalCpu}%</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.cpu?.cores || '?'} cores</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Memory</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: totalMem > 80 ? '#FF453A' : totalMem > 50 ? '#FF9F0A' : '#30D158', fontVariantNumeric: 'tabular-nums' }}>{totalMem}%</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{memUsedGB} / {memTotalGB} GB</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Processes</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{processes.length}</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{filtered.length} shown</div>
         </div>
         {status.battery && (
-          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '12px 14px' }}>
+          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Battery</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{status.battery.percent}%</div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.battery.charging ? 'Charging' : 'On battery'}</div>
@@ -433,7 +433,7 @@ const SystemMonitorPanel: React.FC = () => {
           value={filter}
           onChange={e => setFilter(e.target.value)}
           style={{
-            flex: 1, height: 32, padding: '0 12px', borderRadius: 8,
+            flex: 1, height: 32, padding: '0 12px', borderRadius: 6,
             background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)',
             color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit', outline: 'none',
           }}
@@ -441,7 +441,7 @@ const SystemMonitorPanel: React.FC = () => {
         <button
           onClick={refresh}
           style={{
-            height: 32, padding: '0 14px', borderRadius: 8, border: '1px solid var(--color-border-subtle)',
+            height: 32, padding: '0 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
             background: 'var(--color-bg-elevated, #1a1a1e)', color: 'var(--color-text-primary)',
             fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}
@@ -449,14 +449,14 @@ const SystemMonitorPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div style={{ padding: '10px 14px', background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 8, color: '#FF6961', fontSize: 12 }}>
+        <div style={{ padding: '10px 14px', background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 6, color: '#FF6961', fontSize: 12 }}>
           {error}
         </div>
       )}
 
       {/* Process table */}
       <div style={{
-        border: '1px solid var(--color-border-subtle)', borderRadius: 10, overflow: 'hidden',
+        border: '1px solid var(--color-border-subtle)', borderRadius: 8, overflow: 'hidden',
         background: 'var(--color-bg-base, #0e0e11)',
       }}>
         <div style={{ maxHeight: 520, overflowY: 'auto' }}>
@@ -503,7 +503,7 @@ const SystemMonitorPanel: React.FC = () => {
                       disabled={busyPid === p.pid}
                       aria-label={busyPid === p.pid ? `Ending ${p.name}` : `End process ${p.name} (PID ${p.pid})`}
                       style={{
-                        padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(255,69,58,0.4)',
+                        padding: '3px 10px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.4)',
                         background: busyPid === p.pid ? 'rgba(255,69,58,0.1)' : 'transparent',
                         color: '#FF6961', fontSize: 11, fontWeight: 600,
                         cursor: busyPid === p.pid ? 'wait' : 'pointer',
@@ -672,7 +672,7 @@ const UpdateManagerSection: React.FC = () => {
     background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
-  const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
+  const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
 
   const Toggle: React.FC<{ on: boolean; onToggle: () => void; ariaLabel: string }> = ({ on, onToggle, ariaLabel }) => (
     <button style={pill(on)} onClick={onToggle} aria-checked={on} role="switch" aria-label={ariaLabel}>
@@ -689,12 +689,12 @@ const UpdateManagerSection: React.FC = () => {
     <div style={{ flex: 1, padding: '0 24px 24px', overflowY: 'auto' as const }}>
       {/* Status Banner */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12,
+        display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 10,
         background: info.updateAvailable ? 'rgba(10,132,255,0.08)' : 'rgba(48,209,88,0.08)',
         border: `1px solid ${info.updateAvailable ? 'rgba(10,132,255,0.2)' : 'rgba(48,209,88,0.2)'}`,
         marginBottom: 20,
       }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: info.updateAvailable ? 'rgba(10,132,255,0.15)' : 'rgba(48,209,88,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 8, background: info.updateAvailable ? 'rgba(10,132,255,0.15)' : 'rgba(48,209,88,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {info.updateAvailable ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           ) : (
@@ -748,7 +748,7 @@ const UpdateManagerSection: React.FC = () => {
         <>
           <div style={heading}>Release Notes</div>
           <div style={{
-            padding: 14, borderRadius: 10, background: 'var(--color-bg-surface)',
+            padding: 14, borderRadius: 8, background: 'var(--color-bg-surface)',
             border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
             lineHeight: 1.6, maxHeight: 120, overflowY: 'auto' as const, marginBottom: 12, whiteSpace: 'pre-wrap' as const,
           }}>
@@ -811,7 +811,7 @@ const UpdateManagerSection: React.FC = () => {
       </button>
       {showChangelog && changelog && (
         <div style={{
-          padding: 14, borderRadius: 10, background: 'var(--color-bg-surface)',
+          padding: 14, borderRadius: 8, background: 'var(--color-bg-surface)',
           border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
           lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' as const, marginBottom: 12, whiteSpace: 'pre-wrap' as const,
         }}>
@@ -825,7 +825,7 @@ const UpdateManagerSection: React.FC = () => {
           <div style={heading}>Update History</div>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 12 }}>
             {history.slice(0, 10).map((h, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: h.success ? 'var(--color-success)' : 'var(--color-error)' }} />
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>v{h.version}</span>
@@ -844,7 +844,7 @@ const UpdateManagerSection: React.FC = () => {
           <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>Restore a previous version if the current one has issues.</p>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
             {backups.map((b: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
                 <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{b.version || b.id}</span>
                 <button
                   onClick={() => rollback(b.id)}
@@ -1048,13 +1048,25 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface-solid)');
     }
     
-    // Apply high contrast
+    // Apply high contrast — set both the legacy body class and a root attribute
+    // so the WCAG-AAA palette in design-system.css ([data-high-contrast="true"])
+    // can override the core --color-* tokens per theme, live with no reload.
     if (settings.highContrast) {
       body.classList.add('high-contrast');
+      root.setAttribute('data-high-contrast', 'true');
     } else {
       body.classList.remove('high-contrast');
+      root.removeAttribute('data-high-contrast');
     }
-    
+
+    // Apply text spacing (WCAG 1.4.12) — multipliers exposed as root CSS vars.
+    const letterSp = typeof settings.letterSpacing === 'number' ? settings.letterSpacing : 0;
+    const lineHt = typeof settings.lineHeight === 'number' ? settings.lineHeight : 1.5;
+    const wordSp = typeof settings.wordSpacing === 'number' ? settings.wordSpacing : 0;
+    root.style.setProperty('--text-letter-spacing', `${letterSp}em`);
+    root.style.setProperty('--text-line-height', String(lineHt));
+    root.style.setProperty('--text-word-spacing', `${wordSp}em`);
+
     // Apply large text
     if (settings.largeText) {
       body.style.fontSize = '18px';
@@ -1277,6 +1289,9 @@ const DEFAULT_SETTINGS = {
   largeText: false,
   reduceTransparency: false,
   screenReader: false,
+  letterSpacing: 0,    // WCAG 1.4.12 text spacing — em multiplier
+  lineHeight: 1.5,     // WCAG 1.4.12 line height (unitless)
+  wordSpacing: 0,      // WCAG 1.4.12 word spacing — em multiplier
 
   // Window Management
   snapWindows: true,          // Enable window snapping to edges/zones
@@ -1571,7 +1586,7 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
           disabled={!ttsAvailable || previewing}
           aria-label="Preview UKI voice"
           style={{
-            padding: '6px 14px', borderRadius: 8, fontSize: 12,
+            padding: '6px 14px', borderRadius: 6, fontSize: 12,
             border: '1px solid var(--color-border)',
             background: previewing ? 'var(--color-bg-active)' : 'var(--color-bg-hover)',
             color: 'var(--color-text-primary)', cursor: ttsAvailable ? 'pointer' : 'not-allowed',
@@ -1635,7 +1650,7 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
         onClick={handleClear}
         disabled={busy || !stats || stats.archiveCount === 0}
         style={{
-          padding: '4px 10px', borderRadius: 6, fontSize: 11,
+          padding: '4px 10px', borderRadius: 4, fontSize: 11,
           border: '1px solid var(--color-border)',
           background: 'var(--color-bg-hover)',
           color: 'var(--color-text-secondary)',
@@ -1724,7 +1739,7 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
           onClick={handleRun}
           disabled={busy}
           style={{
-            padding: '4px 10px', borderRadius: 6, fontSize: 11,
+            padding: '4px 10px', borderRadius: 4, fontSize: 11,
             border: '1px solid var(--color-border)',
             background: 'var(--color-bg-hover)',
             color: 'var(--color-text-secondary)',
@@ -2350,6 +2365,31 @@ export const Settings: React.FC = () => {
             aria-label="Enable Mini Pulse monitor"
           />
         </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Auto-recover crashed apps</span>
+            <span style={styles.settingDesc}>Restart a crashed app automatically (up to 3 attempts), then show the crash card.</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={prefs.autoRecoverApps}
+            onChange={(e) => prefs.setAutoRecoverApps(e.target.checked)}
+            aria-label="Auto-recover crashed apps"
+          />
+        </div>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Compact mode</span>
+            <span style={styles.settingDesc}>Shrink DEX to an always-on-top mini pill to keep it beside other work. Toggle anytime with Ctrl+Shift+M.</span>
+          </div>
+          <button
+            style={styles.button}
+            onClick={() => { void import('../shell/MiniShell').then(m => m.useCompactMode.getState().enter()); }}
+            aria-label="Enter compact mode"
+          >
+            Enter compact mode
+          </button>
+        </div>
 
         <h3 style={styles.sectionTitle}>Diagnostics</h3>
         <div style={styles.settingRow}>
@@ -2396,7 +2436,7 @@ export const Settings: React.FC = () => {
                 }
               }}
               style={{
-                padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                 border: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                 background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'rgba(10,132,255,0.15)' : 'transparent',
                 color: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -2484,7 +2524,7 @@ export const Settings: React.FC = () => {
                   }));
                 }}
                 style={{
-                  padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                   background: active ? 'rgba(10,132,255,0.15)' : 'transparent',
                   color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -2499,7 +2539,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper</h3>
       <div style={{
-        padding: 16, borderRadius: 12,
+        padding: 16, borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -2510,7 +2550,7 @@ export const Settings: React.FC = () => {
               aria-label={`Set wallpaper: ${preset.name}`}
               onClick={() => useWallpaperStore.getState().setWallpaper(preset)}
               style={{
-                width: '100%', aspectRatio: '16/10', borderRadius: 8, cursor: 'pointer',
+                width: '100%', aspectRatio: '16/10', borderRadius: 6, cursor: 'pointer',
                 border: useWallpaperStore.getState().presetId === preset.id ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                 background: preset.thumbnail?.startsWith('url(') ? undefined : (preset.thumbnail || preset.value),
                 backgroundImage: preset.thumbnail?.startsWith('url(') ? preset.thumbnail : (preset.mode === 'gradient' ? preset.value : undefined),
@@ -2546,7 +2586,7 @@ export const Settings: React.FC = () => {
             input.click();
           }}
           style={{
-            width: '100%', padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+            width: '100%', padding: '8px 0', borderRadius: 6, cursor: 'pointer',
             border: '1px dashed var(--color-border-subtle)',
             background: 'transparent', color: 'var(--color-text-secondary)',
             fontSize: 11, fontWeight: 500,
@@ -2556,7 +2596,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper Tinting</h3>
       <div style={{
-        padding: 16, borderRadius: 12,
+        padding: 16, borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
         backdropFilter: `blur(${Math.min(settings.blurIntensity, 12)}px)`,
@@ -2573,7 +2613,7 @@ export const Settings: React.FC = () => {
                 aria-label={`Select ${mat} material`}
                 onClick={() => setSettings(prev => ({ ...prev, windowMaterial: mat }))}
                 style={{
-                  padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   border: settings.windowMaterial === mat ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                   background: settings.windowMaterial === mat ? 'rgba(10,132,255,0.15)' : 'transparent',
                   color: settings.windowMaterial === mat ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -2636,7 +2676,7 @@ export const Settings: React.FC = () => {
               }}
               style={{
                 padding: '6px 14px',
-                borderRadius: 8,
+                borderRadius: 6,
                 border: settings.windowControls === style ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                 background: settings.windowControls === style ? 'rgba(10,132,255,0.15)' : 'transparent',
                 color: settings.windowControls === style ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -2743,7 +2783,7 @@ export const Settings: React.FC = () => {
       </div>
       
       {showPinSetup && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Enter PIN (4-8 digits)</label>
             <input
@@ -2753,7 +2793,7 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={pinInput}
               onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
@@ -2766,7 +2806,7 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={confirmPinInput}
               onChange={e => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
@@ -2779,7 +2819,7 @@ export const Settings: React.FC = () => {
       )}
       
       {showPinChange && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Current PIN</label>
             <input
@@ -2789,7 +2829,7 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={currentPinInput}
               onChange={e => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
@@ -2802,7 +2842,7 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={pinInput}
               onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
@@ -2815,7 +2855,7 @@ export const Settings: React.FC = () => {
               maxLength={8}
               value={confirmPinInput}
               onChange={e => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '18px', letterSpacing: '8px', textAlign: 'center' }}
               placeholder="****"
             />
           </div>
@@ -2844,14 +2884,14 @@ export const Settings: React.FC = () => {
       </div>
       
       {showPasswordSetup && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Enter Password (min 8 characters)</label>
             <input
               type="password"
               value={passwordInput}
               onChange={e => setPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="Enter password"
             />
           </div>
@@ -2861,7 +2901,7 @@ export const Settings: React.FC = () => {
               type="password"
               value={confirmPasswordInput}
               onChange={e => setConfirmPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="Confirm password"
             />
           </div>
@@ -2874,14 +2914,14 @@ export const Settings: React.FC = () => {
       )}
       
       {showPasswordChange && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Current Password</label>
             <input
               type="password"
               value={currentPasswordInput}
               onChange={e => setCurrentPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="Current password"
             />
           </div>
@@ -2891,7 +2931,7 @@ export const Settings: React.FC = () => {
               type="password"
               value={passwordInput}
               onChange={e => setPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="New password"
             />
           </div>
@@ -2901,7 +2941,7 @@ export const Settings: React.FC = () => {
               type="password"
               value={confirmPasswordInput}
               onChange={e => setConfirmPasswordInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text-primary)', fontSize: '14px' }}
+              style={{ width: '100%', padding: '10px', background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '14px' }}
               placeholder="Confirm new password"
             />
           </div>
@@ -2931,7 +2971,7 @@ export const Settings: React.FC = () => {
       
       {/* Current Auth Status */}
       {(settings.pinEnabled || settings.passwordEnabled || settings.biometricEnabled) && (
-        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '8px' }}>
+        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success)', fontSize: '13px', fontWeight: 500 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9,12 11,14 15,10"/></svg>
             Protected with: {[
@@ -2954,11 +2994,11 @@ export const Settings: React.FC = () => {
             <button style={styles.manageBtn} aria-label="Generate recovery codes" onClick={handleGenerateRecoveryCodes}>Generate</button>
           </div>
           {showRecoveryCodes && recoveryCodes.length > 0 && (
-            <div style={{ padding: '16px', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '8px', marginBottom: '16px' }}>
+            <div style={{ padding: '16px', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: '16px' }}>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'monospace', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
-                  <div key={i} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', textAlign: 'center' }}>{code}</div>
+                  <div key={i} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
                 ))}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>Each code can only be used once. Store them securely.</div>
@@ -3050,7 +3090,7 @@ export const Settings: React.FC = () => {
                     style={{
                       background: 'var(--color-bg-surface)',
                       border: '1px solid var(--color-border-subtle)',
-                      borderRadius: 6, color: 'var(--color-text-secondary)',
+                      borderRadius: 4, color: 'var(--color-text-secondary)',
                       fontSize: 11, padding: '4px 6px', cursor: 'pointer',
                     }}
                     aria-label={`Auto-disable timeout for ${PERMISSION_LABELS[id]}`}
@@ -3071,7 +3111,7 @@ export const Settings: React.FC = () => {
                     aria-label={`Toggle ${PERMISSION_LABELS[id]} permission`}
                   />
                   <span style={{
-                    position: 'absolute', inset: 0, borderRadius: 12,
+                    position: 'absolute', inset: 0, borderRadius: 10,
                     background: entry.enabled ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)',
                     transition: 'background 0.2s ease',
                   }}>
@@ -3127,7 +3167,7 @@ export const Settings: React.FC = () => {
       
       {/* Creator Watermark */}
       <div style={{
-        padding: '20px', borderRadius: '14px', marginBottom: '20px',
+        padding: '20px', borderRadius: '10px', marginBottom: '20px',
         background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
         border: '1px solid rgba(74,158,255,0.15)',
         position: 'relative', overflow: 'hidden',
@@ -3178,7 +3218,7 @@ export const Settings: React.FC = () => {
             { title: 'Always improving', body: 'Free updates roll in automatically. New features show up here, with the changelog one click away.' },
           ].map(card => (
             <div key={card.title} style={{
-              padding: '12px 14px', borderRadius: 10,
+              padding: '12px 14px', borderRadius: 8,
               border: '1px solid var(--color-border-subtle)',
               background: 'rgba(255,255,255,0.03)',
             }}>
@@ -3240,7 +3280,7 @@ export const Settings: React.FC = () => {
               style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
               aria-label="Toggle optional product analytics"
             />
-            <span style={{ position: 'absolute', inset: 0, borderRadius: 12, background: optionalAnalytics ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: 10, background: optionalAnalytics ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)', transition: 'background 0.2s ease' }}>
               <span style={{ position: 'absolute', left: optionalAnalytics ? 20 : 2, top: 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
             </span>
           </label>
@@ -3248,7 +3288,7 @@ export const Settings: React.FC = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 14 }}>
           {DATA_CATEGORIES.map(category => (
-            <div key={category.id} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.035)' }}>
+            <div key={category.id} style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.035)' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>{category.label}</div>
               <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
@@ -3386,7 +3426,7 @@ export const Settings: React.FC = () => {
         onChange={e => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
         aria-label={label}
         style={{
-          padding: '6px 12px', borderRadius: 8, fontSize: 12,
+          padding: '6px 12px', borderRadius: 6, fontSize: 12,
           border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
           color: 'var(--color-text-primary)', outline: 'none', cursor: 'pointer',
         }}
@@ -3502,7 +3542,7 @@ export const Settings: React.FC = () => {
               {hw.weakGPU ? ' (weak GPU)' : ''}
             </div>
             {/* 5-segment tier selector */}
-            <div style={{ display: 'flex', gap: 2, marginBottom: 8, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ display: 'flex', gap: 2, marginBottom: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
               {ALL_TIERS.map((tier) => {
                 const active = tier === currentTier;
                 return (
@@ -3541,7 +3581,7 @@ export const Settings: React.FC = () => {
                 }}
                 style={{
                   background: 'none', border: '1px solid var(--color-border-subtle)',
-                  color: 'var(--color-text-secondary)', borderRadius: 8, padding: '6px 14px',
+                  color: 'var(--color-text-secondary)', borderRadius: 6, padding: '6px 14px',
                   cursor: 'pointer', fontSize: 12, marginBottom: 12,
                 }}
               >
@@ -3562,7 +3602,7 @@ export const Settings: React.FC = () => {
                   style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
                 />
                 <span style={{
-                  position: 'absolute', inset: 0, borderRadius: 12,
+                  position: 'absolute', inset: 0, borderRadius: 10,
                   background: autoOpt ? 'var(--color-accent, #34C759)' : 'var(--color-bg-hover)',
                   transition: 'background 0.2s ease',
                 }}>
@@ -3629,6 +3669,11 @@ export const Settings: React.FC = () => {
       {renderToggle('largeText', 'Larger Text', 'Use larger text size throughout the interface')}
       {renderToggle('reduceTransparency', 'Reduce Transparency', 'Use solid backgrounds instead of translucent surfaces')}
 
+      <h3 style={styles.sectionTitle}>Text Spacing</h3>
+      {renderSlider('letterSpacing', 'Letter Spacing', 'Space between characters (WCAG 1.4.12)', 0, 0.2, 'em', 0.01)}
+      {renderSlider('lineHeight', 'Line Height', 'Spacing between lines of text (WCAG 1.4.12)', 1.2, 2, '', 0.05)}
+      {renderSlider('wordSpacing', 'Word Spacing', 'Space between words (WCAG 1.4.12)', 0, 0.5, 'em', 0.02)}
+
       <h3 style={styles.sectionTitle}>Screen Reader</h3>
       {renderToggle('screenReader', 'Screen Reader', 'Enable screen reader support and ARIA announcements')}
 
@@ -3658,7 +3703,7 @@ export const Settings: React.FC = () => {
                 display: 'flex', alignItems: 'flex-start', gap: 12,
                 background: selected ? 'rgba(74,158,255,0.10)' : 'transparent',
                 border: `1px solid ${selected ? 'rgba(74,158,255,0.40)' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
-                borderRadius: 8, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+                borderRadius: 6, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.12s, border-color 0.12s',
               }}
@@ -3845,7 +3890,7 @@ export const Settings: React.FC = () => {
               <span style={styles.settingDesc}>{sc.desc}</span>
             </div>
             <div style={{
-              padding: '4px 12px', borderRadius: 6,
+              padding: '4px 12px', borderRadius: 4,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
               fontFamily: 'monospace', letterSpacing: '0.02em',
@@ -3854,7 +3899,7 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         ))}
-        <div style={{ ...styles.settingDesc, marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--color-bg-surface)' }}>
+        <div style={{ ...styles.settingDesc, marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
           Keyboard shortcut customization is available in the Command Palette ({_M}+Shift+P → "Keyboard Shortcuts").
         </div>
       </div>
@@ -3946,7 +3991,7 @@ export const Settings: React.FC = () => {
           <span style={styles.settingDesc}>The phrase to activate UKI hands-free</span>
         </div>
         <div style={{
-          padding: '4px 12px', borderRadius: 6,
+          padding: '4px 12px', borderRadius: 4,
           background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
           fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
           fontFamily: 'monospace',
@@ -4053,14 +4098,14 @@ export const Settings: React.FC = () => {
                 onClick={() => setSelectedCreativeApp(isSelected ? null : id)}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  padding: '14px 8px', borderRadius: 12, cursor: 'pointer',
+                  padding: '14px 8px', borderRadius: 10, cursor: 'pointer',
                   background: isSelected ? `${app.color}22` : 'var(--color-bg-surface)',
                   border: isSelected ? `1.5px solid ${app.color}` : '1.5px solid var(--color-border-subtle)',
                   transition: 'all 0.15s ease',
                 }}
               >
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10,
+                  width: 36, height: 36, borderRadius: 8,
                   background: `linear-gradient(135deg, ${app.color}44, ${app.color}22)`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 700, color: app.color,
@@ -4081,13 +4126,13 @@ export const Settings: React.FC = () => {
         {/* Detail Panel */}
         {detail && selectedCreativeApp && (
           <div style={{
-            background: 'var(--color-bg-surface)', borderRadius: 12,
+            background: 'var(--color-bg-surface)', borderRadius: 10,
             border: `1px solid ${detail.color}33`, padding: 20,
           }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div style={{
-                width: 48, height: 48, borderRadius: 14,
+                width: 48, height: 48, borderRadius: 10,
                 background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, fontWeight: 700, color: detail.color,
@@ -4118,7 +4163,7 @@ export const Settings: React.FC = () => {
               <div style={styles.aboutRow}>
                 <span style={styles.aboutLabel}>Shortcut</span>
                 <span style={{
-                  fontFamily: 'monospace', fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                  fontFamily: 'monospace', fontSize: 11, padding: '2px 8px', borderRadius: 4,
                   background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
                 }}>{detail.shortcut || '—'}</span>
               </div>
@@ -4140,7 +4185,7 @@ export const Settings: React.FC = () => {
                 onChange={e => setAppSetting(selectedCreativeApp, 'qualityMode', e.target.value)}
                 style={{
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
+                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
                   outline: 'none', cursor: 'pointer',
                 }}
               >
@@ -4175,7 +4220,7 @@ export const Settings: React.FC = () => {
                 onChange={e => setAppSetting(selectedCreativeApp, 'autoSaveInterval', e.target.value)}
                 style={{
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
+                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
                   outline: 'none', cursor: 'pointer',
                 }}
               >
@@ -4199,7 +4244,7 @@ export const Settings: React.FC = () => {
                 onChange={e => setAppSetting(selectedCreativeApp, 'cacheLimit', e.target.value)}
                 style={{
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 6, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
+                  borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 12, padding: '4px 10px',
                   outline: 'none', cursor: 'pointer',
                 }}
               >
@@ -4310,7 +4355,7 @@ export const Settings: React.FC = () => {
         .settings-color:hover { transform: scale(1.15); }
         .settings-shell input[type="range"] { accent-color: var(--color-accent); }
         .settings-shell input[type="checkbox"] { accent-color: var(--color-accent); }
-        .settings-shell input[type="color"] { border-radius: 8px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
+        .settings-shell input[type="color"] { border-radius: 6px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
         .settings-shell button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14), 0 6px 18px rgba(10,132,255,0.18); }
         .settings-shell button, .settings-shell input, .settings-shell select { transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.12s ease; }
         .settings-content::-webkit-scrollbar { width: 6px; }
@@ -4336,7 +4381,7 @@ export const Settings: React.FC = () => {
             style={{
               width: '100%', padding: '6px 10px', fontSize: 12,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
-              borderRadius: 6, color: 'var(--color-text-primary)', outline: 'none',
+              borderRadius: 4, color: 'var(--color-text-primary)', outline: 'none',
               boxSizing: 'border-box' as const,
             }}
           />
@@ -4348,7 +4393,7 @@ export const Settings: React.FC = () => {
             onClick={() => importSettings(setSettings)}
             aria-label="Import settings from file"
             style={{
-              flex: 1, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 500,
+              flex: 1, padding: '5px 8px', borderRadius: 4, fontSize: 10, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -4365,7 +4410,7 @@ export const Settings: React.FC = () => {
             onClick={() => exportSettings(settings)}
             aria-label="Export settings to file"
             style={{
-              flex: 1, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 500,
+              flex: 1, padding: '5px 8px', borderRadius: 4, fontSize: 10, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -4383,7 +4428,7 @@ export const Settings: React.FC = () => {
         {/* Changed settings count */}
         {countChangedSettings(settings) > 0 && (
           <div style={{ 
-            padding: '6px 12px', margin: '0 12px 8px', borderRadius: 6,
+            padding: '6px 12px', margin: '0 12px 8px', borderRadius: 4,
             background: 'rgba(10,132,255,0.1)', border: '1px solid rgba(10,132,255,0.2)',
             fontSize: 10, color: 'var(--color-accent)',
             display: 'flex', alignItems: 'center', gap: 6,
@@ -4650,7 +4695,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryBtn: {
     marginTop: '12px',
     padding: '10px 18px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: '1px solid var(--color-border)',
     background: 'var(--color-bg-hover)',
     color: 'var(--color-text-primary)',
@@ -4663,7 +4708,7 @@ const styles: Record<string, React.CSSProperties> = {
   dangerBtn: {
     marginTop: '12px',
     padding: '10px 18px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: 'none',
     background: 'rgba(255,69,58,0.12)',
     color: 'var(--color-error)',
@@ -4674,7 +4719,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dangerBtnSmall: {
     padding: '6px 12px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     background: 'rgba(255,67,58,0.15)',
     color: 'var(--color-error)',
@@ -4692,7 +4737,7 @@ const styles: Record<string, React.CSSProperties> = {
   appIcon: {
     width: '72px',
     height: '72px',
-    borderRadius: '18px',
+    borderRadius: '14px',
     background: 'linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)',
     display: 'flex',
     alignItems: 'center',
@@ -4716,7 +4761,7 @@ const styles: Record<string, React.CSSProperties> = {
   aboutDetails: {
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '12px',
+    borderRadius: '10px',
     padding: '4px 16px',
     marginBottom: '24px',
   },
@@ -4741,7 +4786,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   linkBtn: {
     padding: '9px 16px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface)',
     color: 'var(--color-accent)',
@@ -4754,7 +4799,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Manage button
   manageBtn: {
     padding: '6px 12px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     background: 'var(--color-bg-glass)',
     color: 'var(--color-accent)',

@@ -101,7 +101,7 @@ const AiProviderSettings: React.FC = () => {
       <div
         data-testid="active-model-banner"
         style={{
-          padding: '10px 14px', marginBottom: 12, borderRadius: 10, fontSize: 13,
+          padding: '10px 14px', marginBottom: 12, borderRadius: 8, fontSize: 13,
           display: 'flex', alignItems: 'center', gap: 8,
           background: routedTop ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'var(--pg-surface)',
           border: `1px solid ${routedTop ? 'var(--color-success)' : 'var(--pg-border)'}`,
@@ -129,7 +129,7 @@ const AiProviderSettings: React.FC = () => {
 
       <div
         style={{
-          padding: '10px 14px', marginBottom: 16, borderRadius: 10,
+          padding: '10px 14px', marginBottom: 16, borderRadius: 8,
           background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         }}
@@ -143,7 +143,7 @@ const AiProviderSettings: React.FC = () => {
           onChange={(e) => chooseGoal(e.target.value as RoutingGoal)}
           aria-label="Smart Router goal"
           style={{
-            height: 28, padding: '0 8px', borderRadius: 8, fontSize: 12,
+            height: 28, padding: '0 8px', borderRadius: 6, fontSize: 12,
             background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
             border: '1px solid var(--color-border)',
           }}
@@ -159,7 +159,7 @@ const AiProviderSettings: React.FC = () => {
         <div
           key={p.id}
           style={{
-            padding: 14, marginBottom: 10, borderRadius: 12,
+            padding: 14, marginBottom: 10, borderRadius: 10,
             background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
           }}
         >
@@ -184,7 +184,7 @@ const AiProviderSettings: React.FC = () => {
                 placeholder={`${p.label} API key`}
                 aria-label={`${p.label} API key`}
                 style={{
-                  flex: 1, height: 32, padding: '0 10px', borderRadius: 8, fontSize: 13,
+                  flex: 1, height: 32, padding: '0 10px', borderRadius: 6, fontSize: 13,
                   background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
                   border: '1px solid var(--color-border)',
                 }}
@@ -192,7 +192,7 @@ const AiProviderSettings: React.FC = () => {
               <button
                 onClick={() => save(p.id)}
                 style={{
-                  height: 32, padding: '0 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  height: 32, padding: '0 14px', borderRadius: 6, fontSize: 13, fontWeight: 600,
                   background: 'var(--color-accent)', color: '#fff', border: 'none', cursor: 'pointer',
                 }}
               >
@@ -202,7 +202,7 @@ const AiProviderSettings: React.FC = () => {
                 <button
                   onClick={() => clear(p.id)}
                   style={{
-                    height: 32, padding: '0 12px', borderRadius: 8, fontSize: 13,
+                    height: 32, padding: '0 12px', borderRadius: 6, fontSize: 13,
                     background: 'transparent', color: 'var(--color-error)',
                     border: '1px solid var(--color-border)', cursor: 'pointer',
                   }}
@@ -223,7 +223,7 @@ const AiProviderSettings: React.FC = () => {
               onChange={(e) => chooseModel(p.id, e.target.value)}
               aria-label={`${p.label} model`}
               style={{
-                height: 28, padding: '0 8px', borderRadius: 8, fontSize: 12,
+                height: 28, padding: '0 8px', borderRadius: 6, fontSize: 12,
                 background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
                 border: '1px solid var(--color-border)',
               }}

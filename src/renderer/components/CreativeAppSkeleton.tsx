@@ -79,7 +79,7 @@ const AudioEditorSkeleton: React.FC = () => (
       {/* Track headers */}
       <div style={{ width: 180, background: 'var(--color-bg-secondary)', padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {Array(6).fill(0).map((_, i) => (
-          <div key={i} style={{ height: 60, display: 'flex', flexDirection: 'column', gap: 4, padding: 8, background: 'var(--color-bg-tertiary)', borderRadius: 6 }}>
+          <div key={i} style={{ height: 60, display: 'flex', flexDirection: 'column', gap: 4, padding: 8, background: 'var(--color-bg-tertiary)', borderRadius: 4 }}>
             <ShimmerBlock height="16px" width="80%" />
             <ShimmerBlock height="24px" width="60%" />
           </div>
@@ -181,7 +181,7 @@ export const CreativeAppSkeleton: React.FC<CreativeAppSkeletonProps> = ({ type, 
           transform: 'translateX(-50%)',
           background: 'var(--color-bg-elevated)',
           padding: '8px 16px',
-          borderRadius: 8,
+          borderRadius: 6,
           fontSize: 13,
           color: 'var(--color-text-secondary)',
           boxShadow: 'var(--pg-shadow-chip)',

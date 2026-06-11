@@ -212,3 +212,97 @@ there are more features, but because everything feels finished.
 3. Never leave the tree broken between batches.
 4. Update this file (and TAURI-MIGRATION.md when the migration is touched)
    before ending a session.
+
+## UX Depth 250 program — Session 1 (2026-06-10)
+
+WS0 scaffold + WS1 free tiers/updates + WS6 recovery levels. Checklist:
+docs/UX_DEPTH_250.md. Verified: lint (tsc + watermark 2520 files) + build:main green.
+
+- WS1 free tiers: all 41 FEATURE_FLAGS_CONFIG gates -> 'free'; new + existing
+  installs pinned to pro-equivalent, no trial clock, getLimits() returns null.
+  Licensing machinery untouched (reversible). LicensingManager.ts.
+- WS1 payments hidden: AccountSettingsCard PAYMENTS_ENABLED=false flag gates the
+  manage-subscription button, UpgradePrompt, Billing/PlanCompare/PaymentMethod
+  panels; plan line shows "Free — all features included". Files kept. Store.tsx
+  had no plan gating to strip.
+- WS1 immediate updates: ReleaseManager DEFAULT_CONFIG autoDownload true,
+  autoInstall (install-on-quit) true, checkInterval 24h -> 4h; loadConfig pins
+  download/install policy for existing installs; autoInstallOnAppQuit wired.
+- WS6 L1: shellPreferences.autoRecoverApps (default on); ErrorBoundary auto-fires
+  the existing bounded handleRecover while crashCount < 3; Settings toggle added.
+- WS6 L2: new windowStateKeeper.ts persists main-window bounds + maximized to
+  window-state.json, restores with multi-display visibility validation; wired
+  into main.ts createWindow.
+- WS6 L3: last-session journal in runningApps (writeJournal debounced, marked
+  clean on pagehide/beforeunload); AppManager shows a one-click "Restore your
+  workspace?" banner when the prior session ended unclean within 24h.
+- FLAGGED FOR USER SIGN-OFF (not executed): tier/ad language in
+  policyDocuments.ts TERMS section 8, PRICING.md, TERMS.md (UXD-025).
+
+## UX Depth 250 program — Session 2 (2026-06-10)
+
+Parallel implementation across non-overlapping file sets. Verified: full lint
+(tsc + watermark 2520) + full build (renderer + main) green.
+
+- WS3 Nexus modernized in place (standalone/Nexus.tsx): additive layered node
+  bloom (lighter compositing + restore), z-depth size/alpha/saturation cueing,
+  3-shell parallax starfield with deterministic twinkle, gradient connection
+  lines, radial vignette, glass HUD with tabular-nums + tighter tracking;
+  rotating hexagons replaced by concentric breathing rings + golden-angle
+  particle orbit. New oscillations gated by prefers-reduced-motion. All morph
+  modes / drag-rotate / zoom / tooltips intact.
+- WS4 Notes depth: [[wiki-link]] autocomplete (caret-anchored popup mirroring
+  WordSuggestions) + render/round-trip in NotesDocumentModel; TableOfContents
+  outline (H1-H3, click-to-jump) in right panel; drag-drop attachments with
+  drop-target highlight; AutosaveIndicator wired to store.saving. Pinned-notes
+  grouping already existed (left intact).
+- WS7 accessibility: real WCAG-AAA high-contrast palette ([data-high-contrast]
+  dark + light overriding all --color-* tokens, hairlines to ~0.4) wired live to
+  the existing Settings toggle (was pointing at nothing); WCAG-1.4.12 text
+  spacing controls (letter/line/word multipliers as root CSS vars, persisted);
+  contrast checker in AccessibilityManager flagged available for a dev overlay.
+- WS2 partial: AutosaveIndicator mounted in Prism/Flux/Forge/Imosion headers
+  with honest dirty->saving->saved state. ScrollEnhancements wraps deferred
+  (real panels use differing token backgrounds; wrapping risked layout/fade
+  regression) — revisit with a token-aware fade. FINDING: prism/PrismUI.tsx and
+  flux/FluxUI.tsx are dead code (zero importers) — candidates for deletion.
+
+## UX Depth 250 program — Session 3 (2026-06-10): WS5 compact mode
+
+Verified: full lint (tsc + watermark 2521) + full build (renderer + main) green.
+
+- New src/renderer/shell/MiniShell.tsx + useCompactMode zustand store: single-
+  window morph (no 2nd BrowserWindow), shows active app + 3 quick actions
+  (Notes/Timer/Clipboard — each expands then fires a real, listened event) + an
+  expand control. Press feedback + hover via MotionController cssTransitions.
+- Main process IPC (main.ts): window:enter-compact saves bounds, unmaximizes,
+  shrinks to a corner pill (clamped to the current display's work area via
+  screen.getDisplayMatching), setAlwaysOnTop('floating'), non-resizable;
+  window:exit-compact restores saved bounds + resizable + min size. Exposed
+  through preload window.enterCompact/exitCompact (window: prefix already
+  allow-listed).
+- App.tsx renders MiniShell as a top overlay when compact (apps keep running
+  underneath, so expand returns to exact state); global Ctrl+Shift+M shortcut;
+  new dex-open-clipboard listener so the compact clipboard action is real.
+- Discoverable: Spotlight action "Compact Mode (Mini Window)" + a Settings
+  shell-section "Enter compact mode" button.
+
+## UX Depth 250 program — Session 4 (2026-06-11): perf sweep + release prep
+
+Verified: full lint (tsc + watermark 2519) + full build green; version 5.1.0.
+
+- Perf sweep: two confirmed memoization fixes — Stopwatch bestLap/worstLap (ran
+  ~60x/sec via the RAF elapsed tick) and AXL FeatureTree totalWeight (volume/
+  weight math per part on every render). Triaged ~20 agent findings and rejected
+  the false positives: App.tsx auto-lock listeners + MutationObserver already
+  clean up; Timer interval is cleaned up and playSound is a stable useCallback;
+  WorldClock + ClipboardHistory already pause on visibilitychange and cap growth.
+  Note-list virtualization deferred (only helps at 500+ notes; risky on the
+  flagship file) — flagged as a scaling follow-up.
+- Context menu: submenus now flip leftward near the right screen edge instead of
+  overflowing off-screen (edge-aware subDir).
+- Release prep for v5.1.0 (staged, NOT pushed/published — outward steps are the
+  user's): package.json 5.0.1 -> 5.1.0; docs/CHANGELOG.md v5.1.0 entry; in-app
+  WhatsNewModal entries refreshed; docs/RELEASE_v5.1.0.md checklist (repo
+  topology Dex + dex-updates feed, exact release-script commands, signing note,
+  legal-text sign-off flag); docs/RELEASE_NOTES.md public block + commit message.

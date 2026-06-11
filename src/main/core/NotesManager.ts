@@ -2015,7 +2015,7 @@ export class NotesManager extends EventEmitter {
   h1 { font-size: 2em; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; }
   h2 { font-size: 1.5em; }
   h3 { font-size: 1.25em; font-style: italic; }
-  pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
+  pre { background: #f5f5f5; padding: 16px; border-radius: 3px; overflow-x: auto; }
   code { font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; }
   blockquote { border-left: 3px solid #0066ff; padding-left: 16px; margin-left: 0; color: #666; }
   table { border-collapse: collapse; width: 100%; }

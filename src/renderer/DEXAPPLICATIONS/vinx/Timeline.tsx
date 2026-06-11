@@ -313,7 +313,7 @@ const ClipVisual: React.FC<{
     height: track.height - 4,
     background: selected ? alpha(color, 19) : alpha(color, 9),
     border: `1px solid ${selected ? color : alpha(color, 25)}`,
-    borderRadius: 3,
+    borderRadius: 2,
     overflow: 'hidden',
     cursor: activeTool === 'razor' ? 'crosshair' : activeTool === 'select' ? 'grab' : 'default',
     display: 'flex',
@@ -565,7 +565,7 @@ const TimelineToolbar: React.FC = memo(() => {
           aria-pressed={activeTool === t.tool}
           style={{
             width: 22, height: 20, fontSize: 10, fontWeight: 600,
-            border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+            border: '1px solid var(--color-border-subtle)', borderRadius: 2,
             background: activeTool === t.tool ? 'rgba(74,158,255,0.15)' : 'transparent',
             color: activeTool === t.tool ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
             cursor: 'pointer', padding: 0,
@@ -584,7 +584,7 @@ const TimelineToolbar: React.FC = memo(() => {
         aria-pressed={snapEnabled}
         style={{
           height: 20, fontSize: 9, fontWeight: 600, padding: '0 6px',
-          border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+          border: '1px solid var(--color-border-subtle)', borderRadius: 2,
           background: snapEnabled ? 'rgba(74,158,255,0.15)' : 'transparent',
           color: snapEnabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
         }}
@@ -616,13 +616,13 @@ TimelineToolbar.displayName = 'TimelineToolbar';
 
 const addTrackBtnStyle: React.CSSProperties = {
   height: 20, fontSize: 9, fontWeight: 600, padding: '0 4px',
-  border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+  border: '1px solid var(--color-border-subtle)', borderRadius: 2,
   background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
 };
 
 const zoomBtnStyle: React.CSSProperties = {
   width: 20, height: 20, fontSize: 12,
-  border: '1px solid var(--color-border-subtle)', borderRadius: 3,
+  border: '1px solid var(--color-border-subtle)', borderRadius: 2,
   background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
 };

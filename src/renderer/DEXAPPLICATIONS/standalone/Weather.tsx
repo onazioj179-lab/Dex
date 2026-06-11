@@ -308,16 +308,16 @@ const s: Record<string, React.CSSProperties> = {
   },
   locationSelect: {
     flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border, var(--color-border))',
-    borderRadius: 8, padding: '8px 12px', color: 'var(--color-text-primary)',
+    borderRadius: 6, padding: '8px 12px', color: 'var(--color-text-primary)',
     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-family)', outline: 'none', cursor: 'pointer',
   },
   iconBtn: {
-    width: 32, height: 32, borderRadius: 8, border: 'none',
+    width: 32, height: 32, borderRadius: 6, border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
     fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   unitBtn: {
-    padding: '6px 10px', borderRadius: 8, border: 'none',
+    padding: '6px 10px', borderRadius: 6, border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
     fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
@@ -326,16 +326,16 @@ const s: Record<string, React.CSSProperties> = {
   },
   addInput: {
     flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border, var(--color-border))',
-    borderRadius: 8, padding: '8px 12px', color: 'var(--color-text-primary)',
+    borderRadius: 6, padding: '8px 12px', color: 'var(--color-text-primary)',
     fontSize: 13, outline: 'none', fontFamily: 'var(--font-family)',
   },
   addBtn: {
-    padding: '8px 16px', borderRadius: 8, border: 'none',
+    padding: '8px 16px', borderRadius: 6, border: 'none',
     background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   currentCard: {
-    padding: '20px', margin: '8px 20px 12px', borderRadius: 16,
+    padding: '20px', margin: '8px 20px 12px', borderRadius: 12,
     background: 'linear-gradient(135deg, rgba(10,132,255,0.15), rgba(94,92,230,0.1))',
     border: '1px solid var(--color-bg-hover)',
   },
@@ -357,7 +357,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   detailItem: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: '8px', borderRadius: 8, background: 'var(--color-border-subtle)',
+    padding: '8px', borderRadius: 6, background: 'var(--color-border-subtle)',
   },
   detailLabel: { fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 2 },
   detailValue: { fontSize: 15, fontWeight: 600 },
@@ -373,7 +373,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   hourlyItem: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4,
-    padding: '8px 10px', borderRadius: 10, background: 'var(--color-border-subtle)',
+    padding: '8px 10px', borderRadius: 8, background: 'var(--color-border-subtle)',
     minWidth: 54, flexShrink: 0,
   },
   hourlyTime: { fontSize: 11, color: 'var(--color-text-secondary)' },
@@ -383,7 +383,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   forecastRow: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-    borderRadius: 10, border: 'none', cursor: 'pointer', width: '100%',
+    borderRadius: 8, border: 'none', cursor: 'pointer', width: '100%',
     fontFamily: 'var(--font-family)', color: 'var(--color-text-primary)',
     transition: 'background 0.15s',
   },

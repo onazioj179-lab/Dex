@@ -8,7 +8,7 @@
 // AXL Feature Tree Component (Left Panel)
 // ═══════════════════════════════════════════════════════════════════════════
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { formatWeight, calcVolume, calcWeight } from '../utils/math';
@@ -38,12 +38,14 @@ const FeatureTree: React.FC = () => {
   const { selectedPartId, setSelectedPartId } = useViewportStore();
   const parts = project.assembly.parts;
 
-  const totalWeight = parts.reduce((sum, p) => {
+  // Volume/weight math per part is pure in `parts`; memoize so it doesn't
+  // re-run on every render (e.g. selection/hover changes) with large assemblies.
+  const totalWeight = useMemo(() => parts.reduce((sum, p) => {
     const feat = p.features[0];
     const params = (feat?.params || {}) as Record<string, number | string | boolean>;
     const vol = calcVolume((String(params.primitiveType || 'box')) as PrimitiveType, params as Record<string, number>);
     return sum + calcWeight(vol * 1e-9, p.material.density);
-  }, 0);
+  }, 0), [parts]);
 
   return (
     <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
@@ -56,7 +58,7 @@ const FeatureTree: React.FC = () => {
         <div style={{ ...sidebarItemStyle(false), fontWeight: 600, fontSize: 11, color: 'var(--color-text-primary)', padding: '6px 10px' }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
           {project.assembly.name}
-          <span style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--color-text-tertiary)', background: 'var(--color-bg-hover)', padding: '1px 5px', borderRadius: 3 }}>{parts.length}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--color-text-tertiary)', background: 'var(--color-bg-hover)', padding: '1px 5px', borderRadius: 2 }}>{parts.length}</span>
         </div>
 
         {/* Parts */}

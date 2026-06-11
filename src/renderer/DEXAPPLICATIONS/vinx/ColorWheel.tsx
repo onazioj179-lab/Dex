@@ -231,7 +231,7 @@ export const ColorWheel: React.FC<Props> = ({ label, value, onChange, size = 120
           style={{
             position: 'relative', width: 12, height: size,
             background: 'linear-gradient(to bottom, #FFFFFF 0%, #808080 50%, #000000 100%)',
-            borderRadius: 3, cursor: 'ns-resize', touchAction: 'none',
+            borderRadius: 2, cursor: 'ns-resize', touchAction: 'none',
             border: '1px solid var(--color-border-subtle)',
           }}
           title="Master"

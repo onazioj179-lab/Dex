@@ -655,7 +655,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
   container: {
     padding: 12,
     background: 'var(--color-bg-surface)',
-    borderRadius: 8,
+    borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
   },
   compact: {
@@ -663,7 +663,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     padding: '4px 8px',
-    borderRadius: 4,
+    borderRadius: 3,
     background: 'var(--color-bg-inset)',
   },
   header: {
@@ -713,7 +713,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-inverse)',
     padding: '2px 6px',
-    borderRadius: 10,
+    borderRadius: 8,
   },
   alerts: {
     marginTop: 12,
@@ -725,7 +725,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: 'var(--color-text-secondary)',
     padding: '6px 8px',
-    borderRadius: 4,
+    borderRadius: 3,
     background: 'var(--color-bg-inset)',
     borderLeft: '2px solid',
   },

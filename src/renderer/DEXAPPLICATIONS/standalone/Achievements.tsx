@@ -83,7 +83,7 @@ const Achievements: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 38, height: 38, borderRadius: 10,
+              width: 38, height: 38, borderRadius: 8,
               background: 'linear-gradient(135deg, #ff9f0a, #d97706)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -105,7 +105,7 @@ const Achievements: React.FC = () => {
             )}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '6px 12px', borderRadius: 10,
+              padding: '6px 12px', borderRadius: 8,
               background: 'rgba(255,255,255,.04)',
             }}>
               <DexIcon name={rank.icon} size={16} color="#ff9f0a" />
@@ -128,7 +128,7 @@ const Achievements: React.FC = () => {
         <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
           {categories.map(cat => (
             <button key={cat.key} onClick={() => setActiveTab(cat.key)} style={{
-              padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap',
               background: activeTab === cat.key ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.03)',
               color: activeTab === cat.key ? 'var(--color-warning)' : 'rgba(255,255,255,.5)',
@@ -142,7 +142,7 @@ const Achievements: React.FC = () => {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 10px', borderRadius: 8,
+            padding: '5px 10px', borderRadius: 6,
             background: 'rgba(255,255,255,.04)',
             border: '1px solid rgba(255,255,255,.06)',
             flex: 1, maxWidth: 280,
@@ -154,10 +154,10 @@ const Achievements: React.FC = () => {
               style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontSize: 12, width: '100%' }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,.03)', borderRadius: 8, padding: 2 }}>
+          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,.03)', borderRadius: 6, padding: 2 }}>
             {(['all', 'unlocked', 'locked'] as StatusFilter[]).map(s => (
               <button key={s} onClick={() => setStatusFilter(s)} style={{
-                padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                padding: '4px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
                 fontSize: 11, fontWeight: 500, textTransform: 'capitalize',
                 background: statusFilter === s ? 'rgba(245,158,11,.15)' : 'transparent',
                 color: statusFilter === s ? 'var(--color-warning)' : 'rgba(255,255,255,.45)',
@@ -204,7 +204,7 @@ const AchievementCard: React.FC<{
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 12px', borderRadius: 10,
+      padding: '10px 12px', borderRadius: 8,
       background: isUnlocked ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.015)',
       border: '1px solid rgba(255,255,255,.04)',
       opacity: isUnlocked ? 1 : 0.55,
@@ -212,7 +212,7 @@ const AchievementCard: React.FC<{
     }}>
       {/* Icon */}
       <div style={{
-        width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+        width: 34, height: 34, borderRadius: 7, flexShrink: 0,
         background: isUnlocked ? `${meta.color}18` : 'rgba(255,255,255,.04)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>

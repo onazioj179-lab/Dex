@@ -46,6 +46,7 @@ import { SystemFeatures } from './components/SystemFeatures';
 import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
 import MiniPulse from './components/MiniPulse';
+import { MiniShell, useCompactMode, useCompactModeShortcut } from './shell/MiniShell';
 import { useShellPreferences } from './store/shellPreferencesStore';
 import { loadManifest as loadWindowManifest, flush as flushWindowManifest } from './shell/WindowManifest';
 
@@ -211,8 +212,14 @@ export const App: React.FC = () => {
   // Command Palette (Ctrl+K)
   const commandPalette = useCommandPalette();
   
-  // Clipboard History (Ctrl+Shift+V)
+  // Clipboard History (Ctrl+Shift+V, or the compact-mode quick action)
   const clipboardHistory = useClipboardHistory();
+  const clipboardOpen = clipboardHistory.open;
+  useEffect(() => {
+    const onOpenClipboard = () => clipboardOpen();
+    window.addEventListener('dex-open-clipboard', onOpenClipboard);
+    return () => window.removeEventListener('dex-open-clipboard', onOpenClipboard);
+  }, [clipboardOpen]);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();
@@ -223,6 +230,10 @@ export const App: React.FC = () => {
   // System Diagnostics overlay (Ctrl+Shift+D)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const miniPulseEnabled = useShellPreferences(s => s.miniPulseEnabled);
+
+  // Compact / mini always-on-top mode (Ctrl+Shift+M)
+  useCompactModeShortcut();
+  const compactMode = useCompactMode(s => s.compact);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
@@ -577,6 +588,14 @@ export const App: React.FC = () => {
           hidden={diagnosticsOpen}
           onExpand={() => setDiagnosticsOpen(true)}
         />
+      )}
+
+      {/* Compact / mini always-on-top mode — overlays the shell while the apps
+          keep running underneath, so expanding returns to the exact state. */}
+      {compactMode && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999999 }}>
+          <MiniShell />
+        </div>
       )}
 
       {/* What's New modal (shown once per version) */}

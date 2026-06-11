@@ -255,7 +255,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   valueChip: {
     flex: 1, display: 'flex', flexDirection: 'column', gap: 2,
-    padding: '8px 10px', borderRadius: 8, border: 'none',
+    padding: '8px 10px', borderRadius: 6, border: 'none',
     background: 'var(--color-bg-surface)', cursor: 'pointer',
     transition: 'all 0.15s ease', textAlign: 'left',
     fontFamily: 'var(--font-family)',
@@ -274,7 +274,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   hexRow: { padding: '0 20px 12px' },
   hexInput: {
-    width: '100%', padding: '8px 12px', borderRadius: 8,
+    width: '100%', padding: '8px 12px', borderRadius: 6,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 14,
     fontFamily: 'var(--font-mono)', outline: 'none',
@@ -289,7 +289,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexWrap: 'wrap', gap: 6,
   },
   swatch: {
-    width: 28, height: 28, borderRadius: 6, border: 'none',
+    width: 28, height: 28, borderRadius: 4, border: 'none',
     cursor: 'pointer', transition: 'all 0.15s ease',
   },
 };

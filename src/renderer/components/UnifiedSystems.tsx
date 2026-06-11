@@ -160,7 +160,7 @@ function NotificationPanel(): React.ReactElement {
         maxHeight: '500px',
         background: 'var(--color-bg-surface)',
         border: '1px solid #3a3a3c',
-        borderRadius: '12px',
+        borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
         overflow: 'hidden',
@@ -260,7 +260,7 @@ function NotificationPanel(): React.ReactElement {
 const pillBtnStyle: React.CSSProperties = {
   background: 'none',
   border: '1px solid #3a3a3c',
-  borderRadius: '6px',
+  borderRadius: '4px',
   color: 'var(--color-text-secondary)',
   fontSize: '11px',
   padding: '4px 8px',
@@ -338,7 +338,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
           maxHeight: '70vh',
           background: 'var(--color-bg-surface)',
           border: '1px solid #3a3a3c',
-          borderRadius: '16px',
+          borderRadius: '12px',
           boxShadow: 'var(--pg-shadow-popover)',
           overflow: 'hidden',
           display: 'flex',
@@ -355,7 +355,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
               width: '100%',
               background: 'var(--color-bg-hover)',
               border: '1px solid #3a3a3c',
-              borderRadius: '10px',
+              borderRadius: '8px',
               padding: '12px 16px',
               color: 'var(--color-text-primary)',
               fontSize: '15px',
@@ -503,7 +503,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             alignItems: 'center',
             gap: '10px',
             padding: '4px 8px',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
             background: selectedTaskId === task.id ? 'var(--color-bg-hover)' : 'transparent',
           }}
@@ -532,7 +532,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             <button
               onClick={(e) => { e.stopPropagation(); retryTask(task.id); }}
               aria-label={`Retry task ${task.name}`}
-              style={{ background: 'none', border: '1px solid #ef4444', borderRadius: '4px', color: 'var(--color-error)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: 'none', border: '1px solid #ef4444', borderRadius: '3px', color: 'var(--color-error)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
             >
               Retry
             </button>
@@ -540,7 +540,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             <button
               onClick={(e) => { e.stopPropagation(); cancelTask(task.id); }}
               aria-label={`Cancel task ${task.name}`}
-              style={{ background: 'none', border: '1px solid #3a3a3c', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: 'none', border: '1px solid #3a3a3c', borderRadius: '3px', color: 'var(--color-text-secondary)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -559,7 +559,7 @@ function TaskDetailView({ taskId, onClose }: { taskId: string; onClose: () => vo
   if (!task) return null;
 
   return (
-    <div style={{ padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '8px', marginTop: '4px' }}>
+    <div style={{ padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '6px', marginTop: '4px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
         <span style={{ color: 'var(--color-text-primary)', fontSize: '13px', fontWeight: 600 }}>{task.name}</span>
         <button onClick={onClose} aria-label="Close task details" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px' }}>x</button>
@@ -682,7 +682,7 @@ export function ScratchpadOverlay(): React.ReactElement | null {
           height: `${size.height}px`,
           background: 'var(--color-bg-surface)',
           border: '1px solid #3a3a3c',
-          borderRadius: '12px',
+          borderRadius: '10px',
           boxShadow: 'var(--pg-shadow-popover)',
           display: 'flex',
           flexDirection: 'column',
@@ -800,7 +800,7 @@ export function FeedbackPanel(): React.ReactElement | null {
         width: '360px',
         background: 'var(--color-bg-surface)',
         border: '1px solid #3a3a3c',
-        borderRadius: '12px',
+        borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
         overflow: 'hidden',
@@ -832,7 +832,7 @@ export function FeedbackPanel(): React.ReactElement | null {
                   padding: '6px 4px',
                   background: reportType === t.value ? 'var(--color-bg-hover)' : 'transparent',
                   border: `1px solid ${reportType === t.value ? '#3b82f6' : '#3a3a3c'}`,
-                  borderRadius: '6px',
+                  borderRadius: '4px',
                   color: reportType === t.value ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontSize: '12px',
                   cursor: 'pointer',
@@ -851,7 +851,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               width: '100%',
               background: 'var(--color-bg-hover)',
               border: '1px solid #3a3a3c',
-              borderRadius: '8px',
+              borderRadius: '6px',
               color: 'var(--color-text-primary)',
               fontSize: '13px',
               padding: '10px',
@@ -870,7 +870,7 @@ export function FeedbackPanel(): React.ReactElement | null {
             </button>
           </div>
           {showSystemInfo && systemInfoPreview && (
-            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '6px', fontSize: '11px', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
               <div>DEX Version: {systemInfoPreview.dexVersion}</div>
               <div>OS: {systemInfoPreview.osName} {systemInfoPreview.osVersion}</div>
               <div>Capability Tier: {systemInfoPreview.capabilityTier}</div>
@@ -888,7 +888,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               padding: '8px',
               background: description.trim() ? '#3b82f6' : 'var(--color-bg-hover)',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: '6px',
               color: '#fff',
               fontSize: '13px',
               fontWeight: 500,
@@ -1016,7 +1016,7 @@ export function BatchActionBar(): React.ReactElement | null {
         transform: 'translateX(-50%)',
         background: 'var(--color-bg-surface)',
         border: '1px solid #3a3a3c',
-        borderRadius: '12px',
+        borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
         padding: '8px 16px',
@@ -1063,7 +1063,7 @@ export function DetachButton({ appId }: { appId: string }): React.ReactElement {
       style={{
         background: 'none',
         border: '1px solid #3a3a3c',
-        borderRadius: '6px',
+        borderRadius: '4px',
         color: 'var(--color-text-secondary)',
         fontSize: '11px',
         padding: '4px 8px',

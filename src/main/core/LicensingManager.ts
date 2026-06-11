@@ -54,41 +54,44 @@ interface FeatureFlagConfig {
   [featureName: string]: LicenseTier;
 }
 
+// ALL-FREE POLICY: every feature is available on every tier. The tier
+// machinery (keys, verification, tiers) is kept intact and reversible; only
+// the gate values are opened. To restore gating, change values back here.
 const FEATURE_FLAGS_CONFIG: FeatureFlagConfig = {
   'notes.basic': 'free',
   'notes.attachments': 'free',
   'notes.templates': 'free',
   'tasks.basic': 'free',
   'tasks.kanban': 'free',
-  'tasks.kanban.unlimited': 'pro',
+  'tasks.kanban.unlimited': 'free',
   'media.library': 'free',
-  'media.unlimited_storage': 'pro',
+  'media.unlimited_storage': 'free',
   'automation.basic': 'free',
-  'automation.unlimited_rules': 'pro',
+  'automation.unlimited_rules': 'free',
   'rewind.basic': 'free',
-  'rewind.full': 'pro',
+  'rewind.full': 'free',
   'rift.game': 'free',
   'vinx.basic': 'free',
-  'vinx.full': 'pro',
-  'multi_window': 'pro',
+  'vinx.full': 'free',
+  'multi_window': 'free',
   'store.free_items': 'free',
-  'store.paid_items': 'pro',
+  'store.paid_items': 'free',
   'developer.console': 'free',
   'developer.extensions': 'free',
-  'early_access': 'pro',
-  'team.collaboration': 'team',
-  'team.admin': 'team',
-  'team.priority_support': 'team',
+  'early_access': 'free',
+  'team.collaboration': 'free',
+  'team.admin': 'free',
+  'team.priority_support': 'free',
   'analytics.basic': 'free',
-  'analytics.advanced': 'pro',
+  'analytics.advanced': 'free',
   'export.basic': 'free',
-  'export.advanced': 'pro',
+  'export.advanced': 'free',
   'themes.basic': 'free',
   'themes.custom': 'free',
   'search.basic': 'free',
-  'search.advanced': 'pro',
+  'search.advanced': 'free',
   'voice.memos': 'free',
-  'voice.transcription': 'pro',
+  'voice.transcription': 'free',
   'security.encryption': 'free',
   'security.vault': 'free',
   'backup.manual': 'free',
@@ -234,12 +237,13 @@ export class LicensingManager extends EventEmitter {
     if (!this.db) return;
     let row = this.db.prepare('SELECT * FROM license WHERE id = 1').get() as LicenseRecord | undefined;
     if (!row) {
+      // ALL-FREE POLICY: new installs start at pro-equivalent with no trial
+      // clock, so no countdown or expiry UI ever appears.
       const now = Date.now();
-      const trialExpires = now + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
       this.db.prepare(`
         INSERT INTO license (id, tier, trial_started_at, trial_expires_at, failed_verifications)
-        VALUES (1, 'pro', ?, ?, 0)
-      `).run(now, trialExpires);
+        VALUES (1, 'pro', ?, NULL, 0)
+      `).run(now);
       row = this.db.prepare('SELECT * FROM license WHERE id = 1').get() as LicenseRecord;
     }
     this.license = row;
@@ -257,10 +261,13 @@ export class LicensingManager extends EventEmitter {
     }
     if (this.license.license_key) return;
 
-    if (this.license.trial_expires_at && Date.now() > this.license.trial_expires_at) {
-      this.db.prepare('UPDATE license SET tier = ? WHERE id = 1').run('free');
-      this.license.tier = 'free';
-      log.info('[LicensingManager] Trial expired, downgraded to free tier');
+    // ALL-FREE POLICY: trials never expire and previously-downgraded installs
+    // are restored to pro-equivalent. (Was: downgrade to 'free' on expiry.)
+    if (this.license.tier !== 'pro' || this.license.trial_expires_at) {
+      this.db.prepare('UPDATE license SET tier = ?, trial_expires_at = NULL WHERE id = 1').run('pro');
+      this.license.tier = 'pro';
+      this.license.trial_expires_at = null;
+      log.info('[LicensingManager] All-free policy: license pinned to pro, no expiry');
     }
   }
 
@@ -305,8 +312,8 @@ export class LicensingManager extends EventEmitter {
   }
 
   getLimits(): typeof FREE_LIMITS | null {
-    if (this.creatorMode) return null;
-    if (this.getCurrentTier() === 'free') return { ...FREE_LIMITS };
+    // ALL-FREE POLICY: no quota limits on any tier. FREE_LIMITS is kept for
+    // reversibility; restore the tier check here to re-enable quotas.
     return null;
   }
 
