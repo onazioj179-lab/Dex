@@ -13,6 +13,10 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { POLICY_REPOSITORY_URL } from '../../shared/policies';
+
+// Full changelog lives on the repository's releases page.
+const CHANGELOG_URL = `${POLICY_REPOSITORY_URL}/releases`;
 
 // Pulled from package.json at build time via vite.config.ts ('define' block).
 const WHATSNEW_VERSION = (import.meta.env.VITE_APP_VERSION as string) || 'current';
@@ -87,7 +91,7 @@ const WhatsNewModal: React.FC = () => {
           width: 480, maxWidth: 'calc(100vw - 40px)',
           background: 'var(--pg-surface)',
           border: '1px solid var(--color-border)',
-          borderRadius: 12,
+          borderRadius: 'var(--radius-2xl)',
           boxShadow: 'var(--shadow-md)',
           padding: 24,
           color: 'var(--color-text-primary)',
@@ -118,7 +122,11 @@ const WhatsNewModal: React.FC = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <button
-            onClick={() => { /* changelog link placeholder */ }}
+            onClick={() =>
+              (window as any).electron?.invoke?.('shell:openExternal', CHANGELOG_URL) ||
+              window.open(CHANGELOG_URL, '_blank', 'noopener,noreferrer')
+            }
+            aria-label="Open the full changelog on the DEX releases page"
             style={{
               background: 'none', border: 'none',
               color: 'var(--color-accent)', cursor: 'pointer',
@@ -132,7 +140,7 @@ const WhatsNewModal: React.FC = () => {
             autoFocus
             style={{
               background: 'var(--color-accent)', color: '#fff',
-              border: 'none', borderRadius: 8,
+              border: 'none', borderRadius: 'var(--radius-lg)',
               padding: '8px 18px', fontSize: 13, fontWeight: 600,
               cursor: 'pointer',
             }}
