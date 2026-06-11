@@ -140,7 +140,7 @@ const DEFAULT_FALLBACK: CanonicalFallback = ({ scope, name, error, fatal, retry,
       style: {
         padding: '16px',
         border: '1px solid rgba(255,59,48,0.25)',
-        borderRadius: '8px',
+        borderRadius: '6px',
         background: 'rgba(255,59,48,0.06)',
         color: 'inherit',
         font: '13px system-ui, sans-serif',

@@ -39,7 +39,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
       style={{
         margin: '8px 0',
         padding: 12,
-        borderRadius: 10,
+        borderRadius: 8,
         background: 'rgba(248, 81, 73, 0.08)',
         border: `1px solid ${riskColor[plan.risk] || '#666'}`,
         color: 'inherit',
@@ -50,7 +50,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
         <span
           aria-label={`Risk: ${plan.risk}`}
           style={{
-            display: 'inline-block', width: 8, height: 8, borderRadius: 8,
+            display: 'inline-block', width: 8, height: 8, borderRadius: 6,
             background: riskColor[plan.risk] || '#666',
           }}
         />
@@ -74,7 +74,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           type="button"
           onClick={onDeny}
           style={{
-            padding: '4px 12px', borderRadius: 6,
+            padding: '4px 12px', borderRadius: 4,
             border: '1px solid rgba(127,127,127,0.4)',
             background: 'transparent', color: 'inherit', cursor: 'pointer',
           }}
@@ -85,7 +85,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           type="button"
           onClick={onApprove}
           style={{
-            padding: '4px 12px', borderRadius: 6,
+            padding: '4px 12px', borderRadius: 4,
             border: 'none', background: '#238636', color: '#fff', cursor: 'pointer',
             fontWeight: 600,
           }}

@@ -297,7 +297,7 @@ export const FOCUS_MODE_STYLES = {
     transform: 'translateX(-50%)',
     zIndex: Z_FOCUS_SESSION_TOP,
     padding: '6px 16px',
-    borderRadius: '0 0 8px 8px',
+    borderRadius: '0 0 6px 6px',
     background: 'rgba(0,0,0,0.85)',
     color: 'var(--color-text-primary)',
     fontSize: 12,

@@ -82,7 +82,7 @@ const toolbarStyle: React.CSSProperties = {
 
 const projectNameStyle: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary, #F2F2F2)', background: 'transparent',
-  border: 'none', outline: 'none', padding: '2px 4px', borderRadius: 3,
+  border: 'none', outline: 'none', padding: '2px 4px', borderRadius: 2,
   minWidth: 80, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 };
 
@@ -92,7 +92,7 @@ const toolbarSeparatorStyle: React.CSSProperties = {
 
 const toolbarBtnStyle: React.CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px',
-  fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary, #909090)', borderRadius: 4,
+  fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary, #909090)', borderRadius: 3,
   display: 'flex', alignItems: 'center', gap: 3,
   whiteSpace: 'nowrap', flexShrink: 0,
   letterSpacing: '0.02em',
@@ -930,7 +930,7 @@ const VinxEditor: React.FC = () => {
       {/* Toolbar */}
       <div style={toolbarStyle} className="vinx-tb">
         {/* App Icon + Project name */}
-        <img src={new URL('../../../../appicons/vinx.png', import.meta.url).href} alt="VINX" style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+        <img src={new URL('../../../../appicons/vinx.png', import.meta.url).href} alt="VINX" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
         <input
           style={projectNameStyle}
           value={project.name}
@@ -1052,14 +1052,14 @@ const VinxEditor: React.FC = () => {
             <DexIcon name="sliders" size={10} /> Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg>
           </button>
           {showFeaturesMenu && (
-            <div role="menu" onKeyDown={(e) => { if (e.key === 'Escape') setShowFeaturesMenu(false); }} style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2c2c2e)', border: '1px solid var(--color-border)', borderRadius: '8px', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+            <div role="menu" onKeyDown={(e) => { if (e.key === 'Escape') setShowFeaturesMenu(false); }} style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2c2c2e)', border: '1px solid var(--color-border)', borderRadius: '6px', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>COLOR</div>
               {[
                 { label: 'LUT Browser', active: showLUTBrowser, fn: toggleLUTBrowser },
                 { label: 'Speed Ramp', active: showSpeedRampEditor, fn: toggleSpeedRampEditor },
                 { label: 'Freeze Frame', active: false, fn: () => { if (selectedClipIds.length > 0) createFreezeFrame(selectedClipIds[0], currentFrame, project.frameRate * 2); } },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>AUDIO</div>
@@ -1071,7 +1071,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Crossfade Presets', active: showCrossfadePresets, fn: toggleCrossfadePresets },
                 { label: 'Audio EQ', active: showAudioEQ, fn: toggleAudioEQ },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>VIDEO</div>
@@ -1082,7 +1082,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Noise Reduction', active: showNoiseReductionPanel, fn: toggleNoiseReductionPanel },
                 { label: 'Ken Burns Zoom', active: showKenBurns, fn: toggleKenBurns },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EDITING</div>
@@ -1097,7 +1097,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Copy Attributes', active: false, fn: () => { if (selectedClipIds.length > 0) copyClipAttributes(selectedClipIds[0]); } },
                 { label: 'Paste Attributes', active: false, fn: () => { if (copiedClipAttributes && selectedClipIds.length > 0) pasteClipAttributes(selectedClipIds[0]); } },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>SUBTITLES</div>
@@ -1107,7 +1107,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Multicam Angles Panel', active: showMulticamPanel, fn: () => setShowMulticamPanel(!showMulticamPanel) },
                 { label: 'Timecode Overlay', active: timecodeOverlayEnabled, fn: toggleTimecodeOverlay },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>MARKERS</div>
@@ -1115,7 +1115,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Marker Manager', active: showMarkerManager, fn: toggleMarkerManager },
                 { label: 'Snap Settings', active: showSnapSettings, fn: toggleSnapSettings },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
@@ -1127,7 +1127,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Templates', active: false, fn: toggleTemplateDialog },
                 { label: 'Batch Export', active: showBatchExport, fn: toggleBatchExport },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
               <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
               <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PREVIEW</div>
@@ -1138,7 +1138,7 @@ const VinxEditor: React.FC = () => {
                 { label: 'Clip Inspector', active: showClipInspector, fn: toggleClipInspector },
                 { label: 'Render Preview', active: renderPreviewStatus === 'rendering', fn: renderPreviewStatus === 'rendering' ? cancelRenderPreview : startRenderPreview },
               ].map(item => (
-                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                <div key={item.label} role="menuitem" tabIndex={0} className="vinx-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.fn(); setShowFeaturesMenu(false); } }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
               ))}
             </div>
           )}
@@ -1241,7 +1241,7 @@ const VinxEditor: React.FC = () => {
 
       {/* LUT Browser Panel */}
       {showLUTBrowser && (
-        <div style={{ position: 'absolute', right: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(440px, calc(100% - 112px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', right: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(440px, calc(100% - 112px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>LUT Browser</span>
             <button aria-label="Close LUT Browser" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleLUTBrowser}><DexIcon name="close" size={14} /></button>
@@ -1258,7 +1258,7 @@ const VinxEditor: React.FC = () => {
                     const cats = ['cinematic','cinematic','cinematic','filmic','filmic','filmic','vintage','vintage','vintage','creative','creative','creative','technical','technical','technical'];
                     return cats[i] === cat;
                   }).map(name => (
-                    <button key={name} aria-label={`Apply ${name} LUT`} onClick={() => { const lutFilters: Record<string,string> = { 'Teal & Orange': 'sepia(0.3) hue-rotate(-30deg) saturate(1.6) contrast(1.1)', 'Bleach Bypass': 'saturate(0.4) contrast(1.4) brightness(1.1)', 'Film Noir': 'grayscale(1) contrast(1.3) brightness(0.9)', 'Kodak 50D': 'sepia(0.15) saturate(1.2) brightness(1.05) contrast(1.05)', 'Kodak 500T': 'sepia(0.1) hue-rotate(-10deg) saturate(1.1) contrast(1.1)', 'Fuji F-125': 'sepia(0.08) hue-rotate(10deg) saturate(1.15)', 'Super 8': 'sepia(0.4) contrast(1.2) brightness(0.95) saturate(0.8)', 'Polaroid': 'sepia(0.25) contrast(0.9) brightness(1.1) saturate(0.85)', 'VHS': 'sepia(0.15) contrast(1.3) brightness(0.85) blur(0.3px) saturate(1.3)', 'Cyberpunk': 'hue-rotate(280deg) saturate(2) contrast(1.3) brightness(1.1)', 'Golden Hour': 'sepia(0.2) hue-rotate(-15deg) saturate(1.4) brightness(1.1)', 'Moonlight': 'hue-rotate(200deg) saturate(0.6) brightness(0.85) contrast(1.15)', 'Rec.709': 'none', 'Log-C→709': 'contrast(1.5) saturate(1.3) brightness(1.1)', 'S-Log3→709': 'contrast(1.6) saturate(1.4) brightness(1.15)' }; const f = lutFilters[name] || 'none'; const viewer = document.querySelector('[data-vinx-program-canvas]') as HTMLElement; if (viewer) viewer.style.filter = f; }} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{name}</button>
+                    <button key={name} aria-label={`Apply ${name} LUT`} onClick={() => { const lutFilters: Record<string,string> = { 'Teal & Orange': 'sepia(0.3) hue-rotate(-30deg) saturate(1.6) contrast(1.1)', 'Bleach Bypass': 'saturate(0.4) contrast(1.4) brightness(1.1)', 'Film Noir': 'grayscale(1) contrast(1.3) brightness(0.9)', 'Kodak 50D': 'sepia(0.15) saturate(1.2) brightness(1.05) contrast(1.05)', 'Kodak 500T': 'sepia(0.1) hue-rotate(-10deg) saturate(1.1) contrast(1.1)', 'Fuji F-125': 'sepia(0.08) hue-rotate(10deg) saturate(1.15)', 'Super 8': 'sepia(0.4) contrast(1.2) brightness(0.95) saturate(0.8)', 'Polaroid': 'sepia(0.25) contrast(0.9) brightness(1.1) saturate(0.85)', 'VHS': 'sepia(0.15) contrast(1.3) brightness(0.85) blur(0.3px) saturate(1.3)', 'Cyberpunk': 'hue-rotate(280deg) saturate(2) contrast(1.3) brightness(1.1)', 'Golden Hour': 'sepia(0.2) hue-rotate(-15deg) saturate(1.4) brightness(1.1)', 'Moonlight': 'hue-rotate(200deg) saturate(0.6) brightness(0.85) contrast(1.15)', 'Rec.709': 'none', 'Log-C→709': 'contrast(1.5) saturate(1.3) brightness(1.1)', 'S-Log3→709': 'contrast(1.6) saturate(1.4) brightness(1.15)' }; const f = lutFilters[name] || 'none'; const viewer = document.querySelector('[data-vinx-program-canvas]') as HTMLElement; if (viewer) viewer.style.filter = f; }} style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>{name}</button>
                   ))}
                 </div>
               </div>
@@ -1269,13 +1269,13 @@ const VinxEditor: React.FC = () => {
 
       {/* Speed Ramp Panel */}
       {showSpeedRampEditor && (
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 60, width: 480, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 60, width: 480, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Speed Ramping</span>
             <button aria-label="Close Speed Ramp editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleSpeedRampEditor}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ height: 120, background: 'var(--color-border-subtle)', borderRadius: 8, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, cursor: selectedClipIds.length > 0 ? 'crosshair' : 'default' }} onClick={(e) => { const clipId = selectedClipIds[0]; if (!clipId) return; const svg = document.querySelector('[data-speed-ramp-svg]') as SVGSVGElement; if (!svg) return; const rect = svg.getBoundingClientRect(); const cx = Math.max(0, Math.min(400, ((e.clientX - rect.left) / rect.width) * 400)); const cy = Math.max(5, Math.min(75, ((e.clientY - rect.top) / rect.height) * 80)); const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); circle.setAttribute('cx', String(Math.round(cx))); circle.setAttribute('cy', String(Math.round(cy))); circle.setAttribute('r', '5'); circle.setAttribute('fill', 'var(--color-accent)'); circle.setAttribute('style', 'cursor:grab'); circle.addEventListener('mousedown', (de) => { de.stopPropagation(); const onMove = (me: MouseEvent) => { const r2 = svg.getBoundingClientRect(); const nx = Math.max(0, Math.min(400, ((me.clientX - r2.left) / r2.width) * 400)); const ny = Math.max(5, Math.min(75, ((me.clientY - r2.top) / r2.height) * 80)); circle.setAttribute('cx', String(Math.round(nx))); circle.setAttribute('cy', String(Math.round(ny))); }; const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); const pts = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points: pts }); }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }); svg.appendChild(circle); const points = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points }); }}>
+            <div style={{ height: 120, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, cursor: selectedClipIds.length > 0 ? 'crosshair' : 'default' }} onClick={(e) => { const clipId = selectedClipIds[0]; if (!clipId) return; const svg = document.querySelector('[data-speed-ramp-svg]') as SVGSVGElement; if (!svg) return; const rect = svg.getBoundingClientRect(); const cx = Math.max(0, Math.min(400, ((e.clientX - rect.left) / rect.width) * 400)); const cy = Math.max(5, Math.min(75, ((e.clientY - rect.top) / rect.height) * 80)); const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); circle.setAttribute('cx', String(Math.round(cx))); circle.setAttribute('cy', String(Math.round(cy))); circle.setAttribute('r', '5'); circle.setAttribute('fill', 'var(--color-accent)'); circle.setAttribute('style', 'cursor:grab'); circle.addEventListener('mousedown', (de) => { de.stopPropagation(); const onMove = (me: MouseEvent) => { const r2 = svg.getBoundingClientRect(); const nx = Math.max(0, Math.min(400, ((me.clientX - r2.left) / r2.width) * 400)); const ny = Math.max(5, Math.min(75, ((me.clientY - r2.top) / r2.height) * 80)); circle.setAttribute('cx', String(Math.round(nx))); circle.setAttribute('cy', String(Math.round(ny))); }; const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); const pts = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points: pts }); }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }); svg.appendChild(circle); const points = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points }); }}>
               <svg data-speed-ramp-svg="" width="400" height="80" viewBox="0 0 400 80">
                 <line x1="0" y1="60" x2="400" y2="60" stroke="var(--color-bg-hover)" strokeWidth="1" strokeDasharray="4"/>
                 <text x="0" y="70" fill="#606060" fontSize="8">1.0x</text><text x="380" y="70" fill="#606060" fontSize="8">1.0x</text>
@@ -1284,8 +1284,8 @@ const VinxEditor: React.FC = () => {
               </svg>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button aria-label="Add speed ramp point at center" onClick={() => { const clipId = selectedClipIds[0]; if (!clipId) return; const svg = document.querySelector('[data-speed-ramp-svg]') as SVGSVGElement; if (!svg) return; const circles = Array.from(svg.querySelectorAll('circle')); const cxValues = circles.map(c => parseFloat(c.getAttribute('cx') || '0')).sort((a, b) => a - b); let bestGap = 0, bestMid = 200; const edges = [0, ...cxValues, 400]; for (let i = 0; i < edges.length - 1; i++) { const gap = edges[i + 1] - edges[i]; if (gap > bestGap) { bestGap = gap; bestMid = (edges[i] + edges[i + 1]) / 2; } } const cx = Math.round(bestMid); const cy = 20; const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); circle.setAttribute('cx', String(cx)); circle.setAttribute('cy', String(cy)); circle.setAttribute('r', '5'); circle.setAttribute('fill', 'var(--color-accent)'); circle.setAttribute('style', 'cursor:grab'); circle.addEventListener('mousedown', (de) => { de.stopPropagation(); const onMove = (me: MouseEvent) => { const r2 = svg.getBoundingClientRect(); const nx = Math.max(0, Math.min(400, ((me.clientX - r2.left) / r2.width) * 400)); const ny = Math.max(5, Math.min(75, ((me.clientY - r2.top) / r2.height) * 80)); circle.setAttribute('cx', String(Math.round(nx))); circle.setAttribute('cy', String(Math.round(ny))); }; const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); const pts = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points: pts }); }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }); svg.appendChild(circle); const points = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points }); }} style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 6, padding: '4px 12px' }}>Add Point</button>
-              <button aria-label="Reset speed ramp" onClick={() => { const svg = document.querySelector('[data-speed-ramp-svg]'); if (svg) { svg.querySelectorAll('circle').forEach((c, i) => { if (i >= 2) c.remove(); }); } const clipId = selectedClipIds[0]; if (clipId) useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: false, points: [{ frame: 0, speed: 1, easing: 'linear' }, { frame: 150, speed: 1, easing: 'linear' }] }); }} style={{ ...toolbarBtnStyle, borderRadius: 6, padding: '4px 12px' }}>Reset</button>
+              <button aria-label="Add speed ramp point at center" onClick={() => { const clipId = selectedClipIds[0]; if (!clipId) return; const svg = document.querySelector('[data-speed-ramp-svg]') as SVGSVGElement; if (!svg) return; const circles = Array.from(svg.querySelectorAll('circle')); const cxValues = circles.map(c => parseFloat(c.getAttribute('cx') || '0')).sort((a, b) => a - b); let bestGap = 0, bestMid = 200; const edges = [0, ...cxValues, 400]; for (let i = 0; i < edges.length - 1; i++) { const gap = edges[i + 1] - edges[i]; if (gap > bestGap) { bestGap = gap; bestMid = (edges[i] + edges[i + 1]) / 2; } } const cx = Math.round(bestMid); const cy = 20; const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); circle.setAttribute('cx', String(cx)); circle.setAttribute('cy', String(cy)); circle.setAttribute('r', '5'); circle.setAttribute('fill', 'var(--color-accent)'); circle.setAttribute('style', 'cursor:grab'); circle.addEventListener('mousedown', (de) => { de.stopPropagation(); const onMove = (me: MouseEvent) => { const r2 = svg.getBoundingClientRect(); const nx = Math.max(0, Math.min(400, ((me.clientX - r2.left) / r2.width) * 400)); const ny = Math.max(5, Math.min(75, ((me.clientY - r2.top) / r2.height) * 80)); circle.setAttribute('cx', String(Math.round(nx))); circle.setAttribute('cy', String(Math.round(ny))); }; const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); const pts = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points: pts }); }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); }); svg.appendChild(circle); const points = Array.from(svg.querySelectorAll('circle')).map(c => ({ frame: Math.round(parseFloat(c.getAttribute('cx') || '0') / 400 * 150), speed: parseFloat(Math.max(0.1, 1 + (60 - parseFloat(c.getAttribute('cy') || '40')) / 30).toFixed(2)), easing: 'linear' as const })).sort((a, b) => a.frame - b.frame); useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: true, points }); }} style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 4, padding: '4px 12px' }}>Add Point</button>
+              <button aria-label="Reset speed ramp" onClick={() => { const svg = document.querySelector('[data-speed-ramp-svg]'); if (svg) { svg.querySelectorAll('circle').forEach((c, i) => { if (i >= 2) c.remove(); }); } const clipId = selectedClipIds[0]; if (clipId) useVinxStore.getState().setClipSpeedRamp(clipId, { enabled: false, points: [{ frame: 0, speed: 1, easing: 'linear' }, { frame: 150, speed: 1, easing: 'linear' }] }); }} style={{ ...toolbarBtnStyle, borderRadius: 4, padding: '4px 12px' }}>Reset</button>
               <div style={{ flex: 1 }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', alignSelf: 'center' }}>{selectedClipIds.length > 0 ? 'Editing speed ramp' : 'Select a clip to ramp speed'}</span>
             </div>
@@ -1295,22 +1295,22 @@ const VinxEditor: React.FC = () => {
 
       {/* Subtitle Editor Panel */}
       {showSubtitleEditor && (
-        <div style={{ position: 'absolute', right: 12, top: 'min(320px, 35%)', bottom: 12, width: 'min(320px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', right: 12, top: 'min(320px, 35%)', bottom: 12, width: 'min(320px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Subtitles (SRT)</span>
             <button aria-label="Close Subtitle editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleSubtitleEditor}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10, overflow: 'auto' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
-              <button aria-label="Add subtitle track" onClick={() => useVinxStore.getState().addSubtitleTrack(`Track ${(project.subtitleTracks?.length || 0) + 1}`, 'en')} style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>+ Add Track</button>
-              <button aria-label="Import SRT subtitle file" onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = '.srt'; input.onchange = () => { const file = input.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const text = reader.result as string; const store = useVinxStore.getState(); store.addSubtitleTrack(file.name.replace('.srt', ''), 'en'); const tracks = useVinxStore.getState().project.subtitleTracks; const track = tracks?.[tracks.length - 1]; if (!track) return; const blocks = text.trim().split(/\n\n+/); blocks.forEach(block => { const lines = block.split('\n'); if (lines.length < 3) return; const timeParts = lines[1].split(' --> '); const parseTime = (s: string) => { const p = s.trim().replace(',', '.').split(':'); return parseFloat(p[0]) * 3600 + parseFloat(p[1]) * 60 + parseFloat(p[2]); }; store.addSubtitleEntry(track.id, { id: crypto.randomUUID(), index: 0, startFrame: Math.round(parseTime(timeParts[0]) * 30), endFrame: Math.round(parseTime(timeParts[1]) * 30), text: lines.slice(2).join('\n'), style: { fontFamily: 'Arial', fontSize: 24, color: 'var(--color-text-primary)', backgroundColor: 'rgba(0,0,0,0.6)', backgroundOpacity: 0.6, position: 'bottom' as const, bold: false, italic: false } }); }); }; reader.readAsText(file); }; input.click(); input.remove(); }} style={{ ...toolbarBtnStyle, borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Import SRT</button>
-              <button aria-label="Export SRT subtitle file" onClick={() => { const tracks = project.subtitleTracks; if (!tracks?.length) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'No subtitle tracks to export' } })); return; } const track = tracks[0]; if (!track.entries?.length) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'No subtitle entries to export' } })); return; } let srt = ''; track.entries.forEach((e: any, i: number) => { const startSec = (e.start ?? e.startFrame / 30); const endSec = (e.end ?? e.endFrame / 30); const fmt = (t: number) => { const h = Math.floor(t / 3600); const m = Math.floor((t % 3600) / 60); const s = t % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s.toFixed(3).padStart(6, '0').replace('.', ',')}`; }; srt += `${i + 1}\n${fmt(startSec)} --> ${fmt(endSec)}\n${e.text}\n\n`; }); const blob = new Blob([srt], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${track.name}.srt`; a.click(); URL.revokeObjectURL(url); }} style={{ ...toolbarBtnStyle, borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Export SRT</button>
+              <button aria-label="Add subtitle track" onClick={() => useVinxStore.getState().addSubtitleTrack(`Track ${(project.subtitleTracks?.length || 0) + 1}`, 'en')} style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 4, padding: '4px 10px', fontSize: 11 }}>+ Add Track</button>
+              <button aria-label="Import SRT subtitle file" onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = '.srt'; input.onchange = () => { const file = input.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const text = reader.result as string; const store = useVinxStore.getState(); store.addSubtitleTrack(file.name.replace('.srt', ''), 'en'); const tracks = useVinxStore.getState().project.subtitleTracks; const track = tracks?.[tracks.length - 1]; if (!track) return; const blocks = text.trim().split(/\n\n+/); blocks.forEach(block => { const lines = block.split('\n'); if (lines.length < 3) return; const timeParts = lines[1].split(' --> '); const parseTime = (s: string) => { const p = s.trim().replace(',', '.').split(':'); return parseFloat(p[0]) * 3600 + parseFloat(p[1]) * 60 + parseFloat(p[2]); }; store.addSubtitleEntry(track.id, { id: crypto.randomUUID(), index: 0, startFrame: Math.round(parseTime(timeParts[0]) * 30), endFrame: Math.round(parseTime(timeParts[1]) * 30), text: lines.slice(2).join('\n'), style: { fontFamily: 'Arial', fontSize: 24, color: 'var(--color-text-primary)', backgroundColor: 'rgba(0,0,0,0.6)', backgroundOpacity: 0.6, position: 'bottom' as const, bold: false, italic: false } }); }); }; reader.readAsText(file); }; input.click(); input.remove(); }} style={{ ...toolbarBtnStyle, borderRadius: 4, padding: '4px 10px', fontSize: 11 }}>Import SRT</button>
+              <button aria-label="Export SRT subtitle file" onClick={() => { const tracks = project.subtitleTracks; if (!tracks?.length) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'No subtitle tracks to export' } })); return; } const track = tracks[0]; if (!track.entries?.length) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'No subtitle entries to export' } })); return; } let srt = ''; track.entries.forEach((e: any, i: number) => { const startSec = (e.start ?? e.startFrame / 30); const endSec = (e.end ?? e.endFrame / 30); const fmt = (t: number) => { const h = Math.floor(t / 3600); const m = Math.floor((t % 3600) / 60); const s = t % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s.toFixed(3).padStart(6, '0').replace('.', ',')}`; }; srt += `${i + 1}\n${fmt(startSec)} --> ${fmt(endSec)}\n${e.text}\n\n`; }); const blob = new Blob([srt], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${track.name}.srt`; a.click(); URL.revokeObjectURL(url); }} style={{ ...toolbarBtnStyle, borderRadius: 4, padding: '4px 10px', fontSize: 11 }}>Export SRT</button>
             </div>
             {(project.subtitleTracks?.length || 0) === 0 ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No subtitle tracks. Add one to get started.</div>
             ) : (
               (project.subtitleTracks || []).map(track => (
-                <div key={track.id} style={{ padding: 8, borderRadius: 6, background: 'var(--color-border-subtle)', marginBottom: 6 }}>
+                <div key={track.id} style={{ padding: 8, borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{track.name} ({track.language})</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{track.entries.length} entries</div>
                 </div>
@@ -1322,7 +1322,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Loudness Metering Panel */}
       {showLoudnessPanel && (
-        <div style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Loudness</span>
             <button aria-label="Close Loudness panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleLoudnessPanel}><DexIcon name="close" size={14} /></button>
@@ -1347,7 +1347,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Audio Ducking Panel */}
       {showAudioDuckingPanel && (
-        <div style={{ position: 'absolute', left: 'min(280px, 35%)', top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', left: 'min(280px, 35%)', top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Ducking</span>
             <button aria-label="Close Audio Ducking panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAudioDuckingPanel}><DexIcon name="close" size={14} /></button>
@@ -1364,29 +1364,29 @@ const VinxEditor: React.FC = () => {
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{p.value}</span>
               </div>
             ))}
-            <button aria-label={project.audioDucking?.enabled ? 'Disable audio ducking' : 'Enable audio ducking'} style={{ ...toolbarBtnStyle, background: project.audioDucking?.enabled ? 'rgba(48,209,88,0.15)' : 'var(--color-bg-hover)', color: project.audioDucking?.enabled ? 'var(--color-success)' : 'var(--color-text-secondary)', borderRadius: 6, padding: '6px 12px', justifyContent: 'center', marginTop: 4 }} onClick={() => useVinxStore.getState().setAudioDucking({ enabled: !(project.audioDucking?.enabled) })}>{project.audioDucking?.enabled ? 'Enabled' : 'Disabled'}</button>
+            <button aria-label={project.audioDucking?.enabled ? 'Disable audio ducking' : 'Enable audio ducking'} style={{ ...toolbarBtnStyle, background: project.audioDucking?.enabled ? 'rgba(48,209,88,0.15)' : 'var(--color-bg-hover)', color: project.audioDucking?.enabled ? 'var(--color-success)' : 'var(--color-text-secondary)', borderRadius: 4, padding: '6px 12px', justifyContent: 'center', marginTop: 4 }} onClick={() => useVinxStore.getState().setAudioDucking({ enabled: !(project.audioDucking?.enabled) })}>{project.audioDucking?.enabled ? 'Enabled' : 'Disabled'}</button>
           </div>
         </div>
       )}
 
       {/* Motion Tracker Panel */}
       {showMotionTracker && (
-        <div style={{ position: 'absolute', right: 'min(320px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 'min(320px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Motion Tracking</span>
             <button aria-label="Close Motion Tracker" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleMotionTracker}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              <button aria-label="Add point tracker" onClick={() => { const clipId = selectedClipIds[0] || 'default'; useVinxStore.getState().addMotionTracker(clipId); const trackers = useVinxStore.getState().project.motionTrackers || []; const last = trackers[trackers.length - 1]; if (last) { const lid = last.id; useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(t => t.id === lid ? { ...t, type: 'point' as const, name: `Point Tracker ${trackers.length}`, status: 'tracking' as const } : t) } })); } }} style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>+ Point</button>
-              <button aria-label="Add planar tracker" onClick={() => { const clipId = selectedClipIds[0] || 'default'; useVinxStore.getState().addMotionTracker(clipId); const trackers = useVinxStore.getState().project.motionTrackers || []; const last = trackers[trackers.length - 1]; if (last) { const lid = last.id; useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(t => t.id === lid ? { ...t, type: 'planar' as const, name: `Planar Tracker ${trackers.length}`, status: 'tracking' as const } : t) } })); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Planar tracker added — use Track to analyze frames' } })); } }} style={{ ...toolbarBtnStyle, borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Planar</button>
-              <button aria-label="Add object tracker" onClick={() => { const clipId = selectedClipIds[0] || 'default'; useVinxStore.getState().addMotionTracker(clipId); const trackers = useVinxStore.getState().project.motionTrackers || []; const last = trackers[trackers.length - 1]; if (last) { const lid = last.id; useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(t => t.id === lid ? { ...t, type: 'object' as const, name: `Object Tracker ${trackers.length}`, status: 'tracking' as const } : t) } })); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Object tracker added — use Track to analyze frames' } })); } }} style={{ ...toolbarBtnStyle, borderRadius: 6, padding: '4px 10px', fontSize: 11 }}>Object</button>
+              <button aria-label="Add point tracker" onClick={() => { const clipId = selectedClipIds[0] || 'default'; useVinxStore.getState().addMotionTracker(clipId); const trackers = useVinxStore.getState().project.motionTrackers || []; const last = trackers[trackers.length - 1]; if (last) { const lid = last.id; useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(t => t.id === lid ? { ...t, type: 'point' as const, name: `Point Tracker ${trackers.length}`, status: 'tracking' as const } : t) } })); } }} style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 4, padding: '4px 10px', fontSize: 11 }}>+ Point</button>
+              <button aria-label="Add planar tracker" onClick={() => { const clipId = selectedClipIds[0] || 'default'; useVinxStore.getState().addMotionTracker(clipId); const trackers = useVinxStore.getState().project.motionTrackers || []; const last = trackers[trackers.length - 1]; if (last) { const lid = last.id; useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(t => t.id === lid ? { ...t, type: 'planar' as const, name: `Planar Tracker ${trackers.length}`, status: 'tracking' as const } : t) } })); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Planar tracker added — use Track to analyze frames' } })); } }} style={{ ...toolbarBtnStyle, borderRadius: 4, padding: '4px 10px', fontSize: 11 }}>Planar</button>
+              <button aria-label="Add object tracker" onClick={() => { const clipId = selectedClipIds[0] || 'default'; useVinxStore.getState().addMotionTracker(clipId); const trackers = useVinxStore.getState().project.motionTrackers || []; const last = trackers[trackers.length - 1]; if (last) { const lid = last.id; useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(t => t.id === lid ? { ...t, type: 'object' as const, name: `Object Tracker ${trackers.length}`, status: 'tracking' as const } : t) } })); window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Object tracker added — use Track to analyze frames' } })); } }} style={{ ...toolbarBtnStyle, borderRadius: 4, padding: '4px 10px', fontSize: 11 }}>Object</button>
             </div>
             {(project.motionTrackers?.length || 0) === 0 ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Select a clip and add a tracker</div>
             ) : (
               (project.motionTrackers || []).map(t => (
-                <div key={t.id} style={{ padding: 8, borderRadius: 6, background: 'var(--color-border-subtle)', marginBottom: 4 }}>
+                <div key={t.id} style={{ padding: 8, borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{t.name} ({t.type})</span>
                     <span style={{ fontSize: 11, color: t.status === 'complete' ? 'var(--color-success)' : t.status === 'tracking' ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{t.status}</span>
@@ -1398,17 +1398,17 @@ const VinxEditor: React.FC = () => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
-                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)' }}><DexIcon name="chevron-left" size={10} /> Track</button>
+                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 3, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)' }}><DexIcon name="chevron-left" size={10} /> Track</button>
                     <button aria-label="Track forward" title="Track Forward" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'tracking' as const } : tr) } }));
                       void runMotionTrack('forward', 60).then((trackPoints) => {
                         useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).map(tr => tr.id === t.id ? { ...tr, status: 'complete' as const, trackPoints } : tr) } }));
                         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `${t.name}: Tracking complete (${trackPoints.length} points)` } }));
                       });
-                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
+                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 3, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)' }}>Track <DexIcon name="chevron-right" size={10} /></button>
                     <button aria-label="Delete tracker" title="Delete" onClick={() => {
                       useVinxStore.setState(s => ({ project: { ...s.project, motionTrackers: (s.project.motionTrackers || []).filter(tr => tr.id !== t.id) } }));
-                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 4, marginLeft: 'auto', color: 'var(--color-error)' }}><DexIcon name="close" size={10} /></button>
+                    }} style={{ ...toolbarBtnStyle, fontSize: 11, padding: '2px 6px', borderRadius: 3, marginLeft: 'auto', color: 'var(--color-error)' }}><DexIcon name="close" size={10} /></button>
                   </div>
                 </div>
               ))
@@ -1419,7 +1419,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Mask Editor Panel */}
       {showMaskEditor && (
-        <div style={{ position: 'absolute', left: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', left: 12, top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Mask Editor</span>
             <button aria-label="Close Mask Editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleMaskEditor}><DexIcon name="close" size={14} /></button>
@@ -1427,7 +1427,7 @@ const VinxEditor: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {['Ellipse', 'Rectangle', 'Pen', 'Freehand'].map(shape => (
-                <button key={shape} aria-label={`${shape} mask shape`} onClick={() => setMaskShape(shape)} style={{ flex: 1, padding: '4px 0', borderRadius: 5, border: `1px solid ${maskShape === shape ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-bg-hover)'}`, background: maskShape === shape ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'var(--color-border-subtle)', color: maskShape === shape ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{shape}</button>
+                <button key={shape} aria-label={`${shape} mask shape`} onClick={() => setMaskShape(shape)} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${maskShape === shape ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-bg-hover)'}`, background: maskShape === shape ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'var(--color-border-subtle)', color: maskShape === shape ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{shape}</button>
               ))}
             </div>
             <div style={{ marginBottom: 8 }}>
@@ -1452,8 +1452,8 @@ const VinxEditor: React.FC = () => {
               <input type="range" min="-50" max="50" value={maskExpansion} onChange={e => setMaskExpansion(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
             </div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              <button aria-label="Invert mask" onClick={() => setMaskInverted(!maskInverted)} style={{ flex: 1, padding: '5px', borderRadius: 5, border: `1px solid ${maskInverted ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-bg-hover)'}`, background: maskInverted ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'var(--color-border-subtle)', color: maskInverted ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Invert</button>
-              <button aria-label="Reset mask" onClick={() => { setMaskFeather(0); setMaskOpacity(100); setMaskExpansion(0); setMaskInverted(false); }} style={{ flex: 1, padding: '5px', borderRadius: 5, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Reset</button>
+              <button aria-label="Invert mask" onClick={() => setMaskInverted(!maskInverted)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: `1px solid ${maskInverted ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-bg-hover)'}`, background: maskInverted ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'var(--color-border-subtle)', color: maskInverted ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Invert</button>
+              <button aria-label="Reset mask" onClick={() => { setMaskFeather(0); setMaskOpacity(100); setMaskExpansion(0); setMaskInverted(false); }} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Reset</button>
             </div>
             <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Mask List</div>
@@ -1477,7 +1477,7 @@ const VinxEditor: React.FC = () => {
                 if (selectedClipIds.length === 0) return;
                 const mask = { id: `mask-${Date.now()}`, name: `${maskShape} mask`, type: maskShape.toLowerCase() as 'ellipse' | 'rectangle' | 'bezier', shape: maskShape.toLowerCase(), feather: maskFeather, opacity: maskOpacity / 100, expansion: maskExpansion, inverted: maskInverted, points: maskShape === 'Ellipse' ? [{ x: 0.5, y: 0.5, handleInX: 0, handleInY: 0, handleOutX: 0, handleOutY: 0 }] : maskShape === 'Rectangle' ? [{ x: 0.25, y: 0.25, handleInX: 0, handleInY: 0, handleOutX: 0, handleOutY: 0 }, { x: 0.75, y: 0.75, handleInX: 0, handleInY: 0, handleOutX: 0, handleOutY: 0 }] : [], keyframes: [] };
                 useVinxStore.getState().addClipMask(selectedClipIds[0], mask);
-              }} style={{ width: '100%', padding: '6px', borderRadius: 5, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Add Mask</button>
+              }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Add Mask</button>
             </div>
           </div>
         </div>
@@ -1486,7 +1486,7 @@ const VinxEditor: React.FC = () => {
       {/* Project Templates Dialog */}
       {showTemplateDialog && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleTemplateDialog}>
-          <div style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: 'min(80vh, calc(100% - 32px))', background: 'var(--color-bg-elevated)', borderRadius: 16, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: 'min(80vh, calc(100% - 32px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Project Templates</span>
               <button aria-label="Close Templates dialog" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleTemplateDialog}><DexIcon name="close" size={14} /></button>
@@ -1504,7 +1504,7 @@ const VinxEditor: React.FC = () => {
                 { icon: 'MIC', name: 'Podcast Video', desc: '1920×1080 @ 30fps', cat: 'Web' },
                 { icon: 'AU', name: 'Podcast Audio', desc: 'Audio-only @ 48kHz', cat: 'Web' },
               ].map(t => (
-                <button key={t.name} aria-label={`Use ${t.name} template (${t.desc})`} onClick={() => { useVinxStore.getState().setProjectName(`${t.name} Project`); toggleTemplateDialog(); }} style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left', display: 'flex', gap: 12, alignItems: 'center' }}>
+                <button key={t.name} aria-label={`Use ${t.name} template (${t.desc})`} onClick={() => { useVinxStore.getState().setProjectName(`${t.name} Project`); toggleTemplateDialog(); }} style={{ padding: '14px 16px', borderRadius: 8, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left', display: 'flex', gap: 12, alignItems: 'center' }}>
                   <span style={{ fontSize: 24 }}>{t.icon}</span>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>{t.name}</div>
@@ -1521,7 +1521,7 @@ const VinxEditor: React.FC = () => {
       {/* Batch Export Panel */}
       {showBatchExport && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleBatchExport}>
-          <div style={{ width: 480, background: 'var(--color-bg-elevated)', borderRadius: 16, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ width: 480, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Export</span>
               <button aria-label="Close Batch Export dialog" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleBatchExport}><DexIcon name="close" size={14} /></button>
@@ -1530,7 +1530,7 @@ const VinxEditor: React.FC = () => {
               <div style={{ marginBottom: 12, color: 'var(--color-text-secondary)', fontSize: 11 }}>Export chapters, markers, or sections as separate files</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {['Export by Chapter Markers', 'Export by In/Out Points', 'Export Each Track Separately', 'Export Stems'].map(opt => (
-                  <button key={opt} aria-label={opt} onClick={() => { toggleBatchExport(); useVinxStore.getState().setBatchExportMode(opt); setShowExportDialog(true); }} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
+                  <button key={opt} aria-label={opt} onClick={() => { toggleBatchExport(); useVinxStore.getState().setBatchExportMode(opt); setShowExportDialog(true); }} style={{ padding: '10px 14px', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
                     <div>{opt}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{opt === 'Export by Chapter Markers' ? `${(project.markers?.length || 0)} markers found` : opt === 'Export by In/Out Points' ? 'Uses timeline in/out range' : opt === 'Export Each Track Separately' ? `${project.sequences?.[0]?.tracks?.length || 0} tracks` : 'Audio stems separated'}</div>
                   </button>
@@ -1547,7 +1547,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Clip Roles Panel */}
       {showClipRolesPanel && (
-        <div style={{ position: 'absolute', left: 12, top: 120, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', left: 12, top: 120, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clip Roles</span>
             <button aria-label="Close Clip Roles panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleClipRolesPanel}><DexIcon name="close" size={14} /></button>
@@ -1569,7 +1569,7 @@ const VinxEditor: React.FC = () => {
 
       {/* PiP Presets Panel */}
       {showPipPresets && (
-        <div style={{ position: 'absolute', left: 'min(300px, 38%)', top: 120, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', left: 'min(300px, 38%)', top: 120, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 144px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>PiP Presets</span>
             <button aria-label="Close PiP presets" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={togglePipPresets}><DexIcon name="close" size={14} /></button>
@@ -1585,8 +1585,8 @@ const VinxEditor: React.FC = () => {
               { name: 'Center Small', x: 0, y: 0, sx: 0.4, sy: 0.4 },
               { name: 'Full Frame', x: 0, y: 0, sx: 1, sy: 1 },
             ].map(p => (
-              <button key={p.name} aria-label={`Apply ${p.name} PiP preset`} onClick={() => { if (selectedClipIds.length > 0) applyPipPreset(selectedClipIds[0], p.x, p.y, p.sx, p.sy); }} style={{ padding: '10px 8px', borderRadius: 8, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'center' }}>
-                <div style={{ width: 48, height: 28, border: '1px solid var(--color-border)', borderRadius: 3, margin: '0 auto 4px', position: 'relative', overflow: 'hidden' }}>
+              <button key={p.name} aria-label={`Apply ${p.name} PiP preset`} onClick={() => { if (selectedClipIds.length > 0) applyPipPreset(selectedClipIds[0], p.x, p.y, p.sx, p.sy); }} style={{ padding: '10px 8px', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'center' }}>
+                <div style={{ width: 48, height: 28, border: '1px solid var(--color-border)', borderRadius: 2, margin: '0 auto 4px', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', left: `${(0.5 + p.x - p.sx / 2) * 100}%`, top: `${(0.5 + p.y - p.sy / 2) * 100}%`, width: `${p.sx * 100}%`, height: `${p.sy * 100}%`, background: 'rgba(74,158,255,0.3)', borderRadius: 1 }} />
                 </div>
                 {p.name}
@@ -1598,7 +1598,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Reference Frame Panel */}
       {showReferenceFrame && (
-        <div style={{ position: 'absolute', right: 12, top: 'min(350px, 40%)', bottom: 12, width: 'min(280px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 12, top: 'min(350px, 40%)', bottom: 12, width: 'min(280px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Reference Frame</span>
             <button aria-label="Close Reference Frame panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleReferenceFrame}><DexIcon name="close" size={14} /></button>
@@ -1607,23 +1607,23 @@ const VinxEditor: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Compare current frame with a reference</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Ref Frame:</span>
-              <input type="number" value={referenceFrameNum} onChange={e => setReferenceFrame(parseInt(e.target.value) || 0)} style={{ width: 60, padding: '3px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 11 }} />
-              <button style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 4, padding: '3px 8px' }} onClick={() => setReferenceFrame(currentFrame)} aria-label="Set reference to current frame">Capture</button>
+              <input type="number" value={referenceFrameNum} onChange={e => setReferenceFrame(parseInt(e.target.value) || 0)} style={{ width: 60, padding: '3px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 11 }} />
+              <button style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 3, padding: '3px 8px' }} onClick={() => setReferenceFrame(currentFrame)} aria-label="Set reference to current frame">Capture</button>
             </div>
-            <div style={{ display: 'flex', gap: 6, background: 'var(--color-border-subtle)', borderRadius: 8, padding: 8 }}>
+            <div style={{ display: 'flex', gap: 6, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 8 }}>
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>REFERENCE</div>
-                <div style={{ height: 60, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {referenceFrameNum}</div>
+                <div style={{ height: 60, borderRadius: 3, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {referenceFrameNum}</div>
               </div>
               <div style={{ width: 1, background: 'var(--color-border-subtle)' }} />
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>CURRENT</div>
-                <div style={{ height: 60, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {currentFrame}</div>
+                <div style={{ height: 60, borderRadius: 3, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Frame {currentFrame}</div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
               {['Side-by-Side', 'Overlay', 'Split', 'Difference'].map(mode => (
-                <button key={mode} onClick={() => setCompareMode(mode)} aria-label={`Compare mode: ${mode}`} aria-pressed={compareMode === mode} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
+                <button key={mode} onClick={() => setCompareMode(mode)} aria-label={`Compare mode: ${mode}`} aria-pressed={compareMode === mode} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: compareMode === mode ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: compareMode === mode ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{mode}</button>
               ))}
             </div>
           </div>
@@ -1632,7 +1632,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Auto-Reframe Panel */}
       {showAutoReframe && (
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 84, width: 360, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 84, width: 360, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Auto-Reframe</span>
             <button aria-label="Close Auto-Reframe panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAutoReframe}><DexIcon name="close" size={14} /></button>
@@ -1641,20 +1641,20 @@ const VinxEditor: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>Current: {project.width}×{project.height}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 12 }}>
               {([['16:9', '1920×1080'], ['9:16', '1080×1920'], ['1:1', '1080×1080'], ['4:5', '1080×1350'], ['4:3', '1440×1080'], ['21:9', '2560×1080']] as const).map(([aspect, res]) => (
-                <button key={aspect} aria-label={`Reframe to ${aspect}`} onClick={() => setAutoReframeAspect(aspect as any)} style={{ padding: '10px 6px', borderRadius: 8, border: autoReframeAspect === aspect ? '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)' : '1px solid var(--color-bg-hover)', background: autoReframeAspect === aspect ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: autoReframeAspect === aspect ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'center' }}>
+                <button key={aspect} aria-label={`Reframe to ${aspect}`} onClick={() => setAutoReframeAspect(aspect as any)} style={{ padding: '10px 6px', borderRadius: 6, border: autoReframeAspect === aspect ? '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)' : '1px solid var(--color-bg-hover)', background: autoReframeAspect === aspect ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: autoReframeAspect === aspect ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'center' }}>
                   <div style={{ fontWeight: 600, marginBottom: 2 }}>{aspect}</div>
                   <div style={{ fontSize: 11, color: autoReframeAspect === aspect ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{res}</div>
                 </button>
               ))}
             </div>
-            <button onClick={applyAutoReframe} aria-label="Apply auto-reframe" style={{ width: '100%', padding: '8px 0', borderRadius: 8, border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Reframe</button>
+            <button onClick={applyAutoReframe} aria-label="Apply auto-reframe" style={{ width: '100%', padding: '8px 0', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Reframe</button>
           </div>
         </div>
       )}
 
       {/* Ken Burns / Dynamic Zoom Panel */}
       {showKenBurns && (
-        <div style={{ position: 'absolute', right: 'min(300px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 'min(300px, 35%)', top: 84, width: 'min(280px, calc(100% - 24px))', maxHeight: 'min(460px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Ken Burns / Dynamic Zoom</span>
             <button aria-label="Close Ken Burns panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleKenBurns}><DexIcon name="close" size={14} /></button>
@@ -1692,7 +1692,7 @@ const VinxEditor: React.FC = () => {
                     useVinxStore.setState({ project: { ...project }, isDirty: true });
                   }
                 }
-              }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', borderRadius: 6, border: `1px solid ${kenBurnsPreset === p.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'}`, background: kenBurnsPreset === p.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: kenBurnsPreset === p.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
+              }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', borderRadius: 4, border: `1px solid ${kenBurnsPreset === p.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'}`, background: kenBurnsPreset === p.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: kenBurnsPreset === p.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
                 <span style={{ width: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{p.icon}</span>
                 <div>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
@@ -1706,7 +1706,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Audio Crossfade Presets Panel */}
       {showCrossfadePresets && (
-        <div style={{ position: 'absolute', left: 400, top: 84, width: 240, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'absolute', left: 400, top: 84, width: 240, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crossfade Presets</span>
             <button aria-label="Close Crossfade presets" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleCrossfadePresets}><DexIcon name="close" size={14} /></button>
@@ -1727,7 +1727,7 @@ const VinxEditor: React.FC = () => {
                   const transition = { definitionId: `crossfade-${p.name.toLowerCase().replace(/\s+/g, '-')}`, type: tType as 'constant-gain' | 'constant-power' | 'exponential-fade', durationFrames: dur };
                   useVinxStore.getState()._setTransition(selectedClipIds[0], 'out', transition);
                 }
-              }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', borderRadius: 6, border: `1px solid ${crossfadePreset === p.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'}`, background: crossfadePreset === p.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: crossfadePreset === p.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3 }}>
+              }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', borderRadius: 4, border: `1px solid ${crossfadePreset === p.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'}`, background: crossfadePreset === p.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: crossfadePreset === p.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3 }}>
                 <svg width="24" height="20" viewBox="0 0 20 20"><path d={p.curve} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" /><path d={p.curve.replace(/Q\d+ \d+ (\d+ \d+)/, 'Q$1')} fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1" /></svg>
                 <div>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
@@ -1741,7 +1741,7 @@ const VinxEditor: React.FC = () => {
 
       {/* J/L Cut Panel */}
       {showJLCutPanel && (
-        <div style={{ position: 'absolute', left: 400, top: 200, width: 240, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'absolute', left: 400, top: 200, width: 240, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>J-Cut / L-Cut</span>
             <button aria-label="Close J/L Cut panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleJLCutPanel}><DexIcon name="close" size={14} /></button>
@@ -1750,13 +1750,13 @@ const VinxEditor: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Offset audio relative to video for selected clip</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', marginBottom: 6 }}>J-Cut (audio leads)</div>
             {[15, 30, 60].map(f => (
-              <button key={`j-${f}`} aria-label={`Apply J-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'j-cut', f); }} style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
+              <button key={`j-${f}`} aria-label={`Apply J-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'j-cut', f); }} style={{ width: '100%', padding: '5px 8px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
                 {f} frames ({(f / project.frameRate).toFixed(1)}s)
               </button>
             ))}
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-success)', margin: '8px 0 6px' }}>L-Cut (audio trails)</div>
             {[15, 30, 60].map(f => (
-              <button key={`l-${f}`} aria-label={`Apply L-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'l-cut', f); }} style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
+              <button key={`l-${f}`} aria-label={`Apply L-cut ${f} frames`} onClick={() => { if (selectedClipIds.length > 0) applyJLCut(selectedClipIds[0], 'l-cut', f); }} style={{ width: '100%', padding: '5px 8px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 3, textAlign: 'left' }}>
                 {f} frames ({(f / project.frameRate).toFixed(1)}s)
               </button>
             ))}
@@ -1766,7 +1766,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Stabilization Panel */}
       {showStabilizationPanel && (
-        <div style={{ position: 'absolute', right: 12, top: 'min(200px, 30%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 12, top: 'min(200px, 30%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Stabilization</span>
             <button aria-label="Close Stabilization panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleStabilizationPanel}><DexIcon name="close" size={14} /></button>
@@ -1787,7 +1787,7 @@ const VinxEditor: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Method</span>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {['Warp', 'Position', 'Pos+Scale+Rot'].map(m => (
-                      <button key={m} onClick={() => setStabMethod(m)} aria-label={`Stabilization method: ${m}`} aria-pressed={stabMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                      <button key={m} onClick={() => setStabMethod(m)} aria-label={`Stabilization method: ${m}`} aria-pressed={stabMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
                     ))}
                   </div>
                 </div>
@@ -1795,7 +1795,7 @@ const VinxEditor: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Crop Mode</span>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {['Auto', 'Stabilize Only', 'Smooth'].map(m => (
-                      <button key={m} onClick={() => setStabCropMode(m)} aria-label={`Stabilization crop mode: ${m}`} aria-pressed={stabCropMode === m} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabCropMode === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                      <button key={m} onClick={() => setStabCropMode(m)} aria-label={`Stabilization crop mode: ${m}`} aria-pressed={stabCropMode === m} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabCropMode === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
                     ))}
                   </div>
                 </div>
@@ -1806,7 +1806,7 @@ const VinxEditor: React.FC = () => {
                   </div>
                   <input type="range" min="0" max="100" value={stabRollingShutter} onChange={e => setStabRollingShutter(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
                 </div>
-                <button onClick={() => { if (selectedClipIds.length > 0) setClipStabilization(selectedClipIds[0], { enabled: true, smoothness: stabSmoothness, method: stabMethod.toLowerCase().replace('+', '_') as any, cropMode: stabCropMode.toLowerCase().replace(' ', '_') as any, rollingShutter: stabRollingShutter }); }} aria-label="Apply stabilization" style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stabilization</button>
+                <button onClick={() => { if (selectedClipIds.length > 0) setClipStabilization(selectedClipIds[0], { enabled: true, smoothness: stabSmoothness, method: stabMethod.toLowerCase().replace('+', '_') as any, cropMode: stabCropMode.toLowerCase().replace(' ', '_') as any, rollingShutter: stabRollingShutter }); }} aria-label="Apply stabilization" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stabilization</button>
               </>
             )}
           </div>
@@ -1815,7 +1815,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Noise Reduction Panel */}
       {showNoiseReductionPanel && (
-        <div style={{ position: 'absolute', right: 12, top: 'min(380px, 40%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 12, top: 'min(380px, 40%)', bottom: 12, width: 'min(260px, calc(100% - 24px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Noise Reduction</span>
             <button aria-label="Close Noise Reduction panel" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleNoiseReductionPanel}><DexIcon name="close" size={14} /></button>
@@ -1829,7 +1829,7 @@ const VinxEditor: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Method</span>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {['Temporal', 'Spatial', 'Combined'].map(m => (
-                      <button key={m} onClick={() => setNrMethod(m)} aria-label={`Noise reduction method: ${m}`} aria-pressed={nrMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: nrMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                      <button key={m} onClick={() => setNrMethod(m)} aria-label={`Noise reduction method: ${m}`} aria-pressed={nrMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: nrMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
                     ))}
                   </div>
                 </div>
@@ -1846,7 +1846,7 @@ const VinxEditor: React.FC = () => {
                     <input type="range" min="0" max="100" value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
                   </div>
                 ))}
-                <button onClick={() => { if (selectedClipIds.length > 0) setClipNoiseReduction(selectedClipIds[0], { enabled: true, temporalStrength: nrTemporal, spatialStrength: nrSpatial, detailPreservation: nrDetail, method: nrMethod.toLowerCase() as any }); }} aria-label="Apply noise reduction" style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Noise Reduction</button>
+                <button onClick={() => { if (selectedClipIds.length > 0) setClipNoiseReduction(selectedClipIds[0], { enabled: true, temporalStrength: nrTemporal, spatialStrength: nrSpatial, detailPreservation: nrDetail, method: nrMethod.toLowerCase() as any }); }} aria-label="Apply noise reduction" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Noise Reduction</button>
               </>
             )}
           </div>
@@ -1855,11 +1855,11 @@ const VinxEditor: React.FC = () => {
 
       {/* Marker Manager Panel */}
       {showMarkerManager && (
-        <div style={{ position: 'absolute', left: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', left: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Markers</span>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button aria-label="Add marker at playhead" style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 4, padding: '2px 8px', fontSize: 11 }} onClick={() => addMarker(currentFrame, `Marker ${project.markers.length + 1}`)}>+ Add</button>
+              <button aria-label="Add marker at playhead" style={{ ...toolbarBtnStyle, background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', borderRadius: 3, padding: '2px 8px', fontSize: 11 }} onClick={() => addMarker(currentFrame, `Marker ${project.markers.length + 1}`)}>+ Add</button>
               <button aria-label="Close Marker Manager" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleMarkerManager}><DexIcon name="close" size={14} /></button>
             </div>
           </div>
@@ -1875,8 +1875,8 @@ const VinxEditor: React.FC = () => {
                     updateMarker(m.id, { color: colors[(idx + 1) % colors.length] });
                   }} />
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 70 }}>{formatTimecode(m.frame, project.frameRate)}</span>
-                  <input value={m.name} onChange={e => updateMarker(m.id, { name: e.target.value })} style={{ flex: 1, padding: '2px 4px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, minWidth: 0 }} />
-                  <select value={m.type} onChange={e => updateMarker(m.id, { type: e.target.value as any })} style={{ padding: '2px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: '#1a1a1a', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                  <input value={m.name} onChange={e => updateMarker(m.id, { name: e.target.value })} style={{ flex: 1, padding: '2px 4px', borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, minWidth: 0 }} />
+                  <select value={m.type} onChange={e => updateMarker(m.id, { type: e.target.value as any })} style={{ padding: '2px', borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: '#1a1a1a', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                     <option value="standard">Standard</option>
                     <option value="chapter">Chapter</option>
                     <option value="todo">To-Do</option>
@@ -1892,13 +1892,13 @@ const VinxEditor: React.FC = () => {
 
       {/* Audio EQ Panel */}
       {showAudioEQ && (
-        <div style={{ position: 'absolute', left: 'min(280px, 35%)', bottom: 60, width: 'min(300px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', left: 'min(280px, 35%)', bottom: 60, width: 'min(300px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>5-Band EQ</span>
             <button aria-label="Close Audio EQ" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAudioEQ}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 12 }}>
-            <div style={{ display: 'flex', gap: 6, height: 140, alignItems: 'flex-end', justifyContent: 'center', marginBottom: 8, background: 'var(--color-border-subtle)', borderRadius: 8, padding: '12px 8px' }}>
+            <div style={{ display: 'flex', gap: 6, height: 140, alignItems: 'flex-end', justifyContent: 'center', marginBottom: 8, background: 'var(--color-border-subtle)', borderRadius: 6, padding: '12px 8px' }}>
               {[
                 { freq: '80', label: 'Low', idx: 0 },
                 { freq: '250', label: 'Lo-Mid', idx: 1 },
@@ -1921,7 +1921,7 @@ const VinxEditor: React.FC = () => {
                 { name: 'Bass Boost', bands: [6,4,0,-1,-2,0] },
                 { name: 'High Cut', bands: [0,0,0,-4,-8,0] },
               ].map(preset => (
-                <button key={preset.name} onClick={() => { setEqPreset(preset.name); setEqBands(preset.bands); }} aria-label={`EQ preset: ${preset.name}`} aria-pressed={eqPreset === preset.name} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === preset.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{preset.name}</button>
+                <button key={preset.name} onClick={() => { setEqPreset(preset.name); setEqBands(preset.bands); }} aria-label={`EQ preset: ${preset.name}`} aria-pressed={eqPreset === preset.name} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === preset.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{preset.name}</button>
               ))}
             </div>
           </div>
@@ -1930,7 +1930,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Snap Settings Panel */}
       {showSnapSettings && (
-        <div style={{ position: 'absolute', right: 'min(200px, 30%)', top: 84, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
+        <div style={{ position: 'absolute', right: 'min(200px, 30%)', top: 84, width: 'min(220px, calc(100% - 24px))', maxHeight: 'min(420px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Snap Settings</span>
             <button aria-label="Close Snap Settings" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleSnapSettings}><DexIcon name="close" size={14} /></button>
@@ -1961,7 +1961,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Background Render Queue Panel */}
       {showBackgroundRender && (
-        <div style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', right: 12, bottom: 60, width: 'min(320px, calc(100% - 24px))', maxHeight: 'min(400px, calc(100% - 84px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Render Queue</span>
             <button aria-label="Close Render Queue" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleBackgroundRender}><DexIcon name="close" size={14} /></button>
@@ -1971,7 +1971,7 @@ const VinxEditor: React.FC = () => {
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No render jobs queued. Export will add jobs here.</div>
             ) : (
               backgroundRenderQueue.map(job => (
-                <div key={job.id} style={{ padding: 8, borderRadius: 6, background: 'var(--color-border-subtle)', marginBottom: 4 }}>
+                <div key={job.id} style={{ padding: 8, borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{job.filename}</span>
                     <span style={{ fontSize: 11, color: job.status === 'complete' ? 'var(--color-success)' : job.status === 'encoding' ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{job.status}</span>
@@ -1991,7 +1991,7 @@ const VinxEditor: React.FC = () => {
         const clip = getClipById(selectedClipIds[0]);
         if (!clip) return null;
         return (
-          <div style={{ position: 'absolute', right: 12, top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(500px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflowY: 'auto' }}>
+          <div style={{ position: 'absolute', right: 12, top: 84, width: 'min(260px, calc(100% - 24px))', maxHeight: 'min(500px, calc(100% - 108px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', overflowY: 'auto' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clip Inspector</span>
               <button aria-label="Close Clip Inspector" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleClipInspector}><DexIcon name="close" size={14} /></button>
@@ -2020,7 +2020,7 @@ const VinxEditor: React.FC = () => {
                 </div>
               ))}
               <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
-                <input type="color" defaultValue={clip.color} onChange={e => setClipColor(clip.id, e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
+                <input type="color" defaultValue={clip.color} onChange={e => setClipColor(clip.id, e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 3, cursor: 'pointer' }} />
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', alignSelf: 'center' }}>Clip Color Label</span>
               </div>
             </div>
@@ -2030,7 +2030,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Auto-Color Match Panel */}
       {showAutoColorMatch && (
-        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 400, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 400, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Auto-Color Match</span>
             <button aria-label="Close Auto-Color Match" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleAutoColorMatch}><DexIcon name="close" size={14} /></button>
@@ -2039,14 +2039,14 @@ const VinxEditor: React.FC = () => {
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>SOURCE CLIP</div>
-                <div style={{ height: 80, borderRadius: 6, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>{selectedClipIds.length > 0 ? 'Selected' : 'None'}</div>
+                <div style={{ height: 80, borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>{selectedClipIds.length > 0 ? 'Selected' : 'None'}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', color: 'var(--color-text-tertiary)' }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 8h10M10 5l3 3-3 3" /></svg>
               </div>
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>REFERENCE</div>
-                <div style={{ height: 80, borderRadius: 6, border: '1px dashed var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Drop clip here</div>
+                <div style={{ height: 80, borderRadius: 4, border: '1px dashed var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Drop clip here</div>
               </div>
             </div>
             <button aria-label="Match colors" onClick={() => {
@@ -2068,7 +2068,7 @@ const VinxEditor: React.FC = () => {
               };
               useVinxStore.getState().updateClipColorCorrection?.(clipId, correction);
               toggleAutoColorMatch();
-            }} style={{ width: '100%', marginTop: 12, padding: '8px', borderRadius: 8, border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Match Colors</button>
+            }} style={{ width: '100%', marginTop: 12, padding: '8px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Match Colors</button>
           </div>
         </div>
       )}
@@ -2076,7 +2076,7 @@ const VinxEditor: React.FC = () => {
       {/* EDL/XML Export Panel */}
       {showEDLExport && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleEDLExport}>
-          <div style={{ width: 400, background: 'var(--color-bg-elevated)', borderRadius: 16, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ width: 400, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>EDL/XML Export</span>
               <button aria-label="Close EDL Export" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleEDLExport}><DexIcon name="close" size={14} /></button>
@@ -2117,7 +2117,7 @@ const VinxEditor: React.FC = () => {
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url; a.download = `${project.name}${f.ext}`; a.click();
                   URL.revokeObjectURL(url);
-                }} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
+                }} style={{ padding: '10px 14px', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ fontWeight: 600 }}>{f.format}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{f.desc}</div>
                 </button>
@@ -2130,7 +2130,7 @@ const VinxEditor: React.FC = () => {
       {/* Keyboard Shortcuts Editor */}
       {showShortcutsEditor && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleShortcutsEditor}>
-          <div style={{ width: 560, maxHeight: '80vh', background: 'var(--color-bg-elevated)', borderRadius: 16, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ width: 560, maxHeight: '80vh', background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Keyboard Shortcuts</span>
               <button aria-label="Close Shortcuts Editor" style={{ ...toolbarBtnStyle, fontSize: 16, padding: 4 }} onClick={toggleShortcutsEditor}><DexIcon name="close" size={14} /></button>
@@ -2147,7 +2147,7 @@ const VinxEditor: React.FC = () => {
                   {group.shortcuts.map(([key, action]) => (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{action}</span>
-                      <kbd style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'monospace' }}>{key}</kbd>
+                      <kbd style={{ padding: '2px 8px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'monospace' }}>{key}</kbd>
                     </div>
                   ))}
                 </div>
@@ -2159,7 +2159,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Timecode Overlay (HUD in viewer) */}
       {timecodeOverlayEnabled && (
-        <div style={{ position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)', padding: '4px 12px', background: 'rgba(0,0,0,0.7)', borderRadius: 6, fontSize: 14, fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', zIndex: 90, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)', padding: '4px 12px', background: 'rgba(0,0,0,0.7)', borderRadius: 4, fontSize: 14, fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', zIndex: 90, pointerEvents: 'none' }}>
           {formatTimecode(currentFrame, project.frameRate)}
         </div>
       )}
@@ -2176,10 +2176,10 @@ const VinxEditor: React.FC = () => {
           { label: 'Delete Clip', fn: () => _removeClip(ctxMenu.clipId!), danger: true },
         ];
         return (
-          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-context-menu)', minWidth: 170, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-context-menu)', minWidth: 170, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 8px' }} />
-              : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? 'var(--color-text-disabled)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>
+              : <div key={i} className="vinx-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? 'var(--color-text-disabled)' : item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );

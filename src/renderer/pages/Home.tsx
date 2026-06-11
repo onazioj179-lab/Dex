@@ -124,7 +124,7 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
         gap: 6,
         padding: '8px 6px',
         border: '1px solid transparent',
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'transparent',
         color: '#fff',
         cursor: 'grab',
@@ -141,7 +141,7 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
       <span style={{
         width: 42,
         height: 42,
-        borderRadius: 10,
+        borderRadius: 8,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -232,7 +232,7 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
         gap: 6,
         padding: '8px 6px',
         border: '1px solid transparent',
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'transparent',
         color: '#fff',
         cursor: 'grab',
@@ -249,7 +249,7 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
       <span style={{
         width: 46,
         height: 46,
-        borderRadius: 12,
+        borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -259,7 +259,7 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
         overflow: 'hidden',
       }}>
         {png
-          ? <img src={png} alt="" draggable={false} style={{ width: 46, height: 46, borderRadius: 12, objectFit: 'cover' }} />
+          ? <img src={png} alt="" draggable={false} style={{ width: 46, height: 46, borderRadius: 10, objectFit: 'cover' }} />
           : <DexIcon name={def.icon as any} size={24} color="currentColor" />}
       </span>
       <span style={{
@@ -317,7 +317,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
             placeholder="Search apps"
             aria-label="Filter apps"
             style={{
-              width: '100%', padding: '8px 12px', borderRadius: 10,
+              width: '100%', padding: '8px 12px', borderRadius: 8,
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
@@ -338,7 +338,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
                   aria-label={pinned ? `${def.name} already pinned` : `Pin ${def.name}`}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                    padding: '10px 6px', borderRadius: 10,
+                    padding: '10px 6px', borderRadius: 8,
                     background: 'transparent',
                     border: '1px solid transparent',
                     color: 'var(--color-text-primary)', fontSize: 11,
@@ -347,14 +347,14 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
                   }}
                 >
                   <span style={{
-                    width: 40, height: 40, borderRadius: 10,
+                    width: 40, height: 40, borderRadius: 8,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: png ? 'transparent' : `linear-gradient(135deg, ${def.color}, ${def.color}cc)`,
                     boxShadow: png ? 'none' : '0 3px 10px rgba(0,0,0,0.28)',
                     color: '#fff', overflow: 'hidden',
                   }}>
                     {png
-                      ? <img src={png} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover' }} />
+                      ? <img src={png} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} />
                       : <DexIcon name={def.icon as any} size={22} color="currentColor" />}
                   </span>
                   <span style={{ width: '100%', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def.name}</span>
@@ -680,7 +680,7 @@ export const Home: React.FC = () => {
                     backdropFilter: 'var(--blur-xl) saturate(180%)',
                     WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
                     border: '1px solid rgba(255,255,255,0.10)',
-                    borderRadius: 16, cursor: 'pointer',
+                    borderRadius: 12, cursor: 'pointer',
                     color: 'var(--color-text-primary)', fontSize: 12,
                     textAlign: 'left',
                     boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
@@ -757,7 +757,7 @@ export const Home: React.FC = () => {
               position: 'fixed', left: Math.min(ctxMenu.x, window.innerWidth - 220), top: Math.min(ctxMenu.y, window.innerHeight - 420),
               zIndex: Z_CONTEXT_MENU, minWidth: 200, padding: '5px 0',
               background: 'var(--color-bg-elevated)',
-              borderRadius: 12, border: '1px solid var(--color-border-subtle)',
+              borderRadius: 10, border: '1px solid var(--color-border-subtle)',
               boxShadow: 'var(--pg-shadow-context), 0 0 0 0.5px rgba(255,255,255,0.04)',
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
@@ -790,7 +790,7 @@ export const Home: React.FC = () => {
                     background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13,
                     textAlign: 'left', cursor: 'pointer',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     transition: 'background 0.12s ease',
                   }}
                 >
@@ -849,7 +849,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: 0 }}>Wallpaper</h2>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose a desktop background</p>
             </div>
-            <button onClick={onClose} aria-label="Close wallpaper picker" className="dex-hover-bg" style={{ background: 'var(--color-border-subtle)', border: 'none', borderRadius: 8, width: 28, height: 28, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
+            <button onClick={onClose} aria-label="Close wallpaper picker" className="dex-hover-bg" style={{ background: 'var(--color-border-subtle)', border: 'none', borderRadius: 6, width: 28, height: 28, color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -875,7 +875,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       title={p.name}
                       className="dex-hover-lift"
                       style={{
-                        width: '100%', aspectRatio: '16/10', borderRadius: 10,
+                        width: '100%', aspectRatio: '16/10', borderRadius: 8,
                         background: bg,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
@@ -892,7 +892,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                         </div>
                       )}
                       {p.mode === 'live' && (
-                        <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
+                        <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
                       )}
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}
@@ -922,7 +922,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             onClick={handleFileSelect}
             className="dex-hover-bg"
             style={{
-              width: '100%', height: 52, borderRadius: 10,
+              width: '100%', height: 52, borderRadius: 8,
               background: 'var(--color-border-subtle)',
               border: presetId === 'custom' ? '2px solid #0a84ff' : '2px solid var(--color-bg-hover)',
               cursor: 'pointer',
@@ -1013,7 +1013,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
           backdrop-filter: var(--blur-xl) saturate(180%);
           -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
           border: 1px solid rgba(255,255,255,0.10);
-          border-radius: 18px;
+          border-radius: 14px;
           cursor: pointer;
           box-shadow: 0 8px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.10);
           transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
@@ -1058,7 +1058,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
             style={{ animationDelay: `${i * 0.04}s` }}
           >
             {APP_ICON_PNGS[app.id] ? (
-              <img src={APP_ICON_PNGS[app.id]} alt="" style={{ width: 42, height: 42, borderRadius: 8 }} />
+              <img src={APP_ICON_PNGS[app.id]} alt="" style={{ width: 42, height: 42, borderRadius: 6 }} />
             ) : (
               <DexIcon name={app.icon} size={42} color="rgba(255,255,255,0.9)" />
             )}
@@ -1081,7 +1081,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
               minWidth: 180,
               padding: '6px 0',
               background: 'rgba(28, 28, 32, 0.95)',
-              borderRadius: 12,
+              borderRadius: 10,
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
               backdropFilter: 'var(--blur-lg) saturate(180%)',
@@ -1096,7 +1096,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px',
                   background: 'transparent', border: 'none', color: '#FF453A', fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                  borderRadius: 6, margin: '0 4px', transition: 'all 0.1s ease',
+                  borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.15)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'translateX(0)'; }}
@@ -1116,7 +1116,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8, width: 'calc(100% - 8px)', padding: '8px 14px',
                         background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                        borderRadius: 6, margin: '0 4px', transition: 'all 0.1s ease',
+                        borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(10,132,255,0.15)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = 'translateX(0)'; }}
@@ -1144,7 +1144,7 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
   return (
     <div className="dex-hover-card" style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 14px', borderRadius: 16,
+      padding: '10px 14px', borderRadius: 12,
       background: 'rgba(255,255,255,0.06)',
       backdropFilter: 'var(--blur-xl) saturate(180%)',
       WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',

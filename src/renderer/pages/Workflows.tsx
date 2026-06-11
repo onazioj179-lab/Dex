@@ -428,7 +428,7 @@ const WorkflowNodeCard: React.FC<{
         <div
           onMouseDown={(e) => { e.stopPropagation(); onSelect(); onDragStart(e); }}
           style={{
-            width: NODE_WIDTH, height: NODE_HEIGHT, borderRadius: 14,
+            width: NODE_WIDTH, height: NODE_HEIGHT, borderRadius: 10,
             background: 'var(--color-bg-elevated)',
             border: `1.5px solid ${borderColor}`,
             display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px',
@@ -436,7 +436,7 @@ const WorkflowNodeCard: React.FC<{
             boxShadow: selected ? '0 0 0 2px rgba(10,132,255,0.25)' : 'none',
           }}
         >
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
             {catIcon}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -903,7 +903,7 @@ export const Workflows: React.FC = () => {
                 </div>
               ) : filteredWorkflows.length === 0 ? (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' as const }}>
-                  <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(45deg)' }}>
+                  <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(45deg)' }}>
                     <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-text-muted)' }}><DexIcon name="zap" size={24} /></span>
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '16px', color: 'var(--color-text-primary)' }}>
@@ -1001,7 +1001,7 @@ export const Workflows: React.FC = () => {
               <div style={styles.canvasContainer}>
                 {nodes.length === 0 ? (
                   <div style={styles.emptyEditor}>
-                    <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(45deg)' }}>
+                    <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(45deg)' }}>
                       <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-accent)' }}><DexIcon name="zap" size={24} /></span>
                     </div>
                     <span style={{ fontSize: 16, fontWeight: 600, marginTop: 16 }}>Add actions to build your workflow</span>
@@ -1208,7 +1208,7 @@ const styles: Record<string, React.CSSProperties> = {
   sidebarTitle: { fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' },
   sidebarContent: { flex: 1, overflow: 'auto', padding: '8px' },
   sidebarItem: {
-    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '6px',
+    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '4px',
     border: 'none', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left',
     background: 'transparent', color: 'var(--color-text-primary)',
   },
@@ -1232,7 +1232,7 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: { fontSize: '12px', color: 'var(--color-text-muted)' },
   searchBox: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
-    background: 'var(--color-border-subtle)', borderRadius: '8px', color: 'var(--color-text-muted)',
+    background: 'var(--color-border-subtle)', borderRadius: '6px', color: 'var(--color-text-muted)',
     minWidth: 150, flexShrink: 0,
   },
   searchInput: {
@@ -1240,7 +1240,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px', outline: 'none', width: '150px', minWidth: 0,
   },
   createBtn: {
-    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px',
+    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '6px',
     border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   },
@@ -1250,18 +1250,18 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '16px', alignContent: 'start',
   },
   workflowCard: {
-    background: 'var(--color-bg-elevated)', borderRadius: '8px', padding: '20px',
+    background: 'var(--color-bg-elevated)', borderRadius: '6px', padding: '20px',
     display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0,
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardIcon: {
-    width: '48px', height: '48px', borderRadius: '12px',
+    width: '48px', height: '48px', borderRadius: '10px',
     display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
   },
   cardActions: { display: 'flex', gap: '4px' },
   cardActionBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: '28px', height: '28px', borderRadius: '6px', border: 'none',
+    width: '28px', height: '28px', borderRadius: '4px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', cursor: 'pointer',
   },
   cardTitle: { fontSize: '16px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -1285,7 +1285,7 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 0, overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
   backBtn: {
-    padding: '6px 12px', borderRadius: '6px', border: 'none',
+    padding: '6px 12px', borderRadius: '4px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-accent)',
     cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 4,
     whiteSpace: 'nowrap', flexShrink: 0,
@@ -1298,13 +1298,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
   },
   runEditorBtn: {
-    padding: '6px 14px', borderRadius: '8px', border: 'none',
+    padding: '6px 14px', borderRadius: '6px', border: 'none',
     background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
     whiteSpace: 'nowrap', flexShrink: 0,
   },
   saveBtn: {
-    padding: '6px 14px', borderRadius: '8px', border: 'none',
+    padding: '6px 14px', borderRadius: '6px', border: 'none',
     background: 'var(--color-success, #30d158)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
     whiteSpace: 'nowrap', flexShrink: 0,
@@ -1312,13 +1312,13 @@ const styles: Record<string, React.CSSProperties> = {
   templatesPanel: {
     position: 'absolute' as const, top: 52, right: 16, zIndex: 'var(--z-modal)',
     background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border)', borderRadius: 12,
+    border: '1px solid var(--color-border)', borderRadius: 10,
     padding: 16, width: 'min(280px, calc(100% - 32px))', maxHeight: 'min(420px, calc(100% - 68px))',
     overflow: 'auto', boxShadow: 'var(--pg-shadow-panel)', boxSizing: 'border-box' as const,
   },
   templateCard: {
     display: 'block', width: '100%', textAlign: 'left' as const, padding: '10px 12px',
-    borderRadius: 8, border: 'none', background: 'var(--color-border-subtle)',
+    borderRadius: 6, border: 'none', background: 'var(--color-border-subtle)',
     cursor: 'pointer', marginBottom: 6,
   },
   editorContent: { flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' as const },
@@ -1340,12 +1340,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   configPanel: { padding: 16, overflowY: 'auto' as const, flex: 1 },
   configInput: {
-    width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--color-border)',
+    width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
     boxSizing: 'border-box' as const,
   },
   configSelect: {
-    width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--color-border)',
+    width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
     boxSizing: 'border-box' as const,
   },
@@ -1354,7 +1354,7 @@ const styles: Record<string, React.CSSProperties> = {
   libraryTitle: { fontSize: '14px', fontWeight: 600 },
   actionSearchBox: {
     display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-    borderRadius: 8, background: 'var(--color-border-subtle)',
+    borderRadius: 6, background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-muted)',
   },
   actionSearchInput: {
@@ -1364,7 +1364,7 @@ const styles: Record<string, React.CSSProperties> = {
   actionList: { flex: 1, overflow: 'auto', padding: '8px' },
   actionItem: {
     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-    borderRadius: '8px', cursor: 'pointer', marginBottom: '4px',
+    borderRadius: '6px', cursor: 'pointer', marginBottom: '4px',
     background: 'var(--color-bg-elevated)', border: 'none', width: '100%',
     textAlign: 'left' as const, color: 'var(--color-text-primary)', minWidth: 0,
   },

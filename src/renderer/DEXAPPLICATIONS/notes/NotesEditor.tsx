@@ -40,6 +40,12 @@ interface NotesEditorProps {
   editorMode: 'edit' | 'preview' | 'split';
   focusMode?: boolean;
   placeholder?: string;
+  /** Existing note titles, used to power [[wiki-link]] autocomplete. */
+  noteTitles?: string[];
+  /** Invoked when a rendered [[wiki-link]] is clicked, with the target title. */
+  onWikiLinkClick?: (title: string) => void;
+  /** Invoked when files are dropped onto the editor, to add them as attachments. */
+  onDropFiles?: (files: FileList) => void;
 }
 
 interface ToolbarAction {
@@ -172,7 +178,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
-    borderRadius: 4,
+    borderRadius: 3,
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
@@ -256,7 +262,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '0 10px',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'transparent',
     color: 'var(--color-accent)',
     fontSize: 12,
@@ -275,6 +281,56 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap' as const,
     maxWidth: '60%',
   },
+  dropOverlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(100,210,255,0.08)',
+    border: '2px dashed rgba(100,210,255,0.6)',
+    borderRadius: 'var(--radius-md, 8px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+    zIndex: 5,
+  },
+  dropOverlayInner: {
+    padding: '8px 16px',
+    borderRadius: 'var(--radius-sm, 6px)',
+    background: 'rgba(0,0,0,0.55)',
+    color: '#64d2ff',
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  // [[wiki-link]] popup -- mirrors the WordSuggestions SuggestionBar styling.
+  wikiPopup: {
+    position: 'fixed',
+    zIndex: 'var(--z-tooltip)' as unknown as number,
+    display: 'flex',
+    flexDirection: 'column',
+    background: 'rgba(30,30,30,0.97)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-sm, 4px)',
+    padding: '4px 0',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
+    minWidth: 160,
+    maxWidth: 320,
+    maxHeight: 240,
+    overflow: 'auto',
+  },
+  wikiItem: {
+    padding: '6px 12px',
+    fontSize: 13,
+    color: 'var(--color-text-primary)',
+    cursor: 'pointer',
+    transition: 'background 0.1s',
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  wikiItemActive: {
+    background: 'rgba(191,90,242,0.18)',
+    color: 'var(--color-text-primary)',
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -289,6 +345,9 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   editorMode,
   focusMode = false,
   placeholder = 'Start writing...',
+  noteTitles = [],
+  onWikiLinkClick,
+  onDropFiles,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const undoMgr = useRef(new UndoManager(200));
@@ -300,6 +359,15 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   const [wdCount, setWdCount] = useState(0);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // -- [[wiki-link]] autocomplete state --------------------------------------
+  // Mirrors the WordSuggestions popup mechanics: a caret-anchored list that
+  // appears once the user opens "[[" and filters note titles by what follows.
+  const [wikiOpen, setWikiOpen] = useState(false);
+  const [wikiQuery, setWikiQuery] = useState('');
+  const [wikiPos, setWikiPos] = useState({ top: 0, left: 0 });
+  const [wikiActive, setWikiActive] = useState(0);
 
   // Feed uki's app-context registry: answer "what note is open?" (first line as
   // a title + the live selection) so the assistant is aware of the active note.
@@ -399,6 +467,73 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     editorRef.current?.focus();
     emitChange();
   }, [pushUndo, emitChange]);
+
+  // -- [[wiki-link]] autocomplete ----------------------------------------
+
+  const wikiMatches = React.useMemo(() => {
+    const q = wikiQuery.trim().toLowerCase();
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const t of noteTitles) {
+      const title = (t || '').trim();
+      if (!title) continue;
+      const key = title.toLowerCase();
+      if (seen.has(key)) continue;
+      if (q && !key.includes(q)) continue;
+      seen.add(key);
+      out.push(title);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [noteTitles, wikiQuery]);
+
+  const closeWiki = useCallback(() => {
+    setWikiOpen(false);
+    setWikiQuery('');
+    setWikiActive(0);
+  }, []);
+
+  // Inspect the text immediately before the caret for an open "[[query".
+  const detectWikiTrigger = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) { closeWiki(); return; }
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) { closeWiki(); return; }
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) { closeWiki(); return; }
+    const before = (node.textContent || '').slice(0, range.startOffset);
+    // Open "[[" with no closing "]]" between it and the caret, no newline.
+    const m = before.match(/\[\[([^\[\]\n]*)$/);
+    if (!m) { closeWiki(); return; }
+    setWikiQuery(m[1]);
+    setWikiActive(0);
+    setWikiOpen(true);
+    const rect = range.getBoundingClientRect();
+    setWikiPos({ top: rect.bottom + 4, left: rect.left });
+  }, [closeWiki]);
+
+  // Replace the open "[[query" before the caret with a finished "[[Title]]".
+  const insertWikiLink = useCallback((title: string) => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) { closeWiki(); return; }
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) { closeWiki(); return; }
+    const text = node.textContent || '';
+    const before = text.slice(0, range.startOffset);
+    const m = before.match(/\[\[([^\[\]\n]*)$/);
+    if (!m) { closeWiki(); return; }
+    pushUndo();
+    const start = range.startOffset - m[0].length;
+    const delRange = document.createRange();
+    delRange.setStart(node, Math.max(0, start));
+    delRange.setEnd(node, range.startOffset);
+    sel.removeAllRanges();
+    sel.addRange(delRange);
+    document.execCommand('insertText', false, `[[${title}]]`);
+    closeWiki();
+    emitChange();
+  }, [closeWiki, pushUndo, emitChange]);
 
   // -- uki AI writing actions --------------------------------------------
 
@@ -566,6 +701,30 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (readOnly) return;
 
+    // Wiki-link popup steals navigation keys while open.
+    if (wikiOpen && wikiMatches.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setWikiActive(i => Math.min(i + 1, wikiMatches.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setWikiActive(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertWikiLink(wikiMatches[wikiActive]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeWiki();
+        return;
+      }
+    }
+
     const ctrl = e.ctrlKey || e.metaKey;
 
     // Save
@@ -673,13 +832,14 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         }
       }
     }
-  }, [readOnly, exec, emitChange, onSave]);
+  }, [readOnly, exec, emitChange, onSave, wikiOpen, wikiMatches, wikiActive, insertWikiLink, closeWiki]);
 
   // -- Input Handler -----------------------------------------------------
 
   const handleInput = useCallback(() => {
     emitChange();
-  }, [emitChange]);
+    detectWikiTrigger();
+  }, [emitChange, detectWikiTrigger]);
 
   // -- Composition (IME) -------------------------------------------------
 
@@ -728,8 +888,19 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         li.setAttribute('data-checked', checked ? 'true' : 'false');
         emitChange();
       }
+      return;
     }
-  }, [emitChange]);
+    // Wiki-link navigation: Ctrl/Cmd-click (or plain click in preview) follows it.
+    const wiki = target.closest('a.wikilink') as HTMLElement | null;
+    if (wiki && onWikiLinkClick) {
+      const isPreview = !!target.closest('.dexnotes-preview');
+      if (isPreview || e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const title = wiki.getAttribute('data-wikilink') || wiki.textContent || '';
+        if (title.trim()) onWikiLinkClick(title.trim());
+      }
+    }
+  }, [emitChange, onWikiLinkClick]);
 
   // -- Render Preview ----------------------------------------------------
 
@@ -738,16 +909,37 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     return docToHTML(doc);
   }, []);
 
-  // -- Drop handler for attachments --------------------------------------
+  // -- Drag-drop attachments ---------------------------------------------
+  // A file dropped onto the editor becomes an attachment on the active note.
+  // dragOver/dragLeave drive a subtle drop-target highlight; text/html drags
+  // fall through to the browser's native handling untouched.
+
+  const hasFileDrag = useCallback((e: React.DragEvent) => {
+    const types = e.dataTransfer?.types;
+    return !!types && Array.from(types).includes('Files');
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (readOnly || !onDropFiles || !hasFileDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!isDragOver) setIsDragOver(true);
+  }, [readOnly, onDropFiles, hasFileDrag, isDragOver]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear when the cursor actually leaves the editor wrapper.
+    if (e.currentTarget === e.target) setIsDragOver(false);
+  }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    // Allow default text/html drops
+    if (readOnly || !onDropFiles) return;
     const files = e.dataTransfer.files;
-    if (files.length > 0) {
+    if (files && files.length > 0) {
       e.preventDefault();
-      // File drops handled by parent component
+      setIsDragOver(false);
+      onDropFiles(files);
     }
-  }, []);
+  }, [readOnly, onDropFiles]);
 
   // -- Render ------------------------------------------------------------
 
@@ -797,7 +989,12 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       )}
 
       {/* Editor + Preview */}
-      <div style={styles.editorWrap}>
+      <div
+        style={{ ...styles.editorWrap, position: 'relative' }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         {showEditor && (
           <div style={styles.editorArea}>
             <div style={{ position: 'relative' }}>
@@ -808,6 +1005,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 ref={editorRef}
                 contentEditable={!readOnly}
                 suppressContentEditableWarning
+                className="dexnotes-editable"
                 style={{
                   ...styles.editable,
                   ...(focusMode ? styles.focusModeEditable : {}),
@@ -816,7 +1014,6 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onClick={handleClick}
-                onDrop={handleDrop}
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 spellCheck
@@ -829,9 +1026,37 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
         {showPreview && (
           <div
+            className="dexnotes-preview"
             style={styles.preview}
+            onClick={handleClick}
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderPreview(content)) }}
           />
+        )}
+
+        {/* Drop-target highlight for dragged attachments */}
+        {isDragOver && (
+          <div style={styles.dropOverlay}>
+            <div style={styles.dropOverlayInner}>Drop file to attach</div>
+          </div>
+        )}
+
+        {/* [[wiki-link]] autocomplete popup */}
+        {wikiOpen && wikiMatches.length > 0 && (
+          <div style={{ ...styles.wikiPopup, top: wikiPos.top, left: wikiPos.left }}>
+            {wikiMatches.map((title, i) => (
+              <div
+                key={title}
+                style={{
+                  ...styles.wikiItem,
+                  ...(i === wikiActive ? styles.wikiItemActive : {}),
+                }}
+                onMouseDown={e => { e.preventDefault(); insertWikiLink(title); }}
+                onMouseEnter={() => setWikiActive(i)}
+              >
+                {title}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -884,7 +1109,7 @@ div[contenteditable] blockquote {
 }
 div[contenteditable] pre {
   background: rgba(0,0,0,0.3);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 12px 16px;
   margin: 12px 0;
   overflow-x: auto;
@@ -896,7 +1121,7 @@ div[contenteditable] pre {
 div[contenteditable] code {
   background: rgba(100,210,255,0.08);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 2px;
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 13px;
   color: #64d2ff;
@@ -925,6 +1150,16 @@ div[contenteditable] a {
 div[contenteditable] a:hover {
   text-decoration: underline;
 }
+a.wikilink, .dexnotes-preview a.wikilink {
+  color: #bf5af2;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(191,90,242,0.5);
+  cursor: pointer;
+}
+a.wikilink:hover {
+  border-bottom-color: #bf5af2;
+  background: rgba(191,90,242,0.1);
+}
 div[contenteditable] ul, div[contenteditable] ol {
   padding-left: 24px;
   margin: 8px 0;
@@ -948,7 +1183,7 @@ div[contenteditable] th {
 }
 div[contenteditable] img {
   max-width: 100%;
-  border-radius: 6px;
+  border-radius: 4px;
   margin: 8px 0;
 }
 `;

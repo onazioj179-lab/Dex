@@ -193,7 +193,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px 12px', borderRadius: 8, border: 'none',
+    padding: '6px 12px', borderRadius: 6, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', whiteSpace: 'nowrap',
@@ -211,20 +211,20 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', display: 'flex', flexDirection: 'column', gap: 8,
   },
   select: {
-    width: '100%', padding: '10px 12px', borderRadius: 10,
+    width: '100%', padding: '10px 12px', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500,
     cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-family)',
   },
   input: {
-    width: '100%', padding: '14px 16px', borderRadius: 12,
+    width: '100%', padding: '14px 16px', borderRadius: 10,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 300,
     outline: 'none', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   resultDisplay: {
-    width: '100%', padding: '14px 16px', borderRadius: 12,
+    width: '100%', padding: '14px 16px', borderRadius: 10,
     background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-light)',
     color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',

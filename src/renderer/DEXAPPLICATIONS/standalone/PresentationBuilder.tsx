@@ -222,7 +222,7 @@ const PresentationBuilder: React.FC = () => {
     <div
       style={{
         position: 'relative', width: CANVAS_W * scale, height: CANVAS_H * scale,
-        background: slide.background, overflow: 'hidden', borderRadius: 8 * scale,
+        background: slide.background, overflow: 'hidden', borderRadius: 6 * scale,
       }}
       onClick={interactive ? () => setSelectedBlockId(null) : undefined}
     >
@@ -256,7 +256,7 @@ const PresentationBuilder: React.FC = () => {
           return (
             <div
               key={b.id}
-              style={{ ...common, background: b.style.background ?? '#5E5CE6', borderRadius: 6 * scale }}
+              style={{ ...common, background: b.style.background ?? '#5E5CE6', borderRadius: 4 * scale }}
               onMouseDown={interactive ? (e) => onBlockMouseDown(e, b) : undefined}
             />
           );
@@ -357,12 +357,12 @@ const PresentationBuilder: React.FC = () => {
               }}
               onClick={() => { setCurrentIdx(idx); setSelectedBlockId(null); }}
               style={{
-                position: 'relative', cursor: 'pointer', borderRadius: 6,
+                position: 'relative', cursor: 'pointer', borderRadius: 4,
                 padding: 4, border: idx === currentIdx ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                 background: dragOverIdx === idx ? 'var(--color-bg-hover)' : 'transparent',
               }}
             >
-              <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 4 }}>
+              <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 3 }}>
                 {renderSlide(s, 0.18)}
               </div>
               <div style={{
@@ -419,7 +419,7 @@ const PresentationBuilder: React.FC = () => {
               type="color"
               value={currentSlide?.background ?? '#000000'}
               onChange={e => updateCurrentSlide(s => ({ ...s, background: e.target.value }))}
-              style={{ width: '100%', height: 32, border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer' }}
+              style={{ width: '100%', height: 32, border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer' }}
             />
           </label>
           <label style={fieldLabel}>
@@ -465,7 +465,7 @@ const PresentationBuilder: React.FC = () => {
                       type="color"
                       value={selectedBlock.style.color ?? '#ffffff'}
                       onChange={e => updateBlock(selectedBlock.id, { style: { color: e.target.value } })}
-                      style={{ width: '100%', height: 32, border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer' }}
+                      style={{ width: '100%', height: 32, border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer' }}
                     />
                   </label>
                 </>
@@ -477,7 +477,7 @@ const PresentationBuilder: React.FC = () => {
                     type="color"
                     value={selectedBlock.style.background ?? '#5E5CE6'}
                     onChange={e => updateBlock(selectedBlock.id, { style: { background: e.target.value } })}
-                    style={{ width: '100%', height: 32, border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer' }}
+                    style={{ width: '100%', height: 32, border: 'none', borderRadius: 4, background: 'transparent', cursor: 'pointer' }}
                   />
                 </label>
               )}
@@ -527,7 +527,7 @@ const PresentationBuilder: React.FC = () => {
 
 const toolbarBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '6px 12px', borderRadius: 8, fontSize: 12,
+  padding: '6px 12px', borderRadius: 6, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
@@ -537,7 +537,7 @@ const fieldLabel: React.CSSProperties = {
 };
 
 const fieldInput: React.CSSProperties = {
-  padding: '6px 8px', borderRadius: 6, fontSize: 12,
+  padding: '6px 8px', borderRadius: 4, fontSize: 12,
   background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)',
 };

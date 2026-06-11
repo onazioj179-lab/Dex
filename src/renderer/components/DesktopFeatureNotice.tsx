@@ -44,7 +44,7 @@ export const DesktopFeatureNotice: React.FC<Props> = ({ feature, namespace, chil
         gap: 12,
         padding: '14px 16px',
         margin: 12,
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'var(--pg-surface, rgba(255,255,255,0.04))',
         border: '1px solid var(--color-border, rgba(255,255,255,0.10))',
         color: 'var(--color-text-primary)',

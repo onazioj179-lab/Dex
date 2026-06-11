@@ -479,7 +479,7 @@ const TaskManager: React.FC = () => {
                 <div
                   key={stage.id}
                   style={{
-                    flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 10,
+                    flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 8,
                     border: '1px solid ' + (isActive ? 'rgba(74,158,255,0.42)' : 'var(--color-border-subtle)'),
                     background: isActive ? 'rgba(74,158,255,0.06)' : 'rgba(255,255,255,0.03)',
                   }}
@@ -495,7 +495,7 @@ const TaskManager: React.FC = () => {
                     ) : stageApps.map(appId => {
                       const def = APP_DEFINITIONS[appId];
                       return (
-                        <span key={appId} title={def?.name || appId} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', fontSize: 11 }}>
+                        <span key={appId} title={def?.name || appId} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', fontSize: 11 }}>
                           <DexIcon name={def?.icon || appId} size={11} color="#fff" strokeWidth={2.2} />
                           {def?.name || appId}
                         </span>
@@ -539,7 +539,7 @@ const TaskManager: React.FC = () => {
                     onChange={(e) => setGovernance(prev => ({ ...prev, [app.id]: e.target.value as GovernanceClass }))}
                     aria-label={`Set governance for ${definition?.name || app.name}`}
                     title="Process governance class"
-                    style={{ height: 28, borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', fontSize: 11, padding: '0 6px' }}
+                    style={{ height: 28, borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', fontSize: 11, padding: '0 6px' }}
                   >
                     {(Object.keys(GOVERNANCE_LABEL) as GovernanceClass[]).map(g => (
                       <option key={g} value={g}>{GOVERNANCE_LABEL[g]}</option>
@@ -616,29 +616,29 @@ const styles: Record<string, React.CSSProperties> = {
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   titleWrap: { display: 'flex', alignItems: 'center', gap: 10 },
-  titleIcon: { width: 34, height: 34, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', boxShadow: '0 8px 22px rgba(10,132,255,0.28)' },
+  titleIcon: { width: 34, height: 34, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', boxShadow: '0 8px 22px rgba(10,132,255,0.28)' },
   title: { margin: 0, fontSize: 18, fontWeight: 750, letterSpacing: 0 },
   subtitle: { fontSize: 12, color: 'var(--color-text-secondary)' },
-  refreshButton: { display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', cursor: 'pointer' },
+  refreshButton: { display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', cursor: 'pointer' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  statCard: { padding: 14, borderRadius: 14, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 4 },
+  statCard: { padding: 14, borderRadius: 10, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 4 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   statValue: { fontSize: 24, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
   sparkWrap: { marginTop: 6, height: 46 },
   contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 12 },
-  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-chip), var(--pg-gloss-top)' },
+  panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-chip), var(--pg-gloss-top)' },
   panelHeader: { height: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 12px', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 700 },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
   list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 },
-  appRow: { display: 'flex', alignItems: 'center', gap: 9, padding: 9, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)' },
-  appGlyph: { width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', color: '#fff', flexShrink: 0, boxShadow: '0 6px 18px rgba(10,132,255,0.24)' },
+  appRow: { display: 'flex', alignItems: 'center', gap: 9, padding: 9, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)' },
+  appGlyph: { width: 32, height: 32, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', color: '#fff', flexShrink: 0, boxShadow: '0 6px 18px rgba(10,132,255,0.24)' },
   appMeta: { flex: 1, minWidth: 0 },
   appName: { fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   appDetail: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
-  ghostButton: { height: 28, padding: '0 9px', borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
-  endButton: { height: 28, padding: '0 9px', borderRadius: 7, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: '#FF8A82', cursor: 'pointer' },
-  filterInput: { width: 150, height: 28, borderRadius: 7, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
+  ghostButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
+  endButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: '#FF8A82', cursor: 'pointer' },
+  filterInput: { width: 150, height: 28, borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
   processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },
   processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12 },

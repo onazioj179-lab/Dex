@@ -728,7 +728,7 @@ export function injectScrollbarStyles(): void {
     }
     .dex-scroll::-webkit-scrollbar-thumb {
       background: transparent;
-      border-radius: 3px;
+      border-radius: 2px;
       transition: background 0.3s;
     }
     .dex-scroll:hover::-webkit-scrollbar-thumb,
@@ -801,7 +801,7 @@ export function injectScrollbarStyles(): void {
       font-size: 10px;
       line-height: 1.4;
       padding: 6px 10px;
-      border-radius: 6px;
+      border-radius: 4px;
       background: rgba(0,0,0,0.75);
       color: #30d158;
       backdrop-filter: var(--blur-md);

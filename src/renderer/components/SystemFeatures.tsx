@@ -97,7 +97,7 @@ const SimpleToast: React.FC<ToastProps> = ({ notification, onClose }) => {
     <div style={{
       padding: '12px 16px',
       background: 'var(--color-bg-elevated, #2a2a2a)',
-      borderRadius: 8,
+      borderRadius: 6,
       boxShadow: 'var(--pg-shadow-tooltip)',
       borderLeft: `3px solid ${colors[notification.type]}`,
       minWidth: 280,
@@ -303,7 +303,7 @@ const launcherStyles: Record<string, React.CSSProperties> = {
     width: 520, maxWidth: '90vw',
     background: 'var(--color-bg-surface, rgba(30,30,30,0.92))',
     border: '1px solid var(--color-border-default, var(--color-border))',
-    borderRadius: 14,
+    borderRadius: 10,
     boxShadow: 'var(--pg-shadow-modal), 0 0 0 0.5px var(--color-bg-hover)',
     overflow: 'hidden',
   },
@@ -324,7 +324,7 @@ const launcherStyles: Record<string, React.CSSProperties> = {
     cursor: 'pointer', fontSize: 14, textAlign: 'left' as const,
   },
   appIcon: {
-    width: 28, height: 28, borderRadius: 7,
+    width: 28, height: 28, borderRadius: 5,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, fontWeight: 600, color: '#fff', flexShrink: 0,
   },
@@ -489,7 +489,7 @@ const ToastNotification: React.FC<ToastNotificationProps> = memo(({ notification
       style={{
         padding: '12px 16px',
         background: 'var(--color-bg-elevated, #2a2a2a)',
-        borderRadius: 8,
+        borderRadius: 6,
         boxShadow: 'var(--pg-shadow-tooltip)',
         borderLeft: `3px solid ${bgColor}`,
         maxWidth: 320,

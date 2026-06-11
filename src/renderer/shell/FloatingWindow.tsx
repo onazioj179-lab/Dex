@@ -180,7 +180,7 @@ export const SnapPreview: React.FC<{ zone: SnapZone | null }> = ({ zone }) => {
         top: bounds.y + 6,
         width: bounds.width - 12,
         height: bounds.height - 12,
-        borderRadius: 12,
+        borderRadius: 10,
         border: '2px solid var(--color-accent)',
         background: 'rgba(74,158,255,0.08)',
         boxShadow: '0 0 24px rgba(74,158,255,0.15)',
@@ -650,7 +650,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         {/* Edge glow */}
         {edgeGlow && !maximized && (
           <div style={{
-            position: 'absolute', inset: 0, borderRadius: 12, pointerEvents: 'none',
+            position: 'absolute', inset: 0, borderRadius: 10, pointerEvents: 'none',
             border: '1px solid var(--color-accent)',
             opacity: 0.4,
             zIndex: 2,
@@ -733,7 +733,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           left: sizeTooltip.x,
           top: sizeTooltip.y,
           padding: '4px 8px',
-          borderRadius: 6,
+          borderRadius: 4,
           background: 'rgba(0,0,0,0.80)',
           color: 'var(--color-text-primary)',
           fontSize: 11,

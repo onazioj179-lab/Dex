@@ -184,7 +184,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', gap: 4, padding: '16px 20px', flexShrink: 0,
   },
   phaseTab: {
-    padding: '6px 14px', borderRadius: 8, border: 'none',
+    padding: '6px 14px', borderRadius: 6, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',

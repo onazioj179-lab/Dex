@@ -52,7 +52,7 @@ export function useFileDrop(acceptTypes: string[], onFiles: (files: FileDropResu
     position: 'absolute', inset: 0, zIndex: 9999,
     background: 'rgba(10,132,255,0.15)',
     border: '2px dashed rgba(10,132,255,0.6)',
-    borderRadius: 12,
+    borderRadius: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     pointerEvents: 'none',
   } : null;

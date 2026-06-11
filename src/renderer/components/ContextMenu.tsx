@@ -55,6 +55,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
   const menuRef = useRef<HTMLDivElement>(null);
   const [focusIdx, setFocusIdx] = useState(-1);
   const [openSub, setOpenSub] = useState<string | null>(null);
+  // Submenu opens rightward by default, but flips left when the parent item is
+  // close to the right screen edge so the submenu never overflows off-screen.
+  const [subDir, setSubDir] = useState<'right' | 'left'>('right');
   const subCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [adjustedPos, setAdjustedPos] = useState(position);
 
@@ -128,7 +131,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         maxHeight: 'calc(100vh - 32px)',
         overflowY: 'auto',
         padding: '5px 0',
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'rgba(22,22,26,1)',
         border: '1px solid rgba(255,255,255,0.12)',
         boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px rgba(255,255,255,0.06), var(--pg-gloss-top)',
@@ -157,10 +160,13 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
               role="menuitem"
               aria-disabled={item.disabled}
               tabIndex={-1}
-              onMouseEnter={() => {
+              onMouseEnter={(e) => {
                 setFocusIdx(curActionIdx);
                 if (hasSub) {
                   if (subCloseTimerRef.current) { clearTimeout(subCloseTimerRef.current); subCloseTimerRef.current = null; }
+                  // Flip the submenu to the left if a rightward one would clip.
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setSubDir(r.right + 176 > window.innerWidth ? 'left' : 'right');
                   setOpenSub(itemKey);
                 }
               }}
@@ -182,7 +188,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                 gap: 8,
                 padding: '6px 12px',
                 margin: '0 4px',
-                borderRadius: 6,
+                borderRadius: 4,
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: item.disabled ? 'default' : 'pointer',
@@ -207,9 +213,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
               )}
               {hasSub && openSub === itemKey && (
                 <div style={{
-                  position: 'absolute', left: '100%', top: -4,
+                  position: 'absolute', top: -4,
+                  left: subDir === 'right' ? '100%' : undefined,
+                  right: subDir === 'left' ? '100%' : undefined,
                   minWidth: 160, maxHeight: 320, overflowY: 'auto',
-                  padding: '5px 0', borderRadius: 10,
+                  padding: '5px 0', borderRadius: 8,
                   background: 'rgba(30,30,34,0.98)',
                   border: '1px solid var(--color-border)',
                   boxShadow: 'var(--pg-shadow-panel)',
@@ -221,7 +229,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                       onClick={() => { if (!sub.disabled) { (sub.onClick ?? sub.onSelect)?.(); onClose(); } }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 12px', margin: '0 4px', borderRadius: 6,
+                        padding: '6px 12px', margin: '0 4px', borderRadius: 4,
                         fontSize: 13, fontWeight: 500, cursor: sub.disabled ? 'default' : 'pointer',
                         color: sub.danger ? 'var(--color-error, #ff453a)' : sub.disabled ? 'var(--color-text-tertiary)' : '#fff',
                       }}

@@ -290,7 +290,7 @@ const PixelArt: React.FC = () => {
               key={c}
               onClick={() => setColor(c)}
               style={{
-                width: 28, height: 28, borderRadius: 4,
+                width: 28, height: 28, borderRadius: 3,
                 background: c, cursor: 'pointer',
                 border: c === color ? '2px solid var(--color-text-primary)' : '1px solid rgba(255,255,255,0.08)',
                 padding: 0,
@@ -311,7 +311,7 @@ const PixelArt: React.FC = () => {
             height={canvasPx}
             style={{
               imageRendering: 'pixelated', cursor: 'crosshair',
-              boxShadow: 'var(--pg-shadow-context)', borderRadius: 4,
+              boxShadow: 'var(--pg-shadow-context)', borderRadius: 3,
             }}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
@@ -334,7 +334,7 @@ const PixelArt: React.FC = () => {
               <button
                 onClick={() => setCurrentFrame(i)}
                 style={{
-                  width: 56, height: 56, padding: 0, borderRadius: 4,
+                  width: 56, height: 56, padding: 0, borderRadius: 3,
                   background: '#1a1a1f', cursor: 'pointer',
                   border: i === currentFrame ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
@@ -361,7 +361,7 @@ const PixelArt: React.FC = () => {
           }}>+ Frame</button>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 18, height: 18, borderRadius: 4, background: color, border: '1px solid var(--color-border-subtle)' }} />
+          <span style={{ width: 18, height: 18, borderRadius: 3, background: color, border: '1px solid var(--color-border-subtle)' }} />
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{color}</span>
         </div>
       </div>
@@ -371,12 +371,12 @@ const PixelArt: React.FC = () => {
 
 const toolBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center',
-  padding: '6px 10px', borderRadius: 6, fontSize: 12, textTransform: 'capitalize',
+  padding: '6px 10px', borderRadius: 4, fontSize: 12, textTransform: 'capitalize',
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
 const selectStyle: React.CSSProperties = {
-  padding: '6px 8px', borderRadius: 6, fontSize: 12,
+  padding: '6px 8px', borderRadius: 4, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)',
 };

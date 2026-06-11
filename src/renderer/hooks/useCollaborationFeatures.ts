@@ -171,7 +171,7 @@ export const collabButtonStyles: Record<string, React.CSSProperties> = {
     padding: '4px 10px',
     background: 'rgba(94, 92, 230, 0.15)',
     border: '1px solid rgba(94, 92, 230, 0.3)',
-    borderRadius: 6,
+    borderRadius: 4,
     color: '#5e5ce6',
     fontSize: 11,
     fontWeight: 600,

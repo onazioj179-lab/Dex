@@ -393,7 +393,7 @@ export function createSkipLink(targetId: string, label = 'Skip to main content')
     background: var(--color-bg-elevated);
     color: var(--color-text-primary);
     border: 2px solid var(--color-accent);
-    border-radius: 8px;
+    border-radius: 6px;
     text-decoration: none;
     font-weight: 600;
     transition: top 0.2s ease;

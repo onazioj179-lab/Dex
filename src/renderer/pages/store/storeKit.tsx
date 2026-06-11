@@ -229,7 +229,7 @@ export function storeButton(variant: 'accent' | 'muted' | 'danger'): React.CSSPr
     justifyContent: 'center',
     gap: 6,
     padding: '0 14px',
-    borderRadius: 9,
+    borderRadius: 7,
     border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
     background: 'rgba(255,255,255,0.04)',

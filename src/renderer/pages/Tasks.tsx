@@ -544,7 +544,7 @@ export const Tasks: React.FC = () => {
             onChange={(e) => setSortBy(e.target.value as 'priority' | 'date' | 'name' | 'manual')}
             aria-label="Sort tasks by"
             style={{
-              padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+              padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               color: 'var(--color-text-secondary)', cursor: 'pointer', outline: 'none',
               fontFamily: 'inherit',
@@ -574,7 +574,7 @@ export const Tasks: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              width: '100%', padding: '8px 12px', borderRadius: 8,
+              width: '100%', padding: '8px 12px', borderRadius: 6,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
               fontFamily: 'inherit', boxSizing: 'border-box',
@@ -619,7 +619,7 @@ export const Tasks: React.FC = () => {
                       key={day}
                       onClick={() => { if (dayTasks.length > 0) { setSelectedList('scheduled'); setShowCalendarView(false); } }}
                       style={{
-                        textAlign: 'center', padding: '4px 2px', borderRadius: 6, cursor: dayTasks.length > 0 ? 'pointer' : 'default',
+                        textAlign: 'center', padding: '4px 2px', borderRadius: 4, cursor: dayTasks.length > 0 ? 'pointer' : 'default',
                         background: isToday ? 'rgba(10,132,255,0.2)' : dayTasks.length > 0 ? 'var(--color-border-subtle)' : 'transparent',
                         border: isToday ? '1px solid rgba(10,132,255,0.4)' : '1px solid transparent',
                       }}
@@ -658,7 +658,7 @@ export const Tasks: React.FC = () => {
             onChange={(e) => setNewTaskDue(e.target.value)}
             aria-label="Due date"
             style={{
-              padding: '4px 8px', borderRadius: 6,
+              padding: '4px 8px', borderRadius: 4,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               color: 'var(--color-text-secondary)', fontSize: 12,
               outline: 'none', fontFamily: 'inherit',
@@ -679,7 +679,7 @@ export const Tasks: React.FC = () => {
               onClick={() => applyTemplate(i)}
               className="dex-hover-bg"
               style={{
-                padding: '3px 8px', borderRadius: 5,
+                padding: '3px 8px', borderRadius: 4,
                 background: 'var(--color-border-subtle)',
                 border: '1px solid var(--color-bg-hover)',
                 color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500,
@@ -696,7 +696,7 @@ export const Tasks: React.FC = () => {
           {isLoading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0' }}>
               {[1,2,3].map(i => (
-                <div key={i} style={{ height: 48, borderRadius: 10, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div key={i} style={{ height: 48, borderRadius: 8, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (
@@ -787,7 +787,7 @@ export const Tasks: React.FC = () => {
                       value={task.description || ''}
                       onChange={(e) => setDescription(task.id, e.target.value)}
                       placeholder="Add a description..."
-                      style={{ width: '100%', minHeight: 48, padding: 8, borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+                      style={{ width: '100%', minHeight: 48, padding: 8, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
                     />
                   </div>
 
@@ -797,7 +797,7 @@ export const Tasks: React.FC = () => {
                     <div style={{ display: 'flex', gap: 4 }}>
                       {(['none', 'daily', 'weekly', 'monthly'] as const).map(r => (
                         <button key={r} aria-label={`Set repeat to ${r}`} onClick={() => setRecurring(task.id, r)} style={{
-                          padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                          padding: '4px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
                           border: '1px solid var(--color-border-subtle)',
                           background: (task.recurring || 'none') === r ? 'var(--color-accent-light)' : 'var(--color-bg-inset)',
                           color: (task.recurring || 'none') === r ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -834,9 +834,9 @@ export const Tasks: React.FC = () => {
                         onChange={e => setSubtaskInput(e.target.value)}
                         placeholder="Add subtask..."
                         onKeyDown={e => { if (e.key === 'Enter') addSubtask(task.id); }}
-                        style={{ flex: 1, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit' }}
+                        style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit' }}
                       />
-                      <button onClick={() => addSubtask(task.id)} aria-label="Add subtask" style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--color-accent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+</button>
+                      <button onClick={() => addSubtask(task.id)} aria-label="Add subtask" style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+</button>
                     </div>
                   </div>
                 </div>
@@ -846,7 +846,7 @@ export const Tasks: React.FC = () => {
           
           {sortedTasks.length === 0 && (
             <div style={styles.empty}>
-              <div style={{ width: 72, height: 72, borderRadius: 18, background: 'rgba(48,209,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <div style={{ width: 72, height: 72, borderRadius: 14, background: 'rgba(48,209,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               </div>
               <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
@@ -858,7 +858,7 @@ export const Tasks: React.FC = () => {
               <button
                 onClick={() => newTaskInputRef.current?.focus()}
                 style={{
-                  marginTop: 12, padding: '8px 20px', borderRadius: 8,
+                  marginTop: 12, padding: '8px 20px', borderRadius: 6,
                   background: 'var(--color-accent, #0a84ff)', color: '#fff',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer',
@@ -924,7 +924,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     padding: '8px 12px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: 'none',
     cursor: 'pointer',
     fontSize: '13px',
@@ -969,7 +969,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toggleCompleted: {
     padding: '5px 10px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-secondary)',
@@ -999,7 +999,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '32px',
     height: '32px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: 'none',
     background: 'var(--color-accent)',
     color: 'var(--color-accent-text)',
@@ -1052,7 +1052,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '28px',
     height: '28px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
@@ -1064,7 +1064,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '28px',
     height: '28px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-muted)',

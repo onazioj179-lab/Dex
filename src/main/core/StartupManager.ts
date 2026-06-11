@@ -88,7 +88,7 @@ class StartupManager {
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              border-radius: 12px;
+              border-radius: 10px;
               border: 1px solid rgba(255,255,255,0.1);
             }
             .title { font-size: 24px; font-weight: 600; margin-bottom: 16px; }
@@ -116,7 +116,7 @@ class StartupManager {
               padding: 8px 16px;
               background: rgba(234, 179, 8, 0.2);
               color: #fbbf24;
-              border-radius: 6px;
+              border-radius: 4px;
               font-size: 12px;
             }
           </style>
@@ -293,7 +293,7 @@ class StartupManager {
           .error-box {
             background: rgba(239, 68, 68, 0.1);
             border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 16px;
             margin-bottom: 24px;
           }
@@ -301,7 +301,7 @@ class StartupManager {
           .error-msg { font-family: monospace; font-size: 13px; color: #fca5a5; }
           pre {
             background: rgba(255,255,255,0.05);
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 16px;
             font-size: 12px;
             overflow: auto;
@@ -312,7 +312,7 @@ class StartupManager {
           button {
             padding: 10px 20px;
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;

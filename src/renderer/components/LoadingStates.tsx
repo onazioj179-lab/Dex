@@ -415,7 +415,7 @@ export const SkeletonCard = memo<{ width?: number | string }>(({ width = '100%' 
   <div style={{
     width,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 10,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border-subtle)',
   }}>

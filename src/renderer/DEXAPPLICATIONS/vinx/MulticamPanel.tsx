@@ -66,7 +66,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
               onClick={() => onSelectAngle(angle.id)}
               style={{
                 display: 'flex', flexDirection: 'column', gap: 4,
-                padding: 6, borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                padding: 6, borderRadius: 4, cursor: 'pointer', textAlign: 'left',
                 background: 'var(--color-bg-base)',
                 border: isActive ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
               }}
@@ -75,7 +75,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
               <div
                 style={{
                   width: '100%', aspectRatio: '16 / 9', background: bg,
-                  borderRadius: 4, position: 'relative', overflow: 'hidden',
+                  borderRadius: 3, position: 'relative', overflow: 'hidden',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'rgba(255,255,255,0.4)', fontSize: 22, fontWeight: 700,
                 }}
@@ -84,7 +84,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
                 <span style={{
                   position: 'absolute', top: 4, left: 4,
                   fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                  background: 'rgba(0,0,0,0.6)', padding: '2px 4px', borderRadius: 3,
+                  background: 'rgba(0,0,0,0.6)', padding: '2px 4px', borderRadius: 2,
                   color: 'var(--color-text-primary)',
                 }}>
                   ANGLE {idx + 1}
@@ -93,7 +93,7 @@ export const MulticamPanel: React.FC<Props> = ({ multicamClip, onSelectAngle, ac
                   <span style={{
                     position: 'absolute', top: 4, right: 4,
                     fontSize: 8, fontWeight: 700, letterSpacing: '0.08em',
-                    background: 'var(--color-accent)', padding: '2px 4px', borderRadius: 3,
+                    background: 'var(--color-accent)', padding: '2px 4px', borderRadius: 2,
                     color: '#FFFFFF',
                   }}>
                     ACTIVE

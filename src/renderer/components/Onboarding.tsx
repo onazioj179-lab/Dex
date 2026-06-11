@@ -106,33 +106,45 @@ export const KEYBOARD_SHORTCUTS: Record<string, { key: string; action: string }[
 const CARD_STYLE: React.CSSProperties = {
   background: '#0A0A0A',
   border: '1px solid var(--color-bg-hover)',
-  borderRadius: 12,
+  borderRadius: 6,
   padding: '16px 20px',
 };
 
-const ACCENT_BTN: React.CSSProperties = {
-  background: 'var(--color-accent, #4A9EFF)',
-  border: 'none',
-  borderRadius: 10,
-  padding: '10px 28px',
-  color: '#fff',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'opacity 0.15s',
-};
-
-const GHOST_BTN: React.CSSProperties = {
-  background: 'transparent',
-  border: '1px solid var(--color-border)',
-  borderRadius: 10,
-  padding: '10px 28px',
-  color: 'var(--color-text-secondary)',
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
-  transition: 'opacity 0.15s',
-};
+// Buttons are CSS classes (not inline styles) so hover/press/disabled states
+// actually fire — inline styles cannot express :hover/:active.
+const ONBOARD_BUTTON_CSS = `
+  .onboard-btn {
+    border: none;
+    border-radius: var(--radius-lg, 6px);
+    padding: 10px 28px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease,
+                color 0.15s ease, transform 0.12s ease;
+  }
+  .onboard-btn:active:not(:disabled) { transform: scale(0.98); }
+  .onboard-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .onboard-btn-accent {
+    background: var(--color-accent, #4A9EFF);
+    color: #fff;
+  }
+  .onboard-btn-accent:hover:not(:disabled) {
+    background: var(--color-accent-hover, #6CB2FF);
+  }
+  .onboard-btn-ghost {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+  .onboard-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--color-text-tertiary);
+    color: var(--color-text-primary);
+  }
+`;
 
 // ==================== STEP INDICATOR ====================
 const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, total }) => (
@@ -158,7 +170,7 @@ const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, 
 const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ onNext, onSkip }) => (
   <div style={{ textAlign: 'center', padding: '48px 0' }}>
     <div style={{
-      width: 80, height: 80, borderRadius: 22, margin: '0 auto 28px',
+      width: 80, height: 80, borderRadius: 16, margin: '0 auto 28px',
       background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '0 8px 32px rgba(59, 130, 246, 0.25)',
@@ -173,8 +185,8 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
       Let us set things up for the best experience.
     </p>
     <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-      <button style={ACCENT_BTN} onClick={onNext} aria-label="Get started with setup">Get Started</button>
-      <button style={GHOST_BTN} onClick={onSkip} aria-label="Skip setup wizard and review required policies">Skip Setup</button>
+      <button className="onboard-btn onboard-btn-accent" onClick={onNext} aria-label="Get started with setup">Get Started</button>
+      <button className="onboard-btn onboard-btn-ghost" onClick={onSkip} aria-label="Skip setup wizard and review required policies">Skip Setup</button>
     </div>
   </div>
 );
@@ -238,7 +250,7 @@ const HardwareScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
 
       <div style={{ textAlign: 'center' }}>
-        <button style={ACCENT_BTN} onClick={onNext}>Continue</button>
+        <button className="onboard-btn onboard-btn-accent" onClick={onNext}>Continue</button>
       </div>
     </div>
   );
@@ -307,7 +319,7 @@ const PrivacyScreen: React.FC<{
       <div style={{
         background: 'rgba(74, 158, 255, 0.06)',
         border: '1px solid rgba(74, 158, 255, 0.12)',
-        borderRadius: 10, padding: '12px 16px', marginTop: 16, marginBottom: 28,
+        borderRadius: 6, padding: '12px 16px', marginTop: 16, marginBottom: 28,
       }}>
         <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, marginBottom: 4 }}>Clear data categories</div>
         <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
@@ -317,7 +329,7 @@ const PrivacyScreen: React.FC<{
       </div>
 
       <div style={{ textAlign: 'center' }}>
-        <button style={ACCENT_BTN} onClick={onNext}>Continue</button>
+        <button className="onboard-btn onboard-btn-accent" onClick={onNext}>Continue</button>
       </div>
     </div>
   );
@@ -348,7 +360,7 @@ const PolicyAcceptanceScreen: React.FC<{
             style={{
               background: '#0A0A0A',
               border: '1px solid var(--color-bg-hover)',
-              borderRadius: 10,
+              borderRadius: 6,
               padding: '12px 14px',
               display: 'flex',
               gap: 12,
@@ -361,7 +373,7 @@ const PolicyAcceptanceScreen: React.FC<{
                   {policy.title}
                 </span>
                 <span style={{
-                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
                   background: 'rgba(74,158,255,0.12)', color: 'var(--color-accent, #4A9EFF)',
                   letterSpacing: '0.04em', textTransform: 'uppercase',
                 }}>
@@ -379,7 +391,7 @@ const PolicyAcceptanceScreen: React.FC<{
               style={{
                 background: 'transparent',
                 border: '1px solid var(--color-border)',
-                borderRadius: 6,
+                borderRadius: 4,
                 padding: '6px 10px',
                 color: 'var(--color-text-secondary)',
                 fontSize: 11,
@@ -414,7 +426,7 @@ const PolicyAcceptanceScreen: React.FC<{
               style={{
                 background: 'transparent',
                 border: '1px solid var(--color-border)',
-                borderRadius: 6,
+                borderRadius: 4,
                 padding: '4px 8px',
                 color: 'var(--color-text-secondary)',
                 fontSize: 11,
@@ -430,7 +442,7 @@ const PolicyAcceptanceScreen: React.FC<{
 
       <label style={{
         display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16,
-        padding: '12px 14px', borderRadius: 10,
+        padding: '12px 14px', borderRadius: 6,
         background: accepted ? 'rgba(74,158,255,0.06)' : 'rgba(255,255,255,0.02)',
         border: `1px solid ${accepted ? 'rgba(74,158,255,0.25)' : 'var(--color-bg-hover)'}`,
         cursor: 'pointer',
@@ -449,7 +461,7 @@ const PolicyAcceptanceScreen: React.FC<{
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
         <button
-          style={{ ...ACCENT_BTN, opacity: accepted ? 1 : 0.4, cursor: accepted ? 'pointer' : 'not-allowed' }}
+          className="onboard-btn onboard-btn-accent"
           disabled={!accepted}
           onClick={onAccept}
         >
@@ -494,7 +506,7 @@ const TourScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         {features.map(f => (
           <div key={f.title} style={{ ...CARD_STYLE, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              width: 32, height: 32, borderRadius: 6, flexShrink: 0,
               background: 'rgba(74, 158, 255, 0.1)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 14, fontWeight: 700, color: 'var(--color-accent, #4A9EFF)',
@@ -510,7 +522,7 @@ const TourScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
 
       <div style={{ textAlign: 'center' }}>
-        <button style={ACCENT_BTN} onClick={onNext}>Continue</button>
+        <button className="onboard-btn onboard-btn-accent" onClick={onNext}>Continue</button>
       </div>
     </div>
   );
@@ -539,7 +551,7 @@ const SampleDataScreen: React.FC<{
         }}
       >
         <div style={{
-          width: 28, height: 28, borderRadius: 8, marginBottom: 10,
+          width: 28, height: 28, borderRadius: 6, marginBottom: 10,
           background: 'rgba(74,158,255,0.12)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--color-accent, #4A9EFF)',
@@ -561,7 +573,7 @@ const SampleDataScreen: React.FC<{
         }}
       >
         <div style={{
-          width: 28, height: 28, borderRadius: 8, marginBottom: 10,
+          width: 28, height: 28, borderRadius: 6, marginBottom: 10,
           background: 'rgba(255,255,255,0.05)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--color-text-secondary)',
@@ -596,14 +608,14 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
     </h2>
     <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 12px', lineHeight: 1.6 }}>
       DEX is ready. Press <kbd style={{
-        background: 'var(--color-border)', padding: '2px 6px', borderRadius: 4,
+        background: 'var(--color-border)', padding: '2px 6px', borderRadius: 3,
         fontSize: 11, fontFamily: 'inherit',
       }}>?</kbd> anytime for keyboard shortcuts.
     </p>
     <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 36px' }}>
       Tip: Use {platform.isMac ? '⌘' : 'Ctrl'}+K to open the Command Palette.
     </p>
-    <button style={ACCENT_BTN} onClick={onComplete}>Launch DEX</button>
+    <button className="onboard-btn onboard-btn-accent" onClick={onComplete}>Launch DEX</button>
   </div>
 );
 
@@ -739,6 +751,7 @@ export const OnboardingWizard: React.FC<{
           from { opacity: 0; transform: translateX(-40px); }
           to { opacity: 1; transform: translateX(0); }
         }
+        ${ONBOARD_BUTTON_CSS}
       `}</style>
       <div style={{
         width: '100%', maxWidth: 600, padding: '0 32px',
@@ -753,11 +766,8 @@ export const OnboardingWizard: React.FC<{
         {screenIndex > 0 && current !== 'ready' && (
           <div style={{ marginBottom: 8 }}>
             <button
-              style={{
-                ...GHOST_BTN,
-                padding: '6px 16px',
-                fontSize: 12,
-              }}
+              className="onboard-btn onboard-btn-ghost"
+              style={{ padding: '6px 16px', fontSize: 12 }}
               onClick={goBack}
             >
               Back
@@ -792,7 +802,7 @@ export const OnboardingWizard: React.FC<{
               background: 'transparent',
               color: 'var(--color-text-secondary, #bbb)',
               border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
-              borderRadius: 6,
+              borderRadius: 4,
               padding: '6px 12px',
               fontSize: 11, fontWeight: 600,
               cursor: 'pointer',
@@ -847,7 +857,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           width: 320,
           background: 'var(--color-bg-elevated, #111111)',
           border: '1px solid var(--color-border-subtle)',
-          borderRadius: 14,
+          borderRadius: 8,
           overflow: 'hidden',
           boxShadow: 'var(--pg-shadow-popover)',
         }}
@@ -874,7 +884,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           {global.map(s => (
             <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.action}</span>
-              <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 4, color: '#d4d4d8', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
+              <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: '#d4d4d8', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
             </div>
           ))}
           {appShortcuts.length > 0 && (
@@ -885,7 +895,7 @@ export const KeyboardShortcutsPanel: React.FC<{
               {appShortcuts.map(s => (
                 <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.action}</span>
-                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 4, color: '#d4d4d8', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
+                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: '#d4d4d8', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
                 </div>
               ))}
             </>
@@ -904,7 +914,7 @@ export const BeginnerTip: React.FC<{
   <div style={{
     background: 'var(--color-bg-elevated, #111111)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 10,
+    borderRadius: 6,
     padding: '10px 12px',
     maxWidth: 200,
     boxShadow: 'var(--pg-shadow-tooltip)',

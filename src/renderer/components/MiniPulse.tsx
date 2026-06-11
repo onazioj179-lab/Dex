@@ -133,7 +133,7 @@ export const MiniPulse: React.FC<MiniPulseProps> = ({ onExpand, hidden }) => {
         alignItems: 'center',
         gap: 10,
         padding: '0 12px',
-        borderRadius: 14,
+        borderRadius: 10,
         background: 'var(--pg-toolbar, rgba(28,28,32,0.78))',
         border: '1px solid var(--pg-border, rgba(255,255,255,0.08))',
         boxShadow: 'var(--pg-shadow-overlay, 0 12px 32px rgba(0,0,0,0.45))',

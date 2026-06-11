@@ -192,7 +192,7 @@ const ScreenRecorder: React.FC = () => {
             disabled={sourceDisabled}
             onChange={e => setSelectedId(e.target.value)}
             style={{
-              padding: '6px 10px', borderRadius: 8, fontSize: 12,
+              padding: '6px 10px', borderRadius: 6, fontSize: 12,
               background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
               border: '1px solid var(--color-border-subtle)',
               opacity: sourceDisabled ? 0.5 : 1, cursor: sourceDisabled ? 'not-allowed' : 'pointer',
@@ -262,7 +262,7 @@ const ScreenRecorder: React.FC = () => {
               href={downloadUrl}
               download={downloadName}
               style={{
-                marginLeft: 8, padding: '8px 14px', borderRadius: 8,
+                marginLeft: 8, padding: '8px 14px', borderRadius: 6,
                 background: 'var(--color-accent)', color: '#fff', textDecoration: 'none',
                 fontSize: 13, fontWeight: 500,
               }}
@@ -287,7 +287,7 @@ const ScreenRecorder: React.FC = () => {
 
 function controlButtonStyle(disabled: boolean, accent: string): React.CSSProperties {
   return {
-    padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+    padding: '8px 18px', borderRadius: 6, fontSize: 13, fontWeight: 500,
     background: disabled ? 'var(--color-bg-hover)' : accent,
     color: disabled ? 'var(--color-text-muted)' : '#fff',
     border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
