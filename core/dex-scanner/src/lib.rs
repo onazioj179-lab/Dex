@@ -6,6 +6,7 @@
 //! by byte size first (cheap), then SHA-256 only files that share a size (so most
 //! files are never hashed). Streaming hash — never loads a whole file into RAM.
 
+use rayon::prelude::*;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -72,25 +73,37 @@ pub fn find_duplicates(root: &Path, max: usize) -> Vec<DupGroup> {
         }
     }
 
-    let mut groups: Vec<DupGroup> = Vec::new();
-    for (size, paths) in by_size {
-        if paths.len() < 2 {
-            continue; // unique size -> can't be a duplicate
-        }
-        let mut by_hash: HashMap<String, Vec<String>> = HashMap::new();
-        for p in paths {
-            if let Some(h) = hash_file(&p) {
-                by_hash.entry(h).or_default().push(p.to_string_lossy().to_string());
-            }
-        }
-        for (hash, ps) in by_hash {
-            if ps.len() >= 2 {
-                groups.push(DupGroup { hash, size, paths: ps });
-            }
-        }
+    // Only files that share a size can be duplicates — collect those candidates,
+    // then SHA-256 them all in parallel (hashing is the dominant, embarrassingly
+    // parallel cost; each hash_file is independent and streams).
+    let candidates: Vec<(u64, PathBuf)> = by_size
+        .into_iter()
+        .filter(|(_, ps)| ps.len() >= 2)
+        .flat_map(|(size, ps)| ps.into_iter().map(move |p| (size, p)))
+        .collect();
+    let hashed: Vec<(u64, String, String)> = candidates
+        .par_iter()
+        .filter_map(|(size, p)| {
+            hash_file(p).map(|h| (*size, h, p.to_string_lossy().to_string()))
+        })
+        .collect();
+
+    // Regroup by (size, hash); a group of >=2 identical files is a duplicate set.
+    let mut by_sh: HashMap<(u64, String), Vec<String>> = HashMap::new();
+    for (size, hash, path) in hashed {
+        by_sh.entry((size, hash)).or_default().push(path);
     }
-    // Largest wasted space first.
-    groups.sort_by(|a, b| (b.size * b.paths.len() as u64).cmp(&(a.size * a.paths.len() as u64)));
+    let mut groups: Vec<DupGroup> = by_sh
+        .into_iter()
+        .filter(|(_, ps)| ps.len() >= 2)
+        .map(|((size, hash), paths)| DupGroup { hash, size, paths })
+        .collect();
+    // Largest wasted space first (saturating to avoid overflow on absurd inputs).
+    groups.sort_by(|a, b| {
+        b.size
+            .saturating_mul(b.paths.len() as u64)
+            .cmp(&a.size.saturating_mul(a.paths.len() as u64))
+    });
     groups
 }
 

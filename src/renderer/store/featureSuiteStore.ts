@@ -529,11 +529,20 @@ export const useVoiceMemoStore = create<VoiceMemoState>((set) => ({
   loading: false,
   loadMemos: async (app, parentType, parentId) => {
     set({ loading: true });
-    const data = await invoke('voice-memo:get', app, parentType, parentId);
+    const data = await invoke('voice-memo:getForParent', app, parentType, parentId);
     set({ memos: data || [], loading: false });
   },
   saveMemo: async (app, parentType, parentId, buffer, durationMs) => {
-    return await invoke('voice-memo:save', app, parentType, parentId, buffer, durationMs);
+    // Both shells take the audio as base64 (voice-memo:save audioBase64 arg);
+    // a raw ArrayBuffer would not survive the JSON IPC bridge.
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const audioBase64 = btoa(binary);
+    return await invoke('voice-memo:save', app, parentType, parentId, audioBase64, durationMs);
   },
   deleteMemo: async (id) => {
     await invoke('voice-memo:delete', id);

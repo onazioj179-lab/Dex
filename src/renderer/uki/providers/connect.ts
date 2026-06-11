@@ -158,7 +158,7 @@ export interface StreamFetchResponse {
 }
 export type StreamFetchLike = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body?: string },
+  init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<StreamFetchResponse>;
 
 /** Default stream fetch: real `fetch`, reading the ReadableStream body as text chunks. */
@@ -187,6 +187,8 @@ const defaultStreamFetch: StreamFetchLike = async (url, init) => {
 export interface StreamOptions extends AskOptions {
   /** Injectable streaming fetch for tests. */
   streamFetch?: StreamFetchLike;
+  /** Abort the in-flight stream (caller's "stop" control). */
+  signal?: AbortSignal;
 }
 
 /**
@@ -233,7 +235,7 @@ export async function streamConfiguredLLM(
 
   const doFetch = opts.streamFetch ?? defaultStreamFetch;
   try {
-    const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body });
+    const res = await doFetch(httpReq.url, { method: httpReq.method, headers: httpReq.headers, body: httpReq.body, signal: opts.signal });
     if (!res.ok) return null;
 
     const format = STREAM_FORMAT[provider.id] ?? 'sse';

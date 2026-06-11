@@ -33,12 +33,14 @@ interface DowngradeEligibility {
 type Phase = 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
 
 const COLOR_BG = 'rgba(28, 28, 30, 0.98)';
-const COLOR_BORDER = 'rgba(255, 255, 255, 0.12)';
-const COLOR_ACCENT = '#0a84ff';
-const COLOR_TEXT = '#f5f5f7';
-const COLOR_MUTED = '#8e8e93';
+// Use design tokens so this component themes correctly (incl. light mode) instead
+// of staying hardcoded-dark. COLOR_PRO stays a literal brand gold.
+const COLOR_BORDER = 'var(--color-border)';
+const COLOR_ACCENT = 'var(--color-accent)';
+const COLOR_TEXT = 'var(--color-text-primary)';
+const COLOR_MUTED = 'var(--color-text-tertiary)';
 const COLOR_PRO = '#ffd60a';
-const COLOR_DANGER = '#ff453a';
+const COLOR_DANGER = 'var(--color-error)';
 
 export const UpdateNotificationDropdown: React.FC = () => {
   const [open, setOpen] = useState(false);
