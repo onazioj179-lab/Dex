@@ -122,7 +122,7 @@ const ResultItem: React.FC<{
         display: 'flex', alignItems: 'center',
         width: '100%', height: 40, padding: '0 10px',
         background: isSelected ? 'rgba(59,130,246,0.35)' : 'transparent',
-        border: 'none', borderRadius: 10, cursor: 'pointer',
+        border: 'none', borderRadius: 8, cursor: 'pointer',
         transition: isReduceMotion() ? 'none' : 'background 0.15s ease, transform 0.12s ease',
         position: 'relative', gap: 10,
         textAlign: 'left',
@@ -131,7 +131,7 @@ const ResultItem: React.FC<{
     >
       {/* Icon */}
       <div style={{
-        width: 26, height: 26, borderRadius: 7,
+        width: 26, height: 26, borderRadius: 5,
         background: isSelected ? 'var(--color-border)' : (result.color ? `${result.color}18` : 'var(--color-bg-hover)'),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
@@ -631,7 +631,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               backdropFilter: 'var(--blur-xl) saturate(180%)',
               WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
               border: '1px solid rgba(255,255,255,0.10)',
-              borderRadius: 18,
+              borderRadius: 14,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: '4px',
               animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
@@ -702,7 +702,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           display: 'flex', flexDirection: 'column',
           background: 'var(--color-bg-surface-solid, #141416)',
           border: '1px solid var(--color-border)',
-          borderRadius: 22,
+          borderRadius: 16,
           boxShadow: 'var(--pg-shadow-modal), 0 0 0 1px var(--color-bg-hover), var(--pg-gloss-top)',
           overflow: 'hidden',
         }}
@@ -762,7 +762,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             fontSize: 10, padding: '2px 6px',
             background: 'var(--color-bg-hover)',
             border: '1px solid var(--color-border)',
-            borderRadius: 5, color: 'var(--color-text-tertiary)',
+            borderRadius: 4, color: 'var(--color-text-tertiary)',
             fontFamily: 'var(--font-family)',
             flexShrink: 0,
           }}>Esc</kbd>
@@ -846,7 +846,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
                   padding: '1px 5px', fontSize: 10,
                   background: 'var(--color-bg-hover)',
                   border: '1px solid var(--color-border-subtle)',
-                  borderRadius: 4, color: 'var(--color-text-tertiary)',
+                  borderRadius: 3, color: 'var(--color-text-tertiary)',
                   fontFamily: 'var(--font-family)',
                   lineHeight: '14px',
                 }}>{k}</kbd>
@@ -872,7 +872,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         }
         .spotlight-results-scroll::-webkit-scrollbar-thumb {
           background: var(--color-border);
-          border-radius: 3px;
+          border-radius: 2px;
         }
         .spotlight-results-scroll::-webkit-scrollbar-thumb:hover {
           background: var(--color-text-tertiary);

@@ -114,7 +114,7 @@ export const DexCheckbox: React.FC<{
         style={{
           width: 18,
           height: 18,
-          borderRadius: 5,
+          borderRadius: 4,
           border: checked ? 'none' : '2px solid var(--color-border)',
           background: checked ? 'var(--color-accent)' : 'transparent',
           cursor: disabled ? 'not-allowed' : 'pointer',
@@ -240,7 +240,7 @@ export const DexSlider: React.FC<{
             left: '50%',
             transform: 'translateX(-50%)',
             padding: '2px 6px',
-            borderRadius: 4,
+            borderRadius: 3,
             background: 'rgba(0,0,0,0.75)',
             color: '#fff',
             fontSize: 10,
@@ -301,7 +301,7 @@ export const DexInput: React.FC<{
           background: focused ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)',
           border: '1px solid',
           borderColor: error ? 'var(--color-error)' : focused ? 'var(--color-accent)' : 'var(--color-border-subtle)',
-          borderRadius: 8,
+          borderRadius: 6,
           outline: 'none',
           transition: isReduceMotion() ? 'none' : 'background 0.12s ease, border-color 0.12s ease',
           opacity: disabled ? 0.5 : 1,
@@ -316,7 +316,7 @@ export const DexInput: React.FC<{
         right: 0,
         height: 2,
         background: error ? 'var(--color-error)' : 'var(--color-accent)',
-        borderRadius: '0 0 8px 8px',
+        borderRadius: '0 0 6px 6px',
         transform: `scaleX(${focused ? 1 : 0})`,
         transformOrigin: 'center bottom',
         transition: isReduceMotion() ? 'none' : `transform ${focused ? '0.12s' : '0.1s'} ease`,
@@ -358,7 +358,7 @@ export const DexButton: React.FC<{
       onPointerLeave={() => setPressed(false)}
       style={{
         padding: '8px 16px',
-        borderRadius: 8,
+        borderRadius: 6,
         border: variant === 'ghost' ? '1px solid var(--color-border-subtle)' : 'none',
         background: bg,
         color,
@@ -403,7 +403,7 @@ export const DexListItem: React.FC<{
         display: 'flex',
         alignItems: 'center',
         padding: '8px 12px',
-        borderRadius: 6,
+        borderRadius: 4,
         cursor: 'pointer',
         position: 'relative',
         background: selected
@@ -480,7 +480,7 @@ export const LetterScrubber: React.FC<{
           right: 24,
           width: 36,
           height: 36,
-          borderRadius: 8,
+          borderRadius: 6,
           background: 'rgba(0,0,0,0.80)',
           display: 'flex',
           alignItems: 'center',
@@ -655,7 +655,7 @@ export const SelectionToolbar: React.FC<{
     fontSize: 12,
     fontWeight: 500,
     cursor: 'pointer',
-    borderRadius: 4,
+    borderRadius: 3,
     transition: 'background 0.1s ease',
   };
 
@@ -669,7 +669,7 @@ export const SelectionToolbar: React.FC<{
       display: 'flex',
       gap: 2,
       padding: 4,
-      borderRadius: 8,
+      borderRadius: 6,
       background: 'var(--color-bg-elevated)',
       border: '1px solid var(--color-border-subtle)',
       boxShadow: 'var(--pg-shadow-tooltip)',
@@ -735,7 +735,7 @@ export const EmptyState: React.FC<{
       <button
         onClick={action.onClick}
         style={{
-          marginTop: 8, padding: '6px 16px', borderRadius: 8, border: '1px solid var(--color-border)',
+          marginTop: 8, padding: '6px 16px', borderRadius: 6, border: '1px solid var(--color-border)',
           background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
           fontSize: 12, fontWeight: 500, cursor: 'pointer',
           transition: 'background 0.1s',

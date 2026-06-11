@@ -144,7 +144,7 @@ export const NexusBiometrics: React.FC = () => {
               value={enrollLabel}
               onChange={e => setEnrollLabel(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') confirmEnroll(); if (e.key === 'Escape') { setEnrollKind(null); setEnrollLabel(''); } }}
-              style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--pg-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--color-text-primary)', outline: 'none' }}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--pg-border)', borderRadius: 4, padding: '5px 10px', fontSize: 12, color: 'var(--color-text-primary)', outline: 'none' }}
             />
             <button onClick={confirmEnroll} disabled={!enrollLabel.trim()} style={btnStyle('accent')}>Confirm</button>
             <button onClick={() => { setEnrollKind(null); setEnrollLabel(''); }} style={btnStyle('muted')}>Cancel</button>
@@ -197,7 +197,7 @@ const emptyStyle: React.CSSProperties = {
 
 const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties => {
   const base: React.CSSProperties = {
-    padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+    padding: '6px 12px', borderRadius: 4, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
   };

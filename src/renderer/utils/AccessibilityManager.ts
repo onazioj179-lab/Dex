@@ -80,7 +80,7 @@ class AccessibilityManager {
         border: 2px solid var(--color-accent-primary, #2563eb);
         font-size: 14px;
         text-decoration: none;
-        border-radius: 4px;
+        border-radius: 3px;
       }
 
       .dex-skip-nav:focus {
@@ -384,6 +384,7 @@ function parseColor(color: string): [number, number, number] | null {
   return null;
 }
 
+// AVAILABLE FOR A FUTURE DEV OVERLAY: checkContrast / getLuminance compute live WCAG ratios for any fg/bg pair and can power an on-screen contrast inspector.
 export function checkContrast(foreground: string, background: string): ContrastResult {
   const fg = parseColor(foreground);
   const bg = parseColor(background);

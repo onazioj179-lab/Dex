@@ -1151,7 +1151,7 @@ export const Files: React.FC = () => {
                 onKeyDown={e => { if (e.key === 'Enter') submitFolderCreate(); if (e.key === 'Escape') setFolderNameDraft(null); }}
                 onBlur={submitFolderCreate}
                 placeholder="Folder name"
-                style={{ height: 26, padding: '0 8px', borderRadius: 5, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none', width: 120 }}
+                style={{ height: 26, padding: '0 8px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none', width: 120 }}
               />
             ) : (
               <button
@@ -1320,7 +1320,7 @@ export const Files: React.FC = () => {
                     }
                   }}
                   aria-label={isPinned ? `Unpin folder ${folderName}` : `Pin folder ${folderName}`}
-                  style={{ padding: '3px 10px', borderRadius: 6, background: isPinned ? 'var(--color-accent-soft)' : 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: isPinned ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
+                  style={{ padding: '3px 10px', borderRadius: 4, background: isPinned ? 'var(--color-accent-soft)' : 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: isPinned ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
                 >
                   {isPinned ? 'Unpin folder' : 'Pin folder'}
                 </button>
@@ -1328,7 +1328,7 @@ export const Files: React.FC = () => {
             })()}
             <button
               onClick={() => handleCreateFolder()}
-              style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
+              style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
               aria-label="New folder"
             >
               New folder
@@ -1336,7 +1336,7 @@ export const Files: React.FC = () => {
             {clipboard && (
               <button
                 onClick={() => handlePasteFile()}
-                style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
+                style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
                 aria-label={`Paste ${clipboard.file.name}`}
               >
                 Paste "{clipboard.file.name}"
@@ -1351,11 +1351,11 @@ export const Files: React.FC = () => {
         {selectedFiles.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 }}>{selectedFiles.size} selected</span>
-            <button onClick={handleBatchDelete} style={{ padding: '6px 12px', borderRadius: 8, background: 'var(--color-error-muted)', border: '1px solid rgba(255,69,58,0.35)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
-            <button onClick={() => { selectedFiles.forEach(p => navigator.clipboard.writeText(p)); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
+            <button onClick={handleBatchDelete} style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid rgba(255,69,58,0.35)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            <button onClick={() => { selectedFiles.forEach(p => navigator.clipboard.writeText(p)); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
-            <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
-            <button onClick={() => setSelectedFiles(new Set())} style={{ padding: '3px 10px', borderRadius: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Clear</button>
+            <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
+            <button onClick={() => setSelectedFiles(new Set())} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Clear</button>
           </div>
         )}
 
@@ -1363,20 +1363,20 @@ export const Files: React.FC = () => {
         <div style={styles.content}>
           {loadError ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '8px' }}>
-              <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--color-error-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+              <div style={{ width: 64, height: 64, borderRadius: 12, background: 'var(--color-error-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff453a" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>Failed to load files</span>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 280 }}>{loadError}</span>
-              <button onClick={() => loadFiles(currentPath || selectedLocation)} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 8, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
+              <button onClick={() => loadFiles(currentPath || selectedLocation)} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
             </div>
           ) : loading ? (
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.06}s` }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
-                  <div style={{ flex: 1, height: 12, borderRadius: 4, background: 'var(--color-bg-hover)' }} />
-                  <div style={{ width: 60, height: 10, borderRadius: 4, background: 'var(--color-border-subtle)' }} />
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 6, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.06}s` }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 4, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
+                  <div style={{ flex: 1, height: 12, borderRadius: 3, background: 'var(--color-bg-hover)' }} />
+                  <div style={{ width: 60, height: 10, borderRadius: 3, background: 'var(--color-border-subtle)' }} />
                 </div>
               ))}
               <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
@@ -1394,12 +1394,12 @@ export const Files: React.FC = () => {
               {/* Files */}
               {filteredFiles.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '8px' }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(10,132,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 12, background: 'rgba(10,132,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   </div>
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)' }}>Drop files here or navigate to another folder</span>
-                  <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 8, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                  <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                 </div>
               ) : visibleFiles.map((file, idx) => (
                 <div
@@ -1439,7 +1439,7 @@ export const Files: React.FC = () => {
                           else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
                         }}
                         aria-label={`Rename ${file.name}`}
-                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
+                        style={{ flex: 1, minWidth: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 12 }}
                       />
                     ) : (
                       <span>{file.name}</span>
@@ -1491,12 +1491,12 @@ export const Files: React.FC = () => {
             <div style={styles.gridContainer}>
               {filteredFiles.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '8px', gridColumn: '1 / -1' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(10,132,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(10,132,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
                   <span style={{ fontSize: 11, color: 'var(--color-text-secondary, #8a8a8a)' }}>Drop files here to get started</span>
-                  <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 4, padding: '6px 16px', borderRadius: 8, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                  <button onClick={() => { (window as any).electron?.invoke?.('dialog:open', { properties: ['openFile', 'multiSelections'] }); }} style={{ marginTop: 4, padding: '6px 16px', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                 </div>
               ) : visibleFiles.map(file => (
                 <div
@@ -1534,7 +1534,7 @@ export const Files: React.FC = () => {
                         else if (e.key === 'Escape') { e.preventDefault(); cancelInlineRename(); }
                       }}
                       aria-label={`Rename ${file.name}`}
-                      style={{ width: '90%', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
+                      style={{ width: '90%', padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-accent)', background: 'var(--color-bg-surface-solid)', color: 'var(--color-text-primary)', fontSize: 11, textAlign: 'center' }}
                     />
                   ) : (
                     <span style={styles.gridLabel}>{file.name}</span>
@@ -1585,7 +1585,7 @@ export const Files: React.FC = () => {
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            background: 'var(--color-bg-elevated, #2c2c2e)', borderRadius: 12,
+            background: 'var(--color-bg-elevated, #2c2c2e)', borderRadius: 10,
             boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', maxWidth: '80vw', maxHeight: '80vh',
           }}>
             {/* Quick Look header */}
@@ -1599,10 +1599,10 @@ export const Files: React.FC = () => {
             {/* Quick Look content */}
             <div style={{ padding: 16, textAlign: 'center' }}>
               {['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'].includes(quickLookFile.extension.toLowerCase()) && (
-                <img src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} alt={quickLookFile.name} style={{ maxWidth: '70vw', maxHeight: '65vh', objectFit: 'contain', borderRadius: 4 }} />
+                <img src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} alt={quickLookFile.name} style={{ maxWidth: '70vw', maxHeight: '65vh', objectFit: 'contain', borderRadius: 3 }} />
               )}
               {['.mp4', '.mov', '.webm'].includes(quickLookFile.extension.toLowerCase()) && (
-                <video src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} controls autoPlay style={{ maxWidth: '70vw', maxHeight: '65vh', borderRadius: 4 }} />
+                <video src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} controls autoPlay style={{ maxWidth: '70vw', maxHeight: '65vh', borderRadius: 3 }} />
               )}
               {['.mp3', '.wav', '.m4a', '.ogg'].includes(quickLookFile.extension.toLowerCase()) && (
                 <div style={{ padding: 32 }}>
@@ -1612,20 +1612,20 @@ export const Files: React.FC = () => {
                 </div>
               )}
               {['.txt', '.md', '.json', '.js', '.ts', '.css', '.html'].includes(quickLookFile.extension.toLowerCase()) && (
-                <div style={{ textAlign: 'left', padding: 16, background: 'var(--color-bg-primary)', borderRadius: 8, maxHeight: '60vh', overflow: 'auto', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap' as const, color: 'var(--color-text-primary)' }}>
+                <div style={{ textAlign: 'left', padding: 16, background: 'var(--color-bg-primary)', borderRadius: 6, maxHeight: '60vh', overflow: 'auto', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap' as const, color: 'var(--color-text-primary)' }}>
                   {/* Text file preview - content loaded on demand */}
                   <span style={{ opacity: 0.5 }}>Text preview for {quickLookFile.name}</span>
                 </div>
               )}
               {['.pdf'].includes(quickLookFile.extension.toLowerCase()) && (
-                <iframe src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} style={{ width: '70vw', height: '65vh', border: 'none', borderRadius: 4 }} title={quickLookFile.name} />
+                <iframe src={`file://${quickLookFile.path.replace(/\\/g, '/')}`} style={{ width: '70vw', height: '65vh', border: 'none', borderRadius: 3 }} title={quickLookFile.name} />
               )}
             </div>
             {/* Quick Look footer */}
             <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 16px 12px', gap: 12, borderTop: '1px solid var(--color-border, var(--color-border-subtle))' }}>
               <button
                 onClick={() => { handleItemDoubleClick(quickLookFile); setQuickLookFile(null); }}
-                style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
+                style={{ padding: '5px 16px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
               >Open</button>
             </div>
           </div>
@@ -1677,7 +1677,7 @@ export const Files: React.FC = () => {
               <img
                 src={`file://${previewFile.path.replace(/\\/g, '/')}`}
                 alt={previewFile.name}
-                style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8 }}
+                style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 6 }}
               />
             )}
             {/* Video Preview */}
@@ -1686,12 +1686,12 @@ export const Files: React.FC = () => {
                 src={`file://${previewFile.path.replace(/\\/g, '/')}`}
                 controls
                 autoPlay
-                style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 8 }}
+                style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 6 }}
               />
             )}
             {/* Audio Preview */}
             {['.mp3', '.wav', '.m4a', '.ogg'].includes(previewFile.extension.toLowerCase()) && (
-              <div style={{ background: 'var(--color-bg-elevated)', padding: 32, borderRadius: 12 }}>
+              <div style={{ background: 'var(--color-bg-elevated)', padding: 32, borderRadius: 10 }}>
                 <Icons.music size={64} />
                 <div style={{ marginTop: 16, marginBottom: 16, color: 'var(--color-text-primary)', fontSize: 16 }}>{previewFile.name}</div>
                 <audio src={`file://${previewFile.path.replace(/\\/g, '/')}`} controls autoPlay style={{ width: 300 }} />
@@ -1711,7 +1711,7 @@ export const Files: React.FC = () => {
           <div style={{
             position: 'absolute', left: contextMenu.x, top: contextMenu.y,
             background: 'var(--color-bg-elevated, #1c1c1e)', border: '1px solid var(--color-border, var(--color-border))',
-            borderRadius: '8px', boxShadow: 'var(--pg-shadow-popover)', padding: '4px 0', minWidth: '180px',
+            borderRadius: '6px', boxShadow: 'var(--pg-shadow-popover)', padding: '4px 0', minWidth: '180px',
           }} onClick={(e) => e.stopPropagation()}>
             <button onClick={() => handleItemDoubleClick(contextMenu.file)} aria-label={`Open ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Open
@@ -1881,7 +1881,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '28px',
     height: '28px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -1908,7 +1908,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '10px',
+    borderRadius: '8px',
     border: '1px solid var(--color-border)',
     padding: '8px 12px',
     width: '240px',
@@ -1924,7 +1924,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewToggle: {
     display: 'flex',
     background: 'var(--color-bg-hover)',
-    borderRadius: '10px',
+    borderRadius: '8px',
     border: '1px solid var(--color-border)',
     padding: '2px',
   },
@@ -1934,7 +1934,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '26px',
     height: '26px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     border: 'none',
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
@@ -1960,7 +1960,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '6px',
     padding: '12px 14px',
-    borderRadius: '12px',
+    borderRadius: '10px',
     background: 'var(--color-bg-surface-solid)',
     border: '1px solid var(--color-border)',
     minWidth: 0,
@@ -2002,7 +2002,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'sticky',
     top: 0,
     background: 'var(--color-bg-surface-solid)',
-    borderRadius: '12px 12px 0 0',
+    borderRadius: '10px 10px 0 0',
     zIndex: 1,
   },
   listRow: {
@@ -2042,7 +2042,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '18px 12px',
-    borderRadius: '12px',
+    borderRadius: '10px',
     cursor: 'pointer',
     transition: 'background 0.1s',
     border: '1px solid var(--color-border)',
@@ -2081,7 +2081,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: 'auto',
     background: 'var(--color-bg-hover)',
     padding: '2px 6px',
-    borderRadius: '10px',
+    borderRadius: '8px',
     fontSize: '10px',
     color: 'var(--color-text-secondary)',
   },
@@ -2107,7 +2107,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   filterBtn: {
     padding: '6px 10px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     border: '1px solid var(--color-border)',
     fontSize: '11px',
     color: 'var(--color-text-secondary)',

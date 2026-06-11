@@ -377,7 +377,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
         width: size.width,
         height: size.height,
         zIndex: Z_PIP,
-        borderRadius: 12,
+        borderRadius: 10,
         overflow: 'hidden',
         boxShadow: 'var(--pg-shadow-popover), 0 0 0 1px rgba(255,255,255,0.08)',
         background: '#000',

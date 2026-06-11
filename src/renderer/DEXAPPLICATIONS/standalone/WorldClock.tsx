@@ -239,12 +239,12 @@ const s: Record<string, React.CSSProperties> = {
   title: { fontSize: 16, fontWeight: 700 },
   toolbarRight: { display: 'flex', gap: 6 },
   toggleBtn: {
-    padding: '5px 10px', borderRadius: 6, border: 'none',
+    padding: '5px 10px', borderRadius: 4, border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
     fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   addBtn: {
-    width: 28, height: 28, borderRadius: 6, border: 'none',
+    width: 28, height: 28, borderRadius: 4, border: 'none',
     background: 'var(--color-accent)', color: '#fff', fontSize: 16, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
@@ -255,7 +255,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexWrap: 'wrap' as const, gap: 6,
   },
   zoneOption: {
-    padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border, var(--color-border))',
+    padding: '6px 12px', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
     cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-family)',
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 2,
@@ -268,7 +268,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   clockCard: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: '20px 16px', borderRadius: 16,
+    padding: '20px 16px', borderRadius: 12,
     border: '1px solid var(--color-border, var(--color-bg-hover))',
     position: 'relative' as const, gap: 4,
   },

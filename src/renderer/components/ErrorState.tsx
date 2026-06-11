@@ -83,7 +83,7 @@ const actionsStyle: React.CSSProperties = {
 
 const buttonBase: React.CSSProperties = {
   padding: '6px 14px',
-  borderRadius: 8,
+  borderRadius: 6,
   fontSize: 13,
   fontWeight: 500,
   cursor: 'pointer',

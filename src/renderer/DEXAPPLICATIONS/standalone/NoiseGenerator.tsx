@@ -360,11 +360,11 @@ const st: Record<string, React.CSSProperties> = {
   timerLabel: { fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' },
   timerOptions: { display: 'flex', gap: 4 },
   timerBtn: {
-    padding: '4px 8px', borderRadius: 6, border: 'none',
+    padding: '4px 8px', borderRadius: 4, border: 'none',
     fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   mixToggle: {
-    display: 'flex', borderRadius: 8, overflow: 'hidden',
+    display: 'flex', borderRadius: 6, overflow: 'hidden',
     border: '1px solid var(--color-border, var(--color-border))',
     marginBottom: 16,
   },
@@ -381,7 +381,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   presetBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-    padding: '14px 8px', borderRadius: 12, cursor: 'pointer',
+    padding: '14px 8px', borderRadius: 10, cursor: 'pointer',
     border: '1px solid', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s',
   },

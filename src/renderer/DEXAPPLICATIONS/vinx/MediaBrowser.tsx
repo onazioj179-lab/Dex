@@ -36,7 +36,7 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
   fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase',
   color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', cursor: 'pointer', userSelect: 'none',
-  borderBottom: active ? '1px solid #4A9EFF' : '1px solid transparent',
+  borderBottom: active ? '1px solid var(--color-accent, #4A9EFF)' : '1px solid transparent',
   background: 'transparent',
 });
 
@@ -47,7 +47,7 @@ const searchBarStyle: React.CSSProperties = {
 
 const searchInputStyle: React.CSSProperties = {
   flex: 1, height: 22, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
-  borderRadius: 4, padding: '0 6px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
+  borderRadius: 3, padding: '0 6px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
   fontFamily: 'inherit',
 };
 
@@ -60,11 +60,11 @@ const listItemStyle = (selected: boolean): React.CSSProperties => ({
 const gridItemStyle = (selected: boolean): React.CSSProperties => ({
   display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 4, cursor: 'pointer',
   background: selected ? 'rgba(74,158,255,0.12)' : 'transparent',
-  borderRadius: 4, width: 80,
+  borderRadius: 3, width: 80,
 });
 
 const thumbnailStyle: React.CSSProperties = {
-  width: 64, height: 36, borderRadius: 2, background: '#1A1A1A', overflow: 'hidden',
+  width: 64, height: 36, borderRadius: 2, background: 'var(--color-bg-base, #1A1A1A)', overflow: 'hidden',
   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
 };
 
@@ -391,7 +391,7 @@ const MediaTab: React.FC = memo(() => {
             minWidth: 160, padding: '4px 0',
             background: 'var(--color-bg-elevated, #1a1a1e)',
             border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
-            borderRadius: 8,
+            borderRadius: 6,
             boxShadow: 'var(--pg-shadow-context)',
             fontSize: 12, color: 'var(--color-text-primary)',
           }}

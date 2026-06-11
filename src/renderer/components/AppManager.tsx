@@ -14,7 +14,7 @@
 
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 import { platform } from '../utils';
-import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
 
 import { useAppTransition } from '../utils/motionHooks';
@@ -503,7 +503,7 @@ const errorBoundaryContainer: React.CSSProperties = {
   animation: 'fadeIn 0.25s var(--ease-out)',
 };
 const errorBoundaryIcon: React.CSSProperties = {
-  width: 52, height: 52, borderRadius: 14,
+  width: 52, height: 52, borderRadius: 10,
   background: 'rgba(255,69,58,0.1)', border: '0.5px solid rgba(255,69,58,0.2)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 };
@@ -511,7 +511,7 @@ const errorBoundaryTitle: React.CSSProperties = { fontSize: 14, fontWeight: 500,
 const errorBoundaryMsg: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 320, textAlign: 'center', lineHeight: 1.5 };
 const errorBoundaryBtn: React.CSSProperties = {
   padding: '8px 22px', background: 'var(--color-accent)', color: '#fff',
-  border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500,
+  border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500,
   cursor: 'pointer', marginTop: 4, letterSpacing: '-0.01em',
   transition: 'opacity 0.15s ease, transform 0.12s ease',
 };
@@ -812,10 +812,41 @@ export const AppManager: React.FC = () => {
         icon: ICONS.includes(d.icon) ? d.icon : (ICONS.includes(d.type) ? d.type : 'info'),
         priority: PRIOS.includes(d.priority) ? d.priority : 'normal',
         source: d.source != null ? String(d.source) : undefined,
+        actions: Array.isArray(d.actions) ? d.actions : undefined,
       });
     };
     window.addEventListener('dex-notification', onNotify as EventListener);
     return () => window.removeEventListener('dex-notification', onNotify as EventListener);
+  }, [notifyPush]);
+
+  // Recovery Level 3: if the previous session ended uncleanly with apps open,
+  // offer a one-click workspace restore (last-session journal in runningApps).
+  const restoreOfferShownRef = useRef(false);
+  useEffect(() => {
+    if (restoreOfferShownRef.current) return;
+    restoreOfferShownRef.current = true;
+    try {
+      const last = readLastSession();
+      if (!last || last.clean || last.apps.length === 0) return;
+      if (Date.now() - last.timestamp > 24 * 60 * 60 * 1000) { clearLastSession(); return; }
+      const apps = last.apps;
+      notifyPush({
+        title: 'Restore your workspace?',
+        body: `Your last session ended unexpectedly with ${apps.length === 1 ? apps[0].name : `${apps.length} apps`} open.`,
+        icon: 'warning',
+        priority: 'high',
+        duration: 15000,
+        source: 'recovery',
+        actions: [{
+          label: 'Restore',
+          onClick: () => {
+            const launch = useRunningApps.getState().launchApp;
+            for (const a of apps) launch(a);
+          },
+        }],
+      });
+      clearLastSession();
+    } catch { /* never block boot */ }
   }, [notifyPush]);
 
   // -- Split-screen tiling ------------------------------------------------
@@ -2274,6 +2305,14 @@ export const AppManager: React.FC = () => {
         },
       });
     }
+    // Compact / mini always-on-top mode — discoverable in Spotlight.
+    actions.push({
+      id: 'toggle-compact-mode',
+      label: 'Compact Mode (Mini Window)',
+      keywords: ['compact', 'mini', 'minimize', 'always on top', 'pip', 'pin', 'corner', 'small window', 'float'],
+      icon: 'minimize-2',
+      action: () => { void import('../shell/MiniShell').then(m => m.useCompactMode.getState().enter()); },
+    });
     spotlightEngine.registerActions(actions);
 
     const handleNavigate = (e: Event) => {
@@ -2662,7 +2701,7 @@ export const AppManager: React.FC = () => {
                 const appDef = APP_DEFINITIONS[appId];
                 const appColor = appDef?.color || LAUNCHPAD_APPS.find(a => a.id === appId)?.color || '#8E8E93';
                 return (
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 4, background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                     {AppIconPngs[appId]
                       ? <AppIconImg appId={appId} size={22} />
                       : <span style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[appId] || <DexIcon name={APP_DEFINITIONS[appId]?.icon || appId} size={16} color="#fff" />}</span>}
@@ -2694,7 +2733,7 @@ export const AppManager: React.FC = () => {
                     aria-label={`Minimize ${getLabel(appId)}`}
                     style={{
                       width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none', borderRadius: 6,
+                      background: 'transparent', border: 'none', borderRadius: 4,
                       color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#fff'; }}
@@ -2719,7 +2758,7 @@ export const AppManager: React.FC = () => {
                       aria-label={`Maximize ${getLabel(appId)}`}
                       style={{
                         width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'transparent', border: 'none', borderRadius: 6,
+                        background: 'transparent', border: 'none', borderRadius: 4,
                         color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#fff'; }}
@@ -2734,7 +2773,7 @@ export const AppManager: React.FC = () => {
                       <div style={{
                         position: 'absolute', top: 28, right: -16, zIndex: 'var(--z-overlay)' as unknown as number,
                         background: 'var(--color-bg-elevated)',
-                        border: '1px solid var(--color-border)', borderRadius: 12,
+                        border: '1px solid var(--color-border)', borderRadius: 10,
                         padding: '10px 10px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5,
                         boxShadow: 'var(--pg-shadow-context), inset 0 0.5px 0 var(--color-border-subtle)',
                         width: 240,
@@ -2759,7 +2798,7 @@ export const AppManager: React.FC = () => {
                             aria-label={`Snap window ${label}`}
                             style={{
                               width: 50, height: 38, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                              background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 7,
+                              background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 5,
                               color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0,
                               transition: 'all 0.15s ease',
                             }}
@@ -2780,7 +2819,7 @@ export const AppManager: React.FC = () => {
                     aria-label={`Close ${getLabel(appId)}`}
                     style={{
                       width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none', borderRadius: 6,
+                      background: 'transparent', border: 'none', borderRadius: 4,
                       color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.18)'; e.currentTarget.style.color = 'var(--color-error)'; }}
@@ -2997,7 +3036,7 @@ export const AppManager: React.FC = () => {
                   data-resize-handle="se"
                   style={{ 
                     position: 'absolute', right: 0, bottom: 0, width: 20, height: 20, 
-                    cursor: 'nwse-resize', zIndex: 3, borderRadius: '0 0 14px 0',
+                    cursor: 'nwse-resize', zIndex: 3, borderRadius: '0 0 10px 0',
                     display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end',
                     padding: 4,
                   }}
@@ -3604,7 +3643,7 @@ export const AppManager: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               background: 'var(--color-bg-surface)',
-              borderRadius: 12,
+              borderRadius: 10,
               border: '1px dashed var(--color-border)',
               color: 'var(--color-text-muted)',
               fontSize: 10,
@@ -3802,7 +3841,7 @@ export const AppManager: React.FC = () => {
               title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 10px 0 8px', height: 26, borderRadius: 6,
+                padding: '0 10px 0 8px', height: 26, borderRadius: 4,
                 background: isActive ? 'rgba(74,158,255,0.16)' : isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
                 border: isDragging ? '1px dashed var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
@@ -3838,7 +3877,7 @@ export const AppManager: React.FC = () => {
                 onPointerDown={e => e.stopPropagation()}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 18, height: 18, borderRadius: 4,
+                  width: 18, height: 18, borderRadius: 3,
                   background: 'transparent', border: 'none', cursor: 'pointer',
                   color: 'var(--color-text-tertiary)', padding: 0, marginLeft: 4, flexShrink: 0,
                   transition: 'color 0.08s ease, background 0.08s ease, transform 0.08s ease',
@@ -3864,7 +3903,7 @@ export const AppManager: React.FC = () => {
             transform: 'translate(10px, -50%) scale(1.06)',
             pointerEvents: 'none', zIndex: 9999,
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '0 10px 0 8px', height: 26, borderRadius: 6,
+            padding: '0 10px 0 8px', height: 26, borderRadius: 4,
             background: 'var(--color-bg-glass-strong, rgba(20,20,22,0.92))',
             backdropFilter: 'var(--blur-lg) saturate(180%)', WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
             border: '1px solid var(--color-border-subtle)',
@@ -3960,7 +3999,7 @@ export const AppManager: React.FC = () => {
               backdropFilter: 'var(--blur-lg) saturate(160%)',
               WebkitBackdropFilter: 'var(--blur-lg) saturate(160%)',
               border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: 20, padding: '2px 10px 2px 6px',
+              borderRadius: 14, padding: '2px 10px 2px 6px',
               height: 24, overflow: 'hidden',
             }}>
               {activeCreative.length > 0 ? activeCreative.slice(0, 3).map(a => {
@@ -3985,7 +4024,7 @@ export const AppManager: React.FC = () => {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 3,
                       background: showMinimizedList ? 'rgba(255,255,255,0.12)' : 'none',
-                      border: 'none', cursor: 'pointer', padding: '2px 5px', borderRadius: 8,
+                      border: 'none', cursor: 'pointer', padding: '2px 5px', borderRadius: 6,
                       fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 2,
                       transition: 'background 0.12s',
                     }}
@@ -4019,7 +4058,7 @@ export const AppManager: React.FC = () => {
                         position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
                         background: 'var(--pg-toolbar, rgba(28,28,32,0.92))',
                         border: '1px solid var(--pg-border, rgba(255,255,255,0.10))',
-                        borderRadius: 10, padding: '4px 0',
+                        borderRadius: 8, padding: '4px 0',
                         boxShadow: 'var(--pg-shadow-overlay, 0 12px 32px rgba(0,0,0,0.45))',
                         backdropFilter: 'var(--blur-lg) saturate(180%)',
                         WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
@@ -4064,7 +4103,7 @@ export const AppManager: React.FC = () => {
         {/* Date + time live in the draggable Clock widget on Home (user-placed).
             Keeping the topbar minimal -- only system status indicators here. */}
         {/* Battery - always visible */}
-        <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2.5, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
+        <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
           <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1.5, background: batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
           <div style={{ position: 'absolute', right: -2.5, width: 1.5, height: 3.5, borderRadius: '0 0.5px 0.5px 0', background: 'var(--color-text-tertiary)' }} />
         </div>
@@ -4082,7 +4121,7 @@ export const AppManager: React.FC = () => {
           aria-label="Open notification center"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, height: 18, borderRadius: 5, position: 'relative',
+            width: 22, height: 18, borderRadius: 4, position: 'relative',
             background: showNotifCenter ? 'var(--color-border)' : 'transparent',
             border: 'none', cursor: 'pointer', padding: 0,
             transition: 'background 0.15s ease',
@@ -4112,7 +4151,7 @@ export const AppManager: React.FC = () => {
             aria-expanded={titlebarMenuOpen}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 18, borderRadius: 5,
+              width: 22, height: 18, borderRadius: 4,
               background: titlebarMenuOpen ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
               border: '1px solid rgba(255,255,255,0.10)',
               cursor: 'pointer', padding: 0, transition: 'background 0.15s ease',
@@ -4137,7 +4176,7 @@ export const AppManager: React.FC = () => {
                   background: 'rgba(24,24,28,0.70)',
                   backdropFilter: 'var(--blur-xl) saturate(180%)',
                   WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-                  borderRadius: 14, border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)',
                   boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
                   animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
                   transformOrigin: 'top right',
@@ -4352,7 +4391,7 @@ export const AppManager: React.FC = () => {
           }}
           style={{
             position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)',
-            width: 6, height: 48, borderRadius: '0 4px 4px 0',
+            width: 6, height: 48, borderRadius: '0 3px 3px 0',
             background: 'var(--color-text-tertiary)',
             opacity: 0.3, cursor: 'pointer', zIndex: 5001,
             transition: 'opacity 0.2s ease, width 0.2s ease',
@@ -4461,7 +4500,7 @@ export const AppManager: React.FC = () => {
               position: 'fixed', left: z.x, top: z.y, width: z.w, height: z.h,
               background: 'rgba(59,130,246,0.08)',
               border: '2.5px solid rgba(59,130,246,0.35)',
-              borderRadius: 14,
+              borderRadius: 10,
               pointerEvents: 'none',
               zIndex: 4000,
               transition: 'all 0.2s cubic-bezier(0.2,0.9,0.3,1)',
@@ -4496,7 +4535,7 @@ export const AppManager: React.FC = () => {
             transform: 'translate(-50%, -100%)',
             zIndex: 5002,
             background: 'var(--color-bg-elevated)',
-            borderRadius: 10,
+            borderRadius: 8,
             border: '1px solid var(--color-border)',
             padding: '7px 14px',
             pointerEvents: 'auto',
@@ -4504,7 +4543,7 @@ export const AppManager: React.FC = () => {
             display: 'flex', alignItems: 'center', gap: 8,
             animation: isReduceMotion() ? 'none' : 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
           } as React.CSSProperties}>
-            <div style={{ width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewApp.color, background: `${previewApp.color}18`, flexShrink: 0 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewApp.color, background: `${previewApp.color}18`, flexShrink: 0 }}>
               {AppIconPngs[previewApp.id]
                 ? <AppIconImg appId={previewApp.id} size={20} />
                 : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[previewApp.id] || <DexIcon name={APP_DEFINITIONS[previewApp.id]?.icon || previewApp.id} size={18} color={previewApp.color} />}</span>}
@@ -4529,7 +4568,7 @@ export const AppManager: React.FC = () => {
               }}
               style={{
                 border: '1px solid var(--color-border)',
-                borderRadius: 8,
+                borderRadius: 6,
                 background: isPeekPinned ? 'var(--color-accent)' : 'var(--color-bg-surface)',
                 color: isPeekPinned ? '#fff' : 'var(--color-text-primary)',
                 fontSize: 10,
@@ -4549,7 +4588,7 @@ export const AppManager: React.FC = () => {
               }}
               style={{
                 border: '1px solid var(--color-border)',
-                borderRadius: 8,
+                borderRadius: 6,
                 background: 'var(--color-bg-surface)',
                 color: 'var(--color-text-primary)',
                 fontSize: 10,
@@ -4577,7 +4616,7 @@ export const AppManager: React.FC = () => {
                 }}
                 style={{
                   border: '1px solid var(--color-border)',
-                  borderRadius: 8,
+                  borderRadius: 6,
                   background: 'var(--color-bg-surface)',
                   color: 'var(--color-text-primary)',
                   fontSize: 10,
@@ -4658,7 +4697,7 @@ export const AppManager: React.FC = () => {
                 width: 40, height: 40,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: showAppMenu ? 'var(--color-border-subtle)' : 'transparent',
-                border: 'none', borderRadius: 10, cursor: 'pointer',
+                border: 'none', borderRadius: 8, cursor: 'pointer',
                 transition: 'background 0.25s ease',
                 padding: 0, touchAction: 'manipulation',
                 outline: 'none',
@@ -4692,7 +4731,7 @@ export const AppManager: React.FC = () => {
                     width: 36, height: 36,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isUkiActive ? 'rgba(10,132,255,0.20)' : 'transparent',
-                    border: 'none', borderRadius: 10, cursor: 'pointer',
+                    border: 'none', borderRadius: 8, cursor: 'pointer',
                     transition: 'all 0.25s ease',
                     padding: 0, touchAction: 'manipulation',
                     outline: 'none',
@@ -4728,7 +4767,7 @@ export const AppManager: React.FC = () => {
                     width: 28, height: 28,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: 'transparent',
-                    border: 'none', borderRadius: 8, cursor: 'pointer',
+                    border: 'none', borderRadius: 6, cursor: 'pointer',
                     transition: 'transform 0.25s cubic-bezier(0.23,1,0.32,1)',
                     padding: 0, touchAction: 'manipulation',
                   }}
@@ -4828,7 +4867,7 @@ export const AppManager: React.FC = () => {
               backdropFilter: 'none',
               WebkitBackdropFilter: 'none',
               border: '1px solid rgba(255, 255, 255, 0.14)',
-              borderRadius: 22,
+              borderRadius: 16,
               padding: '20px 20px 16px',
               boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
               animation: 'appMenuSlideUp 0.22s cubic-bezier(0.23,1,0.32,1)',
@@ -4888,13 +4927,13 @@ export const AppManager: React.FC = () => {
                     className="dex-hover-lift"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
-                      width: '100%', padding: '10px 12px', borderRadius: 14,
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
                       background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
                       cursor: 'pointer', textAlign: 'left',
                     }}
                   >
                     <div style={{
-                      width: 38, height: 38, borderRadius: 12,
+                      width: 38, height: 38, borderRadius: 10,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: result.color || '#8E8E93',
                       background: `${result.color || '#8E8E93'}18`,
@@ -4956,7 +4995,7 @@ export const AppManager: React.FC = () => {
                     className="dex-hover-lift"
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      padding: '7px 4px', borderRadius: 12, width: '100%',
+                      padding: '7px 4px', borderRadius: 10, width: '100%',
                       background: 'transparent',
                       border: 'none', cursor: 'pointer',
                       transition: 'transform 0.3s cubic-bezier(0.23,1,0.32,1)',
@@ -4966,7 +5005,7 @@ export const AppManager: React.FC = () => {
                       color: app.color,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: 42, height: 42,
-                      borderRadius: 12,
+                      borderRadius: 10,
                       // No glass tile behind the icon — the icon stands on its own.
                       background: 'transparent',
                       border: 'none',
@@ -5014,7 +5053,7 @@ export const AppManager: React.FC = () => {
               // .dex-surface-overlay class — the canonical overlay surface for
               // context menus. Blur is perf-tier/thermal gated automatically.
               zIndex: 5006, minWidth: 180,
-              borderRadius: 12, padding: 4,
+              borderRadius: 10, padding: 4,
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >
@@ -5039,7 +5078,7 @@ export const AppManager: React.FC = () => {
                   onClick={item.action}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left',
-                    padding: '7px 14px', fontSize: 13, fontWeight: 400, borderRadius: 8,
+                    padding: '7px 14px', fontSize: 13, fontWeight: 400, borderRadius: 6,
                     background: 'transparent', border: 'none',
                     color: item.danger ? 'var(--color-error)' : 'var(--color-text-primary)',
                     cursor: 'pointer', transition: 'background 0.08s',
@@ -5076,7 +5115,7 @@ export const AppManager: React.FC = () => {
             zIndex: 5006, minWidth: 170,
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border)',
-            borderRadius: 12, padding: 4,
+            borderRadius: 10, padding: 4,
             boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
             animation: 'ctxMenuIn 0.3s cubic-bezier(0.23,1,0.32,1)',
             transformOrigin: 'bottom left',
@@ -5157,7 +5196,7 @@ export const AppManager: React.FC = () => {
                     onClick={item.action}
                     style={{
                       display: 'block', width: '100%', textAlign: 'left',
-                      padding: '7px 14px', fontSize: 13, fontWeight: 400, borderRadius: 8,
+                      padding: '7px 14px', fontSize: 13, fontWeight: 400, borderRadius: 6,
                       color: item.danger ? 'var(--color-error)' : 'var(--color-text-primary)',
                       background: 'transparent', border: 'none', cursor: 'pointer',
                       transition: 'background 0.25s cubic-bezier(0.23,1,0.32,1)',
@@ -5250,14 +5289,14 @@ const trafficBtn = (color: string): React.CSSProperties => ({
 const navBtnStyle: React.CSSProperties = {
   width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--color-text-primary)',
-  cursor: 'pointer', borderRadius: 6, touchAction: 'manipulation',
+  cursor: 'pointer', borderRadius: 4, touchAction: 'manipulation',
   transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), background 0.15s ease',
 };
 
 const winBtnStyle: React.CSSProperties = {
   width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'transparent', border: 'none', color: 'var(--color-text-primary)', cursor: 'pointer',
-  borderRadius: 6, transition: 'color 0.12s ease, background 0.15s ease',
+  borderRadius: 4, transition: 'color 0.12s ease, background 0.15s ease',
 };
 
 export default AppManager;

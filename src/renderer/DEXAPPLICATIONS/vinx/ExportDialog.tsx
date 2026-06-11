@@ -34,7 +34,7 @@ const overlayStyle: React.CSSProperties = {
 
 const dialogStyle: React.CSSProperties = {
   width: 'min(560px, calc(100vw - 32px))', maxHeight: 'min(80vh, calc(100vh - 32px))', background: 'var(--color-bg-base)',
-  border: '1px solid var(--color-border-subtle)', borderRadius: 8,
+  border: '1px solid var(--color-border-subtle)', borderRadius: 6,
   display: 'flex', flexDirection: 'column', overflow: 'hidden',
 };
 
@@ -53,7 +53,7 @@ const presetGridStyle: React.CSSProperties = {
 };
 
 const presetCardStyle = (selected: boolean): React.CSSProperties => ({
-  padding: '8px', borderRadius: 4, cursor: 'pointer',
+  padding: '8px', borderRadius: 3, cursor: 'pointer',
   border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-bg-hover)'}`,
   background: selected ? 'rgba(74,158,255,0.08)' : 'var(--color-border-subtle)',
 });
@@ -68,7 +68,7 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   flex: 1, height: 24, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
-  borderRadius: 3, padding: '0 6px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
+  borderRadius: 2, padding: '0 6px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
   fontFamily: 'inherit', minWidth: 0,
 };
 
@@ -81,11 +81,11 @@ const selectStyle: React.CSSProperties = {
 
 const btnPrimaryStyle: React.CSSProperties = {
   padding: '6px 20px', fontSize: 11, fontWeight: 600, border: 'none',
-  borderRadius: 4, background: 'var(--color-accent)', color: '#000000', cursor: 'pointer',
+  borderRadius: 3, background: 'var(--color-accent)', color: '#000000', cursor: 'pointer',
 };
 
 const btnSecondaryStyle: React.CSSProperties = {
-  padding: '6px 16px', fontSize: 11, fontWeight: 600, borderRadius: 4,
+  padding: '6px 16px', fontSize: 11, fontWeight: 600, borderRadius: 3,
   border: '1px solid var(--color-border)', background: 'transparent',
   color: 'var(--color-text-secondary)', cursor: 'pointer',
 };

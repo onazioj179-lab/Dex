@@ -421,7 +421,7 @@ export const Power: React.FC = () => {
                   value={searchFilter}
                   onChange={e => setSearchFilter(e.target.value)}
                   style={{
-                    padding: '6px 12px', borderRadius: 8, fontSize: 12,
+                    padding: '6px 12px', borderRadius: 6, fontSize: 12,
                     background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
                     color: 'var(--color-text-primary)', outline: 'none', width: 180,
                   }}
@@ -435,7 +435,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* CPU Mini Chart */}
-            <div style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+            <div style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600 }}>CPU Usage</div>
               <div style={{ display: 'flex', alignItems: 'end', gap: 1, height: 40 }}>
                 {cpuHistory.map((v, i) => (
@@ -448,7 +448,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Process Table */}
-            <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 80px 90px 60px 70px 70px', padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                 {[
                   { key: 'pid', label: 'PID' },
@@ -488,7 +488,7 @@ export const Power: React.FC = () => {
                     <span style={{ color: 'var(--color-text-secondary)' }}>{p.memory > 1024 ? `${(p.memory / 1024).toFixed(1)} GB` : `${p.memory} MB`}</span>
                     <span style={{ color: 'var(--color-text-tertiary)' }}>{p.disk} MB/s</span>
                     <span style={{ 
-                      fontSize: 10, padding: '2px 6px', borderRadius: 6,
+                      fontSize: 10, padding: '2px 6px', borderRadius: 4,
                       background: p.status === 'running' ? 'rgba(48,209,88,0.15)' : p.status === 'sleeping' ? 'rgba(255,159,10,0.15)' : 'var(--color-bg-hover)',
                       color: p.status === 'running' ? 'var(--color-success)' : p.status === 'sleeping' ? 'var(--color-warning)' : 'var(--color-text-tertiary)',
                       textAlign: 'center' as const,
@@ -507,7 +507,7 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Battery</h3>
 
             {/* Main battery display */}
-            <div style={{ ...glassPanel, padding: 24, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ ...glassPanel, padding: 24, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 24 }}>
               <div style={{ position: 'relative', width: 80, height: 80 }}>
                 <svg width="80" height="80" viewBox="0 0 80 80">
                   <circle cx="40" cy="40" r="35" fill="none" stroke="var(--color-border-subtle)" strokeWidth="6" />
@@ -538,7 +538,7 @@ export const Power: React.FC = () => {
                 { label: 'Temperature', value: `${battery.temperature}C`, color: battery.temperature > 40 ? 'var(--color-error)' : 'var(--color-accent)' },
                 { label: 'Voltage', value: `${battery.voltage}V`, color: '#bf5af2' },
               ].map(s => (
-                <div key={s.label} style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+                <div key={s.label} style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
                   <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 22, fontWeight: 500, color: s.color }}>{s.value}</div>
                 </div>
@@ -546,7 +546,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Optimized charging toggle */}
-            <div style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+            <div style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Optimized Battery Charging</div>
@@ -557,7 +557,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Low power mode */}
-            <div style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+            <div style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>Low Power Mode</div>
@@ -581,7 +581,7 @@ export const Power: React.FC = () => {
                   onClick={() => setProfile(key)}
                   style={{
                     ...glassPanel,
-                    padding: 16, borderRadius: 12, cursor: 'pointer',
+                    padding: 16, borderRadius: 10, cursor: 'pointer',
                     border: profile === key ? `2px solid ${info.color}` : '1px solid var(--color-border-subtle)',
                     textAlign: 'left' as const,
                     transition: 'all 0.15s',
@@ -601,7 +601,7 @@ export const Power: React.FC = () => {
 
             {/* Custom profile sliders */}
             {profile === 'custom' && (
-              <div style={{ ...glassPanel, padding: 20, borderRadius: 12 }}>
+              <div style={{ ...glassPanel, padding: 20, borderRadius: 10 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 16 }}>Custom Profile Settings</div>
                 {[
                   { label: 'CPU Limit', value: cpuLimit, set: setCpuLimitWired, color: 'var(--color-accent)' },
@@ -638,7 +638,7 @@ export const Power: React.FC = () => {
                 { label: 'Available', value: `${(memInfo.available / 1024).toFixed(1)} GB`, total: '', pct: (memInfo.available / memInfo.total * 100), color: 'var(--color-success)' },
                 { label: 'Cached', value: `${(memInfo.cached / 1024).toFixed(1)} GB`, total: '', pct: (memInfo.cached / memInfo.total * 100), color: '#64d2ff' },
               ].map(s => (
-                <div key={s.label} style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+                <div key={s.label} style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
                   <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 500, color: s.color }}>{s.value}</div>
                   {s.total && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{s.total}</div>}
@@ -650,7 +650,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Per-app memory */}
-            <div style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+            <div style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>App Memory Usage</div>
               {memInfo.appMemory.map(app => (
                 <div key={app.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
@@ -664,7 +664,7 @@ export const Power: React.FC = () => {
             </div>
 
             {/* Swap */}
-            <div style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+            <div style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Swap</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                 <span>{(memInfo.swapUsed / 1024).toFixed(1)} GB used</span>
@@ -682,7 +682,7 @@ export const Power: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 600 }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Startup Items</h3>
 
-            <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
               {startupItems.map((item, i) => (
                 <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < startupItems.length - 1 ? '1px solid var(--color-border-subtle)' : 'none' }}>
                   <span style={{ fontSize: 14, display: 'flex' }}>{item.type === 'app' ? <PackageIcon size={14} /> : item.type === 'service' ? <SettingsIcon size={14} /> : <FileTextIcon size={14} />}</span>
@@ -699,7 +699,7 @@ export const Power: React.FC = () => {
             </div>
 
             <h3 style={{ margin: '8px 0 0', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>Scheduled Tasks</h3>
-            <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
               {scheduledTasks.map((task, i) => (
                 <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < scheduledTasks.length - 1 ? '1px solid var(--color-border-subtle)' : 'none' }}>
                   <div style={{ flex: 1 }}>
@@ -722,7 +722,7 @@ export const Power: React.FC = () => {
               const pct = (zone.temp / zone.maxTemp) * 100;
               const color = pct > 80 ? 'var(--color-error)' : pct > 60 ? 'var(--color-warning)' : 'var(--color-success)';
               return (
-                <div key={zone.name} style={{ ...glassPanel, padding: 16, borderRadius: 12 }}>
+                <div key={zone.name} style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>{zone.name}</span>
                     <span style={{ fontSize: 20, fontWeight: 500, color }}>{zone.temp.toFixed(0)}C</span>
@@ -746,7 +746,7 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>System Controls</h3>
 
             {panicStopped && (
-              <div style={{ ...glassPanel, padding: 16, borderRadius: 12, border: '1px solid rgba(255,69,58,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ ...glassPanel, padding: 16, borderRadius: 10, border: '1px solid rgba(255,69,58,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 14, color: 'var(--color-error)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}><WarningIcon size={14} color="#ff453a" /> All systems stopped</span>
                 <button onClick={() => { setPanicStopped(false); setAutomationsEnabled(true); }} style={{ ...glassButton, padding: '6px 14px', fontSize: 12, color: 'var(--color-success)', background: 'rgba(48,209,88,0.15)', border: '1px solid rgba(48,209,88,0.25)' }}>
                   Resume
@@ -754,25 +754,25 @@ export const Power: React.FC = () => {
               </div>
             )}
 
-            <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Automation</div>
               <ControlRow label="Automations" description="Run automated tasks and workflows" checked={automationsEnabled && !panicStopped} onChange={() => setAutomationsEnabled(!automationsEnabled)} disabled={panicStopped} />
               <ControlRow label="Learning" description="Learn from usage patterns" checked={learningEnabled && !panicStopped} onChange={() => setLearningEnabled(!learningEnabled)} disabled={panicStopped} />
             </div>
 
-            <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Security</div>
               <ControlRow label="Lock DEX" description="Require authentication to access" checked={appLocked} onChange={() => setAppLocked(!appLocked)} />
               <ControlRow label="Safe Mode" description="Disable all extensions and custom scripts" checked={safeMode} onChange={() => setSafeMode(!safeMode)} />
             </div>
 
-            <div style={{ ...glassPanel, borderRadius: 12, padding: 16 }}>
+            <div style={{ ...glassPanel, borderRadius: 10, padding: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 12 }}>Emergency</div>
               <button
                 onClick={handlePanicStop}
                 disabled={panicStopped}
                 style={{
-                  width: '100%', padding: 14, borderRadius: 10,
+                  width: '100%', padding: 14, borderRadius: 8,
                   background: 'rgba(255,69,58,0.15)', border: '1px solid rgba(255,69,58,0.25)',
                   color: 'var(--color-error)', fontSize: 14, fontWeight: 500, cursor: panicStopped ? 'default' : 'pointer',
                   opacity: panicStopped ? 0.5 : 1,
@@ -851,7 +851,7 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shield</h3>
         <span style={{
-          fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20,
+          fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 14,
           background: overall === 'safe' ? 'rgba(48,209,88,0.15)' : overall === 'warning' ? 'rgba(255,159,10,0.15)' : 'rgba(255,69,58,0.15)',
           color: SEV_COLOR[overall],
           border: `1px solid ${SEV_COLOR[overall]}40`,
@@ -861,7 +861,7 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
       </div>
 
       {threats.length === 0 ? (
-        <div style={{ ...glassPanel, padding: 32, borderRadius: 12, textAlign: 'center' }}>
+        <div style={{ ...glassPanel, padding: 32, borderRadius: 10, textAlign: 'center' }}>
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
           </svg>
@@ -872,14 +872,14 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {threats.map(({ process: p, reasons, score }) => (
             <div key={p.pid} style={{
-              ...glassPanel, borderRadius: 12, padding: 14,
+              ...glassPanel, borderRadius: 10, padding: 14,
               border: `1px solid ${score >= 3 ? 'rgba(255,69,58,0.25)' : 'rgba(255,159,10,0.2)'}`,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <WarningIcon size={14} color={score >= 3 ? 'var(--color-error)' : 'var(--color-warning)'} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>{p.name}</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>PID {p.pid}</span>
-                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, fontWeight: 600,
                   background: score >= 3 ? 'rgba(255,69,58,0.15)' : 'rgba(255,159,10,0.15)',
                   color: score >= 3 ? 'var(--color-error)' : 'var(--color-warning)' }}>
                   Score {score}
@@ -887,7 +887,7 @@ const ShieldPanel: React.FC<{ processes: ProcessInfo[] }> = ({ processes }) => {
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                 {reasons.map(r => (
-                  <span key={r.label} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: `${SEV_COLOR[r.severity]}18`, color: SEV_COLOR[r.severity], border: `1px solid ${SEV_COLOR[r.severity]}30` }}>
+                  <span key={r.label} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, background: `${SEV_COLOR[r.severity]}18`, color: SEV_COLOR[r.severity], border: `1px solid ${SEV_COLOR[r.severity]}30` }}>
                     {r.label}
                   </span>
                 ))}

@@ -26,6 +26,7 @@ import React, { Component, ErrorInfo, ReactNode, useCallback, useMemo } from 're
 import { useLifecycleManager, AppProcess } from './LifecycleManager';
 import { useSystemEvents } from './SystemServices';
 import { useRunningApps } from '../store/runningApps';
+import { useShellPreferences } from '../store/shellPreferencesStore';
 
 // ===========================================================================
 // TYPES
@@ -177,6 +178,20 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
     // Call optional crash handler
     onCrash?.(error, errorInfo);
+
+    // Recovery Level 1: bounded auto-recovery. With the shell preference on
+    // (default), recover automatically while the retry budget lasts; the
+    // CrashScreen's "Recovering..." state stays visible during the attempt.
+    // After 3 crashes this never fires and the crash card takes over.
+    let autoRecover = true;
+    try {
+      autoRecover = useShellPreferences.getState().autoRecoverApps;
+    } catch {
+      // store unavailable (tests/early boot) — keep default
+    }
+    if (autoRecover && updatedCrashCount < 3) {
+      this.handleRecover();
+    }
   }
 
   componentWillUnmount() {
@@ -347,7 +362,7 @@ const styles: Record<string, React.CSSProperties> = {
   icon: {
     width: 64,
     height: 64,
-    borderRadius: 'var(--radius-lg, 14px)',
+    borderRadius: 'var(--radius-lg, 10px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -384,7 +399,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   button: {
     padding: 'var(--space-2, 10px) var(--space-5, 20px)',
-    borderRadius: 'var(--radius-md, 8px)',
+    borderRadius: 'var(--radius-md, 6px)',
     border: '1px solid var(--color-border-default)',
     background: 'var(--color-bg-secondary)',
     fontSize: 'var(--font-size-sm, 14px)',
@@ -411,7 +426,7 @@ const styles: Record<string, React.CSSProperties> = {
   pre: {
     marginTop: 'var(--space-2, 8px)',
     padding: 'var(--space-3, 12px)',
-    borderRadius: 'var(--radius-md, 8px)',
+    borderRadius: 'var(--radius-md, 6px)',
     background: 'var(--bg-tertiary, rgba(0,0,0,0.04))',
     fontSize: 'var(--font-size-2xs, 10px)',
     fontFamily: 'var(--font-mono, monospace)',
@@ -601,7 +616,7 @@ const stateStyles: Record<string, React.CSSProperties> = {
   icon: {
     width: 64,
     height: 64,
-    borderRadius: 'var(--radius-lg, 14px)',
+    borderRadius: 'var(--radius-lg, 10px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -677,17 +692,17 @@ export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErr
     }
 
     return (
-      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 700 }}>View error in {this.props.viewName}</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>Something went wrong in this view. The issue was logged.</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={this.reloadView} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 8, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>Reload view</button>
-          <button onClick={() => this.setState(prev => ({ ...prev, showDetails: !prev.showDetails }))} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 8, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
+          <button onClick={this.reloadView} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 6, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>Reload view</button>
+          <button onClick={() => this.setState(prev => ({ ...prev, showDetails: !prev.showDetails }))} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 6, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
             {this.state.showDetails ? 'Hide error details' : 'View error details'}
           </button>
         </div>
         {this.state.showDetails && (
-          <pre style={{ margin: 0, padding: 8, borderRadius: 6, background: 'rgba(0,0,0,0.2)', fontSize: 11, overflowX: 'auto' }}>{this.state.errorMessage}</pre>
+          <pre style={{ margin: 0, padding: 8, borderRadius: 4, background: 'rgba(0,0,0,0.2)', fontSize: 11, overflowX: 'auto' }}>{this.state.errorMessage}</pre>
         )}
       </div>
     );

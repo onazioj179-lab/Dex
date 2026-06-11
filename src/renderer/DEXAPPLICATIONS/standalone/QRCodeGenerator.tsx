@@ -357,7 +357,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px 12px', borderRadius: 8, border: 'none',
+    padding: '6px 12px', borderRadius: 6, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -371,19 +371,19 @@ const s: Record<string, React.CSSProperties> = {
   },
   inputArea: {},
   textarea: {
-    width: '100%', minHeight: 80, padding: '10px 12px', borderRadius: 10,
+    width: '100%', minHeight: 80, padding: '10px 12px', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 14, resize: 'vertical',
     outline: 'none', fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   input: {
-    width: '100%', padding: '10px 12px', borderRadius: 10,
+    width: '100%', padding: '10px 12px', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 14, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   select: {
-    width: '100%', padding: '10px 12px', borderRadius: 10,
+    width: '100%', padding: '10px 12px', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)', fontSize: 14, cursor: 'pointer',
     outline: 'none', fontFamily: 'var(--font-family)',
@@ -392,11 +392,11 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', justifyContent: 'center', padding: 16,
   },
   canvas: {
-    width: 240, height: 240, borderRadius: 12,
+    width: 240, height: 240, borderRadius: 10,
     border: '1px solid var(--color-border-subtle)',
   },
   placeholder: {
-    width: 240, height: 240, borderRadius: 12,
+    width: 240, height: 240, borderRadius: 10,
     border: '2px dashed var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center',
@@ -407,7 +407,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   actionBtn: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '8px 16px', borderRadius: 8, border: 'none',
+    padding: '8px 16px', borderRadius: 6, border: 'none',
     background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)',
     fontSize: 13, fontWeight: 500, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -419,7 +419,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
   },
   colorInput: {
-    width: 28, height: 28, border: 'none', borderRadius: 6,
+    width: 28, height: 28, border: 'none', borderRadius: 4,
     cursor: 'pointer', background: 'transparent',
   },
 };

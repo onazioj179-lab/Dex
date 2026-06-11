@@ -288,7 +288,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         fontSize: 12,
         lineHeight: 1.45,
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 6,
+        borderRadius: 4,
         overflow: 'hidden',
       }}
       onClick={() => inputRef.current?.focus()}

@@ -145,14 +145,14 @@ export const Skeleton = memo(function Skeleton({
         return {
           width: width ?? '100%',
           height: height ?? 100,
-          borderRadius: 8,
+          borderRadius: 6,
         };
       case 'text':
       default:
         return {
           width: width ?? '100%',
           height: height ?? 14,
-          borderRadius: 4,
+          borderRadius: 3,
         };
     }
   };
@@ -216,7 +216,7 @@ export const GlassPanel = memo(function GlassPanel({
         ...materialStyles,
         boxShadow: shadowMap[elevation],
         border: '1px solid rgba(255, 255, 255, 0.12)',
-        borderRadius: 12,
+        borderRadius: 10,
         position: 'relative',
         ...style,
       }}
@@ -276,7 +276,7 @@ export const PremiumButton = memo(function PremiumButton({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 8,
+        borderRadius: 6,
         fontWeight: 500,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -562,7 +562,7 @@ export const SurfaceCard = memo(function SurfaceCard({
       className={className}
       style={{
         ...materialStyle,
-        borderRadius: 12,
+        borderRadius: 10,
         border: '1px solid rgba(255, 255, 255, 0.12)',
         ...style,
       }}
@@ -611,7 +611,7 @@ export const PremiumInput = memo(function PremiumInput({
       style={{
         width: '100%',
         padding: '8px 12px',
-        borderRadius: 8,
+        borderRadius: 6,
         border: `1px solid ${error ? 'var(--color-error)' : success ? 'var(--color-success)' : 'rgba(255, 255, 255, 0.14)'}`,
         background: 'rgba(0, 0, 0, 0.25)',
         color: 'var(--color-text-primary)',

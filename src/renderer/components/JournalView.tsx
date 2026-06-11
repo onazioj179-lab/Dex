@@ -45,7 +45,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 500,
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'transparent',
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
@@ -62,7 +62,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 12,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-bg-hover)',
-    borderRadius: 6,
+    borderRadius: 4,
     color: 'var(--color-text-primary)',
     outline: 'none',
   },
@@ -71,7 +71,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 500,
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'transparent',
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
@@ -123,7 +123,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 10,
     fontWeight: 600,
     padding: '1px 6px',
-    borderRadius: 3,
+    borderRadius: 2,
     background: 'rgba(10,132,255,0.12)',
     color: 'var(--color-accent)',
     whiteSpace: 'nowrap' as const,
@@ -148,7 +148,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 500,
     border: '1px solid var(--color-bg-hover)',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
@@ -193,7 +193,7 @@ const S: Record<string, React.CSSProperties> = {
   sessionCard: {
     padding: '10px 12px',
     marginBottom: 6,
-    borderRadius: 8,
+    borderRadius: 6,
     border: '1px solid var(--color-bg-hover)',
     background: 'var(--color-border-subtle)',
     cursor: 'pointer',
@@ -225,7 +225,7 @@ const S: Record<string, React.CSSProperties> = {
     width: 320,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)',
-    borderRadius: 10,
+    borderRadius: 8,
     padding: 16,
     zIndex: 100,
     boxShadow: 'var(--pg-shadow-popover)',
@@ -251,7 +251,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 4,
+    borderRadius: 3,
     color: 'var(--color-text-primary)',
     outline: 'none',
   },
@@ -260,7 +260,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 500,
     border: '1px solid var(--color-border)',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
@@ -272,7 +272,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 600,
     border: '1px solid rgba(255,59,48,0.3)',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'rgba(255,59,48,0.08)',
     color: 'var(--color-error)',
     cursor: 'pointer',
@@ -283,7 +283,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: 4,
+    borderRadius: 3,
     color: 'var(--color-text-primary)',
     outline: 'none',
   },
@@ -558,7 +558,7 @@ const BySessionView: React.FC = () => {
               <div style={S.sessionHeader}>
                 <span style={S.sessionId}>{session.id.slice(0, 8)}...</span>
                 {isCurrent && (
-                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)', fontWeight: 600 }}>
+                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)', fontWeight: 600 }}>
                     CURRENT
                   </span>
                 )}
@@ -669,7 +669,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       )}
 
       {lastResult && (
-        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 8, padding: '4px 8px', background: 'rgba(48,209,88,0.08)', borderRadius: 4 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 8, padding: '4px 8px', background: 'rgba(48,209,88,0.08)', borderRadius: 3 }}>
           {lastResult}
         </div>
       )}

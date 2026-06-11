@@ -62,7 +62,7 @@ export const panelBodyStyle: React.CSSProperties = {
 // ===== Item 78: Action button (green) =====
 export const actionButtonStyle: React.CSSProperties = {
   padding: '6px 14px',
-  borderRadius: 6,
+  borderRadius: 4,
   border: '1px solid rgba(48,209,88,0.3)',
   background: 'rgba(48,209,88,0.12)',
   color: 'var(--color-success)',
@@ -75,7 +75,7 @@ export const actionButtonStyle: React.CSSProperties = {
 // ===== Item 79: Destructive button (red) =====
 export const destructiveButtonStyle: React.CSSProperties = {
   padding: '6px 14px',
-  borderRadius: 6,
+  borderRadius: 4,
   border: '1px solid rgba(255,69,58,0.3)',
   background: 'rgba(255,69,58,0.12)',
   color: 'var(--color-error)',
@@ -128,7 +128,7 @@ const TOOLTIP_STYLES = `
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 8px;
-  border-radius: 5px;
+  border-radius: 4px;
   background: rgba(30,30,32,0.92);
   color: var(--color-text-primary);
   font-size: 10px;

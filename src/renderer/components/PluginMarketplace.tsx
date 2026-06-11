@@ -219,7 +219,7 @@ export const PluginMarketplace: React.FC = () => {
 
 const tabBtnStyle = (active: boolean): React.CSSProperties => ({
   padding: '4px 10px',
-  borderRadius: 6,
+  borderRadius: 4,
   border: '1px solid var(--pg-border)',
   background: active ? 'var(--pg-row-active)' : 'transparent',
   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -262,7 +262,7 @@ const emptyStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 10px', borderRadius: 8,
+  width: '100%', padding: '8px 10px', borderRadius: 6,
   border: '1px solid var(--pg-border-strong)',
   background: 'rgba(0,0,0,0.35)',
   color: 'var(--color-text-primary)',
@@ -273,7 +273,7 @@ const inputStyle: React.CSSProperties = {
 
 const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties => {
   const base: React.CSSProperties = {
-    padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+    padding: '6px 12px', borderRadius: 4, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
     whiteSpace: 'nowrap', flexShrink: 0,

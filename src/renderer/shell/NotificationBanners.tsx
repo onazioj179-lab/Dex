@@ -244,7 +244,7 @@ const Banner: React.FC<{
       style={{
         width: BANNER_WIDTH,
         minHeight: 64,
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
         boxShadow: 'var(--pg-shadow-panel)',
@@ -260,7 +260,7 @@ const Banner: React.FC<{
     >
       <div style={{ padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          width: 28, height: 28, borderRadius: 6, flexShrink: 0,
           background: `color-mix(in srgb, ${iconColor} 8%, transparent)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -301,7 +301,7 @@ const Banner: React.FC<{
                     onDismiss(notification.id); 
                   }}
                   style={{
-                    padding: '4px 10px', borderRadius: 6,
+                    padding: '4px 10px', borderRadius: 4,
                     background: 'var(--color-warning)',
                     color: '#000',
                     border: 'none', fontSize: 11, fontWeight: 600,
@@ -325,7 +325,7 @@ const Banner: React.FC<{
                   key={i}
                   onClick={(e) => { e.stopPropagation(); action.onClick(); onDismiss(notification.id); }}
                   style={{
-                    padding: '4px 10px', borderRadius: 6,
+                    padding: '4px 10px', borderRadius: 4,
                     background: i === 0 && !notification.undoAction ? 'var(--color-accent)' : 'var(--color-border-subtle)',
                     color: i === 0 && !notification.undoAction ? '#fff' : 'var(--color-text-secondary)',
                     border: 'none', fontSize: 11, fontWeight: 500,
@@ -349,7 +349,7 @@ const Banner: React.FC<{
           position: 'absolute',
           top: 0, left: 0, right: 0, height: 2,
           background: 'linear-gradient(90deg, var(--color-error), var(--color-warning))',
-          borderRadius: '12px 12px 0 0',
+          borderRadius: '10px 10px 0 0',
         }} />
       )}
 
@@ -425,7 +425,7 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
           fontSize: 11, color: 'var(--color-text-tertiary)',
           textAlign: 'center', padding: '4px 0',
           background: 'var(--color-bg-elevated)',
-          borderRadius: 8, opacity: 0.9,
+          borderRadius: 6, opacity: 0.9,
         }}>
           +{overflow} more notification{overflow > 1 ? 's' : ''}
         </div>
@@ -598,7 +598,7 @@ export const NotificationCenter: React.FC<{
         width: 360, zIndex: 'var(--z-notification)',
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
-        borderRadius: 16,
+        borderRadius: 12,
         boxShadow: 'var(--pg-shadow-popover-strong)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
@@ -633,7 +633,7 @@ export const NotificationCenter: React.FC<{
               <span style={{
                 fontSize: 10, fontWeight: 600, color: '#fff',
                 background: 'var(--color-accent)',
-                padding: '2px 6px', borderRadius: 10,
+                padding: '2px 6px', borderRadius: 8,
               }}>
                 {unreadCount}
               </span>
@@ -643,12 +643,12 @@ export const NotificationCenter: React.FC<{
             {/* View mode toggle */}
             <div style={{
               display: 'flex', background: 'var(--color-bg-hover)',
-              borderRadius: 6, padding: 2,
+              borderRadius: 4, padding: 2,
             }}>
               <button
                 onClick={() => setViewMode('timeline')}
                 style={{
-                  padding: '3px 8px', borderRadius: 4, border: 'none',
+                  padding: '3px 8px', borderRadius: 3, border: 'none',
                   background: viewMode === 'timeline' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'timeline' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
@@ -660,7 +660,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('grouped')}
                 style={{
-                  padding: '3px 8px', borderRadius: 4, border: 'none',
+                  padding: '3px 8px', borderRadius: 3, border: 'none',
                   background: viewMode === 'grouped' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'grouped' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
@@ -676,7 +676,7 @@ export const NotificationCenter: React.FC<{
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
                   fontSize: 11, color: 'var(--color-text-tertiary)',
-                  fontWeight: 500, padding: '2px 6px', borderRadius: 6,
+                  fontWeight: 500, padding: '2px 6px', borderRadius: 4,
                   transition: 'color 0.1s',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
@@ -688,7 +688,7 @@ export const NotificationCenter: React.FC<{
             <button
               onClick={onClose}
               style={{
-                width: 22, height: 22, borderRadius: 6, border: 'none',
+                width: 22, height: 22, borderRadius: 4, border: 'none',
                 background: 'var(--color-bg-hover)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--color-text-tertiary)',
@@ -732,7 +732,7 @@ export const NotificationCenter: React.FC<{
                     <span style={{
                       fontSize: 9, fontWeight: 600, color: 'var(--color-accent)',
                       background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
-                      padding: '1px 5px', borderRadius: 8,
+                      padding: '1px 5px', borderRadius: 6,
                     }}>
                       {group.unreadCount} new
                     </span>
@@ -747,7 +747,7 @@ export const NotificationCenter: React.FC<{
                       key={n.id} 
                       onClick={() => onMarkAsRead?.(n.id)}
                       style={{
-                        padding: '10px 12px', borderRadius: 10, marginBottom: 4,
+                        padding: '10px 12px', borderRadius: 8, marginBottom: 4,
                         background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
                         border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
                         cursor: 'pointer',
@@ -787,7 +787,7 @@ export const NotificationCenter: React.FC<{
               const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
               return (
                 <div key={n.id} style={{
-                  padding: '10px 12px', borderRadius: 10, marginBottom: 6,
+                  padding: '10px 12px', borderRadius: 8, marginBottom: 6,
                   background: 'var(--color-bg-surface)',
                   border: '1px solid var(--color-border-subtle)',
                 }}>

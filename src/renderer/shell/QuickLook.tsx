@@ -113,7 +113,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
         style={{
           width: 'min(720px, 85vw)',
           maxHeight: '80vh',
-          borderRadius: 14,
+          borderRadius: 10,
           background: 'var(--color-bg-elevated)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-popover)',
@@ -143,7 +143,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
             onClick={onDismiss}
             aria-label="Close preview"
             style={{
-              width: 24, height: 24, borderRadius: 6,
+              width: 24, height: 24, borderRadius: 4,
               background: 'var(--color-bg-hover)',
               border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -202,7 +202,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
           <img
             src={item.content}
             alt={item.title}
-            style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 8, objectFit: 'contain' }}
+            style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 6, objectFit: 'contain' }}
           />
         </div>
       );
@@ -213,7 +213,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
           src={item.content}
           controls
           autoPlay
-          style={{ width: '100%', maxHeight: '60vh', borderRadius: 8, background: '#000' }}
+          style={{ width: '100%', maxHeight: '60vh', borderRadius: 6, background: '#000' }}
         />
       );
 

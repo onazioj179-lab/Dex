@@ -172,7 +172,7 @@ export async function loadDEXRenderer(win: BrowserWindow): Promise<void> {
         <div style="text-align:center">
           <h2>DEX failed to load</h2>
           <p style="opacity:0.5">The renderer could not be initialized.</p>
-          <button onclick="location.reload()" style="padding:8px 24px;background:#0a84ff;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-top:12px">Retry</button>
+          <button onclick="location.reload()" style="padding:8px 24px;background:#0a84ff;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-top:12px">Retry</button>
         </div>
       </body></html>
     `);

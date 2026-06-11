@@ -313,7 +313,7 @@ const Calculator: React.FC = () => {
           <button style={btnStyle('op')} onClick={() => performOperation('+')} aria-label="Add">+</button>
           {mode === 'scientific' && <button style={btnStyle('func')} onClick={() => { setDisplay(formatNumber(memory)); setWaitingForOperand(true); }} aria-label="Memory recall">MR</button>}
           
-          <button style={{ ...btnStyle('num'), gridColumn: 'span 2', width: '100%', borderRadius: '36px' }} onClick={() => inputDigit('0')} aria-label="0">0</button>
+          <button style={{ ...btnStyle('num'), gridColumn: 'span 2', width: '100%', borderRadius: '24px' }} onClick={() => inputDigit('0')} aria-label="0">0</button>
           <button style={btnStyle('num')} onClick={inputDecimal} aria-label="Decimal point">.</button>
           <button style={btnStyle('equal')} onClick={equals} aria-label="Equals">=</button>
           {mode === 'scientific' && <button style={btnStyle('func')} onClick={() => setMemory(0)} aria-label="Memory clear">MC</button>}
@@ -370,7 +370,7 @@ const styles: Record<string, React.CSSProperties> = {
   modeToggle: {
     display: 'flex',
     background: 'var(--color-bg-hover)',
-    borderRadius: '8px',
+    borderRadius: '6px',
     padding: '2px',
     border: '1px solid var(--color-border-subtle)',
     gap: '2px',
@@ -378,7 +378,7 @@ const styles: Record<string, React.CSSProperties> = {
   modeBtn: {
     padding: '8px 16px',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '4px',
     background: 'transparent',
     color: 'var(--color-text-muted)',
     fontSize: '11px',
@@ -399,7 +399,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-muted)',
     cursor: 'pointer',
     padding: '8px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -422,7 +422,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'flex-end',
     position: 'relative',
     background: 'var(--color-bg-surface)',
-    borderRadius: '12px',
+    borderRadius: '10px',
     marginBottom: '10px',
     border: '1px solid var(--color-border-subtle)',
   },
@@ -449,7 +449,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent-light)',
     color: 'var(--color-accent)',
     padding: '4px 10px',
-    borderRadius: '4px',
+    borderRadius: '3px',
     fontSize: '10px',
     fontWeight: 700,
     letterSpacing: '0.5px',
@@ -495,7 +495,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     padding: '4px 8px',
-    borderRadius: '4px',
+    borderRadius: '3px',
     transition: 'all 0.2s ease',
     letterSpacing: '0.3px',
   },
@@ -513,7 +513,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   historyItem: {
     padding: '12px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     marginBottom: '8px',
     background: 'var(--color-bg-surface)',
     cursor: 'pointer',

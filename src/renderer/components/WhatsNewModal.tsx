@@ -29,16 +29,20 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
-    title: 'Save Backup',
-    body: 'Right-click the tray icon -> Save backup... to write a single, integrity-checked JSON file with your notes, tasks, projects, workflows, modes and settings.',
+    title: 'DEX is now 100% free',
+    body: 'Every feature on every tier is unlocked - the full creative suite, automation, multi-window and more. No trial, no quotas, no payment.',
   },
   {
-    title: 'Calmer assistant',
-    body: 'UKI no longer carries an old microphone error into a fresh text turn. Permission denials are surfaced once, then cleared.',
+    title: 'Compact mode',
+    body: 'Press Ctrl+Shift+M to shrink DEX to a small always-on-top pill in the corner, with quick actions for Notes, Timer and Clipboard. Your apps keep running underneath.',
   },
   {
-    title: 'Polish and fixes',
-    body: 'Smaller refinements across the shell so DEX stays out of your way.',
+    title: 'Workspace recovery',
+    body: 'If a session ends unexpectedly, DEX offers to restore your workspace. Crashed apps recover on their own, and the window remembers its size and position.',
+  },
+  {
+    title: 'A sharper, more alive system',
+    body: 'Crisper corners everywhere, a reimagined Nexus, better note-taking with wiki-links and an outline, a high-contrast theme, and controls that respond to every press.',
   },
 ];
 

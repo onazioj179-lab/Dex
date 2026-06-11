@@ -1420,7 +1420,7 @@ export const Browser: React.FC = () => {
         {tabGroups.size > 0 && (
           <div style={{ display: 'flex', gap: 4, padding: '2px 8px', background: 'var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
             {Array.from(tabGroups.entries()).map(([gid, group]) => (
-              <div key={gid} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: `${group.color}22`, cursor: 'pointer' }}
+              <div key={gid} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: `${group.color}22`, cursor: 'pointer' }}
                 onClick={() => { const firstTab = group.tabIds[0]; if (firstTab) setActiveTab(firstTab); }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color }} />
@@ -1669,7 +1669,7 @@ export const Browser: React.FC = () => {
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     {bookmarkFolders.length > 0 && (
                       <select
-                        style={{ fontSize: 10, background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', padding: '1px 4px' }}
+                        style={{ fontSize: 10, background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 4, color: 'var(--color-text)', padding: '1px 4px' }}
                         value={b.folderId || ''}
                         onClick={e => e.stopPropagation()}
                         onChange={e => moveBookmarkToFolder(b.id, e.target.value || undefined)}
@@ -1869,7 +1869,7 @@ export const Browser: React.FC = () => {
                   { label: 'Fingerprints', value: browserSettings.fingerprintProtection ? Math.floor(blockedCount * 0.3) : 0, color: '#bf5af2' },
                   { label: 'Cookies Blocked', value: browserSettings.blockThirdPartyCookies ? Math.floor(blockedCount * 0.6) : 0, color: 'var(--color-accent)' },
                 ].map(stat => (
-                  <div key={stat.label} style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--color-bg-secondary)' }}>
+                  <div key={stat.label} style={{ padding: '10px 12px', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
                     <div style={{ fontSize: 18, fontWeight: 600, color: stat.color }}>{stat.value.toLocaleString()}</div>
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{stat.label}</div>
                   </div>
@@ -1928,7 +1928,7 @@ export const Browser: React.FC = () => {
                 {savedPasswords.map(p => (
                   <div key={p.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px', borderRadius: '6px', marginBottom: '4px',
+                    padding: '8px', borderRadius: '4px', marginBottom: '4px',
                     background: 'var(--color-bg-secondary)', fontSize: '12px',
                   }}>
                     <div style={{ overflow: 'hidden' }}>
@@ -1952,7 +1952,7 @@ export const Browser: React.FC = () => {
                     onClick={() => setShowAddCard(true)}
                     aria-label="Add payment card"
                     style={{
-                      width: '100%', padding: '8px', marginBottom: '8px', borderRadius: '6px',
+                      width: '100%', padding: '8px', marginBottom: '8px', borderRadius: '4px',
                       border: '1px dashed var(--color-border-subtle)', background: 'transparent',
                       color: 'var(--color-accent)', cursor: 'pointer', fontSize: '12px',
                     }}
@@ -1971,21 +1971,21 @@ export const Browser: React.FC = () => {
                     e.currentTarget.reset();
                   }} style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', fontSize: '12px' }}>
                     <input name="cardName" required placeholder="Cardholder name" autoComplete="off"
-                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
+                      style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <input name="cardNumber" required placeholder="Card number" autoComplete="off" maxLength={19}
-                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
+                      style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <input name="expiry" required placeholder="MM/YY" autoComplete="off" maxLength={5}
-                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
+                      style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: 'var(--color-accent)', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Save</button>
-                      <button type="button" aria-label="Cancel adding card" onClick={() => setShowAddCard(false)} style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                      <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                      <button type="button" aria-label="Cancel adding card" onClick={() => setShowAddCard(false)} style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                     </div>
                   </form>
                 )}
                 {savedCards.map(c => (
                   <div key={c.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px', borderRadius: '6px', marginBottom: '4px',
+                    padding: '8px', borderRadius: '4px', marginBottom: '4px',
                     background: 'var(--color-bg-secondary)', fontSize: '12px',
                   }}>
                     <div>
@@ -2010,16 +2010,16 @@ export const Browser: React.FC = () => {
         <div style={{
           position: 'absolute', top: '80px', right: '12px', zIndex: 'var(--z-modal)',
           background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
-          borderRadius: '10px', padding: '14px 16px', boxShadow: 'var(--pg-shadow-tooltip)',
+          borderRadius: '8px', padding: '14px 16px', boxShadow: 'var(--pg-shadow-tooltip)',
           width: '280px', fontSize: '12px',
         }}>
           <div style={{ fontWeight: 600, marginBottom: '8px', color: 'var(--color-text-primary)' }}>Save password for {savePrompt.domain}?</div>
           <div style={{ color: 'var(--color-text-muted)', marginBottom: '10px' }}>Username: {savePrompt.username}</div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => { savePassword(savePrompt.domain, savePrompt.username, savePrompt.password); setSavePrompt(null); }}
-              style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: 'var(--color-accent)', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+              style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Save</button>
             <button onClick={() => setSavePrompt(null)}
-              style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Never</button>
+              style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Never</button>
           </div>
         </div>
       )}
@@ -2136,7 +2136,7 @@ export const Browser: React.FC = () => {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 8, padding: '6px 12px', color: 'var(--color-text-secondary)',
+                  borderRadius: 6, padding: '6px 12px', color: 'var(--color-text-secondary)',
                   cursor: 'pointer', fontSize: 12, marginBottom: 24,
                 }}
               >
@@ -2197,7 +2197,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '4px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2218,7 +2218,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '3px 8px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     cursor: 'pointer',
     maxWidth: '180px',
     minWidth: '0',
@@ -2273,7 +2273,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '2px',
     display: 'flex',
-    borderRadius: '6px',
+    borderRadius: '4px',
     opacity: 1,
     transition: 'opacity 0.15s',
     flexShrink: 0,
@@ -2284,7 +2284,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '3px 5px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2326,7 +2326,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '3px',
-    borderRadius: '5px',
+    borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2342,7 +2342,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '8px',
+    borderRadius: '6px',
     padding: '4px 10px',
     transition: 'box-shadow 0.15s, background 0.15s',
     border: '1px solid var(--color-bg-hover)',
@@ -2369,7 +2369,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: '42px',
     left: '10px',
     background: 'var(--color-bg-elevated)',
-    borderRadius: '14px',
+    borderRadius: '10px',
     border: '1px solid var(--color-border)',
     boxShadow: '0 8px 32px var(--color-shadow-strong)',
     zIndex: 9999,
@@ -2401,7 +2401,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '320px',
     maxHeight: '420px',
     background: 'var(--color-bg-elevated)',
-    borderRadius: '16px',
+    borderRadius: '12px',
     border: '1px solid var(--color-border)',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 9999,
@@ -2426,7 +2426,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     display: 'flex',
     padding: '2px',
-    borderRadius: '6px',
+    borderRadius: '4px',
   },
   clearBtn: {
     background: 'transparent',
@@ -2492,7 +2492,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: '12px',
     width: '280px',
     background: 'var(--color-bg-elevated)',
-    borderRadius: '16px',
+    borderRadius: '12px',
     border: '1px solid var(--color-border)',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 100,
@@ -2542,7 +2542,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '12px',
+    borderRadius: '10px',
     padding: '5px 12px',
   },
   findInput: {
@@ -2566,7 +2566,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '4px',
     display: 'flex',
-    borderRadius: '6px',
+    borderRadius: '4px',
   },
   findCloseBtn: {
     background: 'transparent',
@@ -2575,7 +2575,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: '4px',
     display: 'flex',
-    borderRadius: '6px',
+    borderRadius: '4px',
     marginLeft: '4px',
   },
 
@@ -2587,7 +2587,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '280px',
     maxHeight: '460px',
     background: 'var(--color-bg-elevated)',
-    borderRadius: '16px',
+    borderRadius: '12px',
     border: '1px solid var(--color-border)',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 200,
@@ -2631,7 +2631,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 10px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
+    borderRadius: '8px',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
     outline: 'none',
@@ -2680,7 +2680,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '11px 18px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
-    borderRadius: '12px',
+    borderRadius: '10px',
     color: 'var(--color-text-primary)',
     fontSize: '14px',
     outline: 'none',
@@ -2701,7 +2701,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     padding: '10px 14px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '12px',
+    borderRadius: '10px',
     cursor: 'pointer',
     position: 'relative',
     transition: 'background 0.12s, transform 0.08s',
@@ -2710,7 +2710,7 @@ const styles: Record<string, React.CSSProperties> = {
   favIcon: {
     width: '32px',
     height: '32px',
-    borderRadius: '8px',
+    borderRadius: '6px',
     background: 'var(--color-border-subtle)',
     display: 'flex',
     alignItems: 'center',
@@ -2770,7 +2770,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '9px 22px',
     background: 'var(--color-accent)',
     border: 'none',
-    borderRadius: '10px',
+    borderRadius: '8px',
     color: 'var(--color-accent-text)',
     fontSize: '13px',
     fontWeight: 500,
@@ -2781,7 +2781,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 18px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
-    borderRadius: '10px',
+    borderRadius: '8px',
     color: 'var(--color-text-secondary)',
     fontSize: '13px',
     cursor: 'pointer',
@@ -2796,7 +2796,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: 0,
     marginTop: '4px',
     background: 'var(--color-bg-elevated)',
-    borderRadius: '14px',
+    borderRadius: '10px',
     border: '1px solid var(--color-border)',
     boxShadow: '0 8px 32px var(--color-shadow-strong)',
     zIndex: 300,

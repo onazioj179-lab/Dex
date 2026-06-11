@@ -76,7 +76,7 @@ export const AppErrorState: React.FC<BaseProps & { onRetry?: () => void }> = ({
           marginTop: 6,
           height: 'var(--ctl-h-sm, 28px)',
           padding: '0 14px',
-          borderRadius: 8,
+          borderRadius: 6,
           background: 'rgba(255,255,255,0.08)',
           border: '1px solid rgba(255,255,255,0.12)',
           color: '#fff',

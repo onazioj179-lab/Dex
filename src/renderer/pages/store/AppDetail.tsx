@@ -215,7 +215,7 @@ function PublisherCard({ publisher, fallbackId }: { publisher?: PublisherProfile
   }
   return (
     <div style={{ ...premiumGlassCard, padding: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-      <span style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', background: 'rgba(10,132,255,0.12)', border: '1px solid rgba(10,132,255,0.26)' }}>
+      <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', background: 'rgba(10,132,255,0.12)', border: '1px solid rgba(10,132,255,0.26)' }}>
         <DexIcon name={badge?.level === 'first-party' ? 'shield' : 'award'} size={22} />
       </span>
       <div style={{ minWidth: 0, flex: '1 1 220px' }}>
@@ -260,7 +260,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 18,
     alignItems: 'flex-start',
     padding: 22,
-    borderRadius: 16,
+    borderRadius: 12,
     flexWrap: 'wrap',
   },
   metaRow: {
@@ -278,7 +278,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     marginTop: 12,
     padding: '8px 11px',
-    borderRadius: 9,
+    borderRadius: 7,
     border: '1px solid var(--pg-border)',
     background: 'rgba(255,255,255,0.04)',
     color: 'var(--color-text-secondary)',
@@ -298,7 +298,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 360,
     height: 225,
     flexShrink: 0,
-    borderRadius: 12,
+    borderRadius: 10,
     objectFit: 'cover',
     border: '1px solid var(--pg-border)',
     background: 'rgba(0,0,0,0.25)',

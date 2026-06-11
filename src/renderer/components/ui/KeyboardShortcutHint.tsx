@@ -41,9 +41,9 @@ export interface KeyboardShortcutHintProps {
 }
 
 const SIZE_STYLES: Record<'xs' | 'sm' | 'md', React.CSSProperties> = {
-  xs: { fontSize: 9, padding: '1px 4px', borderRadius: 3 },
-  sm: { fontSize: 10, padding: '1px 5px', borderRadius: 4 },
-  md: { fontSize: 12, padding: '2px 7px', borderRadius: 5 },
+  xs: { fontSize: 9, padding: '1px 4px', borderRadius: 2 },
+  sm: { fontSize: 10, padding: '1px 5px', borderRadius: 3 },
+  md: { fontSize: 12, padding: '2px 7px', borderRadius: 4 },
 };
 
 export const KeyboardShortcutHint: React.FC<KeyboardShortcutHintProps> = ({

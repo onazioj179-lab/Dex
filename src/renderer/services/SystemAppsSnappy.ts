@@ -197,7 +197,7 @@ export function createFilePreviewManager(): {
           transition: transform 150ms ease-out, opacity 150ms ease-out;
           z-index: var(--z-drag-overlay);
           background: var(--color-bg-elevated);
-          border-radius: 8px;
+          border-radius: 6px;
           box-shadow: 0 20px 40px rgba(0,0,0,0.3);
           padding: 20px;
         `;

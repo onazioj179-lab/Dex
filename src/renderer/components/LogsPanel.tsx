@@ -126,7 +126,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
         height,
         background: 'var(--pg-surface-overlay, rgba(10,10,14,0.96))',
         border: '1px solid var(--pg-border-subtle, rgba(255,255,255,0.08))',
-        borderRadius: 8,
+        borderRadius: 6,
         overflow: 'hidden',
         fontFamily: 'var(--font-mono, monospace)',
         fontSize: 11,
@@ -143,7 +143,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
             aria-label={`Toggle ${lvl} logs`}
             style={{
               padding: '2px 6px',
-              borderRadius: 4,
+              borderRadius: 3,
               border: '1px solid',
               borderColor: filter.has(lvl) ? LEVEL_COLORS[lvl] : 'transparent',
               background: filter.has(lvl) ? `${LEVEL_COLORS[lvl]}22` : 'transparent',
@@ -167,7 +167,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
             marginLeft: 'auto',
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 4,
+            borderRadius: 3,
             color: 'var(--pg-text-primary, #fff)',
             padding: '2px 8px',
             fontSize: 11,
@@ -179,7 +179,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
           onClick={clear}
           aria-label="Clear log entries"
           title="Clear"
-          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px 8px', fontSize: 10, fontFamily: 'inherit' }}
+          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 3, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px 8px', fontSize: 10, fontFamily: 'inherit' }}
         >
           Clear
         </button>

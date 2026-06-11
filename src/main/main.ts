@@ -195,6 +195,7 @@ import { ipcRateLimiter } from './security/IPCRateLimiter';
 
 // Centralized constants
 import { WINDOW, TIMEOUTS, LIMITS, THEME_DEFAULTS, MEDIA_EXTENSIONS } from './utils/constants';
+import { loadWindowState, trackWindowState } from './utils/windowStateKeeper';
 
 // AI Integration (Phase 56-57) - Planned for future release
 // AI Hub module available at ./ai when ready to enable
@@ -1313,21 +1314,23 @@ class DexApp {
     
     // GPU switches are applied in initialize() before app.whenReady()
 
-    // In OS mode, use full screen; otherwise cap to 85% of display
+    // In OS mode, use full screen; otherwise restore the last session's
+    // bounds (Recovery Level 2), falling back to 80% of the display.
     const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
     const fullBounds = screen.getPrimaryDisplay().bounds;
-    const winWidth = isOSMode ? fullBounds.width : Math.min(WINDOW.DEFAULT_WIDTH, Math.round(screenW * 0.80));
-    const winHeight = isOSMode ? fullBounds.height : Math.min(WINDOW.DEFAULT_HEIGHT, Math.round(screenH * 0.80));
-    
+    const savedState = isOSMode ? null : loadWindowState();
+    const winWidth = isOSMode ? fullBounds.width : (savedState?.width ?? Math.min(WINDOW.DEFAULT_WIDTH, Math.round(screenW * 0.80)));
+    const winHeight = isOSMode ? fullBounds.height : (savedState?.height ?? Math.min(WINDOW.DEFAULT_HEIGHT, Math.round(screenH * 0.80)));
+
     this.mainWindow = new BrowserWindow({
       width: winWidth,
       height: winHeight,
       minWidth: WINDOW.MIN_WIDTH,
       minHeight: WINDOW.MIN_HEIGHT,
       show: false, // Don't show until ready
-      center: !isOSMode,
-      x: isOSMode ? fullBounds.x : undefined,
-      y: isOSMode ? fullBounds.y : undefined,
+      center: !isOSMode && !savedState,
+      x: isOSMode ? fullBounds.x : savedState?.x,
+      y: isOSMode ? fullBounds.y : savedState?.y,
       icon: path.join(__dirname, '../../assets/icon.png'),
       frame: isOSMode ? false : isMac,
       transparent: false,
@@ -1364,6 +1367,12 @@ class DexApp {
 
     log.info('[DEX] BrowserWindow created');
 
+    // Persist bounds across launches (debounced save on move/resize/close).
+    if (!isOSMode && this.mainWindow) {
+      trackWindowState(this.mainWindow);
+      if (savedState?.maximized) this.mainWindow.maximize();
+    }
+
     // Create native macOS menu
     if (isMac) {
       this.createMacMenu();
@@ -1372,8 +1381,8 @@ class DexApp {
     // Show window when ready (prevents flash)
     this.mainWindow.once('ready-to-show', () => {
       log.info('[DEX] Window ready-to-show');
-      // In OS mode, stay fullscreen; otherwise ensure defined size
-      if (!isOSMode && this.mainWindow?.isMaximized()) {
+      // In OS mode, stay fullscreen; otherwise honor restored maximized state
+      if (!isOSMode && !savedState?.maximized && this.mainWindow?.isMaximized()) {
         this.mainWindow.unmaximize();
       }
       this.mainWindow?.show();
@@ -2624,6 +2633,54 @@ class DexApp {
     ipcMain.handle('window:hide', () => {
       this.mainWindow?.hide();
       return { success: true };
+    });
+    // Compact / mini always-on-top mode (Recovery + flexibility WS5). Saves the
+    // current bounds, shrinks the window to a corner pill, and pins it on top so
+    // DEX stays usable beside other work. exit-compact restores the saved bounds.
+    let compactSavedBounds: Electron.Rectangle | null = null;
+    ipcMain.handle('window:enter-compact', (_e: any, opts?: { width?: number; height?: number; corner?: string }) => {
+      const win = this.mainWindow;
+      if (!win || win.isDestroyed()) return { success: false };
+      try {
+        if (!compactSavedBounds) compactSavedBounds = win.getBounds();
+        if (win.isMaximized()) win.unmaximize();
+        if (win.isFullScreen()) win.setFullScreen(false);
+        const w = Math.max(240, Math.min(640, Math.round(opts?.width ?? 380)));
+        const h = Math.max(72, Math.min(480, Math.round(opts?.height ?? 96)));
+        // Clamp to the work area of the display the window is currently on.
+        const display = screen.getDisplayMatching(win.getBounds());
+        const area = display.workArea;
+        const margin = 16;
+        const corner = opts?.corner ?? 'bottom-right';
+        const x = corner.includes('left') ? area.x + margin : area.x + area.width - w - margin;
+        const y = corner.includes('top') ? area.y + margin : area.y + area.height - h - margin;
+        win.setMinimumSize(Math.min(240, w), Math.min(72, h));
+        win.setBounds({ x: Math.round(x), y: Math.round(y), width: w, height: h }, false);
+        win.setAlwaysOnTop(true, 'floating');
+        win.setResizable(false);
+        return { success: true };
+      } catch (error) {
+        log.warn('[DEX] enter-compact failed:', error);
+        return { success: false, error: String(error) };
+      }
+    });
+    ipcMain.handle('window:exit-compact', () => {
+      const win = this.mainWindow;
+      if (!win || win.isDestroyed()) return { success: false };
+      try {
+        win.setAlwaysOnTop(false);
+        win.setResizable(true);
+        win.setMinimumSize(WINDOW.MIN_WIDTH, WINDOW.MIN_HEIGHT);
+        if (compactSavedBounds) {
+          win.setBounds(compactSavedBounds, false);
+          compactSavedBounds = null;
+        }
+        win.focus();
+        return { success: true };
+      } catch (error) {
+        log.warn('[DEX] exit-compact failed:', error);
+        return { success: false, error: String(error) };
+      }
     });
     ipcMain.handle('window:setTitleBarOverlay', (_e: any, enabled: boolean) => {
       if (!this.mainWindow || process.platform === 'darwin') return { success: false };

@@ -159,9 +159,9 @@ const LIGHT_TOKENS: ThemeTokens = {
   text2xl: '24px',
 
   // Radius
-  radiusSm: '4px',
-  radiusMd: '8px',
-  radiusLg: '12px',
+  radiusSm: '3px',
+  radiusMd: '4px',
+  radiusLg: '6px',
   radiusFull: '9999px',
 
   // Transitions
@@ -227,9 +227,9 @@ const DARK_TOKENS: ThemeTokens = {
   text2xl: '24px',
 
   // Radius (same as light)
-  radiusSm: '4px',
-  radiusMd: '8px',
-  radiusLg: '12px',
+  radiusSm: '3px',
+  radiusMd: '4px',
+  radiusLg: '6px',
   radiusFull: '9999px',
 
   // Transitions (same as light)
@@ -295,9 +295,9 @@ const TRUE_BLACK_TOKENS: ThemeTokens = {
   text2xl: '24px',
 
   // Radius
-  radiusSm: '4px',
-  radiusMd: '8px',
-  radiusLg: '12px',
+  radiusSm: '3px',
+  radiusMd: '4px',
+  radiusLg: '6px',
   radiusFull: '9999px',
 
   // Transitions
@@ -461,8 +461,8 @@ class ThemeSystem {
       baseTokens = {
         ...baseTokens,
         radiusSm: '2px',
-        radiusMd: '4px',
-        radiusLg: '6px',
+        radiusMd: '3px',
+        radiusLg: '4px',
       };
     }
 

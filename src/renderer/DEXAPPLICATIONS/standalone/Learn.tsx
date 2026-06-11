@@ -130,7 +130,7 @@ const CONTENT: React.CSSProperties = {
 };
 const CARD: React.CSSProperties = {
   background: 'var(--color-bg-elevated, rgba(255,255,255,.04))',
-  borderRadius: 12, padding: '16px 18px',
+  borderRadius: 10, padding: '16px 18px',
   border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
 };
 const CARD_TITLE: React.CSSProperties = {
@@ -147,7 +147,7 @@ const BAR_BG: React.CSSProperties = {
 };
 const TAB_STYLE = (active: boolean): React.CSSProperties => ({
   padding: '6px 14px', fontSize: 12, fontWeight: active ? 600 : 400,
-  borderRadius: 8, cursor: 'pointer', border: 'none',
+  borderRadius: 6, cursor: 'pointer', border: 'none',
   background: active ? 'rgba(255,255,255,.1)' : 'transparent',
   color: active ? '#fff' : 'rgba(255,255,255,.5)',
   transition: 'all .15s ease',
@@ -281,7 +281,7 @@ const Learn: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 38, height: 38, borderRadius: 10,
+              width: 38, height: 38, borderRadius: 8,
               background: 'linear-gradient(135deg, #5e5ce6, #7d7aff)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
@@ -297,7 +297,7 @@ const Learn: React.FC = () => {
           <button
             onClick={() => setEnabled(!enabled)}
             style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 500, borderRadius: 8,
+              padding: '6px 14px', fontSize: 12, fontWeight: 500, borderRadius: 6,
               border: 'none', cursor: 'pointer',
               background: enabled ? 'rgba(48,209,88,.15)' : 'rgba(255,69,58,.15)',
               color: enabled ? 'var(--color-success)' : 'var(--color-error)',
@@ -391,7 +391,7 @@ const Learn: React.FC = () => {
                     display: 'flex', alignItems: 'center', gap: 10,
                   }}>
                     <div style={{
-                      width: 28, height: 28, borderRadius: 7,
+                      width: 28, height: 28, borderRadius: 5,
                       background: 'rgba(94,92,230,.15)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}>
@@ -401,7 +401,7 @@ const Learn: React.FC = () => {
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</div>
                       <div style={{ fontSize: 11, opacity: 0.45 }}>{s.reason}</div>
                     </div>
-                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'rgba(255,255,255,.04)', borderRadius: 4 }}>{s.type}</div>
+                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'rgba(255,255,255,.04)', borderRadius: 3 }}>{s.type}</div>
                   </div>
                 ))}
               </div>
@@ -443,7 +443,7 @@ const Learn: React.FC = () => {
                               {ki > 0 && <span style={{ fontSize: 10, opacity: 0.3, lineHeight: '22px' }}>+</span>}
                               <span style={{
                                 padding: '2px 8px', fontSize: 11, fontWeight: 600,
-                                background: 'rgba(255,255,255,.08)', borderRadius: 5,
+                                background: 'rgba(255,255,255,.08)', borderRadius: 4,
                                 border: '1px solid rgba(255,255,255,.06)',
                                 fontFamily: 'var(--font-mono, monospace)',
                                 minWidth: 24, textAlign: 'center' as const,
@@ -453,7 +453,7 @@ const Learn: React.FC = () => {
                         ) : (
                           <span style={{
                             padding: '2px 8px', fontSize: 11, fontWeight: 600,
-                            background: 'rgba(255,255,255,.08)', borderRadius: 5,
+                            background: 'rgba(255,255,255,.08)', borderRadius: 4,
                             border: '1px solid rgba(255,255,255,.06)',
                             fontFamily: 'var(--font-mono, monospace)',
                           }}>{item.keys}</span>
@@ -475,7 +475,7 @@ const Learn: React.FC = () => {
               <div key={app.app} style={CARD}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                   <div style={{
-                    width: 24, height: 24, borderRadius: 6,
+                    width: 24, height: 24, borderRadius: 4,
                     background: `${app.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <div style={{ width: 8, height: 8, borderRadius: 2, background: app.color }} />
@@ -552,7 +552,7 @@ const Learn: React.FC = () => {
                       <div key={day} style={{ flex: 1, textAlign: 'center' as const }}>
                         <div style={{ height: 48, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                           <div style={{
-                            width: '80%', borderRadius: 3,
+                            width: '80%', borderRadius: 2,
                             background: total ? 'rgba(94,92,230,.6)' : 'rgba(255,255,255,.04)',
                             height: `${Math.max(4, (total / maxTotal) * 100)}%`,
                           }} />
@@ -601,7 +601,7 @@ const Learn: React.FC = () => {
                 <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
                   {patterns.searchPatterns.slice(0, 20).map((q, i) => (
                     <span key={i} style={{
-                      padding: '4px 10px', fontSize: 12, borderRadius: 6,
+                      padding: '4px 10px', fontSize: 12, borderRadius: 4,
                       background: 'rgba(255,255,255,.05)', opacity: 0.7,
                     }}>{q}</span>
                   ))}
@@ -620,7 +620,7 @@ const Learn: React.FC = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</span>
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(94,92,230,.15)', color: '#7d7aff' }}>{s.type}</span>
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(94,92,230,.15)', color: '#7d7aff' }}>{s.type}</span>
                       <span style={{ fontSize: 10, opacity: 0.4, marginLeft: 'auto' }}>{Math.round(s.confidence * 100)}%</span>
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.5 }}>{s.reason}</div>
@@ -648,7 +648,7 @@ const Learn: React.FC = () => {
               <button
                 onClick={handleReset}
                 style={{
-                  padding: '8px 16px', fontSize: 12, fontWeight: 500, borderRadius: 8,
+                  padding: '8px 16px', fontSize: 12, fontWeight: 500, borderRadius: 6,
                   border: '1px solid rgba(255,69,58,.3)', background: 'rgba(255,69,58,.08)',
                   color: 'var(--color-error)', cursor: 'pointer',
                 }}
@@ -710,7 +710,7 @@ const Learn: React.FC = () => {
                     onClick={() => changePowerProfile(profile.id)}
                     style={{
                       padding: '14px 16px',
-                      borderRadius: 10,
+                      borderRadius: 8,
                       border: powerProfile === profile.id ? `2px solid ${profile.color}` : '2px solid transparent',
                       background: powerProfile === profile.id ? `${profile.color}15` : 'rgba(255,255,255,.03)',
                       cursor: 'pointer',
@@ -753,7 +753,7 @@ const Learn: React.FC = () => {
                 <button
                   onClick={toggleRestrictions}
                   style={{
-                    padding: '8px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+                    padding: '8px 16px', fontSize: 12, fontWeight: 600, borderRadius: 6,
                     border: 'none', cursor: 'pointer',
                     background: restrictedMode ? 'rgba(255,69,58,.15)' : 'rgba(48,209,88,.15)',
                     color: restrictedMode ? '#FF453A' : '#30D158',
@@ -775,7 +775,7 @@ const Learn: React.FC = () => {
                     key={item.label}
                     onClick={() => (window as any).electron?.invoke?.(item.action)}
                     style={{
-                      padding: '10px 12px', borderRadius: 8, border: 'none',
+                      padding: '10px 12px', borderRadius: 6, border: 'none',
                       background: 'rgba(255,255,255,.05)', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       fontSize: 11, color: 'inherit', transition: 'background 0.15s ease',
@@ -802,7 +802,7 @@ const Learn: React.FC = () => {
                 ].filter(t => t.condition).map((item, i) => (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 8,
+                    padding: '10px 12px', borderRadius: 6,
                     background: 'rgba(94,92,230,.1)',
                   }}>
                     <DexIcon name="info" size={14} color="#5E5CE6" />

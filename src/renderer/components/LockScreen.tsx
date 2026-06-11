@@ -575,7 +575,7 @@ export const LockScreen: React.FC = () => {
                 placeholder="XXXX-XXXX"
                 style={{
                   width: '100%', padding: '12px', background: 'var(--color-border-subtle)',
-                  border: '1px solid var(--color-border)', borderRadius: '10px',
+                  border: '1px solid var(--color-border)', borderRadius: '8px',
                   color: '#fff', fontSize: '16px', textAlign: 'center',
                   fontFamily: 'monospace', letterSpacing: '2px',
                   outline: 'none',
@@ -587,7 +587,7 @@ export const LockScreen: React.FC = () => {
                   onClick={handleRecoverySubmit}
                   disabled={isLoading || !recoveryCode.trim()}
                   style={{
-                    padding: '8px 20px', borderRadius: '8px', border: 'none',
+                    padding: '8px 20px', borderRadius: '6px', border: 'none',
                     background: 'rgba(74,158,255,0.3)', color: '#fff', fontSize: '13px',
                     cursor: 'pointer', opacity: (!recoveryCode.trim() || isLoading) ? 0.5 : 1,
                   }}
@@ -597,7 +597,7 @@ export const LockScreen: React.FC = () => {
                 <button
                   onClick={() => { setShowRecovery(false); setRecoveryCode(''); }}
                   style={{
-                    padding: '8px 20px', borderRadius: '8px', border: 'none',
+                    padding: '8px 20px', borderRadius: '6px', border: 'none',
                     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
                     fontSize: '13px', cursor: 'pointer',
                   }}
@@ -626,7 +626,7 @@ export const LockScreen: React.FC = () => {
           <button
             onClick={() => setIdleWarning(null)}
             style={{
-              padding: '4px 14px', borderRadius: '6px', border: '1px solid var(--color-text-tertiary)',
+              padding: '4px 14px', borderRadius: '4px', border: '1px solid var(--color-text-tertiary)',
               background: 'var(--color-border)', color: '#fff', fontSize: '12px',
               cursor: 'pointer', fontWeight: 600,
             }}
@@ -703,7 +703,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     padding: '10px 16px',
-    borderRadius: 10,
+    borderRadius: 8,
     background: 'rgba(255,159,10,0.12)',
     border: '1px solid rgba(255,159,10,0.25)',
     color: 'var(--color-warning)',
@@ -781,7 +781,7 @@ const styles: Record<string, React.CSSProperties> = {
   passwordInput: {
     width: '100%',
     height: 48,
-    borderRadius: 12,
+    borderRadius: 10,
     border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-primary)',
@@ -808,7 +808,7 @@ const styles: Record<string, React.CSSProperties> = {
   unlockBtn: {
     width: '100%',
     height: 44,
-    borderRadius: 10,
+    borderRadius: 8,
     border: 'none',
     background: 'var(--color-accent)',
     color: 'var(--color-text-primary)',
@@ -840,7 +840,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 14,
     transition: 'background 0.15s ease',
   },
   biometricLabel: {

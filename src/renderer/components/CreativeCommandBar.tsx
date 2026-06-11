@@ -130,7 +130,7 @@ export default function CreativeCommandBar({
           spellCheck={false}
           style={{
             flex: 1, minWidth: 0, background: C.surface2, color: C.text,
-            border: C.border, borderRadius: 6, padding: '7px 10px', outline: 'none',
+            border: C.border, borderRadius: 4, padding: '7px 10px', outline: 'none',
           }}
         />
         <button
@@ -139,7 +139,7 @@ export default function CreativeCommandBar({
           disabled={!input.trim() || phase === 'planning'}
           style={{
             flex: '0 0 auto', background: C.accent, color: '#08111f', border: 'none',
-            borderRadius: 6, padding: '7px 14px', fontWeight: 600,
+            borderRadius: 4, padding: '7px 14px', fontWeight: 600,
             cursor: !input.trim() ? 'not-allowed' : 'pointer', opacity: !input.trim() ? 0.5 : 1,
           }}
         >
@@ -208,7 +208,7 @@ export default function CreativeCommandBar({
                   disabled={blocked}
                   style={{
                     background: blocked ? 'var(--color-bg-base,#222)' : C.accent,
-                    color: blocked ? C.textDim : '#08111f', border: 'none', borderRadius: 6,
+                    color: blocked ? C.textDim : '#08111f', border: 'none', borderRadius: 4,
                     padding: '7px 14px', fontWeight: 600, cursor: blocked ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -219,7 +219,7 @@ export default function CreativeCommandBar({
                   onClick={reset}
                   style={{
                     background: 'transparent', color: C.textDim, border: C.border,
-                    borderRadius: 6, padding: '7px 14px', cursor: 'pointer',
+                    borderRadius: 4, padding: '7px 14px', cursor: 'pointer',
                   }}
                 >
                   Cancel
@@ -261,7 +261,7 @@ export default function CreativeCommandBar({
             onClick={() => { reset(); setInput(''); }}
             style={{
               alignSelf: 'flex-start', background: 'transparent', color: C.accent,
-              border: C.border, borderRadius: 6, padding: '6px 12px', cursor: 'pointer',
+              border: C.border, borderRadius: 4, padding: '6px 12px', cursor: 'pointer',
             }}
           >
             New command

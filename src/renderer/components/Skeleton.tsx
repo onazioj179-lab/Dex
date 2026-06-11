@@ -168,7 +168,7 @@ export const SkeletonCard: React.FC<SkeletonCardProps> = ({
   return (
     <div style={{
       background: 'var(--color-bg-secondary, #1a1a1a)',
-      borderRadius: 12,
+      borderRadius: 10,
       overflow: 'hidden',
       padding: showImage ? 0 : 16,
     }}>
@@ -314,7 +314,7 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
           gap: 12,
           padding: '12px 16px',
           background: 'var(--color-bg-secondary, #1a1a1a)',
-          borderRadius: '8px 8px 0 0',
+          borderRadius: '6px 6px 0 0',
         }}>
           {Array.from({ length: columns }).map((_, i) => (
             <SkeletonBase key={i} height={12} animate={animate} />

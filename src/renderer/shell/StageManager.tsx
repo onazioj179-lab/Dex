@@ -91,7 +91,7 @@ const StageTile = memo<TileProps>(({ app, isActive, isHovered, icon, isWeak, red
           position: 'relative',
           width: 72,
           minHeight: 72,
-          borderRadius: 16,
+          borderRadius: 12,
           border: isActive
             ? `1.5px solid ${color}66`
             : isHovered
@@ -124,7 +124,7 @@ const StageTile = memo<TileProps>(({ app, isActive, isHovered, icon, isWeak, red
       >
         {/* App icon -- large, centered, dock-style */}
         <div style={{
-          width: 38, height: 38, borderRadius: 10,
+          width: 38, height: 38, borderRadius: 8,
           background: `linear-gradient(135deg, ${color} 0%, ${color}bb 100%)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: isWeak ? 'none' : `0 3px 10px ${color}40`,
@@ -292,7 +292,7 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
           backdropFilter: expanded ? 'var(--blur-xl) saturate(180%)' : 'none',
           WebkitBackdropFilter: expanded ? 'var(--blur-xl) saturate(180%)' : 'none',
           border: expanded ? '1px solid var(--pg-border)' : 'none',
-          borderRadius: 16,
+          borderRadius: 12,
           boxShadow: expanded ? 'var(--pg-shadow-overlay)' : 'none',
           opacity: expanded ? 1 : 0,
           // Slightly longer, GPU-composited slide so the strip glides in from the

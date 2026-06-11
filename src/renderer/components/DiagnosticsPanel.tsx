@@ -82,7 +82,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         zIndex: Z_DIAGNOSTICS,
         background: 'var(--pg-surface-overlay, rgba(10,10,14,0.97))',
         border: '1px solid var(--pg-border-subtle, rgba(255,255,255,0.10))',
-        borderRadius: 12,
+        borderRadius: 10,
         boxShadow: 'var(--pg-shadow-modal)',
         display: 'flex',
         flexDirection: 'column',
@@ -105,7 +105,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
             aria-label="Close diagnostics panel"
             style={{
               background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 6, color: 'var(--pg-text-secondary)', cursor: 'pointer',
+              borderRadius: 4, color: 'var(--pg-text-secondary)', cursor: 'pointer',
               padding: '2px 10px', fontSize: 11,
             }}
           >
@@ -149,7 +149,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
                   display: 'flex', justifyContent: 'space-between',
                   fontSize: 11, fontVariantNumeric: 'tabular-nums',
                   color: p.durationMs > 500 ? 'var(--status-error, #ef4444)' : 'var(--pg-text-secondary, #9ca3af)',
-                  padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4,
+                  padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 3,
                 }}>
                   <span style={{ fontFamily: 'ui-monospace, monospace' }}>{p.name}</span>
                   <span style={{ fontWeight: 600 }}>{p.durationMs} ms</span>
@@ -173,7 +173,7 @@ interface StatProps { label: string; value: string; warn?: boolean }
 const Stat: React.FC<StatProps> = ({ label, value, warn }) => (
   <div style={{
     background: 'rgba(255,255,255,0.04)',
-    borderRadius: 6,
+    borderRadius: 4,
     padding: '8px 10px',
     border: `1px solid ${warn ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.06)'}`,
   }}>

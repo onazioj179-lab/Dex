@@ -12,6 +12,44 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v5.1.0 — Free for everyone, compact mode & a sharper system (2026-06-11)
+
+### New
+
+- **DEX is now 100% free.** Every feature on every tier is unlocked — no trial,
+  no quotas, no payment. The full creative suite, automation, multi-window, and
+  everything else is available to all users.
+- **Compact mode.** Press Ctrl+Shift+M (or pick it from search / Settings) to
+  shrink DEX to a small always-on-top pill in the corner of your screen, with
+  quick actions for Notes, Timer and Clipboard. Your apps keep running, and
+  expanding returns you to exactly where you were.
+- **Workspace recovery.** If a session ends unexpectedly, DEX offers a one-click
+  "Restore your workspace?" so you pick up where you left off. Crashed apps now
+  recover on their own (up to three attempts), and the window remembers its size
+  and position across launches.
+- **Instant updates.** Updates download quietly in the background and install on
+  quit, so you are always on the latest version without interruption.
+
+### Improvements
+
+- **A sharper interface everywhere.** Tighter, more precise corner radii across
+  the whole system and every app, with crisper borders and a more modern feel.
+- **Nexus, reimagined.** Layered glow, real depth, a denser parallax starfield,
+  gradient connections and a refined glass HUD — a far more alive workspace.
+- **Better note-taking.** [[wiki-link]] autocomplete, a clickable table-of-
+  contents outline, drag-and-drop attachments, and a live autosave indicator.
+- **Accessibility depth.** A true high-contrast theme and text-spacing controls
+  for letter, line and word spacing.
+- **Alive controls.** Buttons respond to presses across the app, context-menu
+  submenus flip to stay on-screen, and the creative apps gained autosave
+  indicators and smoother panels.
+
+### Fixes
+
+- Removed dead code and unused modules; lighter, faster app startup.
+- Memoized hot calculations in the Stopwatch and AXL outliner to cut needless
+  re-renders.
+
 ## v5.0.1 — DEX Store, reviews & quality pass (2026-06-06)
 
 ### New

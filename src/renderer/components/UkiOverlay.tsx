@@ -1693,7 +1693,7 @@ const UkiOverlay: React.FC = () => {
         backdropFilter: 'var(--blur-xl) saturate(180%)',
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
         border: '1px solid rgba(255,255,255,0.10)',
-        borderRadius: 16,
+        borderRadius: 12,
         boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
         overflow: 'hidden',
         cursor: draggingRef.current ? 'grabbing' : 'grab',
@@ -1741,7 +1741,7 @@ const UkiOverlay: React.FC = () => {
             aria-pressed={speakResponses}
             style={{
               marginLeft: state === 'listening' ? 0 : 'auto',
-              width: 24, height: 22, borderRadius: 6,
+              width: 24, height: 22, borderRadius: 4,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: speakResponses ? 'rgba(10,132,255,0.14)' : 'transparent',
               border: 'none', color: speakResponses ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
@@ -1761,7 +1761,7 @@ const UkiOverlay: React.FC = () => {
             aria-label={collapsed ? 'Expand UKI panel' : 'Collapse UKI panel'}
             aria-expanded={!collapsed}
             style={{
-              width: 24, height: 22, borderRadius: 6,
+              width: 24, height: 22, borderRadius: 4,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
             }}
@@ -1776,7 +1776,7 @@ const UkiOverlay: React.FC = () => {
             onClick={() => useUkiStore.getState().reset()}
             style={{
               marginLeft: 0,
-              width: 20, height: 20, borderRadius: 6,
+              width: 20, height: 20, borderRadius: 4,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none',
               color: 'var(--color-text-tertiary)', cursor: 'pointer',
@@ -1851,7 +1851,7 @@ const UkiOverlay: React.FC = () => {
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
                     lineHeight: 1.5, padding: '6px 8px', marginBottom: 6,
                     background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(10,132,255,0.4)',
-                    borderRadius: 4,
+                    borderRadius: 3,
                   }}>
                     {turn.thoughtSteps && turn.thoughtSteps.length > 0 ? (
                       <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1898,7 +1898,7 @@ const UkiOverlay: React.FC = () => {
               padding: '6px 8px', marginBottom: 8,
               background: 'rgba(10,132,255,0.06)',
               borderLeft: '2px solid rgba(10,132,255,0.5)',
-              borderRadius: 4,
+              borderRadius: 3,
             }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -1949,7 +1949,7 @@ const UkiOverlay: React.FC = () => {
             <div style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
               padding: '6px 8px', background: 'rgba(255,69,58,0.08)',
-              borderRadius: 8, border: '1px solid rgba(255,69,58,0.15)',
+              borderRadius: 6, border: '1px solid rgba(255,69,58,0.15)',
             }}>
               {error}
             </div>
@@ -2049,7 +2049,7 @@ const UkiOverlay: React.FC = () => {
                 marginBottom: 6, padding: 6,
                 background: 'var(--color-bg-elevated, rgba(28,28,30,0.95))',
                 border: '1px solid var(--color-border-subtle)',
-                borderRadius: 8, fontSize: 11,
+                borderRadius: 6, fontSize: 11,
                 maxHeight: 220, overflowY: 'auto',
                 boxShadow: 'var(--pg-shadow-tooltip)',
                 zIndex: 2,
@@ -2062,7 +2062,7 @@ const UkiOverlay: React.FC = () => {
                     onMouseDown={(e) => { e.preventDefault(); setInputText(m.cmd + ' '); inputRef.current?.focus(); }}
                     style={{
                       display: 'flex', alignItems: 'baseline', gap: 8,
-                      padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                      padding: '4px 8px', borderRadius: 4, cursor: 'pointer',
                     }}
                   >
                     <span style={{ fontFamily: 'monospace', color: 'var(--color-accent)', fontWeight: 600 }}>{m.cmd}</span>
@@ -2100,7 +2100,7 @@ const UkiOverlay: React.FC = () => {
             style={{
               flex: 1, background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 10, padding: '8px 12px',
+              borderRadius: 8, padding: '8px 12px',
               fontSize: 13, color: 'var(--color-text-primary)',
               outline: 'none',
               resize: 'none',
@@ -2119,7 +2119,7 @@ const UkiOverlay: React.FC = () => {
             onClick={handleSendText}
             disabled={!inputText.trim() || isThinking || state === 'processing' || state === 'thinking'}
             style={{
-              width: 32, height: 32, borderRadius: 10,
+              width: 32, height: 32, borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: (inputText.trim() && !isThinking) ? 'rgba(10,132,255,0.28)' : 'transparent',
               border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'rgba(10,132,255,0.4)' : 'transparent'),

@@ -63,6 +63,8 @@ export interface DexAPI {
     close: () => void;
     hide: () => void;
     setTitleBarOverlay: (enabled: boolean) => Promise<any>;
+    enterCompact: (opts?: { width?: number; height?: number; corner?: string }) => Promise<any>;
+    exitCompact: () => Promise<any>;
   };
 
   // Actions
@@ -1945,6 +1947,8 @@ const api: DexAPI = {
     close: () => ipcRenderer.invoke('window:close'),
     hide: () => ipcRenderer.invoke('window:hide'),
     setTitleBarOverlay: (enabled: boolean) => ipcRenderer.invoke('window:setTitleBarOverlay', enabled),
+    enterCompact: (opts?: { width?: number; height?: number; corner?: string }) => ipcRenderer.invoke('window:enter-compact', opts),
+    exitCompact: () => ipcRenderer.invoke('window:exit-compact'),
   },
 
   actions: {
