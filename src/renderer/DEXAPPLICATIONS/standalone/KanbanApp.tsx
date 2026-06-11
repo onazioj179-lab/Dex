@@ -181,7 +181,7 @@ const CardDetail: React.FC<{
           <label style={modalStyles.label}>Labels</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
             {labels.map((l, i) => (
-              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: `${l.color}20`, color: l.color }}>
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: `${l.color}20`, color: l.color }}>
                 {l.text}
                 <button style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }} onClick={() => setLabels(labels.filter((_, j) => j !== i))} aria-label={`Remove label ${l.text}`}>{Icons.x}</button>
               </span>
@@ -191,7 +191,7 @@ const CardDetail: React.FC<{
             <input style={{ ...modalStyles.input, flex: 1 }} value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="New label" onKeyDown={e => e.key === 'Enter' && addLabel()} />
             <div style={{ display: 'flex', gap: 2 }}>
               {LABEL_COLORS.map(c => (
-                <button key={c} onClick={() => setLabelColor(c)} aria-label={`Select label color ${c}`} style={{ width: 20, height: 20, borderRadius: 4, border: labelColor === c ? '2px solid #fff' : '1px solid transparent', background: c, cursor: 'pointer' }} />
+                <button key={c} onClick={() => setLabelColor(c)} aria-label={`Select label color ${c}`} style={{ width: 20, height: 20, borderRadius: 3, border: labelColor === c ? '2px solid #fff' : '1px solid transparent', background: c, cursor: 'pointer' }} />
               ))}
             </div>
             <button style={modalStyles.addBtn} onClick={addLabel} aria-label="Add label">Add</button>
@@ -225,19 +225,19 @@ const CardDetail: React.FC<{
 
 const modalStyles: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' },
-  modal: { width: 'min(520px, 92vw)', maxHeight: '85vh', background: 'var(--color-bg-elevated, #1e1e1e)', borderRadius: 14, border: '1px solid var(--color-border, var(--color-border))', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  modal: { width: 'min(520px, 92vw)', maxHeight: '85vh', background: 'var(--color-bg-elevated, #1e1e1e)', borderRadius: 10, border: '1px solid var(--color-border, var(--color-border))', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))' },
   headerTitle: { fontSize: 16, fontWeight: 700, margin: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 4 },
   body: { padding: '16px 20px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 },
   label: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-muted, #999)', marginBottom: -4 },
-  input: { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none', fontFamily: 'inherit' },
-  select: { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
-  addBtn: { padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  input: { width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none', fontFamily: 'inherit' },
+  select: { width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
+  addBtn: { padding: '6px 14px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   footer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--color-border, var(--color-border-subtle))' },
-  deleteBtn: { padding: '8px 16px', borderRadius: 8, border: 'none', background: 'rgba(255,59,48,0.1)', color: 'var(--color-error)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { padding: '8px 16px', borderRadius: 8, border: '1px solid var(--color-border, var(--color-border))', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  saveBtn: { padding: '8px 20px', borderRadius: 8, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  deleteBtn: { padding: '8px 16px', borderRadius: 6, border: 'none', background: 'rgba(255,59,48,0.1)', color: 'var(--color-error)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { padding: '8px 16px', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  saveBtn: { padding: '8px 20px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
 };
 
 // -- Main app -----------------------------------------------------------
@@ -467,7 +467,7 @@ const KanbanApp: React.FC = () => {
                   {card.labels.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
                       {card.labels.map((l, li) => (
-                        <span key={li} style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: `${l.color}20`, color: l.color }}>{l.text}</span>
+                        <span key={li} style={{ padding: '1px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, background: `${l.color}20`, color: l.color }}>{l.text}</span>
                       ))}
                     </div>
                   )}
@@ -558,35 +558,35 @@ const styles: Record<string, React.CSSProperties> = {
   topBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, background: 'var(--color-bg-surface-solid, #1C1C1E)' },
   topLeft: { display: 'flex', alignItems: 'center', gap: 12 },
   topRight: { display: 'flex', alignItems: 'center', gap: 16 },
-  boardIcon: { width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.12)', color: '#5e5ce6', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  boardIcon: { width: 36, height: 36, borderRadius: 8, background: 'rgba(99,102,241,0.12)', color: '#5e5ce6', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   boardTitle: { fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: '-0.3px' },
   boardMeta: { fontSize: 11, color: 'var(--color-text-muted, #666)', fontWeight: 500 },
-  progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 8, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
-  boardTabs: { display: 'flex', alignItems: 'center', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 8, padding: 2 },
-  boardTab: { padding: '6px 14px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease' },
+  progressChip: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 6, background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600 },
+  boardTabs: { display: 'flex', alignItems: 'center', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 2 },
+  boardTab: { padding: '6px 14px', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s ease' },
   boardTabActive: { background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #fafafa)' },
-  boardTabAdd: { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  boardTabAdd: { width: 28, height: 28, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   board: { flex: 1, display: 'flex', gap: 16, padding: '16px 20px', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
   column: { minWidth: 300, maxWidth: 340, background: 'var(--color-border-subtle)', borderRadius: 14, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
-  colHeader: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', borderRadius: '14px 14px 0 0' },
+  colHeader: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', borderRadius: '10px 10px 0 0' },
   colDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
   colTitle: { fontSize: 13, fontWeight: 700, flex: 1 },
   colCount: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
   colDeleteBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2, opacity: 0.4 },
   cardList: { flex: 1, padding: '8px 8px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 },
-  card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.12s var(--ease-spring)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
+  card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.12s var(--ease-spring)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
   cardTitle: { fontSize: 13, fontWeight: 600, lineHeight: 1.4 },
   cardDesc: { fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, lineHeight: 1.4 },
   cardFooter: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' },
   priorityBadge: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 600 },
   checkCount: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 600 },
   dueBadge: { fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 600 },
-  addCardBtn: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', width: '100%', justifyContent: 'flex-start', transition: 'all 0.15s ease' },
+  addCardBtn: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', width: '100%', justifyContent: 'flex-start', transition: 'all 0.15s ease' },
   addCardForm: { padding: 8, display: 'flex', flexDirection: 'column', gap: 8 },
-  addCardInput: { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
-  addCardSubmit: { padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  addCardCancel: { padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--color-bg-hover)', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  addColBtn: { minWidth: 240, height: 44, borderRadius: 12, border: '1px dashed var(--color-border, var(--color-border))', background: 'transparent', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s ease' },
+  addCardInput: { width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
+  addCardSubmit: { padding: '6px 14px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  addCardCancel: { padding: '6px 14px', borderRadius: 6, border: 'none', background: 'var(--color-bg-hover)', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  addColBtn: { minWidth: 240, height: 44, borderRadius: 10, border: '1px dashed var(--color-border, var(--color-border))', background: 'transparent', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s ease' },
 };
 
 KanbanApp.displayName = 'KanbanApp';

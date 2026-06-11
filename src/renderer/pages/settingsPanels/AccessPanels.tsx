@@ -38,13 +38,13 @@ const TITLE: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginTop: 1
 const SECTION: React.CSSProperties = {
   background: 'var(--color-bg-elevated)',
   border: '1px solid var(--color-border-subtle)',
-  borderRadius: 10,
+  borderRadius: 8,
   padding: '4px 14px',
 };
 const BTN: React.CSSProperties = {
   padding: '6px 12px',
   fontSize: 12,
-  borderRadius: 6,
+  borderRadius: 4,
   border: '1px solid var(--color-border-subtle)',
   background: 'var(--color-bg-hover)',
   color: 'var(--color-text-primary)',
@@ -67,7 +67,7 @@ const TEXTAREA: React.CSSProperties = {
   fontFamily: 'ui-monospace, "SF Mono", monospace',
   fontSize: 11,
   padding: 8,
-  borderRadius: 6,
+  borderRadius: 4,
   border: '1px solid var(--color-border-subtle)',
   background: 'var(--color-bg-base)',
   color: 'var(--color-text-primary)',
@@ -330,7 +330,7 @@ export const SnapLayoutsPanel: React.FC = () => {
               fontFamily: 'ui-monospace, monospace',
               fontSize: 11,
               padding: '3px 8px',
-              borderRadius: 4,
+              borderRadius: 3,
               background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
             }}>{s.keys}</kbd>
@@ -537,7 +537,7 @@ export const CreatorAccessPanel: React.FC = () => {
 
       {verifyMsg && (
         <div style={{
-          padding: 10, borderRadius: 6, fontSize: 12,
+          padding: 10, borderRadius: 4, fontSize: 12,
           background: verifyMsg.startsWith('Unlocked') ? 'rgba(48,209,88,0.1)' : 'rgba(255,69,58,0.1)',
           color: verifyMsg.startsWith('Unlocked') ? '#30d158' : '#ff453a',
         }}>{verifyMsg}</div>

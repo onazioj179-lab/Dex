@@ -173,6 +173,13 @@ html, body, #root {
     transform var(--dex-transition);
 }
 
+/* Universal press feedback — every plain button physically responds to a
+   click (no layout shift; specificity 0, so any component transform wins,
+   and inline-positioned buttons are untouched by the cascade). */
+:where(button, [role="button"]):not(:disabled):active {
+  transform: scale(0.97);
+}
+
 /* Data/numeric elements align by default (tabular figures). */
 :where(time, [data-numeric], .tabular) {
   font-variant-numeric: tabular-nums lining-nums;

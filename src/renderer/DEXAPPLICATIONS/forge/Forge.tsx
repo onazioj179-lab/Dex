@@ -9,6 +9,7 @@ import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave } from '../../utils/useAutoSave';
+import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useToastHelpers } from '../../components/Toast';
 import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
@@ -298,6 +299,19 @@ const Forge: React.FC = () => {
     try { const saved = localStorage.getItem('forge-custom-presets'); return saved ? [...DEFAULT_PRESETS, ...JSON.parse(saved)] : DEFAULT_PRESETS; } catch { return DEFAULT_PRESETS; }
   });
   useAutoSave('forge', useCallback(() => ({ jobs, presets }), [jobs, presets]), isDirty, 30_000);
+  // Queue autosave status surfaced in the header. The encode queue has no manual
+  // save, so this reassures the user their queue/presets are being persisted.
+  const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isDirty) return;
+    setAutosaveState('saving');
+    const t = setTimeout(() => {
+      setAutosaveState('saved');
+      setLastSavedAt(Date.now());
+    }, 800);
+    return () => clearTimeout(t);
+  }, [isDirty, jobs, presets]);
 
   // Undo/redo for queue operations
   const [undoStack, setUndoStack] = useState<Job[][]>([]);
@@ -534,7 +548,7 @@ const Forge: React.FC = () => {
         <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Drop media files or click Add Files to start encoding</span>
       </div>
       <button onClick={addFiles} aria-label="Add files" style={{  
-        border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: 600, background: 'var(--color-accent)',
+        border: 'none', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 600, background: 'var(--color-accent)',
         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 24px',
       }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1197,9 +1211,9 @@ const Forge: React.FC = () => {
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 800, color: 'var(--color-accent)', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
-    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '8px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: '#5ac8fa', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '8px' },
-    btnDanger: { background: '#3a1818', color: '#ff6961', border: '1px solid #4a2020', borderRadius: '8px' },
+    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
+    btnPrimary: { background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: '#5ac8fa', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '6px' },
+    btnDanger: { background: '#3a1818', color: '#ff6961', border: '1px solid #4a2020', borderRadius: '6px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     sidebar: { width: '220px', flexShrink: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
@@ -1211,9 +1225,9 @@ const Forge: React.FC = () => {
     queueStats: { display: 'flex', gap: '12px', marginLeft: 'auto' },
     stat: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' },
     queueList: { flex: 1, overflow: 'auto', padding: '10px' },
-    jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--color-border-subtle)', borderRadius: '10px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
+    jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--color-border-subtle)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
     jobItemSelected: { borderColor: 'var(--color-accent)', background: '#0d1a2e' },
-    jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '8px', color: 'var(--color-accent)' },
+    jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '6px', color: 'var(--color-accent)' },
     jobInfo: { flex: 1 },
     jobName: { fontWeight: 600, marginBottom: '2px', fontSize: '11px', color: 'var(--color-text-primary)' },
     jobMeta: { display: 'flex', gap: '10px', fontSize: '11px', color: 'var(--color-text-muted)' },
@@ -1222,7 +1236,7 @@ const Forge: React.FC = () => {
     progressFill: { height: '100%', background: 'var(--color-accent)', borderRadius: '2px' },
     jobStatus: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 },
     jobActions: { display: 'flex', gap: '2px' },
-    iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '6px' },
+    iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px' },
     inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, background: 'var(--color-bg-inset)', borderLeft: '1px solid var(--color-border-subtle)', padding: '12px', overflow: 'auto' },
     inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: '12px', color: 'var(--color-text-primary)' },
     inspectorSection: { marginBottom: '12px' },
@@ -1230,20 +1244,20 @@ const Forge: React.FC = () => {
     infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: '11px' },
     infoLabel: { color: 'var(--color-text-muted)' },
     infoValue: { color: 'var(--color-text-primary)', fontWeight: 600 },
-    presetItem: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '10px', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
+    presetItem: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
     presetItemSelected: { borderColor: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
     presetInfo: { flex: 1 },
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
     presetDesc: { fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' },
     categoryHeader: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', padding: '12px 0 8px', marginTop: '8px', letterSpacing: '0.8px', fontWeight: 700, borderTop: '1px solid var(--color-border-subtle)' },
     statusBar: { display: 'flex', alignItems: 'center', gap: '12px', padding: '0 12px', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
-    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
+    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
     checkbox: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', cursor: 'pointer', fontSize: '11px', fontWeight: 600 },
     sliderRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
     sliderLabel: { width: '90px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
     slider: { flex: 1, accentColor: 'var(--color-accent)' },
     sliderValue: { width: '36px', fontSize: '11px', textAlign: 'right', color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontWeight: 600 },
-    select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '8px', color: 'var(--color-text-primary)', padding: '6px 8px', fontSize: '11px', cursor: 'pointer', width: '100%', fontWeight: 600, transition: 'all 0.12s ease' },
+    select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px 8px', fontSize: '11px', cursor: 'pointer', width: '100%', fontWeight: 600, transition: 'all 0.12s ease' },
   }), []);
 
   // Keyboard shortcuts
@@ -1351,17 +1365,20 @@ const Forge: React.FC = () => {
         .forge-dropdown-item { transition: background 0.12s ease; }
         .forge-dropdown-item:hover { background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important; }
         .forge-dropdown-item:active { background: color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
+        .forge-tools-btn { transition: background 0.12s ease, color 0.12s ease; }
+        .forge-tools-btn:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important; color: var(--color-text-primary) !important; }
       `}</style>
       {/* Header */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <img src={new URL('../../../../appicons/forge.png', import.meta.url).href} alt="Forge" style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'cover' }} />
+          <img src={new URL('../../../../appicons/forge.png', import.meta.url).href} alt="Forge" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
           <div style={styles.logo}>FORGE</div>
         </div>
         <div style={{ flex: 1 }} />
         <div style={styles.headerCenter}>
           <button style={styles.btn} onClick={addFiles} title="Add files to encode" aria-label="Add files to encode">{Icons.plus} Add Files</button>
           <button style={styles.btn} onClick={addFolder} title="Add folder to encode" aria-label="Add folder to encode">{Icons.folderPlus} Add Folder</button>
+          <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           {isEncoding ? (
             <button style={{ ...styles.btn, ...styles.btnDanger }} onClick={pauseQueue} title="Pause encoding queue" aria-label="Pause encoding queue">{Icons.pause} Pause</button>
@@ -1380,9 +1397,9 @@ const Forge: React.FC = () => {
           )}
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button aria-label="Tools menu" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
+            <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showToolsMenu && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '10px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
                 {[
                   { label: 'Trim / Split', active: showTrimSplit, fn: () => setShowTrimSplit(v => !v) },
@@ -1392,7 +1409,7 @@ const Forge: React.FC = () => {
                   { label: 'Normalize Audio', active: audioNormalize, fn: () => setAudioNormalize(v => !v) },
                   { label: 'Concatenate', active: showConcat, fn: () => { setShowConcat(v => !v); setConcatOrder(jobs.map(j => j.id)); } },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
                 <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PREVIEW</div>
@@ -1400,7 +1417,7 @@ const Forge: React.FC = () => {
                   { label: 'Preview', active: showPreview, fn: () => { if (selectedJob) setShowPreview(v => !v); } },
                   { label: 'A/B Compare', active: showABCompare, fn: () => { if (selectedJob?.outputBlobUrl) setShowABCompare(v => !v); } },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
                 <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
@@ -1409,14 +1426,14 @@ const Forge: React.FC = () => {
                   { label: 'Audio Extract', active: showAudioExtract, fn: () => setShowAudioExtract(v => !v) },
                   { label: 'Batch Rename', active: showBatchRename, fn: () => setShowBatchRename(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
                 <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>AUTOMATION</div>
                 {[
                   { label: 'Auto Rules', active: showConditionalRules, fn: () => setShowConditionalRules(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
               </div>
             )}
@@ -1462,7 +1479,7 @@ const Forge: React.FC = () => {
                 </select>
                 {showPresetInput ? (
                   <div style={{ display: 'flex', gap: 4, marginBottom: 12, width: '100%' }}>
-                    <input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPresetName.trim()) { const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); } else if (e.key === 'Escape') { setShowPresetInput(false); setNewPresetName(''); } }} autoFocus placeholder="Preset name..." style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid #2a5e3a', borderRadius: 4, padding: '4px 8px', color: '#fff', fontSize: 11, outline: 'none' }} />
+                    <input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPresetName.trim()) { const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); } else if (e.key === 'Escape') { setShowPresetInput(false); setNewPresetName(''); } }} autoFocus placeholder="Preset name..." style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid #2a5e3a', borderRadius: 3, padding: '4px 8px', color: '#fff', fontSize: 11, outline: 'none' }} />
                     <button onClick={() => { if (!newPresetName.trim()) return; const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px 8px', background: '#1e3a28', color: 'var(--color-success)', border: '1px solid #2a5e3a' }}>Save</button>
                     <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px 8px' }}>Cancel</button>
                   </div>
@@ -1509,7 +1526,7 @@ const Forge: React.FC = () => {
                   </div>
                 ) : (
                   watchFolders.map(wf => (
-                    <div key={wf.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '4px', marginBottom: '4px', border: '1px solid var(--color-border-subtle)' }}>
+                    <div key={wf.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '3px', marginBottom: '4px', border: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ color: wf.active ? 'var(--color-success)' : '#6b7280' }}>{Icons.folderWatch}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '11px', fontWeight: 600 }}>{wf.path}</div>
@@ -1533,7 +1550,7 @@ const Forge: React.FC = () => {
                 </div>
                 
                 <div style={styles.checkbox} onClick={() => setUseHardwareAccel(!useHardwareAccel)}>
-                  <div style={{ width: '14px', height: '14px', background: useHardwareAccel ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: useHardwareAccel ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {useHardwareAccel && Icons.check}
                   </div>
                   <span>Use Hardware Acceleration</span>
@@ -1541,13 +1558,13 @@ const Forge: React.FC = () => {
                 
                 <div style={{ ...styles.sectionTitle, marginTop: '16px' }}>Completion</div>
                 <div style={styles.checkbox} onClick={() => setNotifyOnComplete(!notifyOnComplete)}>
-                  <div style={{ width: '14px', height: '14px', background: notifyOnComplete ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: notifyOnComplete ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {notifyOnComplete && Icons.check}
                   </div>
                   <span>Notify on Completion</span>
                 </div>
                 <div style={styles.checkbox} onClick={() => setShutdownAfter(!shutdownAfter)}>
-                  <div style={{ width: '14px', height: '14px', background: shutdownAfter ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: shutdownAfter ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {shutdownAfter && Icons.check}
                   </div>
                   <span>Shutdown After Queue Complete</span>
@@ -1555,7 +1572,7 @@ const Forge: React.FC = () => {
 
                 <div style={{ ...styles.sectionTitle, marginTop: '16px' }}>Audio</div>
                 <div style={styles.checkbox} onClick={() => setAudioNormalize(!audioNormalize)}>
-                  <div style={{ width: '14px', height: '14px', background: audioNormalize ? '#bf5af2' : 'var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', background: audioNormalize ? '#bf5af2' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {audioNormalize && Icons.check}
                   </div>
                   <span>Audio Normalization</span>
@@ -1572,7 +1589,7 @@ const Forge: React.FC = () => {
                 <div style={{ marginBottom: '10px' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '4px', display: 'block' }}>Output Directory</span>
                   <input value={customOutputDir} onChange={e => setCustomOutputDir(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '11px' }} />
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '11px' }} />
                 </div>
               </div>
             )}
@@ -1585,7 +1602,7 @@ const Forge: React.FC = () => {
             <div style={{
               position: 'absolute', inset: 0, zIndex: 'var(--z-modal)',
               background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', border: '3px dashed color-mix(in srgb, var(--color-accent) 50%, transparent)',
-              borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#5ac8fa' }}>Drop media files to add to queue</div>
             </div>
@@ -1735,21 +1752,21 @@ const Forge: React.FC = () => {
             {!beginnerMode && selectedJob.status === 'queued' && (
               <div style={{ marginTop: '16px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Encoding Preset</div>
-                <select value={selectedJob.preset} onChange={e => { const preset = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, preset } : j)); }} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer', marginBottom: '8px' }}>
+                <select value={selectedJob.preset} onChange={e => { const preset = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, preset } : j)); }} style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer', marginBottom: '8px' }}>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Output Format</div>
-                <select value={selectedJob.format} onChange={e => { const format = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, format } : j)); }} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
+                <select value={selectedJob.format} onChange={e => { const format = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, format } : j)); }} style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
                   {['mp4', 'webm', 'mkv', 'mov', 'avi', 'gif', 'mp3', 'wav', 'flac', 'aac'].map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
                 </select>
 
                 {/* Per-Job Video Overrides */}
-                <div style={{ marginTop: 10, padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: 6, border: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ marginTop: 10, padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6 }}>VIDEO</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Resolution</div>
-                      <select value={(selectedJob as any).overrideRes || ''} onChange={e => { const val = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideRes: val } as any : j)); }} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                      <select value={(selectedJob as any).overrideRes || ''} onChange={e => { const val = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideRes: val } as any : j)); }} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                         <option value="">From Preset</option>
                         <option value="3840x2160">4K (3840x2160)</option>
                         <option value="2560x1440">QHD (2560x1440)</option>
@@ -1762,7 +1779,7 @@ const Forge: React.FC = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Framerate</div>
-                      <select value={(selectedJob as any).overrideFps || ''} onChange={e => { const val = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideFps: val } as any : j)); }} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                      <select value={(selectedJob as any).overrideFps || ''} onChange={e => { const val = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideFps: val } as any : j)); }} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                         <option value="">From Preset</option>
                         <option value="23.976">23.976</option>
                         <option value="24">24</option>
@@ -1791,12 +1808,12 @@ const Forge: React.FC = () => {
                 </div>
 
                 {/* Per-Job Audio Overrides */}
-                <div style={{ marginTop: 6, padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: 6, border: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ marginTop: 6, padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6 }}>AUDIO</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Codec</div>
-                      <select value={(selectedJob as any).overrideAudioCodec || ''} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideAudioCodec: e.target.value } as any : j))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                      <select value={(selectedJob as any).overrideAudioCodec || ''} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideAudioCodec: e.target.value } as any : j))} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                         <option value="">From Preset</option>
                         <option value="aac">AAC</option>
                         <option value="mp3">MP3</option>
@@ -1807,7 +1824,7 @@ const Forge: React.FC = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Bitrate</div>
-                      <select value={(selectedJob as any).overrideAudioBitrate || ''} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideAudioBitrate: e.target.value } as any : j))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                      <select value={(selectedJob as any).overrideAudioBitrate || ''} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideAudioBitrate: e.target.value } as any : j))} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                         <option value="">Auto</option>
                         <option value="64">64 kbps</option>
                         <option value="128">128 kbps</option>
@@ -1818,7 +1835,7 @@ const Forge: React.FC = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Sample Rate</div>
-                      <select value={(selectedJob as any).overrideSampleRate || ''} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideSampleRate: e.target.value } as any : j))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+                      <select value={(selectedJob as any).overrideSampleRate || ''} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideSampleRate: e.target.value } as any : j))} style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                         <option value="">Auto</option>
                         <option value="44100">44.1 kHz</option>
                         <option value="48000">48 kHz</option>
@@ -1841,7 +1858,7 @@ const Forge: React.FC = () => {
             )}
 
             {selectedJob.status === 'failed' && selectedJob.error && (
-              <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,69,58,0.1)', borderRadius: '6px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,69,58,0.1)', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {Icons.alert} {selectedJob.error}
               </div>
             )}
@@ -1855,7 +1872,7 @@ const Forge: React.FC = () => {
 
       {/* Image Sequence Export */}
       {showImageSequence && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Image Sequence Export</span>
             <button aria-label="Close Image Sequence Export" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowImageSequence(false)}><DexIcon name="close" size={14} /></button>
@@ -1864,15 +1881,15 @@ const Forge: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Frame Format</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 12 }}>
               {(['tiff', 'png', 'exr', 'dpx'] as const).map(f => (
-                <button key={f} aria-label={`Select ${f} format`} aria-pressed={imgSeqFormat === f} onClick={() => setImgSeqFormat(f)} style={{ padding: '8px 4px', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: imgSeqFormat === f ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: imgSeqFormat === f ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
+                <button key={f} aria-label={`Select ${f} format`} aria-pressed={imgSeqFormat === f} onClick={() => setImgSeqFormat(f)} style={{ padding: '8px 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: imgSeqFormat === f ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: imgSeqFormat === f ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
               ))}
             </div>
-            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>frame_[####].{imgSeqFormat}</div>
             </div>
             {imgSeqFormat === 'exr' && (
-              <div style={{ padding: 8, background: 'rgba(255,149,10,0.08)', borderRadius: 6, border: '1px solid rgba(255,149,10,0.15)', marginBottom: 10 }}>
+              <div style={{ padding: 8, background: 'rgba(255,149,10,0.08)', borderRadius: 4, border: '1px solid rgba(255,149,10,0.15)', marginBottom: 10 }}>
                 <div style={{ fontSize: 11, color: 'var(--color-warning)' }}>32-bit float HDR — ideal for VFX compositing</div>
               </div>
             )}
@@ -1905,14 +1922,14 @@ const Forge: React.FC = () => {
                 const a = document.createElement('a'); a.href = URL.createObjectURL(frameBlobs[i]); a.download = `frame_${String(i).padStart(6, '0')}.${imgSeqFormat}`; a.click(); URL.revokeObjectURL(a.href);
               }
               URL.revokeObjectURL(objUrl); toast.success(`Exported ${totalFrames} frames`); setShowImageSequence(false);
-            }} style={{ width: '100%', padding: '8px', borderRadius: 6, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Export Sequence</button>
+            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Export Sequence</button>
           </div>
         </div>
       )}
 
       {/* Audio Extraction */}
       {showAudioExtract && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Extraction</span>
             <button aria-label="Close Audio Extraction" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowAudioExtract(false)}><DexIcon name="close" size={14} /></button>
@@ -1921,10 +1938,10 @@ const Forge: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Output Format</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 12 }}>
               {(['wav', 'mp3', 'flac', 'aac'] as const).map(f => (
-                <button key={f} aria-label={`Select ${f} audio format`} aria-pressed={audioExtractFormat === f} onClick={() => setAudioExtractFormat(f)} style={{ padding: '8px 4px', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: audioExtractFormat === f ? 'rgba(191,90,242,0.15)' : 'var(--color-border-subtle)', color: audioExtractFormat === f ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
+                <button key={f} aria-label={`Select ${f} audio format`} aria-pressed={audioExtractFormat === f} onClick={() => setAudioExtractFormat(f)} style={{ padding: '8px 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: audioExtractFormat === f ? 'rgba(191,90,242,0.15)' : 'var(--color-border-subtle)', color: audioExtractFormat === f ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
               ))}
             </div>
-            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               {[{ label: 'Sample Rate', value: '48 kHz' }, { label: 'Channels', value: 'Stereo' }, { label: 'Bit Depth', value: audioExtractFormat === 'wav' || audioExtractFormat === 'flac' ? '24-bit' : '16-bit' }].map(i => (
                 <div key={i.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{i.label}</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{i.value}</span></div>
               ))}
@@ -1958,14 +1975,14 @@ const Forge: React.FC = () => {
                 recorder.start(100); source.start(0);
                 source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
               } catch (err: any) { toast.error('Audio extraction failed: ' + (err?.message || 'Unknown error')); }
-            }} style={{ width: '100%', padding: '8px', borderRadius: 6, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Extract Audio</button>
+            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Extract Audio</button>
           </div>
         </div>
       )}
 
       {/* Watermark Overlay */}
       {showWatermark && (
-        <div style={{ position: 'fixed', right: 20, top: 80, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', right: 20, top: 80, width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Watermark Overlay</span>
             <button aria-label="Close Watermark Overlay" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowWatermark(false)}><DexIcon name="close" size={14} /></button>
@@ -1973,16 +1990,16 @@ const Forge: React.FC = () => {
           <div style={{ padding: 12 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['text', 'image'] as const).map(t => (
-                <button key={t} aria-label={`Select ${t} watermark type`} aria-pressed={watermarkType === t} onClick={() => setWatermarkType(t)} style={{ flex: 1, padding: '5px', borderRadius: 5, border: '1px solid var(--color-bg-hover)', background: watermarkType === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                <button key={t} aria-label={`Select ${t} watermark type`} aria-pressed={watermarkType === t} onClick={() => setWatermarkType(t)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: watermarkType === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
               ))}
             </div>
             {watermarkType === 'text' && (
-              <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px 8px', borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 8 }} />
+              <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 8 }} />
             )}
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Position</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 8 }}>
               {(['top-left', 'top-center', 'top-right', 'bottom-left', 'center', 'bottom-right'] as const).map((p) => (
-                <button key={p} aria-label={`Set watermark position ${p}`} onClick={() => setWatermarkPosition(p)} style={{ padding: 4, borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: watermarkPosition === p ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkPosition === p ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p === 'center' ? '●' : p.split('-').map(w => w[0].toUpperCase()).join('')}</button>
+                <button key={p} aria-label={`Set watermark position ${p}`} onClick={() => setWatermarkPosition(p)} style={{ padding: 4, borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: watermarkPosition === p ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkPosition === p ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p === 'center' ? '●' : p.split('-').map(w => w[0].toUpperCase()).join('')}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Opacity</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{watermarkOpacity}%</span></div>
@@ -1991,20 +2008,20 @@ const Forge: React.FC = () => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, watermark: { type: watermarkType, text: watermarkText, opacity: watermarkOpacity, position: watermarkPosition } } as any : j));
               toast.success('Watermark applied to job'); setShowWatermark(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Watermark</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Watermark</button>
           </div>
         </div>
       )}
 
       {/* Trim / Split Panel */}
       {showTrimSplit && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Trim & Split</span>
             <button aria-label="Close Trim and Split" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrimSplit(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ height: 40, background: 'var(--color-border-subtle)', borderRadius: 6, position: 'relative', marginBottom: 8, overflow: 'hidden' }}>
+            <div style={{ height: 40, background: 'var(--color-border-subtle)', borderRadius: 4, position: 'relative', marginBottom: 8, overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: `${trimIn}%`, right: `${100 - trimOut}%`, top: 0, bottom: 0, background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', borderLeft: '2px solid var(--color-accent)', borderRight: '2px solid var(--color-accent)' }} />
               <svg width="100%" height="40" viewBox="0 0 380 40" preserveAspectRatio="none" style={{ position: 'absolute', top: 0 }}>
                 {/* Waveform unavailable in renderer — audio not decoded yet */}
@@ -2021,7 +2038,7 @@ const Forge: React.FC = () => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
                 setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, trimIn: trimIn / 100, trimOut: trimOut / 100 } as any : j));
                 toast.success(`Trim set: ${trimIn}% → ${trimOut}%`); setShowTrimSplit(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Trim</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Trim</button>
               <button aria-label="Split video at intervals" onClick={() => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
                 const segments = 3;
@@ -2032,7 +2049,7 @@ const Forge: React.FC = () => {
                 }
                 setJobs(prev => [...prev.filter(j => j.id !== selectedJob.id), ...newJobs]);
                 toast.success(`Split into ${segments} segments`); setShowTrimSplit(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid rgba(255,149,10,0.2)', background: 'rgba(255,149,10,0.08)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Split at Intervals</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid rgba(255,149,10,0.2)', background: 'rgba(255,149,10,0.08)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Split at Intervals</button>
             </div>
           </div>
         </div>
@@ -2040,7 +2057,7 @@ const Forge: React.FC = () => {
 
       {/* Crop & Pad Panel */}
       {showCropPad && (
-        <div style={{ position: 'fixed', right: 20, top: 100, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', right: 20, top: 100, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crop & Pad</span>
             <button aria-label="Close Crop and Pad panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropPad(false)}><DexIcon name="close" size={14} /></button>
@@ -2049,39 +2066,39 @@ const Forge: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '9:16'] as const).map(a => (
-                <button key={a} onClick={() => setCropAspect(a)} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: cropAspect === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropAspect === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
+                <button key={a} onClick={() => setCropAspect(a)} style={{ padding: '4px 8px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: cropAspect === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropAspect === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
               ))}
             </div>
-            <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: cropAspect === '9:16' ? 30 : cropAspect === '1:1' ? 50 : 60, height: cropAspect === '9:16' ? 54 : cropAspect === '1:1' ? 50 : cropAspect === '4:3' ? 45 : 34, border: '2px dashed var(--color-accent)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: cropAspect === '9:16' ? 30 : cropAspect === '1:1' ? 50 : 60, height: cropAspect === '9:16' ? 54 : cropAspect === '1:1' ? 50 : cropAspect === '4:3' ? 45 : 34, border: '2px dashed var(--color-accent)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{cropAspect}</span>
               </div>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Pad Color</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
-              <input type="color" value={padColor} onChange={e => setPadColor(e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer' }} />
+              <input type="color" value={padColor} onChange={e => setPadColor(e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 3, cursor: 'pointer' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{padColor}</span>
             </div>
             <button aria-label="Apply crop and pad" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, cropAspect, padColor } as any : j));
               toast.success(`Crop set to ${cropAspect}`); setShowCropPad(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Crop & Pad</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Crop & Pad</button>
           </div>
         </div>
       )}
 
       {/* Subtitle Burn-in */}
       {showSubBurnIn && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Subtitle Burn-in</span>
             <button aria-label="Close Subtitle Burn-in" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSubBurnIn(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
+            <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Subtitle File</div>
-              <label style={{ padding: '6px 12px', borderRadius: 5, border: '1px dashed var(--color-border)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'inline-block' }}>Load SRT / ASS<input type="file" accept=".srt,.ass,.ssa,.vtt" style={{ display: 'none' }} onChange={(e) => {
+              <label style={{ padding: '6px 12px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'inline-block' }}>Load SRT / ASS<input type="file" accept=".srt,.ass,.ssa,.vtt" style={{ display: 'none' }} onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
                   const reader = new FileReader();
@@ -2110,27 +2127,27 @@ const Forge: React.FC = () => {
               }} /></label>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Font Family</div>
-            <select value={subBurnFont} onChange={e => setSubBurnFont(e.target.value)} style={{ width: '100%', padding: '5px 8px', borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 8 }}>
+            <select value={subBurnFont} onChange={e => setSubBurnFont(e.target.value)} style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 8 }}>
               {['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Impact'].map(f => <option key={f} value={f}>{f}</option>)}
             </select>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Font Size</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{subBurnSize}px</span></div>
             <input type="range" min="12" max="64" value={subBurnSize} onChange={e => setSubBurnSize(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 8 }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Position</div><select style={{ width: '100%', padding: '4px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Bottom</option><option>Top</option><option>Center</option></select></div>
-              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Style</div><select style={{ width: '100%', padding: '4px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Outline</option><option>Shadow</option><option>Box</option></select></div>
+              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Position</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Bottom</option><option>Top</option><option>Center</option></select></div>
+              <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Style</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Outline</option><option>Shadow</option><option>Box</option></select></div>
             </div>
             <button aria-label="Apply subtitle burn-in" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, subtitleBurnIn: { font: subBurnFont, size: subBurnSize } } as any : j));
               toast.success('Subtitle burn-in configured'); setShowSubBurnIn(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Apply Subtitle Settings</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Apply Subtitle Settings</button>
           </div>
         </div>
       )}
 
       {/* Conditional Encoding Rules */}
       {showConditionalRules && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 420, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 420, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Conditional Encoding Rules</span>
             <button aria-label="Close Conditional Rules" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConditionalRules(false)}><DexIcon name="close" size={14} /></button>
@@ -2138,7 +2155,7 @@ const Forge: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>When input matches a condition, automatically apply the action</div>
             {conditionalRules.map((rule, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                 <input type="checkbox" checked={rule.enabled} onChange={() => setConditionalRules(rules => rules.map((r, j) => j === i ? { ...r, enabled: !r.enabled } : r))} style={{ accentColor: 'var(--color-success)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: rule.enabled ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)' }}>IF {rule.condition}</div>
@@ -2147,21 +2164,21 @@ const Forge: React.FC = () => {
                 <button aria-label={`Remove rule ${i + 1}`} onClick={() => setConditionalRules(rules => rules.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11 }}><DexIcon name="close" size={10} /></button>
               </div>
             ))}
-            <button aria-label="Add conditional encoding rule" onClick={() => setConditionalRules(rules => [...rules, { condition: 'New condition', action: 'New action', enabled: true }])} style={{ width: '100%', padding: '6px', borderRadius: 5, border: '1px dashed var(--color-border-subtle)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginTop: 6 }}>+ Add Rule</button>
+            <button aria-label="Add conditional encoding rule" onClick={() => setConditionalRules(rules => [...rules, { condition: 'New condition', action: 'New action', enabled: true }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border-subtle)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginTop: 6 }}>+ Add Rule</button>
           </div>
         </div>
       )}
 
       {/* Preview Modal */}
       {showPreview && selectedJob && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 560, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 560, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Preview — {selectedJob.name}</span>
             <button aria-label="Close Preview" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowPreview(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
             {fileMapRef.current.has(selectedJob.id) ? (
-              <div style={{ borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+              <div style={{ borderRadius: 6, overflow: 'hidden', background: '#000' }}>
                 {selectedJob.isAudio ? (
                   <div style={{ padding: 20, textAlign: 'center' }}>
                     <div style={{ fontSize: 40, marginBottom: 12 }}>{Icons.audioWave}</div>
@@ -2187,7 +2204,7 @@ const Forge: React.FC = () => {
 
       {/* A/B Compare */}
       {showABCompare && selectedJob?.outputBlobUrl && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 680, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 680, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>A/B Compare — {selectedJob.name}</span>
             <button aria-label="Close A/B Compare" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowABCompare(false)}><DexIcon name="close" size={14} /></button>
@@ -2195,7 +2212,7 @@ const Forge: React.FC = () => {
           <div style={{ padding: 14, display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', marginBottom: 4, textTransform: 'uppercase' }}>Source</div>
-              <div style={{ borderRadius: 6, overflow: 'hidden', background: '#000', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ borderRadius: 4, overflow: 'hidden', background: '#000', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {previewSourceUrl ? (
                   <video controls muted style={{ width: '100%', maxHeight: 200 }}
                     src={previewSourceUrl} />
@@ -2207,7 +2224,7 @@ const Forge: React.FC = () => {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-success)', marginBottom: 4, textTransform: 'uppercase' }}>Output</div>
-              <div style={{ borderRadius: 6, overflow: 'hidden', background: '#000', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ borderRadius: 4, overflow: 'hidden', background: '#000', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <video controls muted style={{ width: '100%', maxHeight: 200 }}
                   src={selectedJob.outputBlobUrl} />
               </div>
@@ -2221,7 +2238,7 @@ const Forge: React.FC = () => {
 
       {/* Batch Rename */}
       {showBatchRename && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Rename Output</span>
             <button aria-label="Close Batch Rename" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowBatchRename(false)}><DexIcon name="close" size={14} /></button>
@@ -2229,16 +2246,16 @@ const Forge: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
             <input value={batchRenamePattern} onChange={e => setBatchRenamePattern(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }} />
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
               {['{name}', '{preset}', '{format}', '{date}', '{index}', '{resolution}'].map(token => (
                 <button key={token} onClick={() => setBatchRenamePattern(prev => prev + token)} style={{
-                  padding: '3px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)',
+                  padding: '3px 8px', borderRadius: 3, border: '1px solid var(--color-bg-hover)',
                   background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
                 }}>{token}</button>
               ))}
             </div>
-            <div style={{ padding: 8, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <div style={{ padding: 8, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Preview</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
                 {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', new Date().toISOString().split('T')[0]).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
@@ -2257,14 +2274,14 @@ const Forge: React.FC = () => {
                   + '.' + (presets.find(p => p.id === j.preset)?.container || 'mp4'),
               })));
               setShowBatchRename(false);
-            }} style={{ width: '100%', padding: '8px', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to All Jobs</button>
+            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to All Jobs</button>
           </div>
         </div>
       )}
 
       {/* Concat / Merge */}
       {showConcat && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Concatenate / Merge Files</span>
             <button aria-label="Close Concat" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConcat(false)}><DexIcon name="close" size={14} /></button>
@@ -2279,7 +2296,7 @@ const Forge: React.FC = () => {
                   const job = jobs.find(j => j.id === id);
                   if (!job) return null;
                   return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)' }}>
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 16 }}>{idx + 1}.</span>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', flex: 1 }}>{job.name}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -2309,7 +2326,7 @@ const Forge: React.FC = () => {
                 };
                 setJobs(prev => [...prev, mergedJob]);
                 setShowConcat(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Merge to Single File</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Merge to Single File</button>
               <button onClick={async () => {
                 if (concatOrder.length < 2) return;
                 toast.info('Joining files via sequential re-encode...');
@@ -2376,7 +2393,7 @@ const Forge: React.FC = () => {
                   toast.error('Smart join failed: ' + (err?.message || 'Unknown error'));
                 }
                 setShowConcat(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid rgba(255,149,10,0.2)', background: 'rgba(255,149,10,0.08)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Smart Join (re-encode)</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid rgba(255,149,10,0.2)', background: 'rgba(255,149,10,0.08)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Smart Join (re-encode)</button>
             </div>
           </div>
         </div>
@@ -2409,10 +2426,10 @@ const Forge: React.FC = () => {
           { label: 'Remove Job', fn: () => removeJob(ctxJob.id), danger: true },
         ];
         return (
-          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 8, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
               ? <div key={i} style={{ height: 1, background: '#333', margin: '4px 8px' }} />
-              : <div key={i} className="forge-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 4, margin: '0 4px' }}>{item.label}</div>
+              : <div key={i} className="forge-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );

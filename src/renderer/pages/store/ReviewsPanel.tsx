@@ -221,7 +221,7 @@ const inputStyle: React.CSSProperties = {
   padding: '9px 11px',
   background: 'rgba(0,0,0,0.28)',
   border: '1px solid var(--pg-border-strong)',
-  borderRadius: 9,
+  borderRadius: 7,
   color: 'var(--color-text-primary)',
   outline: 'none',
   fontSize: 13,

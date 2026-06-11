@@ -180,7 +180,7 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
         width: '100%', height,
         background: '#0A0A0A',
         border: '1px solid var(--color-border-subtle)',
-        borderRadius: 4, display: 'block',
+        borderRadius: 3, display: 'block',
       }}
     />
   );

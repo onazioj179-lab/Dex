@@ -53,6 +53,8 @@ export interface ShellPreferences {
   stageManagerPinned: boolean;
   /** Show the always-on-top MiniPulse system monitor pill. */
   miniPulseEnabled: boolean;
+  /** Automatically recover crashed apps (bounded retries, then crash card). */
+  autoRecoverApps: boolean;
 }
 
 export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
@@ -69,6 +71,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   clipboardCloudSync: false,
   stageManagerPinned: false,
   miniPulseEnabled: false,
+  autoRecoverApps: true,
 };
 
 interface ShellPreferencesActions {
@@ -85,6 +88,7 @@ interface ShellPreferencesActions {
   setClipboardCloudSync: (enabled: boolean) => void;
   setStageManagerPinned: (enabled: boolean) => void;
   setMiniPulseEnabled: (enabled: boolean) => void;
+  setAutoRecoverApps: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -127,6 +131,8 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.preventTabRefreshOnSleep = o.preventTabRefreshOnSleep !== false;
   base.clipboardCloudSync = o.clipboardCloudSync === true;
   base.stageManagerPinned = o.stageManagerPinned === true;
+  base.miniPulseEnabled = o.miniPulseEnabled === true;
+  base.autoRecoverApps = o.autoRecoverApps !== false; // default true
   return base;
 }
 
@@ -341,6 +347,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
     setClipboardCloudSync: (enabled) => update({ clipboardCloudSync: enabled }),
     setStageManagerPinned: (enabled) => update({ stageManagerPinned: enabled }),
     setMiniPulseEnabled: (enabled) => update({ miniPulseEnabled: enabled }),
+    setAutoRecoverApps: (enabled) => update({ autoRecoverApps: enabled }),
 
     reset: () => {
       const next = { ...DEFAULT_SHELL_PREFERENCES };

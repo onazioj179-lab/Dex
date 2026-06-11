@@ -131,7 +131,7 @@ function nodesToHTML(nodes: DocNode[] | undefined): string {
 function nodeToHTML(node: DocNode): string {
   // Text node with marks
   if (node.text !== undefined) {
-    let html = escapeHTML(node.text);
+    let html = renderWikiLinks(escapeHTML(node.text));
     if (node.marks) {
       for (const mark of node.marks) {
         html = wrapMark(html, mark);
@@ -322,6 +322,16 @@ function parseInline(el: Element): DocNode[] {
 
       // Skip checkbox inputs (handled by checklist_item)
       if (tag === 'input') continue;
+
+      // Wiki-link anchors round-trip back to "[[Title]]" plain text so the
+      // stored doc keeps the portable syntax rather than a baked-in anchor.
+      if (tag === 'a' && inlineEl.classList.contains('wikilink')) {
+        const title = inlineEl.getAttribute('data-wikilink') || inlineEl.textContent || '';
+        if (title.trim()) {
+          nodes.push({ type: 'paragraph', text: `[[${title.trim()}]]` });
+        }
+        continue;
+      }
 
       const mark = tagToMark(inlineEl);
       if (mark) {
@@ -544,6 +554,56 @@ function walkNodes(nodes: DocNode[] | undefined, fn: (node: DocNode, depth: numb
       walkNodes(node.content, fn, depth + 1);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Wiki-links: [[Note Title]] -> clickable anchor
+// ---------------------------------------------------------------------------
+// Operates on already-HTML-escaped text. The rendered anchor carries the raw
+// title in data-wikilink so click handlers can resolve it, while the visible
+// label keeps the original "[[Title]]" syntax off-screen. On the way back in
+// (htmlToDoc), a .wikilink anchor is flattened to "[[Title]]" plain text so the
+// stored document model never accumulates anchor cruft and round-trips cleanly.
+
+const WIKILINK_RE = /\[\[([^\[\]]+?)\]\]/g;
+
+export function renderWikiLinks(escapedText: string): string {
+  return escapedText.replace(WIKILINK_RE, (_m, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return _m;
+    // title is already HTML-escaped (came from escapeHTML); reuse for the attr.
+    return `<a class="wikilink" data-wikilink="${trimmed}" href="#">${trimmed}</a>`;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Headings: extract a flat outline for a table-of-contents view
+// ---------------------------------------------------------------------------
+
+export interface HeadingItem {
+  level: number;
+  text: string;
+  /** Stable index among headings, used to locate the matching DOM element. */
+  index: number;
+}
+
+export function extractHeadings(doc: DocRoot): HeadingItem[] {
+  const headings: HeadingItem[] = [];
+  walkNodes(doc.content, (node) => {
+    if (node.type === 'heading') {
+      const level = Math.min(Math.max(node.attrs?.level || 1, 1), 3);
+      const text = nodeText(node).trim();
+      if (text) {
+        headings.push({ level, text, index: headings.length });
+      }
+    }
+  });
+  return headings;
+}
+
+function nodeText(node: DocNode): string {
+  if (node.text !== undefined) return node.text;
+  return (node.content || []).map(nodeText).join('');
 }
 
 function escapeHTML(text: string): string {

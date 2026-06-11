@@ -5170,7 +5170,7 @@ html.focus-mode,
   z-index: 100000;
   text-decoration: none;
   font-weight: 600;
-  border-radius: 0 0 8px 0;
+  border-radius: 0 0 6px 0;
 }
 
 .dex-skip-link:focus {
@@ -5467,7 +5467,7 @@ html[style*="font-size: 120"] * {
   width: 10px;
   height: 10px;
   background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.15) 50%);
-  border-radius: 0 0 4px 0;
+  border-radius: 0 0 3px 0;
 }
 
 .dex-resize-handle[data-corner="sw"],

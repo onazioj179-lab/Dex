@@ -461,7 +461,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     background: 'var(--color-accent, #0a84ff)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '6px',
     cursor: 'pointer',
   },
   closeButton: {
@@ -471,7 +471,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary, #ffffff)',
     background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '6px',
     cursor: 'pointer',
   },
   errorDetails: {
@@ -490,7 +490,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#888',
     background: 'rgba(0,0,0,0.3)',
     padding: '12px',
-    borderRadius: '6px',
+    borderRadius: '4px',
     overflow: 'auto',
     maxHeight: '150px',
     whiteSpace: 'pre-wrap',
@@ -535,7 +535,7 @@ const styles: Record<string, React.CSSProperties> = {
   skeleton: {
     background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%)',
     backgroundSize: '200% 100%',
-    borderRadius: '4px',
+    borderRadius: '3px',
   },
 };
 

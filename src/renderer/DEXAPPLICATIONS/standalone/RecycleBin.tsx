@@ -77,7 +77,7 @@ const headerStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 const searchInput: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', borderRadius: 8,
+  width: '100%', padding: '8px 12px', borderRadius: 6,
   border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
   color: '#e5e5ea', fontSize: 13, outline: 'none',
 };
@@ -90,10 +90,10 @@ const groupHeader: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-  borderRadius: 8, cursor: 'default', transition: 'background 0.15s',
+  borderRadius: 6, cursor: 'default', transition: 'background 0.15s',
 };
 const btnSmall: React.CSSProperties = {
-  padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: 12,
+  padding: '4px 10px', borderRadius: 4, border: 'none', fontSize: 12,
   fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s',
 };
 const emptyState: React.CSSProperties = {
@@ -120,7 +120,7 @@ const ItemRow = memo(({ item, onRestore, onDelete }: {
       {/* Badge */}
       <span style={{
         display: 'inline-block', minWidth: 38, textAlign: 'center',
-        padding: '2px 6px', borderRadius: 6,
+        padding: '2px 6px', borderRadius: 4,
         background: badgeColor, fontSize: 11, fontWeight: 700,
         color: days <= 7 ? '#fff' : 'var(--color-text-secondary)',
       }}>

@@ -174,7 +174,7 @@ export const ScrollContainer: React.FC<ScrollContainerProps> = ({
         }
         .dex-scroll-container > div::-webkit-scrollbar-thumb {
           background: rgba(255, 255, 255, 0.08);
-          border-radius: 3px;
+          border-radius: 2px;
           transition: background 0.15s ease;
         }
         .dex-scroll-container > div:hover::-webkit-scrollbar-thumb,

@@ -36,7 +36,7 @@ function toolBtnStyle(active: boolean): React.CSSProperties {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 3,
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.12s',
@@ -148,13 +148,13 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
           <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Export</span>
         </button>
         {ui.showExport && (
-          <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', padding: 4, minWidth: 160, maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(320px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
+          <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: 'var(--pg-shadow-popover)', padding: 4, minWidth: 160, maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(320px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
             {(['stl', 'gltf', 'dxf', 'pdf', 'json', 'png'] as const).map(fmt => (
               <button key={fmt} onClick={() => { onExport(fmt); ui.toggleExport(); }}
                 className="dex-hover-bg"
                 role="menuitem"
                 aria-label={`Export as ${fmt.toUpperCase()}`}
-                style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, textAlign: 'left', padding: '7px 10px', fontSize: 11, color: 'var(--color-text-primary)', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, textAlign: 'left', padding: '7px 10px', fontSize: 11, color: 'var(--color-text-primary)', background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
                 <span style={{ flex: 1 }}>{fmt.toUpperCase()}</span>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{fmt === 'stl' ? '3D Print' : fmt === 'gltf' ? 'PBR/Web3D' : fmt === 'dxf' ? 'CNC/CAD' : fmt === 'pdf' ? 'Drawing' : fmt === 'json' ? 'Project' : 'Image'}</span>

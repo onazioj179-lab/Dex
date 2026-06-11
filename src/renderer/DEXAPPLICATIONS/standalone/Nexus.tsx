@@ -42,6 +42,9 @@ interface Star {
   z: number;
   r: number;
   phase: number;
+  // parallax layer (0 = far/slow/faint, 2 = near/fast/bright)
+  layer: number;
+  twinkleRate: number;
 }
 
 interface NexusNode {
@@ -133,6 +136,55 @@ function getResponsiveRadii(w: number, h: number, dpr: number): number[] {
 const LERP_SPEED = 0.085;
 const FOCUS_LERP = 0.03;
 
+// Captured once -- gate the new ambient oscillations (breathing rings, twinkle,
+// link pulses) so motion-sensitive users get a calm, static field.
+const PREFERS_REDUCED_MOTION = typeof window !== 'undefined' && window.matchMedia
+  ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  : false;
+
+// Parse #rrggbb -> [r,g,b]. Cached so repeated palette lookups stay cheap.
+const _hexCache = new Map<string, [number, number, number]>();
+function hexToRgb(hex: string): [number, number, number] {
+  let v = _hexCache.get(hex);
+  if (v) return v;
+  const h = hex.replace('#', '');
+  v = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  _hexCache.set(hex, v);
+  return v;
+}
+
+// Blend `from` toward `to` by t (0..1) and return an rgb() string. Used for
+// depth desaturation -- far nodes lerp toward the deep-space background.
+function mixToward(from: string, to: string, t: number): string {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  const r = Math.round(a[0] + (b[0] - a[0]) * t);
+  const g = Math.round(a[1] + (b[1] - a[1]) * t);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
+// Shared additive-bloom helper: paint a soft glow halo behind a node using
+// 'lighter' compositing, then restore source-over so callers stay clean.
+function additiveGlow(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, radius: number, color: string, alpha: number,
+) {
+  if (alpha <= 0.01 || radius < 0.5) return;
+  const prev = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  g.addColorStop(0, color);
+  g.addColorStop(0.5, color + '55');
+  g.addColorStop(1, color + '00');
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.globalAlpha = alpha;
+  ctx.fill();
+  ctx.globalCompositeOperation = prev;
+}
+
 const CLUSTER_CATEGORIES: Record<string, { label: string; color: string }> = {
   primary: { label: 'PRI', color: ICE_BLUE },
   secondary: { label: 'SEC', color: ELECTRIC },
@@ -197,16 +249,29 @@ function computeLookAt(x: number, y: number, z: number): { rotX: number; rotY: n
 
 function generateStars(count: number): Star[] {
   const stars: Star[] = [];
+  // Three parallax shells: far field is densest + faintest, near field is
+  // sparse + brightest. Each star carries a fixed twinkle phase + rate so the
+  // shimmer is deterministic (no Math.random per frame).
+  const layerCfg = [
+    { radMin: 560, radSpan: 360, rMin: 0.3, rSpan: 0.9, weight: 0.5 },
+    { radMin: 380, radSpan: 220, rMin: 0.5, rSpan: 1.4, weight: 0.32 },
+    { radMin: 240, radSpan: 160, rMin: 0.8, rSpan: 2.0, weight: 0.18 },
+  ];
   for (let i = 0; i < count; i++) {
+    const roll = Math.random();
+    const layer = roll < layerCfg[0].weight ? 0 : roll < layerCfg[0].weight + layerCfg[1].weight ? 1 : 2;
+    const cfg = layerCfg[layer];
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const r = 300 + Math.random() * 400;
+    const r = cfg.radMin + Math.random() * cfg.radSpan;
     stars.push({
       x: r * Math.sin(phi) * Math.cos(theta),
       y: r * Math.sin(phi) * Math.sin(theta),
       z: r * Math.cos(phi),
-      r: 0.5 + Math.random() * 1.8,
+      r: cfg.rMin + Math.random() * cfg.rSpan,
       phase: Math.random() * Math.PI * 2,
+      layer,
+      twinkleRate: 1.6 + Math.random() * 2.4,
     });
   }
   return stars;
@@ -264,41 +329,57 @@ function drawNexusAvatar(
   ctx.globalAlpha = 1;
   ctx.fill();
 
-  // ── Outer hexagonal frame (6 sides, rotates slowly) ──
-  const hexR = 58 * s;
-  const hexAngle = time * 0.08;
+  // ── Concentric breathing rings ──
+  // Replaces the old rotating hexagons. Each ring's radius gently oscillates on
+  // its own phase via sin(time), so the avatar feels like it is inhaling rather
+  // than spinning. Gated by reduced-motion so it can hold perfectly still.
+  const breatheM = PREFERS_REDUCED_MOTION ? 0 : 1;
+  const ringBase = [42, 58, 74];
+  const ringPhase = [0, 1.4, 2.7];
+  const ringHues = ['#64D2FF', '#0A84FF', '#5E5CE6'];
   ctx.save();
-  ctx.rotate(hexAngle);
-  ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
-    const x = hexR * Math.cos(a);
-    const y = hexR * Math.sin(a);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let ri = 0; ri < ringBase.length; ri++) {
+    const osc = Math.sin(time * (0.9 + ri * 0.25) + ringPhase[ri]);
+    const rad = (ringBase[ri] + osc * 4 * breatheM + ukiAmp * 8) * s;
+    ctx.beginPath();
+    ctx.arc(0, 0, rad, 0, Math.PI * 2);
+    ctx.strokeStyle = ringHues[ri];
+    ctx.lineWidth = (1.2 - ri * 0.25) * s;
+    ctx.globalAlpha = 0.16 + (0.5 + 0.5 * osc) * 0.14 + pulse * 0.06;
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.strokeStyle = energyColor;
-  ctx.lineWidth = 1.2 * s;
-  ctx.globalAlpha = 0.22 + breathe * 0.08;
-  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
 
-  // ── Inner hexagonal frame (counter-rotates) ──
+  // ── Particle orbit ── points circling the core at staggered radii/speeds,
+  // their angular position driven by the same time variable as the rings.
+  const orbitCount = ukiActive ? 14 : 9;
   ctx.save();
-  ctx.rotate(-hexAngle * 1.5);
-  const hex2R = 40 * s;
-  ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    const x = hex2R * Math.cos(a);
-    const y = hex2R * Math.sin(a);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let pi = 0; pi < orbitCount; pi++) {
+    const seed = pi * 2.39996; // golden-angle spacing for even distribution
+    const orbR = (46 + (pi % 3) * 12) * s;
+    const spin = (0.4 + (pi % 3) * 0.22) * (pi % 2 === 0 ? 1 : -1);
+    const a = seed + time * spin * breatheM;
+    const px = orbR * Math.cos(a);
+    const py = orbR * Math.sin(a) * 0.82; // slight tilt for depth
+    const pr = (1.1 + (pi % 2) * 0.7) * s;
+    const g = ctx.createRadialGradient(px, py, 0, px, py, pr * 4);
+    g.addColorStop(0, ringHues[pi % 3]);
+    g.addColorStop(1, ringHues[pi % 3] + '00');
+    ctx.beginPath();
+    ctx.arc(px, py, pr * 4, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.globalAlpha = 0.35 + pulse * 0.2;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fillStyle = '#D8F2FF';
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
   }
-  ctx.closePath();
-  ctx.strokeStyle = ringColor;
-  ctx.lineWidth = 0.8 * s;
-  ctx.globalAlpha = 0.30 + pulse * 0.12;
-  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
 
   // ── Three orbital rings at different tilts (classic arc reactor) ──
@@ -865,8 +946,8 @@ const Nexus: React.FC = () => {
   // -----------------------------------------------------------------------
   useEffect(() => {
     const tier = getPerfTier();
-    const counts: Record<string, number> = { low: 120, mid: 250, high: 320, ultra: 400 };
-    starsRef.current = generateStars(counts[tier] || 250);
+    const counts: Record<string, number> = { low: 200, mid: 420, high: 560, ultra: 720 };
+    starsRef.current = generateStars(counts[tier] || 420);
     const pCounts: Record<string, number> = { low: 15, mid: 35, high: 55, ultra: 70 };
     particlesRef.current = generateParticles(pCounts[tier] || 35);
   }, []);
@@ -1309,25 +1390,46 @@ const Nexus: React.FC = () => {
 
       ctx.globalAlpha = 1;
 
-      // --- Stars (graph nodes) ---
+      // --- Stars (parallax starfield) ---
+      // Three shells rotate at staggered rates around the camera yaw so the
+      // near field drifts faster than the far field -- genuine depth parallax.
       const starAlpha = modeRef.current === 'starfield' ? 1.0 : 0.25;
       const stars = starsRef.current;
+      const motion = PREFERS_REDUCED_MOTION ? 0 : 1;
+      const layerYaw = [time * 0.012 * motion, time * 0.026 * motion, time * 0.045 * motion];
+      const layerBright = [0.55, 0.78, 1.0];
+      ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
-        const p = project3D(s.x, s.y, s.z, cam.rotX, cam.rotY, cam.zoom, cx, cy);
+        const p = project3D(s.x, s.y, s.z, cam.rotX, cam.rotY + layerYaw[s.layer], cam.zoom, cx, cy);
         if (p.depth < -cam.zoom * 0.8) continue;
-        const twinkle = 0.5 + 0.5 * Math.sin(time * 2.5 + s.phase);
-        const alpha = Math.min(1, p.scale * 1.5) * twinkle * starAlpha;
+        // Deterministic per-star twinkle (seeded phase + rate, no per-frame RNG).
+        const twinkle = PREFERS_REDUCED_MOTION
+          ? 0.8
+          : 0.45 + 0.55 * Math.sin(time * s.twinkleRate + s.phase);
+        const alpha = Math.min(1, p.scale * 1.5) * twinkle * starAlpha * layerBright[s.layer];
         const radius = s.r * p.scale;
-        if (radius < 0.2) continue;
+        if (radius < 0.2 || alpha < 0.02) continue;
 
+        const starColor = CYBER_COLORS[i % 3];
+        // Bright near-field stars get a faint additive halo for a lens-bloom feel.
+        if (s.layer === 2 && radius > 0.9) {
+          const g = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, radius * 4 * dpr);
+          g.addColorStop(0, starColor + '66');
+          g.addColorStop(1, starColor + '00');
+          ctx.beginPath();
+          ctx.arc(p.sx, p.sy, radius * 4 * dpr, 0, Math.PI * 2);
+          ctx.fillStyle = g;
+          ctx.globalAlpha = alpha * 0.4;
+          ctx.fill();
+        }
         ctx.beginPath();
         ctx.arc(p.sx, p.sy, radius * dpr, 0, Math.PI * 2);
-        const starColor = CYBER_COLORS[i % 3];
         ctx.fillStyle = starColor;
-        ctx.globalAlpha = alpha * 0.7;
+        ctx.globalAlpha = alpha * 0.8;
         ctx.fill();
       }
+      ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
 
       // --- Ambient floating particles (UKI-reactive velocity) ---
@@ -1489,15 +1591,21 @@ const Nexus: React.FC = () => {
             if (pi.depth < -cam.zoom * 0.7 || pj.depth < -cam.zoom * 0.7) continue;
 
             const wireAlpha = (1 - dist / maxConnDist) * 0.35 * Math.min(ni.visibility, nj.visibility);
-            
-            // Glowing wire line
+
+            // Gradient wire line: fades from each endpoint's hue toward the center
+            // so links read as energy flowing between nodes rather than flat ink.
+            const cA = CYBER_COLORS[i % 3];
+            const cB = CYBER_COLORS[j % 3];
+            const midX = (pi.sx + pj.sx) / 2 + Math.sin(time + i) * 8 * motion;
+            const midY = (pi.sy + pj.sy) / 2 + Math.cos(time + j) * 8 * motion;
+            const wireGrad = ctx.createLinearGradient(pi.sx, pi.sy, pj.sx, pj.sy);
+            wireGrad.addColorStop(0, cA);
+            wireGrad.addColorStop(0.5, '#FFFFFF');
+            wireGrad.addColorStop(1, cB);
             ctx.beginPath();
             ctx.moveTo(pi.sx, pi.sy);
-            // Curved bezier for organic feel
-            const midX = (pi.sx + pj.sx) / 2 + Math.sin(time + i) * 8;
-            const midY = (pi.sy + pj.sy) / 2 + Math.cos(time + j) * 8;
             ctx.quadraticCurveTo(midX, midY, pj.sx, pj.sy);
-            ctx.strokeStyle = CYBER_COLORS[(i + j) % 3];
+            ctx.strokeStyle = wireGrad;
             ctx.globalAlpha = wireAlpha;
             ctx.lineWidth = 1.2 * dpr;
             ctx.stroke();
@@ -1661,7 +1769,10 @@ const Nexus: React.FC = () => {
           const pj = project3D(nj.cx, nj.cy, nj.cz, cam.rotX, cam.rotY, cam.zoom, cx, cy);
           if (pj.depth < -cam.zoom * 0.7) continue;
           const edgeAlpha = 0.22 * (1 - dist / 120) * Math.min(1, pi.scale, pj.scale);
-          ctx.strokeStyle = CYBER_COLORS[(i + j) % 3];
+          const edgeGrad = ctx.createLinearGradient(pi.sx, pi.sy, pj.sx, pj.sy);
+          edgeGrad.addColorStop(0, CYBER_COLORS[i % 3]);
+          edgeGrad.addColorStop(1, CYBER_COLORS[j % 3]);
+          ctx.strokeStyle = edgeGrad;
           ctx.globalAlpha = edgeAlpha;
           ctx.lineWidth = 1.6 * dpr;
           ctx.beginPath();
@@ -1984,6 +2095,11 @@ const Nexus: React.FC = () => {
         const alpha = Math.min(1, n.scale * 1.5) * (matchesSearch ? 1 : 0.12) * n.visibility * depthFog;
         if (alpha < 0.02) continue;
 
+        // Depth cueing: nearer nodes render fully saturated, far nodes desaturate
+        // toward the background so the field reads with real volumetric depth.
+        const depthSat = Math.max(0, Math.min(1, (depthFog - 0.15) / 0.85));
+        const drawColor = depthSat >= 0.92 ? nodeColor : mixToward(nodeColor, BG, (1 - depthSat) * 0.55);
+
         // Motion trail
         const trailDx = n.sx - n.prevSx;
         const trailDy = n.sy - n.prevSy;
@@ -1999,13 +2115,20 @@ const Nexus: React.FC = () => {
           ctx.stroke();
         }
 
+        // Layered additive bloom: two soft halo passes in 'lighter' build a
+        // luminous core that nearer/brighter nodes wear more strongly. The
+        // crisp body is drawn on top afterward in source-over.
+        const bloomBoost = isHovered ? 1.6 : isSelected ? 1.35 : 1;
+        additiveGlow(ctx, n.sx, n.sy, r * 3.2 * bloomBoost, drawColor, alpha * 0.16 * depthSat * bloomBoost);
+        additiveGlow(ctx, n.sx, n.sy, r * 1.7 * bloomBoost, drawColor, alpha * 0.30 * depthSat * bloomBoost);
+
         // Outer neon glow (sharp box shadow effect)
         if (isHovered || isSelected || isDir) {
           const glowR = r * (isHovered ? 3.5 : isSelected ? 3 : 2.5);
           ctx.beginPath();
           ctx.arc(n.sx, n.sy, glowR, 0, Math.PI * 2);
           const glowGrad = ctx.createRadialGradient(n.sx, n.sy, 0, n.sx, n.sy, glowR);
-          glowGrad.addColorStop(0, nodeColor);
+          glowGrad.addColorStop(0, drawColor);
           glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = glowGrad;
           ctx.globalAlpha = alpha * (isHovered ? 0.55 : isSelected ? 0.45 : 0.2);
@@ -2019,7 +2142,7 @@ const Nexus: React.FC = () => {
           ctx.arc(n.sx, n.sy, ringR, 0, Math.PI * 2);
           ctx.setLineDash([3 * dpr, 3 * dpr]);
           ctx.strokeStyle = nodeColor;
-          ctx.globalAlpha = alpha * (0.4 + 0.2 * Math.sin(time * 4));
+          ctx.globalAlpha = alpha * (0.4 + 0.2 * Math.sin(time * 4) * motion);
           ctx.lineWidth = 1.5 * dpr;
           ctx.stroke();
           ctx.setLineDash([]);
@@ -2068,7 +2191,7 @@ const Nexus: React.FC = () => {
           ctx.lineTo(n.sx, n.sy + r);
           ctx.lineTo(n.sx - r, n.sy);
           ctx.closePath();
-          ctx.fillStyle = nodeColor;
+          ctx.fillStyle = drawColor;
           ctx.fill();
           // Diamond border
           ctx.strokeStyle = WHITE;
@@ -2086,7 +2209,7 @@ const Nexus: React.FC = () => {
             else ctx.lineTo(hx, hy);
           }
           ctx.closePath();
-          ctx.fillStyle = nodeColor;
+          ctx.fillStyle = drawColor;
           ctx.fill();
           // Hex border
           ctx.strokeStyle = WHITE;
@@ -2304,6 +2427,18 @@ const Nexus: React.FC = () => {
 
       ctx.globalAlpha = 1;
 
+      // --- Vignette: radial darkening of the edges, painted last so it sits
+      // over the whole scene and pulls focus toward the core. ---
+      const vigInner = Math.min(w, h) * 0.36;
+      const vigOuter = Math.hypot(w, h) * 0.62;
+      const vig = ctx.createRadialGradient(cx, cy, vigInner, cx, cy, vigOuter);
+      vig.addColorStop(0, 'rgba(3,6,12,0)');
+      vig.addColorStop(0.7, 'rgba(3,6,12,0.28)');
+      vig.addColorStop(1, 'rgba(2,4,9,0.72)');
+      ctx.fillStyle = vig;
+      ctx.globalAlpha = 1;
+      ctx.fillRect(0, 0, w, h);
+
       rafRef.current = requestAnimationFrame(draw);
     };
 
@@ -2361,7 +2496,7 @@ const Nexus: React.FC = () => {
         {/* Title + node count */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto', minWidth: 0, flexShrink: 0 }}>
           <div style={{
-            width: 24, height: 24, borderRadius: 8,
+            width: 24, height: 24, borderRadius: 6,
             background: 'rgba(100,210,255,0.08)',
             border: `1.5px solid ${ICE_BLUE}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2373,7 +2508,7 @@ const Nexus: React.FC = () => {
           </div>
           <div>
             <div style={{ color: ICE_BLUE, fontSize: 12, fontWeight: 700, letterSpacing: 1.2, fontFamily: FONT_STACK, textTransform: 'uppercase' }}>Nexus</div>
-            <div style={{ color: ELECTRIC, fontSize: 8, fontWeight: 700, marginTop: 1, fontFamily: FONT_STACK, letterSpacing: 0.8 }}>
+            <div style={{ color: ELECTRIC, fontSize: 8, fontWeight: 700, marginTop: 1, fontFamily: FONT_STACK, letterSpacing: 0.8, fontVariantNumeric: 'tabular-nums' }}>
               {nodeCount} nodes / {mode.toUpperCase()} / LIVE
             </div>
           </div>
@@ -2391,7 +2526,7 @@ const Nexus: React.FC = () => {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             height: 28,
-            borderRadius: 10,
+            borderRadius: 8,
             padding: '0 10px',
             background: searchFocused ? 'rgba(100,210,255,0.08)' : 'rgba(11,18,28,0.82)',
             border: `1px solid ${searchFocused ? ICE_BLUE : 'rgba(100,210,255,0.16)'}`,
@@ -2450,7 +2585,7 @@ const Nexus: React.FC = () => {
                 aria-label="Clear search"
                 style={{
                   background: 'rgba(100,210,255,0.12)', border: `1px solid ${ELECTRIC}`,
-                  borderRadius: 6,
+                  borderRadius: 4,
                   width: 20, height: 20, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'background 0.15s',
@@ -2472,7 +2607,7 @@ const Nexus: React.FC = () => {
               background: 'rgba(11,18,28,0.97)',
               border: `1px solid rgba(100,210,255,0.18)`,
               borderTop: 'none',
-              borderRadius: '0 0 10px 10px',
+              borderRadius: '0 0 8px 8px',
               padding: '12px',
               zIndex: 30,
             }}>
@@ -2487,7 +2622,7 @@ const Nexus: React.FC = () => {
               background: 'rgba(11,18,28,0.97)',
               border: `1px solid ${ICE_BLUE}`,
               borderTop: 'none',
-              borderRadius: '0 0 10px 10px',
+              borderRadius: '0 0 8px 8px',
               boxShadow: `0 12px 34px rgba(0,0,0,0.45), 0 0 20px ${ICE_BLUE}18`,
               padding: '4px 0',
               maxHeight: 'min(280px, calc(100vh - 98px))',
@@ -2549,7 +2684,7 @@ const Nexus: React.FC = () => {
           style={{
             pointerEvents: 'auto',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 26, height: 26, borderRadius: 9,
+            width: 26, height: 26, borderRadius: 7,
             background: 'rgba(100,210,255,0.06)',
             border: `1px solid rgba(100,210,255,0.18)`,
             color: 'rgba(216,226,240,0.72)',
@@ -2591,7 +2726,7 @@ const Nexus: React.FC = () => {
         scrollbarWidth: 'thin',
         background: 'rgba(11,18,28,0.92)',
         border: `1px solid rgba(100,210,255,0.2)`,
-        borderRadius: 12,
+        borderRadius: 10,
         boxShadow: `0 8px 26px rgba(0,0,0,0.34), 0 0 12px ${ICE_BLUE}10`,
         zIndex: 10,
       }}>
@@ -2680,13 +2815,16 @@ const Nexus: React.FC = () => {
         ].map((item) => (
           <div key={item.label} style={{
             padding: '4px 8px',
-            background: 'rgba(11,18,28,0.72)',
+            background: 'rgba(11,18,28,0.55)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.08)',
             borderLeft: `2px solid ${item.color}`,
-            borderRadius: 8,
+            borderRadius: 6,
             boxShadow: `0 0 10px ${item.color}20`,
           }}>
-            <div style={{ fontSize: 8, color: 'rgba(216,226,240,0.45)', letterSpacing: 1, fontWeight: 700 }}>{item.label}</div>
-            <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 0.3 }}>{item.value}</div>
+            <div style={{ fontSize: 8, color: 'rgba(216,226,240,0.45)', letterSpacing: 1.2, fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 0.2, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
           </div>
         ))}
       </div>
@@ -2706,14 +2844,17 @@ const Nexus: React.FC = () => {
         ].map((item) => (
           <div key={item.label} style={{
             padding: '4px 8px',
-            background: 'rgba(11,18,28,0.72)',
+            background: 'rgba(11,18,28,0.55)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.08)',
             borderRight: `2px solid ${item.color}`,
-            borderRadius: 8,
+            borderRadius: 6,
             textAlign: 'right',
             boxShadow: `0 0 10px ${item.color}20`,
           }}>
-            <div style={{ fontSize: 8, color: 'rgba(216,226,240,0.45)', letterSpacing: 1, fontWeight: 700 }}>{item.label}</div>
-            <div style={{ fontSize: 9, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 0.3 }}>{item.status}</div>
+            <div style={{ fontSize: 8, color: 'rgba(216,226,240,0.45)', letterSpacing: 1.2, fontWeight: 700 }}>{item.label}</div>
+            <div style={{ fontSize: 9, color: item.color, fontWeight: 700, marginTop: 1, letterSpacing: 0.2, fontVariantNumeric: 'tabular-nums' }}>{item.status}</div>
           </div>
         ))}
       </div>
@@ -2724,7 +2865,7 @@ const Nexus: React.FC = () => {
         pointerEvents: 'none',
         background: 'rgba(11,18,28,0.95)',
         border: `1px solid ${ICE_BLUE}`,
-        borderRadius: 8,
+        borderRadius: 6,
         padding: '6px 10px',
         zIndex: 20,
         maxWidth: 260,
@@ -2744,7 +2885,7 @@ const Nexus: React.FC = () => {
           maxHeight: 'min(320px, calc(100% - 84px))', overflowY: 'auto',
           background: 'rgba(11,18,28,0.94)',
           border: `1px solid ${ICE_BLUE}30`,
-          borderRadius: 12,
+          borderRadius: 10,
           boxShadow: `0 4px 20px rgba(0,0,0,0.4), 0 0 12px ${ICE_BLUE}15`,
           zIndex: 20,
           fontFamily: FONT_STACK,
@@ -2812,7 +2953,7 @@ const Nexus: React.FC = () => {
               fontSize: 8, color: ICE_BLUE, fontWeight: 700, letterSpacing: 0.5,
               padding: '1px 4px',
               border: `1px solid rgba(100,210,255,0.18)`,
-              borderRadius: 5,
+              borderRadius: 4,
               background: 'rgba(11,18,28,0.7)',
             }}>{h.key}</span>
           </div>
@@ -2832,7 +2973,7 @@ const modeBtnBase: React.CSSProperties = {
   gap: 4,
   padding: '4px 8px',
   border: `1px solid rgba(100,210,255,0.14)`,
-  borderRadius: 8,
+  borderRadius: 6,
   cursor: 'pointer',
   fontSize: 9,
   fontWeight: 700,
@@ -2895,7 +3036,7 @@ const ZoomButton = memo(({ label, onClick, icon }: {
         width: 24,
         height: 24,
         border: `1px solid ${hovered ? ICE_BLUE : 'rgba(100,210,255,0.16)'}`,
-        borderRadius: 8,
+        borderRadius: 6,
         background: hovered ? 'rgba(100,210,255,0.08)' : 'transparent',
         color: hovered ? ICE_BLUE : 'rgba(216,226,240,0.72)',
         fontSize: 12,

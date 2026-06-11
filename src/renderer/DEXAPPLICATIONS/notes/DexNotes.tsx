@@ -26,12 +26,14 @@ import {
   TemplateSelector,
   NoteStats,
   TitleInput,
+  TableOfContents,
 } from './NotesComponents';
 import {
   SuggestionBar,
   useWordSuggestions,
   populateTrieFromBackend,
 } from './WordSuggestions';
+import { deserializeDoc, extractHeadings } from './NotesDocumentModel';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -120,7 +122,7 @@ const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     padding: '4px 10px',
-    borderRadius: 6,
+    borderRadius: 4,
     transition: 'background 0.1s, color 0.1s',
     fontWeight: 500,
   },
@@ -466,6 +468,83 @@ const DexNotes: React.FC = () => {
     }
   }, [activeNote, store]);
 
+  // -- Drag-drop attachments onto the editor ----------------------------
+  // Electron exposes the absolute path on the dropped File (same pattern the
+  // dock uses in AppManager). Falls back to a toast if no path is available.
+  const handleDropFiles = useCallback(async (files: FileList) => {
+    if (!activeNote) return;
+    let added = 0;
+    for (const file of Array.from(files)) {
+      const filePath = (file as File & { path?: string }).path;
+      if (filePath) {
+        try {
+          await store.addAttachment(activeNote.id, filePath);
+          added++;
+        } catch { /* skip files that fail to attach */ }
+      }
+    }
+    if (added > 0) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Attached ${added} file${added !== 1 ? 's' : ''}` } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Could not attach dropped file' } }));
+    }
+  }, [activeNote, store]);
+
+  // -- [[wiki-link]] navigation: open the note whose title matches ------
+  const handleWikiLinkClick = useCallback((title: string) => {
+    const target = title.trim().toLowerCase();
+    const match = notes.find(n => (n.title || '').trim().toLowerCase() === target);
+    if (match) {
+      store.selectNote(match.id);
+    } else {
+      // No such note yet -- create one with that title so the link resolves.
+      store.createNote(selectedFolderId || undefined).then(id => {
+        if (id) store.updateNote(id, { title: title.trim() });
+      });
+    }
+  }, [notes, store, selectedFolderId]);
+
+  // -- Note titles for the [[wiki-link]] autocomplete -------------------
+  const noteTitles = React.useMemo(
+    () => notes.map(n => (n.title || '').trim()).filter(Boolean),
+    [notes],
+  );
+
+  // -- Outline / table of contents --------------------------------------
+  const headings = React.useMemo(() => {
+    if (!activeNote?.content) return [];
+    try {
+      return extractHeadings(deserializeDoc(activeNote.content));
+    } catch {
+      return [];
+    }
+  }, [activeNote?.content]);
+
+  // Scroll the editor to the Nth heading (matches extractHeadings order).
+  const handleJumpToHeading = useCallback((index: number) => {
+    const editorEl = editorAreaRef.current?.querySelector('.dexnotes-editable, .dexnotes-preview');
+    if (!editorEl) return;
+    const hs = editorEl.querySelectorAll('h1, h2, h3');
+    const target = hs[index] as HTMLElement | undefined;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  // -- Autosave indicator state -----------------------------------------
+  // Derives a save state from the store's `saving` flag and remembers when the
+  // last successful save landed, so the header pill reads "Saved Xs ago".
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const wasSaving = useRef(false);
+  useEffect(() => {
+    if (saving) {
+      wasSaving.current = true;
+    } else if (wasSaving.current) {
+      wasSaving.current = false;
+      setLastSavedAt(Date.now());
+    }
+  }, [saving]);
+
   // -- Render -----------------------------------------------------------
 
   if (loading) {
@@ -495,7 +574,7 @@ const DexNotes: React.FC = () => {
           </div>
           <button
             onClick={() => { setInitFailed(false); createAttempted.current = false; store.initialize(); }}
-            style={{ padding: '6px 16px', background: 'rgba(10,132,255,0.15)', border: '1px solid rgba(10,132,255,0.3)', borderRadius: 6, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+            style={{ padding: '6px 16px', background: 'rgba(10,132,255,0.15)', border: '1px solid rgba(10,132,255,0.3)', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
           >
             Retry
           </button>
@@ -522,6 +601,7 @@ const DexNotes: React.FC = () => {
             onColorLabel={(c) => store.updateNote(activeNote.id, { color_label: c })}
             focusMode={focusMode}
             saving={saving}
+            lastSavedAt={lastSavedAt}
           />
           <TitleInput title={titleValue} onChange={handleTitleChange} />
           <NotesEditor
@@ -531,6 +611,9 @@ const DexNotes: React.FC = () => {
             editorMode={editorMode}
             focusMode
             readOnly={!!activeNote.locked}
+            noteTitles={noteTitles}
+            onWikiLinkClick={handleWikiLinkClick}
+            onDropFiles={handleDropFiles}
           />
         </div>
       </div>
@@ -544,6 +627,10 @@ const DexNotes: React.FC = () => {
         .dexnotes-app button { font-family: inherit; transition: all 0.12s ease; }
         .dexnotes-app button:active { transform: scale(0.97); }
         .dexnotes-app .dn-footer button:hover { background: rgba(10,132,255,0.12) !important; color: #0a84ff !important; }
+        .dexnotes-app .dn-tree-acts:hover { opacity: 1 !important; }
+        .dexnotes-app .dn-tree-acts button:hover { background: rgba(255,255,255,0.08) !important; border-radius: 3px; }
+        .dexnotes-app .dn-swatch { transition: transform 0.12s ease; }
+        .dexnotes-app .dn-swatch:hover { transform: scale(1.15); }
         .dexnotes-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         .dexnotes-app ::-webkit-scrollbar { width: 6px; height: 6px; }
         .dexnotes-app ::-webkit-scrollbar-track { background: transparent; }
@@ -709,6 +796,7 @@ const DexNotes: React.FC = () => {
               onColorLabel={(c) => store.updateNote(activeNote.id, { color_label: c })}
               focusMode={focusMode}
               saving={saving}
+              lastSavedAt={lastSavedAt}
             />
             <TitleInput
               title={titleValue}
@@ -722,6 +810,9 @@ const DexNotes: React.FC = () => {
                 onSave={handleSave}
                 editorMode={editorMode}
                 readOnly={!!activeNote.locked}
+                noteTitles={noteTitles}
+                onWikiLinkClick={handleWikiLinkClick}
+                onDropFiles={handleDropFiles}
               />
               <FindReplace
                 visible={showFindReplace}
@@ -768,7 +859,7 @@ const DexNotes: React.FC = () => {
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>Select or create a note</div>
             <button
               onClick={() => { createAttempted.current = false; store.createNote(); }}
-              style={{ padding: '6px 16px', background: 'rgba(10,132,255,0.12)', border: '1px solid rgba(10,132,255,0.2)', borderRadius: 6, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+              style={{ padding: '6px 16px', background: 'rgba(10,132,255,0.12)', border: '1px solid rgba(10,132,255,0.2)', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
             >New Note</button>
           </div>
         )}
@@ -778,6 +869,8 @@ const DexNotes: React.FC = () => {
       {showRightPanel && activeNote && (
         <div style={S.rightPanel}>
           <div style={S.rightPanelHeader}>Note Details</div>
+          <TableOfContents headings={headings} onJump={handleJumpToHeading} />
+          <div style={{ height: 1, background: 'var(--color-bg-hover)' }} />
           <TagEditor
             tags={activeNote.tags}
             allTags={allTags}
@@ -833,7 +926,7 @@ const DexNotes: React.FC = () => {
             style={{
               background: 'rgba(0,0,0,0.3)',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 4,
+              borderRadius: 3,
               color: 'var(--color-text-tertiary)',
               cursor: 'pointer',
               fontSize: 11,
@@ -867,7 +960,7 @@ const DexNotes: React.FC = () => {
           background: 'rgba(0,0,0,0.7)',
         }} onClick={cancelDelete}>
           <div style={{
-            background: 'rgba(44,44,46,0.96)', borderRadius: 14,
+            background: 'rgba(44,44,46,0.96)', borderRadius: 10,
             padding: '24px 28px', maxWidth: 340, width: '90%',
             border: '1px solid var(--color-border)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -880,11 +973,11 @@ const DexNotes: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={cancelDelete} style={{
-                padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600,
+                padding: '7px 16px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
                 background: 'var(--color-border-subtle)', color: '#e5e5ea', cursor: 'pointer',
               }}>Cancel</button>
               <button onClick={confirmDelete} style={{
-                padding: '7px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600,
+                padding: '7px 16px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
                 background: 'rgba(255,69,58,0.2)', color: 'var(--color-error)', cursor: 'pointer',
               }}>Move to Trash</button>
             </div>
@@ -897,7 +990,7 @@ const DexNotes: React.FC = () => {
         <div style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           zIndex: 'var(--z-notification)', display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 16px', borderRadius: 10,
+          padding: '10px 16px', borderRadius: 8,
           background: 'var(--color-bg-surface-solid, #2C2C2E)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-panel)',

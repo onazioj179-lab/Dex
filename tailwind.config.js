@@ -53,6 +53,14 @@ export default {
       borderRadius: {
         // Bound to the canonical radius scale in design-system.css — never
         // restate pixel values here.
+        'none': '0',
+        'sm': 'var(--radius-xs)',
+        'DEFAULT': 'var(--radius-sm)',
+        'md': 'var(--radius-md)',
+        'lg': 'var(--radius-lg)',
+        'xl': 'var(--radius-xl)',
+        '2xl': 'var(--radius-2xl)',
+        'full': 'var(--radius-full)',
         'window': 'var(--radius-xl)',
         'dock': 'var(--radius-2xl)',
       },

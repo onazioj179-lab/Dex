@@ -58,7 +58,7 @@ const PropertiesPanel: React.FC = () => {
             </div>
 
             {(['position', 'rotation', 'scale'] as (keyof Transform)[]).map(key => (
-              <div key={key} style={{ background: 'var(--color-border-subtle)', borderRadius: 6, padding: '6px 8px', border: '1px solid var(--color-border-subtle)' }}>
+              <div key={key} style={{ background: 'var(--color-border-subtle)', borderRadius: 4, padding: '6px 8px' }}>
                 <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
                   {key === 'position' && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>}
                   {key === 'rotation' && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>}
@@ -74,7 +74,7 @@ const PropertiesPanel: React.FC = () => {
                         value={selectedPart.transform[key][axis]}
                         onChange={e => { pushUndo(); updatePartTransform(selectedPart.id, key, axis, Number(e.target.value)); }}
                         step={key === 'rotation' ? 5 : key === 'scale' ? 0.1 : project.gridSnap}
-                        style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid', borderColor: axis === 'x' ? 'rgba(255,69,58,0.25)' : axis === 'y' ? 'rgba(48,209,88,0.25)' : 'rgba(10,132,255,0.25)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 5px', outline: 'none', fontVariantNumeric: 'tabular-nums' }}
+                        style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid', borderColor: axis === 'x' ? 'rgba(255,69,58,0.25)' : axis === 'y' ? 'rgba(48,209,88,0.25)' : 'rgba(10,132,255,0.25)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 5px', outline: 'none', fontVariantNumeric: 'tabular-nums' }}
                       />
                     </label>
                   ))}
@@ -82,7 +82,7 @@ const PropertiesPanel: React.FC = () => {
               </div>
             ))}
 
-            <div style={{ padding: '8px', background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ padding: '8px', background: 'var(--color-border-subtle)', borderRadius: 4 }}>
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                 OBJECT DATA
@@ -97,17 +97,17 @@ const PropertiesPanel: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => duplicatePart(selectedPart.id)} style={{ flex: 1, fontSize: 9, padding: '5px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 5, color: 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <button onClick={() => duplicatePart(selectedPart.id)} style={{ flex: 1, fontSize: 9, padding: '5px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 Duplicate
               </button>
-              <button onClick={() => { deletePart(selectedPart.id); setSelectedPartId(null); }} style={{ flex: 1, fontSize: 9, padding: '5px 8px', background: 'rgba(255,68,58,0.08)', border: '1px solid rgba(255,68,58,0.15)', borderRadius: 5, color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <button onClick={() => { deletePart(selectedPart.id); setSelectedPartId(null); }} style={{ flex: 1, fontSize: 9, padding: '5px 8px', background: 'rgba(255,68,58,0.08)', border: '1px solid rgba(255,68,58,0.15)', borderRadius: 4, color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Delete
               </button>
             </div>
             <button onClick={() => togglePartVisibility(selectedPart.id)}
-              style={{ fontSize: 9, padding: '5px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 5, color: selectedPart.visible ? 'var(--color-text-primary)' : 'var(--color-warning)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              style={{ fontSize: 9, padding: '5px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: selectedPart.visible ? 'var(--color-text-primary)' : 'var(--color-warning)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               {selectedPart.visible ? (
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               ) : (
@@ -134,9 +134,9 @@ const PropertiesPanel: React.FC = () => {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', fontSize: 10,
                   background: selectedPart.material.id === mat.id ? 'rgba(10,132,255,0.15)' : 'transparent',
                   border: selectedPart.material.id === mat.id ? '1px solid rgba(10,132,255,0.3)' : '1px solid transparent',
-                  borderRadius: 6, cursor: 'pointer', color: 'var(--color-text-primary)', width: '100%', textAlign: 'left' as const,
+                  borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-primary)', width: '100%', textAlign: 'left' as const,
                 }}>
-                <div style={{ width: 14, height: 14, borderRadius: 3, background: mat.color, border: '1px solid var(--color-border)' }} />
+                <div style={{ width: 14, height: 14, borderRadius: 2, background: mat.color, border: '1px solid var(--color-border)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500 }}>{mat.name}</div>
                   <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{mat.density} kg/m\u00B3 | {mat.tensileStrength} MPa</div>
@@ -151,13 +151,13 @@ const PropertiesPanel: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>ADD CONSTRAINT</div>
             <select value={constraintType} onChange={e => setConstraintType(e.target.value as ConstraintType)}
-              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
+              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
               {(['coincident', 'concentric', 'distance', 'parallel', 'perpendicular', 'tangent', 'angle', 'fixed'] as ConstraintType[]).map(t => (
                 <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
               ))}
             </select>
             <select value={constraintPartB} onChange={e => setConstraintPartB(e.target.value)}
-              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
+              style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
               <option value="">Select part B...</option>
               {parts.filter(p => p.id !== selectedPartId).map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -166,10 +166,10 @@ const PropertiesPanel: React.FC = () => {
             {(constraintType === 'distance' || constraintType === 'angle') && (
               <input type="number" value={constraintValue} onChange={e => setConstraintValue(Number(e.target.value))}
                 placeholder={constraintType === 'angle' ? 'Angle (deg)' : 'Distance'}
-                style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 4, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
+                style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
             )}
             <button onClick={handleAddConstraint} disabled={!constraintPartB}
-              style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'rgba(10,132,255,0.2)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid rgba(10,132,255,0.3)', borderRadius: 6, cursor: constraintPartB ? 'pointer' : 'default' }}>
+              style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'rgba(10,132,255,0.2)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid rgba(10,132,255,0.3)', borderRadius: 4, cursor: constraintPartB ? 'pointer' : 'default' }}>
               Apply Constraint
             </button>
 
@@ -177,7 +177,7 @@ const PropertiesPanel: React.FC = () => {
               <>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginTop: 8 }}>ACTIVE CONSTRAINTS</div>
                 {project.assembly.constraints.filter(c => c.partA === selectedPartId || c.partB === selectedPartId).map(c => (
-                  <div key={c.id} style={{ fontSize: 10, padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div key={c.id} style={{ fontSize: 10, padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ color: c.satisfied ? 'var(--color-success)' : 'var(--color-error)' }}>{c.satisfied ? '\u2713' : '\u2717'}</span>
                     <span style={{ color: 'var(--color-text-secondary)' }}>{c.type}</span>
                     {c.value > 0 && <span style={{ color: 'var(--color-text-tertiary)' }}>({c.value})</span>}

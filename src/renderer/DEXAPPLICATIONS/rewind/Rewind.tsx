@@ -1253,7 +1253,7 @@ const timer = setInterval(check, 15000);
               width: 'min(920px, 94vw)',
               background: 'rgba(20,20,22,0.98)',
               border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 12,
+              borderRadius: 10,
               overflow: 'hidden',
             }}
             onMouseDown={e => e.stopPropagation()}
@@ -1315,7 +1315,7 @@ const timer = setInterval(check, 15000);
                       flexDirection: 'column',
                       gap: 2,
                       padding: '10px 12px',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       border: 'none',
                       background: commandIndex === idx ? 'rgba(74,158,255,0.15)' : 'transparent',
                       color: 'var(--color-text-primary)',
@@ -1340,7 +1340,7 @@ const timer = setInterval(check, 15000);
                       width: '100%',
                       textAlign: 'left',
                       padding: '10px 12px',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       border: 'none',
                       background: commandIndex === idx ? 'rgba(74,158,255,0.15)' : 'transparent',
                       color: 'var(--color-text-primary)',
@@ -1423,12 +1423,12 @@ const timer = setInterval(check, 15000);
           flexShrink: 0,
         }}>
           {/* Mini tab strip - iOS segmented control style */}
-          <div style={{ display: 'flex', gap: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 4, padding: 2, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 3, padding: 2, flexShrink: 0 }}>
             {(['timeline', 'search'] as const).map(t => (
               <button
                 key={t}
                 style={{
-                  padding: '4px 12px', borderRadius: 3, border: 'none', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                  padding: '4px 12px', borderRadius: 2, border: 'none', fontSize: 11, fontWeight: 500, cursor: 'pointer',
                   background: overviewSection === t ? 'rgba(255,255,255,0.08)' : 'transparent',
                   color: overviewSection === t ? 'var(--text-primary, #fafafa)' : 'var(--text-muted, #71717a)',
                 }}
@@ -1465,7 +1465,7 @@ const timer = setInterval(check, 15000);
                   style={{
                     ...S.filterBtn,
                     padding: '8px 14px',
-                    borderRadius: 10,
+                    borderRadius: 8,
                     fontSize: 12,
                     ...(filterType === t ? { background: 'rgba(74,158,255,0.15)', color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))' } : {}),
                   }}
@@ -1490,7 +1490,7 @@ const timer = setInterval(check, 15000);
               {loading && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[1,2,3,4,5].map(i => (
-                    <div key={i} className="dex-skeleton" style={{ height: 64, borderRadius: 14 }} />
+                    <div key={i} className="dex-skeleton" style={{ height: 64, borderRadius: 10 }} />
                   ))}
                 </div>
               )}
@@ -1589,7 +1589,7 @@ const timer = setInterval(check, 15000);
                       flex: '1 1 80px',
                       background: 'var(--bg-surface, #121215)',
                       border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
-                      borderRadius: 10,
+                      borderRadius: 8,
                       padding: '10px 14px',
                       minWidth: 80,
                     }}>
@@ -1602,7 +1602,7 @@ const timer = setInterval(check, 15000);
                       flex: '1 1 80px',
                       background: 'var(--bg-surface, #121215)',
                       border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
-                      borderRadius: 10,
+                      borderRadius: 8,
                       padding: '10px 14px',
                       minWidth: 80,
                     }}>
@@ -1633,7 +1633,7 @@ const timer = setInterval(check, 15000);
                     return (
                       <div
                         key={ss.id}
-                        style={{ flexShrink: 0, width: 120, height: 76, borderRadius: 8, overflow: 'hidden', background: 'var(--bg-surface, #121215)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))', cursor: dataUrl ? 'pointer' : 'default' }}
+                        style={{ flexShrink: 0, width: 120, height: 76, borderRadius: 6, overflow: 'hidden', background: 'var(--bg-surface, #121215)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.06))', cursor: dataUrl ? 'pointer' : 'default' }}
                         onClick={() => dataUrl && setLightboxUrl(dataUrl)}
                         title={formatTime(ss.timestamp)}
                       >
@@ -1732,7 +1732,7 @@ const timer = setInterval(check, 15000);
           {loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
               {[1,2,3,4,5].map(i => (
-                <div key={i} className="dex-skeleton" style={{ height: 52, borderRadius: 8 }} />
+                <div key={i} className="dex-skeleton" style={{ height: 52, borderRadius: 6 }} />
               ))}
             </div>
           )}
@@ -1930,7 +1930,7 @@ const timer = setInterval(check, 15000);
                 key={f}
                 onClick={() => setJournalFilter(f)}
                 style={{
-                  padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 500,
+                  padding: '4px 10px', borderRadius: 4, border: 'none', fontSize: 11, fontWeight: 500,
                   cursor: 'pointer', fontFamily: 'inherit',
                   background: journalFilter === f ? 'rgba(74,158,255,0.15)' : 'transparent',
                   color: journalFilter === f ? 'var(--color-accent)' : 'var(--text-muted, #71717a)',
@@ -1952,7 +1952,7 @@ const timer = setInterval(check, 15000);
             onChange={e => setJournalDraft(d => ({ ...d, title: e.target.value }))}
             style={{
               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8, padding: '8px 12px', color: 'inherit', fontSize: 13, fontWeight: 600,
+              borderRadius: 6, padding: '8px 12px', color: 'inherit', fontSize: 13, fontWeight: 600,
               outline: 'none', fontFamily: 'inherit',
             }}
             aria-label="Journal entry title"
@@ -1964,7 +1964,7 @@ const timer = setInterval(check, 15000);
             rows={4}
             style={{
               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8, padding: '10px 12px', color: 'inherit', fontSize: 13, lineHeight: 1.6,
+              borderRadius: 6, padding: '10px 12px', color: 'inherit', fontSize: 13, lineHeight: 1.6,
               outline: 'none', resize: 'vertical', fontFamily: 'inherit', minHeight: 80,
             }}
             aria-label="Journal entry body"
@@ -1976,7 +1976,7 @@ const timer = setInterval(check, 15000);
                 key={m}
                 onClick={() => setJournalDraft(d => ({ ...d, mood: m }))}
                 style={{
-                  padding: '3px 8px', borderRadius: 6, border: '1px solid',
+                  padding: '3px 8px', borderRadius: 4, border: '1px solid',
                   fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
                   borderColor: journalDraft.mood === m ? MOOD_MAP[m].color : 'rgba(255,255,255,0.1)',
                   background: journalDraft.mood === m ? `${MOOD_MAP[m].color}20` : 'transparent',
@@ -1995,7 +1995,7 @@ const timer = setInterval(check, 15000);
             onChange={e => setJournalDraft(d => ({ ...d, tags: e.target.value }))}
             style={{
               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8, padding: '6px 12px', color: 'inherit', fontSize: 12,
+              borderRadius: 6, padding: '6px 12px', color: 'inherit', fontSize: 12,
               outline: 'none', fontFamily: 'inherit',
             }}
             aria-label="Tags"
@@ -2006,7 +2006,7 @@ const timer = setInterval(check, 15000);
                 onClick={() => { setJournalEditing(null); setJournalDraft({ title: '', body: '', mood: 'neutral', tags: '' }); }}
                 aria-label="Cancel editing"
                 style={{
-                  padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '6px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
                   background: 'transparent', color: 'var(--text-secondary, #a1a1aa)',
                   fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
                 }}
@@ -2019,7 +2019,7 @@ const timer = setInterval(check, 15000);
               disabled={!journalDraft.body.trim()}
               aria-label={journalEditing ? 'Update entry' : 'Save entry'}
               style={{
-                padding: '6px 14px', borderRadius: 8, border: 'none',
+                padding: '6px 14px', borderRadius: 6, border: 'none',
                 background: journalDraft.body.trim() ? 'var(--color-accent)' : 'rgba(74,158,255,0.3)',
                 color: '#fff', fontSize: 12, fontWeight: 600, cursor: journalDraft.body.trim() ? 'pointer' : 'default',
                 fontFamily: 'inherit', opacity: journalDraft.body.trim() ? 1 : 0.5,
@@ -2042,7 +2042,7 @@ const timer = setInterval(check, 15000);
                     key={act.id}
                     onClick={() => linkActivityToJournal(journalEditing, act.id)}
                     style={{
-                      padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
+                      padding: '3px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
                       border: `1px solid ${linked ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)'}`,
                       background: linked ? 'rgba(74,158,255,0.12)' : 'transparent',
                       color: linked ? 'var(--color-accent)' : 'var(--text-muted, #71717a)',
@@ -2108,7 +2108,7 @@ const timer = setInterval(check, 15000);
                 </span>
               )}
               <span style={{
-                fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                fontSize: 10, padding: '2px 6px', borderRadius: 3,
                 background: `${moodInfo.color}18`, color: moodInfo.color, fontWeight: 500,
               }}>
                 {moodInfo.label}
@@ -2124,7 +2124,7 @@ const timer = setInterval(check, 15000);
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                 {entry.tags.map(tag => (
                   <span key={tag} style={{
-                    fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                    fontSize: 10, padding: '2px 6px', borderRadius: 3,
                     background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted, #71717a)',
                   }}>
                     {tag}
@@ -2366,7 +2366,7 @@ const timer = setInterval(check, 15000);
                   aria-label={`Select ${item.label} theme`}
                   style={{
                     border: active ? `2px solid ${preset.accent}` : '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     background: preset.surface,
                     color: preset.text,
                     cursor: 'pointer',
@@ -2381,7 +2381,7 @@ const timer = setInterval(check, 15000);
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{item.label}</div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {[preset.background, preset.surface, preset.accent, preset.text, preset.muted].map((c, i) => (
-                      <span key={i} style={{ width: 14, height: 14, borderRadius: 4, background: c, border: '1px solid rgba(0,0,0,0.2)' }} />
+                      <span key={i} style={{ width: 14, height: 14, borderRadius: 3, background: c, border: '1px solid rgba(0,0,0,0.2)' }} />
                     ))}
                   </div>
                 </button>
@@ -2523,7 +2523,7 @@ const timer = setInterval(check, 15000);
                 justifyContent: 'space-between',
                 gap: 8,
                 padding: '6px 8px',
-                borderRadius: 6,
+                borderRadius: 4,
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>
@@ -2575,7 +2575,7 @@ const timer = setInterval(check, 15000);
             {plugins.map(plugin => (
               <div key={plugin.id} style={{
                 border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 8,
+                borderRadius: 6,
                 padding: 8,
                 display: 'flex',
                 alignItems: 'center',
@@ -2658,7 +2658,7 @@ const timer = setInterval(check, 15000);
               {auditLog.map((entry: { id?: string; action?: string; timestamp?: number; detail?: string; user?: string }, idx: number) => (
                 <div key={entry.id || idx} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '4px 8px', borderRadius: 4,
+                  padding: '4px 8px', borderRadius: 3,
                   background: 'rgba(255,255,255,0.02)',
                   fontSize: 11,
                 }}>
@@ -2703,7 +2703,7 @@ const timer = setInterval(check, 15000);
 const statusCardStyle: React.CSSProperties = {
   background: 'rgba(255,255,255,0.03)',
   border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 10,
+  borderRadius: 8,
   padding: '14px 16px',
   display: 'flex',
   flexDirection: 'column',
@@ -2771,7 +2771,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 1,
     background: 'rgba(255,255,255,0.03)',
-    borderRadius: 6,
+    borderRadius: 4,
     padding: 2,
     border: '1px solid rgba(255,255,255,0.04)',
     overflowX: 'auto' as const,
@@ -2781,7 +2781,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   tabBtn: {
     padding: '4px 10px',
-    borderRadius: 4,
+    borderRadius: 3,
     border: 'none',
     background: 'transparent',
     color: 'rgba(255,255,255,0.4)',
@@ -2858,7 +2858,7 @@ const S: Record<string, React.CSSProperties> = {
     right: 16,
     background: 'var(--color-bg-surface-solid, #161618)',
     border: '1px solid rgba(255,255,255,0.10)',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: '4px 0',
     zIndex: 'var(--z-max)',
     boxShadow: '0 8px 32px rgba(0,0,0,0.45), inset 0 0.5px 0 rgba(255,255,255,0.06)',
@@ -2888,7 +2888,7 @@ const S: Record<string, React.CSSProperties> = {
     width: '100%',
     background: 'transparent',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 4,
     color: 'rgba(255,255,255,0.5)',
     cursor: 'pointer',
     padding: '8px 12px',
@@ -2957,7 +2957,7 @@ const S: Record<string, React.CSSProperties> = {
   dateBtn: {
     background: 'rgba(255,255,255,0.06)',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 4,
     color: 'var(--color-text-primary, #f5f5f7)',
     cursor: 'pointer',
     padding: '4px 10px',
@@ -2978,7 +2978,7 @@ const S: Record<string, React.CSSProperties> = {
   filterBtn: {
     background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 4,
+    borderRadius: 3,
     color: 'rgba(255,255,255,0.55)',
     cursor: 'pointer',
     padding: '5px 10px',
@@ -2998,14 +2998,14 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 10,
     padding: '10px 12px',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'rgba(255,255,255,0.02)',
     border: '1px solid rgba(255,255,255,0.04)',
   },
   entryIcon: {
     width: 32,
     height: 32,
-    borderRadius: 6,
+    borderRadius: 4,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3052,7 +3052,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     padding: '6px 10px',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.06)',
   },
@@ -3060,7 +3060,7 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 4,
+    borderRadius: 3,
     outline: 'none',
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
     fontSize: 12,
@@ -3069,7 +3069,7 @@ const S: Record<string, React.CSSProperties> = {
   searchBtn: {
     background: 'rgba(74,158,255,0.1)',
     border: '1px solid rgba(74,158,255,0.2)',
-    borderRadius: 4,
+    borderRadius: 3,
     color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))',
     cursor: 'pointer',
     padding: '6px 14px',
@@ -3081,7 +3081,7 @@ const S: Record<string, React.CSSProperties> = {
   headerBtn: {
     background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 4,
+    borderRadius: 3,
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
     cursor: 'pointer',
     padding: '3px 6px',
@@ -3091,7 +3091,7 @@ const S: Record<string, React.CSSProperties> = {
   // Insight cards
   insightCard: {
     padding: '12px 14px',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'rgba(255,255,255,0.025)',
     border: '1px solid rgba(255,255,255,0.05)',
   },
@@ -3138,7 +3138,7 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6,
+    borderRadius: 4,
     padding: '4px 8px',
     color: 'var(--color-text-primary, #f5f5f7)',
     fontSize: 11,
@@ -3149,7 +3149,7 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 4,
     padding: '2px 8px',
-    borderRadius: 6,
+    borderRadius: 4,
     background: 'rgba(255,255,255,0.06)',
     fontSize: 11,
   },
@@ -3167,7 +3167,7 @@ const S: Record<string, React.CSSProperties> = {
   select: {
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6,
+    borderRadius: 4,
     color: 'var(--color-text-primary, #f5f5f7)',
     padding: '4px 8px',
     fontSize: 11,
@@ -3179,7 +3179,7 @@ const S: Record<string, React.CSSProperties> = {
   dangerBtn: {
     background: 'rgba(255,59,48,0.15)',
     border: '1px solid rgba(255,59,48,0.3)',
-    borderRadius: 6,
+    borderRadius: 4,
     color: 'var(--color-error)',
     cursor: 'pointer',
     padding: '6px 14px',
@@ -3195,7 +3195,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '4px 0',
   },
   screenshotCard: {
-    borderRadius: 6,
+    borderRadius: 4,
     overflow: 'hidden',
     background: 'rgba(255,255,255,0.02)',
     border: '1px solid rgba(255,255,255,0.05)',
@@ -3248,7 +3248,7 @@ const S: Record<string, React.CSSProperties> = {
     maxWidth: '90vw',
     maxHeight: '85vh',
     objectFit: 'contain' as const,
-    borderRadius: 8,
+    borderRadius: 6,
     boxShadow: 'var(--pg-shadow-popover)',
   },
   lightboxClose: {
@@ -3272,7 +3272,7 @@ const S: Record<string, React.CSSProperties> = {
   aboutCard: {
     background: 'var(--color-bg-surface-solid, #161618)',
     border: '1px solid rgba(255,255,255,0.10)',
-    borderRadius: 14,
+    borderRadius: 10,
     padding: '24px 28px',
     textAlign: 'center' as const,
     maxWidth: 320,

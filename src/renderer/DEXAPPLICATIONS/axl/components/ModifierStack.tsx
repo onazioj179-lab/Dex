@@ -36,7 +36,7 @@ interface ModifierStackProps {
 const styles = {
   container: {
     display: 'flex', flexDirection: 'column' as const, gap: 8,
-    padding: 12, background: 'var(--color-bg-elevated)', borderRadius: 8,
+    padding: 12, background: 'var(--color-bg-elevated)', borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
   },
   header: {
@@ -48,11 +48,11 @@ const styles = {
   },
   addBtn: {
     padding: '4px 12px', background: 'var(--color-accent)',
-    border: 'none', borderRadius: 6, color: '#fff', fontSize: 12,
+    border: 'none', borderRadius: 4, color: '#fff', fontSize: 12,
     cursor: 'pointer', fontWeight: 500,
   },
   modItem: {
-    background: 'var(--color-bg-base)', borderRadius: 8,
+    background: 'var(--color-bg-base)', borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
     overflow: 'hidden',
   },
@@ -71,7 +71,7 @@ const styles = {
     display: 'flex', gap: 4,
   },
   iconBtn: {
-    width: 22, height: 22, border: 'none', borderRadius: 4,
+    width: 22, height: 22, border: 'none', borderRadius: 3,
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 12, transition: 'all 0.15s',
@@ -87,12 +87,12 @@ const styles = {
   },
   input: {
     flex: 1, padding: '4px 8px', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border-subtle)', borderRadius: 4,
+    border: '1px solid var(--color-border-subtle)', borderRadius: 3,
     color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
   },
   select: {
     flex: 1, padding: '4px 8px', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border-subtle)', borderRadius: 4,
+    border: '1px solid var(--color-border-subtle)', borderRadius: 3,
     color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
   },
   checkbox: {
@@ -103,14 +103,14 @@ const styles = {
   },
   vec3Input: {
     width: 50, padding: '4px 6px', background: 'var(--color-bg-elevated)',
-    border: '1px solid var(--color-border-subtle)', borderRadius: 4,
+    border: '1px solid var(--color-border-subtle)', borderRadius: 3,
     color: 'var(--color-text-primary)', fontSize: 11, outline: 'none',
     textAlign: 'center' as const,
   },
   dropdown: {
     position: 'absolute' as const, top: '100%', left: 0, right: 0,
     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-    borderRadius: 8, boxShadow: 'var(--pg-shadow-panel)',
+    borderRadius: 6, boxShadow: 'var(--pg-shadow-panel)',
     zIndex: 100, maxHeight: 280, overflowY: 'auto' as const,
   },
   dropdownCategory: {

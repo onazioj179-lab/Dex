@@ -167,7 +167,7 @@ const PrecisionInput: React.FC<PrecisionInputProps> = ({
       )}
       <div
         style={{
-          position: 'relative', width, height: 22, borderRadius: 4,
+          position: 'relative', width, height: 22, borderRadius: 3,
           background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
           overflow: 'hidden', userSelect: 'none',
         }}

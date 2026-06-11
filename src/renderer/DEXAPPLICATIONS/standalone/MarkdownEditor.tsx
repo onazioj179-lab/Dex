@@ -48,11 +48,11 @@ Happy writing!
 
     // Code blocks (before other processing)
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre style="background:rgba(255,255,255,0.06);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.5"><code>${code.trim()}</code></pre>`
+      `<pre style="background:rgba(255,255,255,0.06);padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;line-height:1.5"><code>${code.trim()}</code></pre>`
     );
 
     // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:0.9em">$1</code>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:3px;font-size:0.9em">$1</code>');
 
     // Headings
     html = html.replace(/^###### (.+)$/gm, '<h6 style="font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary)">$1</h6>');
@@ -102,7 +102,7 @@ Happy writing!
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#0a84ff;text-decoration:none">$1</a>');
 
     // Images
-    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" style="max-width:100%;border-radius:8px;margin:8px 0"/>');
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" style="max-width:100%;border-radius:6px;margin:8px 0"/>');
 
     // Paragraphs (preserve line breaks)
     html = html.replace(/\n\n/g, '</p><p style="margin:8px 0;line-height:1.6">');
@@ -256,17 +256,17 @@ const s: Record<string, React.CSSProperties> = {
     width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 4px',
   },
   fmtBtn: {
-    width: 28, height: 28, borderRadius: 6, border: 'none',
+    width: 28, height: 28, borderRadius: 4, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'var(--font-family)',
   },
   viewToggle: {
     display: 'flex', background: 'var(--color-bg-glass, rgba(255,255,255,0.04))',
-    borderRadius: 6, padding: 2,
+    borderRadius: 4, padding: 2,
   },
   viewBtn: {
-    padding: '4px 8px', borderRadius: 4, border: 'none',
+    padding: '4px 8px', borderRadius: 3, border: 'none',
     fontSize: 12, cursor: 'pointer',
   },
   panes: {

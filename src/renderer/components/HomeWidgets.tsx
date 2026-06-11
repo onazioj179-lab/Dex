@@ -116,7 +116,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
           top: 6,
           right: 6,
           border: 'none',
-          borderRadius: 8,
+          borderRadius: 6,
           background: 'rgba(255,255,255,0.10)',
           color: 'var(--color-text-secondary)',
           cursor: 'pointer',
@@ -138,7 +138,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
             top: 30,
             right: 6,
             width: 170,
-            borderRadius: 10,
+            borderRadius: 8,
             border: '1px solid rgba(255,255,255,0.15)',
             background: 'rgba(18,18,22,0.92)',
             padding: 8,
@@ -146,20 +146,20 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
             boxShadow: 'var(--pg-shadow-panel)',
           }}
         >
-          <button type="button" onClick={toggleSeconds} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
+          <button type="button" onClick={toggleSeconds} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 4, cursor: 'pointer' }}>
             Seconds: {showSeconds ? 'On' : 'Off'}
           </button>
-          <button type="button" onClick={toggle24Hour} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
+          <button type="button" onClick={toggle24Hour} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 4, cursor: 'pointer' }}>
             Format: {use24Hour ? '24-hour' : '12-hour'}
           </button>
-          <button type="button" onClick={toggleDate} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 6, cursor: 'pointer' }}>
+          <button type="button" onClick={toggleDate} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', fontSize: 11, padding: '5px 6px', borderRadius: 4, cursor: 'pointer' }}>
             Date: {showDate ? 'Shown' : 'Hidden'}
           </button>
           <div style={{ marginTop: 6, fontSize: 10, color: 'var(--color-text-tertiary)', padding: '0 6px 4px' }}>Timezone</div>
           <select
             value={timezone}
             onChange={(e) => updateTimezone(e.target.value)}
-            style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, padding: '5px 6px' }}
+            style={{ width: '100%', borderRadius: 4, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, padding: '5px 6px' }}
           >
             <option value="local">Local</option>
             <option value="UTC">UTC</option>
@@ -276,7 +276,7 @@ const CalendarWidget: React.FC = () => {
           const isToday = isCurrentMonth && d === today;
           return (
             <div key={i} style={{
-              padding: 3, borderRadius: 4, color: isToday ? '#000' : d ? '#fff' : 'transparent',
+              padding: 3, borderRadius: 3, color: isToday ? '#000' : d ? '#fff' : 'transparent',
               background: isToday ? 'var(--color-accent)' : 'transparent', fontWeight: isToday ? 600 : 400,
             }}>
               {d ?? ''}
@@ -349,7 +349,7 @@ const QuickActionsWidget: React.FC = () => {
           key={a.appId} 
           onClick={() => openApp(a.appId)}
           style={{ 
-            padding: '10px 6px', borderRadius: 10, 
+            padding: '10px 6px', borderRadius: 8, 
             background: `${a.color}20`, border: 'none', 
             color: a.color, fontSize: 11, fontWeight: 600, 
             cursor: 'pointer', transition: 'background 0.15s, transform 0.1s' 
@@ -564,7 +564,7 @@ const NexusMiniWidget: React.FC = () => {
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
-  return <canvas ref={canvasRef} width={260} height={260} style={{ width: '100%', height: '100%', borderRadius: 12 }} />;
+  return <canvas ref={canvasRef} width={260} height={260} style={{ width: '100%', height: '100%', borderRadius: 10 }} />;
 };
 
 const WeatherWidget: React.FC = () => {
@@ -699,7 +699,7 @@ const StorageWidget: React.FC = () => {
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>free of {formatBytes(storage.total)}</span>
       </div>
       <div style={{ height: 6, borderRadius: 3, background: 'var(--color-border)', overflow: 'hidden' }}>
-        <div style={{ width: `${usedPercent}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.5s' }} />
+        <div style={{ width: `${usedPercent}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.5s' }} />
       </div>
       <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>{usedPercent}% used</div>
     </div>
@@ -917,7 +917,7 @@ const DraggableWidget: React.FC<{
         top: widget.y,
         width: widget.width,
         height: widget.height,
-        borderRadius: 16,
+        borderRadius: 12,
         background: 'rgba(24,24,28,0.42)',
         backdropFilter: 'var(--blur-xl) saturate(180%)',
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
@@ -967,7 +967,7 @@ const DraggableWidget: React.FC<{
           style={{
             position: 'absolute', bottom: 2, right: 2,
             width: 16, height: 16, cursor: 'nwse-resize',
-            background: 'rgba(10,132,255,0.4)', borderRadius: 4,
+            background: 'rgba(10,132,255,0.4)', borderRadius: 3,
             touchAction: 'none',
           }}
         />
@@ -992,7 +992,7 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         background: 'rgba(24,24,28,0.60)',
         backdropFilter: 'var(--blur-xl) saturate(180%)',
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-        borderRadius: 16, border: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)',
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 20, overflow: 'auto',
       }}>
@@ -1006,7 +1006,7 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 onClick={() => { addWidget(t.type); onClose(); }}
                 disabled={t.type !== 'notes-scratchpad' && exists}
                 style={{
-                  padding: '14px 10px', borderRadius: 12, border: 'none',
+                  padding: '14px 10px', borderRadius: 10, border: 'none',
                   background: exists && t.type !== 'notes-scratchpad' ? 'var(--color-border-subtle)' : 'var(--color-bg-hover)',
                   color: exists && t.type !== 'notes-scratchpad' ? 'var(--color-text-tertiary)' : '#fff',
                   cursor: exists && t.type !== 'notes-scratchpad' ? 'not-allowed' : 'pointer',
@@ -1071,7 +1071,7 @@ export const HomeWidgets: React.FC = () => {
             onClick={() => { addWidget('clock'); }}
             style={{
               padding: '8px 12px',
-              borderRadius: 12,
+              borderRadius: 10,
               border: '1px solid rgba(255,255,255,0.16)',
               background: 'rgba(24,24,28,0.58)',
               color: '#fff',
@@ -1096,7 +1096,7 @@ export const HomeWidgets: React.FC = () => {
           <button
             onClick={() => setShowPicker(true)}
             style={{
-              padding: '8px 16px', borderRadius: 20, border: 'none',
+              padding: '8px 16px', borderRadius: 14, border: 'none',
               background: 'rgba(10,132,255,0.9)', color: '#fff',
               fontSize: 13, fontWeight: 600, cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(10,132,255,0.3)',
@@ -1107,7 +1107,7 @@ export const HomeWidgets: React.FC = () => {
           <button
             onClick={toggleEditMode}
             style={{
-              padding: '8px 16px', borderRadius: 20, border: 'none',
+              padding: '8px 16px', borderRadius: 14, border: 'none',
               background: 'var(--color-border)', color: '#fff',
               fontSize: 13, fontWeight: 500, cursor: 'pointer',
             }}

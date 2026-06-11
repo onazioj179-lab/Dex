@@ -229,6 +229,69 @@ if (typeof window !== 'undefined') {
 }
 
 // ---------------------------------------------------------------------------
+// Recovery Level 3 — last-session journal.
+// runningApps intentionally resets on restart (no ghost apps), so a separate
+// lightweight journal records what was open. A clean shutdown marks the
+// record clean; after a crash the record stays dirty and the shell offers a
+// one-click workspace restore on next boot (see AppManager).
+// ---------------------------------------------------------------------------
+
+export interface LastSessionRecord {
+  apps: Array<Pick<RunningApp, 'id' | 'name' | 'icon' | 'color'>>;
+  currentAppId: string;
+  timestamp: number;
+  clean: boolean;
+}
+
+export const LAST_SESSION_KEY = 'dex-last-session';
+
+export function readLastSession(): LastSessionRecord | null {
+  try {
+    const raw = localStorage.getItem(LAST_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LastSessionRecord;
+    if (!Array.isArray(parsed.apps)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function clearLastSession(): void {
+  try { localStorage.removeItem(LAST_SESSION_KEY); } catch { /* ignore */ }
+}
+
+if (typeof window !== 'undefined') {
+  let journalTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const writeJournal = (clean: boolean) => {
+    try {
+      const s = useRunningApps.getState();
+      const record: LastSessionRecord = {
+        apps: s.runningApps.map(a => ({ id: a.id, name: a.name, icon: a.icon, color: a.color })),
+        currentAppId: s.currentAppId,
+        timestamp: Date.now(),
+        clean,
+      };
+      localStorage.setItem(LAST_SESSION_KEY, JSON.stringify(record));
+    } catch { /* never interfere with the session itself */ }
+  };
+
+  useRunningApps.subscribe((state, prev) => {
+    if (state.runningApps === prev.runningApps && state.currentAppId === prev.currentAppId) return;
+    if (journalTimer) clearTimeout(journalTimer);
+    journalTimer = setTimeout(() => writeJournal(false), 800);
+  });
+
+  const markClean = () => {
+    if (journalTimer) clearTimeout(journalTimer);
+    writeJournal(true);
+  };
+  window.addEventListener('pagehide', markClean);
+  window.addEventListener('beforeunload', markClean);
+}
+
+// ---------------------------------------------------------------------------
 // Selector-based subscriptions (item 146) — minimize re-renders
 // ---------------------------------------------------------------------------
 export const useCurrentAppId = () => useRunningApps(s => s.currentAppId);

@@ -158,7 +158,7 @@ const barStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     background: 'rgba(30,30,30,0.95)',
     border: '1px solid var(--color-border)',
-    borderRadius: 6,
+    borderRadius: 4,
     padding: '4px 0',
     boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
     minWidth: 140,

@@ -15,6 +15,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { Folder, NoteListItem, NoteAttachment, NoteTemplate, SortField, SortDirection, ViewMode, EditorMode } from '../../store/notesStore';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../../components/ContextMenu';
+import AutosaveIndicator from '../../components/AutosaveIndicator';
 
 // ---------------------------------------------------------------------------
 // Shared Styles
@@ -105,7 +106,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             gap: 6,
             padding: '5px 8px',
             paddingLeft: 8 + depth * 16,
-            borderRadius: 4,
+            borderRadius: 3,
             cursor: 'pointer',
             background: isSelected ? colors.bgSelected : 'transparent',
             color: isSelected ? colors.accent : colors.text,
@@ -132,7 +133,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
                 flex: 1,
                 background: 'rgba(0,0,0,0.3)',
                 border: `1px solid ${colors.accent}`,
-                borderRadius: 3,
+                borderRadius: 2,
                 color: colors.text,
                 fontSize: 13,
                 padding: '1px 4px',
@@ -145,7 +146,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             </span>
           )}
           {!isEditing && (
-            <div style={{ display: 'flex', gap: 2, opacity: 0.4 }}>
+            <div className="dn-tree-acts" style={{ display: 'flex', gap: 2, opacity: 0.4, transition: 'opacity 0.12s ease' }}>
               <button
                 aria-label="New subfolder"
                 onClick={e => { e.stopPropagation(); startCreate(folder.id); }}
@@ -175,7 +176,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           alignItems: 'center',
           gap: 6,
           padding: '6px 8px',
-          borderRadius: 4,
+          borderRadius: 3,
           cursor: 'pointer',
           background: selectedFolderId === null ? colors.bgSelected : 'transparent',
           color: selectedFolderId === null ? colors.accent : colors.text,
@@ -211,7 +212,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
               width: '100%',
               background: 'rgba(0,0,0,0.3)',
               border: `1px solid ${colors.accent}`,
-              borderRadius: 4,
+              borderRadius: 3,
               color: colors.text,
               fontSize: 13,
               padding: '4px 8px',
@@ -228,7 +229,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           alignItems: 'center',
           gap: 6,
           padding: '6px 8px',
-          borderRadius: 4,
+          borderRadius: 3,
           cursor: 'pointer',
           color: colors.textDim,
           fontSize: 12,
@@ -336,7 +337,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         }}
         style={{
           padding: viewMode === 'compact' ? '6px 10px' : '10px 12px',
-          borderRadius: 6,
+          borderRadius: 4,
           cursor: 'pointer',
           background: isSelected ? colors.bgSelected : 'transparent',
           borderLeft: isSelected ? `2px solid ${colors.accent}` : '2px solid transparent',
@@ -388,7 +389,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
                 color: colors.accent,
                 background: colors.accentDim,
                 padding: '1px 6px',
-                borderRadius: 8,
+                borderRadius: 6,
               }}>{tag}</span>
             ))}
             {note.tags.length > 3 && (
@@ -409,7 +410,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
           alignItems: 'center',
           gap: 6,
           background: 'var(--color-border-subtle)',
-          borderRadius: 6,
+          borderRadius: 4,
           padding: '6px 10px',
         }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2">
@@ -460,7 +461,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
                   style={{
                     background: viewMode === m ? 'var(--color-border-subtle)' : 'transparent',
                     border: 'none', color: viewMode === m ? '#fff' : colors.textDim,
-                    cursor: 'pointer', fontSize: 10, padding: '2px 5px', borderRadius: 3,
+                    cursor: 'pointer', fontSize: 10, padding: '2px 5px', borderRadius: 2,
                   }}
                 >{m === 'list'
                   ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
@@ -542,7 +543,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
             padding: '8px 0',
             background: colors.accentDim,
             border: 'none',
-            borderRadius: 6,
+            borderRadius: 4,
             color: colors.accent,
             fontSize: 13,
             fontWeight: 500,
@@ -577,6 +578,8 @@ interface NoteToolbarProps {
   onColorLabel?: (color: string | null) => void;
   focusMode: boolean;
   saving: boolean;
+  /** Timestamp of the last successful save, for the autosave indicator. */
+  lastSavedAt?: number | null;
 }
 
 const COLOR_LABELS = [
@@ -602,11 +605,14 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
   onColorLabel,
   focusMode,
   saving,
+  lastSavedAt,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showColorMenu, setShowColorMenu] = useState(false);
 
   if (!note) return null;
+
+  const autosaveState: 'idle' | 'saving' | 'saved' = saving ? 'saving' : lastSavedAt ? 'saved' : 'idle';
 
   return (
     <div style={{
@@ -619,13 +625,11 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
       flexShrink: 0,
       minHeight: 36,
     }}>
-      {/* Left: save status */}
-      <div style={{ fontSize: 11, color: colors.textDim }}>
-        {saving ? 'Saving...' : 'Saved'}
-      </div>
+      {/* Left: autosave status */}
+      <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
 
       {/* Center: editor mode tabs */}
-      <div style={{ display: 'flex', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 6, padding: 2 }}>
+      <div style={{ display: 'flex', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 4, padding: 2 }}>
         {(['edit', 'split', 'preview'] as EditorMode[]).map(mode => (
           <button
             key={mode}
@@ -633,7 +637,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
             onClick={() => onEditorModeChange(mode)}
             style={{
               padding: '3px 10px',
-              borderRadius: 4,
+              borderRadius: 3,
               border: 'none',
               fontSize: 11,
               fontWeight: 500,
@@ -687,12 +691,13 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
               <div style={{
                 position: 'absolute', top: '100%', right: 0, marginTop: 4,
                 background: 'rgba(30,30,30,0.95)', border: `1px solid ${colors.border}`,
-                borderRadius: 6, padding: 6, display: 'flex', gap: 4, zIndex: 'var(--z-max)',
+                borderRadius: 4, padding: 6, display: 'flex', gap: 4, zIndex: 'var(--z-max)',
               }}>
                 {COLOR_LABELS.map(c => (
                   <div
                     key={c.label}
                     title={c.label}
+                    className="dn-swatch"
                     style={{
                       width: 18, height: 18, borderRadius: '50%', cursor: 'pointer',
                       background: c.hex === 'transparent' ? 'var(--color-bg-hover)' : c.hex,
@@ -716,7 +721,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
               marginTop: 4,
               background: 'rgba(30,30,30,0.95)',
               border: `1px solid ${colors.border}`,
-              borderRadius: 6,
+              borderRadius: 4,
               padding: '4px 0',
               minWidth: 120,
               zIndex: 'var(--z-max)',
@@ -765,7 +770,7 @@ const ToolbarIconButton: React.FC<{
       alignItems: 'center',
       justifyContent: 'center',
       border: 'none',
-      borderRadius: 4,
+      borderRadius: 3,
       background: active ? colors.accentDim : 'transparent',
       color: danger ? colors.danger : active ? colors.accent : colors.textDim,
       cursor: 'pointer',
@@ -907,7 +912,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
       zIndex: 'var(--z-max)',
       background: 'rgba(30,30,30,0.95)',
       border: `1px solid ${colors.border}`,
-      borderRadius: 8,
+      borderRadius: 6,
       padding: '8px 12px',
       display: 'flex',
       flexDirection: 'column',
@@ -925,7 +930,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
             flex: 1,
             background: 'rgba(0,0,0,0.3)',
             border: `1px solid ${colors.border}`,
-            borderRadius: 4,
+            borderRadius: 3,
             color: colors.text,
             fontSize: 13,
             padding: '4px 8px',
@@ -960,7 +965,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
               flex: 1,
               background: 'rgba(0,0,0,0.3)',
               border: `1px solid ${colors.border}`,
-              borderRadius: 4,
+              borderRadius: 3,
               color: colors.text,
               fontSize: 13,
               padding: '4px 8px',
@@ -1032,7 +1037,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
               color: colors.accent,
               background: colors.accentDim,
               padding: '2px 8px',
-              borderRadius: 10,
+              borderRadius: 8,
             }}
           >
             {tag}
@@ -1061,7 +1066,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
             width: '100%',
             background: 'rgba(0,0,0,0.2)',
             border: `1px solid ${colors.border}`,
-            borderRadius: 4,
+            borderRadius: 3,
             color: colors.text,
             fontSize: 12,
             padding: '4px 8px',
@@ -1077,7 +1082,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
             marginTop: 2,
             background: 'rgba(30,30,30,0.95)',
             border: `1px solid ${colors.border}`,
-            borderRadius: 4,
+            borderRadius: 3,
             zIndex: 'var(--z-max)',
           }}>
             {filteredSuggestions.map(s => (
@@ -1234,7 +1239,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
         style={{
           background: 'rgba(35,35,35,0.98)',
           border: `1px solid ${colors.border}`,
-          borderRadius: 12,
+          borderRadius: 10,
           padding: 24,
           minWidth: 400,
           maxWidth: 500,
@@ -1262,7 +1267,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
               key={tmpl.id}
               style={{
                 padding: '12px 16px',
-                borderRadius: 8,
+                borderRadius: 6,
                 background: 'var(--color-border-subtle)',
                 border: `1px solid ${colors.border}`,
                 cursor: 'pointer',
@@ -1334,7 +1339,7 @@ export const NoteStats: React.FC<NoteStatsProps> = memo(({
         style={{
           background: 'rgba(35,35,35,0.98)',
           border: `1px solid ${colors.border}`,
-          borderRadius: 12,
+          borderRadius: 10,
           padding: 24,
           minWidth: 300,
         }}
@@ -1367,6 +1372,87 @@ export const NoteStats: React.FC<NoteStatsProps> = memo(({
 });
 
 NoteStats.displayName = 'NoteStats';
+
+// ---------------------------------------------------------------------------
+// TableOfContents (auto outline from H1/H2/H3 headings)
+// ---------------------------------------------------------------------------
+
+interface TableOfContentsItem {
+  level: number;
+  text: string;
+  index: number;
+}
+
+interface TableOfContentsProps {
+  headings: TableOfContentsItem[];
+  onJump: (index: number) => void;
+}
+
+export const TableOfContents: React.FC<TableOfContentsProps> = memo(({ headings, onJump }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div style={{ padding: '8px 12px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          userSelect: 'none',
+          marginBottom: collapsed ? 0 : 8,
+        }}
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <span style={{ fontSize: 12, fontWeight: 600, color: colors.text }}>
+          Outline ({headings.length})
+        </span>
+        <svg
+          width="12" height="12" viewBox="0 0 14 14" fill="none"
+          style={{ transform: `rotate(${collapsed ? -90 : 0}deg)`, transition: 'transform 0.15s ease' }}
+        >
+          <path d="M3 5L7 9L11 5" stroke={colors.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      {!collapsed && (
+        headings.length === 0 ? (
+          <div style={{ fontSize: 12, color: colors.textMuted, padding: '4px 0' }}>
+            No headings yet
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {headings.map(h => (
+              <div
+                key={h.index}
+                onClick={() => onJump(h.index)}
+                title={h.text}
+                style={{
+                  fontSize: 12,
+                  color: h.level === 1 ? colors.text : colors.textDim,
+                  fontWeight: h.level === 1 ? 600 : 400,
+                  cursor: 'pointer',
+                  padding: '3px 6px',
+                  paddingLeft: 6 + (h.level - 1) * 12,
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = colors.bgHover)}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                {h.text}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+});
+
+TableOfContents.displayName = 'TableOfContents';
 
 // ---------------------------------------------------------------------------
 // TitleInput

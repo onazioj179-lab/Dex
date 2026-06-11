@@ -405,6 +405,8 @@ export default function Uki(): React.ReactElement {
               <button
                 style={S.convDelete}
                 onClick={(e) => void deleteConversation(c.id, e)}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-error, #ff6b6b)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
                 aria-label={`Delete ${c.title}`}
               >
                 ×
@@ -495,14 +497,14 @@ const S: Record<string, React.CSSProperties> = {
   sidebar: { width: 256, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' },
   sidebarHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px 8px' },
   brand: { fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-accent)' },
-  newBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  searchInput: { margin: '0 12px 10px', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, outline: 'none' },
+  newBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  searchInput: { margin: '0 12px 10px', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, outline: 'none' },
   convList: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 8px 8px' },
   convEmpty: { padding: '12px 8px', color: 'var(--color-text-tertiary)', fontSize: 12 },
-  convItem: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', marginBottom: 2 },
+  convItem: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 2 },
   convItemActive: { background: 'var(--color-bg-hover)' },
   convTitle: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 },
-  editInput: { flex: 1, minWidth: 0, fontSize: 13, padding: '2px 6px', borderRadius: 6, border: '1px solid var(--color-accent)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', outline: 'none' },
+  editInput: { flex: 1, minWidth: 0, fontSize: 13, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', outline: 'none' },
   convDelete: { background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   thread: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 12 },
@@ -512,19 +514,19 @@ const S: Record<string, React.CSSProperties> = {
   welcomeSub: { fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.5 },
   welcomeHint: { fontSize: 13, color: 'var(--color-accent)', marginTop: 14, lineHeight: 1.5 },
   row: { display: 'flex', width: '100%' },
-  bubble: { maxWidth: '76%', padding: '10px 14px', borderRadius: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
-  bubbleUser: { background: 'var(--color-accent)', color: '#fff', borderBottomRightRadius: 4 },
-  bubbleAi: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: 4 },
+  bubble: { maxWidth: '76%', padding: '10px 14px', borderRadius: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  bubbleUser: { background: 'var(--color-accent)', color: '#fff', borderBottomRightRadius: 3 },
+  bubbleAi: { background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: 3 },
   bubbleSystem: { background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', fontSize: 13, fontStyle: 'italic' },
   caret: { opacity: 0.6, marginLeft: 1 },
-  actionCard: { alignSelf: 'flex-start', maxWidth: '80%', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-accent)', borderRadius: 14, padding: 12 },
+  actionCard: { alignSelf: 'flex-start', maxWidth: '80%', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-accent)', borderRadius: 10, padding: 12 },
   actionTitle: { fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', marginBottom: 6 },
   actionSummary: { margin: 0, fontSize: 12.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', color: 'var(--color-text-secondary)', lineHeight: 1.5 },
   actionRow: { display: 'flex', gap: 8, marginTop: 10 },
-  runBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '6px 16px', fontSize: 13, cursor: 'pointer' },
+  runBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '6px 16px', fontSize: 13, cursor: 'pointer' },
   composer: { display: 'flex', gap: 8, alignItems: 'flex-end', padding: 14, borderTop: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' },
-  textarea: { flex: 1, minWidth: 0, resize: 'none', maxHeight: 160, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 14, lineHeight: 1.4, outline: 'none', fontFamily: 'inherit' },
-  sendBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
+  textarea: { flex: 1, minWidth: 0, resize: 'none', maxHeight: 160, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 14, lineHeight: 1.4, outline: 'none', fontFamily: 'inherit' },
+  sendBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   sendBtnDisabled: { opacity: 0.5, cursor: 'default' },
 };
