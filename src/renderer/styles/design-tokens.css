@@ -39,8 +39,9 @@
   /* ---- Borders: hairline at low opacity, no heavy shadows -------------- */
   --dex-hairline: 1px solid rgba(255, 255, 255, 0.08);
   --dex-hairline-strong: 1px solid rgba(255, 255, 255, 0.14);
-  /* one restrained elevation, not a heavy drop shadow */
-  --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(0, 0, 0, 0.22);
+  /* one restrained elevation, not a heavy drop shadow
+     (GOAL-6D shadow intensity -40% pass applied) */
+  --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.17), 0 4px 14px rgba(0, 0, 0, 0.13);
 
   /* ---- Spacing scale (4px grid) — no magic numbers --------------------- */
   --dex-space-1: 4px;
@@ -51,11 +52,12 @@
   --dex-space-6: 24px;
   --dex-space-8: 32px;
 
-  /* ---- Radius: one scale, applied to every panel/button/input --------- */
-  --dex-radius-sm: 4px;
-  --dex-radius-md: 6px;
-  --dex-radius-lg: 8px;
-  --dex-radius-xl: 10px;
+  /* ---- Radius: alias of the ONE canonical scale (design-system.css).
+     Never restate values here — there is exactly one radius scale. -------- */
+  --dex-radius-sm: var(--radius-sm);
+  --dex-radius-md: var(--radius-md);
+  --dex-radius-lg: var(--radius-lg);
+  --dex-radius-xl: var(--radius-xl);
 
   /* ---- Icon sizes: fixed set only (16 / 20 / 24) ---------------------- */
   --dex-icon-sm: 16px;
@@ -136,7 +138,7 @@
 
 /* Window vibrancy/blur where the OS supports it (macOS vibrancy, Win11 Mica). */
 @supports (backdrop-filter: blur(1px)) {
-  .dex-vibrancy { backdrop-filter: saturate(1.3) blur(20px); }
+  .dex-vibrancy { backdrop-filter: saturate(1.3) var(--blur-lg); }
 }
 
 /* ==========================================================================

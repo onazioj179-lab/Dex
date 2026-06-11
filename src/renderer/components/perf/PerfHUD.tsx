@@ -126,7 +126,7 @@ export const PerfHUD: React.FC<PerfHUDProps> = ({
         font: '11px/1.35 ui-monospace, Menlo, Consolas, monospace',
         padding: '8px 10px',
         borderRadius: 8,
-        backdropFilter: 'blur(8px)',
+        backdropFilter: 'var(--blur-md)',
         minWidth: 180,
         pointerEvents: 'none',
         boxShadow: 'var(--pg-shadow-tooltip)',

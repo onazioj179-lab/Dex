@@ -173,9 +173,19 @@ fn get_all(conn: &Connection, args: &Value) -> Value {
     query_list(conn, &sql, vec![SqlValue::Integer(limit)])
 }
 
+/// One notification row by id, in the NotificationRecord shape (Null when the
+/// row is gone). Used by the dex_ipc send arm to broadcast the inserted record
+/// (Electron's broadcastNewNotification payload).
+pub(crate) fn record_by_id(conn: &Connection, id: i64) -> Value {
+    let sql = format!("{} WHERE id = ?", SELECT_COLS);
+    conn.query_row(&sql, params![id], row_to_json)
+        .unwrap_or(Value::Null)
+}
+
 /// notification-center:getUnreadCount — getUnreadCount(). Returns a number (0
-/// when the DB is unavailable).
-fn get_unread_count(conn: &Connection) -> Value {
+/// when the DB is unavailable). Also reused by the dex_ipc arms that mirror
+/// Electron's broadcastUnreadCount after mutating calls.
+pub(crate) fn get_unread_count(conn: &Connection) -> Value {
     let cnt: i64 = conn
         .query_row("SELECT COUNT(*) FROM notifications WHERE read = 0", [], |r| {
             r.get(0)

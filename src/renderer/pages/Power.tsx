@@ -351,7 +351,7 @@ export const Power: React.FC = () => {
   ];
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--pg-surface)', backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px', overflow: 'hidden' } as React.CSSProperties}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--pg-surface)', backdropFilter: 'var(--blur-xl) saturate(180%)', WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px', overflow: 'hidden' } as React.CSSProperties}>
       {/* Sidebar */}
       <div style={{
         width: 'var(--pg-sidebar-width)' as any, flexShrink: 0, padding: '16px 10px',

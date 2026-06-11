@@ -89,21 +89,6 @@ export {
 } from './ColorPicker';
 
 // ---------------------------------------------------------------------------
-// Context Menus
-// ---------------------------------------------------------------------------
-
-export {
-  ToolContextMenu,
-  useToolContextMenu,
-  SELECTION_TOOL_OPTIONS,
-  BRUSH_TOOL_OPTIONS,
-  TRANSFORM_TOOL_OPTIONS,
-  ZOOM_TOOL_OPTIONS,
-  type ToolContextMenuProps,
-  type ToolOption,
-} from './ToolContextMenu';
-
-// ---------------------------------------------------------------------------
 // Resizable Panels
 // ---------------------------------------------------------------------------
 

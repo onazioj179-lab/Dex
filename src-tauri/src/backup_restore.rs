@@ -4,18 +4,17 @@
 // =============================================================================
 //! SQLite-backed backup metadata (backup:* channels), reading/writing the shared
 //! `dex.db` `backups` + `backup_settings` tables with the identical schema,
-//! queries, and return shapes as the Electron manager. The renderer-facing
-//! surface is the seven handlers below.
+//! queries, and return shapes as the Electron manager.
 //!
-//! Only the DB-persisted CRUD is ported faithfully here: `backup:list` (backup
-//! history), `backup:get-settings` / `backup:update-settings` (schedule + path
-//! config). The handlers that perform real file I/O — copying/zipping the on-disk
-//! databases, computing checksums, native save/open dialogs, and writing/reading
-//! the `.dexbak` archive — live in the OS layer, not in these pure DB functions,
-//! so they degrade honestly (`{ "success": false, "error": "... (not ported)" }`)
-//! rather than fabricating file paths or running a real backup/restore. The Tauri
-//! command layer should wire the real fs/dialog work and reuse the metadata CRUD
-//! below to record/list/prune history.
+//! This module owns the pure-DB surface: `backup:list`, `backup:get-settings`,
+//! `backup:update-settings`, and `backup:delete`. The stateful trio —
+//! `backup:create` / `backup:verify` / `backup:restore` — is implemented in
+//! `native_ops` (explicit `dex_ipc` arms, dispatched before this module), where
+//! the live connection can be managed: `create` snapshots the Tauri-native
+//! `dex.db` via `VACUUM INTO` (WAL-safe) and `restore` swaps the database file
+//! atomically under the DbGate write lock. The Electron manager's multi-file
+//! gzip archive format is not reproduced here because the Electron database
+//! files (dex-core.db etc.) do not exist in the Tauri app data dir.
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection, Row};
@@ -181,22 +180,29 @@ fn update_settings(conn: &Connection, partial: &Value) -> Value {
     get_settings(conn)
 }
 
-/// backup:delete — deleteBackup(id). The TS unlinks the on-disk `.dexbak` file
-/// (an fs op unavailable here) AND removes the metadata row, returning boolean.
-/// We faithfully port the DB-metadata removal (the persisted half) and return
-/// whether a row was removed; the OS layer is responsible for deleting the file.
+/// backup:delete — deleteBackup(id). Unlinks the on-disk `.dexbak` file
+/// (best-effort, missing file tolerated as in the TS existsSync guard) and
+/// removes the metadata row. Returns false when the backup row is absent.
 fn delete_backup(conn: &Connection, args: &Value) -> Value {
     let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-    // Mirror the TS `if (!row) return false` guard via the affected-row count.
-    let changes = conn
-        .execute("DELETE FROM backups WHERE id = ?", params![id])
-        .unwrap_or(0);
-    json!(changes > 0)
+    let filepath: Option<String> = conn
+        .query_row(
+            "SELECT filepath FROM backups WHERE id = ?",
+            params![id],
+            |r| r.get(0),
+        )
+        .ok();
+    let filepath = match filepath {
+        Some(p) => p,
+        None => return json!(false),
+    };
+    let _ = std::fs::remove_file(filepath);
+    let _ = conn.execute("DELETE FROM backups WHERE id = ?", params![id]);
+    json!(true)
 }
 
 pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
     match channel {
-        // ---- DB-persisted CRUD, ported faithfully -------------------------
         "backup:list" => list_backups(conn),
         "backup:get-settings" => get_settings(conn),
         "backup:update-settings" => {
@@ -204,31 +210,9 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
             update_settings(conn, &partial)
         }
         "backup:delete" => delete_backup(conn, args),
-
-        // ---- Real file I/O — degrade honestly -----------------------------
-        // backup:create copies every database file, builds + gzips an archive,
-        // computes a sha256 checksum, and writes a `.dexbak` file to disk. All of
-        // that is OS-level fs work that lives in the Tauri layer, not in these
-        // pure DB functions, so we degrade rather than fabricate a backup record.
-        "backup:create" => json!({
-            "success": false,
-            "error": "backup file creation requires filesystem access (not ported)"
-        }),
-        // backup:verify reads the `.dexbak` file from disk, recomputes its
-        // checksum, and gunzips/parses the manifest — all fs/decompression work
-        // unavailable in the DB layer.
-        "backup:verify" => json!({
-            "success": false,
-            "error": "backup verification requires filesystem access (not ported)"
-        }),
-        // backup:restore reads + decompresses the archive and overwrites the
-        // on-disk database files (closing/reopening the connection). This is
-        // destructive fs work owned by the OS layer; never run it from here.
-        "backup:restore" => json!({
-            "success": false,
-            "error": "backup restore requires filesystem access (not ported)"
-        }),
-
+        // backup:create / backup:verify / backup:restore are handled by the
+        // explicit native_ops arms in dex_ipc (they manage the live connection
+        // and snapshot/swap the Tauri-native dex.db) and never reach here.
         _ => Value::Null,
     }
 }

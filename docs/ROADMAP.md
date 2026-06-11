@@ -5,6 +5,12 @@
 > git history. Anything still pending is captured here. The detailed, actively
 > maintained migration checkpoint is [TAURI-MIGRATION.md](TAURI-MIGRATION.md) —
 > start there to resume engineering work.
+>
+> **Release theme (2026-06-10): Refinement & Consolidation.** No major feature
+> expansion — performance, consistency, reliability, clarity, fluidity,
+> stability, discoverability, maintainability. The full program and its live
+> status are in [REFINEMENT.md](REFINEMENT.md); the Tauri migration below is
+> its Priority 1 engine.
 
 ## Next major phase: uki AI + intelligence everywhere (owner brief, 2026-06-09)
 
@@ -91,10 +97,14 @@ waveform memory. Remaining: heavy-read allowlist, creative-chunk trims.
   build reaches parity — do not remove Electron source before then.
 - **Direction:** full migration to **Tauri** for a lighter (~4 MB vs ~88 MB),
   faster app on the system WebView2. Electron is the temporary bridge.
-- **Tauri shell today:** boots, serves the same renderer, ~37 namespaces are
-  natively backed (window, files, search, system, shell, clipboard, vault,
-  audio analysis, notifications, and 14 SQLite subsystems sharing `dex.db`).
-  Unported channels degrade to `null` so the UI never crashes.
+- **Tauri shell today:** boots, serves the same renderer, ~80 namespaces are
+  natively backed (24 platform + all ~57 `dex.db` SQLite subsystems), plus the
+  OS command layer (dialogs, OS notifications, zlib/gzip file formats, backup
+  VACUUM-INTO snapshot/restore, reminder + auto-backup scheduler threads,
+  voice-memo audio save, link-preview HTTP, monitors) and a live renderer
+  event bridge (`dex.on(channel, cb)` over Tauri events; reminder +
+  notification-center pushes wired). Unported channels degrade to `null` so
+  the UI never crashes.
 
 ## The only goal that matters now: finish the Tauri migration
 

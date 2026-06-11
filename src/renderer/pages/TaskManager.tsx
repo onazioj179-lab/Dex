@@ -611,7 +611,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 14,
     padding: 18, color: 'var(--color-text-primary)', background: 'var(--pg-surface)',
-    backdropFilter: 'blur(32px) saturate(190%)', WebkitBackdropFilter: 'blur(32px) saturate(190%)',
+    backdropFilter: 'var(--blur-xl) saturate(190%)', WebkitBackdropFilter: 'var(--blur-xl) saturate(190%)',
     overflow: 'hidden',
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },

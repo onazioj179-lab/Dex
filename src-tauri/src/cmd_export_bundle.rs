@@ -18,15 +18,12 @@
 //! We therefore assemble the bundle as an ordered `Vec<(key, JSON-string)>` and
 //! splice the pieces together by hand, reproducing the exact wire shape — down to
 //! Node's `Buffer` -> `{"type":"Buffer","data":[..]}` JSON encoding for the
-//! binary voice-memo files. gzip uses `flate2`'s `GzEncoder` at level 6, the same
-//! effective level as Node's `zlib.gzipSync` default (Z_DEFAULT_COMPRESSION).
+//! binary voice-memo files. gzip uses the shared [`crate::zlib::gzip`] (level 6,
+//! the same effective level as Node's `zlib.gzipSync` default).
 
 use crate::native_ops::{fp_to_string, now_ms, with_conn};
-use flate2::write::GzEncoder;
-use flate2::Compression;
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
-use std::io::Write;
 use tauri_plugin_dialog::DialogExt;
 
 /// One manifest content descriptor: `{ type, name, path }` (matches the TS
@@ -341,25 +338,11 @@ pub fn create(app: &tauri::AppHandle, args: &Value) -> Value {
     json_bundle.push('}');
 
     // --- gzip (zlib.gzipSync default == level 6) and write -------------------
-    let compressed = match gzip_level6(json_bundle.as_bytes()) {
-        Some(c) => c,
-        None => return Value::Null,
-    };
+    let compressed = crate::zlib::gzip(json_bundle.as_bytes());
     match std::fs::write(&file_path, &compressed) {
         Ok(()) => json!(file_path),
         Err(_) => Value::Null, // matches the TS try/catch -> return null
     }
-}
-
-/// gzip-compress bytes at level 6 (matches `zlib.gzipSync` default). Returns
-/// `None` on the (effectively impossible) in-memory write failure so the caller
-/// degrades to null rather than panicking.
-fn gzip_level6(data: &[u8]) -> Option<Vec<u8>> {
-    let mut encoder = GzEncoder::new(Vec::new(), Compression::new(6));
-    if encoder.write_all(data).is_err() {
-        return None;
-    }
-    encoder.finish().ok()
 }
 
 /// UTC `YYYY-MM-DD` for an epoch-millis instant (mirrors

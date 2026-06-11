@@ -547,8 +547,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           display: 'flex', alignItems: 'center', gap: 12,
           height: 50, padding: '0 20px',
           background: 'rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(40px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+          backdropFilter: 'var(--blur-xl) saturate(180%)',
+          WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
           border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 9999,
           transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
@@ -628,8 +628,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               // Near-opaque so Home wallpaper/widgets never bleed through and
               // make results unreadable (kept a hint of glass + the blur).
               background: 'rgba(18,18,22,0.97)',
-              backdropFilter: 'blur(42px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(42px) saturate(180%)',
+              backdropFilter: 'var(--blur-xl) saturate(180%)',
+              WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
               border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: 18,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
