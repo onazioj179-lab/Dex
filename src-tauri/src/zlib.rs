@@ -9,7 +9,7 @@
 //! `zlib.inflateSync`, so BLOBs and files written by either shell round-trip in
 //! the other.
 
-use flate2::read::{GzDecoder, ZlibDecoder};
+use flate2::read::ZlibDecoder;
 use flate2::write::{GzEncoder, ZlibEncoder};
 use flate2::Compression;
 use std::io::{Read, Write};
@@ -34,6 +34,14 @@ pub fn inflate(data: &[u8]) -> std::io::Result<Vec<u8>> {
     Ok(out)
 }
 
+/// zlib-inflate to a UTF-8 string (`inflateSync(blob).toString('utf8')`).
+/// Returns `None` on malformed input rather than panicking.
+pub fn inflate_to_string(data: &[u8]) -> Option<String> {
+    inflate(data)
+        .ok()
+        .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+}
+
 /// gzip `data` at level 6 (Node `zlib.gzipSync(data, { level: 6 })` parity —
 /// the framing the `.dexbak` backup archives use).
 pub fn gzip(data: &[u8]) -> Vec<u8> {
@@ -44,11 +52,3 @@ pub fn gzip(data: &[u8]) -> Vec<u8> {
     enc.finish().unwrap_or_else(|_| data.to_vec())
 }
 
-/// gunzip `data` (Node `zlib.gunzipSync` equivalent). Errors on streams that
-/// are not valid gzip, exactly where the Node call would throw.
-pub fn gunzip(data: &[u8]) -> std::io::Result<Vec<u8>> {
-    let mut dec = GzDecoder::new(data);
-    let mut out = Vec::new();
-    dec.read_to_end(&mut out)?;
-    Ok(out)
-}

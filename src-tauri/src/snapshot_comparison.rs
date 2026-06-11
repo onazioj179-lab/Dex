@@ -39,8 +39,17 @@ pub fn ensure_schema(conn: &Connection) {
 ///
 /// Matches the TS shape EXACTLY: id, app, project_id, project_name, timestamp,
 /// auto_saved (snake_case, as the TS object literal uses), plus `data` = the
-/// parsed snapshot JSON (BLOB decoded as UTF-8). On parse failure, `data` falls
-/// back to `{ raw: <stringified snapshot> }`, identical to the TS catch.
+/// parsed snapshot JSON.
+///
+/// The `snapshot` column is a zlib BLOB written by DatabaseManager via Node
+/// `zlib.deflateSync(JSON.stringify(state))`, so it must be inflated before
+/// parsing — decoding the BLOB bytes directly as UTF-8/JSON (as the TS literally
+/// does) garbles the compressed stream. We inflate via crate::zlib (the
+/// byte-compatible mirror of `zlib.inflateSync(...).toString()`) and then
+/// JSON.parse the result. On JSON parse failure we fall back to
+/// `{ raw: <inflated string> }`, mirroring the TS catch's `{ raw: ... }` shape;
+/// if inflate itself fails we degrade to a lossy UTF-8 view of the raw bytes
+/// (matching the TS `String(row.snapshot)` last-resort behaviour).
 fn get_snapshot(conn: &Connection, snapshot_id: i64) -> Value {
     // SELECT * column order under the table def: id, app, project_id,
     // project_name, snapshot, size, timestamp, auto_saved.
@@ -51,8 +60,8 @@ fn get_snapshot(conn: &Connection, snapshot_id: i64) -> Value {
         Err(_) => return Value::Null,
     };
 
-    // Read the snapshot BLOB as raw bytes, then decode UTF-8 (matches the TS
-    // Buffer.toString('utf-8') / String(row.snapshot) handling).
+    // Read the snapshot BLOB as raw bytes; it is a zlib stream that must be
+    // inflated (see fn doc) before being decoded/parsed as JSON.
     let row = stmt.query_row(params![snapshot_id], |r| {
         Ok((
             r.get::<_, i64>(0)?,           // id
@@ -70,7 +79,12 @@ fn get_snapshot(conn: &Connection, snapshot_id: i64) -> Value {
         Err(_) => return Value::Null,
     };
 
-    let raw = String::from_utf8_lossy(&snapshot_bytes).into_owned();
+    // Inflate the zlib BLOB to the original JSON text (the bytes the Electron
+    // side fed to JSON.stringify before compressing). If inflate fails the BLOB
+    // is not a valid zlib stream, so degrade to a lossy UTF-8 view of the raw
+    // bytes — the same last-resort string the TS `String(row.snapshot)` yields.
+    let raw = crate::zlib::inflate_to_string(&snapshot_bytes)
+        .unwrap_or_else(|| String::from_utf8_lossy(&snapshot_bytes).into_owned());
     let data = match serde_json::from_str::<Value>(&raw) {
         Ok(v) => v,
         Err(_) => json!({ "raw": raw }),
@@ -279,8 +293,11 @@ fn restore_snapshot(conn: &Connection, snapshot_id: i64) -> Value {
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
 
-    // Fetch the current latest snapshot's raw BLOB + size for this project. Bind
-    // results before any further query/return (rusqlite borrow discipline).
+    // Fetch the current latest snapshot's raw BLOB + size for this project. The
+    // BLOB is copied verbatim (BLOB-to-BLOB) into the backup row below — we never
+    // decode it, so it stays in the exact zlib format DatabaseManager wrote and
+    // no inflate/deflate is needed here (matches the TS `currentRow.snapshot`).
+    // Bind results before any further query/return (rusqlite borrow discipline).
     let current = {
         let sql = "SELECT snapshot, size FROM version_history \
                    WHERE app = ? AND project_id = ? ORDER BY timestamp DESC LIMIT 1";

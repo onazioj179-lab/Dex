@@ -48,6 +48,19 @@ export default defineConfig({
           if (id.includes('node_modules/lucide-react')) return 'icons-vendor';
           if (id.includes('node_modules/dompurify')) return 'sanitize-vendor';
           if (id.includes('node_modules/d3-force')) return 'd3-vendor';
+          // These two runtime deps had no vendor rule and were being inlined into
+          // whichever (often eager) chunk imported them first. Split them out so
+          // they cache once and stay off the eager critical path.
+          if (id.includes('node_modules/@tanstack')) return 'virtual-vendor';
+          if (id.includes('node_modules/idb-keyval')) return 'idb-vendor';
+          // Standalone apps (Calculator, Calendar, Nexus, DexCode, …) are each
+          // lazy-imported separately by AppManager, but were all collapsed into one
+          // ~370K `app-standalone` chunk — so opening any one downloaded all of them.
+          // Give each standalone app its own chunk so only what's opened loads.
+          if (id.includes('DEXAPPLICATIONS/standalone/')) {
+            const m = id.match(/DEXAPPLICATIONS\/standalone\/([^/.]+)/);
+            return m ? `app-standalone-${m[1].toLowerCase()}` : 'app-standalone';
+          }
           // DEX sub-apps into their own chunks (lazy-loadable)
           if (id.includes('DEXAPPLICATIONS/')) {
             // NOTE: axl was previously split into axl-core (engine+stores) and

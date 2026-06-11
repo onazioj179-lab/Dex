@@ -325,6 +325,7 @@ version = "6.0.0"
 name = "dex-scanner"
 version = "6.0.0"
 dependencies = [
+ "rayon",
  "serde",
  "sha2",
  "tempfile",
@@ -334,6 +335,7 @@ dependencies = [
 name = "dex-search"
 version = "6.0.0"
 dependencies = [
+ "rayon",
  "serde",
  "tantivy",
  "tempfile",

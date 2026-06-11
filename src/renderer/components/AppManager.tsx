@@ -146,6 +146,7 @@ const Imosion = lazyRetry(() => import('../DEXAPPLICATIONS/imosion/Imosion'));
 const Prism = lazyRetry(() => import('../DEXAPPLICATIONS/prism/Prism'));
 const Flux = lazyRetry(() => import('../DEXAPPLICATIONS/flux/Flux'));
 const Forge = lazyRetry(() => import('../DEXAPPLICATIONS/forge/Forge'));
+const Uki = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Uki'));
 const Calculator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Calculator'));
 const Calendar = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Calendar'));
 const PasswordGenerator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PasswordGenerator'));
@@ -177,7 +178,7 @@ const PixelArt = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PixelArt'
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
   | 'notes' | 'tasks' | 'power' | 'workflows' | 'gallery' | 'audio' | 'store' | 'games'
-  | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl'
+  | 'videoeditor' | 'imosion' | 'prism' | 'flux' | 'forge' | 'axl' | 'uki'
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
@@ -304,6 +305,7 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   notes: Notes, tasks: Tasks, power: Power, workflows: Workflows,
   gallery: Gallery, audio: AudioPage, store: Store, games: Games,
   videoeditor: VideoEditor, imosion: Imosion, prism: Prism, flux: Flux, forge: Forge,
+  uki: Uki,
   calculator: Calculator, calendar: Calendar, passwordgenerator: PasswordGenerator,
   rewind: Rewind, kanban: KanbanApp, achievements: AchievementsApp,
   recyclebin: RecycleBin,
@@ -427,6 +429,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
   { id: 'gallery', label: 'Gallery', color: '#FF375F' },
   { id: 'audio', label: 'Audio', color: '#FC3D39' },
   // Tools
+  { id: 'uki', label: 'uki', color: 'var(--color-accent)' },
   { id: 'calculator', label: 'Calculator', color: 'var(--color-text-tertiary)' },
   { id: 'passwordgenerator', label: 'Passwords', color: 'var(--color-success)' },
   { id: 'transfers', label: 'Share', color: '#32D74B' },
@@ -3884,7 +3887,10 @@ export const AppManager: React.FC = () => {
   };
 
   const renderTitleBar = () => (
-    <div style={{
+    // data-tauri-drag-region: makes the bar draggable under Tauri (the Electron
+    // -webkit-app-region below only works in Electron). Tauri starts a drag only
+    // for mousedowns directly on this element, so the child buttons are unaffected.
+    <div data-tauri-drag-region style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
       background: 'rgba(14,14,17,0.46)',
@@ -3932,7 +3938,9 @@ export const AppManager: React.FC = () => {
         display: currentApp === 'home' ? 'none' : 'flex', alignItems: 'center', gap: 6,
         WebkitAppRegion: 'no-drag',
         cursor: 'pointer',
-        maxWidth: 'calc(50% - 320px)',
+        // Clamp at 0 so the strip never gets a negative width on narrow windows
+        // (calc(50% - 320px) goes negative below ~640px and clipped the title).
+        maxWidth: 'max(0px, calc(50% - 320px))',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',

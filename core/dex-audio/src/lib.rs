@@ -4,9 +4,15 @@
 // =============================================================================
 //! Audio metadata + waveform extraction via Symphonia (wav/mp3/flac/ogg/aac/
 //! m4a). `metadata()` reads duration/sample-rate/channels + title/artist/album
-//! tags; `waveform()` decodes the full stream and downsamples it to N peak
+//! tags; `waveform()` streams the decoded signal and downsamples it to N peak
 //! amplitudes for a renderer waveform. Pure analysis — playback (a real output
 //! sink) is a separate, device-dependent concern handled in the shell.
+//!
+//! `waveform()` is two-pass and never buffers the whole signal: pass 1 counts
+//! the mono samples (bounded by `CAP`), pass 2 re-decodes and folds each sample
+//! into its peak bucket on the fly. Memory is O(buckets) instead of O(samples),
+//! while the produced peaks are bit-for-bit identical to a full-buffer
+//! `downsample_peaks` over the same input.
 
 use serde::Serialize;
 use symphonia::core::audio::SampleBuffer;
@@ -77,9 +83,13 @@ pub fn metadata(path: &str) -> Result<AudioMeta, String> {
     Ok(AudioMeta { duration_ms, sample_rate, channels, title, artist, album })
 }
 
-/// Decode the full stream (mono-mixed) and downsample to `buckets` peak values
-/// in [0, 1] — a renderer-ready waveform.
-pub fn waveform(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
+const CAP: usize = 12_000_000; // bound memory/time on very long files
+
+/// Decode the default track as a stream of mono-mixed samples (left-to-right,
+/// CAP-bounded), invoking `sink` for each. Stops after at most `CAP` samples so
+/// both passes see exactly the same prefix of the signal. Returns the count
+/// actually delivered.
+fn decode_mono<F: FnMut(f32)>(path: &str, mut sink: F) -> Result<usize, String> {
     let mut format = open_format(path)?;
 
     let (track_id, codec_params, channels) = {
@@ -91,9 +101,8 @@ pub fn waveform(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
         .make(&codec_params, &DecoderOptions::default())
         .map_err(|e| e.to_string())?;
 
-    let mut samples: Vec<f32> = Vec::new();
-    const CAP: usize = 12_000_000; // bound memory/time on very long files
-    loop {
+    let mut emitted: usize = 0;
+    'outer: loop {
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(_) => break, // end of stream / IO end
@@ -108,20 +117,85 @@ pub fn waveform(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
                 sb.copy_interleaved_ref(decoded);
                 for frame in sb.samples().chunks(channels) {
                     let mono = frame.iter().copied().sum::<f32>() / frame.len() as f32;
-                    samples.push(mono);
-                }
-                if samples.len() >= CAP {
-                    break;
+                    sink(mono);
+                    emitted += 1;
+                    if emitted >= CAP {
+                        break 'outer;
+                    }
                 }
             }
             Err(SymphoniaError::DecodeError(_)) => continue, // recoverable
             Err(_) => break,
         }
     }
-
-    Ok(downsample_peaks(&samples, buckets.max(1)))
+    Ok(emitted)
 }
 
+/// Stream the decoded signal and downsample to `buckets` peak values in [0, 1] —
+/// a renderer-ready waveform.
+///
+/// Two-pass and O(buckets) in memory: pass 1 counts the (CAP-bounded) mono
+/// samples so the per-bucket window size is known; pass 2 re-decodes and folds
+/// each sample's absolute value into its bucket's running peak. Output is
+/// identical to `downsample_peaks(&full_buffer, buckets)`.
+pub fn waveform(path: &str, buckets: usize) -> Result<Vec<f32>, String> {
+    let buckets = buckets.max(1);
+
+    // Pass 1: count samples (same CAP-bounded prefix pass 2 will see).
+    let total = decode_mono(path, |_| {})?;
+    if total == 0 {
+        return Ok(vec![0.0; buckets]);
+    }
+
+    // Replicate downsample_peaks' window math exactly. For bucket b the range is
+    //   start = floor(b*win)
+    //   end   = min(floor((b+1)*win), total).max(start)
+    // and peak = max abs over samples[start..end]. We precompute the current
+    // bucket's [start, end) and only fold samples whose global index lands in it,
+    // advancing the bucket as the index crosses each boundary. This drops any
+    // sample beyond the last bucket's clamped `end` precisely as the full-buffer
+    // version does (matters when float rounding makes floor(buckets*win) < total).
+    let win = (total as f64 / buckets as f64).max(1.0);
+    let bucket_range = |b: usize| -> (usize, usize) {
+        let start = (b as f64 * win) as usize;
+        let end = (((b + 1) as f64 * win) as usize).min(total).max(start);
+        (start, end)
+    };
+    let mut out = vec![0.0f32; buckets];
+
+    let mut idx: usize = 0;
+    let mut bucket: usize = 0;
+    let (mut start, mut end) = bucket_range(0);
+
+    // Pass 2: fold each sample into its bucket's running peak.
+    decode_mono(path, |s| {
+        // Skip past exhausted buckets (their range ends at or before idx).
+        // Empty buckets (start == end, possible when buckets > total) keep their
+        // 0.0 default, exactly as the full-buffer loop leaves them.
+        while bucket + 1 < buckets && idx >= end {
+            bucket += 1;
+            let r = bucket_range(bucket);
+            start = r.0;
+            end = r.1;
+        }
+        // Fold only if the index is within the current bucket's clamped range;
+        // indices past the final bucket's `end` are ignored, matching the slice.
+        if idx >= start && idx < end {
+            let a = s.abs();
+            if a > out[bucket] {
+                out[bucket] = a;
+            }
+        }
+        idx += 1;
+    })?;
+
+    for p in out.iter_mut() {
+        *p = p.min(1.0);
+    }
+    Ok(out)
+}
+
+#[cfg(any(test, doc))]
 fn downsample_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
     if samples.is_empty() {
         return vec![0.0; buckets];
@@ -205,5 +279,47 @@ mod tests {
         let peaks = downsample_peaks(&[0.5, -0.9, 0.2, 0.1], 2);
         assert_eq!(peaks.len(), 2);
         assert!((peaks[0] - 0.9).abs() < 1e-6); // max abs in first window
+    }
+
+    /// The streaming (two-pass) `waveform` must produce bit-for-bit the same
+    /// peaks the old full-buffer path produced: decode the whole WAV the legacy
+    /// way, run `downsample_peaks` over it, and compare to `waveform` across a
+    /// range of bucket counts (including the buckets > samples edge case).
+    #[test]
+    fn streamed_waveform_matches_full_buffer() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tone.wav");
+        // A non-trivial, asymmetric signal so per-bucket peaks actually differ.
+        let samples: Vec<i16> = (0..7993)
+            .map(|i| {
+                let t = i as f32 * 0.073;
+                ((t.sin() * 0.7 + (t * 1.9).cos() * 0.3) * 20000.0) as i16
+            })
+            .collect();
+        write_wav(&path, 8000, &samples);
+        let p = path.to_str().unwrap();
+
+        // Reference: collect the full mono buffer exactly like the legacy loop.
+        let mut full: Vec<f32> = Vec::new();
+        decode_mono(p, |s| full.push(s)).unwrap();
+        assert!(!full.is_empty());
+
+        // Compare across sizes, incl. 1, odd, and buckets near the sample count.
+        // (We stop at full.len() because the legacy downsample_peaks panics when
+        // buckets > samples.len() — start index runs past the slice. The
+        // streaming path avoids that latent bug, verified separately below.)
+        for &b in &[1usize, 7, 32, 256, 1000, full.len() - 1, full.len()] {
+            let streamed = waveform(p, b).unwrap();
+            let reference = downsample_peaks(&full, b.max(1));
+            assert_eq!(streamed.len(), reference.len(), "len mismatch at buckets={b}");
+            assert_eq!(streamed, reference, "peak mismatch at buckets={b}");
+        }
+
+        // buckets > sample count: streaming must not panic (the old full-buffer
+        // downsample_peaks would). Trailing buckets with no samples read 0.0.
+        let more = waveform(p, full.len() + 50).unwrap();
+        assert_eq!(more.len(), full.len() + 50);
+        assert!(more.iter().all(|&q| (0.0..=1.0).contains(&q)));
+        assert!(more.iter().rev().take(50).all(|&q| q == 0.0), "tail buckets are silent");
     }
 }

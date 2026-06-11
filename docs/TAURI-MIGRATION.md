@@ -15,6 +15,51 @@
 the same renderer; **~80 namespaces are natively backed** (24 platform + 57
 SQLite subsystem modules sharing `dex.db`); the rest degrade to `null`.
 
+**Renderer slice (2026-06-09): uki chat app finished on top of `uki-chat:*`.**
+`DEXAPPLICATIONS/standalone/Uki.tsx` (app id `uki`, wired into AppManager +
+appSubsystem + AppIcon `sparkle`) is now feature-complete against the native
+store: persistent history, native cross-conversation search, double-click
+rename, auto-grow composer, a real Stop (AbortController threaded through
+`uki/providers/connect.ts` → `fetch` signal), live provider re-check, and a
+live on-screen context snapshot folded into the system prompt. `tsc --noEmit`
+green. No backend channels changed — this consumes already-ported ones.
+
+**Renderer slice (2026-06-09): uki writing-assist in Notes.** `NotesEditor.tsx`
+toolbar gained an AI group (Improve / Summarise / Bullets / Continue) running
+`askConfiguredLLM` (one-shot through the configured provider) on the selection
+or whole note, inserting non-destructively (replace selection, else append).
+Uses `shared/uki/promptTemplates` (injection-safe). `tsc --noEmit` green.
+
+**Renderer slice (2026-06-09): uki deep app-context resolvers.** New
+`uki/appContextRegistry.ts` (singleton over `shared/uki/appContext`): apps
+register "what am I looking at?" resolvers; Notes registers one (open-note title
++ live selection); the uki chat app folds `formatUkiContexts()` into its prompt.
+`tsc --noEmit` green.
+
+**Renderer slice (2026-06-09): uki multi-step actions (confirm-gated).** New
+`uki/chatActions.ts` brings the planner -> actionExecutor -> confirmTier pipeline
+(the creative command bar's) to the uki chat. Imperative messages decompose into
+a Plan, preview via `summarizePlan`, and gate by tier: `app.open` really launches
+an app through the running-apps store (mutating -> Run/Cancel card), `uki.*` LLM
+transforms auto-run. Anchored intents so normal chat isn't hijacked. `tsc` green.
+
+**Renderer slice (2026-06-09): broader uki reach + NL tasks + suite green.**
+(1) `app.close` chat action (confirm-gated, via running-apps store) joins
+`app.open`. (2) `appContextRegistry` gained a built-in foreground resolver giving
+uki the active app + selection for ANY app (defers to richer per-app resolvers).
+(3) Tasks "Add a task" routes through native `nl-task:parse` (title/due/priority,
+safe fallback). (4) Fixed a STALE pre-existing test (`pricing.test.ts` asserted a
+dropped "no ads" promise; now asserts the current "ad-free on paid plans").
+Full `npx vitest run` green (5584 passing, 0 failing) + `tsc --noEmit` clean.
+
+**FINDING (2026-06-09) — dormant intelligence engines.** `settings.notes_data`/
+`tasks_data` are READ by smart-grouping, duplication-detector, statistics-
+dashboard, daily-briefing, goal-system, but WRITTEN by nothing in the repo
+(Electron included). Those engines are dormant for lack of input. Lighting them
+up needs a Notes/Tasks -> `notes_data` writer (`[{id,title,content,tags,
+createdAt}]`) AND a native settings-table write channel (none renderer-facing
+exists yet). Do not build smart-grouping UI before the writer — it would be empty.
+
 **SQLite subsystem sweep complete (2026-06-09).** All ~57 DatabaseManager-backed
 managers now have a native `src-tauri/src/<name>.rs` module (`ensure_schema` +
 `dispatch`), wired through `db_dispatch` by channel prefix. Each copies its
@@ -127,25 +172,145 @@ This converges to 100% deterministically and never ports a dead/guessed channel.
 - **Stateful engines** (Rewind capture, transfer, PTY, automation store): need a
   native store/runtime; build as `core/` crates with `cargo test`, then thin-wire.
 
-**Next slice (P3 done for DB; pick up at the Tauri command layer):** the
-shared-`dex.db` subsystem sweep is complete — every DatabaseManager-backed
-manager is ported. What remains is the **non-DB tail** that the ported modules
-currently degrade honestly. These need real Tauri commands (not the pure-DB
-`dispatch` layer):
-  - **Filesystem + compression: DONE 2026-06-10** (see latest slices) —
-    version-history / session-replay / project-archiver zlib BLOBs, voice-memo
-    + media-library file IO, backup create/verify/restore (.dexbak gzip);
-    bulk-metadata / smart-rename were already ported. Remaining here: the
-    export-bundle / changelog native save dialogs (dialog plugin) and notes
-    attachments file copy/remove.
-  - **Native OS/UI:** dialogs (open/save), OS notifications (notification-center,
-    reminder firing), live BrowserWindow/screen (multiwindow, multimonitor, layout
-    apply, vinx presenter), theme apply.
-  - **Networking:** link-preview HTTP fetch, live-collab mDNS/peer sync.
-  - **Background runtimes:** file-watcher (fs.watch), reminder/expiry/theme timers,
-    scratchpad autosave buffer, migration runner.
+**Command-layer tier 1 DONE (2026-06-09): zlib BLOBs.** Added the `flate2` dep +
+a shared zlib helper, byte-compatible with Node `zlib.deflateSync`/`inflateSync`
+(today `src-tauri/src/zlib.rs`; see the merge-consolidation entry below). Now
+fully functional (no longer degraded): `version-history:save/
+getState/restore` (deflate→BLOB, inflate→JSON, 50-version cap), `session-replay:
+recordAction/getSessionActions/getCurrentSession`, and
+`snapshot-comparison:getSnapshot` (fixed: was reading the
+compressed BLOB as raw UTF-8). `cargo check` green.
+
+**Command-layer tier 2 DONE (2026-06-09): native dialogs + OS notifications.**
+Added `tauri-plugin-dialog` + `tauri-plugin-notification` (registered in the
+builder), and a new `src-tauri/src/native_ops.rs` command layer invoked from
+`dex_ipc` (which holds the `AppHandle`). Now functional: `dialog:showOpenDialog` /
+`files:openDialog` (native picker -> Electron `{ canceled, filePaths }`, honoring
+openDirectory/multiSelections/filters/defaultPath) and `notification-center:send`
+(DB record + real OS toast). Pattern established: app/UI-bound channels get an
+explicit arm in `dex_ipc` before the db-prefix guard, calling `native_ops`.
+`cargo check` green.
+
+**Command-layer tier 3 DONE (2026-06-09): filesystem ops (no new dep).** Via
+`native_ops` (app paths/dialog + `with_conn` to reach the shared db): real
+`project-archiver:archive/unarchive/getArchiveDir` (zlib `.dex-archive` files
+under <appData>/archive + DB row lifecycle), `media-library:import` (dedupe or
+stat+insert with extension type detection), `changelog:export` (render markdown
+-> native save dialog -> write). `cargo check` green.
+
+**Command-layer tier 3b DONE (2026-06-09): notes attachments.** `dexnotes:
+addAttachment` (copy source into <appData>/notes-data/attachments as `<uuid><ext>`,
+50 MB cap, type detect, DB row + note updated_at), `removeAttachment` (unlink +
+row), `openAttachment` (OS default handler via `open`). No new dep. Full NSIS
+installer rebuilt green WITH the dialog/notification plugins (06:01).
+
+**Command-layer tier 4 DONE (2026-06-09): backup (no new dep).** `backup:create`
+uses SQLite `VACUUM INTO` for a WAL-safe single-file snapshot of dex.db to a
+`.dexbak` in the configured/`<appData>/backups` dir, records the row, prunes to
+max_backups; `backup:verify` recomputes the sha256 (reusing licensing's audited
+impl, now `pub(crate)`) and compares. `cargo check` green.
+
+**Command-layer tier 5 DONE (2026-06-09): reminder scheduler (no new dep).** A
+background thread (`native_ops::start_reminder_scheduler`, spawned in setup())
+polls due/non-completed/non-snoozed reminders every 30s (2s initial delay, matching
+the TS), fires an OS toast per reminder, then completes (`repeat='none'`) or
+advances `remind_at` by the repeat interval (SQLite date math). Renderer push and
+the legacy notifications-table insert are intentionally skipped (bridge no-ops
+event subscriptions; legacy table schema differs). `cargo check` green AND
+runtime-verified: seeded an overdue reminder via sqlite3, launched the built
+`dex-tauri.exe`, and confirmed the row flipped `completed 0 -> 1` within the
+first poll — the scheduler fires for real, not just compiles.
+
+**Command-layer tier 5b DONE (2026-06-09): automatic backups (no new dep).** A
+second background thread (`native_ops::start_autobackup_scheduler`) honors
+`backup_settings` (auto_enabled, interval_hours, last_auto_backup) with a startup
+catchup, calling `backup:create('automatic')` when due. RUNTIME-VERIFIED: set
+interval_hours=0, launched the built exe, confirmed an `automatic` backups row +
+a ~946 KB `.dexbak` snapshot on disk + `last_auto_backup` set. NOTE (faithful):
+ContentExpiry has NO timer in Electron (IPC-only), so no expiry auto-run was
+added — not inventing behavior.
+
+**Command-layer tier 6 DONE (2026-06-09): backup:restore (no new dep).**
+Implemented in native_ops: verify checksum -> pre-restore safety backup -> lock
+DbState + drop the live connection -> atomic swap (copy snapshot -> dex.restore-tmp
+-> rename over dex.db) + remove stale dex.db-wal/-shm -> reopen + `ensure_all_schemas`
+(factored out of setup() and reused) -> restore the managed connection. On any
+failure the old dex.db is left intact and reopened (no data-loss path). Compiles
+green; the swap+WAL-drop+reopen MECHANISM was data-level validated on a throwaway
+WAL db (live B -> snapshot A round-trips). NOT yet launch-tested through the
+renderer (restore is IPC-triggered, can't be driven headlessly) — needs a manual
+in-app smoke test to fully confirm.
+
+**Command-layer tier 7 DONE (2026-06-09): export-bundle, link-preview, monitors,
+scratchpad, file-watcher config.** Five self-contained `src-tauri/src/cmd_*.rs`
+modules (reusing `native_ops` `pub(crate)` helpers), wired via explicit `dex_ipc`
+arms before the db guard:
+  - `export-bundle:create` — gather project rows -> gzip (flate2) -> native save
+    dialog -> write file; returns path (cmd_export_bundle.rs).
+  - `link-preview:fetch` — cache hit OR `ureq` HTTP GET (8s timeout, 512KB cap)
+    -> scrape og:title/description + <title> -> UPSERT cache (cmd_link_preview.rs).
+    Added `ureq` dep (you OK'd HTTP+TLS). Network call done outside the db lock.
+  - `multimonitor:get-displays/get-current-display/get-scale-factor` — Tauri
+    Window monitor APIs; Display shape approximate (physical px, workArea==bounds,
+    rotation/internal constant) (cmd_window_monitor.rs).
+  - `scratchpad:updateContent/saveNow` — persist content directly (no in-memory
+    buffer needed) (cmd_scratchpad.rs).
+  - `file-watcher:addFolder/importFile` — folder dialog + DB insert / stat+insert
+    (cmd_file_watcher.rs). LIVE fs-watch events deferred (need the renderer event
+    bridge). `cargo check` green (first try).
+
+**Merge consolidation DONE (2026-06-10): local command layer + cloud refinement
+(PR #19) reconciled.** Both lines of work landed in one merge. The cloud PR
+contributed the shared helpers `src-tauri/src/zlib.rs` (deflate/inflate/gzip/
+gunzip + string conveniences; supersedes the earlier compress.rs, now deleted)
+and `src-tauri/src/util.rs` (pseudo_uuid_v4, iso_utc_now), plus fs-capable db
+modules. Where both sides implemented the same channels, exactly one
+implementation now serves each:
+  - **session-replay:** cloud version adopted — states stored as zlib+base64
+    TEXT exactly like Electron's compressJson (the local raw-BLOB port did not
+    round-trip Electron-written rows), and per-process session identity via
+    OnceLock (the local meta-table port wrongly reused one session id across runs).
+  - **version-history:** cloud version adopted (same raw zlib BLOB format,
+    crate::zlib helpers).
+  - **project-archiver / media-library:import:** cloud db-module implementations
+    adopted (db_dispatch passes the app data dir in); the duplicate native_ops
+    fns + explicit dex_ipc arms were removed.
+  - **backup:create/verify/restore:** local native_ops kept — VACUUM INTO
+    snapshot of the Tauri-native dex.db + atomic-swap restore, both
+    runtime-verified. The cloud's Electron-file-format trio was removed from
+    backup_restore.rs: it archived dex-core.db/dex-notes.db/help.db, which do
+    not exist in the Tauri data dir, so it would have backed up nothing.
+    backup_restore.rs keeps list/get-settings/update-settings/delete.
+  - **voice-memo:save DONE (cloud):** base64 audio -> `.opus` under
+    <appData>/voice-memos + DB row, matching Electron's audioBase64 contract.
+    Renderer store fixed: loadMemos now calls the real `voice-memo:getForParent`
+    channel (`voice-memo:get` never existed in either shell) and saveMemo
+    base64-encodes the ArrayBuffer before crossing the JSON bridge.
+
+**Renderer event bridge DONE (2026-06-10).** The generic push path now works
+end to end: Rust pushes with `native_ops::emit_event(app, channel, payload)`
+(Tauri `Emitter`, one payload value per event — the analog of Electron's
+`webContents.send`), and tauriCompat implements the preload's generic
+`dex.on(channel, cb)` / `dex.off(channel, cb)` (plus `window.electron.on/off`)
+over `__TAURI__.event.listen` (withGlobalTauri is on). Callbacks receive the
+payload directly, matching the preload wrappers that strip the IPC event arg.
+Namespaced `dex.x.onY(cb)` subscriptions still return no-op unsubscribes (their
+channel mapping under Electron is irregular). Wired emit sites, mirroring the
+Electron broadcasts: `reminder:fired` (full reminder row, from the scheduler
+thread), `notification-center:new` (inserted record) +
+`notification-center:unread-count` after send, and `unread-count` after
+markRead/markAllRead/clearAll/delete. `cargo check` + `tsc` green; renderer
+delivery still needs an in-app smoke test (subscriptions are UI-triggered).
+
+**Remaining non-DB items:**
+  - **file-watcher live fs events** — `notify` crate + emit
+    `file-watcher:detected` through the (now live) event bridge.
+  - Live multiwindow detach, live theme apply + theme-schedule timer —
+    BrowserWindow/OS-theme bound.
+  - **Networking:** live-collab mDNS/peer sync.
 Use `__dexDegradeReport()` (see Verify) to order these by real usage. Then the
-non-DB engines from the phase plan: transfer/device, audio sink, PTY.
+non-DB engines from the phase plan: transfer/device, audio sink, PTY, rewind
+capture.
 
 ---
 

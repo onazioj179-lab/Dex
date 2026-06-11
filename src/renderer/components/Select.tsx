@@ -596,10 +596,12 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           <span key={option.value} style={styles.tag}>
             {option.label}
             <button
+              type="button"
               style={styles.tagRemove}
               onClick={(e) => handleRemove(option.value, e)}
+              aria-label={`Remove ${option.label}`}
             >
-              
+              ×
             </button>
           </span>
         ))}
@@ -611,6 +613,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
             style={styles.input}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label={placeholder || 'Filter options'}
             placeholder={selectedOptions.length === 0 ? placeholder : ''}
             onClick={(e) => {
               e.stopPropagation();

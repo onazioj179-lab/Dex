@@ -23,10 +23,52 @@
  */
 
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+type UnlistenFn = () => void;
+type TauriListen = (event: string, handler: (e: { payload: unknown }) => void) => Promise<UnlistenFn>;
 
 function tauriInvoke(): TauriInvoke | null {
   const t = (globalThis as { __TAURI__?: { core?: { invoke?: TauriInvoke }; invoke?: TauriInvoke } }).__TAURI__;
   return t?.core?.invoke ?? t?.invoke ?? null;
+}
+
+function tauriListen(): TauriListen | null {
+  const t = (globalThis as { __TAURI__?: { event?: { listen?: TauriListen } } }).__TAURI__;
+  return t?.event?.listen ?? null;
+}
+
+/**
+ * Generic push-event bridge — the Tauri side of the Electron preload's
+ * `dex.on(channel, cb)` / `dex.off(channel, cb)`. Rust pushes with
+ * `native_ops::emit_event(app, channel, payload)` (one payload value per event);
+ * the callback receives that payload directly, matching the preload wrappers
+ * which strip Electron's IPC event argument before invoking the callback.
+ */
+const pushListeners = new Map<string, Map<(...args: unknown[]) => void, Promise<UnlistenFn>>>();
+
+function dexOn(channel: string, callback: (...args: unknown[]) => void): void {
+  const listen = tauriListen();
+  if (!listen || typeof channel !== 'string' || typeof callback !== 'function') return;
+  let perChannel = pushListeners.get(channel);
+  if (!perChannel) {
+    perChannel = new Map();
+    pushListeners.set(channel, perChannel);
+  }
+  if (perChannel.has(callback)) return; // ipcRenderer.on semantics: one wrapper per cb
+  perChannel.set(
+    callback,
+    listen(channel, (e) => callback(e.payload)).catch((err) => {
+      console.warn(`[dex-ipc] subscribe ${channel} failed:`, err);
+      return () => {};
+    })
+  );
+}
+
+function dexOff(channel: string, callback: (...args: unknown[]) => void): void {
+  const perChannel = pushListeners.get(channel);
+  const unlisten = perChannel?.get(callback);
+  if (!perChannel || !unlisten) return;
+  perChannel.delete(callback);
+  unlisten.then((f) => f()).catch(() => {});
 }
 
 /** True when the renderer is running inside the Tauri shell. */
@@ -101,9 +143,9 @@ function namespaceProxy(prefix: string): unknown {
       return namespaceProxy(prefix ? `${prefix}:${prop}` : prop);
     },
     apply(_t, _thisArg, args: unknown[]) {
-      // Event-subscription methods (onState/onInstalled/...) take a callback and
-      // return an unsubscribe fn. No native events fire yet under the bridge, so
-      // return a no-op unsubscribe instead of serializing a function over IPC —
+      // Namespaced event-subscription methods (dex.x.onY(cb)) map irregularly to
+      // their push channels under Electron, so they stay no-op unsubscribes here.
+      // Live pushes go through the generic `dex.on(channel, cb)` bridge above —
       // callers that do `const off = dex.x.onY(cb); ...; off()` won't break.
       const leaf = prefix.slice(prefix.lastIndexOf(':') + 1);
       if ((leaf.startsWith('on') || leaf.startsWith('off')) && typeof args[0] === 'function') {
@@ -130,6 +172,9 @@ export function installTauriCompat(): void {
       if (typeof prop !== 'string') return undefined;
       // Generic invoke: dex.invoke(channel, ...args) -> dex_ipc(channel, args)
       if (prop === 'invoke') return (channel: string, ...args: unknown[]) => dexIpc(channel, args);
+      // Generic push subscriptions (preload's dex.on/dex.off) -> Tauri events.
+      if (prop === 'on') return dexOn;
+      if (prop === 'off') return dexOff;
       // Synchronous data accessor exposed by the Electron preload.
       if (prop === 'platform') return platformInfo();
       if (prop === 'then') return undefined;
@@ -139,8 +184,12 @@ export function installTauriCompat(): void {
 
   const w = globalThis as Record<string, unknown>;
   w.dex = root;
-  // Several call sites use window.electron.invoke(channel, payload) directly.
-  w.electron = { invoke: (channel: string, ...args: unknown[]) => dexIpc(channel, args) };
+  // Several call sites use window.electron.invoke/on/off(channel, ...) directly.
+  w.electron = {
+    invoke: (channel: string, ...args: unknown[]) => dexIpc(channel, args),
+    on: dexOn,
+    off: dexOff,
+  };
   // Expose the migration telemetry for live inspection from devtools.
   w.__dexDegradeReport = dexDegradeReport;
   console.info('[dex] Tauri IPC compatibility layer installed (degraded backend; channels port incrementally). Run __dexDegradeReport() to see what to port next.');

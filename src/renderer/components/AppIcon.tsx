@@ -77,6 +77,7 @@ const SVG_FOR_APP: Record<string, string> = {
   flux: 'flux',
   forge: 'forge',
   axl: 'axl',
+  uki: 'sparkle',
   nexus: 'nexus',
   rewind: 'rewind',
   collabhub: 'collabhub',
