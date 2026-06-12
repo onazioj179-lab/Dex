@@ -45,7 +45,7 @@ export interface ZoomBounds {
 export interface SmoothZoomContextValue {
   transform: Transform;
   setTransform: (transform: Transform | ((prev: Transform) => Transform)) => void;
-  zoomTo: (scale: number, center?: { x: number; y: number }) => void;
+  zoomTo: (scale: number, center?: { x: number; y: number }, immediate?: boolean) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitToScreen: () => void;
@@ -110,30 +110,33 @@ export const SmoothZoomProvider: React.FC<SmoothZoomProviderProps> = ({
 
   const zoomTo = useCallback((
     targetScale: number,
-    center?: { x: number; y: number }
+    center?: { x: number; y: number },
+    immediate = false
   ) => {
     const clampedScale = Math.max(
       bounds.minScale,
       Math.min(bounds.maxScale, targetScale)
     );
 
-    if (isReduceMotion()) {
+    // Immediate path for live trackpad/pinch gestures: apply directly via the
+    // functional updater so each high-frequency event reads the freshest scale
+    // (no stale closure, no 200ms animation stacking = no jank). Cancel any
+    // in-flight button-zoom animation first.
+    if (immediate || isReduceMotion()) {
+      if (animationRef.current) { cancelAnimationFrame(animationRef.current); animationRef.current = undefined; }
       setTransform(prev => {
-        if (center) {
-          // Zoom towards center point
-          const scaleDelta = clampedScale / prev.scale;
-          return {
-            x: center.x - (center.x - prev.x) * scaleDelta,
-            y: center.y - (center.y - prev.y) * scaleDelta,
-            scale: clampedScale,
-          };
-        }
-        return { ...prev, scale: clampedScale };
+        if (!center) return { ...prev, scale: clampedScale };
+        const scaleDelta = clampedScale / prev.scale;
+        return {
+          x: center.x - (center.x - prev.x) * scaleDelta,
+          y: center.y - (center.y - prev.y) * scaleDelta,
+          scale: clampedScale,
+        };
       });
       return;
     }
 
-    // Animated zoom
+    // Animated zoom (discrete button / wheel-click zoom only)
     const startTime = performance.now();
     const duration = 200;
     const startScale = transform.scale;
@@ -238,6 +241,8 @@ export interface ZoomContainerProps {
   style?: React.CSSProperties;
   /** Enable wheel zoom */
   enableWheel?: boolean;
+  /** Pan the canvas on plain two-finger trackpad scroll (opt-in). */
+  enableWheelPan?: boolean;
   /** Enable pan with middle mouse */
   enableMiddleMousePan?: boolean;
   /** Enable touch gestures */
@@ -251,6 +256,7 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
   className,
   style,
   enableWheel = true,
+  enableWheelPan = false,
   enableMiddleMousePan = true,
   enableTouch = true,
   background = 'transparent',
@@ -261,30 +267,40 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
   const lastPos = useRef({ x: 0, y: 0 });
   const pinchStartDistance = useRef(0);
   const pinchStartScale = useRef(1);
+  // Live mirror of the current transform so the high-frequency wheel handler
+  // never reads a stale scale from a render closure (the old jank source).
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
 
-  // Wheel zoom
+  // Wheel zoom + two-finger pan
   useEffect(() => {
     if (!enableWheel || !containerRef.current) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Trackpad pinch and Ctrl/Cmd-wheel report as a wheel event with the
+      // ctrl/meta modifier. Zoom immediately, anchored at the cursor — no
+      // per-event 200ms animation (which used to stack and stutter).
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        
         const rect = containerRef.current!.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
-        const delta = -e.deltaY * 0.001;
-        const newScale = transform.scale * (1 + delta);
-        
-        zoomTo(newScale, { x, y });
+        // Exponential mapping keeps zoom speed perceptually even across the range.
+        const newScale = transformRef.current.scale * Math.exp(-e.deltaY * 0.01);
+        zoomTo(newScale, { x, y }, true);
+        return;
+      }
+      // Plain two-finger trackpad scroll pans the canvas (opt-in).
+      if (enableWheelPan) {
+        e.preventDefault();
+        panBy(-e.deltaX, -e.deltaY);
       }
     };
 
     const container = containerRef.current;
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [enableWheel, transform.scale, zoomTo]);
+  }, [enableWheel, enableWheelPan, zoomTo, panBy]);
 
   // Middle mouse pan
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -351,10 +367,11 @@ export const ZoomContainer: React.FC<ZoomContainerProps> = ({
       const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       const rect = containerRef.current!.getBoundingClientRect();
       
+      // Immediate: a pinch fires many touchmove events; animating each stutters.
       zoomTo(scale, {
         x: centerX - rect.left,
         y: centerY - rect.top,
-      });
+      }, true);
     } else if (e.touches.length === 1) {
       // Pan
       const dx = e.touches[0].clientX - lastPos.current.x;

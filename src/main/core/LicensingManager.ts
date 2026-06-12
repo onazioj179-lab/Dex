@@ -10,7 +10,7 @@ import log from 'electron-log';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import Database from 'better-sqlite3';
+import Database from '../native/safeSqlite';
 
 type LicenseTier = 'free' | 'pro' | 'team';
 

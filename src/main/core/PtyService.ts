@@ -24,6 +24,7 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { ipcMain, BrowserWindow } from 'electron';
 import os from 'os';
 import path from 'path';
+import fs from 'fs';
 import log from 'electron-log';
 
 interface Session {
@@ -32,6 +33,8 @@ interface Session {
   cwd: string;
   proc: ChildProcessWithoutNullStreams;
   createdAt: number;
+  cols: number;
+  rows: number;
 }
 
 const MAX_SESSIONS = 16;
@@ -52,39 +55,62 @@ class PtyServiceImpl {
 
     ipcMain.handle('pty:spawn', (_e, opts?: { shell?: string; cwd?: string }) => this.spawnSession(opts));
     ipcMain.handle('pty:write', (_e, args: { sessionId: string; data: string }) => this.write(args));
-    ipcMain.handle('pty:resize', (_e, _args: { sessionId: string; cols: number; rows: number }) => ({ success: true }));
+    ipcMain.handle('pty:resize', (_e, args: { sessionId: string; cols: number; rows: number }) => this.resize(args));
     ipcMain.handle('pty:kill', (_e, args: { sessionId: string }) => this.kill(args.sessionId));
     ipcMain.handle('pty:list', () => this.list());
 
     log.info('[PtyService] Initialized');
   }
 
-  private defaultShell(): { shell: string; args: string[] } {
+  /**
+   * Resolve a shell that actually exists on this machine. Each candidate is
+   * validated with fs.existsSync (absolute paths only); the chain ends in a
+   * shell that is effectively always present (cmd.exe on Windows, /bin/sh on
+   * unix) so a missing pwsh/zsh can never leave us with an unspawnable shell —
+   * the root cause of the terminal crash-respawn loop.
+   */
+  private resolveShell(): { shell: string; args: string[] } {
+    const exists = (p: string): boolean => {
+      try { return path.isAbsolute(p) && fs.existsSync(p); } catch { return false; }
+    };
     if (process.platform === 'win32') {
-      // Prefer pwsh.exe if present, else fall back to powershell.exe
-      const pwsh = process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, 'PowerShell', '7', 'pwsh.exe') : 'pwsh.exe';
-      return { shell: pwsh, args: ['-NoLogo'] };
+      const sysRoot = process.env.SystemRoot || 'C:\\Windows';
+      const pf = process.env.PROGRAMFILES || 'C:\\Program Files';
+      const pwsh = path.join(pf, 'PowerShell', '7', 'pwsh.exe');
+      const powershell = path.join(sysRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+      const cmd = process.env.COMSPEC || path.join(sysRoot, 'System32', 'cmd.exe');
+      if (exists(pwsh)) return { shell: pwsh, args: ['-NoLogo'] };
+      if (exists(powershell)) return { shell: powershell, args: ['-NoLogo'] };
+      return { shell: cmd, args: [] };
     }
-    if (process.platform === 'darwin') {
-      return { shell: process.env.SHELL || '/bin/zsh', args: ['-i'] };
-    }
-    return { shell: process.env.SHELL || '/bin/bash', args: ['-i'] };
+    const userShell = process.env.SHELL;
+    if (userShell && exists(userShell)) return { shell: userShell, args: ['-i'] };
+    if (process.platform === 'darwin' && exists('/bin/zsh')) return { shell: '/bin/zsh', args: ['-i'] };
+    if (exists('/bin/bash')) return { shell: '/bin/bash', args: ['-i'] };
+    return { shell: '/bin/sh', args: ['-i'] };
   }
 
-  spawnSession(opts?: { shell?: string; cwd?: string }): { sessionId: string } | { error: string } {
+  spawnSession(opts?: { shell?: string; cwd?: string; cols?: number; rows?: number }): { sessionId: string } | { error: string } {
     if (this.sessions.size >= MAX_SESSIONS) {
       return { error: `Maximum ${MAX_SESSIONS} terminal sessions reached.` };
     }
-    const { shell: defShell, args } = this.defaultShell();
-    const shell = opts?.shell || defShell;
+    const { shell: defShell, args } = this.resolveShell();
+    // A caller-supplied shell is honoured only if it exists; otherwise fall back
+    // to the resolved default so a bad override can't crash-loop the terminal.
+    let shell = defShell;
+    if (opts?.shell) {
+      try { if (path.isAbsolute(opts.shell) ? fs.existsSync(opts.shell) : true) shell = opts.shell; } catch { /* keep default */ }
+    }
     const cwd = opts?.cwd || os.homedir();
+    const cols = Math.max(1, opts?.cols ?? 80);
+    const rows = Math.max(1, opts?.rows ?? 24);
     const id = `pty-${this.nextId++}`;
 
     let proc: ChildProcessWithoutNullStreams;
     try {
       proc = spawn(shell, args, {
         cwd,
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', COLUMNS: String(cols), LINES: String(rows) },
         windowsHide: true,
       });
     } catch (e) {
@@ -92,28 +118,37 @@ class PtyServiceImpl {
       return { error: String(e) };
     }
 
-    const session: Session = { id, shell, cwd, proc, createdAt: Date.now() };
+    const session: Session = { id, shell, cwd, proc, createdAt: Date.now(), cols, rows };
     this.sessions.set(id, session);
 
     const pushData = (data: Buffer | string) => {
       if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
       this.mainWindow.webContents.send('pty:data', { sessionId: id, data: data.toString('utf8') });
     };
+    const pushExit = (code: number | null) => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('pty:exit', { sessionId: id, code });
+      }
+    };
     proc.stdout.on('data', pushData);
     proc.stderr.on('data', pushData);
     proc.on('exit', (code) => {
       this.sessions.delete(id);
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send('pty:exit', { sessionId: id, code });
-      }
+      pushExit(code);
       log.info(`[PtyService] Session ${id} exited code=${code}`);
     });
+    // ENOENT (shell binary missing/unspawnable) arrives here, NOT via the
+    // synchronous try/catch above. Surface it as a clean exit + remove the
+    // session so the renderer shows "terminal unavailable" instead of treating
+    // the dead session as live and respawning in a loop.
     proc.on('error', (err) => {
       log.error(`[PtyService] Session ${id} error:`, err);
-      pushData(`\r\n[pty error] ${err.message}\r\n`);
+      pushData(`\r\n[terminal unavailable] ${err.message}\r\n`);
+      this.sessions.delete(id);
+      pushExit(-1);
     });
 
-    log.info(`[PtyService] Spawned ${id} shell=${shell} cwd=${cwd}`);
+    log.info(`[PtyService] Spawned ${id} shell=${shell} cwd=${cwd} ${cols}x${rows}`);
     return { sessionId: id };
   }
 
@@ -126,6 +161,22 @@ class PtyServiceImpl {
     } catch (e) {
       return { success: false, error: String(e) };
     }
+  }
+
+  /**
+   * Track terminal geometry. This is pipe-based stdio (no native PTY), so we
+   * cannot resize a real TTY; we record cols/rows and, on unix, nudge the child
+   * with SIGWINCH (best effort). xterm.js fit-addon (WS7) drives this.
+   */
+  resize(args: { sessionId: string; cols: number; rows: number }): { success: boolean } {
+    const s = this.sessions.get(args.sessionId);
+    if (!s) return { success: false };
+    s.cols = Math.max(1, args.cols | 0) || s.cols;
+    s.rows = Math.max(1, args.rows | 0) || s.rows;
+    if (process.platform !== 'win32') {
+      try { s.proc.kill('SIGWINCH'); } catch { /* best effort */ }
+    }
+    return { success: true };
   }
 
   kill(sessionId: string): { success: boolean } {

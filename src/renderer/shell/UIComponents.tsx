@@ -143,6 +143,89 @@ export const DexCheckbox: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
+// DEX RADIO GROUP -- the one primitive genuinely missing from the set. Single
+// selection across options with roving semantics (role="radiogroup"/"radio",
+// aria-checked) and arrow-key navigation. Matches DexCheckbox styling.
+// ---------------------------------------------------------------------------
+
+export interface DexRadioOption<T extends string = string> {
+  value: T;
+  label: React.ReactNode;
+  disabled?: boolean;
+}
+
+export function DexRadioGroup<T extends string = string>({
+  value, onChange, options, disabled = false, name, ariaLabel,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: DexRadioOption<T>[];
+  disabled?: boolean;
+  name?: string;
+  ariaLabel?: string;
+}): React.ReactElement {
+  const move = (dir: 1 | -1) => {
+    const enabled = options.filter(o => !o.disabled);
+    if (enabled.length === 0) return;
+    const idx = Math.max(0, enabled.findIndex(o => o.value === value));
+    const next = enabled[(idx + dir + enabled.length) % enabled.length];
+    if (next) onChange(next.value);
+  };
+
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {options.map(opt => {
+        const selected = opt.value === value;
+        const isDisabled = disabled || opt.disabled;
+        return (
+          <label
+            key={opt.value}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              opacity: isDisabled ? 0.5 : 1, userSelect: 'none',
+            }}
+          >
+            <button
+              type="button"
+              role="radio"
+              name={name}
+              aria-checked={selected}
+              tabIndex={selected ? 0 : -1}
+              disabled={isDisabled}
+              onClick={() => !isDisabled && onChange(opt.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); move(1); }
+                else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); move(-1); }
+              }}
+              style={{
+                width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0,
+                border: `2px solid ${selected ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                transition: isReduceMotion() ? 'none' : 'border-color 0.15s ease',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: selected ? 'var(--color-accent)' : 'transparent',
+                  transform: selected ? 'scale(1)' : 'scale(0.4)',
+                  transition: isReduceMotion() ? 'none' : 'transform 0.12s ease, background 0.15s ease',
+                }}
+              />
+            </button>
+            <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{opt.label}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // DEX SLIDER
 // ---------------------------------------------------------------------------
 
@@ -828,3 +911,87 @@ export const AppToolbar: React.FC<{
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>{right}</div>
   </div>
 );
+
+// ---------------------------------------------------------------------------
+// DEX TABS -- shared, accessible tab strip. Apps previously rolled their own
+// inline tab bars; this is the one consistent primitive. role="tablist"/"tab",
+// arrow-key roving, and a spring-sliding underline indicator. Controlled.
+// ---------------------------------------------------------------------------
+
+export interface DexTab<T extends string = string> {
+  value: T;
+  label: React.ReactNode;
+  disabled?: boolean;
+}
+
+export function DexTabs<T extends string = string>({
+  value, onChange, tabs, ariaLabel, style,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  tabs: DexTab<T>[];
+  ariaLabel?: string;
+  style?: React.CSSProperties;
+}): React.ReactElement {
+  const move = (dir: 1 | -1) => {
+    const enabled = tabs.filter(t => !t.disabled);
+    if (enabled.length === 0) return;
+    const idx = Math.max(0, enabled.findIndex(t => t.value === value));
+    const next = enabled[(idx + dir + enabled.length) % enabled.length];
+    if (next) onChange(next.value);
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--color-border-subtle)', ...style }}
+    >
+      {tabs.map(tab => {
+        const selected = tab.value === value;
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            tabIndex={selected ? 0 : -1}
+            disabled={tab.disabled}
+            onClick={() => !tab.disabled && onChange(tab.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight') { e.preventDefault(); move(1); }
+              else if (e.key === 'ArrowLeft') { e.preventDefault(); move(-1); }
+            }}
+            style={{
+              position: 'relative',
+              padding: '8px 14px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '2px solid transparent',
+              marginBottom: -1,
+              fontSize: 13,
+              fontWeight: 600,
+              color: selected ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+              cursor: tab.disabled ? 'not-allowed' : 'pointer',
+              opacity: tab.disabled ? 0.5 : 1,
+              transition: isReduceMotion() ? 'none' : 'color 0.15s ease, border-color 0.18s ease',
+            }}
+          >
+            {tab.label}
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute', left: 8, right: 8, bottom: -1, height: 2,
+                borderRadius: 2,
+                background: 'var(--color-accent, #4a9eff)',
+                transform: selected ? 'scaleX(1)' : 'scaleX(0)',
+                transformOrigin: 'center',
+                transition: isReduceMotion() ? 'none' : 'transform 0.18s cubic-bezier(0.4,0,0.2,1)',
+              }}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}

@@ -34,4 +34,5 @@ export type { AppShellProps, ToolbarProps } from './AppShell';
 
 // Re-export the existing pre-tokenized controls so consumers have a single
 // import surface. These already use the design tokens internally.
-export { DexToggle as Toggle, DexCheckbox as Checkbox, DexSlider as Slider } from '../shell/UIComponents';
+export { DexToggle as Toggle, DexCheckbox as Checkbox, DexSlider as Slider, DexRadioGroup as RadioGroup, DexTabs as Tabs } from '../shell/UIComponents';
+export type { DexRadioOption as RadioOption, DexTab as TabItem } from '../shell/UIComponents';

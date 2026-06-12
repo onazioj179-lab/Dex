@@ -128,6 +128,10 @@
   --shadow-glow: 0 0 16px rgba(74, 158, 255, 0.15);
   --shadow-glow-sm: 0 0 8px rgba(74, 158, 255, 0.09);
   --shadow-glow-accent: 0 0 20px rgba(74, 158, 255, 0.18);
+  /* Interactive state shadows — affordances for hover-lift and press-in feedback
+     so components stop hardcoding one-off inline shadows for these states. */
+  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.22);
+  --shadow-pressed: inset 0 2px 4px rgba(0, 0, 0, 0.28);
   --shadow-depth-1: 0 1px 2px rgba(0, 0, 0, 0.21), 0 2px 6px rgba(0, 0, 0, 0.15);
   --shadow-depth-2: 0 2px 4px rgba(0, 0, 0, 0.21), 0 4px 14px rgba(0, 0, 0, 0.18);
   --shadow-depth-3: 0 2px 6px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(0, 0, 0, 0.21);
@@ -717,6 +721,32 @@
   background: var(--surface-tinted);
   backdrop-filter: var(--blur-lg) saturate(130%);
   -webkit-backdrop-filter: var(--blur-lg) saturate(130%);
+}
+
+/* Liquid Glass (macOS Tahoe-grade) — the frosted base PLUS pronounced specular
+   lensing: a bright top rim that falls off down the sides, for the "lit glass"
+   look that flat frosted panels lack. Built only from existing tokens. The
+   universal low-tier rule (html[data-perf-tier="low"] *) strips the blur on weak
+   machines; reduced-transparency drops it for accessibility. */
+.dex-liquid-glass {
+  background: var(--surface-glass);
+  backdrop-filter: var(--blur-lg) saturate(200%);
+  -webkit-backdrop-filter: var(--blur-lg) saturate(200%);
+  border: 1px solid var(--color-border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    var(--shadow-premium-md),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),   /* bright top specular rim */
+    inset 1px 0 0 rgba(255, 255, 255, 0.05),   /* left edge lens */
+    inset -1px 0 0 rgba(255, 255, 255, 0.05),  /* right edge lens */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02);  /* faint bottom */
+}
+@media (prefers-reduced-transparency: reduce) {
+  .dex-liquid-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--color-bg-surface, #161618);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

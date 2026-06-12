@@ -1809,6 +1809,7 @@ const invokePrefixAllowlist = [
   'batch:',
   'state-sync:',
   // Deep Backend Systems (11-Part Architecture Pass)
+  'perf:',
   'perf-instrument:',
   'db-cluster:',
   'plugin-gate:',
