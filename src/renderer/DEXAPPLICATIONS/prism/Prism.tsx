@@ -84,6 +84,7 @@ import {
 } from './PrismEngine';
 import { getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
+import { AdjustmentControls } from './AdjustmentControls';
 
 // ===========================================================================
 // DEX PRISM - Professional Image Editor
@@ -3454,8 +3455,14 @@ const Prism: React.FC = () => {
                   </select>
                 </div>
                 {selectedLayer.type === 'adjustment' && selectedLayer.adjustment && (
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: 8 }}>
-                    Adjustment: {selectedLayer.adjustment.kind}
+                  <div style={{ padding: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+                      {selectedLayer.adjustment.kind.replace('-', ' / ')}
+                    </div>
+                    <AdjustmentControls
+                      adjustment={selectedLayer.adjustment}
+                      onChange={(patch) => updateLayerAdjustment(selectedLayer.id, patch)}
+                    />
                   </div>
                 )}
               </div>

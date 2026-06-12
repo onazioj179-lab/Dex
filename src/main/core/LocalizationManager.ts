@@ -8,7 +8,7 @@ import { app, ipcMain } from 'electron';
 import { EventEmitter } from 'events';
 import log from 'electron-log';
 import path from 'path';
-import Database from 'better-sqlite3';
+import Database from '../native/safeSqlite';
 
 type LocaleCode = 'en' | 'es' | 'fr' | 'de' | 'ja' | 'zh' | 'ar';
 

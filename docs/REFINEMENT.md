@@ -306,3 +306,119 @@ Verified: full lint (tsc + watermark 2519) + full build green; version 5.1.0.
   WhatsNewModal entries refreshed; docs/RELEASE_v5.1.0.md checklist (repo
   topology Dex + dex-updates feed, exact release-script commands, signing note,
   legal-text sign-off flag); docs/RELEASE_NOTES.md public block + commit message.
+
+## SOTA 1000 program — Batch A / WS1 first sub-batch (2026-06-11)
+
+Crash-first. Verified: npm run lint (tsc + watermark 2520) green. Checklist: docs/SOTA_1000.md.
+
+- Terminal crash root cause (SOTA-001..009): PtyService now validates the shell
+  binary before spawn with a fallback chain (Win pwsh->powershell->cmd, unix
+  $SHELL->zsh->bash->sh); an ENOENT spawn error emits a clean pty:exit and removes
+  the session instead of leaking a dead one; real resize tracking. Terminal.tsx
+  gained bounded exponential-backoff retry, a fast-fail vs clean-exit distinction
+  (no more respawn loop), and an "unavailable" state with a Retry button.
+- Global process guards (SOTA-010..013): main.ts installs uncaughtException +
+  unhandledRejection handlers (there were none -> silent main-process death) with
+  a fatal-error circuit-breaker, plus exponential backoff + jitter on the renderer
+  crash-reload (was a fixed 500ms storm).
+- Native-module crash guard (SOTA-014..015): new src/main/native/safeSqlite.ts
+  contains the better-sqlite3 require so a missing/incompatible prebuilt binary
+  degrades to fallbacks instead of killing startup at module-load; 8 managers that
+  used unguarded `import Database from 'better-sqlite3'` now route through it
+  (type fidelity preserved via typeof import + namespace re-export).
+- Universal-only build rule (SOTA-340..342, WS12 applied early): package.json
+  build.win.target is nsis-only (per-arch x64/arm64, portable, zip removed),
+  artifactName drops -${arch}, and the package:win:x64/arm64/portable scripts are
+  retired — every build now produces exactly one DEX-Setup-<version>.exe.
+
+## SOTA 1000 — Batch A / WS1 second sub-batch (2026-06-11)
+
+Verified: npm run lint + main tsc green.
+
+- Perf-tier startup pacing (SOTA-016): initializeSubsystems now detects getPerfTier()
+  and on ultra-low/low tiers yields to the event loop (breathe()) between the ~30
+  subsystem .start() groups instead of one synchronous burst, so weak machines no
+  longer thrash/crash at startup. perf:getTier IPC + 'perf:' allowlist added so the
+  renderer reads one authoritative tier (SOTA-018).
+- ErrorBoundary coverage (SOTA-017): audited — AppManager already wraps all four app
+  render paths (keep-alive/detached/current/split) in AppErrorBoundary; one sub-app
+  crash cannot kill the renderer. No change needed; verified, not fabricated.
+- GPU crash resilience (SOTA-019..020): app.on('child-process-gone') records GPU
+  process crashes to gpu-state.json; shouldDisableHwAccel() trips after 2, so the next
+  launch calls app.disableHardwareAcceleration() and software-renders instead of a
+  blank screen on flaky integrated GPUs. Count clears after 60s of stable run, and
+  DEX_FORCE_GPU / DEX_DISABLE_GPU env overrides are honoured.
+
+## SOTA 1000 — WS3 trackpad smoothness first sub-batch (2026-06-12)
+
+Verified: npm run lint (tsc + watermark 2520) green.
+
+- SmoothZoom (SOTA-090..094): added an immediate, non-animated zoom path (functional
+  setTransform) for live gestures so high-frequency pinch/wheel events no longer each
+  start a 200ms animation that stacks and stutters. A live transformRef removes the
+  stale-scale read that caused jumpy pinch. Trackpad pinch (ctrl/meta wheel) now zooms
+  immediately and cursor-anchored with exponential speed mapping; two-finger trackpad
+  scroll pans the canvas (opt-in enableWheelPan); touch pinch is immediate too. The
+  discrete button/wheel-click zoom keeps its smooth 200ms animation.
+
+## SOTA 1000 — WS3 smoothness + Liquid Glass (2026-06-12)
+
+Verified: npm run lint (tsc + watermark 2520) green.
+
+- ScrollEnhancements (SOTA-095..097): added a configurable fadeColor prop so the
+  top/bottom fades match the wrapping panel's background — this was the exact
+  mismatch that blocked wiring it into the creative apps, now unblocked. Removed a
+  dead velocity ref. Kept native scroll momentum (WebkitOverflowScrolling) rather
+  than faking a JS reimplementation that would fight the OS — honest call.
+- Liquid Glass material (SOTA-098): new .dex-liquid-glass utility gives the
+  macOS-Tahoe "lit glass" look — a bright top specular rim falling off down the
+  side edges — composed only from existing tokens (--surface-glass, --blur-lg,
+  --shadow-premium-md, --color-border-glass). Auto-degrades: the universal
+  html[data-perf-tier="low"] * rule strips the blur on weak machines, and
+  prefers-reduced-transparency drops it for accessibility.
+
+## SOTA 1000 — WS2/WS24 verified findings + RadioGroup (2026-06-12)
+
+Verified: npm run lint green. Honest corrections to the audits:
+
+- WS2 engine code-split: SKIPPED with reason — vite.config already lazy-loads each
+  app into its own chunk (opening one app never downloads others), and a code comment
+  documents that splitting axl's engine into sub-chunks caused a production circular-dep
+  crash ("Cannot access 'S' before initialization"). Re-attempting would reintroduce a
+  known crash. Not done.
+- WS24 missing components: the audit was WRONG — Toggle/Checkbox/Slider already exist
+  as DexToggle/DexCheckbox/DexSlider in shell/UIComponents, re-exported via ui/index.
+  Deleted the redundant Switch.tsx/Checkbox.tsx duplicates I had drafted rather than
+  ship dead duplicates. Added the ONE genuinely-missing primitive: DexRadioGroup
+  (role=radiogroup/radio, aria-checked, arrow-key roving selection), exported as
+  RadioGroup from the ui barrel. Tabs/Tooltip remain genuinely missing (open).
+- design-system: added --shadow-hover / --shadow-pressed state tokens for hover-lift
+  and press-in affordances.
+
+## SOTA 1000 — Tabs primitive + audit-vs-reality finding (2026-06-12)
+
+Verified: npm run lint green.
+
+- Added DexTabs (role=tablist/tab, aria-selected, arrow-key roving, spring underline
+  indicator), exported as Tabs from the ui barrel. This was the one genuinely-missing
+  shared primitive (apps rolled their own inline tab bars).
+- IMPORTANT FINDING: the design-system audit over-claimed "missing components". Verified
+  already-present: Toggle/Checkbox/Slider (DexToggle/DexCheckbox/DexSlider), Tooltip
+  (the [data-tip] CSS system in uiPolish.ts). Only RadioGroup and Tabs were truly
+  missing — both now added. Net: the component layer is far more complete than the
+  1000-item plan implied; remaining real work is narrower than the headline count.
+
+## SOTA 1000 — WS5 Prism: adjustment editor + Curves graph (2026-06-12)
+
+Verified: npm run lint + full build green.
+
+- Real feature, engine-grounded: Prism's pixel engine already supported curves,
+  levels, brightness/contrast and hue/saturation (applyAdjustmentToImageData +
+  curveLUTFromPoints), but updateLayerAdjustment was never called by any UI, so
+  adjustment layers applied defaults and could not be tuned. New
+  prism/AdjustmentControls.tsx provides the editor: sliders for the scalar
+  adjustments and an interactive Curves graph (draggable control points over a
+  0..255 square, click to add, right-click to remove, live LUT rebuild via
+  curveLUTFromPoints, reset). Wired into the layer-properties panel, replacing the
+  static "Adjustment: {kind}" text; edits flow through updateLayerAdjustment ->
+  setLayers -> live re-composite.
