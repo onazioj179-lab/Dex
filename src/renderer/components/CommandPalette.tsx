@@ -342,7 +342,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     overlay: {
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0, 0, 0, 0.75)',
+      background: 'var(--color-scrim, rgba(0, 0, 0, 0.75))',
       zIndex: 'var(--z-overlay)' as any,
       display: 'flex',
       alignItems: 'flex-start',
