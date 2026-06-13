@@ -651,7 +651,7 @@ const Learn: React.FC = () => {
                 onClick={handleReset}
                 style={{
                   padding: '8px 16px', fontSize: 12, fontWeight: 500, borderRadius: 6,
-                  border: '1px solid rgba(255,69,58,.3)', background: 'rgba(255,69,58,.08)',
+                  border: '1px solid var(--color-error-muted, rgba(255,69,58,.3))', background: 'var(--color-error-muted, rgba(255,69,58,.08))',
                   color: 'var(--color-error)', cursor: 'pointer',
                 }}
               >
