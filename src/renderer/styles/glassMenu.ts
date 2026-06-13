@@ -28,34 +28,15 @@ const _tier = (): 'low' | 'mid' | 'high' | 'ultra' => {
   return 'high';
 };
 
-/** DEX 6.0 reduced-glass redesign (GOAL-6D): blur -60%, applied once here so
- * every adaptiveBlur call site inherits the pass. Call sites keep their
- * historical "full strength" numbers; this is the single point of control,
- * mirroring the --blur-* token reduction in design-system.css. */
-const GOAL_6D_BLUR_SCALE = 0.4;
-
-/** Returns a scaled backdrop-filter value based on device capability */
-export const adaptiveBlur = (highBlur: number, highSaturate = 200): { backdropFilter: string; WebkitBackdropFilter: string } => {
-  const glassMode = (() => {
-    try {
-      return document.documentElement.getAttribute('data-glass-effective-mode');
-    } catch {
-      return null;
-    }
-  })();
-  if (glassMode === 'off') {
-    return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
-  }
-
-  const tier = _tier();
-  if (tier === 'low') return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
-  const reducedScale = glassMode === 'reduced' ? 0.45 : 1;
-  const liquidScale = glassMode === 'liquid' ? 1.15 : 1;
-  const perfScale = tier === 'mid' ? 0.3 : 1;
-  const blur = Math.max(0, Math.round(highBlur * GOAL_6D_BLUR_SCALE * perfScale * reducedScale * liquidScale));
-  const sat = Math.max(100, Math.round(highSaturate * (tier === 'mid' ? 0.6 : 1) * (glassMode === 'reduced' ? 0.8 : 1)));
-  const v = `blur(${blur}px) saturate(${sat}%)`;
-  return { backdropFilter: v, WebkitBackdropFilter: v };
+/** Backdrop-filter helper. DEX Sharp full-flat (2026-06-13, owner direction
+ * "strip the glass and all, put them on place like other OSes"): UI surfaces are
+ * solid/placed, not frosted. Backdrop blur is disabled platform-wide here — this
+ * is the single point of control, so every glass preset and call site inherits
+ * the flat look and loses the GPU compositing cost (and the muddy see-through).
+ * To bring a translucent material back, restore the tiered computation that the
+ * git history of this function holds. Params kept for call-site compatibility. */
+export const adaptiveBlur = (_highBlur: number, _highSaturate = 200): { backdropFilter: string; WebkitBackdropFilter: string } => {
+  return { backdropFilter: 'none', WebkitBackdropFilter: 'none' };
 };
 
 /** Returns a scaled box-shadow value based on device capability */
@@ -131,15 +112,14 @@ export const glassButtonHover: React.CSSProperties = {
   borderColor: 'var(--color-text-tertiary)',
 };
 
-/** Liquid glass dock -- frosted glass with strong blur. Background uses the
- * runtime CSS variable `--dex-glass-bg` (set by shellPreferencesStore) so the
- * user can tune Liquid-Glass tint and opacity from Settings. */
+/** Dock surface. DEX Sharp full-flat: a solid, placed bar (like a native OS
+ * dock/taskbar in its opaque mode) rather than frosted glass — no blur, opaque
+ * elevated surface. Depth comes from the drop shadow + a hairline top rim. */
 export const liquidGlassDock: React.CSSProperties = {
-  background: 'var(--dex-glass-bg, rgba(26, 26, 30, 0.73))',
-  ...adaptiveBlur(38, 190),
-  border: '1px solid rgba(255, 255, 255, 0.10)',
+  background: 'var(--color-bg-elevated)',
+  border: '1px solid var(--color-border-subtle)',
   borderRadius: 9999,
-  boxShadow: '0 14px 48px rgba(0,0,0,0.25), 0 4px 14px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.10)',
+  boxShadow: '0 14px 48px rgba(0,0,0,0.25), 0 4px 14px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.06)',
 };
 
 /** Liquid glass for interactive buttons */
@@ -302,13 +282,15 @@ export const premiumGlassOverlay: React.CSSProperties = {
   ...adaptiveBlur(18, 160),
 };
 
-/** Glass tab bar -- for tab navigation containers */
+/** Tab bar -- for tab navigation containers.
+ * DEX Sharp (v5.5): tab strips are a "placed" chrome surface, like a native OS
+ * tab bar — solid and crisp, NOT floating glass. No backdrop-filter (it blurred
+ * content scrolling underneath and softened tab edges); an opaque elevated
+ * surface with a hairline base border reads sharper and costs no GPU compositing. */
 export const glassTabBar: React.CSSProperties = {
-  background: 'var(--color-bg-glass, rgba(22, 22, 24, 0.90))',
-  ...adaptiveBlur(16, 180),
-  border: '1px solid var(--color-border)',
-  borderRadius: 10,
-  boxShadow: 'inset 0 0.5px 0 var(--color-bg-hover)',
+  background: 'var(--color-bg-elevated)',
+  borderBottom: '1px solid var(--color-border-subtle)',
+  borderRadius: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -361,32 +343,15 @@ export function liquidGlass(
   overrides?: Partial<React.CSSProperties>,
 ): React.CSSProperties {
   const p = GLASS_PRESETS[intensity];
-  const tier = _tier();
-
-  // Low: fall back to solid dark background
-  if (tier === 'low') {
-    return {
-      background: 'var(--color-bg-surface-solid)',
-      border: p.border,
-      borderRadius: p.radius,
-      boxShadow: p.highlight,
-      ...overrides,
-    };
-  }
-
-  const goal6dBlur = p.blur * GOAL_6D_BLUR_SCALE;
-  const blur = Math.round(tier === 'mid' ? goal6dBlur * 0.4 : goal6dBlur);
-  const sat = tier === 'mid' ? Math.round(p.sat * 0.6) : p.sat;
-  const filterVal = `blur(${blur}px) saturate(${sat}%) brightness(1.05)`;
-
+  // DEX Sharp full-flat: solid, placed surface — no backdrop blur, no
+  // translucency. Elevation is conveyed by the drop shadow alone (how native
+  // OS panels read). The intensity now only scales radius/border/shadow depth.
   return {
-    background: p.bg,
-    backdropFilter: filterVal,
-    WebkitBackdropFilter: filterVal,
+    background: 'var(--color-bg-elevated)',
     border: p.border,
     borderRadius: p.radius,
     boxShadow: `${p.shadow}, ${p.highlight}`,
-    transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
     ...overrides,
   };
 }

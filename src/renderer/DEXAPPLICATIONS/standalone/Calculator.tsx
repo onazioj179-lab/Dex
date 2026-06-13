@@ -205,7 +205,7 @@ const Calculator: React.FC = () => {
       fontWeight: 500,
       cursor: 'pointer',
       transition: 'all 0.15s ease',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: 'var(--dex-font-ui)',
       boxShadow: 'var(--shadow-md)',
     };
     
@@ -354,7 +354,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     background: 'var(--color-bg-base)',
     color: 'var(--color-text-primary)',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
     position: 'relative',
     overflow: 'hidden',
   },

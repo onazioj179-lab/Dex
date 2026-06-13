@@ -105,8 +105,8 @@ export const KEYBOARD_SHORTCUTS: Record<string, { key: string; action: string }[
 
 // ==================== SHARED STYLES ====================
 const CARD_STYLE: React.CSSProperties = {
-  background: 'var(--color-bg-secondary, #0A0A0A)',
-  border: '1px solid var(--color-bg-hover)',
+  background: 'var(--color-bg-elevated)',
+  border: '1px solid var(--color-border-subtle)',
   borderRadius: 6,
   padding: '16px 20px',
 };
@@ -143,9 +143,9 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '0 8px 32px rgba(59, 130, 246, 0.25)',
     }}>
-      <span style={{ fontSize: 36, fontWeight: 800, color: 'var(--color-accent-text, #fff)', fontFamily: 'Inter, system-ui, sans-serif' }}>D</span>
+      <span style={{ fontSize: 36, fontWeight: 700, color: 'var(--color-accent-text, #fff)', fontFamily: 'var(--dex-font-ui)', letterSpacing: '-0.02em' }}>D</span>
     </div>
-    <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', letterSpacing: '-0.5px' }}>
+    <h1 style={{ fontSize: 28, fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
       Welcome to DEX
     </h1>
     <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: '0 0 40px', lineHeight: 1.6 }}>
@@ -188,7 +188,7 @@ const HardwareScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
   return (
     <div style={{ padding: '32px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', textAlign: 'center' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px', textAlign: 'center' }}>
         System Check
       </h2>
       <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
@@ -258,7 +258,7 @@ const PrivacyScreen: React.FC<{
 
   return (
     <div style={{ padding: '32px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', textAlign: 'center' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px', textAlign: 'center' }}>
         Privacy
       </h2>
       <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
@@ -314,7 +314,7 @@ const PolicyAcceptanceScreen: React.FC<{
 
   return (
     <div style={{ padding: '20px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px', textAlign: 'center' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 6px', textAlign: 'center' }}>
         Terms & Privacy
       </h2>
       <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 20px', textAlign: 'center', lineHeight: 1.55 }}>
@@ -337,7 +337,7 @@ const PolicyAcceptanceScreen: React.FC<{
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
                   {policy.title}
                 </span>
                 <span style={{
@@ -446,7 +446,7 @@ const TourScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
   return (
     <div style={{ padding: '32px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', textAlign: 'center' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px', textAlign: 'center' }}>
         What DEX Can Do
       </h2>
       <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
@@ -484,7 +484,7 @@ const SampleDataScreen: React.FC<{
   onNext: (loadSample: boolean) => void;
 }> = ({ onNext }) => (
   <div style={{ padding: '32px 0', textAlign: 'center' }}>
-    <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px' }}>
+    <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px' }}>
       Sample Content
     </h2>
     <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', lineHeight: 1.6 }}>
@@ -554,7 +554,7 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
         <polyline points="20 6 9 17 4 12" />
       </svg>
     </div>
-    <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px' }}>
+    <h2 style={{ fontSize: 24, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px' }}>
       All Set
     </h2>
     <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 12px', lineHeight: 1.6 }}>
@@ -573,7 +573,7 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
 // ==================== SCREEN: ACCOUNT (optional) ====================
 const AccountStepScreen: React.FC<{ onDone: () => void }> = ({ onDone }) => (
   <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-    <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 4px' }}>
+    <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 4px' }}>
       Sign in or skip
     </h2>
     <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 16px', textAlign: 'center', maxWidth: 460, lineHeight: 1.5 }}>

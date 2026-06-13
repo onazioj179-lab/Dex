@@ -59,7 +59,7 @@ export default function AppDetail({
         <AppIcon iconUrl={entry.iconUrl || undefined} name={name} size={96} radius={22} />
         <div style={{ minWidth: 0, flex: '1 1 320px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{name}</h1>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{name}</h1>
             <RecognitionPill publisher={publisher} />
             {installed && <StateBadge kind="installed" />}
             {!installed && entry.comingSoon && <StateBadge kind="soon" />}
@@ -205,7 +205,7 @@ function PublisherCard({ publisher, fallbackId }: { publisher?: PublisherProfile
       <div style={{ ...premiumGlassCard, padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ color: 'var(--color-text-tertiary)', display: 'inline-flex' }}><DexIcon name="user" size={22} /></span>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>Unverified publisher</div>
+          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>Unverified publisher</div>
           <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>
             This app is not yet linked to a DEX-verified publisher identity ({fallbackId.split('.').slice(0, 2).join('.')}).
           </div>
@@ -220,7 +220,7 @@ function PublisherCard({ publisher, fallbackId }: { publisher?: PublisherProfile
       </span>
       <div style={{ minWidth: 0, flex: '1 1 220px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 14, fontWeight: 700 }}>{publisher.name}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{publisher.name}</span>
           <RecognitionPill publisher={publisher} />
         </div>
         <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>{publisher.id}</div>

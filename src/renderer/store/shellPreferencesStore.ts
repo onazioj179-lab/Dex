@@ -192,30 +192,18 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   root.style.setProperty('--dex-glass-tint-g', String(g));
   root.style.setProperty('--dex-glass-tint-b', String(b));
 
-  if (effectiveMode === 'off') {
-    root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, 1)`);
-    root.style.setProperty('--color-bg-glass', 'var(--color-bg-surface-solid)');
-    root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface-solid)');
-    root.style.setProperty('--dex-glass-blur', '0px');
-    return;
-  }
-
-  if (effectiveMode === 'reduced') {
-    const reducedAlpha = Math.max(0.92, requestedOpacity);
-    root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, ${reducedAlpha.toFixed(2)})`);
-    root.style.setProperty('--color-bg-glass', `rgba(${r}, ${g}, ${b}, 0.90)`);
-    root.style.setProperty('--color-bg-glass-strong', `rgba(${r}, ${g}, ${b}, 0.94)`);
-    root.style.setProperty('--dex-glass-blur', '8px');
-    return;
-  }
-
-  const isLiquid = effectiveMode === 'liquid';
-  const baseAlpha = isLiquid ? Math.max(0.62, Math.min(0.86, requestedOpacity - 0.08)) : Math.max(0.72, Math.min(0.92, requestedOpacity - 0.02));
-  const strongAlpha = isLiquid ? Math.max(0.78, Math.min(0.92, requestedOpacity + 0.02)) : Math.max(0.82, Math.min(0.96, requestedOpacity + 0.04));
-  root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, ${baseAlpha.toFixed(2)})`);
-  root.style.setProperty('--color-bg-glass', `rgba(${r}, ${g}, ${b}, ${baseAlpha.toFixed(2)})`);
-  root.style.setProperty('--color-bg-glass-strong', `rgba(${r}, ${g}, ${b}, ${strongAlpha.toFixed(2)})`);
-  root.style.setProperty('--dex-glass-blur', isLiquid ? '30px' : '22px');
+  // DEX Sharp full-flat (2026-06-13, owner direction "strip the glass and all,
+  // put them on place"): UI surfaces are SOLID regardless of the saved glass
+  // mode/opacity. Backdrop blur is already disabled platform-wide (see
+  // styles/glassMenu.ts `adaptiveBlur` + the --blur-* tokens), so these fills
+  // resolve opaque and theme-aware via --color-bg-surface-solid. The glass
+  // prefs + the data-glass-* attributes above are preserved untouched, so the
+  // frosted look can be restored by reverting this block to the per-mode
+  // branches kept in this file's git history.
+  root.style.setProperty('--dex-glass-bg', `rgba(${r}, ${g}, ${b}, 1)`);
+  root.style.setProperty('--color-bg-glass', 'var(--color-bg-surface-solid)');
+  root.style.setProperty('--color-bg-glass-strong', 'var(--color-bg-surface-solid)');
+  root.style.setProperty('--dex-glass-blur', '0px');
 }
 
 export function applyNightShift(prefs: Pick<ShellPreferences, 'nightShift' | 'nightShiftIntensity'>): void {

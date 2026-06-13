@@ -1000,9 +1000,10 @@ class ProPerformanceEngine {
   destroy(): void {
     if (this.memoryPressureInterval) {
       clearInterval(this.memoryPressureInterval);
+      this.memoryPressureInterval = null;
     }
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
-    
+
     this.scheduler.destroy();
     this.gpu.destroy();
     this.cache.clear();

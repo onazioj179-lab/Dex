@@ -134,7 +134,7 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
 
       {/* Write a review */}
       <div style={{ ...premiumGlassCard, padding: 16, marginTop: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Write a review</div>
+        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 10 }}>Write a review</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
           <StarRating value={rating} size={22} onChange={setRating} ariaLabel="Your star rating" />
           <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>{rating > 0 ? `${rating} / 5` : 'Tap to rate'}</span>
@@ -219,7 +219,7 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
   padding: '9px 11px',
-  background: 'rgba(0,0,0,0.28)',
+  background: 'var(--color-bg-surface)',
   border: '1px solid var(--pg-border-strong)',
   borderRadius: 7,
   color: 'var(--color-text-primary)',

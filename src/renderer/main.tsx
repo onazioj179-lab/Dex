@@ -290,7 +290,7 @@ class RootErrorBoundary extends React.Component<
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '100vh', background: '#0a0a0f', color: '#71717a',
-            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 13,
+            fontFamily: 'var(--dex-font-ui)', fontSize: 13,
           }}>
             Recovering...
           </div>
@@ -300,7 +300,7 @@ class RootErrorBoundary extends React.Component<
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100vh', background: '#0a0a0f', color: '#e5e5ea', fontFamily: 'Inter, system-ui, sans-serif', gap: 16,
+          height: '100vh', background: '#0a0a0f', color: '#e5e5ea', fontFamily: 'var(--dex-font-ui)', gap: 16,
         }}>
           <div style={{
             width: 64, height: 64, borderRadius: 12,

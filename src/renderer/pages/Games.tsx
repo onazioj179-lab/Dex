@@ -15,7 +15,7 @@ import type { ScanResult } from '../../shared/games/scanner';
 type IpcBridge = { invoke: (c: string, ...a: any[]) => Promise<any> };
 
 const rowStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
+  background: 'var(--color-bg-surface)',
   border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 6,
 };

@@ -41,8 +41,8 @@ function toolBtnStyle(active: boolean): React.CSSProperties {
     cursor: 'pointer',
     transition: 'all 0.12s',
     color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-    background: active ? 'rgba(10,132,255,0.2)' : 'transparent',
-    boxShadow: active ? 'inset 0 -1px 0 #0A84FF' : 'none',
+    background: active ? 'var(--color-accent-light)' : 'transparent',
+    boxShadow: active ? 'inset 0 -1px 0 var(--color-accent)' : 'none',
   };
 }
 
@@ -73,7 +73,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
     }} className="scrollbar-hidden">
       {/* Project name + mode indicator */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 2, flexShrink: 0 }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0A84FF" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>
           AXL
         </span>

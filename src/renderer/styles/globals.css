@@ -2054,7 +2054,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 
 .code-content {
   padding: 16px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -2070,7 +2070,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
 
 .terminal-content {
   padding: 16px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
   min-height: 300px;
@@ -2480,7 +2480,7 @@ textarea,
 }
 
 .command-text {
-  font-family: 'SF Mono', Monaco, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   color: var(--accent);
   background: rgba(0, 122, 255, 0.08);
@@ -3790,7 +3790,7 @@ select:focus {
 
 /* Mono — code/terminal */
 .dex-type-mono {
-  font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -4124,7 +4124,7 @@ body {
 
 /* Item 187: System font monospace for code areas */
 pre, code, .code-editor, [data-code] {
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--font-mono);
 }
 
 /* Item 188: Responsive font scaling for very small windows */

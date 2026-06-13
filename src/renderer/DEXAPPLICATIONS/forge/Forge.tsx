@@ -544,7 +544,7 @@ const Forge: React.FC = () => {
         </svg>
       </div>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>FORGE</div>
+        <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>FORGE</div>
         <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Drop media files or click Add Files to start encoding</span>
       </div>
       <button onClick={addFiles} aria-label="Add files" style={{  
@@ -1886,7 +1886,7 @@ const Forge: React.FC = () => {
             </div>
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>frame_[####].{imgSeqFormat}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>frame_[####].{imgSeqFormat}</div>
             </div>
             {imgSeqFormat === 'exr' && (
               <div style={{ padding: 8, background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.15))', marginBottom: 10 }}>
@@ -2077,7 +2077,7 @@ const Forge: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Pad Color</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
               <input type="color" value={padColor} onChange={e => setPadColor(e.target.value)} style={{ width: 24, height: 24, border: 'none', borderRadius: 3, cursor: 'pointer' }} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{padColor}</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{padColor}</span>
             </div>
             <button aria-label="Apply crop and pad" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
@@ -2246,18 +2246,18 @@ const Forge: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
             <input value={batchRenamePattern} onChange={e => setBatchRenamePattern(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }} />
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, fontFamily: 'var(--font-mono)', marginBottom: 8 }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
               {['{name}', '{preset}', '{format}', '{date}', '{index}', '{resolution}'].map(token => (
                 <button key={token} onClick={() => setBatchRenamePattern(prev => prev + token)} style={{
                   padding: '3px 8px', borderRadius: 3, border: '1px solid var(--color-bg-hover)',
-                  background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
+                  background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)',
                 }}>{token}</button>
               ))}
             </div>
             <div style={{ padding: 8, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Preview</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
                 {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', new Date().toISOString().split('T')[0]).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
               </div>
             </div>
