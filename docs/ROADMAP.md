@@ -18,16 +18,17 @@
 > ONE 28/32/40 control rhythm, hairline borders that stay one device pixel at
 > high DPI, functional motion only (150-220ms standard curve, no bounce, no
 > decorative effects), responsive-by-construction overlays, light-mode parity.
-> Batch 1 (foundation + shell + entry surfaces) and Batch 2 (platform-wide
-> app/page sweep, ~35 files incl. all standalone + creative apps + Settings/
-> Browser/Audio/Files/Gallery) are both done and verified — details in
-> [TAURI-MIGRATION.md](TAURI-MIGRATION.md) "Renderer slice 2026-06-12".
-> Remaining (Batch 3, foundation): `--color-accent-dark` token, translucent
-> neutral/scrim tokens (unblocks ~45+ subtle-surface sites that can't map to
-> opaque bg tokens), structural flex-centering of the ~37 wrapper-less creative
-> modals (currently width-guarded), Axl accent migration off macOS system-blue,
-> and AppManager inline-SVG -> DexIcon consolidation. All are tracked, none
-> block shipping; the platform is consistent and operational as-is.
+> Batches 1-3 done and verified (PR #24, feat/dex-dev-platform -> main):
+> foundation + shell + entry surfaces; platform-wide app/page sweep (~35
+> files); dock redesign + component sweeps + bug fixes. Details in
+> [TAURI-MIGRATION.md](TAURI-MIGRATION.md) "Renderer slice 2026-06-12/13".
+> Remaining (foundation follow-ups, none block shipping): make the dark-only
+> `tokens.colors` JS object theme-aware (largest remaining light-mode gap),
+> `--color-accent-dark` token, translucent neutral/scrim tokens, structural
+> flex-centering of ~37 width-guarded creative modals, Axl accent migration,
+> AppManager inline-SVG -> DexIcon, and finishing the partial wave-3/4/5
+> component sweeps that a weekly usage limit interrupted. The platform is
+> consistent, verified, and operational as-is.
 
 ## Next major phase: uki AI + intelligence everywhere (owner brief, 2026-06-09)
 
