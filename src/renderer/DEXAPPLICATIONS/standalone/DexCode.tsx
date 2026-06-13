@@ -809,7 +809,7 @@ const S: Record<string, React.CSSProperties> = {
     height: 32,
     border: 'none',
     background: 'var(--color-accent, #4a9eff)',
-    color: '#fff',
+    color: 'var(--color-accent-text, #fff)',
     borderRadius: 4,
     cursor: 'pointer',
   },
