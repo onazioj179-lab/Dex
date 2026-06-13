@@ -182,7 +182,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
     transition: 'background 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1)',
   },
   toolbarBtnActive: {
@@ -212,7 +212,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary, #e0e0e0)',
     fontSize: 15,
     lineHeight: 1.7,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
     caretColor: '#64d2ff',
     wordWrap: 'break-word' as const,
     overflowWrap: 'break-word' as const,
@@ -224,7 +224,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary, #e0e0e0)',
     fontSize: 15,
     lineHeight: 1.7,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
   },
   splitDivider: {
     width: 1,
@@ -249,7 +249,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary)',
     fontSize: 15,
     pointerEvents: 'none' as const,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
   },
   focusModeEditable: {
     maxWidth: 720,
@@ -859,11 +859,13 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
 
-    // If it has HTML, use it directly (supports paste from other rich editors)
+    // If it has HTML, use it (supports paste from other rich editors). Sanitize
+    // first: external clipboard HTML is untrusted and can carry scripts / inline
+    // event handlers (onerror, onload, ...) that would execute on insertion.
     if (html) {
       e.preventDefault();
       pushUndo();
-      document.execCommand('insertHTML', false, html);
+      document.execCommand('insertHTML', false, DOMPurify.sanitize(html));
       emitChange();
       return;
     }
@@ -1113,7 +1115,7 @@ div[contenteditable] pre {
   padding: 12px 16px;
   margin: 12px 0;
   overflow-x: auto;
-  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
   color: #c8d6e5;
@@ -1122,7 +1124,7 @@ div[contenteditable] code {
   background: rgba(100,210,255,0.08);
   padding: 1px 5px;
   border-radius: 2px;
-  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   color: #64d2ff;
 }

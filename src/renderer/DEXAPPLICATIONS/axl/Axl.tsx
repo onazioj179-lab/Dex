@@ -1163,8 +1163,8 @@ const AXL: React.FC = () => {
   // ─── Styles ───────────────────────────────────────────────────────────
   const toolBtnStyle = (active: boolean): React.CSSProperties => ({
     width: 32, height: 32, borderRadius: 10,
-    background: active ? '#0d2847' : 'transparent',
-    border: active ? '1px solid #153d6b' : '1px solid transparent',
+    background: active ? 'var(--color-accent-light)' : 'transparent',
+    border: active ? '1px solid var(--color-accent-muted)' : '1px solid transparent',
     color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.15s ease',
@@ -1177,8 +1177,8 @@ const AXL: React.FC = () => {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden', fontFamily: 'var(--font-family)', fontSize: '11px', position: 'relative', contain: 'layout style' } as React.CSSProperties} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       <style>{`
-        .axl-ctx-item:hover { background: rgba(10,132,255,0.15) !important; }
-        .axl-ctx-item:active { background: rgba(10,132,255,0.25) !important; }
+        .axl-ctx-item:hover { background: var(--color-accent-soft) !important; }
+        .axl-ctx-item:active { background: var(--color-accent-light) !important; }
         .axl-close {
           background: transparent; border: none; cursor: pointer;
           color: var(--color-text-tertiary); font-size: 14px; line-height: 1;
@@ -1194,8 +1194,8 @@ const AXL: React.FC = () => {
         ::-webkit-scrollbar-thumb { background: var(--color-border-subtle, #333); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--color-border, #555); }
         input[type="range"] { -webkit-appearance: none; background: transparent; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: #0a84ff; cursor: pointer; margin-top: -4px; border: none; }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(10,132,255,0.15); border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: var(--color-accent); cursor: pointer; margin-top: -4px; border: none; }
+        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: var(--color-accent-light); border-radius: 2px; }
       `}</style>
 
       {/* ─── Top Toolbar ─────────────────────────────────────────────── */}
@@ -1309,7 +1309,7 @@ const AXL: React.FC = () => {
               ].map(v => (
                 <button key={v.mode} onClick={() => applyStandardView(v.mode)}
                   title={`${v.label} (${v.mode === '3d' ? '1' : v.mode === 'front' ? '2' : v.mode === 'top' ? '3' : v.mode === 'right' ? '4' : '5'})`}
-                  style={{ padding: '3px 8px', borderRadius: 3, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, transition: 'all 0.12s', background: viewMode === v.mode ? '#0d2847' : 'transparent', color: viewMode === v.mode ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
+                  style={{ padding: '3px 8px', borderRadius: 3, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, transition: 'all 0.12s', background: viewMode === v.mode ? 'var(--color-accent-light)' : 'transparent', color: viewMode === v.mode ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
                   {v.icon} {v.label}
                 </button>
               ))}
@@ -1322,7 +1322,7 @@ const AXL: React.FC = () => {
               <button onClick={() => setWireframe(false)} title="Solid" style={{ padding: '3px 7px', borderRadius: 3, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, background: !wireframe ? '#1e3a28' : 'transparent', color: !wireframe ? 'var(--color-success)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Solid
               </button>
-              <button onClick={() => setWireframe(true)} title="Wireframe (W)" style={{ padding: '3px 7px', borderRadius: 3, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, background: wireframe ? '#0d2847' : 'transparent', color: wireframe ? 'var(--color-accent)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
+              <button onClick={() => setWireframe(true)} title="Wireframe (W)" style={{ padding: '3px 7px', borderRadius: 3, border: 'none', fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, background: wireframe ? 'var(--color-accent-light)' : 'transparent', color: wireframe ? 'var(--color-accent)' : 'var(--color-text-tertiary)', transition: 'all 0.12s' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><line x1="3" y1="8" x2="12" y2="13"/><line x1="21" y1="8" x2="12" y2="13"/><line x1="12" y1="13" x2="12" y2="22"/></svg> Wire
               </button>
             </div>
@@ -1494,7 +1494,7 @@ const AXL: React.FC = () => {
                   <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 3 }}>MESH QUALITY</div>
                   <div style={{ display: 'flex', gap: 3 }}>
                     {(['Coarse', 'Medium', 'Fine'] as const).map(q => (
-                      <button key={q} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 600, borderRadius: 4, cursor: 'pointer', border: q === 'Medium' ? '1px solid #153d6b' : '1px solid var(--color-bg-hover)', background: q === 'Medium' ? '#0d2847' : 'var(--color-border-subtle)', color: q === 'Medium' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
+                      <button key={q} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 600, borderRadius: 4, cursor: 'pointer', border: q === 'Medium' ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)', background: q === 'Medium' ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: q === 'Medium' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
                         {q}
                       </button>
                     ))}
@@ -1505,7 +1505,7 @@ const AXL: React.FC = () => {
                     <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 3 }}>BOUNDARY</div>
                     <div style={{ display: 'flex', gap: 3 }}>
                       {(['Fixed', 'Pinned', 'Roller'] as const).map(bc => (
-                        <button key={bc} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 600, borderRadius: 4, cursor: 'pointer', border: bc === 'Fixed' ? '1px solid #153d6b' : '1px solid var(--color-bg-hover)', background: bc === 'Fixed' ? '#0d2847' : 'var(--color-border-subtle)', color: bc === 'Fixed' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
+                        <button key={bc} style={{ flex: 1, padding: '4px 0', fontSize: 9, fontWeight: 600, borderRadius: 4, cursor: 'pointer', border: bc === 'Fixed' ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)', background: bc === 'Fixed' ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: bc === 'Fixed' ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
                           {bc}
                         </button>
                       ))}
@@ -1513,7 +1513,7 @@ const AXL: React.FC = () => {
                   </div>
                 )}
                 <button onClick={runSimulation} disabled={simRunning}
-                  style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: '#0d2847', color: 'var(--color-accent)', border: '1px solid #153d6b', borderRadius: 8, cursor: simRunning ? 'wait' : 'pointer' }}>
+                  style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: 'var(--color-accent-light)', color: 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 8, cursor: simRunning ? 'wait' : 'pointer' }}>
                   {simRunning ? 'Running...' : 'Run Simulation'}
                 </button>
               </div>
@@ -1530,7 +1530,7 @@ const AXL: React.FC = () => {
               {project.measurements.map((m, i) => (
                 <div key={m.id || i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', marginBottom: 2, background: 'var(--color-border-subtle)', borderRadius: 4 }}>
                   <span style={{ color: 'var(--color-warning)', fontWeight: 700, fontSize: 8, width: 14 }}>#{i + 1}</span>
-                  <span style={{ flex: 1, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace' }}>{m.value.toFixed(2)} {project.units}</span>
+                  <span style={{ flex: 1, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>{m.value.toFixed(2)} {project.units}</span>
                   <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>{m.type}</span>
                 </div>
               ))}
@@ -1563,7 +1563,7 @@ const AXL: React.FC = () => {
               {STD_PARTS_LIBRARY.map((cat, i) => (
                 <button key={cat.category} onClick={() => setLibCategory(i)}
                   style={{ padding: '4px 10px', fontSize: 9, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                    background: libCategory === i ? '#0d2847' : 'transparent', color: libCategory === i ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
+                    background: libCategory === i ? 'var(--color-accent-light)' : 'transparent', color: libCategory === i ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>
                   <DexIcon name={cat.icon} size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} /> {cat.category}
                 </button>
               ))}
@@ -1611,9 +1611,9 @@ const AXL: React.FC = () => {
                 {(['extrude', 'revolve', 'chamfer', 'fillet', 'pattern'] as const).map(ft => (
                   <button key={ft} onClick={() => setFeatureType(ft)}
                     style={{ padding: '4px 8px', fontSize: 9, fontWeight: 600, borderRadius: 10, cursor: 'pointer',
-                      background: featureType === ft ? '#0d2847' : 'var(--color-border-subtle)',
+                      background: featureType === ft ? 'var(--color-accent-light)' : 'var(--color-border-subtle)',
                       color: featureType === ft ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                      border: featureType === ft ? '1px solid #153d6b' : '1px solid var(--color-bg-hover)' }}>
+                      border: featureType === ft ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)' }}>
                     {ft.charAt(0).toUpperCase() + ft.slice(1)}
                   </button>
                 ))}
@@ -1664,9 +1664,9 @@ const AXL: React.FC = () => {
 
               <button onClick={addFeatureToSelected} disabled={!selectedPartId}
                 style={{ padding: '7px 12px', fontSize: 10, fontWeight: 600, borderRadius: 8, cursor: selectedPartId ? 'pointer' : 'not-allowed',
-                  background: selectedPartId ? '#0d2847' : 'var(--color-border-subtle)',
+                  background: selectedPartId ? 'var(--color-accent-light)' : 'var(--color-border-subtle)',
                   color: selectedPartId ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                  border: selectedPartId ? '1px solid #153d6b' : '1px solid var(--color-bg-hover)' }}>
+                  border: selectedPartId ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)' }}>
                 {selectedPartId ? `Apply ${featureType.charAt(0).toUpperCase() + featureType.slice(1)}` : 'Select a part first'}
               </button>
             </div>
@@ -1686,9 +1686,9 @@ const AXL: React.FC = () => {
                 {GDT_SYMBOLS.map(g => (
                   <button key={g.symbol} onClick={() => setGdtSymbol(g.symbol)} title={g.name}
                     style={{ padding: '5px 0', fontSize: 14, textAlign: 'center', borderRadius: 10, cursor: 'pointer',
-                      background: gdtSymbol === g.symbol ? '#0d2847' : 'var(--color-border-subtle)',
+                      background: gdtSymbol === g.symbol ? 'var(--color-accent-light)' : 'var(--color-border-subtle)',
                       color: gdtSymbol === g.symbol ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                      border: gdtSymbol === g.symbol ? '1px solid #153d6b' : '1px solid var(--color-bg-hover)' }}>
+                      border: gdtSymbol === g.symbol ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)' }}>
                     {g.symbol}
                   </button>
                 ))}
@@ -1707,16 +1707,16 @@ const AXL: React.FC = () => {
 
               <div style={{ padding: '8px 12px', background: 'var(--color-border-subtle)', borderRadius: 8, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontSize: 16, color: 'var(--color-accent)' }}>{gdtSymbol}</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-primary)', fontFamily: 'monospace' }}>{gdtTolerance}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{gdtTolerance}</span>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>|</span>
                 <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>{gdtDatum}</span>
               </div>
 
               <button onClick={addGDTAnnotation} disabled={!selectedPartId}
                 style={{ padding: '7px 12px', fontSize: 10, fontWeight: 600, borderRadius: 8, cursor: selectedPartId ? 'pointer' : 'not-allowed',
-                  background: selectedPartId ? '#0d2847' : 'var(--color-border-subtle)',
+                  background: selectedPartId ? 'var(--color-accent-light)' : 'var(--color-border-subtle)',
                   color: selectedPartId ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                  border: selectedPartId ? '1px solid #153d6b' : '1px solid var(--color-bg-hover)' }}>
+                  border: selectedPartId ? '1px solid var(--color-accent-muted)' : '1px solid var(--color-bg-hover)' }}>
                 {selectedPartId ? 'Add Annotation' : 'Select a part first'}
               </button>
 
@@ -1728,7 +1728,7 @@ const AXL: React.FC = () => {
                     return (
                       <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', fontSize: 10, color: 'var(--color-text-secondary)', borderRadius: 10, background: 'var(--color-border-subtle)' }}>
                         <span style={{ fontSize: 14, color: 'var(--color-accent)' }}>{a.symbol}</span>
-                        <span style={{ fontFamily: 'monospace' }}>{a.tolerance}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{a.tolerance}</span>
                         <span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>{a.datum}</span>
                         <span style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--color-text-tertiary)' }}>{part?.name || '?'}</span>
                         <button aria-label="Delete annotation" onClick={() => pStore.removeAnnotation(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--color-text-tertiary)', fontSize: 10 }}>
@@ -1794,7 +1794,7 @@ const AXL: React.FC = () => {
                   window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'axlExports', amount: 0 } }));
                 }}
                 disabled={!cPartA || !cPartB}
-                style={{ padding: '7px 12px', fontSize: 10, fontWeight: 600, borderRadius: 8, cursor: (!cPartA || !cPartB) ? 'not-allowed' : 'pointer', background: (!cPartA || !cPartB) ? 'var(--color-border-subtle)' : '#0d2847', color: (!cPartA || !cPartB) ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: (!cPartA || !cPartB) ? '1px solid var(--color-bg-hover)' : '1px solid #153d6b' }}>
+                style={{ padding: '7px 12px', fontSize: 10, fontWeight: 600, borderRadius: 8, cursor: (!cPartA || !cPartB) ? 'not-allowed' : 'pointer', background: (!cPartA || !cPartB) ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: (!cPartA || !cPartB) ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: (!cPartA || !cPartB) ? '1px solid var(--color-bg-hover)' : '1px solid var(--color-accent-muted)' }}>
                 {(!cPartA || !cPartB) ? 'Select parts above' : 'Add Constraint'}
               </button>
             </div>
@@ -1823,7 +1823,7 @@ const AXL: React.FC = () => {
         {ui.showSettings && (
           <div style={{ position: 'absolute', top: 42, right: 0, width: 'min(300px, calc(100% - 24px))', bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>Settings</span>
+              <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>Settings</span>
               <button aria-label="Close settings" onClick={() => ui.toggleSettings()} className="axl-close">&times;</button>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1831,7 +1831,7 @@ const AXL: React.FC = () => {
                 <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6 }}>UNITS</div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {(['mm', 'in', 'm'] as const).map(u => (
-                    <button key={u} onClick={() => pStore.setUnits(u)} style={{ flex: 1, padding: '6px 0', borderRadius: 4, border: '1px solid ' + (project.units === u ? '#153d6b' : 'var(--color-bg-hover)'), background: project.units === u ? '#0d2847' : 'var(--color-border-subtle)', color: project.units === u ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{u}</button>
+                    <button key={u} onClick={() => pStore.setUnits(u)} style={{ flex: 1, padding: '6px 0', borderRadius: 4, border: '1px solid ' + (project.units === u ? 'var(--color-accent-muted)' : 'var(--color-bg-hover)'), background: project.units === u ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: project.units === u ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{u}</button>
                   ))}
                 </div>
               </div>
@@ -1913,7 +1913,7 @@ const AXL: React.FC = () => {
           <div style={{ position: 'absolute', top: 42, right: 0, width: 'min(320px, calc(100% - 24px))', bottom: 0, background: 'var(--color-bg-elevated)', borderLeft: '1px solid var(--color-border-subtle)', zIndex: 600, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-bg-hover)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0A84FF" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>AI Design Copilot</span>
               </div>
               <button onClick={ui.toggleAI} aria-label="Close AI panel" className="axl-close">&times;</button>
@@ -1926,7 +1926,7 @@ const AXL: React.FC = () => {
                   ui.addAIMessage({ role: 'user', content: q, timestamp: Date.now() });
                   setTimeout(() => ui.addAIMessage({ role: 'assistant', content: aiAnalyze(q), timestamp: Date.now() }), 300);
                 }}
-                  style={{ fontSize: 8, padding: '3px 7px', borderRadius: 8, background: '#0d2847', color: 'var(--color-accent)', border: '1px solid #153d6b', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  style={{ fontSize: 8, padding: '3px 7px', borderRadius: 8, background: 'var(--color-accent-light)', color: 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {q}
                 </button>
               ))}
@@ -1950,7 +1950,7 @@ const AXL: React.FC = () => {
                 </div>
               )}
               {ui.aiMessages.map((msg, i) => (
-                <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', padding: '8px 10px', borderRadius: msg.role === 'user' ? '10px 10px 2px 10px' : '10px 10px 10px 2px', background: msg.role === 'user' ? '#0d2847' : 'var(--color-bg-hover)', fontSize: 11, color: 'var(--color-text-primary)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%', padding: '8px 10px', borderRadius: msg.role === 'user' ? '10px 10px 2px 10px' : '10px 10px 10px 2px', background: msg.role === 'user' ? 'var(--color-accent-light)' : 'var(--color-bg-hover)', fontSize: 11, color: 'var(--color-text-primary)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                   {msg.content}
                 </div>
               ))}
@@ -1965,7 +1965,7 @@ const AXL: React.FC = () => {
                 style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, padding: '6px 10px', color: 'var(--color-text-primary)', fontSize: 11, outline: 'none' }}
               />
               <button onClick={sendAIMessage}
-                style={{ padding: '6px 10px', background: '#0d2847', border: '1px solid #153d6b', borderRadius: 10, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>
+                style={{ padding: '6px 10px', background: 'var(--color-accent-light)', border: '1px solid var(--color-accent-muted)', borderRadius: 10, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>
                 Send
               </button>
             </div>
@@ -1980,7 +1980,7 @@ const AXL: React.FC = () => {
           <div style={{ background: 'var(--color-bg-elevated)', borderRadius: 12, border: '1px solid var(--color-border-subtle)', padding: 20, maxWidth: 700, maxHeight: '70vh', overflow: 'auto', width: '90%' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>Bill of Materials \u2014 {project.name}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>Bill of Materials \u2014 {project.name}</div>
               <button onClick={ui.toggleBOM} aria-label="Close bill of materials" className="axl-close">&times;</button>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>

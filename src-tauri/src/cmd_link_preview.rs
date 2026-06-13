@@ -152,9 +152,67 @@ pub fn fetch(app: &tauri::AppHandle, args: &Value) -> Value {
 
 // --- HTTP -------------------------------------------------------------------
 
+/// SSRF guard: the URL is renderer-supplied, so refuse to fetch anything that is
+/// not a public http(s) endpoint. Blocks loopback/localhost, private (RFC1918),
+/// link-local (incl. cloud metadata 169.254.x), unspecified, and IPv6 ULA/
+/// link-local IP literals. Non-IP hostnames are allowed (resolving them would
+/// need a DNS dependency); this still closes the common literal-IP/localhost
+/// vectors a compromised renderer would use to reach internal services.
+fn is_safe_public_url(url: &str) -> bool {
+    let rest = match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let s = scheme.to_ascii_lowercase();
+            if s != "http" && s != "https" {
+                return false;
+            }
+            rest
+        }
+        None => return false,
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let hostport = authority.rsplit_once('@').map(|(_, h)| h).unwrap_or(authority);
+    let host = if let Some(after) = hostport.strip_prefix('[') {
+        // IPv6 literal: [addr]:port
+        match after.split_once(']') {
+            Some((addr, _)) => addr.to_string(),
+            None => return false,
+        }
+    } else {
+        hostport.rsplit_once(':').map(|(h, _)| h).unwrap_or(hostport).to_string()
+    };
+    let host = host.to_ascii_lowercase();
+    if host.is_empty() || host == "localhost" || host.ends_with(".localhost") {
+        return false;
+    }
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return match ip {
+            std::net::IpAddr::V4(v4) => {
+                !(v4.is_loopback()
+                    || v4.is_private()
+                    || v4.is_link_local()
+                    || v4.is_unspecified()
+                    || v4.is_broadcast()
+                    || v4.is_documentation()
+                    || v4.octets()[0] == 0)
+            }
+            std::net::IpAddr::V6(v6) => {
+                !(v6.is_loopback()
+                    || v6.is_unspecified()
+                    || (v6.segments()[0] & 0xfe00) == 0xfc00  // ULA fc00::/7
+                    || (v6.segments()[0] & 0xffc0) == 0xfe80) // link-local fe80::/10
+            }
+        };
+    }
+    true
+}
+
 /// GET `url` and return the body as a String (capped at MAX_BODY_BYTES), or None
 /// on any transport / HTTP error — the network-failure branch of the TS fetch.
 fn http_get(url: &str) -> Option<String> {
+    // SSRF: refuse non-public targets (treated as a network failure by callers).
+    if !is_safe_public_url(url) {
+        return None;
+    }
     let agent = ureq::AgentBuilder::new()
         .timeout(FETCH_TIMEOUT)
         .build();

@@ -133,6 +133,226 @@ adoption across subtle-surface sites, structural flex-centering of the
 width-guarded creative modals, Axl accent migration, AppManager inline-SVG ->
 DexIcon.
 
+**Security + memory-leak audit (2026-06-13).** Owner direction: do the
+security/leak pass, thoroughly. Fanned 7 audit-and-fix workers over the whole
+codebase by territory (main+preload / Rust src-tauri+core / shell+services /
+components / pages+store+utils / creative apps / notes+standalone). Each ran the
+same checklist and FIXED only behavior-preserving issues; risky/behavioral items
+were FLAGGED for owner decision. Verified after fixes: `npx tsc --noEmit` EXIT 0,
+`cargo check` core EXIT 0, `cargo check` src-tauri EXIT 0. Uncommitted.
+
+FIXED — security:
+- MultiWindowManager.ts: renderer-supplied `appId` was string-interpolated into
+  injected window JS (script injection into a privileged window) -> JSON.stringify.
+- NotesManager.ts: offscreen PDF-export BrowserWindow given explicit
+  contextIsolation:true + sandbox:true (was relying on defaults).
+- NotesEditor.tsx: paste handler inserted raw external clipboard HTML via
+  execCommand('insertHTML') -> wrapped in DOMPurify.sanitize (paste XSS).
+- MarkdownEditor.tsx: rendered markdown via dangerouslySetInnerHTML with
+  unsanitized link/image URLs (javascript: + attribute injection) -> added
+  DOMPurify import + sanitize (HIGH-sev XSS closed).
+- core/dex-vault crypto.rs: `decrypt` called Nonce::from_slice on an
+  attacker-controllable (vault import) nonce that PANICS on != 12 bytes (backend
+  DoS) -> length-validate first, return the generic error.
+- src-tauri cmd_link_preview.rs: `link-preview:fetch` did ureq GET on any
+  renderer URL (SSRF: cloud metadata 169.254.x, loopback, RFC1918) -> added
+  is_safe_public_url() guard (scheme http(s) only; blocks loopback/private/
+  link-local/unspecified/ULA IP literals + localhost).
+
+FIXED — memory leaks (behavior-preserving cleanup added):
+- ThermalAdaptiveMonitor.ts: long-task PerformanceObserver + decay interval now
+  torn down on stop (start/stop cycles were stacking them).
+- Browser.tsx: per-tab window 'message' listeners leaked on bulk-close paths
+  (closeAll/toRight/others) and had no unmount drain -> reconcile + drain effects.
+- utils/collaboration.ts (SyncEngine): untracked reconnect setTimeout could
+  re-open the socket after disconnect -> tracked timer + disposed guard.
+- Workflows.tsx: drag rAF not cancelled on unmount -> cancel.
+- Imosion: ImosionRecording.ts devicechange listener stacked unbounded ->
+  stable guarded handler + removal; ImosionMIDI.ts dispose now detaches
+  onmidimessage/onstatechange; ImosionCollaboration.ts intentional-close guard +
+  reconnect-timer clear (was leaving a zombie socket + timer).
+- (Correction: the shell+services worker over-reached and added an
+  IntersectionObserver disconnect into the WRONG class's destroy() in
+  ProPerformanceEngine.ts — tsc caught it; reverted to the legitimate
+  memoryPressureInterval cleanup. The real lazy-loader class already disconnects.)
+
+FLAGGED — owner decision needed (behavior-changing; NOT auto-applied):
+- HIGH: PtyService.ts `pty:spawn` honors a renderer-supplied shell/cwd (a
+  compromised renderer could launch any PATH executable) — wants a shell
+  allowlist + cwd validation, but that could break custom-shell use.
+- MED: Electron main window `sandbox:false` (preload uses Node crypto) —
+  defense-in-depth; moving to sandbox:true needs a sandbox-safe preload.
+- MED: tauri.conf.json `csp:null` + withGlobalTauri — a renderer XSS could reach
+  every dex_ipc channel; a restrictive CSP needs careful testing (heavy inline
+  styling / blob workers / data URLs) so it was NOT guessed.
+- MED: src-tauri fs commands (files_delete/move/copy/mkdir, move_to_trash,
+  shell_open) take raw renderer paths with no root-containment — by-design for a
+  file manager, matches Electron, but no defense-in-depth. files_rename already
+  basename-strips.
+- MED: Browser.tsx webview credential 'message' handler has no origin/source
+  check and the guest injection posts to '*' — mitigated by an unguessable
+  per-session sentinel; tightening needs the webview trust source (runtime).
+- LOW/latent: new Function evaluators (WorkerPool unused handlers,
+  UnifiedSearchService calculator [regex-gated], Flux/Axl expression evaluators
+  [blocklist/whitelist-gated], DexCode runtime [deliberate sandbox]); unbounded
+  caches (axl engine meshCache per-edit, AppOverview thumbnailCache);
+  PasswordGenerator stores password history in cleartext localStorage (feature);
+  AI keys in localStorage (known, accepted design).
+
+Overall posture (verified by the audit) is strong: contextIsolation true and
+nodeIntegration false on every BrowserWindow; bounded contextBridge + allowlisted
+generic invoke; centralized PathValidator/IPCValidator in main; SQL uniformly
+parameterized in Rust; no unsafe blocks; minimal Tauri capabilities. The above
+FLAGGED items are the residual hardening backlog (P8 reliability/security).
+
+**Renderer slice (2026-06-13): v5.5 "DEX Sharp" batch 7 (per-app conformance
+sweep — "no app left out").** Owner direction: do every app now, no misses.
+Fanned out 7 parallel workers over non-overlapping app directories
+(imosion / prism / flux+forge / vinx+axl / rewind+nexus+notes / standalone /
+pages), each running the same OBJECTIVE conformance checklist (no logic, IPC,
+canvas, or content-model changes). What landed:
+- FLAT stragglers removed: Nexus HUD `blur(10px)` panels (+ opaque bg),
+  Imosion toolbar context-menu blur, all page-level backdrop sites (Browser
+  top/address bar, Files/Gallery/Audio/Power/TaskManager/Settings containers +
+  toolbars, Home search/cards/menu), Settings wallpaper-preview live blur.
+- SOLID SURFACES: Rewind's ~21 translucent white surface fills mapped to the
+  canonical `--color-surface-1/2/3` neutral tokens; Nexus/MarkdownEditor/Home
+  menu/Store/Games/TaskManager/Dev+Reviews panels glass fills -> opaque tokens.
+- DEX FONT: remaining hardcoded mono readouts across every app routed to
+  `var(--font-mono)` (Imosion 46 sites, Flux/Forge code+numeric, Vinx/Axl
+  timecode+measurement, notes pre/code, password/markdown editors, pages
+  pid/url/stats/shortcuts); notes/standalone chrome stragglers to
+  `var(--dex-font-ui)`.
+- SHARP TYPE: chrome headings/titles thinned 700/800 -> 600 with tight tracking
+  across imosion, prism, flux, forge, vinx, axl, rewind, notes, ~10 standalone
+  apps, and ~25 page titles (data values / badges / tracked uppercase labels
+  deliberately NOT thinned; no duplicate letterSpacing keys introduced).
+- MOTION: Vinx export bar retimed to the standard curve; otherwise apps were
+  already on standard easing (Nexus's reduced-motion-gated oscillations and all
+  loading/live indicators correctly KEPT).
+- AXL ACCENT MIGRATION (the documented debt) DONE: macOS system-blue
+  (#0a84ff / #0d2847 / #153d6b / rgba(10,132,255,...)) used as the app accent
+  migrated to `--color-accent`/`-light`/`-muted` across Axl + its Toolbar/
+  FeatureTree/PropertiesPanel; CAD axis-color coding (Z=blue) and the per-tool
+  color legend correctly LEFT as semantic data.
+Every worker preserved canvas/WebGL render fonts (ctx.font/fillText), image/
+presentation text-LAYER + slide-element content defaults, modal scrims, accent
+tints, selection highlights, and per-app brand colors (prism pink, imosion
+green, forge cyan, flux purple) — reported honestly per file.
+Verified: `npx tsc --noEmit` EXIT 0 across the whole tree (no duplicate keys /
+malformed edits from the parallel sweep); preview renderer alive after reload,
+zero backdrop-filters in the DOM, glass token solid, no new console errors.
+Uncommitted — owner reviews and commits.
+
+OPEN DECISION (flagged by multiple workers, deliberately NOT auto-applied):
+the creative/pro apps (Imosion, Prism, Flux, Forge, Vinx, Axl) and many
+standalone utilities set their ROOT container font to `var(--font-family)` —
+the Berkeley-Mono "DEX data identity" token, NOT `--dex-font-ui`. It IS a DEX
+font (so arguably intentional pro-tool styling), which is why it was left. If
+the owner wants those app chromes on the UI sans instead, that is a one-line-
+per-app change — needs a visual call, so it is recorded here rather than guessed.
+
+**Renderer slice (2026-06-13): v5.5 "DEX Sharp" batch 6 (FULL-FLAT glass +
+onboarding sharpening).** Owner direction: go fully flat ("strip the glass and
+all, put them on place like other OSes") and redesign onboarding.
+- FULL-FLAT, done at the single points of control so it is one reversible lever:
+  (1) styles/glassMenu.ts `adaptiveBlur` is now a platform-wide blur KILL SWITCH
+  (returns none always) — every glass preset + call site inherits flat, with the
+  GPU compositing cost gone; `liquidGlass()` and `liquidGlassDock` return solid
+  elevated surfaces (depth via drop shadow only); the now-dead GOAL_6D_BLUR_SCALE
+  const removed. (2) design-system.css: `--color-bg-glass`/`-strong`/
+  `--surface-glass` are now OPAQUE solids (kept under the same names so the
+  hundreds of token consumers go solid with zero per-site edits); `--blur-sm/md/
+  lg/xl` set to `blur(0px)` so inline `var(--blur-*)` consumers also flatten;
+  index.html boot fallback aligned (no flash-of-glass on load). (3) THE runtime
+  override that was re-injecting translucency: store/shellPreferencesStore.ts
+  `applyGlassVars` rebuilt the glass vars from the saved glassMode/glassOpacity
+  every change, overriding the CSS — now forced to solid in all modes (prefs +
+  data-glass-* attributes preserved, so reverting the block restores frost).
+  VERIFIED LIVE in preview: `--color-bg-glass` resolves `#161618`, and a DOM
+  sweep finds ZERO elements with any backdrop-filter. The modal dimming scrim
+  (--color-scrim / glassOverlay bg) is intentionally kept — that is a backdrop,
+  not a UI glass surface. Note: a handful of inline-literal translucent rgba
+  backgrounds in a few components (e.g. some AppManager grids) are now blur-free
+  but keep faint translucency; a later literal sweep can opaque them.
+- ONBOARDING sharpening (components/Onboarding.tsx): screen headings thinned
+  700 -> 600 with tight tracking (the DEX Sharp heading weight), the shared
+  card moved to an elevated surface + hairline `--color-border-subtle` border,
+  logo + all copy already on `var(--dex-font-ui)` from batch 5. The 8-step flow
+  (welcome/hardware/privacy/tour/sampleData/terms/account/ready) was kept intact
+  — terms/privacy are required and cutting steps is a behavior change, not a
+  visual redesign; this was a sharpening pass, not a restructure.
+Verified: `npx tsc --noEmit` EXIT 0; preview renderer alive after reload, flat
+tokens confirmed live, no new console errors (only the pre-existing dev
+createRoot HMR warning). Uncommitted — owner reviews and commits.
+
+REMAINING: option (c) per-app deep polish ("no app left out") is a genuine
+multi-batch sweep, not yet started. The platform-wide visual identity (flat
+surfaces, Dex font, sharp type) is now consistent; the per-app passes are
+timeline/mixer/tool-level refinements inside each creative + standalone app.
+
+**Renderer slice (2026-06-13): v5.5 "DEX Sharp" batch 5 (de-glass placed
+surfaces + Dex-font unification + DEX-wide recovery screen).** Owner brief:
+strip glass from "placed" chrome (tabs, window title bars) so they read solid
+like a native OS, keep glass only on transient floating overlays; put the Dex
+font everywhere; ensure a visible safety screen if DEX itself fails.
+- DE-GLASS (pure renderer, both shells): `glassTabBar` (styles/glassMenu.ts) is
+  now a SOLID elevated surface with a hairline base border — no backdrop-filter
+  (it blurred content scrolling under tab strips and softened edges) and zero
+  GPU compositing. FloatingWindow title bar (shell/FloatingWindow.tsx) likewise
+  switched from `--pg-toolbar`/`--pg-surface` glass + `blur-lg` to solid
+  `--color-bg-elevated`/`--color-bg-surface` with a `--color-border-subtle`
+  base. DELIBERATELY KEPT: the dock (liquidGlassDock) and dropdown/menu/command
+  overlays — floating transient surfaces where glass is conventional (macOS
+  dock / Windows acrylic). Going fully flat everywhere is a larger product call
+  left for owner sign-off.
+- DEX FONT EVERYWHERE: the global rule already sets `var(--dex-font-ui)` on
+  html/body/#root; the gaps were inline `fontFamily` overrides. Routed ~24
+  hardcoded chrome sites across 16 files to `var(--dex-font-ui)` (App.tsx root,
+  main.tsx boot/recovery fallbacks, AppWrapper, UkiOverlay x3,
+  UpdateNotificationDropdown, Onboarding logo, CollabHub, Rewind, notes:
+  DexNotes/NotesEditor x4/NotesComponents/WordSuggestions, standalone:
+  Calculator/Calendar x6/PasswordGenerator x4, utils/performanceHooks,
+  design-system.css .tahoe-date-picker). Five code/terminal CSS rules in
+  globals.css routed to the canonical `var(--font-mono)` (Berkeley Mono, the DEX
+  data identity). DELIBERATELY LEFT (document/canvas content, NOT chrome —
+  CSS vars can't resolve in canvas fillText / are user-editable element
+  defaults): Prism text-layer defaults, Vinx text-element defaults. The
+  `--font-sans`/`@font-face` token definitions in design-system.css/CleanUI.ts
+  are the source of truth and untouched.
+- DEX-WIDE RECOVERY SCREEN: the root is already wrapped in AppErrorBoundary, but
+  its crash card was app-flavored ("Close App" would tear down DEX). Added an
+  `isRoot` branch in services/ErrorBoundary.tsx CrashScreen: a full-window
+  "DEX hit a problem — your workspace is safe" screen that reassures (window
+  manifest + last-session journal already persist layout/open apps), offers
+  "Reload DEX" (re-runs session restore) and "Try to continue" (in-place
+  recover while crashCount < 3), and drops the destructive Close. NOTE: this
+  catches React render failures at root; uncaught async/window errors are still
+  marked + silently reloaded by improvements500/crashRecovery.ts (a visible
+  overlay for those is a possible follow-up but risks firing on benign promise
+  rejections).
+Verified: `npx tsc --noEmit` EXIT 0; preview renderer alive after reload (root
+populated, body font resolves to the --dex-font-ui stack), no new console
+errors beyond the pre-existing dev createRoot HMR warning. Uncommitted — owner
+reviews and commits.
+
+REMAINING for the owner's broader "operate DEX better" brief (NOT done this
+batch — honest scoping; each is its own batch):
+- Per-app deep polish so NO app is left out (creative apps timeline/mixer
+  tooling, Forge/Imosion/Flux/Axl micro-passes) — the platform-wide sweep is
+  done; these are the deep per-app passes.
+- Nav fluidity micro-opts flagged by exploration: GestureEngine wheel buffer
+  uses O(n) shift() (bounded ~16 frames so impact is small — verify before
+  touching) and FloatingWindow shake history slice()-per-pointermove. Low risk,
+  low reward; do only if a real jank is measured.
+- "Thinner fonts" beyond family unification (weight/tracking pass) — needs
+  visual sign-off; the type scale already maxes at 700 and headings track tight.
+- Onboarding visual redesign beyond the font/token fixes already in place.
+- Internal-wiring / memory-leak / security sweep: exploration found nav listeners
+  already cleaned up (no leak fabricated). A dedicated security pass is its own
+  batch — do not claim it done.
+- Docs redesign: this checkpoint is updated; a full docs restructure is separate.
+
 **Renderer slice (2026-06-09): uki chat app finished on top of `uki-chat:*`.**
 `DEXAPPLICATIONS/standalone/Uki.tsx` (app id `uki`, wired into AppManager +
 appSubsystem + AppIcon `sparkle`) is now feature-complete against the native

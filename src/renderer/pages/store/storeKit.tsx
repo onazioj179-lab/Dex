@@ -232,7 +232,7 @@ export function storeButton(variant: 'accent' | 'muted' | 'danger'): React.CSSPr
     borderRadius: 7,
     border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--color-bg-surface)',
     fontSize: 12.5,
     fontWeight: 700,
     cursor: 'pointer',
@@ -324,7 +324,7 @@ export function AppTile({
 export function SectionTitle({ icon, title, action }: { icon?: string; title: string; action?: React.ReactNode }): React.ReactElement {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, margin: '4px 0 10px' }}>
-      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-primary)' }}>
+      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-primary)' }}>
         {icon && <span aria-hidden style={{ color: 'var(--color-accent)', display: 'inline-flex' }}><DexIcon name={icon} size={15} /></span>}
         {title}
       </h2>

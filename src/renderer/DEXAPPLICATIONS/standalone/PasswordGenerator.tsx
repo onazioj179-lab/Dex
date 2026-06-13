@@ -279,7 +279,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     background: 'var(--color-bg-base)',
     color: 'var(--color-text-primary)',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
     transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease',
   },
   header: {
@@ -333,7 +333,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border-subtle)',
   },
   passwordText: {
-    fontFamily: "'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace",
+    fontFamily: 'var(--font-mono)',
     fontSize: '14px',
     letterSpacing: '1px',
     wordBreak: 'break-all',
@@ -386,7 +386,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
   generateBtn: {
     background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
@@ -495,7 +495,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 8px',
     borderRadius: '3px',
     transition: 'all 0.15s ease',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
   historyList: {
     display: 'flex',
@@ -519,7 +519,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   historyPassword: {
-    fontFamily: "'JetBrains Mono', 'SF Mono', Monaco, monospace",
+    fontFamily: 'var(--font-mono)',
     fontSize: '11px',
     wordBreak: 'break-all',
     marginBottom: '8px',
@@ -546,7 +546,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
 };
 

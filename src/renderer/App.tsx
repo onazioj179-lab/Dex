@@ -651,7 +651,7 @@ const rootStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column' as const,
     background: 'transparent',
-    fontFamily: 'var(--font-family, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif)',
+    fontFamily: 'var(--dex-font-ui)',
     transition: 'background-color 0.3s ease, color 0.3s ease',
   },
 };

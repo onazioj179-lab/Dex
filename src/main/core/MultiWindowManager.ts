@@ -90,7 +90,7 @@ class MultiWindowManager {
     try {
       await detachedWindow.loadFile(indexPath);
       detachedWindow.webContents.executeJavaScript(
-        `window.__dexDetachedApp = "${appId}"; window.__dexIsDetached = true;`
+        `window.__dexDetachedApp = ${JSON.stringify(appId)}; window.__dexIsDetached = true;`
       );
       // Show on ready-to-show to prevent white flash
       detachedWindow.once('ready-to-show', () => {

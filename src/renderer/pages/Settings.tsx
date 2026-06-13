@@ -393,7 +393,7 @@ const SystemMonitorPanel: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', maxWidth: 980 }}>
       <div>
-        <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--color-text-primary)' }}>System Monitor</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>System Monitor</h3>
         <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
           Live view of all processes running on this computer. End unresponsive processes or check resource usage.
         </p>
@@ -2599,7 +2599,6 @@ export const Settings: React.FC = () => {
         padding: 16, borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
-        backdropFilter: `blur(${Math.min(settings.blurIntensity, 12)}px)`,
       }}>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
@@ -2637,7 +2636,7 @@ export const Settings: React.FC = () => {
                 useWallpaperStore.getState().setBlur(v);
               }}
               style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'monospace', minWidth: 28 }}>{settings.blurIntensity ?? 12}px</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{settings.blurIntensity ?? 12}px</span>
           </div>
         </div>
         <div style={{ ...styles.settingRow, marginTop: 8 }}>
@@ -2653,7 +2652,7 @@ export const Settings: React.FC = () => {
                 useWallpaperStore.getState().setOpacity(v);
               }}
               style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'monospace', minWidth: 28 }}>{Math.round((settings.glassOpacity ?? 0.85) * 100)}%</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{Math.round((settings.glassOpacity ?? 0.85) * 100)}%</span>
           </div>
         </div>
       </div>
@@ -2996,7 +2995,7 @@ export const Settings: React.FC = () => {
           {showRecoveryCodes && recoveryCodes.length > 0 && (
             <div style={{ padding: '16px', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: '16px' }}>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'monospace', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
                   <div key={i} style={{ padding: '6px 10px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
                 ))}
@@ -3222,7 +3221,7 @@ export const Settings: React.FC = () => {
               border: '1px solid var(--color-border-subtle)',
               background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
             }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{card.title}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>{card.title}</div>
               <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{card.body}</div>
             </div>
           ))}
@@ -3289,7 +3288,7 @@ export const Settings: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 14 }}>
           {DATA_CATEGORIES.map(category => (
             <div key={category.id} style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>{category.label}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{category.label}</div>
               <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
             </div>
@@ -3893,7 +3892,7 @@ export const Settings: React.FC = () => {
               padding: '4px 12px', borderRadius: 4,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
-              fontFamily: 'monospace', letterSpacing: '0.02em',
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
             }}>
               {settings[sc.key]}
             </div>
@@ -3994,7 +3993,7 @@ export const Settings: React.FC = () => {
           padding: '4px 12px', borderRadius: 4,
           background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
           fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
-          fontFamily: 'monospace',
+          fontFamily: 'var(--font-mono)',
         }}>
           {settings.ukiWakePhrase}
         </div>
@@ -4115,7 +4114,7 @@ export const Settings: React.FC = () => {
                 <span style={{ fontSize: 11, fontWeight: 600, color: isSelected ? app.color : 'var(--color-text-primary)' }}>
                   {app.name}
                 </span>
-                <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
                   v{app.version || '—'}
                 </span>
               </button>
@@ -4140,7 +4139,7 @@ export const Settings: React.FC = () => {
                 {detail.name.charAt(0)}
               </div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>
                   {detail.name}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
@@ -4154,7 +4153,7 @@ export const Settings: React.FC = () => {
             <div style={styles.aboutDetails}>
               <div style={styles.aboutRow}>
                 <span style={styles.aboutLabel}>Version</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 12, color: detail.color }}>{detail.version || '—'}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: detail.color }}>{detail.version || '—'}</span>
               </div>
               <div style={styles.aboutRow}>
                 <span style={styles.aboutLabel}>Build Date</span>
@@ -4163,7 +4162,7 @@ export const Settings: React.FC = () => {
               <div style={styles.aboutRow}>
                 <span style={styles.aboutLabel}>Shortcut</span>
                 <span style={{
-                  fontFamily: 'monospace', fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px 8px', borderRadius: 4,
                   background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
                 }}>{detail.shortcut || '—'}</span>
               </div>
@@ -4528,15 +4527,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     containerType: 'inline-size',
     background: 'var(--pg-surface)',
-    backdropFilter: 'var(--blur-xl) saturate(180%)',
-    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
     fontSize: '13px',
     overflow: 'hidden',
     transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease',
   },
-  
+
   // Sidebar
   sidebar: {
     width: 'var(--pg-sidebar-width)',
@@ -4605,8 +4602,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 18px',
     borderBottom: '1px solid var(--pg-border)',
     background: 'var(--pg-toolbar)',
-    backdropFilter: 'var(--blur-lg) saturate(170%)',
-    WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)',
   },
   headerTitle: {
     fontSize: '15px',

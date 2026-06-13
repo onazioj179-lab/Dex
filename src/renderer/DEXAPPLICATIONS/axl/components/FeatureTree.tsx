@@ -22,9 +22,9 @@ function sidebarItemStyle(active: boolean): React.CSSProperties {
     padding: '5px 10px',
     fontSize: 11,
     color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-    background: active ? 'var(--color-accent-soft, rgba(10,132,255,0.12))' : 'transparent',
+    background: active ? 'var(--color-accent-soft)' : 'transparent',
     border: 'none',
-    borderLeft: active ? '2px solid var(--color-accent, #0A84FF)' : '2px solid transparent',
+    borderLeft: active ? '2px solid var(--color-accent)' : '2px solid transparent',
     borderRadius: 0,
     cursor: 'pointer',
     width: '100%',
@@ -96,7 +96,7 @@ const FeatureTree: React.FC = () => {
                 ) : f.type === 'fillet' ? (
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#30D158" strokeWidth="2"><path d="M4 20c0-8.84 7.16-16 16-16"/></svg>
                 ) : f.type === 'pattern' ? (
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#0A84FF" strokeWidth="2"><rect x="3" y="3" width="6" height="6"/><rect x="15" y="3" width="6" height="6"/><rect x="3" y="15" width="6" height="6"/><rect x="15" y="15" width="6" height="6"/></svg>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2"><rect x="3" y="3" width="6" height="6"/><rect x="15" y="3" width="6" height="6"/><rect x="3" y="15" width="6" height="6"/><rect x="15" y="15" width="6" height="6"/></svg>
                 ) : (
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/></svg>
                 )}

@@ -210,7 +210,7 @@ const EasingCurveEditor: React.FC<EasingCurveEditorProps> = ({ value, onChange, 
           </button>
         ))}
       </div>
-      <div style={{ fontSize: '10px', color: 'var(--color-text-muted, rgba(255,255,255,0.5))', fontFamily: 'monospace' }}>
+      <div style={{ fontSize: '10px', color: 'var(--color-text-muted, rgba(255,255,255,0.5))', fontFamily: 'var(--font-mono)' }}>
         cubic-bezier({value.p1x.toFixed(2)}, {value.p1y.toFixed(2)}, {value.p2x.toFixed(2)}, {value.p2y.toFixed(2)})
       </div>
     </div>

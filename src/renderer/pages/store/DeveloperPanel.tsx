@@ -107,7 +107,7 @@ export default function DeveloperPanel({ onClose, onInstalled }: { onClose: () =
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <span style={styles.headIcon}><DexIcon name="terminal" size={16} /></span>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>Developer</div>
+              <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>Developer</div>
               <div style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>Trust a key and sideload a signed app through the production gate</div>
             </div>
           </div>
@@ -217,7 +217,7 @@ function statusTone(status: ValidationStatus): React.CSSProperties {
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 10px',
-  background: 'rgba(0,0,0,0.28)',
+  background: 'var(--color-bg-surface)',
   border: '1px solid var(--pg-border-strong)',
   borderRadius: 7,
   color: 'var(--color-text-primary)',
@@ -232,14 +232,14 @@ const styles: Record<string, React.CSSProperties> = {
   modal: { ...glassModal, width: 'min(620px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', color: 'var(--color-text-primary)', overflow: 'hidden' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--pg-border)' },
   headIcon: { width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', background: 'rgba(10,132,255,0.14)', border: '1px solid rgba(10,132,255,0.28)', flexShrink: 0 },
-  closeBtn: { width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--pg-border)', background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0 },
+  closeBtn: { width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--pg-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0 },
   body: { padding: 16, overflowY: 'auto', minHeight: 0 },
-  stepTitle: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 800, marginBottom: 6 },
+  stepTitle: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 6 },
   stepNum: { width: 20, height: 20, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--color-accent)', background: 'rgba(10,132,255,0.16)', border: '1px solid rgba(10,132,255,0.30)' },
   help: { margin: '0 0 10px', fontSize: 11.5, lineHeight: 1.5, color: 'var(--color-text-tertiary)' },
   code: { fontFamily: 'var(--font-mono, monospace)', fontSize: 11, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--pg-border)' },
   fieldRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  summaryRow: { display: 'flex', flexWrap: 'wrap', gap: '8px 18px', padding: '10px 12px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--pg-border)' },
+  summaryRow: { display: 'flex', flexWrap: 'wrap', gap: '8px 18px', padding: '10px 12px', borderRadius: 7, background: 'var(--color-bg-surface)', border: '1px solid var(--pg-border)' },
   statusBanner: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '9px 12px', borderRadius: 7, fontSize: 12.5 },
   checkList: { listStyle: 'none', margin: '10px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 8 },
   checkRow: { display: 'flex', gap: 9, alignItems: 'flex-start' },
