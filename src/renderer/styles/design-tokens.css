@@ -288,6 +288,11 @@ html, body, #root {
 .dex-btn[data-variant="primary"]:hover:not(:disabled) {
   background: var(--color-accent-hover, #6cb2ff);
 }
+.dex-btn[data-variant="primary"]:active:not(:disabled) {
+  /* Pressed darken -- a deliberate, physical press affordance (paired with
+     the shared scale(0.97)). Wires --color-accent-dark. */
+  background: var(--color-accent-dark, #2e7dd6);
+}
 
 .dex-btn[data-variant="secondary"] {
   background: var(--color-bg-elevated, #1a1a1e);

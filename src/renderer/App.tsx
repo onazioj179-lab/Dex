@@ -100,7 +100,12 @@ const initializeTheme = () => {
     const savedSettings = localStorage.getItem('dex-settings');
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
-      if (settings.accentColor) {
+      // Only apply a REAL color literal. A stored sentinel like
+      // 'var(--color-accent)' (a prior "auto/default" marker) would set
+      // --color-accent to reference itself -> circular -> the property
+      // resolves to empty app-wide, so every var(--color-accent) fell back to
+      // its hardcoded dark-blue and accent never themed to light mode.
+      if (settings.accentColor && /^#([0-9a-f]{3}|[0-9a-f]{6})$|^rgb/i.test(String(settings.accentColor).trim())) {
         document.documentElement.style.setProperty('--color-accent', settings.accentColor);
         document.documentElement.style.setProperty('--accent-color', settings.accentColor);
       }
