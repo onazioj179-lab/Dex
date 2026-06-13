@@ -75,6 +75,41 @@ global visual changes):
    deliberate accent migration, separate from the behavior-preserving sweep.
 5. AppManager inline-SVG `Icons` map -> consolidate onto DexIcon.
 
+**Renderer slice (2026-06-13): v5.5 "DEX Sharp" batch 3 (dock redesign,
+component sweep, bug fixes) — PR #24 (feat/dex-dev-platform -> main).**
+- DOCK REDESIGNED (AppManager): the active-app indicator was an ambiguous
+  glowing colored dot (read as "highlighted anyhow"). Now one unmistakable
+  focused state — accent-tinted icon pill + crisp accent underline bar —
+  with a small neutral dot for background-running apps, real hover feedback
+  (was forced transparent), no glow, and a bespoke 20px rounded-rect
+  container (was a full pill). App-menu + UKI buttons aligned to the same
+  active language; UKI infinite-pulse glow removed.
+- Terminal spawn-error fixed: surface the failure reason immediately instead
+  of a silent "starting…" while retrying in the background (also fixes the
+  one failing unit test, so the suite is fully green).
+- More real bugs fixed: QR generator all-black unscannable default ->
+  #fff canvas bg; Audio translateX(-50) typo; Select MultiSelect undefined
+  var(--color-text); AppOverview canvas fillStyle using an unresolvable CSS
+  var; --color-text-on-accent aliased to --color-accent-text.
+- Identity class made composable: .dex-caps (tracking/weight/uppercase only)
+  + turnkey .dex-label-caps (adds size/color), so tinted/dense creative
+  micro-labels can adopt the tracking without the color/size opinion.
+- Component sweeps (waves 3-5): EmojiPicker/Select/UnifiedDropdown/
+  ContextMenu and the shell window chrome (FloatingWindow/StageManager/
+  QuickLook/AppOverview/MiniShell/etc.) fully swept. Big interactive
+  overlays (UkiOverlay/CommandPalette/UnifiedSystems), feedback/panel
+  components, and Learn/DexCode/CollabHub + system/productivity subdirs were
+  PARTIALLY swept before a weekly usage limit stopped the agents mid-run;
+  tsc + vite build confirm the partial edits are coherent. The
+  browser/files/creative/polish/prism/flux subdirs are pure .ts logic (no
+  .tsx) so nothing to sweep there.
+Verified: tsc --noEmit clean, vite build clean. NEW batch-3 follow-up
+(highest-leverage light-mode fix): the `colors` export in styles/tokens.ts
+is dark-only literal hex; components consuming colors.* (UnifiedDropdown,
+NumberInput, ColorPicker, EnhancedKnob, RichTextInput) don't react to light
+mode. Needs careful per-consumer migration (some feed canvas fillStyle,
+which can't resolve CSS vars). Plus: finish the partial wave-3/4/5 sweeps.
+
 **Renderer slice (2026-06-09): uki chat app finished on top of `uki-chat:*`.**
 `DEXAPPLICATIONS/standalone/Uki.tsx` (app id `uki`, wired into AppManager +
 appSubsystem + AppIcon `sparkle`) is now feature-complete against the native
