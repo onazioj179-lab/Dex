@@ -1051,7 +1051,19 @@ export class MIDIEngine {
   // Cleanup
   dispose(): void {
     this.stop();
-    
+
+    // Detach MIDI callbacks so the live Web MIDI input/access objects (which
+    // outlive this engine) stop holding references back to `this`, allowing the
+    // engine to be garbage-collected after disposal.
+    if (this.midiAccess) {
+      try {
+        for (const [, input] of this.midiAccess.inputs) {
+          input.onmidimessage = null;
+        }
+        this.midiAccess.onstatechange = null;
+      } catch (e) { console.warn('[DEX]', e); }
+    }
+
     if (this.audioContext) {
       this.audioContext.close();
     }

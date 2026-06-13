@@ -95,11 +95,25 @@ class PtyServiceImpl {
       return { error: `Maximum ${MAX_SESSIONS} terminal sessions reached.` };
     }
     const { shell: defShell, args } = this.resolveShell();
-    // A caller-supplied shell is honoured only if it exists; otherwise fall back
-    // to the resolved default so a bad override can't crash-loop the terminal.
+    // A caller-supplied shell is honoured only if it is a RECOGNIZED shell binary
+    // (matched by basename) and, when absolute, actually exists. Anything else
+    // falls back to the resolved default. This stops a compromised renderer from
+    // using `pty:spawn` to launch an arbitrary PATH executable, while still
+    // allowing a legitimate custom-shell choice.
+    const ALLOWED_SHELLS = new Set([
+      'pwsh', 'pwsh.exe', 'powershell', 'powershell.exe', 'cmd', 'cmd.exe',
+      'bash', 'bash.exe', 'zsh', 'sh', 'fish', 'dash', 'nu', 'nu.exe',
+      'git-bash.exe', 'wsl.exe', 'ksh', 'tcsh', 'csh',
+    ]);
     let shell = defShell;
     if (opts?.shell) {
-      try { if (path.isAbsolute(opts.shell) ? fs.existsSync(opts.shell) : true) shell = opts.shell; } catch { /* keep default */ }
+      let ok = false;
+      try {
+        const base = path.basename(opts.shell).toLowerCase();
+        ok = ALLOWED_SHELLS.has(base) && (path.isAbsolute(opts.shell) ? fs.existsSync(opts.shell) : true);
+      } catch { ok = false; }
+      if (ok) shell = opts.shell;
+      else log.warn(`[PtyService] Ignoring disallowed shell override: ${opts.shell}`);
     }
     const cwd = opts?.cwd || os.homedir();
     const cols = Math.max(1, opts?.cols ?? 80);

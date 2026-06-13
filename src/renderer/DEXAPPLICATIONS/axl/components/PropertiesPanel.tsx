@@ -39,7 +39,7 @@ const PropertiesPanel: React.FC = () => {
       <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset, rgba(0,0,0,0.15))' }}>
         {(['properties', 'material', 'constraints'] as PanelTab[]).map(tab => (
           <button key={tab} onClick={() => setPanelTab(tab)}
-            style={{ flex: 1, padding: '8px 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: panelTab === tab ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: panelTab === tab ? 'var(--color-accent-soft, rgba(10,132,255,0.08))' : 'transparent', border: 'none', borderBottom: panelTab === tab ? '2px solid var(--color-accent, #0A84FF)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            style={{ flex: 1, padding: '8px 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: panelTab === tab ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: panelTab === tab ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: panelTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             {tab === 'properties' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}
             {tab === 'material' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a10.68 10.68 0 0 0-.94 2.06c-.47 1.58-.79 3.27-.79 5 0 3.31 2.69 6 6 6"/><path d="M7.08 16a10.68 10.68 0 0 0-.94 2.06C5.67 19.64 5.35 21.33 5.35 23"/><circle cx="7.5" cy="10.5" r="2.5"/></svg>}
             {tab === 'constraints' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
@@ -52,7 +52,7 @@ const PropertiesPanel: React.FC = () => {
         {/* Properties tab */}
         {panelTab === 'properties' && selectedPart && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: selectedPart.color }} />
               {selectedPart.name}
             </div>
@@ -132,8 +132,8 @@ const PropertiesPanel: React.FC = () => {
               <button key={mat.id} onClick={() => setPartMaterial(selectedPart.id, mat)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', fontSize: 10,
-                  background: selectedPart.material.id === mat.id ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
-                  border: selectedPart.material.id === mat.id ? '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))' : '1px solid transparent',
+                  background: selectedPart.material.id === mat.id ? 'var(--color-accent-light)' : 'transparent',
+                  border: selectedPart.material.id === mat.id ? '1px solid var(--color-accent-muted)' : '1px solid transparent',
                   borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-primary)', width: '100%', textAlign: 'left' as const,
                 }}>
                 <div style={{ width: 14, height: 14, borderRadius: 2, background: mat.color, border: '1px solid var(--color-border)' }} />
@@ -169,7 +169,7 @@ const PropertiesPanel: React.FC = () => {
                 style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
             )}
             <button onClick={handleAddConstraint} disabled={!constraintPartB}
-              style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light, rgba(10,132,255,0.2))', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))', borderRadius: 4, cursor: constraintPartB ? 'pointer' : 'default' }}>
+              style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 4, cursor: constraintPartB ? 'pointer' : 'default' }}>
               Apply Constraint
             </button>
 

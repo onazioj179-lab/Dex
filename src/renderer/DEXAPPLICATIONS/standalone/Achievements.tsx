@@ -90,7 +90,7 @@ const Achievements: React.FC = () => {
               <DexIcon name="trophy" size={20} color="#fff" />
             </div>
             <div>
-              <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Trophies</h1>
+              <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>Trophies</h1>
               <p style={{ fontSize: 11, margin: 0, opacity: 0.45 }}>
                 {stats.totalUnlocked} / {stats.totalAchievements} unlocked
               </p>

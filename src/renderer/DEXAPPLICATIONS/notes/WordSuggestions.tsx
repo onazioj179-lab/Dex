@@ -172,7 +172,7 @@ const barStyles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     transition: 'background 0.1s',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
   },
   itemActive: {
     background: 'var(--color-accent-soft, rgba(100,210,255,0.12))',

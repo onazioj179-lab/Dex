@@ -4,6 +4,7 @@
  * Live preview markdown editor with syntax highlighting
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import DOMPurify from 'dompurify';
 
 const MarkdownEditor: React.FC = () => {
   const [content, setContent] = useState(`# Welcome to DEX Markdown Editor
@@ -108,7 +109,11 @@ Happy writing!
     html = html.replace(/\n\n/g, '</p><p style="margin:8px 0;line-height:1.6">');
     html = `<p style="margin:8px 0;line-height:1.6">${html}</p>`;
 
-    return html;
+    // Sanitize before it reaches dangerouslySetInnerHTML: markdown link/image
+    // URLs are untrusted, so block javascript:/data-script URLs, inline event
+    // handlers, and attribute injection while preserving the safe formatting
+    // markup (DOMPurify keeps style attrs + standard tags this renderer emits).
+    return DOMPurify.sanitize(html);
   }, [content]);
 
   const insertFormatting = useCallback((prefix: string, suffix: string = prefix) => {
@@ -262,7 +267,7 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)',
   },
   viewToggle: {
-    display: 'flex', background: 'var(--color-bg-glass, rgba(255,255,255,0.04))',
+    display: 'flex', background: 'var(--color-bg-elevated)',
     borderRadius: 4, padding: 2,
   },
   viewBtn: {
@@ -280,7 +285,7 @@ const s: Record<string, React.CSSProperties> = {
     background: 'transparent', border: 'none',
     color: 'var(--color-text-primary)',
     fontSize: 14, lineHeight: 1.6, padding: '16px 20px',
-    fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace',
+    fontFamily: 'var(--font-mono)',
     outline: 'none', tabSize: 2,
   },
   preview: {

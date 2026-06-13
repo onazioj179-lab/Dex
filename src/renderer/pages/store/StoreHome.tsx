@@ -190,7 +190,7 @@ function FeaturedHero({
         <AppIcon iconUrl={entry.iconUrl || undefined} name={name} size={84} radius={20} />
         <div style={{ minWidth: 0, flex: '1 1 260px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>{name}</h1>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.1 }}>{name}</h1>
             <RecognitionPill publisher={publisher} />
             {installed && <StateBadge kind="installed" />}
             {!installed && entry.comingSoon && <StateBadge kind="soon" />}

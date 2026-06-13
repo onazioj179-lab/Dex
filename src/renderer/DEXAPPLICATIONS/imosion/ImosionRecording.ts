@@ -160,7 +160,14 @@ export class RecordingEngine {
   
   private buffers: Map<string, Float32Array[]> = new Map();
   private meterCallback?: (meters: Map<string, InputMeter>) => void;
-  
+
+  // Stable handler + guard so the 'devicechange' listener is registered exactly
+  // once. Without this, calling enumerateDevices() (including from inside the
+  // handler itself) would attach a new anonymous listener every time, leaking
+  // listeners on navigator.mediaDevices without bound.
+  private deviceChangeHandler = (): void => { void this.enumerateDevices(); };
+  private deviceChangeListening = false;
+
   constructor() {
     this.settings = this.createDefaultSettings();
   }
@@ -192,11 +199,13 @@ export class RecordingEngine {
         }
       }
       
-      // Listen for device changes
-      navigator.mediaDevices.addEventListener('devicechange', () => {
-        this.enumerateDevices();
-      });
-      
+      // Listen for device changes -- register exactly once with a stable
+      // handler so repeated enumerateDevices() calls do not stack listeners.
+      if (!this.deviceChangeListening) {
+        navigator.mediaDevices.addEventListener('devicechange', this.deviceChangeHandler);
+        this.deviceChangeListening = true;
+      }
+
       return this.devices;
     } catch (error) {
       console.error('Failed to enumerate devices:', error);
@@ -1092,7 +1101,14 @@ export class RecordingEngine {
   
   async dispose(): Promise<void> {
     this.isRecording = false;
-    
+
+    // Remove the device-change listener so it is not left dangling on
+    // navigator.mediaDevices after the engine is torn down.
+    if (this.deviceChangeListening) {
+      navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeHandler);
+      this.deviceChangeListening = false;
+    }
+
     // Stop all recorders
     for (const recorder of this.recorderNodes.values()) {
       recorder.port.postMessage({ type: 'stop' });

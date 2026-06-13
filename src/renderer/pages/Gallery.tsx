@@ -1283,7 +1283,7 @@ export const Gallery: React.FC = () => {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}><path d="M1 3.5A1.5 1.5 0 012.5 2h3.379a1.5 1.5 0 011.06.44L8.062 3.56A1.5 1.5 0 009.122 4H13.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z" fill="currentColor"/></svg>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{album.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{album.rule}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{album.rule}</div>
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{album.count}</span>
               </div>
@@ -1935,8 +1935,6 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%', height: '100%', display: 'flex',
     background: 'var(--pg-surface)',
-    backdropFilter: 'var(--blur-xl) saturate(180%)',
-    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)', fontSize: 13, position: 'relative', overflow: 'hidden',
   },
@@ -1952,7 +1950,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Main
   main: { flex: 1, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
-  toolbar: { height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-toolbar)', backdropFilter: 'var(--blur-lg) saturate(170%)', WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)' },
+  toolbar: { height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-toolbar)' },
   title: { fontSize: 14, fontWeight: 700 },
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 16 },
   itemCount: { fontSize: 13, color: 'var(--color-text-muted)' },

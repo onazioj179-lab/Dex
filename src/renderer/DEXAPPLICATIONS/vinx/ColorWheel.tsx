@@ -53,7 +53,7 @@ const labelStyle: React.CSSProperties = {
 
 const readoutStyle: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: 'repeat(4, auto)', gap: '2px 6px',
-  fontSize: 9, fontFamily: '"SF Mono", "Cascadia Code", monospace',
+  fontSize: 9, fontFamily: 'var(--font-mono)',
   fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-tertiary)',
 };
 

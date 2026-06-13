@@ -190,6 +190,12 @@ export class CollaborationEngine {
   private socketUrl: string = '';
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
+  // Pending exponential-backoff reconnect timer. Tracked so an intentional
+  // stop/dispose can cancel it instead of letting it re-open the socket.
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // Set while we are intentionally closing so the socket's onclose handler does
+  // not schedule a reconnect for a deliberate teardown.
+  private intentionalClose: boolean = false;
   
   // Callbacks
   private onEventCallback?: (event: CollaborationEvent) => void;
@@ -547,10 +553,23 @@ export class CollaborationEngine {
   }
   
   stopRealTimeSession(): void {
+    // Cancel any pending reconnect so a deliberate stop is not undone.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.socket) {
+      this.intentionalClose = true;
       this.sendMessage({ type: 'leave', userId: this.currentUser?.userId });
+      // Detach handlers before closing so onclose/onerror do not trigger a
+      // reconnect for this intentional teardown.
+      this.socket.onopen = null;
+      this.socket.onmessage = null;
+      this.socket.onclose = null;
+      this.socket.onerror = null;
       this.socket.close();
       this.socket = null;
+      this.intentionalClose = false;
     }
     this.cursors.clear();
   }
@@ -619,9 +638,13 @@ export class CollaborationEngine {
   }
   
   private handleDisconnect(): void {
+    // Do not reconnect when the disconnect was an intentional teardown.
+    if (this.intentionalClose) return;
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      setTimeout(() => {
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null;
         this.startRealTimeSession(this.socketUrl);
       }, Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000));
     }

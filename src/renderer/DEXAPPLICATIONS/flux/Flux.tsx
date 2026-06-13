@@ -826,7 +826,7 @@ const Flux: React.FC = () => {
         </svg>
       </div>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>FLUX</div>
+        <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>FLUX</div>
         <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Add a layer to start creating motion graphics</span>
       </div>
       <div style={{ display: 'flex', gap: '8px' }}>
@@ -3231,8 +3231,8 @@ const Flux: React.FC = () => {
                 {['opacity', 'x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'z', 'scaleZ', 'rotationX', 'rotationY'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
-            <textarea value={expressionCode} onChange={e => { setExpressionCode(e.target.value); setExpressionError(null); }} placeholder="// Write expressions here&#10;// time, value, index available&#10;Math.sin(time * 2) * 100" style={{ width: '100%', height: 100, padding: 8, borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'monospace', resize: 'vertical' }} />
-            {expressionError && <div style={{ fontSize: 11, color: '#ff375f', marginTop: 4, fontFamily: 'monospace' }}>{expressionError}</div>}
+            <textarea value={expressionCode} onChange={e => { setExpressionCode(e.target.value); setExpressionError(null); }} placeholder="// Write expressions here&#10;// time, value, index available&#10;Math.sin(time * 2) * 100" style={{ width: '100%', height: 100, padding: 8, borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical' }} />
+            {expressionError && <div style={{ fontSize: 11, color: '#ff375f', marginTop: 4, fontFamily: 'var(--font-mono)' }}>{expressionError}</div>}
             <button onClick={() => {
               if (!selectedLayerId || !expressionCode.trim()) return;
               try {
@@ -3297,7 +3297,7 @@ const Flux: React.FC = () => {
             }} style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 4, border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.12)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to {expressionTarget}</button>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8, marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
-              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px 8px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'monospace' }}>
+              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px 8px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
                 <span style={{ color: '#bf5af2', fontWeight: 600 }}>{t.name}</span> — <span style={{ color: 'var(--color-text-tertiary)' }}>{t.code}</span>
               </button>
             ))}
@@ -3780,7 +3780,7 @@ const Flux: React.FC = () => {
             {/* GLSL Editor */}
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>GLSL Fragment Shader</div>
-              <textarea value={shaderCode} onChange={e => setShaderCode(e.target.value)} style={{ width: '100%', height: 180, padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.4))', color: 'var(--color-success)', fontSize: 11, fontFamily: '"SF Mono", "Fira Code", monospace', resize: 'vertical', lineHeight: 1.5 }} />
+              <textarea value={shaderCode} onChange={e => setShaderCode(e.target.value)} style={{ width: '100%', height: 180, padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.4))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical', lineHeight: 1.5 }} />
               <button aria-label="Compile and apply shader" onClick={() => { if (!selectedLayerId) return; const intensity = shaderUniforms.u_intensity / 50; const filterStr = `contrast(${1 + intensity * 0.2}) saturate(${1 + intensity * 0.3}) brightness(${1 + intensity * 0.1})`; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { sepia: shaderUniforms.u_speed, grayscale: 0, invert: 0, customFilter: filterStr } }] } : l)); }} style={{ marginTop: 6, padding: '6px 14px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Compile & Apply</button>
             </div>
             {/* Uniforms & Presets */}
@@ -3788,7 +3788,7 @@ const Flux: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6, fontWeight: 600 }}>Uniforms</div>
               {[{ name: 'u_time', val: shaderUniforms.u_time }, { name: 'u_speed', val: shaderUniforms.u_speed }, { name: 'u_intensity', val: shaderUniforms.u_intensity }, { name: 'u_color', val: '#bf5af2' }].map(u => (
                 <div key={u.name} style={{ marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{u.name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{u.name}</span>
                   {u.name === 'u_color' ? (
                     <input type="color" defaultValue={u.val as string} style={{ display: 'block', width: '100%', height: 24, border: 'none', borderRadius: 3, cursor: 'pointer', marginTop: 2 }} />
                   ) : (

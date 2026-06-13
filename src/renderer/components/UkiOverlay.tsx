@@ -1714,7 +1714,7 @@ const UkiOverlay: React.FC = () => {
           <span style={{
             fontSize: 11, fontWeight: 600, color: stateInfo.color,
             letterSpacing: '0.02em',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontFamily: 'var(--dex-font-ui)',
           }}>
             {stateInfo.label}
           </span>
@@ -1798,7 +1798,7 @@ const UkiOverlay: React.FC = () => {
           maxHeight: 260,
           overflowY: 'auto',
           padding: '8px 14px',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontFamily: 'var(--dex-font-ui)',
         }}>
           {/* AutoPilot pending-approval cards */}
           <UkiAutoPilotBridge />
@@ -2107,7 +2107,7 @@ const UkiOverlay: React.FC = () => {
               minHeight: 32,
               maxHeight: 120,
               lineHeight: '18px',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontFamily: 'var(--dex-font-ui)',
               transition: 'border-color 0.15s ease, background 0.15s ease',
             }}
             onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-accent)'; e.currentTarget.style.background = 'var(--color-bg-hover)'; }}

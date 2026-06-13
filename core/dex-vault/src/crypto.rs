@@ -71,6 +71,13 @@ pub fn decrypt(password: &str, env: &Envelope) -> Result<Vec<u8>, String> {
     let salt = b64_decode(&env.salt)?;
     let nonce_bytes = b64_decode(&env.nonce)?;
     let ct = b64_decode(&env.ct)?;
+    // AES-GCM nonces are exactly 12 bytes. `Nonce::from_slice` PANICS on any
+    // other length, and `env` is attacker-controllable (vault import takes a
+    // renderer-supplied envelope), so a malformed nonce would crash the backend.
+    // Reject up front with the same generic error (no oracle on why it failed).
+    if nonce_bytes.len() != 12 {
+        return Err("decryption failed (wrong password?)".to_string());
+    }
     let key = derive_key(password, &salt)?;
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
     let nonce = Nonce::from_slice(&nonce_bytes);

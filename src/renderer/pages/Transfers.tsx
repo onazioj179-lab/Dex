@@ -994,7 +994,7 @@ const Transfers: React.FC = () => {
                   <div className="dex-label-caps" style={{ marginBottom: 12 }}>Share URL</div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <div onClick={copyUrl} role="button" tabIndex={0} aria-label="Copy share URL" onKeyDown={e => e.key === 'Enter' && copyUrl()} style={{
-                      fontSize: 13, color: 'var(--color-accent)', fontFamily: '"SF Mono", monospace', fontWeight: 600,
+                      fontSize: 13, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontWeight: 600,
                       padding: '8px 14px', background: 'var(--color-bg-elevated)', borderRadius: 6,
                       border: '1px solid var(--color-border-subtle)', cursor: 'pointer', userSelect: 'all',
                     }}>{httpServerUrl}</div>
@@ -1151,7 +1151,7 @@ const Transfers: React.FC = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Speed Limit</span>
-                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontFamily: 'monospace' }}>{speedLimit === 0 ? 'Unlimited' : `${speedLimit} MB/s`}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>{speedLimit === 0 ? 'Unlimited' : `${speedLimit} MB/s`}</span>
               </div>
               <input type="range" min="0" max="1000" step="10" value={speedLimit}
                 onChange={e => setSpeedLimit(Number(e.target.value))}
@@ -1177,7 +1177,7 @@ const Transfers: React.FC = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Auto-Stop Server</span>
-                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontFamily: 'monospace' }}>{httpExpiry === 0 ? 'Never' : `${httpExpiry}m`}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>{httpExpiry === 0 ? 'Never' : `${httpExpiry}m`}</span>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {[0, 5, 15, 30, 60].map(v => (

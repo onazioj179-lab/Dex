@@ -1789,7 +1789,7 @@ export class NotesManager extends EventEmitter {
         if (this.mainWindow) {
           const html = this.documentToHTML(note.content, note.title);
           const filePath = path.join(exportDir, filename + '.pdf');
-          const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+          const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true } });
           await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
           const pdfData = await win.webContents.printToPDF({
             pageSize: 'A4',

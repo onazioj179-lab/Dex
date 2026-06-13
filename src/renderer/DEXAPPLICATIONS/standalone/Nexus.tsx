@@ -2507,8 +2507,8 @@ const Nexus: React.FC = () => {
             </svg>
           </div>
           <div>
-            <div style={{ color: ICE_BLUE, fontSize: 12, fontWeight: 700, letterSpacing: 1.2, fontFamily: FONT_STACK, textTransform: 'uppercase' }}>Nexus</div>
-            <div style={{ color: ELECTRIC, fontSize: 8, fontWeight: 700, marginTop: 1, fontFamily: FONT_STACK, letterSpacing: 0.8, fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ color: ICE_BLUE, fontSize: 12, fontWeight: 700, letterSpacing: 1.2, fontFamily: 'var(--dex-font-ui)', textTransform: 'uppercase' }}>Nexus</div>
+            <div style={{ color: ELECTRIC, fontSize: 8, fontWeight: 700, marginTop: 1, fontFamily: 'var(--dex-font-ui)', letterSpacing: 0.8, fontVariantNumeric: 'tabular-nums' }}>
               {nodeCount} nodes / {mode.toUpperCase()} / LIVE
             </div>
           </div>
@@ -2533,7 +2533,7 @@ const Nexus: React.FC = () => {
             boxShadow: searchFocused ? `0 0 12px ${ICE_BLUE}33, inset 0 0 6px ${ICE_BLUE}11` : 'none',
             transition: 'all 0.2s ease',
           }}>
-            <span style={{ color: GLOW, fontSize: 10, fontFamily: FONT_STACK, fontWeight: 700, flexShrink: 0 }}>{'>'}</span>
+            <span style={{ color: GLOW, fontSize: 10, fontFamily: 'var(--dex-font-ui)', fontWeight: 700, flexShrink: 0 }}>{'>'}</span>
             <input
               ref={searchInputRef}
               type="text"
@@ -2574,7 +2574,7 @@ const Nexus: React.FC = () => {
               style={{
                 flex: 1, background: 'none', border: 'none', outline: 'none',
                 color: ICE_BLUE, fontSize: 12, fontWeight: 700,
-                fontFamily: FONT_STACK,
+                fontFamily: 'var(--dex-font-ui)',
                 letterSpacing: 1,
                 caretColor: GLOW,
               }}
@@ -2611,7 +2611,7 @@ const Nexus: React.FC = () => {
               padding: '12px',
               zIndex: 30,
             }}>
-              <div style={{ color: 'rgba(216,226,240,0.58)', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, fontFamily: FONT_STACK, textAlign: 'center' }}>
+              <div style={{ color: 'rgba(216,226,240,0.58)', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, fontFamily: 'var(--dex-font-ui)', textAlign: 'center' }}>
                 No match for "{searchQuery}"
               </div>
             </div>
@@ -2629,7 +2629,7 @@ const Nexus: React.FC = () => {
               overflowY: 'auto',
               zIndex: 30,
             }}>
-              <div style={{ padding: '4px 12px 6px', color: GLOW, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', fontFamily: FONT_STACK, borderBottom: '1px solid rgba(100,210,255,0.1)', marginBottom: 2 }}>
+              <div style={{ padding: '4px 12px 6px', color: GLOW, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'var(--dex-font-ui)', borderBottom: '1px solid rgba(100,210,255,0.1)', marginBottom: 2 }}>
                 {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
               </div>
               {searchResults.map((file, i) => (
@@ -2655,7 +2655,7 @@ const Nexus: React.FC = () => {
                     }
                   }}
                 >
-                  <span style={{ color: GLOW, fontSize: 10, fontFamily: FONT_STACK, fontWeight: 700, flexShrink: 0, width: 16, textAlign: 'right' }}>
+                  <span style={{ color: GLOW, fontSize: 10, fontFamily: 'var(--dex-font-ui)', fontWeight: 700, flexShrink: 0, width: 16, textAlign: 'right' }}>
                     {String(i).padStart(2, '0')}
                   </span>
                   <div style={{
@@ -2664,11 +2664,11 @@ const Nexus: React.FC = () => {
                     boxShadow: `0 0 6px ${file.isDirectory ? ICE_BLUE : fileColor(file.extension, false)}`,
                   }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ color: WHITE, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: FONT_STACK, letterSpacing: 0.5 }}>
+                    <div style={{ color: WHITE, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'var(--dex-font-ui)', letterSpacing: 0.5 }}>
                       {file.name}
                     </div>
                   </div>
-                  <span style={{ color: 'rgba(216,226,240,0.45)', fontSize: 9, fontFamily: FONT_STACK, fontWeight: 600, flexShrink: 0 }}>
+                  <span style={{ color: 'rgba(216,226,240,0.45)', fontSize: 9, fontFamily: 'var(--dex-font-ui)', fontWeight: 600, flexShrink: 0 }}>
                     {file.isDirectory ? 'Folder' : 'File'}
                   </span>
                 </div>
@@ -2772,7 +2772,7 @@ const Nexus: React.FC = () => {
             background: 'rgba(100,210,255,0.1)',
             border: `1px solid ${ICE_BLUE}55`,
             color: ICE_BLUE,
-            fontSize: 9, fontWeight: 700, fontFamily: FONT_STACK,
+            fontSize: 9, fontWeight: 700, fontFamily: 'var(--dex-font-ui)',
             letterSpacing: 1.2, textTransform: 'uppercase',
             cursor: 'pointer',
             transition: 'all 0.15s ease',
@@ -2805,7 +2805,7 @@ const Nexus: React.FC = () => {
         position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
         display: 'flex', flexDirection: 'column', gap: 4,
         pointerEvents: 'none', zIndex: 12,
-        fontFamily: FONT_STACK,
+        fontFamily: 'var(--dex-font-ui)',
         maxWidth: 'min(130px, 24vw)',
       }}>
         {[
@@ -2815,9 +2815,7 @@ const Nexus: React.FC = () => {
         ].map((item) => (
           <div key={item.label} style={{
             padding: '4px 8px',
-            background: 'rgba(11,18,28,0.55)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
+            background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
             borderLeft: `2px solid ${item.color}`,
             borderRadius: 6,
@@ -2834,7 +2832,7 @@ const Nexus: React.FC = () => {
         position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
         display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end',
         pointerEvents: 'none', zIndex: 12,
-        fontFamily: FONT_STACK,
+        fontFamily: 'var(--dex-font-ui)',
         maxWidth: 'min(130px, 24vw)',
       }}>
         {[
@@ -2844,9 +2842,7 @@ const Nexus: React.FC = () => {
         ].map((item) => (
           <div key={item.label} style={{
             padding: '4px 8px',
-            background: 'rgba(11,18,28,0.55)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
+            background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
             borderRight: `2px solid ${item.color}`,
             borderRadius: 6,
@@ -2872,9 +2868,9 @@ const Nexus: React.FC = () => {
         boxShadow: `0 8px 24px rgba(0,0,0,0.42), 0 0 8px ${ICE_BLUE}18`,
         display: 'none',
       }}>
-        <div style={{ color: ICE_BLUE, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: FONT_STACK, letterSpacing: 0.5 }}>
+        <div style={{ color: ICE_BLUE, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'var(--dex-font-ui)', letterSpacing: 0.5 }}>
         </div>
-        <div style={{ color: 'rgba(216,226,240,0.5)', fontSize: 9, marginTop: 2, fontFamily: FONT_STACK, letterSpacing: 0.3 }}>
+        <div style={{ color: 'rgba(216,226,240,0.5)', fontSize: 9, marginTop: 2, fontFamily: 'var(--dex-font-ui)', letterSpacing: 0.3 }}>
         </div>
       </div>
 
@@ -2888,7 +2884,7 @@ const Nexus: React.FC = () => {
           borderRadius: 10,
           boxShadow: `0 4px 20px rgba(0,0,0,0.4), 0 0 12px ${ICE_BLUE}15`,
           zIndex: 20,
-          fontFamily: FONT_STACK,
+          fontFamily: 'var(--dex-font-ui)',
           scrollbarWidth: 'none',
         }}>
           <div style={{
@@ -2936,7 +2932,7 @@ const Nexus: React.FC = () => {
         position: 'absolute', bottom: 56, right: 12,
         display: 'flex', flexDirection: 'column', gap: 2,
         pointerEvents: 'none', zIndex: 12,
-        fontFamily: FONT_STACK,
+        fontFamily: 'var(--dex-font-ui)',
         opacity: 0.5,
         maxWidth: 'min(160px, 34vw)',
       }}>
@@ -2977,7 +2973,7 @@ const modeBtnBase: React.CSSProperties = {
   cursor: 'pointer',
   fontSize: 9,
   fontWeight: 700,
-  fontFamily: FONT_STACK,
+  fontFamily: 'var(--dex-font-ui)',
   transition: 'all 0.15s ease',
   color: WHITE,
   letterSpacing: 1,
@@ -3045,7 +3041,7 @@ const ZoomButton = memo(({ label, onClick, icon }: {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: FONT_STACK,
+        fontFamily: 'var(--dex-font-ui)',
         transition: 'all 0.15s ease',
         boxShadow: hovered ? `0 0 6px rgba(100,210,255,0.16)` : 'none',
       }}

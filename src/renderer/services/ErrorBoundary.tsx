@@ -225,15 +225,17 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   };
 
   render() {
-    const { children, appName, appColor, instanceId } = this.props;
+    const { children, appName, appColor, instanceId, appId } = this.props;
     const { hasError, error, errorInfo, crashCount, isRecovering } = this.state;
 
     if (hasError) {
+      const isRoot = appId === 'dex-root' || instanceId === 'root';
       return (
         <CrashScreen
           appName={appName}
           appColor={appColor}
           instanceId={instanceId}
+          isRoot={isRoot}
           error={error}
           errorInfo={errorInfo}
           crashCount={crashCount}
@@ -256,6 +258,7 @@ interface CrashScreenProps {
   appName: string;
   appColor: string;
   instanceId: string;
+  isRoot?: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
   crashCount: number;
@@ -268,6 +271,7 @@ const CrashScreen: React.FC<CrashScreenProps> = ({
   appName,
   appColor,
   instanceId,
+  isRoot,
   error,
   crashCount,
   isRecovering,
@@ -275,6 +279,61 @@ const CrashScreen: React.FC<CrashScreenProps> = ({
   onClose,
 }) => {
   const canRecover = crashCount < 3;
+
+  // DEX-wide recovery screen: when the shell itself crashes, "Close App" would
+  // tear down DEX. Instead reassure the user (the workspace/session is saved by
+  // the window manifest + last-session journal) and offer a clean reload, which
+  // re-runs session restore on boot. This is the visible safety net for a
+  // top-level failure rather than a silent reload.
+  if (isRoot) {
+    const reload = () => { try { window.location.reload(); } catch { /* noop */ } };
+    return (
+      <div style={{ ...styles.container, position: 'fixed', inset: 0, zIndex: 2147483647 }}>
+        <div style={styles.content}>
+          <div style={{ ...styles.icon, background: `${appColor}15` }}>
+            <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={appColor} strokeWidth="1.5">
+              <path d="M12 2v6m0 0 3-3m-3 3L9 5" />
+              <path d="M3 12a9 9 0 1 0 9-9" />
+            </svg>
+          </div>
+          <h2 style={styles.title}>DEX hit a problem</h2>
+          <p style={styles.message}>
+            Your workspace is safe. DEX saved your open apps and window layout, and
+            will restore them when it reloads.
+          </p>
+          {crashCount > 1 && (
+            <p style={styles.crashCount}>This happened {crashCount} times this session</p>
+          )}
+          <div style={styles.actions}>
+            <button
+              style={{ ...styles.button, ...styles.primaryButton, background: `${appColor}22`, borderColor: `${appColor}40`, color: appColor }}
+              onClick={reload}
+            >
+              Reload DEX
+            </button>
+            {canRecover && (
+              <button style={styles.button} onClick={onRecover} disabled={isRecovering}>
+                {isRecovering ? 'Recovering…' : 'Try to continue'}
+              </button>
+            )}
+          </div>
+          <details style={styles.details}>
+            <summary style={styles.summary}>Technical Details</summary>
+            <pre style={styles.pre}>
+              <strong>Error:</strong> {error?.name || 'Unknown'}{'\n'}
+              <strong>Message:</strong> {error?.message || 'No message'}{'\n'}
+              {error?.stack && (
+                <>
+                  <strong>Stack:</strong>{'\n'}
+                  {error.stack.split('\n').slice(0, 6).join('\n')}
+                </>
+              )}
+            </pre>
+          </details>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>

@@ -493,6 +493,9 @@ export const Workflows: React.FC = () => {
   const canvasRef = useRef<SVGSVGElement>(null);
   const dragRafRef = useRef<number>(0);
 
+  // Cancel any pending drag rAF on unmount so it can't fire after teardown.
+  useEffect(() => () => { if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current); }, []);
+
   // Load workflows
   useEffect(() => {
     let cancelled = false;
@@ -1205,7 +1208,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '32px', display: 'flex', alignItems: 'center', padding: '0 10px',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
-  sidebarTitle: { fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' },
+  sidebarTitle: { fontSize: '12px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' },
   sidebarContent: { flex: 1, overflow: 'auto', padding: '8px' },
   sidebarItem: {
     display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '4px',
@@ -1228,7 +1231,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px',
     minWidth: 0, maxWidth: '100%', overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
-  title: { fontSize: '18px', fontWeight: 700, marginBottom: '2px' },
+  title: { fontSize: '18px', fontWeight: 600, letterSpacing: '-0.01em', marginBottom: '2px' },
   subtitle: { fontSize: '12px', color: 'var(--color-text-muted)' },
   searchBox: {
     display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',

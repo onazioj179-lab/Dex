@@ -202,7 +202,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
         top: 44,
         right: 12,
         zIndex: Z_NOTIFICATION,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily: 'var(--dex-font-ui)',
         color: COLOR_TEXT,
       }}
       data-dex-update-notification

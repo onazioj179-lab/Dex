@@ -910,7 +910,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sidebarTitle: {
     fontSize: '12px',
-    fontWeight: 700,
+    fontWeight: 600,
+    letterSpacing: '-0.01em',
     color: 'var(--color-text-primary)',
   },
   lists: {
@@ -961,7 +962,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   titleText: {
     fontSize: '18px',
-    fontWeight: 700,
+    fontWeight: 600,
+    letterSpacing: '-0.01em',
   },
   taskCount: {
     fontSize: '12px',

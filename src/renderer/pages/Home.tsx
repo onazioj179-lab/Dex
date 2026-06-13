@@ -308,7 +308,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
         overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column',
       }}>
         <div style={{ padding: '18px 22px 12px', borderBottom: '1px solid var(--color-bg-hover)' }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff' }}>Pin App to Home</h2>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', color: '#fff' }}>Pin App to Home</h2>
           <p style={{ margin: '3px 0 10px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose an app to drop on your desktop. Drag to move, right-click to unpin.</p>
           <input
             autoFocus
@@ -597,8 +597,6 @@ export const Home: React.FC = () => {
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
           padding: '10px 24px',
           background: 'rgba(12, 12, 14, 0.34)',
-          backdropFilter: 'var(--blur-xl) saturate(180%)',
-          WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex', justifyContent: 'center',
           animation: 'fadeIn 0.15s ease-out',
@@ -671,8 +669,6 @@ export const Home: React.FC = () => {
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '10px 14px',
                     background: 'rgba(255,255,255,0.06)',
-                    backdropFilter: 'var(--blur-xl) saturate(180%)',
-                    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
                     border: '1px solid rgba(255,255,255,0.10)',
                     borderRadius: 12, cursor: 'pointer',
                     color: 'var(--color-text-primary)', fontSize: 12,
@@ -1004,8 +1000,6 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
           width: 76px; min-width: 76px; height: 80px;
           padding: 10px 6px 8px;
           background: rgba(255,255,255,0.06);
-          backdrop-filter: var(--blur-xl) saturate(180%);
-          -webkit-backdrop-filter: var(--blur-xl) saturate(180%);
           border: 1px solid rgba(255,255,255,0.10);
           border-radius: 14px;
           cursor: pointer;
@@ -1074,12 +1068,10 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
               zIndex: Z_CONTEXT_MENU,
               minWidth: 180,
               padding: '6px 0',
-              background: 'rgba(28, 28, 32, 0.95)',
+              background: 'var(--color-bg-elevated)',
               borderRadius: 10,
               border: '1px solid rgba(255,255,255,0.12)',
               boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
-              backdropFilter: 'var(--blur-lg) saturate(180%)',
-              WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
               animation: 'ctxFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
@@ -1140,8 +1132,6 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 14px', borderRadius: 12,
       background: 'rgba(255,255,255,0.06)',
-      backdropFilter: 'var(--blur-xl) saturate(180%)',
-      WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
       border: '1px solid rgba(255,255,255,0.10)',
       boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
       opacity: done ? 0.6 : 1,

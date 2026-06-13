@@ -420,6 +420,8 @@ export class SyncEngine {
   private connected = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private disposed = false;
   private listeners: Map<SyncMessage['type'], ((payload: unknown) => void)[]> = new Map();
 
   constructor(userId: string) {
@@ -429,6 +431,7 @@ export class SyncEngine {
   // 876. Connect
   async connect(url: string, sessionId: string): Promise<boolean> {
     this.sessionId = sessionId;
+    this.disposed = false;
 
     return new Promise((resolve) => {
       try {
@@ -466,7 +469,12 @@ export class SyncEngine {
 
   // 877. Disconnect
   disconnect(): void {
+    this.disposed = true;
     this.connected = false;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.ws?.close();
     this.ws = null;
     this.sessionId = null;
@@ -512,12 +520,16 @@ export class SyncEngine {
 
   // 880. Reconnection
   private attemptReconnect(url: string, sessionId: string): void {
+    if (this.disposed) return;
     if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-    setTimeout(() => {
+    if (this.reconnectTimer !== null) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.disposed) return;
       this.connect(url, sessionId);
     }, delay);
   }

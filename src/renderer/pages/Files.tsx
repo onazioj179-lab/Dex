@@ -1612,7 +1612,7 @@ export const Files: React.FC = () => {
                 </div>
               )}
               {['.txt', '.md', '.json', '.js', '.ts', '.css', '.html'].includes(quickLookFile.extension.toLowerCase()) && (
-                <div style={{ textAlign: 'left', padding: 16, background: 'var(--color-bg-primary)', borderRadius: 6, maxHeight: '60vh', overflow: 'auto', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap' as const, color: 'var(--color-text-primary)' }}>
+                <div style={{ textAlign: 'left', padding: 16, background: 'var(--color-bg-primary)', borderRadius: 6, maxHeight: '60vh', overflow: 'auto', fontSize: 12, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' as const, color: 'var(--color-text-primary)' }}>
                   {/* Text file preview - content loaded on demand */}
                   <span style={{ opacity: 0.5 }}>Text preview for {quickLookFile.name}</span>
                 </div>
@@ -1796,8 +1796,6 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     display: 'flex',
     background: 'var(--pg-surface)',
-    backdropFilter: 'var(--blur-xl) saturate(180%)',
-    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
     fontSize: '13px',
@@ -1822,7 +1820,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sidebarTitle: {
     fontSize: '12px',
-    fontWeight: 700,
+    fontWeight: 600,
+    letterSpacing: '-0.01em',
     color: 'var(--color-text-primary)',
   },
   sidebarSection: {
@@ -1868,8 +1867,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     borderBottom: '1px solid var(--pg-border)',
     background: 'var(--pg-toolbar)',
-    backdropFilter: 'var(--blur-lg) saturate(170%)',
-    WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)',
   },
   navButtons: {
     display: 'flex',
