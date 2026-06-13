@@ -434,7 +434,7 @@ const TaskManager: React.FC = () => {
         )}
         <div style={styles.statCard}>
           <div style={styles.statLabel}>Uptime</div>
-          <div style={{ ...styles.statValue, color: '#0A84FF', fontSize: 22 }}>{formatUptime(uptimeSeconds)}</div>
+          <div style={{ ...styles.statValue, color: 'var(--color-accent, #0A84FF)', fontSize: 22 }}>{formatUptime(uptimeSeconds)}</div>
           <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
           <div style={styles.sparkWrap} />
         </div>

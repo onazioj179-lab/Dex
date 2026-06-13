@@ -183,42 +183,48 @@ export const hairline = {
 export const focusRing = '0 0 0 2px #0c0c0e, 0 0 0 4px #4a9eff';
 
 // ---------------------------------------------------------------------------
-// Colors (for use when CSS variables unavailable)
+// Colors — theme-aware. Each value is a CSS custom property (which flips with
+// [data-theme="light"]) with the original dark literal as the fallback, so:
+//   - inline styles applied to the DOM now respond to light mode automatically;
+//   - if a var ever fails to resolve, behavior is identical to the old literal.
+// Verified safe: no consumer feeds these to a <canvas> fillStyle, concatenates
+// an alpha hex onto them, or compares them by equality (all of which would
+// break with a var()). Use literal hex directly for canvas, not this object.
 // ---------------------------------------------------------------------------
 export const colors = {
   bg: {
-    base: '#0C0C0E',
-    surface: '#161618',
-    inset: '#101012',
-    hover: '#1E1E22',
-    active: '#252528',
-    elevated: '#1A1A1E',
+    base: 'var(--color-bg-base, #0C0C0E)',
+    surface: 'var(--color-bg-surface, #161618)',
+    inset: 'var(--color-bg-inset, #101012)',
+    hover: 'var(--color-bg-hover, #1E1E22)',
+    active: 'var(--color-bg-active, #252528)',
+    elevated: 'var(--color-bg-elevated, #1A1A1E)',
   },
   text: {
-    primary: '#FFFFFF',
-    secondary: '#B8B8BD',
-    tertiary: '#8E8E93',
-    muted: '#A0A0A5',
-    disabled: '#58585D',
+    primary: 'var(--color-text-primary, #FFFFFF)',
+    secondary: 'var(--color-text-secondary, #B8B8BD)',
+    tertiary: 'var(--color-text-tertiary, #8E8E93)',
+    muted: 'var(--color-text-muted, #A0A0A5)',
+    disabled: 'var(--color-text-disabled, #58585D)',
   },
   accent: {
-    default: '#4A9EFF',
-    hover: '#6CB2FF',
-    light: 'rgba(74, 158, 255, 0.14)',
-    soft: 'rgba(74, 158, 255, 0.08)',
+    default: 'var(--color-accent, #4A9EFF)',
+    hover: 'var(--color-accent-hover, #6CB2FF)',
+    light: 'var(--color-accent-light, rgba(74, 158, 255, 0.14))',
+    soft: 'var(--color-accent-soft, rgba(74, 158, 255, 0.08))',
   },
   semantic: {
-    success: '#34C759',
-    successMuted: 'rgba(52, 199, 89, 0.14)',
-    warning: '#FF9F0A',
-    warningMuted: 'rgba(255, 159, 10, 0.14)',
-    error: '#FF453A',
-    errorMuted: 'rgba(255, 69, 58, 0.14)',
+    success: 'var(--color-success, #34C759)',
+    successMuted: 'var(--color-success-muted, rgba(52, 199, 89, 0.14))',
+    warning: 'var(--color-warning, #FF9F0A)',
+    warningMuted: 'var(--color-warning-muted, rgba(255, 159, 10, 0.14))',
+    error: 'var(--color-error, #FF453A)',
+    errorMuted: 'var(--color-error-muted, rgba(255, 69, 58, 0.14))',
   },
   border: {
-    default: 'rgba(255, 255, 255, 0.14)',
-    subtle: 'rgba(255, 255, 255, 0.08)',
-    strong: 'rgba(255, 255, 255, 0.22)',
+    default: 'var(--color-border, rgba(255, 255, 255, 0.14))',
+    subtle: 'var(--color-border-subtle, rgba(255, 255, 255, 0.08))',
+    strong: 'var(--color-border-strong, rgba(255, 255, 255, 0.22))',
   },
 } as const;
 

@@ -29,8 +29,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    background: 'linear-gradient(180deg, #1a1a1c 0%, #0d0d0f 100%)',
-    color: '#fff',
+    background: 'linear-gradient(180deg, var(--color-bg-elevated, #1a1a1c) 0%, var(--color-bg-base, #0d0d0f) 100%)',
+    color: 'var(--color-text-primary, #fff)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   header: {
@@ -66,7 +66,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   subtitle: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     marginTop: 2,
   },
   headerActions: {
@@ -121,7 +121,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 10,
     fontWeight: 700,
     background: 'var(--color-accent)',
-    color: '#fff',
+    color: 'var(--color-accent-text, #fff)',
     borderRadius: 4,
     minWidth: 18,
     textAlign: 'center',
@@ -203,7 +203,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: '#fff',
     marginLeft: -8,
-    border: '2px solid #1a1a1c',
+    border: '2px solid var(--color-bg-base, #1a1a1c)',
   },
   cardAvatarMore: {
     background: 'var(--color-bg-active, rgba(255,255,255,0.1))',
@@ -690,7 +690,7 @@ const CollabHub: React.FC = () => {
               style={{ 
                 background: 'transparent', 
                 border: 'none', 
-                color: '#ff453a', 
+                color: 'var(--color-error, #ff453a)',
                 cursor: 'pointer',
                 padding: 4,
               }}
@@ -973,8 +973,8 @@ const CollabHub: React.FC = () => {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ 
                       fontSize: 14, 
-                      fontWeight: 500, 
-                      color: '#fff', 
+                      fontWeight: 500,
+                      color: 'var(--color-text-primary, #fff)',
                       marginBottom: 2,
                       display: 'flex',
                       alignItems: 'center',
@@ -987,10 +987,10 @@ const CollabHub: React.FC = () => {
                           fontSize: 10,
                           fontWeight: 600,
                           borderRadius: 3,
-                          background: item.status === 'approved' 
-                            ? 'rgba(48,209,88,0.15)' 
-                            : 'rgba(255,69,58,0.15)',
-                          color: item.status === 'approved' ? '#30d158' : '#ff453a',
+                          background: item.status === 'approved'
+                            ? 'var(--color-success-muted, rgba(48,209,88,0.15))'
+                            : 'var(--color-error-muted, rgba(255,69,58,0.15))',
+                          color: item.status === 'approved' ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)',
                         }}>
                           {item.status}
                         </span>
@@ -998,7 +998,7 @@ const CollabHub: React.FC = () => {
                     </div>
                     <div style={{ 
                       fontSize: 12, 
-                      color: '#8e8e93',
+                      color: 'var(--color-text-tertiary, #8e8e93)',
                       marginBottom: item.actionable ? 10 : 0,
                     }}>
                       {item.description}
@@ -1010,8 +1010,8 @@ const CollabHub: React.FC = () => {
                             padding: '6px 14px',
                             fontSize: 12,
                             fontWeight: 600,
-                            background: '#30d158',
-                            color: '#fff',
+                            background: 'var(--color-success, #30d158)',
+                            color: 'var(--color-accent-text, #fff)',
                             border: 'none',
                             borderRadius: 6,
                             cursor: isLoading ? 'not-allowed' : 'pointer',
@@ -1031,8 +1031,8 @@ const CollabHub: React.FC = () => {
                             fontSize: 12,
                             fontWeight: 600,
                             background: 'transparent',
-                            color: '#ff453a',
-                            border: '1px solid rgba(255,69,58,0.3)',
+                            color: 'var(--color-error, #ff453a)',
+                            border: '1px solid var(--color-error-muted, rgba(255,69,58,0.3))',
                             borderRadius: 6,
                             cursor: isLoading ? 'not-allowed' : 'pointer',
                             opacity: isLoading ? 0.6 : 1,
@@ -1049,8 +1049,8 @@ const CollabHub: React.FC = () => {
                     )}
                   </div>
                   <div style={{ 
-                    fontSize: 11, 
-                    color: '#636366',
+                    fontSize: 11,
+                    color: 'var(--color-text-tertiary, #636366)',
                     flexShrink: 0,
                   }}>
                     {formatTime(item.timestamp)}
