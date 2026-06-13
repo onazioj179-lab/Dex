@@ -113,7 +113,9 @@ Happy writing!
     // URLs are untrusted, so block javascript:/data-script URLs, inline event
     // handlers, and attribute injection while preserving the safe formatting
     // markup (DOMPurify keeps style attrs + standard tags this renderer emits).
-    return DOMPurify.sanitize(html);
+    // USE_PROFILES html-only: this renderer emits plain HTML, never SVG/MathML,
+    // so disallowing those namespaces removes that whole attack surface for free.
+    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
   }, [content]);
 
   const insertFormatting = useCallback((prefix: string, suffix: string = prefix) => {
