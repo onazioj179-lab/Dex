@@ -94,6 +94,12 @@ export interface TerminalProps {
 
 interface Line { id: number; spans: Span[]; }
 
+// A shell that dies almost immediately is a failed start (e.g. missing binary),
+// not a normal exit — those get a bounded, backed-off retry. A clean exit after
+// real use does NOT retry. This is what stops the terminal crash-respawn loop.
+const MAX_SPAWN_RETRIES = 3;
+const FAST_EXIT_MS = 1500;
+
 export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -101,6 +107,9 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const retriesRef = useRef(0);
+  const startSessionRef = useRef<(() => void) | null>(null);
   const lineIdRef = useRef(0);
   const bufferRef = useRef('');
   const pendingLinesRef = useRef<Line[]>([]);
@@ -161,6 +170,41 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     let dataOff: (() => void) | null = null;
     let exitOff: (() => void) | null = null;
     let activeId: string | null = null;
+    let spawnedAt = 0;
+    let backoffTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleSpawnFailure = (msg: string) => {
+      if (!mounted) return;
+      // Surface the reason immediately so the user (and tests) see WHY the
+      // terminal didn't start, instead of a silent "starting…" while we retry
+      // in the background. `unavailable` is only set once retries are spent.
+      setError(msg);
+      if (retriesRef.current >= MAX_SPAWN_RETRIES) {
+        setUnavailable(true);
+        return;
+      }
+      retriesRef.current += 1;
+      // Exponential backoff with jitter so rapid failures can't busy-loop.
+      const delay = 400 * 2 ** (retriesRef.current - 1) + Math.floor(Math.random() * 200);
+      appendOutput(`\r\n[retrying terminal in ${Math.round(delay / 100) / 10}s — attempt ${retriesRef.current}/${MAX_SPAWN_RETRIES}]\r\n`);
+      backoffTimer = setTimeout(() => { if (mounted) startSession(); }, delay);
+    };
+
+    const startSession = () => {
+      if (!mounted) return;
+      setUnavailable(false);
+      setError(null);
+      spawnedAt = Date.now();
+      b.invoke('pty:spawn', { cwd, shell }).then(res => {
+        const r = res as { sessionId?: string; error?: string };
+        if (!mounted) return;
+        if (r.error) { handleSpawnFailure(r.error); return; }
+        if (r.sessionId) { activeId = r.sessionId; setSessionId(r.sessionId); }
+      }).catch(err => {
+        if (mounted) handleSpawnFailure(String(err));
+      });
+    };
+    startSessionRef.current = startSession;
 
     const onData = (...args: unknown[]) => {
       const payload = args[args.length - 1] as { sessionId?: string; data?: string };
@@ -170,10 +214,21 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     };
     const onExit = (...args: unknown[]) => {
       const payload = args[args.length - 1] as { sessionId?: string; code?: number };
-      if (payload?.sessionId === activeId) {
-        flushTailBuffer();
-        appendOutput(`\r\n[session exited code=${payload.code ?? 0}]\r\n`);
-        if (mounted) setSessionId(null);
+      if (payload?.sessionId !== activeId) return;
+      const code = payload.code ?? 0;
+      const ranMs = Date.now() - spawnedAt;
+      flushTailBuffer();
+      appendOutput(`\r\n[session exited code=${code}]\r\n`);
+      activeId = null;
+      if (!mounted) return;
+      setSessionId(null);
+      // -1 is our "shell unavailable" sentinel; a non-zero fast exit is also a
+      // failed start. Either way retry (bounded). A clean/long-lived exit does
+      // not loop — it just resets the retry budget for a manual restart.
+      if (code === -1 || (code !== 0 && ranMs < FAST_EXIT_MS)) {
+        handleSpawnFailure(`shell exited early (code ${code})`);
+      } else {
+        retriesRef.current = 0;
       }
     };
 
@@ -182,24 +237,17 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       exitOff = b.on('pty:exit', onExit);
     }
 
-    if (autoSpawn) {
-      b.invoke('pty:spawn', { cwd, shell }).then(res => {
-        const r = res as { sessionId?: string; error?: string };
-        if (!mounted) return;
-        if (r.error) { setError(r.error); return; }
-        if (r.sessionId) { activeId = r.sessionId; setSessionId(r.sessionId); }
-      }).catch(err => {
-        if (mounted) setError(String(err));
-      });
-    }
+    if (autoSpawn) startSession();
 
     return () => {
       if (flushRafRef.current !== null) {
         cancelAnimationFrame(flushRafRef.current);
         flushRafRef.current = null;
       }
+      if (backoffTimer) clearTimeout(backoffTimer);
       flushTailBuffer();
       mounted = false;
+      startSessionRef.current = null;
       if (dataOff) dataOff();
       if (exitOff) exitOff();
       if (activeId) {
@@ -207,6 +255,14 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       }
     };
   }, [autoSpawn, cwd, shell, appendOutput, flushTailBuffer]);
+
+  // Manual restart from the unavailable state — resets the retry budget.
+  const handleRetry = useCallback(() => {
+    retriesRef.current = 0;
+    setUnavailable(false);
+    setError(null);
+    startSessionRef.current?.();
+  }, []);
 
   // -------------------------------------------------------------------------
   // Auto-scroll on new output
@@ -303,19 +359,35 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600,
         }}
       >
-        <span>Terminal {sessionId ? `· ${sessionId}` : error ? '· error' : '· starting…'}</span>
-        <button
-          type="button"
-          onClick={() => setLines([])}
-          title="Clear (Ctrl+L)"
-          aria-label="Clear terminal"
-          style={{
-            background: 'transparent', color: '#999', border: 'none',
-            fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
-          }}
-        >
-          Clear
-        </button>
+        <span>Terminal {sessionId ? `· ${sessionId}` : unavailable ? '· unavailable' : error ? '· error' : '· starting…'}</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(unavailable || (!sessionId && error)) && (
+            <button
+              type="button"
+              onClick={handleRetry}
+              title="Restart terminal"
+              aria-label="Restart terminal"
+              style={{
+                background: 'transparent', color: 'var(--color-accent, #4a9eff)', border: 'none',
+                fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
+              }}
+            >
+              Retry
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setLines([])}
+            title="Clear (Ctrl+L)"
+            aria-label="Clear terminal"
+            style={{
+              background: 'transparent', color: '#999', border: 'none',
+              fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
+            }}
+          >
+            Clear
+          </button>
+        </div>
       </div>
       <div
         ref={scrollRef}
@@ -325,7 +397,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           whiteSpace: 'pre-wrap', wordBreak: 'break-all',
         }}
       >
-        {error && <div style={{ color: '#ff5f5f' }}>{error}</div>}
+        {error && <div style={{ color: 'var(--color-error, #ff5f5f)' }}>{error}</div>}
         {lines.map(l => (
           <div key={l.id}>
             {l.spans.map((sp, i) => (

@@ -574,7 +574,7 @@ const DexNotes: React.FC = () => {
           </div>
           <button
             onClick={() => { setInitFailed(false); createAttempted.current = false; store.initialize(); }}
-            style={{ padding: '6px 16px', background: 'rgba(10,132,255,0.15)', border: '1px solid rgba(10,132,255,0.3)', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+            style={{ padding: '6px 16px', background: 'var(--color-accent-light, rgba(10,132,255,0.15))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
           >
             Retry
           </button>
@@ -626,9 +626,9 @@ const DexNotes: React.FC = () => {
         /* === DEXNOTES - UI HOVER === */
         .dexnotes-app button { font-family: inherit; transition: all 0.12s ease; }
         .dexnotes-app button:active { transform: scale(0.97); }
-        .dexnotes-app .dn-footer button:hover { background: rgba(10,132,255,0.12) !important; color: #0a84ff !important; }
+        .dexnotes-app .dn-footer button:hover { background: var(--color-accent-light, rgba(10,132,255,0.12)) !important; color: var(--color-accent, #0a84ff) !important; }
         .dexnotes-app .dn-tree-acts:hover { opacity: 1 !important; }
-        .dexnotes-app .dn-tree-acts button:hover { background: rgba(255,255,255,0.08) !important; border-radius: 3px; }
+        .dexnotes-app .dn-tree-acts button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; border-radius: 3px; }
         .dexnotes-app .dn-swatch { transition: transform 0.12s ease; }
         .dexnotes-app .dn-swatch:hover { transform: scale(1.15); }
         .dexnotes-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
@@ -859,7 +859,7 @@ const DexNotes: React.FC = () => {
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>Select or create a note</div>
             <button
               onClick={() => { createAttempted.current = false; store.createNote(); }}
-              style={{ padding: '6px 16px', background: 'rgba(10,132,255,0.12)', border: '1px solid rgba(10,132,255,0.2)', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+              style={{ padding: '6px 16px', background: 'var(--color-accent-light, rgba(10,132,255,0.12))', border: '1px solid var(--color-accent-soft, rgba(10,132,255,0.2))', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
             >New Note</button>
           </div>
         )}
@@ -924,7 +924,7 @@ const DexNotes: React.FC = () => {
             aria-label={showRightPanel ? 'Hide details panel' : 'Show details panel'}
             onClick={() => setShowRightPanel(v => !v)}
             style={{
-              background: 'rgba(0,0,0,0.3)',
+              background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
               border: '1px solid var(--color-border-subtle)',
               borderRadius: 3,
               color: 'var(--color-text-tertiary)',

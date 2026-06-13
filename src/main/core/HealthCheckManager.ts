@@ -5,7 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 import { app, ipcMain } from 'electron';
-import Database from 'better-sqlite3';
+import Database from '../native/safeSqlite';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';

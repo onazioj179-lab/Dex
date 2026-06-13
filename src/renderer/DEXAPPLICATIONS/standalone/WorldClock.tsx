@@ -164,7 +164,7 @@ const WorldClock: React.FC = () => {
         <Hand angle={hAngle} len={cx * 0.5} w={3} color="var(--color-text-primary)" />
         <Hand angle={mAngle} len={cx * 0.7} w={2} color="var(--color-text-primary)" />
         <Hand angle={sAngle} len={cx * 0.75} w={1} color="var(--color-error)" smooth={false} />
-        <circle cx={cx} cy={cy} r={3} fill="#FF453A" />
+        <circle cx={cx} cy={cy} r={3} fill="var(--color-error, #FF453A)" />
       </svg>
     );
   };
@@ -181,7 +181,7 @@ const WorldClock: React.FC = () => {
             {is24h ? '24h' : '12h'}
           </button>
           <button
-            style={{ ...s.toggleBtn, background: showAnalog ? 'rgba(10,132,255,0.2)' : 'transparent', color: showAnalog ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+            style={{ ...s.toggleBtn, background: showAnalog ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'transparent', color: showAnalog ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
             onClick={() => setShowAnalog(!showAnalog)}
             aria-label="Toggle analog clocks"
           >CLK</button>
@@ -245,7 +245,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBtn: {
     width: 28, height: 28, borderRadius: 4, border: 'none',
-    background: 'var(--color-accent)', color: '#fff', fontSize: 16, cursor: 'pointer',
+    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 16, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   addPanel: {

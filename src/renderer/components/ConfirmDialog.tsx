@@ -7,20 +7,19 @@
 /**
  * ConfirmDialog -- the in-app replacement for `window.confirm()`.
  *
- * - Focus is trapped inside the dialog while open.
- * - Escape cancels, Enter triggers the primary action.
+ * Built on the canonical ui/Modal primitive (portal, focus trap, scroll
+ * lock, Escape, responsive sizing). This component only adds:
+ * - Enter triggers the primary action.
+ * - Initial focus lands on the confirm button.
  * - The destructive variant uses the danger Button styling.
- * - Backdrop click cancels unless `dismissOnBackdrop={false}`.
- *
- * Pure presentational component: callers own the open state. No globals,
- * no portals -- the host can wrap it in a portal if it needs to.
  */
 
 // DEX v3.8.9 follow-up - confirm dialog UI
 
 import React, { useEffect, useRef } from 'react';
 import { Button } from '../ui/Button';
-import { space, radius, fontSize, fontWeight } from '../styles/tokens';
+import { Modal } from '../ui/Modal';
+import { fontSize } from '../styles/tokens';
 import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
 
 export type ConfirmTone = 'neutral' | 'destructive';
@@ -53,37 +52,28 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
 
+  // Enter confirms; Escape is handled by the Modal primitive (-> onCancel).
   useEffect(() => {
     if (!open) return;
     confirmRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-      else if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
+      if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onConfirm, onCancel]);
-
-  if (!open) return null;
+  }, [open, onConfirm]);
 
   return (
-    <div
-      style={backdropStyle}
-      role="presentation"
-      data-testid={`${testIdPrefix}-backdrop`}
-      onClick={() => { if (dismissOnBackdrop) onCancel(); }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${testIdPrefix}-title`}
-        style={dialogStyle}
-        onClick={(e) => e.stopPropagation()}
-        data-testid={`${testIdPrefix}-dialog`}
-      >
-        <h2 id={`${testIdPrefix}-title`} style={titleStyle}>{title}</h2>
-        {message && <div style={messageStyle}>{message}</div>}
-        <div style={buttonRow}>
+    <Modal
+      open={open}
+      onClose={onCancel}
+      size="sm"
+      title={title}
+      dismissOnBackdrop={dismissOnBackdrop}
+      zIndexOverride={Z_DROPDOWN_BASE}
+      testIdPrefix={testIdPrefix}
+      footer={
+        <>
           <Button variant="ghost" size="md" onClick={onCancel}>{cancelLabel}</Button>
           <Button
             ref={confirmRef}
@@ -92,37 +82,17 @@ export function ConfirmDialog({
             onClick={onConfirm}
             data-testid={`${testIdPrefix}-confirm`}
           >{confirmLabel}</Button>
-        </div>
+        </>
+      }
+    >
+      <div data-testid={`${testIdPrefix}-dialog`}>
+        {message && <div style={messageStyle}>{message}</div>}
       </div>
-    </div>
+    </Modal>
   );
 }
 
-const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.55)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: Z_DROPDOWN_BASE,
-  padding: space[4],
-};
-const dialogStyle: React.CSSProperties = {
-  background: 'var(--color-bg-elevated, #1A1A1E)',
-  border: '1px solid var(--color-border, rgba(255,255,255,0.10))',
-  borderRadius: radius.lg,
-  padding: space[5],
-  minWidth: 320,
-  maxWidth: 480,
-  boxShadow: 'var(--pg-shadow-modal)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: space[4],
-};
-const titleStyle: React.CSSProperties = { margin: 0, fontSize: fontSize.lg, fontWeight: fontWeight.semibold };
 const messageStyle: React.CSSProperties = { margin: 0, fontSize: fontSize.sm, color: 'var(--color-text-secondary, rgba(255,255,255,0.72))', lineHeight: 1.55 };
-const buttonRow: React.CSSProperties = { display: 'flex', gap: space[2], justifyContent: 'flex-end' };
 
 // =============================================================================
 // useConfirm — async helper that returns a Promise<boolean>.

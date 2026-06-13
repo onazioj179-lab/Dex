@@ -1400,7 +1400,7 @@ const Forge: React.FC = () => {
             <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showToolsMenu && (
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '10px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
-                <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
+                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>PROCESSING</div>
                 {[
                   { label: 'Trim / Split', active: showTrimSplit, fn: () => setShowTrimSplit(v => !v) },
                   { label: 'Crop & Pad', active: showCropPad, fn: () => setShowCropPad(v => !v) },
@@ -1412,7 +1412,7 @@ const Forge: React.FC = () => {
                   <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PREVIEW</div>
+                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>PREVIEW</div>
                 {[
                   { label: 'Preview', active: showPreview, fn: () => { if (selectedJob) setShowPreview(v => !v); } },
                   { label: 'A/B Compare', active: showABCompare, fn: () => { if (selectedJob?.outputBlobUrl) setShowABCompare(v => !v); } },
@@ -1420,7 +1420,7 @@ const Forge: React.FC = () => {
                   <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
+                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>EXPORT</div>
                 {[
                   { label: 'Image Sequence', active: showImageSequence, fn: () => setShowImageSequence(v => !v) },
                   { label: 'Audio Extract', active: showAudioExtract, fn: () => setShowAudioExtract(v => !v) },
@@ -1429,7 +1429,7 @@ const Forge: React.FC = () => {
                   <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div style={{ padding: '4px 12px 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>AUTOMATION</div>
+                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>AUTOMATION</div>
                 {[
                   { label: 'Auto Rules', active: showConditionalRules, fn: () => setShowConditionalRules(v => !v) },
                 ].map(item => (
@@ -1484,7 +1484,7 @@ const Forge: React.FC = () => {
                     <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px 8px' }}>Cancel</button>
                   </div>
                 ) : (
-                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: '12px', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.3)', color: 'var(--color-success)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
+                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: '12px', background: 'var(--color-success-muted, rgba(48,209,88,0.1))', border: '1px solid var(--color-success-muted, rgba(48,209,88,0.3))', color: 'var(--color-success)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
                 )}
                 
                 {['Professional', 'Modern Codecs', 'Standard', 'Web', 'Social Media', 'Broadcast', 'Audio', 'Other']
@@ -1761,8 +1761,8 @@ const Forge: React.FC = () => {
                 </select>
 
                 {/* Per-Job Video Overrides */}
-                <div style={{ marginTop: 10, padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6 }}>VIDEO</div>
+                <div style={{ marginTop: 10, padding: '8px', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
+                  <div className="dex-label-caps" style={{ marginBottom: 6 }}>VIDEO</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Resolution</div>
@@ -1808,8 +1808,8 @@ const Forge: React.FC = () => {
                 </div>
 
                 {/* Per-Job Audio Overrides */}
-                <div style={{ marginTop: 6, padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, marginBottom: 6 }}>AUDIO</div>
+                <div style={{ marginTop: 6, padding: '8px', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
+                  <div className="dex-label-caps" style={{ marginBottom: 6 }}>AUDIO</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Codec</div>
@@ -1858,7 +1858,7 @@ const Forge: React.FC = () => {
             )}
 
             {selectedJob.status === 'failed' && selectedJob.error && (
-              <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(255,69,58,0.1)', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ marginTop: '12px', padding: '8px', background: 'var(--color-error-muted, rgba(255,69,58,0.1))', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {Icons.alert} {selectedJob.error}
               </div>
             )}
@@ -1872,7 +1872,7 @@ const Forge: React.FC = () => {
 
       {/* Image Sequence Export */}
       {showImageSequence && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Image Sequence Export</span>
             <button aria-label="Close Image Sequence Export" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowImageSequence(false)}><DexIcon name="close" size={14} /></button>
@@ -1889,7 +1889,7 @@ const Forge: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>frame_[####].{imgSeqFormat}</div>
             </div>
             {imgSeqFormat === 'exr' && (
-              <div style={{ padding: 8, background: 'rgba(255,149,10,0.08)', borderRadius: 4, border: '1px solid rgba(255,149,10,0.15)', marginBottom: 10 }}>
+              <div style={{ padding: 8, background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.15))', marginBottom: 10 }}>
                 <div style={{ fontSize: 11, color: 'var(--color-warning)' }}>32-bit float HDR — ideal for VFX compositing</div>
               </div>
             )}
@@ -1929,7 +1929,7 @@ const Forge: React.FC = () => {
 
       {/* Audio Extraction */}
       {showAudioExtract && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Audio Extraction</span>
             <button aria-label="Close Audio Extraction" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowAudioExtract(false)}><DexIcon name="close" size={14} /></button>
@@ -2015,7 +2015,7 @@ const Forge: React.FC = () => {
 
       {/* Trim / Split Panel */}
       {showTrimSplit && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Trim & Split</span>
             <button aria-label="Close Trim and Split" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrimSplit(false)}><DexIcon name="close" size={14} /></button>
@@ -2049,7 +2049,7 @@ const Forge: React.FC = () => {
                 }
                 setJobs(prev => [...prev.filter(j => j.id !== selectedJob.id), ...newJobs]);
                 toast.success(`Split into ${segments} segments`); setShowTrimSplit(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid rgba(255,149,10,0.2)', background: 'rgba(255,149,10,0.08)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Split at Intervals</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Split at Intervals</button>
             </div>
           </div>
         </div>
@@ -2090,7 +2090,7 @@ const Forge: React.FC = () => {
 
       {/* Subtitle Burn-in */}
       {showSubBurnIn && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Subtitle Burn-in</span>
             <button aria-label="Close Subtitle Burn-in" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSubBurnIn(false)}><DexIcon name="close" size={14} /></button>
@@ -2147,7 +2147,7 @@ const Forge: React.FC = () => {
 
       {/* Conditional Encoding Rules */}
       {showConditionalRules && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 420, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Conditional Encoding Rules</span>
             <button aria-label="Close Conditional Rules" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConditionalRules(false)}><DexIcon name="close" size={14} /></button>
@@ -2171,7 +2171,7 @@ const Forge: React.FC = () => {
 
       {/* Preview Modal */}
       {showPreview && selectedJob && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 560, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(560px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Preview — {selectedJob.name}</span>
             <button aria-label="Close Preview" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowPreview(false)}><DexIcon name="close" size={14} /></button>
@@ -2204,7 +2204,7 @@ const Forge: React.FC = () => {
 
       {/* A/B Compare */}
       {showABCompare && selectedJob?.outputBlobUrl && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 680, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(680px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>A/B Compare — {selectedJob.name}</span>
             <button aria-label="Close A/B Compare" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowABCompare(false)}><DexIcon name="close" size={14} /></button>
@@ -2238,7 +2238,7 @@ const Forge: React.FC = () => {
 
       {/* Batch Rename */}
       {showBatchRename && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Rename Output</span>
             <button aria-label="Close Batch Rename" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowBatchRename(false)}><DexIcon name="close" size={14} /></button>
@@ -2281,7 +2281,7 @@ const Forge: React.FC = () => {
 
       {/* Concat / Merge */}
       {showConcat && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Concatenate / Merge Files</span>
             <button aria-label="Close Concat" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConcat(false)}><DexIcon name="close" size={14} /></button>
@@ -2393,7 +2393,7 @@ const Forge: React.FC = () => {
                   toast.error('Smart join failed: ' + (err?.message || 'Unknown error'));
                 }
                 setShowConcat(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid rgba(255,149,10,0.2)', background: 'rgba(255,149,10,0.08)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Smart Join (re-encode)</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Smart Join (re-encode)</button>
             </div>
           </div>
         </div>

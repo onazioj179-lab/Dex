@@ -79,7 +79,7 @@ const headerStyle: React.CSSProperties = {
 const searchInput: React.CSSProperties = {
   width: '100%', padding: '8px 12px', borderRadius: 6,
   border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
-  color: '#e5e5ea', fontSize: 13, outline: 'none',
+  color: 'var(--color-text-primary, #e5e5ea)', fontSize: 13, outline: 'none',
 };
 const listArea: React.CSSProperties = {
   flex: 1, overflowY: 'auto', padding: '12px 20px 20px',
@@ -242,7 +242,7 @@ const RecycleBin: React.FC = () => {
                   onClick={handleEmptyAll}
                 >Confirm Empty</button>
                 <button
-                  style={{ ...btnSmall, background: 'var(--color-border-subtle)', color: '#e5e5ea' }}
+                  style={{ ...btnSmall, background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #e5e5ea)' }}
                   onClick={() => setConfirmEmpty(false)}
                 >Cancel</button>
               </div>
@@ -262,7 +262,7 @@ const RecycleBin: React.FC = () => {
               onClick={() => setAppFilter(null)}
               style={{
                 ...btnSmall,
-                background: !appFilter ? 'rgba(10,132,255,0.25)' : 'var(--color-bg-hover)',
+                background: !appFilter ? 'var(--color-accent-soft, rgba(74,158,255,0.25))' : 'var(--color-bg-hover)',
                 color: !appFilter ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               }}
             >All</button>
@@ -272,7 +272,7 @@ const RecycleBin: React.FC = () => {
                 onClick={() => setAppFilter(appFilter === g.app ? null : g.app)}
                 style={{
                   ...btnSmall,
-                  background: appFilter === g.app ? 'rgba(10,132,255,0.25)' : 'var(--color-bg-hover)',
+                  background: appFilter === g.app ? 'var(--color-accent-soft, rgba(74,158,255,0.25))' : 'var(--color-bg-hover)',
                   color: appFilter === g.app ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 }}
               >{appLabel(g.app)} ({g.count})</button>

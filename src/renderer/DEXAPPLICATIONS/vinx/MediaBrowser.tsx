@@ -53,13 +53,13 @@ const searchInputStyle: React.CSSProperties = {
 
 const listItemStyle = (selected: boolean): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', cursor: 'pointer',
-  background: selected ? 'rgba(74,158,255,0.12)' : 'transparent',
+  background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'transparent',
   borderBottom: '1px solid var(--color-border-subtle)',
 });
 
 const gridItemStyle = (selected: boolean): React.CSSProperties => ({
   display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 4, cursor: 'pointer',
-  background: selected ? 'rgba(74,158,255,0.12)' : 'transparent',
+  background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'transparent',
   borderRadius: 3, width: 80,
 });
 
@@ -70,7 +70,7 @@ const thumbnailStyle: React.CSSProperties = {
 
 const effectItemStyle = (selected: boolean): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer',
-  background: selected ? 'rgba(74,158,255,0.12)' : 'transparent',
+  background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'transparent',
   borderBottom: '1px solid var(--color-border-subtle)',
   fontSize: 11, color: 'var(--color-text-primary)',
 });

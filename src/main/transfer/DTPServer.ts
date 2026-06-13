@@ -19,7 +19,7 @@ import * as os from 'os';
 import { EventEmitter } from 'events';
 import { app } from 'electron';
 import log from 'electron-log';
-import Database from 'better-sqlite3';
+import Database from '../native/safeSqlite';
 
 import {
   DTP_PORT, DTP_HEADER_SIZE, DTP_FRAME,

@@ -173,7 +173,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 14px',
     background: 'var(--color-bg-surface, #161618)',
     borderRadius: 'var(--radius-xl, 8px)',
-    border: '1px solid rgba(255,255,255,0.10)',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
     boxShadow: '0 8px 30px rgba(0,0,0,0.45)',
     fontFamily: 'var(--dex-font-ui, system-ui)',
     overflow: 'hidden',
@@ -191,12 +191,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent', border: 'none', borderRadius: 'var(--radius-md, 4px)',
     color: 'var(--color-text-secondary)', cursor: 'pointer',
   },
-  divider: { width: 1, height: 18, background: 'rgba(255,255,255,0.10)', margin: '0 2px' },
+  divider: { width: 1, height: 18, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))', margin: '0 2px' },
 };
 
 const miniCss = `
   [data-compact] .mini-action { transition: ${cssTransitions(['background', 'color', 'transform'], 'micro')}; }
-  [data-compact] .mini-action:hover { background: rgba(255,255,255,0.08); color: var(--color-text-primary); }
+  [data-compact] .mini-action:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)); color: var(--color-text-primary); }
   [data-compact] .mini-action:active { transform: scale(0.92); }
   [data-compact] .mini-expand:hover { color: var(--color-accent); }
 `;

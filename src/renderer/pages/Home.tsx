@@ -637,10 +637,7 @@ export const Home: React.FC = () => {
             padding: '0 24px',
             animation: 'fadeIn 0.35s ease-out 0.3s both',
           }}>
-            <div style={{
-              fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)',
-              marginBottom: 6, letterSpacing: '0.03em', textTransform: 'uppercase',
-            }}>
+            <div className="dex-label-caps" style={{ marginBottom: 6 }}>
               Activity
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -660,10 +657,7 @@ export const Home: React.FC = () => {
             padding: '0 24px',
             animation: 'fadeIn 0.35s ease-out 0.1s both',
           }}>
-            <div style={{
-              fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)',
-              marginBottom: 8, letterSpacing: '0.03em', textTransform: 'uppercase',
-            }}>
+            <div className="dex-label-caps" style={{ marginBottom: 8 }}>
               Recent Files
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -879,7 +873,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                         background: bg,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        border: isActive ? '2.5px solid #0a84ff' : '2px solid var(--color-border-subtle)',
+                        border: isActive ? '2.5px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-border-subtle)',
                         cursor: 'pointer', position: 'relative', overflow: 'hidden',
                         transition: 'border-color 0.2s, transform 0.15s',
                         transform: isActive ? 'scale(1.02)' : 'scale(1)',
@@ -904,27 +898,27 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             );
             return (
               <>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Images</div>
+                <div className="dex-label-caps" style={{ marginBottom: 10 }}>Images</div>
                 {renderGrid(imagePresets)}
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Presets</div>
+                <div className="dex-label-caps" style={{ marginBottom: 10 }}>Presets</div>
                 {renderGrid(staticPresets)}
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,59,48,0.6)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Black & Red</div>
                 {renderGrid(redPresets)}
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Live Wallpapers</div>
+                <div className="dex-label-caps" style={{ marginBottom: 10 }}>Live Wallpapers</div>
                 {renderGrid(livePresets)}
               </>
             );
           })()}
 
           {/* Custom image upload */}
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Custom</div>
+          <div className="dex-label-caps" style={{ marginBottom: 10 }}>Custom</div>
           <button
             onClick={handleFileSelect}
             className="dex-hover-bg"
             style={{
               width: '100%', height: 52, borderRadius: 8,
               background: 'var(--color-border-subtle)',
-              border: presetId === 'custom' ? '2px solid #0a84ff' : '2px solid var(--color-bg-hover)',
+              border: presetId === 'custom' ? '2px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-bg-hover)',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
@@ -1086,7 +1080,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
               boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
               backdropFilter: 'var(--blur-lg) saturate(180%)',
               WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
-              animation: 'ctxFadeIn 0.15s cubic-bezier(0.23, 1, 0.32, 1)',
+              animation: 'ctxFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             <style>{`@keyframes ctxFadeIn { from { opacity:0; transform:scale(0.92) translateY(-4px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
@@ -1095,7 +1089,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
                 onClick={() => { removeApp(ctxMenu.appId!); setCtxMenu(null); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px',
-                  background: 'transparent', border: 'none', color: '#FF453A', fontSize: 13, cursor: 'pointer', textAlign: 'left',
+                  background: 'transparent', border: 'none', color: 'var(--color-error, #FF453A)', fontSize: 13, cursor: 'pointer', textAlign: 'left',
                   borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.15)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
@@ -1152,7 +1146,7 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
       boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
       opacity: done ? 0.6 : 1,
       cursor: 'default',
-      transition: 'opacity 0.5s ease, transform 0.4s ease, background 0.15s ease, box-shadow 0.15s ease',
+      transition: 'opacity 0.18s ease, transform 0.18s ease, background 0.15s ease, box-shadow 0.15s ease',
       animation: done ? 'activityDone 0.5s ease-out' : 'fadeIn 0.2s ease-out',
       transform: done ? 'scale(0.97)' : 'scale(1)',
     }}>

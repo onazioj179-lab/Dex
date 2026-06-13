@@ -666,7 +666,7 @@ const UpdateManagerSection: React.FC = () => {
   const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle)' };
   const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' };
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
-  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '0.08em', padding: '16px 0 8px', textTransform: 'uppercase' as const };
+  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: '16px 0 8px', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
     width: 44, height: 26, borderRadius: 13, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
     background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
@@ -690,11 +690,11 @@ const UpdateManagerSection: React.FC = () => {
       {/* Status Banner */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 10,
-        background: info.updateAvailable ? 'rgba(10,132,255,0.08)' : 'rgba(48,209,88,0.08)',
-        border: `1px solid ${info.updateAvailable ? 'rgba(10,132,255,0.2)' : 'rgba(48,209,88,0.2)'}`,
+        background: info.updateAvailable ? 'var(--color-accent-soft, rgba(10,132,255,0.08))' : 'var(--color-success-muted, rgba(48,209,88,0.08))',
+        border: `1px solid ${info.updateAvailable ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'var(--color-success-muted, rgba(48,209,88,0.2))'}`,
         marginBottom: 20,
       }}>
-        <div style={{ width: 40, height: 40, borderRadius: 8, background: info.updateAvailable ? 'rgba(10,132,255,0.15)' : 'rgba(48,209,88,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 8, background: info.updateAvailable ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'var(--color-success-muted, rgba(48,209,88,0.15))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {info.updateAvailable ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           ) : (
@@ -1752,7 +1752,7 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
       </div>
       {status && (
         <div style={{ marginTop: 6, height: 4, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }} aria-hidden>
-          <div style={{ width: `${utilPct}%`, height: '100%', background: 'var(--color-accent, #0A84FF)', transition: 'width 0.3s ease' }} />
+          <div style={{ width: `${utilPct}%`, height: '100%', background: 'var(--color-accent, #0A84FF)', transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
         </div>
       )}
       {lastResult && (
@@ -2438,7 +2438,7 @@ export const Settings: React.FC = () => {
               style={{
                 padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                 border: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'rgba(10,132,255,0.15)' : 'transparent',
+                background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
                 color: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               }}
             >
@@ -2526,7 +2526,7 @@ export const Settings: React.FC = () => {
                 style={{
                   padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                  background: active ? 'rgba(10,132,255,0.15)' : 'transparent',
+                  background: active ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
                   color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 }}
               >{mode.label}</button>
@@ -2615,7 +2615,7 @@ export const Settings: React.FC = () => {
                 style={{
                   padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   border: settings.windowMaterial === mat ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                  background: settings.windowMaterial === mat ? 'rgba(10,132,255,0.15)' : 'transparent',
+                  background: settings.windowMaterial === mat ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
                   color: settings.windowMaterial === mat ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 }}
               >
@@ -2678,7 +2678,7 @@ export const Settings: React.FC = () => {
                 padding: '6px 14px',
                 borderRadius: 6,
                 border: settings.windowControls === style ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                background: settings.windowControls === style ? 'rgba(10,132,255,0.15)' : 'transparent',
+                background: settings.windowControls === style ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
                 color: settings.windowControls === style ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 fontSize: 12,
                 fontWeight: 500,
@@ -2998,7 +2998,7 @@ export const Settings: React.FC = () => {
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'monospace', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
-                  <div key={i} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
+                  <div key={i} style={{ padding: '6px 10px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
                 ))}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>Each code can only be used once. Store them securely.</div>
@@ -3169,10 +3169,10 @@ export const Settings: React.FC = () => {
       <div style={{
         padding: '20px', borderRadius: '10px', marginBottom: '20px',
         background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
-        border: '1px solid rgba(74,158,255,0.15)',
+        border: '1px solid var(--color-accent-light, rgba(74,158,255,0.15))',
         position: 'relative', overflow: 'hidden',
       }}>
-        <div style={{ position: 'absolute', top: -8, right: -8, width: 64, height: 64, borderRadius: '50%', background: 'rgba(74,158,255,0.04)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -8, right: -8, width: 64, height: 64, borderRadius: '50%', background: 'var(--color-accent-soft, rgba(74,158,255,0.04))', pointerEvents: 'none' }} />
         <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-accent)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
           Created by Onazi Treasure OJ
         </div>
@@ -3220,7 +3220,7 @@ export const Settings: React.FC = () => {
             <div key={card.title} style={{
               padding: '12px 14px', borderRadius: 8,
               border: '1px solid var(--color-border-subtle)',
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
             }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{card.title}</div>
               <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{card.body}</div>
@@ -3288,7 +3288,7 @@ export const Settings: React.FC = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 14 }}>
           {DATA_CATEGORIES.map(category => (
-            <div key={category.id} style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.035)' }}>
+            <div key={category.id} style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>{category.label}</div>
               <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
@@ -3701,8 +3701,8 @@ export const Settings: React.FC = () => {
               onClick={() => setNetworkMode(m)}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12,
-                background: selected ? 'rgba(74,158,255,0.10)' : 'transparent',
-                border: `1px solid ${selected ? 'rgba(74,158,255,0.40)' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
+                background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.10))' : 'transparent',
+                border: `1px solid ${selected ? 'var(--color-accent-light, rgba(74,158,255,0.40))' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
                 borderRadius: 6, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.12s, border-color 0.12s',
@@ -4344,7 +4344,7 @@ export const Settings: React.FC = () => {
         .settings-nav[data-active="true"]::before {
           content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
           width: 2px; background: var(--color-accent); border-radius: 2px;
-          box-shadow: 0 0 6px rgba(74,158,255,0.55);
+          box-shadow: 0 0 6px var(--color-accent-light, rgba(74,158,255,0.55));
         }
         .settings-btn:hover { background: var(--color-bg-hover) !important; }
         .settings-btn:active { transform: scale(0.97); }
@@ -4356,7 +4356,7 @@ export const Settings: React.FC = () => {
         .settings-shell input[type="range"] { accent-color: var(--color-accent); }
         .settings-shell input[type="checkbox"] { accent-color: var(--color-accent); }
         .settings-shell input[type="color"] { border-radius: 6px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
-        .settings-shell button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14), 0 6px 18px rgba(10,132,255,0.18); }
+        .settings-shell button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--color-border-subtle, rgba(255,255,255,0.14)), 0 6px 18px var(--color-accent-muted, rgba(10,132,255,0.18)); }
         .settings-shell button, .settings-shell input, .settings-shell select { transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.12s ease; }
         .settings-content::-webkit-scrollbar { width: 6px; }
         .settings-content::-webkit-scrollbar-track { background: transparent; }
@@ -4429,7 +4429,7 @@ export const Settings: React.FC = () => {
         {countChangedSettings(settings) > 0 && (
           <div style={{ 
             padding: '6px 12px', margin: '0 12px 8px', borderRadius: 4,
-            background: 'rgba(10,132,255,0.1)', border: '1px solid rgba(10,132,255,0.2)',
+            background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))',
             fontSize: 10, color: 'var(--color-accent)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
@@ -4469,7 +4469,7 @@ export const Settings: React.FC = () => {
               if (items.length === 0) return null;
               return (
                 <React.Fragment key={cat.label}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.8px', padding: '12px 14px 4px' }}>{cat.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: '12px 14px 4px' }}>{cat.label}</div>
                   {items.map(section => (
                     <button
                       key={section.id}
@@ -4546,7 +4546,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.02)',
+    boxShadow: 'inset -1px 0 0 var(--color-border-subtle, rgba(255,255,255,0.02))',
   },
   sidebarHeader: {
     height: '36px',
@@ -4625,7 +4625,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
     textTransform: 'uppercase',
-    letterSpacing: '0.06em',
+    letterSpacing: 'var(--dex-tracking-label, 0.08em)',
     marginTop: '28px',
     marginBottom: '10px',
   },
@@ -4634,7 +4634,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
     textTransform: 'uppercase',
-    letterSpacing: '0.06em',
+    letterSpacing: 'var(--dex-tracking-label, 0.08em)',
     marginTop: '12px',
     marginBottom: '10px',
   },
@@ -4688,7 +4688,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: '2px',
     top: '50%',
     transform: 'translateY(-50%)',
-    transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)',
+    transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
   },
   
 
@@ -4742,7 +4742,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 16px rgba(10,132,255,0.3), 0 1px 3px rgba(0,0,0,0.2)',
+    boxShadow: '0 4px 16px var(--color-accent-muted, rgba(10,132,255,0.3)), 0 1px 3px rgba(0,0,0,0.2)',
   },
   appInfo: {
     display: 'flex',

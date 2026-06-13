@@ -449,7 +449,7 @@ export const Tasks: React.FC = () => {
     switch (priority) {
       case 'high': return 'var(--color-error)';
       case 'medium': return 'var(--color-warning)';
-      case 'low': return '#8e8e93';
+      case 'low': return 'var(--color-text-tertiary, #8e8e93)';
     }
   };
 
@@ -620,8 +620,8 @@ export const Tasks: React.FC = () => {
                       onClick={() => { if (dayTasks.length > 0) { setSelectedList('scheduled'); setShowCalendarView(false); } }}
                       style={{
                         textAlign: 'center', padding: '4px 2px', borderRadius: 4, cursor: dayTasks.length > 0 ? 'pointer' : 'default',
-                        background: isToday ? 'rgba(10,132,255,0.2)' : dayTasks.length > 0 ? 'var(--color-border-subtle)' : 'transparent',
-                        border: isToday ? '1px solid rgba(10,132,255,0.4)' : '1px solid transparent',
+                        background: isToday ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : dayTasks.length > 0 ? 'var(--color-border-subtle)' : 'transparent',
+                        border: isToday ? '1px solid var(--color-accent-soft, rgba(10,132,255,0.4))' : '1px solid transparent',
                       }}
                     >
                       <div style={{ fontSize: 11, color: isToday ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontWeight: isToday ? 600 : 400 }}>{day}</div>
@@ -817,7 +817,7 @@ export const Tasks: React.FC = () => {
                           onClick={() => toggleSubtask(task.id, sub.id)}
                           style={{
                             width: 16, height: 16, borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
-                            border: sub.completed ? '2px solid #30d158' : '2px solid var(--color-border)',
+                            border: sub.completed ? '2px solid var(--color-success, #30d158)' : '2px solid var(--color-border)',
                             background: sub.completed ? 'var(--color-success)' : 'transparent',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                           }}
@@ -846,8 +846,8 @@ export const Tasks: React.FC = () => {
           
           {sortedTasks.length === 0 && (
             <div style={styles.empty}>
-              <div style={{ width: 72, height: 72, borderRadius: 14, background: 'rgba(48,209,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <div style={{ width: 72, height: 72, borderRadius: 14, background: 'var(--color-success-muted, rgba(48,209,88,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #30d158)" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               </div>
               <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
                 {selectedList === 'today' ? 'All clear for today' : 'No tasks here'}
@@ -887,7 +887,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     display: 'flex',
     overflow: 'hidden',
-    background: '#1C1C20',
+    background: 'var(--color-bg-elevated, #1C1C20)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
     fontSize: '13px',

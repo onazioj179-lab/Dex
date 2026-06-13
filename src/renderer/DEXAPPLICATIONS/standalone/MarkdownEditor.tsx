@@ -48,18 +48,18 @@ Happy writing!
 
     // Code blocks (before other processing)
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre style="background:rgba(255,255,255,0.06);padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;line-height:1.5"><code>${code.trim()}</code></pre>`
+      `<pre style="background:var(--color-bg-hover, rgba(255,255,255,0.06));padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;line-height:1.5"><code>${code.trim()}</code></pre>`
     );
 
     // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:3px;font-size:0.9em">$1</code>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:var(--color-bg-hover, rgba(255,255,255,0.08));padding:2px 6px;border-radius:3px;font-size:0.9em">$1</code>');
 
     // Headings
     html = html.replace(/^###### (.+)$/gm, '<h6 style="font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary)">$1</h6>');
     html = html.replace(/^##### (.+)$/gm, '<h5 style="font-size:14px;margin:12px 0 6px">$1</h5>');
     html = html.replace(/^#### (.+)$/gm, '<h4 style="font-size:15px;margin:14px 0 8px">$1</h4>');
     html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:17px;margin:16px 0 8px">$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:20px;margin:20px 0 10px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.1)">$1</h2>');
+    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:20px;margin:20px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--color-border, rgba(255,255,255,0.1))">$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:26px;margin:24px 0 12px;font-weight:700">$1</h1>');
 
     // Bold + Italic
@@ -71,17 +71,17 @@ Happy writing!
     html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
     // Blockquotes
-    html = html.replace(/^&gt; (.+)$/gm, '<blockquote style="border-left:3px solid #0a84ff;margin:8px 0;padding:4px 12px;color:var(--color-text-secondary)">$1</blockquote>');
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote style="border-left:3px solid var(--color-accent, #4a9eff);margin:8px 0;padding:4px 12px;color:var(--color-text-secondary)">$1</blockquote>');
 
     // Horizontal rules
-    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:16px 0"/>');
+    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--color-border, rgba(255,255,255,0.1));margin:16px 0"/>');
 
     // Tables
     html = html.replace(/^\|(.*)\|$/gm, (match) => {
       const cells = match.split('|').filter(c => c.trim());
       if (cells.every(c => /^[\s-:]+$/.test(c))) return ''; // separator row
       const tag = 'td';
-      return `<tr>${cells.map(c => `<${tag} style="padding:6px 12px;border:1px solid rgba(255,255,255,0.1)">${c.trim()}</${tag}>`).join('')}</tr>`;
+      return `<tr>${cells.map(c => `<${tag} style="padding:6px 12px;border:1px solid var(--color-border, rgba(255,255,255,0.1))">${c.trim()}</${tag}>`).join('')}</tr>`;
     });
     html = html.replace(/(<tr>[\s\S]*?<\/tr>)/g, (match) => {
       if (match.includes('<tr>')) return `<table style="border-collapse:collapse;margin:8px 0;width:100%">${match}</table>`;
@@ -99,7 +99,7 @@ Happy writing!
     html = html.replace(/\[ \]/g, '[ ]');
 
     // Links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#0a84ff;text-decoration:none">$1</a>');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--color-accent, #4a9eff);text-decoration:none">$1</a>');
 
     // Images
     html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" style="max-width:100%;border-radius:6px;margin:8px 0"/>');
@@ -183,7 +183,7 @@ Happy writing!
             {(['editor', 'split', 'preview'] as const).map(mode => (
               <button
                 key={mode}
-                style={{ ...s.viewBtn, background: viewMode === mode ? 'rgba(10,132,255,0.2)' : 'transparent', color: viewMode === mode ? '#0a84ff' : 'var(--color-text-secondary)' }}
+                style={{ ...s.viewBtn, background: viewMode === mode ? 'var(--color-accent-soft, rgba(74,158,255,0.2))' : 'transparent', color: viewMode === mode ? 'var(--color-accent, #4a9eff)' : 'var(--color-text-secondary)' }}
                 onClick={() => setViewMode(mode)}
                 aria-label={`${mode} view`}
               >
@@ -194,7 +194,7 @@ Happy writing!
           <button style={s.fmtBtn} onClick={() => setWordWrap(!wordWrap)} title="Toggle word wrap" aria-label="Toggle word wrap">
             {wordWrap ? '↩' : '→'}
           </button>
-          <button style={{ ...s.fmtBtn, color: '#0a84ff' }} onClick={exportMd} title="Download .md" aria-label="Export markdown">
+          <button style={{ ...s.fmtBtn, color: 'var(--color-accent, #4a9eff)' }} onClick={exportMd} title="Download .md" aria-label="Export markdown">
             DL
           </button>
         </div>
@@ -253,7 +253,7 @@ const s: Record<string, React.CSSProperties> = {
     outline: 'none', width: 130, padding: '4px 6px',
   },
   divider: {
-    width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 4px',
+    width: 1, height: 18, background: 'var(--color-border, rgba(255,255,255,0.1))', margin: '0 4px',
   },
   fmtBtn: {
     width: 28, height: 28, borderRadius: 4, border: 'none',

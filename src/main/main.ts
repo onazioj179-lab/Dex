@@ -139,6 +139,7 @@ import { initializeEcosystemIntegration, shutdownEcosystemIntegration } from './
 import { initializeUXEnhancement, shutdownUXEnhancement } from './core/UXEnhancement';
 import { initializeSecurityLayer, shutdownSecurityLayer } from './core/SecurityLayer';
 import { initializeHardwareOptimization, shutdownHardwareOptimization } from './core/HardwareOptimization';
+import { getPerfTier, presetFor } from './compute/PerfTier';
 
 // Runtime
 import { actionEngine } from './runtime/ActionEngine';
@@ -401,6 +402,7 @@ class DexApp {
   private tray: Tray | null = null;
   private isQuitting = false;
   private shutdownStarted = false;
+  private processGuardsInstalled = false;
   private featureSuiteManagers: Array<[string, { initialize: (win: BrowserWindow) => void; destroy?: () => void }]> = [];
 
   // Core Services
@@ -448,11 +450,86 @@ class DexApp {
     this.eventMonitor = new EventMonitor(this.ruleEngine, this.logger);
   }
 
+  /**
+   * Last-resort process guards. An uncaught exception or unhandled rejection in
+   * a subsystem must never silently terminate DEX — log it, record it for
+   * diagnostics, and keep running. A repeated-fatal counter trips a safe exit
+   * rather than thrashing forever.
+   */
+  private setupProcessGuards(): void {
+    if (this.processGuardsInstalled) return;
+    this.processGuardsInstalled = true;
+    let fatalCount = 0;
+    let fatalWindowStart = Date.now();
+    const FATAL_WINDOW_MS = 30000;
+    const FATAL_LIMIT = 8;
+
+    const note = (kind: string, detail: string) => {
+      const now = Date.now();
+      if (now - fatalWindowStart > FATAL_WINDOW_MS) { fatalCount = 0; fatalWindowStart = now; }
+      fatalCount++;
+      try { securityAudit.log('system', kind, detail.slice(0, 500)); } catch { /* audit optional */ }
+      try {
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          this.mainWindow.webContents.send('main:process-error', { kind, detail: detail.slice(0, 200) });
+        }
+      } catch { /* renderer optional */ }
+      if (fatalCount >= FATAL_LIMIT) {
+        log.error(`[DEX] ${FATAL_LIMIT} fatal main-process errors in ${FATAL_WINDOW_MS / 1000}s — exiting to avoid a thrash loop`);
+        try { app.exit(1); } catch { process.exit(1); }
+      }
+    };
+
+    process.on('uncaughtException', (err) => {
+      log.error('[DEX] Uncaught exception (contained):', err);
+      note('uncaught-exception', String(err?.stack || err?.message || err));
+    });
+    process.on('unhandledRejection', (reason) => {
+      log.error('[DEX] Unhandled promise rejection (contained):', reason);
+      note('unhandled-rejection', String((reason as { stack?: string; message?: string })?.stack || (reason as { message?: string })?.message || reason));
+    });
+    log.info('[DEX] Process crash guards installed');
+  }
+
+  /** Path to the small JSON sentinel that records GPU-process crash counts. */
+  private gpuStatePath(): string {
+    try { return path.join(app.getPath('userData'), 'gpu-state.json'); }
+    catch { return path.join(os.tmpdir(), 'dex-gpu-state.json'); }
+  }
+
+  /** True when prior sessions crashed the GPU process enough to warrant software rendering. */
+  private shouldDisableHwAccel(): boolean {
+    if (process.env.DEX_FORCE_GPU === '1') return false;
+    if (process.env.DEX_DISABLE_GPU === '1') return true;
+    try {
+      const raw = fs.readFileSync(this.gpuStatePath(), 'utf-8');
+      const s = JSON.parse(raw) as { gpuCrashes?: number };
+      return (s.gpuCrashes ?? 0) >= 2;
+    } catch { return false; }
+  }
+
+  /** Record a GPU-process crash; persists the running count for next launch. */
+  private recordGpuCrash(): void {
+    try {
+      const p = this.gpuStatePath();
+      let count = 0;
+      try { count = (JSON.parse(fs.readFileSync(p, 'utf-8')) as { gpuCrashes?: number }).gpuCrashes ?? 0; } catch { /* first crash */ }
+      fs.writeFileSync(p, JSON.stringify({ gpuCrashes: count + 1, at: Date.now() }));
+      log.warn(`[DEX] GPU process crash recorded (${count + 1}); will disable hardware acceleration after 2`);
+    } catch (e) { log.warn('[DEX] Failed to record GPU crash:', e); }
+  }
+
   async initialize(): Promise<void> {
     log.info('[DEX] ========================================');
     log.info('[DEX]   STARTUP SEQUENCE INITIATED');
     log.info('[DEX] ========================================');
     startupTimeline.mark('process:entry');
+
+    // Install global crash guards FIRST so a stray throw or rejected promise in
+    // any subsystem is logged and contained instead of silently killing the
+    // main process (Node terminates on an unhandled uncaughtException by
+    // default). This is the backstop for "DEX just disappears on some machines".
+    this.setupProcessGuards();
 
     const installerLifecycleAction = getInstallerLifecycleAction();
     if (installerLifecycleAction) {
@@ -494,15 +571,25 @@ class DexApp {
       try { this.handleQuickActionArgv(commandLine); } catch (err) { log.warn('[DEX] Quick-action argv handling failed:', err); }
     });
 
-    // GPU command-line switches MUST be applied BEFORE app.whenReady()
-    app.commandLine.appendSwitch('enable-gpu-rasterization');
-    app.commandLine.appendSwitch('enable-accelerated-video-decode');
-    app.commandLine.appendSwitch('enable-accelerated-video-encode');
-    // Vaapi is Linux-only; PlatformHEVCDecoderSupport works cross-platform
-    const gpuFeatures = isLinux
-      ? 'VaapiVideoDecoder,VaapiVideoEncoder,PlatformHEVCDecoderSupport'
-      : 'PlatformHEVCDecoderSupport';
-    app.commandLine.appendSwitch('enable-features', gpuFeatures);
+    // GPU resilience: if previous sessions saw repeated GPU-process crashes
+    // (common on flaky integrated GPUs / stale drivers), boot with hardware
+    // acceleration OFF so the user gets a working software-rendered UI instead
+    // of a blank screen. The flag is set by the child-process-gone handler.
+    const hwAccelDisabled = this.shouldDisableHwAccel();
+    if (hwAccelDisabled) {
+      log.warn('[DEX] Hardware acceleration disabled this session (prior GPU crashes) — using software rendering');
+      app.disableHardwareAcceleration();
+    } else {
+      // GPU command-line switches MUST be applied BEFORE app.whenReady()
+      app.commandLine.appendSwitch('enable-gpu-rasterization');
+      app.commandLine.appendSwitch('enable-accelerated-video-decode');
+      app.commandLine.appendSwitch('enable-accelerated-video-encode');
+      // Vaapi is Linux-only; PlatformHEVCDecoderSupport works cross-platform
+      const gpuFeatures = isLinux
+        ? 'VaapiVideoDecoder,VaapiVideoEncoder,PlatformHEVCDecoderSupport'
+        : 'PlatformHEVCDecoderSupport';
+      app.commandLine.appendSwitch('enable-features', gpuFeatures);
+    }
 
     // Auto-scale V8 heap based on system RAM (optimized for 5GB effective memory)
     // Ultra-low (<=2GB): 256MB, Low (<=4GB): 25%, Mid (<=8GB): 35%, High (>8GB): 45%, capped at 4GB
@@ -943,12 +1030,25 @@ class DexApp {
       log.warn('[DEX] Window closed before subsystem init — skipping');
       return;
     }
+
+    // Pace startup by performance tier. On weak machines, firing ~30 subsystem
+    // .start() calls in one synchronous burst spikes memory and can thrash or
+    // crash the process. `breathe()` yields to the event loop between groups on
+    // low tiers so allocation/GC can settle; on capable machines it's a no-op.
+    const perfTier = getPerfTier();
+    const lowTier = perfTier === 'ultra-low' || perfTier === 'low';
+    const breathe = (): Promise<void> => lowTier
+      ? new Promise(resolve => setTimeout(resolve, perfTier === 'ultra-low' ? 24 : 12))
+      : Promise.resolve();
+    log.info(`[DEX] Subsystem init pacing: tier=${perfTier} (paced=${lowTier})`);
+
     // =======================================================================
     // BACKEND PERFORMANCE ENGINE + BOOSTER (sequential to reduce memory spikes)
     // =======================================================================
     await initializePerformanceEngine();
     await initializePerformanceBooster();
-    
+    await breathe();
+
     // =======================================================================
     // VISUAL SMOOTHNESS + System Integration (parallelized — all fire-and-forget .start())
     // =======================================================================
@@ -959,6 +1059,7 @@ class DexApp {
     InputLatencyController.start();
     SessionStabilityManager.start();
     PerformanceEnforcer.start();
+    await breathe();
     systemMapController.start();
     connectionController.start();
     deviceController.start();
@@ -970,6 +1071,7 @@ class DexApp {
     pythonExecutor.start();
     performanceGuardian.start();
     performanceGuardian.recordStartupTime(Date.now() - 5000);
+    await breathe();
 
     // File & Workflow Management
     fileManagerController.initialize();
@@ -991,8 +1093,19 @@ class DexApp {
       catch (err: any) { return { error: err.message }; }
     });
 
+    // Authoritative performance tier for the renderer (so apps stop re-detecting
+    // host capability independently — one source of truth, main side).
+    ipcMain.handle('perf:getTier', () => {
+      try {
+        const tier = getPerfTier();
+        return { tier, preset: presetFor(tier) };
+      } catch (err: any) { return { error: err?.message || String(err) }; }
+    });
+
     // PlatformHealth facade — single combined snapshot via system:platformHealth
     initializePlatformHealth();
+
+    await breathe();
 
     // Runtime Services
     resourceManager.start();
@@ -1479,6 +1592,16 @@ class DexApp {
     this.mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
       log.error(`[DEX] Renderer failed: ${errorCode} - ${errorDescription}`);
     });
+
+    // GPU / utility child-process crash detection. Repeated GPU crashes (flaky
+    // integrated GPUs, stale drivers) trip a persisted flag so the next launch
+    // boots with software rendering instead of a blank screen.
+    app.on('child-process-gone', (_event, details) => {
+      log.warn(`[DEX] Child process gone: type=${details.type} reason=${details.reason}`);
+      if (details.type === 'GPU' && details.reason !== 'clean-exit') {
+        this.recordGpuCrash();
+      }
+    });
     
     this.mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
       const tag = level >= 3 ? 'error' : level >= 2 ? 'warn' : 'info';
@@ -1488,6 +1611,13 @@ class DexApp {
     this.mainWindow.webContents.on('did-finish-load', () => {
       log.info('[DEX] Renderer finished loading');
       this.logger.info('Renderer finished loading');
+
+      // After a stable run, clear the GPU crash count so a one-off crash never
+      // permanently forces software rendering. A GPU that keeps crashing at
+      // startup re-trips the flag before this fires.
+      setTimeout(() => {
+        try { fs.rmSync(this.gpuStatePath(), { force: true }); } catch { /* nothing to clear */ }
+      }, 60000);
       
       // Register window with performance systems (safely)
       if (this.mainWindow) {
@@ -1535,9 +1665,12 @@ class DexApp {
           return;
         }
 
+        // Back off with each successive crash (and add jitter) so a renderer
+        // that crashes on load doesn't reload-storm: 0.5s, 1s, 2s... capped 5s.
+        const reloadDelay = Math.min(500 * 2 ** (crashCount - 1), 5000) + Math.floor(Math.random() * 250);
         setTimeout(() => {
           if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-            log.info('[DEX] Reloading renderer after crash...');
+            log.info(`[DEX] Reloading renderer after crash (delay ${reloadDelay}ms)...`);
             this.mainWindow.webContents.reload();
             setTimeout(() => {
               if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -1548,7 +1681,7 @@ class DexApp {
               }
             }, 1000);
           }
-        }, 500);
+        }, reloadDelay);
       });
 
       this.mainWindow.on('unresponsive', () => {

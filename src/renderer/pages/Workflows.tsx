@@ -433,7 +433,7 @@ const WorkflowNodeCard: React.FC<{
             border: `1.5px solid ${borderColor}`,
             display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px',
             cursor: 'grab', userSelect: 'none',
-            boxShadow: selected ? '0 0 0 2px rgba(10,132,255,0.25)' : 'none',
+            boxShadow: selected ? '0 0 0 2px var(--color-accent-muted, rgba(10,132,255,0.25))' : 'none',
           }}
         >
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', flexShrink: 0 }}>
@@ -444,10 +444,10 @@ const WorkflowNodeCard: React.FC<{
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{node.category}</div>
           </div>
           {executing && (
-            <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid #0a84ff', borderTopColor: 'transparent' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid var(--color-accent, #0a84ff)', borderTopColor: 'transparent' }} />
           )}
           {executionDone && (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #30d158)" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           )}
         </div>
       </foreignObject>
@@ -456,7 +456,7 @@ const WorkflowNodeCard: React.FC<{
       {/* Output connector (bottom center) */}
       <circle
         cx={node.x + NODE_WIDTH / 2} cy={node.y + NODE_HEIGHT} r={CONNECTOR_R}
-        fill="var(--color-accent)" stroke="rgba(10,132,255,0.5)" strokeWidth="1"
+        fill="var(--color-accent)" stroke="var(--color-accent-light, rgba(10,132,255,0.5))" strokeWidth="1"
         style={{ cursor: 'crosshair' }}
         onMouseDown={(e) => { e.stopPropagation(); onConnectStart(e); }}
       />
@@ -903,7 +903,7 @@ export const Workflows: React.FC = () => {
                 </div>
               ) : filteredWorkflows.length === 0 ? (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' as const }}>
-                  <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(45deg)' }}>
+                  <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'var(--color-bg-hover, rgba(255,255,255,0.03))', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))', transform: 'rotate(45deg)' }}>
                     <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-text-muted)' }}><DexIcon name="zap" size={24} /></span>
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '16px', color: 'var(--color-text-primary)' }}>
@@ -1001,7 +1001,7 @@ export const Workflows: React.FC = () => {
               <div style={styles.canvasContainer}>
                 {nodes.length === 0 ? (
                   <div style={styles.emptyEditor}>
-                    <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', transform: 'rotate(45deg)' }}>
+                    <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'var(--color-bg-hover, rgba(255,255,255,0.03))', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))', transform: 'rotate(45deg)' }}>
                       <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-accent)' }}><DexIcon name="zap" size={24} /></span>
                     </div>
                     <span style={{ fontSize: 16, fontWeight: 600, marginTop: 16 }}>Add actions to build your workflow</span>
@@ -1122,7 +1122,7 @@ export const Workflows: React.FC = () => {
 
                     {/* Connections info */}
                     <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--color-bg-hover)' }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>CONNECTIONS</div>
+                      <div className="dex-label-caps" style={{ marginBottom: 8 }}>CONNECTIONS</div>
                       {connections.filter(c => c.from === selectedNode.id || c.to === selectedNode.id).map((c, i) => {
                         const otherNode = nodes.find(n => n.id === (c.from === selectedNode.id ? c.to : c.from));
                         return (
@@ -1194,7 +1194,7 @@ export const Workflows: React.FC = () => {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%', height: '100%', display: 'flex',
-    background: '#1C1C20',
+    background: 'var(--color-bg-base, #1C1C20)',
     color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px', overflow: 'hidden',
   },
   sidebar: {

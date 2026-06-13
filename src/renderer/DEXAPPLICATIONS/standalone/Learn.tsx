@@ -133,6 +133,8 @@ const CARD: React.CSSProperties = {
   borderRadius: 10, padding: '16px 18px',
   border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
 };
+// Subtle row dividers shared across cards.
+const ROW_DIVIDER = '1px solid var(--color-border-subtle, rgba(255,255,255,.04))';
 const CARD_TITLE: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const,
   letterSpacing: '0.04em', opacity: 0.5, marginBottom: 12,
@@ -143,13 +145,13 @@ const STAT_ROW: React.CSSProperties = {
 };
 const BAR_BG: React.CSSProperties = {
   flex: 1, height: 4, borderRadius: 2, marginLeft: 12,
-  background: 'rgba(255,255,255,.06)', overflow: 'hidden',
+  background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden',
 };
 const TAB_STYLE = (active: boolean): React.CSSProperties => ({
   padding: '6px 14px', fontSize: 12, fontWeight: active ? 600 : 400,
   borderRadius: 6, cursor: 'pointer', border: 'none',
-  background: active ? 'rgba(255,255,255,.1)' : 'transparent',
-  color: active ? '#fff' : 'rgba(255,255,255,.5)',
+  background: active ? 'var(--color-bg-hover, rgba(255,255,255,.1))' : 'transparent',
+  color: active ? 'var(--color-text-primary, #fff)' : 'var(--color-text-tertiary, rgba(255,255,255,.5))',
   transition: 'all .15s ease',
 });
 
@@ -387,7 +389,7 @@ const Learn: React.FC = () => {
                 <div style={CARD_TITLE}>Suggestions</div>
                 {suggestions.slice(0, 5).map((s, i) => (
                   <div key={i} style={{
-                    padding: '8px 0', borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none',
+                    padding: '8px 0', borderBottom: i < suggestions.length - 1 ? ROW_DIVIDER : 'none',
                     display: 'flex', alignItems: 'center', gap: 10,
                   }}>
                     <div style={{
@@ -401,7 +403,7 @@ const Learn: React.FC = () => {
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</div>
                       <div style={{ fontSize: 11, opacity: 0.45 }}>{s.reason}</div>
                     </div>
-                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'rgba(255,255,255,.04)', borderRadius: 3 }}>{s.type}</div>
+                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'var(--color-bg-hover, rgba(255,255,255,.04))', borderRadius: 3 }}>{s.type}</div>
                   </div>
                 ))}
               </div>
@@ -433,7 +435,7 @@ const Learn: React.FC = () => {
                     <div key={i} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '6px 0',
-                      borderBottom: i < section.items.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none',
+                      borderBottom: i < section.items.length - 1 ? ROW_DIVIDER : 'none',
                     }}>
                       <span style={{ fontSize: 13, opacity: 0.8 }}>{item.desc}</span>
                       <div style={{ display: 'flex', gap: 4 }}>
@@ -443,8 +445,8 @@ const Learn: React.FC = () => {
                               {ki > 0 && <span style={{ fontSize: 10, opacity: 0.3, lineHeight: '22px' }}>+</span>}
                               <span style={{
                                 padding: '2px 8px', fontSize: 11, fontWeight: 600,
-                                background: 'rgba(255,255,255,.08)', borderRadius: 4,
-                                border: '1px solid rgba(255,255,255,.06)',
+                                background: 'var(--color-bg-hover, rgba(255,255,255,.08))', borderRadius: 4,
+                                border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
                                 fontFamily: 'var(--font-mono, monospace)',
                                 minWidth: 24, textAlign: 'center' as const,
                               }}>{key.trim()}</span>
@@ -453,8 +455,8 @@ const Learn: React.FC = () => {
                         ) : (
                           <span style={{
                             padding: '2px 8px', fontSize: 11, fontWeight: 600,
-                            background: 'rgba(255,255,255,.08)', borderRadius: 4,
-                            border: '1px solid rgba(255,255,255,.06)',
+                            background: 'var(--color-bg-hover, rgba(255,255,255,.08))', borderRadius: 4,
+                            border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
                             fontFamily: 'var(--font-mono, monospace)',
                           }}>{item.keys}</span>
                         )}
@@ -487,7 +489,7 @@ const Learn: React.FC = () => {
                     <div key={i} style={{
                       display: 'flex', alignItems: 'flex-start', gap: 8,
                       padding: '5px 0',
-                      borderBottom: i < app.tips.length - 1 ? '1px solid rgba(255,255,255,.03)' : 'none',
+                      borderBottom: i < app.tips.length - 1 ? ROW_DIVIDER : 'none',
                     }}>
                       <span style={{ fontSize: 10, opacity: 0.3, marginTop: 2, flexShrink: 0 }}>•</span>
                       <span style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{tip}</span>
@@ -553,7 +555,7 @@ const Learn: React.FC = () => {
                         <div style={{ height: 48, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                           <div style={{
                             width: '80%', borderRadius: 2,
-                            background: total ? 'rgba(94,92,230,.6)' : 'rgba(255,255,255,.04)',
+                            background: total ? 'rgba(94,92,230,.6)' : 'var(--color-bg-hover, rgba(255,255,255,.04))',
                             height: `${Math.max(4, (total / maxTotal) * 100)}%`,
                           }} />
                         </div>
@@ -579,9 +581,9 @@ const Learn: React.FC = () => {
                     return (
                       <div key={idx} style={{
                         flex: 1, borderRadius: 2,
-                        background: total ? 'rgba(100,210,255,.5)' : 'rgba(255,255,255,.03)',
+                        background: total ? 'rgba(100,210,255,.5)' : 'var(--color-bg-hover, rgba(255,255,255,.03))',
                         height: `${Math.max(4, (total / maxTotal) * 100)}%`,
-                        transition: 'height .3s ease',
+                        transition: 'height .18s cubic-bezier(0.4,0,0.2,1)',
                       }} title={`${HOUR_LABELS[idx]}: ${total} actions`} />
                     );
                   })}
@@ -602,7 +604,7 @@ const Learn: React.FC = () => {
                   {patterns.searchPatterns.slice(0, 20).map((q, i) => (
                     <span key={i} style={{
                       padding: '4px 10px', fontSize: 12, borderRadius: 4,
-                      background: 'rgba(255,255,255,.05)', opacity: 0.7,
+                      background: 'var(--color-bg-hover, rgba(255,255,255,.05))', opacity: 0.7,
                     }}>{q}</span>
                   ))}
                 </div>
@@ -616,7 +618,7 @@ const Learn: React.FC = () => {
                 {suggestions.map((s, i) => (
                   <div key={i} style={{
                     padding: '10px 0',
-                    borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,.04)' : 'none',
+                    borderBottom: i < suggestions.length - 1 ? ROW_DIVIDER : 'none',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</span>
@@ -712,7 +714,7 @@ const Learn: React.FC = () => {
                       padding: '14px 16px',
                       borderRadius: 8,
                       border: powerProfile === profile.id ? `2px solid ${profile.color}` : '2px solid transparent',
-                      background: powerProfile === profile.id ? `${profile.color}15` : 'rgba(255,255,255,.03)',
+                      background: powerProfile === profile.id ? `${profile.color}15` : 'var(--color-bg-hover, rgba(255,255,255,.03))',
                       cursor: 'pointer',
                       textAlign: 'left' as const,
                       transition: 'all 0.2s ease',
@@ -776,12 +778,12 @@ const Learn: React.FC = () => {
                     onClick={() => (window as any).electron?.invoke?.(item.action)}
                     style={{
                       padding: '10px 12px', borderRadius: 6, border: 'none',
-                      background: 'rgba(255,255,255,.05)', cursor: 'pointer',
+                      background: 'var(--color-bg-hover, rgba(255,255,255,.05))', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       fontSize: 11, color: 'inherit', transition: 'background 0.15s ease',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.1)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,.05)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,.1))')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,.05))')}
                   >
                     <DexIcon name={item.icon as any} size={14} />
                     {item.label}

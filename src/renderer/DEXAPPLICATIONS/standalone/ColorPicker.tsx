@@ -174,7 +174,7 @@ const ColorPicker: React.FC = () => {
 
       {/* Presets */}
       <div style={s.section}>
-        <div style={s.sectionLabel}>Presets</div>
+        <div className="dex-label-caps" style={s.sectionLabel}>Presets</div>
         <div style={s.palette}>
           {PRESETS.map(c => (
             <button key={c} onClick={() => setHsl(hexToHsl(c))}
@@ -187,7 +187,7 @@ const ColorPicker: React.FC = () => {
       {/* History */}
       {history.length > 0 && (
         <div style={s.section}>
-          <div style={s.sectionLabel}>Recent</div>
+          <div className="dex-label-caps" style={s.sectionLabel}>Recent</div>
           <div style={s.palette}>
             {history.map(c => (
               <button key={c} onClick={() => {
@@ -282,8 +282,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   section: { padding: '0 20px 12px' },
   sectionLabel: {
-    fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)',
-    textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8,
+    marginBottom: 8,
   },
   palette: {
     display: 'flex', flexWrap: 'wrap', gap: 6,

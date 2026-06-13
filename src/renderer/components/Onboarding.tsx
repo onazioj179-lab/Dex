@@ -16,6 +16,7 @@ import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalytics
 import { AccountAuthFlow } from './account/AccountAuthFlow';
 import { platform } from '../utils';
 import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
+import { Button, IconButton } from '../ui';
 
 const PolicyViewer = React.lazy(() => import('./PolicyViewer'));
 
@@ -104,47 +105,14 @@ export const KEYBOARD_SHORTCUTS: Record<string, { key: string; action: string }[
 
 // ==================== SHARED STYLES ====================
 const CARD_STYLE: React.CSSProperties = {
-  background: '#0A0A0A',
+  background: 'var(--color-bg-secondary, #0A0A0A)',
   border: '1px solid var(--color-bg-hover)',
   borderRadius: 6,
   padding: '16px 20px',
 };
 
-// Buttons are CSS classes (not inline styles) so hover/press/disabled states
-// actually fire — inline styles cannot express :hover/:active.
-const ONBOARD_BUTTON_CSS = `
-  .onboard-btn {
-    border: none;
-    border-radius: var(--radius-lg, 6px);
-    padding: 10px 28px;
-    font-size: 13px;
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease,
-                color 0.15s ease, transform 0.12s ease;
-  }
-  .onboard-btn:active:not(:disabled) { transform: scale(0.98); }
-  .onboard-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .onboard-btn-accent {
-    background: var(--color-accent, #4A9EFF);
-    color: #fff;
-  }
-  .onboard-btn-accent:hover:not(:disabled) {
-    background: var(--color-accent-hover, #6CB2FF);
-  }
-  .onboard-btn-ghost {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
-    font-weight: 500;
-  }
-  .onboard-btn-ghost:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: var(--color-text-tertiary);
-    color: var(--color-text-primary);
-  }
-`;
+// Primary CTAs get a touch more horizontal presence than the Button default.
+const CTA_PADDING: React.CSSProperties = { padding: '0 28px' };
 
 // ==================== STEP INDICATOR ====================
 const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, total }) => (
@@ -159,7 +127,7 @@ const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, 
           background: i === current
             ? 'var(--color-accent, #4A9EFF)'
             : i < current ? 'rgba(74, 158, 255, 0.4)' : 'var(--color-border)',
-          transition: 'all 0.3s ease',
+          transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       />
     ))}
@@ -171,11 +139,11 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
   <div style={{ textAlign: 'center', padding: '48px 0' }}>
     <div style={{
       width: 80, height: 80, borderRadius: 16, margin: '0 auto 28px',
-      background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+      background: 'linear-gradient(135deg, var(--color-accent, #3b82f6) 0%, var(--color-app-vinx, #8b5cf6) 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '0 8px 32px rgba(59, 130, 246, 0.25)',
     }}>
-      <span style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>D</span>
+      <span style={{ fontSize: 36, fontWeight: 800, color: 'var(--color-accent-text, #fff)', fontFamily: 'Inter, system-ui, sans-serif' }}>D</span>
     </div>
     <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 8px', letterSpacing: '-0.5px' }}>
       Welcome to DEX
@@ -185,8 +153,8 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
       Let us set things up for the best experience.
     </p>
     <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-      <button className="onboard-btn onboard-btn-accent" onClick={onNext} aria-label="Get started with setup">Get Started</button>
-      <button className="onboard-btn onboard-btn-ghost" onClick={onSkip} aria-label="Skip setup wizard and review required policies">Skip Setup</button>
+      <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext} aria-label="Get started with setup">Get Started</Button>
+      <Button variant="ghost" size="lg" onClick={onSkip} aria-label="Skip setup wizard and review required policies">Skip Setup</Button>
     </div>
   </div>
 );
@@ -235,7 +203,7 @@ const HardwareScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           { label: 'GPU', value: hwInfo?.gpu || '...' },
         ].map(item => (
           <div key={item.label} style={CARD_STYLE}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+            <div className="dex-label-caps" style={{ marginBottom: 4 }}>
               {item.label}
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{item.value}</div>
@@ -250,7 +218,7 @@ const HardwareScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
 
       <div style={{ textAlign: 'center' }}>
-        <button className="onboard-btn onboard-btn-accent" onClick={onNext}>Continue</button>
+        <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext}>Continue</Button>
       </div>
     </div>
   );
@@ -273,16 +241,16 @@ const PrivacyScreen: React.FC<{
         style={{
           width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
           background: value ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border)',
-          position: 'relative', transition: 'background 0.2s',
+          position: 'relative', transition: 'background 180ms cubic-bezier(0.4, 0, 0.2, 1)',
           flexShrink: 0,
         }}
       >
         <div style={{
           width: 18, height: 18, borderRadius: 9,
-          background: '#fff',
+          background: 'var(--color-accent-text, #fff)',
           position: 'absolute', top: 3,
           left: value ? 21 : 3,
-          transition: 'left 0.2s',
+          transition: 'left 180ms cubic-bezier(0.4, 0, 0.2, 1)',
         }} />
       </button>
     </div>
@@ -317,8 +285,8 @@ const PrivacyScreen: React.FC<{
       />
 
       <div style={{
-        background: 'rgba(74, 158, 255, 0.06)',
-        border: '1px solid rgba(74, 158, 255, 0.12)',
+        background: 'var(--color-accent-soft, rgba(74, 158, 255, 0.06))',
+        border: '1px solid var(--color-accent-subtle, rgba(74, 158, 255, 0.12))',
         borderRadius: 6, padding: '12px 16px', marginTop: 16, marginBottom: 28,
       }}>
         <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, marginBottom: 4 }}>Clear data categories</div>
@@ -329,7 +297,7 @@ const PrivacyScreen: React.FC<{
       </div>
 
       <div style={{ textAlign: 'center' }}>
-        <button className="onboard-btn onboard-btn-accent" onClick={onNext}>Continue</button>
+        <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext}>Continue</Button>
       </div>
     </div>
   );
@@ -358,7 +326,7 @@ const PolicyAcceptanceScreen: React.FC<{
           <div
             key={policy.slug}
             style={{
-              background: '#0A0A0A',
+              background: 'var(--color-bg-secondary, #0A0A0A)',
               border: '1px solid var(--color-bg-hover)',
               borderRadius: 6,
               padding: '12px 14px',
@@ -374,7 +342,7 @@ const PolicyAcceptanceScreen: React.FC<{
                 </span>
                 <span style={{
                   fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
-                  background: 'rgba(74,158,255,0.12)', color: 'var(--color-accent, #4A9EFF)',
+                  background: 'var(--color-accent-subtle, rgba(74,158,255,0.12))', color: 'var(--color-accent, #4A9EFF)',
                   letterSpacing: '0.04em', textTransform: 'uppercase',
                 }}>
                   Required
@@ -385,24 +353,14 @@ const PolicyAcceptanceScreen: React.FC<{
                 {policy.summary}
               </div>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setViewerSlug(policy.slug)}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--color-border)',
-                borderRadius: 4,
-                padding: '6px 10px',
-                color: 'var(--color-text-secondary)',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
+              style={{ flexShrink: 0 }}
             >
               Read
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -419,23 +377,14 @@ const PolicyAcceptanceScreen: React.FC<{
             Also available:
           </span>
           {optionalPolicies.map(policy => (
-            <button
+            <Button
               key={policy.slug}
-              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setViewerSlug(policy.slug)}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--color-border)',
-                borderRadius: 4,
-                padding: '4px 8px',
-                color: 'var(--color-text-secondary)',
-                fontSize: 11,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
             >
               {policy.title}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -443,10 +392,10 @@ const PolicyAcceptanceScreen: React.FC<{
       <label style={{
         display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16,
         padding: '12px 14px', borderRadius: 6,
-        background: accepted ? 'rgba(74,158,255,0.06)' : 'rgba(255,255,255,0.02)',
+        background: accepted ? 'var(--color-accent-soft, rgba(74,158,255,0.06))' : 'rgba(255,255,255,0.02)',
         border: `1px solid ${accepted ? 'rgba(74,158,255,0.25)' : 'var(--color-bg-hover)'}`,
         cursor: 'pointer',
-        transition: 'background 0.15s, border-color 0.15s',
+        transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <input
           type="checkbox"
@@ -460,13 +409,15 @@ const PolicyAcceptanceScreen: React.FC<{
       </label>
 
       <div style={{ textAlign: 'center', marginBottom: 12 }}>
-        <button
-          className="onboard-btn onboard-btn-accent"
+        <Button
+          variant="primary"
+          size="lg"
+          style={CTA_PADDING}
           disabled={!accepted}
           onClick={onAccept}
         >
           Accept and Continue
-        </button>
+        </Button>
       </div>
 
       <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.5 }}>
@@ -507,7 +458,7 @@ const TourScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           <div key={f.title} style={{ ...CARD_STYLE, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{
               width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-              background: 'rgba(74, 158, 255, 0.1)',
+              background: 'var(--color-accent-muted, rgba(74, 158, 255, 0.1))',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 14, fontWeight: 700, color: 'var(--color-accent, #4A9EFF)',
             }}>
@@ -522,7 +473,7 @@ const TourScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
 
       <div style={{ textAlign: 'center' }}>
-        <button className="onboard-btn onboard-btn-accent" onClick={onNext}>Continue</button>
+        <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext}>Continue</Button>
       </div>
     </div>
   );
@@ -547,12 +498,12 @@ const SampleDataScreen: React.FC<{
         style={{
           ...CARD_STYLE, border: '1px solid rgba(74, 158, 255, 0.25)',
           cursor: 'pointer', textAlign: 'left',
-          transition: 'border-color 0.2s, background 0.2s',
+          transition: 'border-color 180ms cubic-bezier(0.4, 0, 0.2, 1), background 180ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <div style={{
           width: 28, height: 28, borderRadius: 6, marginBottom: 10,
-          background: 'rgba(74,158,255,0.12)',
+          background: 'var(--color-accent-subtle, rgba(74,158,255,0.12))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--color-accent, #4A9EFF)',
         }}>
@@ -569,7 +520,7 @@ const SampleDataScreen: React.FC<{
         onClick={() => onNext(false)}
         style={{
           ...CARD_STYLE, cursor: 'pointer', textAlign: 'left',
-          transition: 'border-color 0.2s, background 0.2s',
+          transition: 'border-color 180ms cubic-bezier(0.4, 0, 0.2, 1), background 180ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <div style={{
@@ -596,10 +547,10 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
   <div style={{ textAlign: 'center', padding: '48px 0' }}>
     <div style={{
       width: 64, height: 64, borderRadius: 32, margin: '0 auto 24px',
-      background: 'rgba(61, 166, 106, 0.12)',
+      background: 'var(--color-success-muted, rgba(61, 166, 106, 0.12))',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3DA66A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #3DA66A)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12" />
       </svg>
     </div>
@@ -615,7 +566,7 @@ const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
     <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 36px' }}>
       Tip: Use {platform.isMac ? '⌘' : 'Ctrl'}+K to open the Command Palette.
     </p>
-    <button className="onboard-btn onboard-btn-accent" onClick={onComplete}>Launch DEX</button>
+    <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onComplete}>Launch DEX</Button>
   </div>
 );
 
@@ -733,10 +684,10 @@ export const OnboardingWizard: React.FC<{
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: Z_HELP_OVERLAY_BASE,
-      background: '#000000',
+      background: 'var(--color-bg-base, #000000)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       opacity: exiting ? 0 : 1,
-      transition: 'opacity 0.3s ease',
+      transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)',
     }}>
       <style>{`
         @keyframes onboardFadeIn {
@@ -751,27 +702,22 @@ export const OnboardingWizard: React.FC<{
           from { opacity: 0; transform: translateX(-40px); }
           to { opacity: 1; transform: translateX(0); }
         }
-        ${ONBOARD_BUTTON_CSS}
       `}</style>
       <div style={{
-        width: '100%', maxWidth: 600, padding: '0 32px',
-        animation: 'onboardFadeIn 0.4s ease',
+        width: '100%', maxWidth: 'min(600px, calc(100vw - 48px))', padding: '0 32px',
+        animation: 'onboardFadeIn 200ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <StepIndicator current={screenIndex} total={screens.length} />
 
         <div key={screenIndex} style={{
-          animation: `${slideDir === 'next' ? 'onboardSlideNext' : 'onboardSlideBack'} 0.25s ease`,
+          animation: `${slideDir === 'next' ? 'onboardSlideNext' : 'onboardSlideBack'} 200ms cubic-bezier(0.4, 0, 0.2, 1)`,
         }}>
 
         {screenIndex > 0 && current !== 'ready' && (
           <div style={{ marginBottom: 8 }}>
-            <button
-              className="onboard-btn onboard-btn-ghost"
-              style={{ padding: '6px 16px', fontSize: 12 }}
-              onClick={goBack}
-            >
+            <Button variant="ghost" size="sm" onClick={goBack}>
               Back
-            </button>
+            </Button>
           </div>
         )}
 
@@ -803,15 +749,16 @@ export const OnboardingWizard: React.FC<{
               color: 'var(--color-text-secondary, #bbb)',
               border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
               borderRadius: 4,
-              padding: '6px 12px',
+              height: 'var(--dex-control-h-sm, 28px)',
+              padding: '0 12px',
               fontSize: 11, fontWeight: 600,
               cursor: 'pointer',
-              transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+              transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLElement;
-              el.style.background = 'rgba(255, 80, 80, 0.10)';
-              el.style.color = '#ff8080';
+              el.style.background = 'var(--color-error-muted, rgba(255, 80, 80, 0.10))';
+              el.style.color = 'var(--color-error, #ff8080)';
               el.style.borderColor = 'rgba(255, 80, 80, 0.30)';
             }}
             onMouseLeave={e => {
@@ -854,7 +801,7 @@ export const KeyboardShortcutsPanel: React.FC<{
       <div
         onMouseDown={e => e.stopPropagation()}
         style={{
-          width: 320,
+          width: 'min(320px, calc(100vw - 48px))',
           background: 'var(--color-bg-elevated, #111111)',
           border: '1px solid var(--color-border-subtle)',
           borderRadius: 8,
@@ -868,34 +815,37 @@ export const KeyboardShortcutsPanel: React.FC<{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shortcuts</span>
-          <button onClick={onClose} aria-label="Close shortcuts" style={{
-            background: 'none', border: 'none', padding: 4,
-            color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
+          <IconButton
+            ariaLabel="Close shortcuts"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            icon={(
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            )}
+          />
         </div>
         <div style={{ padding: '10px 18px 18px', maxHeight: 400, overflow: 'auto' }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+          <div className="dex-label-caps" style={{ marginBottom: 8 }}>
             General
           </div>
           {global.map(s => (
             <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.action}</span>
-              <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: '#d4d4d8', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
+              <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-secondary, #d4d4d8)', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
             </div>
           ))}
           {appShortcuts.length > 0 && (
             <>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 14, marginBottom: 8 }}>
+              <div className="dex-label-caps" style={{ marginTop: 14, marginBottom: 8 }}>
                 {appId.charAt(0).toUpperCase() + appId.slice(1)}
               </div>
               {appShortcuts.map(s => (
                 <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.action}</span>
-                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: '#d4d4d8', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
+                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-secondary, #d4d4d8)', fontFamily: 'SF Mono, monospace' }}>{s.key}</kbd>
                 </div>
               ))}
             </>

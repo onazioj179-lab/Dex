@@ -15,6 +15,101 @@
 the same renderer; **~80 namespaces are natively backed** (24 platform + 57
 SQLite subsystem modules sharing `dex.db`); the rest degrade to `null`.
 
+**Renderer slice (2026-06-12): v5.5 "DEX Sharp" UI program, batch 1 (shell-wide,
+applies identically to both shells — pure renderer).** Foundation: dex token
+layer gained light-theme parity, responsive modal width vars, 28/32/40 control
+rhythm, tight heading tracking + `dex-label-caps` micro-label, 0.5px hairlines
+at >=1.5dppx. New canonical `ui/Modal.tsx` (portal, flex centering, focus trap,
+scroll lock); ConfirmDialog/ShareDialog/HelpOverlay migrated onto it.
+`ui/Button.tsx` states moved from JS mouse handlers to CSS (`.dex-btn`).
+globals.css glitch layer rewritten: removed universal brightness-filter hovers,
+duplicate press transforms, aria-label hover heuristics, `!important` selection
+overrides, the transform-hijacking modal animation, and all decorative
+keyframes (ripple/shine/glow/pulse — zero consumers). Token/maturity sweeps
+landed on LockScreen, ChatPanel, HomeWidgets, Onboarding (hand-rolled CTA
+system replaced with ui/Button), shell/UIComponents (no bouncy beziers),
+SpotlightSearch, QuickControls, NotificationBanners. Verified: `tsc --noEmit`
+green, vite build green, 5583/5584 unit tests pass (the 1 failure is
+pre-existing on clean HEAD: terminal spawn-error UI test, spun off as a
+separate fix task). Uncommitted — owner reviews and commits.
+
+**Renderer slice (2026-06-12): v5.5 "DEX Sharp" batch 2 (platform-wide app
+sweep, ~35 files).** Every remaining app/page surface swept to the identity:
+- ThemeManager modal de-hacked (flex-center + responsive width); the other
+  translate(-50%) grep hits (ColorPicker thumb/cursor, EnhancedKnob rotary,
+  UnifiedSystems drag fallback) confirmed LEGITIMATE control positioning, left.
+- AppManager: styling-only sweep (registry/lifecycle/IPC untouched); flagged
+  the inline-SVG `Icons` map as the real DexIcon-consolidation debt (deferred).
+- Standalone apps (all ~21), pages (Home/Tasks/TaskManager/Power/Store/Games/
+  Files/Gallery/Settings/Browser/Audio/Workflows/Transfers), and creative apps
+  (Imosion/Prism/Flux/Forge/Vinx+subs/Axl/Rewind/Nexus + notes/components)
+  swept for: light-mode-breaking neutral/accent colors -> tokens; bouncy/spring
+  easing -> standard curve; >250ms UI durations -> ~180ms; decorative motion
+  removed; overflow-prone fixed dialog widths -> min(Xpx, calc(100vw-48px));
+  gray section headers -> dex-label-caps. Gallery's 5 real centered-dialog
+  hacks flex-centered; an Audio `translateX(-50)` typo (missing %) fixed; the
+  QR generator's all-black unscannable-code default fixed (#fff bg).
+- Foundation additions: `--color-text-on-accent` aliased to the canonical
+  `--color-accent-text` (was dead-falling-back in Audio); `dex-label-caps`
+  split into composable `.dex-caps` (tracking/weight/uppercase only) + turnkey
+  `.dex-label-caps` (adds 11px + tertiary) so dense/tinted creative micro-
+  labels can adopt the identity tracking without the size/color opinion.
+Coverage: standard files ~100%; the monoliths (Imosion 655KB, Prism, Flux,
+Settings 225KB, etc.) pattern-swept at ~85-100% of in-scope sites, honestly
+reported per file. Verified: tsc --noEmit green, vite build green, full test
+suite (see below). Uncommitted — owner reviews and commits.
+
+DOCUMENTED FOUNDATION FOLLOW-UPS (batch 3, requested repeatedly by sweep
+agents; deliberately NOT auto-applied to avoid orphan tokens / unverified
+global visual changes):
+1. `--color-accent-dark` token — for pressed/active accent affordances and
+   theme-aware brand gradients (every creative agent asked).
+2. Translucent neutral tokens — many apps use rgba(255,255,255,0.02-0.06)
+   subtle surfaces that DON'T map to the opaque --color-bg-hover/-inset; a
+   --color-surface-1/2/3 (or --color-scrim) set would let ~45+ Rewind sites
+   and similar adopt theme-aware values without shifting the dark baseline.
+3. ~18 Imosion + 19 Prism centered modals are wrapper-less position:fixed
+   panels — width-guarded (overflow fixed) but still translate-centered; a
+   structural pass could wrap+flex-center them for whole-pixel sharpness.
+4. Axl uses macOS system-blue #0a84ff instead of DEX accent #4A9EFF — a
+   deliberate accent migration, separate from the behavior-preserving sweep.
+5. AppManager inline-SVG `Icons` map -> consolidate onto DexIcon.
+
+**Renderer slice (2026-06-13): v5.5 "DEX Sharp" batch 3 (dock redesign,
+component sweep, bug fixes) — PR #24 (feat/dex-dev-platform -> main).**
+- DOCK REDESIGNED (AppManager): the active-app indicator was an ambiguous
+  glowing colored dot (read as "highlighted anyhow"). Now one unmistakable
+  focused state — accent-tinted icon pill + crisp accent underline bar —
+  with a small neutral dot for background-running apps, real hover feedback
+  (was forced transparent), no glow, and a bespoke 20px rounded-rect
+  container (was a full pill). App-menu + UKI buttons aligned to the same
+  active language; UKI infinite-pulse glow removed.
+- Terminal spawn-error fixed: surface the failure reason immediately instead
+  of a silent "starting…" while retrying in the background (also fixes the
+  one failing unit test, so the suite is fully green).
+- More real bugs fixed: QR generator all-black unscannable default ->
+  #fff canvas bg; Audio translateX(-50) typo; Select MultiSelect undefined
+  var(--color-text); AppOverview canvas fillStyle using an unresolvable CSS
+  var; --color-text-on-accent aliased to --color-accent-text.
+- Identity class made composable: .dex-caps (tracking/weight/uppercase only)
+  + turnkey .dex-label-caps (adds size/color), so tinted/dense creative
+  micro-labels can adopt the tracking without the color/size opinion.
+- Component sweeps (waves 3-5): EmojiPicker/Select/UnifiedDropdown/
+  ContextMenu and the shell window chrome (FloatingWindow/StageManager/
+  QuickLook/AppOverview/MiniShell/etc.) fully swept. Big interactive
+  overlays (UkiOverlay/CommandPalette/UnifiedSystems), feedback/panel
+  components, and Learn/DexCode/CollabHub + system/productivity subdirs were
+  PARTIALLY swept before a weekly usage limit stopped the agents mid-run;
+  tsc + vite build confirm the partial edits are coherent. The
+  browser/files/creative/polish/prism/flux subdirs are pure .ts logic (no
+  .tsx) so nothing to sweep there.
+Verified: tsc --noEmit clean, vite build clean. NEW batch-3 follow-up
+(highest-leverage light-mode fix): the `colors` export in styles/tokens.ts
+is dark-only literal hex; components consuming colors.* (UnifiedDropdown,
+NumberInput, ColorPicker, EnhancedKnob, RichTextInput) don't react to light
+mode. Needs careful per-consumer migration (some feed canvas fillStyle,
+which can't resolve CSS vars). Plus: finish the partial wave-3/4/5 sweeps.
+
 **Renderer slice (2026-06-09): uki chat app finished on top of `uki-chat:*`.**
 `DEXAPPLICATIONS/standalone/Uki.tsx` (app id `uki`, wired into AppManager +
 appSubsystem + AppIcon `sparkle`) is now feature-complete against the native

@@ -74,6 +74,49 @@
 
   /* ---- Focus: keyboard-accessible ring -------------------------------- */
   --dex-focus-ring: 0 0 0 2px var(--dex-bg), 0 0 0 4px var(--dex-accent);
+
+  /* ---- Modal widths: responsive by construction (never overflow) ------- */
+  --dex-modal-sm: min(400px, calc(100vw - 32px));
+  --dex-modal-md: min(520px, calc(100vw - 48px));
+  --dex-modal-lg: min(680px, calc(100vw - 64px));
+  --dex-modal-xl: min(900px, calc(100vw - 96px));
+
+  /* ---- DEX SHARP: the house identity ------------------------------------
+     Not macOS, not Windows: precise, tailored, instrument-grade. Tight
+     tracking on display text, spaced uppercase micro-labels, hairline rules,
+     tabular numerals, ONE control rhythm. Surfaces opt in via the utilities
+     below; the variables are the single source of the look. */
+  --dex-tracking-tight: -0.011em; /* headings / display text */
+  --dex-tracking-label: 0.08em;   /* uppercase micro-labels */
+
+  /* Equal control heights: buttons, inputs, selects share ONE rhythm
+     (mirrors button/input heights in tokens.ts -- keep in sync). */
+  --dex-control-h-sm: 28px;
+  --dex-control-h-md: 32px;
+  --dex-control-h-lg: 40px;
+}
+
+/* Light theme parity for the dex token layer. Values mirror the canonical
+   light palette in design-system.css ([data-theme="light"]). Without these,
+   .dex-titlebar / .dex-panel / focus rings stay dark in light mode. */
+[data-theme="light"], .light-mode {
+  --dex-accent: #0066cc;
+  --dex-accent-hover: #0055b3;
+  --dex-accent-soft: rgba(0, 102, 204, 0.08);
+
+  --dex-bg: #fafafa;
+  --dex-bg-surface: #f2f2f4;
+  --dex-bg-hover: #e2e2e5;
+  --dex-bg-active: #d8d8dc;
+
+  --dex-text: #000000;
+  --dex-text-secondary: #3c3c43;
+  --dex-text-tertiary: #636366;
+  --dex-text-disabled: #aeaeb2;
+
+  --dex-hairline: 1px solid rgba(0, 0, 0, 0.1);
+  --dex-hairline-strong: 1px solid rgba(0, 0, 0, 0.16);
+  --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
 }
 
 /* Reduced motion: honour the OS setting. */
@@ -85,12 +128,52 @@
   }
 }
 
+/* High-DPI sharpness: at >=1.5x scaling a 1px border paints 2-3 device
+   pixels and reads soft. Drop to 0.5px (one device pixel) and lift opacity
+   slightly so hairlines stay visible but razor-thin. */
+@media (min-resolution: 1.5dppx) {
+  :root {
+    --dex-hairline: 0.5px solid rgba(255, 255, 255, 0.11);
+    --dex-hairline-strong: 0.5px solid rgba(255, 255, 255, 0.18);
+  }
+  [data-theme="light"], .light-mode {
+    --dex-hairline: 0.5px solid rgba(0, 0, 0, 0.13);
+    --dex-hairline-strong: 0.5px solid rgba(0, 0, 0, 0.2);
+  }
+}
+
 /* --------------------------------------------------------------------------
  * Utilities — opt-in classes that bind to the tokens above.
  * ------------------------------------------------------------------------ */
 
 /* Tabular numerals for data / counters / timecodes. */
 .dex-tnum { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: var(--dex-numeric); }
+
+/* DEX SHARP type discipline -- specificity 0, components always win. */
+/* Display text: tight tracking, no widowed last words. */
+:where(h1, h2, h3) {
+  letter-spacing: var(--dex-tracking-tight);
+  text-wrap: balance;
+}
+
+/* Uppercase micro-label identity. Two layers:
+   - .dex-caps is the COMPOSABLE base (tracking + weight + uppercase only).
+     Add it to a label that already has its own size/color -- e.g. the dense
+     7-10px tinted micro-labels in the creative tools (Imosion/Prism/Flux/
+     Vinx) -- to get the DEX tracking without overriding size or color.
+   - .dex-label-caps is the TURNKEY standard gray section header: the base
+     plus the canonical 11px size and tertiary color.
+   The signature DEX detail -- small, spaced, deliberate. */
+.dex-caps,
+.dex-label-caps {
+  font-weight: 600;
+  letter-spacing: var(--dex-tracking-label);
+  text-transform: uppercase;
+}
+.dex-label-caps {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #8e8e93);
+}
 
 /* Crisp icons at high DPI — SVG, aligned stroke. */
 .dex-icon { width: var(--dex-icon-md); height: var(--dex-icon-md); stroke-width: var(--dex-icon-stroke); shape-rendering: geometricPrecision; }
@@ -187,3 +270,120 @@ html, body, #root {
 
 /* Hairline default for generic separators (component borders still win). */
 :where(hr) { border: 0; border-top: var(--dex-hairline); }
+
+/* ==========================================================================
+ * BUTTON STATES — declarative, CSS-driven. The Button primitive renders
+ * class="dex-btn" + data-variant; hover/active/disabled live HERE, not in
+ * JS mouse handlers, so states can never get stuck and themes always apply.
+ * Caller inline styles still win (inline beats class).
+ * ======================================================================== */
+
+.dex-btn { -webkit-tap-highlight-color: transparent; }
+
+.dex-btn[data-variant="primary"] {
+  background: var(--color-accent, #4a9eff);
+  color: #fff;
+  border: 1px solid transparent;
+}
+.dex-btn[data-variant="primary"]:hover:not(:disabled) {
+  background: var(--color-accent-hover, #6cb2ff);
+}
+
+.dex-btn[data-variant="secondary"] {
+  background: var(--color-bg-elevated, #1a1a1e);
+  color: var(--color-text-primary, #fff);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.14));
+}
+.dex-btn[data-variant="secondary"]:hover:not(:disabled) {
+  background: var(--color-bg-hover, #1e1e22);
+}
+
+.dex-btn[data-variant="ghost"] {
+  background: transparent;
+  color: var(--color-text-secondary, #b8b8bd);
+  border: 1px solid transparent;
+}
+.dex-btn[data-variant="ghost"]:hover:not(:disabled) {
+  background: var(--color-bg-hover, #1e1e22);
+  color: var(--color-text-primary, #fff);
+}
+
+.dex-btn[data-variant="subtle"] {
+  background: var(--color-bg-hover, #1e1e22);
+  color: var(--color-text-primary, #fff);
+  border: 1px solid transparent;
+}
+.dex-btn[data-variant="subtle"]:hover:not(:disabled) {
+  background: var(--color-bg-active, #252528);
+}
+
+.dex-btn[data-variant="danger"] {
+  background: var(--color-error-muted, rgba(255, 69, 58, 0.1));
+  color: var(--color-error, #ff6b61);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+}
+.dex-btn[data-variant="danger"]:hover:not(:disabled) {
+  background: rgba(255, 69, 58, 0.18);
+}
+
+/* Pressed: shared micro-press (slightly stronger than the global :where rule
+   so primitives feel uniform). Disabled: communicated via opacity + cursor. */
+.dex-btn:not(:disabled):active { transform: scale(0.97); }
+.dex-btn:disabled { cursor: not-allowed; }
+
+/* Touch devices: expand the hit target to >= 44px without changing visuals. */
+@media (pointer: coarse) {
+  .dex-btn { position: relative; }
+  .dex-btn::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+}
+
+/* ==========================================================================
+ * MODAL PRIMITIVE — one canonical overlay. Flex-centered (no translate(-50%)
+ * half-pixel blur), opacity/scale entrance on the panel only, token motion.
+ * Used by ui/Modal.tsx; do not restyle per-dialog.
+ * ======================================================================== */
+
+.dex-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--dex-space-6);
+  background: rgba(0, 0, 0, 0.5);
+  animation: dexModalBackdropIn var(--dex-motion-fast) var(--dex-ease) both;
+}
+
+.dex-modal-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(85vh, 100%);
+  background: var(--color-bg-elevated, #1a1a1e);
+  border: var(--dex-hairline-strong);
+  border-radius: var(--dex-radius-xl);
+  box-shadow: var(--dex-elevation);
+  overflow: hidden;
+  animation: dexModalPanelIn var(--dex-motion) var(--dex-ease) both;
+}
+
+.dex-modal-panel[data-size="sm"] { width: var(--dex-modal-sm); }
+.dex-modal-panel[data-size="md"] { width: var(--dex-modal-md); }
+.dex-modal-panel[data-size="lg"] { width: var(--dex-modal-lg); }
+.dex-modal-panel[data-size="xl"] { width: var(--dex-modal-xl); }
+
+@keyframes dexModalBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes dexModalPanelIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: none; }
+}

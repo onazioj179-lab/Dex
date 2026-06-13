@@ -637,7 +637,7 @@ const styles: Record<string, React.CSSProperties> = {
   appName: { fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   appDetail: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
   ghostButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
-  endButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: '#FF8A82', cursor: 'pointer' },
+  endButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer' },
   filterInput: { width: 150, height: 28, borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
   processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },

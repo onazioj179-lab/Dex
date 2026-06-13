@@ -52,9 +52,9 @@ const S: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   modeBtnActive: {
-    background: 'rgba(10,132,255,0.15)',
+    background: 'var(--color-accent-soft, rgba(10,132,255,0.15))',
     color: 'var(--color-accent)',
-    borderColor: 'rgba(10,132,255,0.3)',
+    borderColor: 'var(--color-accent-muted, rgba(10,132,255,0.3))',
   },
   searchBox: {
     flex: 1,
@@ -93,11 +93,6 @@ const S: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   dateHeader: {
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
     padding: '12px 0 4px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
     marginBottom: 4,
@@ -199,8 +194,8 @@ const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   sessionCardActive: {
-    borderColor: 'rgba(10,132,255,0.3)',
-    background: 'rgba(10,132,255,0.06)',
+    borderColor: 'var(--color-accent-muted, rgba(10,132,255,0.3))',
+    background: 'var(--color-accent-soft, rgba(10,132,255,0.06))',
   },
   sessionHeader: {
     display: 'flex',
@@ -232,10 +227,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   manageSectionTitle: {
     fontSize: 11,
-    fontWeight: 600,
     color: 'var(--color-text-secondary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.04em',
     marginBottom: 8,
     marginTop: 12,
   },
@@ -271,9 +263,9 @@ const S: Record<string, React.CSSProperties> = {
     padding: '5px 12px',
     fontSize: 11,
     fontWeight: 600,
-    border: '1px solid rgba(255,59,48,0.3)',
+    border: '1px solid var(--color-error-muted, rgba(255,59,48,0.3))',
     borderRadius: 4,
-    background: 'rgba(255,59,48,0.08)',
+    background: 'var(--color-error-muted, rgba(255,59,48,0.08))',
     color: 'var(--color-error)',
     cursor: 'pointer',
   },
@@ -313,8 +305,6 @@ const S: Record<string, React.CSSProperties> = {
   statLabel: {
     fontSize: 9,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.04em',
     marginTop: 2,
   },
 };
@@ -428,7 +418,7 @@ const TimelineView: React.FC = () => {
     <div ref={scrollRef}>
       {Array.from(dateGroups.entries()).map(([dateStr, dayEntries]) => (
         <div key={dateStr}>
-          <div style={S.dateHeader}>
+          <div className="dex-label-caps" style={S.dateHeader}>
             {formatDate(new Date(dateStr + 'T12:00:00').getTime())} -- {dayEntries.length} entries
           </div>
           {dayEntries.map(entry => (
@@ -558,7 +548,7 @@ const BySessionView: React.FC = () => {
               <div style={S.sessionHeader}>
                 <span style={S.sessionId}>{session.id.slice(0, 8)}...</span>
                 {isCurrent && (
-                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: 'rgba(48,209,88,0.15)', color: 'var(--color-success)', fontWeight: 600 }}>
+                  <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: 'var(--color-success-muted, rgba(48,209,88,0.15))', color: 'var(--color-success)', fontWeight: 600 }}>
                     CURRENT
                   </span>
                 )}
@@ -669,12 +659,12 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       )}
 
       {lastResult && (
-        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 8, padding: '4px 8px', background: 'rgba(48,209,88,0.08)', borderRadius: 3 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 8, padding: '4px 8px', background: 'var(--color-success-muted, rgba(48,209,88,0.08))', borderRadius: 3 }}>
           {lastResult}
         </div>
       )}
 
-      <div style={S.manageSectionTitle}>Clear by Date Range</div>
+      <div className="dex-caps" style={S.manageSectionTitle}>Clear by Date Range</div>
       <div style={S.manageRow}>
         <input
           type="date"
@@ -696,7 +686,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         {clearInProgress ? 'Clearing...' : 'Clear Date Range'}
       </button>
 
-      <div style={S.manageSectionTitle}>Clear by App</div>
+      <div className="dex-caps" style={S.manageSectionTitle}>Clear by App</div>
       <div style={S.manageRow}>
         <select style={S.manageSelect} value={selectedClearApp} onChange={e => setSelectedClearApp(e.target.value)}>
           <option value="">Select an app...</option>
@@ -709,9 +699,9 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </button>
       </div>
 
-      <div style={S.manageSectionTitle}>Clear All</div>
+      <div className="dex-caps" style={S.manageSectionTitle}>Clear All</div>
       <button
-        style={confirmClearAll ? { ...S.manageDangerBtn, background: 'rgba(255,59,48,0.2)' } : S.manageDangerBtn}
+        style={confirmClearAll ? { ...S.manageDangerBtn, background: 'var(--color-error-muted, rgba(255,59,48,0.2))' } : S.manageDangerBtn}
         onClick={handleClearAll}
         disabled={clearInProgress}
       >
@@ -723,7 +713,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
       )}
 
-      <div style={S.manageSectionTitle}>Export</div>
+      <div className="dex-caps" style={S.manageSectionTitle}>Export</div>
       <div style={S.exportRow}>
         {(['txt', 'md', 'json'] as const).map(fmt => (
           <button key={fmt} style={{...S.manageActionBtn, opacity: exportInProgress ? 0.4 : 1, cursor: exportInProgress ? 'not-allowed' : 'pointer'}} onClick={() => handleExport(fmt)} disabled={exportInProgress}>
@@ -732,7 +722,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         ))}
       </div>
 
-      <div style={S.manageSectionTitle}>Maintenance</div>
+      <div className="dex-caps" style={S.manageSectionTitle}>Maintenance</div>
       <button
         style={S.manageActionBtn}
         onClick={async () => {
@@ -763,19 +753,19 @@ const StatsBar: React.FC = () => {
     <div style={S.statsRow}>
       <div style={S.statItem}>
         <span style={S.statValue}>{stats.todayEntries}</span>
-        <span style={S.statLabel}>Today</span>
+        <span className="dex-caps" style={S.statLabel}>Today</span>
       </div>
       <div style={S.statItem}>
         <span style={S.statValue}>{stats.totalEntries}</span>
-        <span style={S.statLabel}>Total</span>
+        <span className="dex-caps" style={S.statLabel}>Total</span>
       </div>
       <div style={S.statItem}>
         <span style={S.statValue}>{stats.totalApps}</span>
-        <span style={S.statLabel}>Apps</span>
+        <span className="dex-caps" style={S.statLabel}>Apps</span>
       </div>
       <div style={S.statItem}>
         <span style={S.statValue}>{stats.totalSessions}</span>
-        <span style={S.statLabel}>Sessions</span>
+        <span className="dex-caps" style={S.statLabel}>Sessions</span>
       </div>
     </div>
   );
@@ -841,7 +831,7 @@ const JournalView: React.FC = () => {
         />
 
         <button
-          style={{ ...S.manageBtn, ...(insightsVisible ? { color: 'var(--color-accent)', borderColor: 'rgba(10,132,255,0.3)' } : {}) }}
+          style={{ ...S.manageBtn, ...(insightsVisible ? { color: 'var(--color-accent)', borderColor: 'var(--color-accent-muted, rgba(10,132,255,0.3))' } : {}) }}
           onClick={() => setInsightsVisible(!insightsVisible)}
         >
           Insights

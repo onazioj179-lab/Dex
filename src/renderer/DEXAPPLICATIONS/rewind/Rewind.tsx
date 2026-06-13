@@ -1252,7 +1252,7 @@ const timer = setInterval(check, 15000);
             style={{
               width: 'min(920px, 94vw)',
               background: 'rgba(20,20,22,0.98)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid var(--color-border-subtle)',
               borderRadius: 10,
               overflow: 'hidden',
             }}
@@ -1699,7 +1699,7 @@ const timer = setInterval(check, 15000);
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 4px' }} aria-label="Work sessions">
             {sessionDays.map(day => (
               <div key={day.dayTs}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.45, margin: '2px 0 6px' }}>
+                <div className="dex-label-caps" style={{ fontSize: 10, margin: '2px 0 6px' }}>
                   {day.heading}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -1951,7 +1951,7 @@ const timer = setInterval(check, 15000);
             value={journalDraft.title}
             onChange={e => setJournalDraft(d => ({ ...d, title: e.target.value }))}
             style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)',
               borderRadius: 6, padding: '8px 12px', color: 'inherit', fontSize: 13, fontWeight: 600,
               outline: 'none', fontFamily: 'inherit',
             }}
@@ -1963,7 +1963,7 @@ const timer = setInterval(check, 15000);
             onChange={e => setJournalDraft(d => ({ ...d, body: e.target.value }))}
             rows={4}
             style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)',
               borderRadius: 6, padding: '10px 12px', color: 'inherit', fontSize: 13, lineHeight: 1.6,
               outline: 'none', resize: 'vertical', fontFamily: 'inherit', minHeight: 80,
             }}
@@ -1994,7 +1994,7 @@ const timer = setInterval(check, 15000);
             value={journalDraft.tags}
             onChange={e => setJournalDraft(d => ({ ...d, tags: e.target.value }))}
             style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)',
               borderRadius: 6, padding: '6px 12px', color: 'inherit', fontSize: 12,
               outline: 'none', fontFamily: 'inherit',
             }}
@@ -2574,7 +2574,7 @@ const timer = setInterval(check, 15000);
             )}
             {plugins.map(plugin => (
               <div key={plugin.id} style={{
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--color-border-subtle)',
                 borderRadius: 6,
                 padding: 8,
                 display: 'flex',
@@ -2757,7 +2757,7 @@ const S: Record<string, React.CSSProperties> = {
     height: 36,
     flexShrink: 0,
     background: 'var(--color-bg-surface-solid, #1C1C1E)',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    borderBottom: '1px solid var(--color-border-subtle)',
   },
   topHeaderBrand: {
     display: 'flex',
@@ -3129,7 +3129,7 @@ const S: Record<string, React.CSSProperties> = {
     background: '#fff',
     position: 'absolute' as const,
     top: 2,
-    transition: 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+    transition: 'transform 0.18s cubic-bezier(0.4,0,0.2,1)',
     boxShadow: 'var(--pg-shadow-chip)',
   },
 
@@ -3137,7 +3137,7 @@ const S: Record<string, React.CSSProperties> = {
   excludeInput: {
     flex: 1,
     background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: 4,
     padding: '4px 8px',
     color: 'var(--color-text-primary, #f5f5f7)',
@@ -3166,7 +3166,7 @@ const S: Record<string, React.CSSProperties> = {
   // Select
   select: {
     background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: 4,
     color: 'var(--color-text-primary, #f5f5f7)',
     padding: '4px 8px',

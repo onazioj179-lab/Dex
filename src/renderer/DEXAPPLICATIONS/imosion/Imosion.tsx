@@ -5271,7 +5271,7 @@ const Imosion: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Track Panel - GarageBand Style */}
         <div data-testid="imosion-tracks" style={{ width: trackPanelWidth, minWidth: 150, flexShrink: 0, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.15)' }}>
+          <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-inset, rgba(0,0,0,0.15))' }}>
             <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '1px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 4 }}>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               Tracks
@@ -6490,7 +6490,7 @@ const Imosion: React.FC = () => {
           const presets = INSTRUMENT_PRESETS[inst.instrument.type] || [];
           return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
-            <div style={{ width: 720, maxHeight: '85vh', background: 'var(--color-bg-base)', borderRadius: 10, border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ width: 'min(720px, calc(100vw - 48px))', maxHeight: '85vh', background: 'var(--color-bg-base)', borderRadius: 10, border: '1px solid #1f1f23', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
               {/* Header */}
               <div style={{ padding: '12px 18px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -6765,7 +6765,7 @@ const Imosion: React.FC = () => {
 
       {/* 1. Batch Fade */}
       {showBatchFade && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Fade</span>
             <button aria-label="Close Batch Fade panel" onClick={() => setShowBatchFade(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -6789,7 +6789,7 @@ const Imosion: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               <button aria-label="Apply fades to all clips" onClick={() => { const fadeInSec = batchFadeIn / 1000; const fadeOutSec = batchFadeOut / 1000; setTracks(prev => prev.map(t => ({ ...t, clips: t.clips.map(c => ({ ...c, fadeIn: fadeInSec, fadeOut: fadeOutSec })) }))); setShowBatchFade(false); }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply to All Clips</button>
-              <button aria-label="Apply fades to selected" onClick={() => { if (!forgeClip) { setShowBatchFade(false); return; } const fadeInSec = batchFadeIn / 1000; const fadeOutSec = batchFadeOut / 1000; updateClip(forgeClip.trackId, forgeClip.clip.id, { fadeIn: fadeInSec, fadeOut: fadeOutSec }); setShowBatchFade(false); }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.06)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Selected Only</button>
+              <button aria-label="Apply fades to selected" onClick={() => { if (!forgeClip) { setShowBatchFade(false); return; } const fadeInSec = batchFadeIn / 1000; const fadeOutSec = batchFadeOut / 1000; updateClip(forgeClip.trackId, forgeClip.clip.id, { fadeIn: fadeInSec, fadeOut: fadeOutSec }); setShowBatchFade(false); }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', background: 'var(--color-accent-light, rgba(10,132,255,0.06))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Selected Only</button>
             </div>
           </div>
         </div>
@@ -6797,7 +6797,7 @@ const Imosion: React.FC = () => {
 
       {/* 2. Time Stretch */}
       {showTimeStretch && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Time Stretch</span>
             <button aria-label="Close Time Stretch panel" onClick={() => setShowTimeStretch(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -6824,7 +6824,7 @@ const Imosion: React.FC = () => {
 
       {/* 3. Pitch Shift */}
       {showPitchShift && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Pitch Shift</span>
             <button aria-label="Close Pitch Shift panel" onClick={() => setShowPitchShift(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -6854,7 +6854,7 @@ const Imosion: React.FC = () => {
 
       {/* 4. Track Templates */}
       {showTrackTemplates && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Track Templates</span>
             <button aria-label="Close Track Templates panel" onClick={() => setShowTrackTemplates(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -6913,7 +6913,7 @@ const Imosion: React.FC = () => {
                     <input type="number" value={tc.bar} min={1} onChange={e => setTempoChanges(prev => prev.map(t => t.id === tc.id ? { ...t, bar: Number(e.target.value) } : t))} style={{ width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-bg-hover)', borderRadius: 2, color: '#ccc', fontSize: 9, padding: '2px 4px', textAlign: 'center' }} />
                     <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 28 }}>BPM</span>
                     <input type="number" value={tc.bpm} min={20} max={300} onChange={e => setTempoChanges(prev => prev.map(t => t.id === tc.id ? { ...t, bpm: Number(e.target.value) } : t))} style={{ width: 40, background: 'var(--color-bg-hover)', border: '1px solid var(--color-bg-hover)', borderRadius: 2, color: '#ccc', fontSize: 9, padding: '2px 4px', textAlign: 'center' }} />
-                    <select value={tc.curve} onChange={e => setTempoChanges(prev => prev.map(t => t.id === tc.id ? { ...t, curve: e.target.value as any } : t))} style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--color-bg-hover)', borderRadius: 2, color: 'var(--color-text-tertiary)', fontSize: 8, padding: '2px' }}>
+                    <select value={tc.curve} onChange={e => setTempoChanges(prev => prev.map(t => t.id === tc.id ? { ...t, curve: e.target.value as any } : t))} style={{ flex: 1, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 2, color: 'var(--color-text-tertiary)', fontSize: 8, padding: '2px' }}>
                       <option value="instant">Instant</option>
                       <option value="linear">Linear</option>
                       <option value="ease">Ease</option>
@@ -6929,7 +6929,7 @@ const Imosion: React.FC = () => {
 
       {/* 7. Groove Quantize */}
       {showGrooveQuant && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Groove Quantize</span>
             <button aria-label="Close Groove Quantize panel" onClick={() => setShowGrooveQuant(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -6953,7 +6953,7 @@ const Imosion: React.FC = () => {
 
       {/* 8. Track Color */}
       {showTrackColor && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(260px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Track Color</span>
             <button aria-label="Close Track Color panel" onClick={() => setShowTrackColor(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7024,7 +7024,7 @@ const Imosion: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
                   <button aria-label={referencePlaying ? 'Pause reference' : 'Play reference'} onClick={() => setReferencePlaying(!referencePlaying)} style={{ flex: 1, padding: '6px', borderRadius: 4, border: 'none', background: referencePlaying ? 'var(--color-success)' : 'rgba(48,209,88,0.1)', color: referencePlaying ? '#000' : 'var(--color-success)', fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>{referencePlaying ? <><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1" /><rect x="9" y="2" width="4" height="12" rx="1" /></svg> Pause</> : <><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6z" /></svg> Play</>}</button>
-                  <button aria-label="A/B switch" onClick={() => { setReferencePlaying(p => !p); setMasterSettings(s => ({ ...s, volume: s.volume > 0 ? 0 : 0.8 })); }} style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.06)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>A/B</button>
+                  <button aria-label="A/B switch" onClick={() => { setReferencePlaying(p => !p); setMasterSettings(s => ({ ...s, volume: s.volume > 0 ? 0 : 0.8 })); }} style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', background: 'var(--color-accent-light, rgba(10,132,255,0.06))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>A/B</button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 35 }}>Level</span>
@@ -7044,7 +7044,7 @@ const Imosion: React.FC = () => {
 
       {/* 11. Bus Compressor */}
       {showBusComp && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Bus Compressor</span>
             <button aria-label="Close Bus Compressor panel" onClick={() => setShowBusComp(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7057,7 +7057,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{p.val}{p.unit}</span>
               </div>
             ))}
-            <div style={{ height: 24, background: 'rgba(0,0,0,0.3)', borderRadius: 3, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ height: 24, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', borderRadius: 3, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)' }}>GR: 0.0 dB</span>
             </div>
           </div>
@@ -7066,7 +7066,7 @@ const Imosion: React.FC = () => {
 
       {/* 12. Tape Emulation */}
       {showTapeEmu && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Tape Emulation</span>
             <button aria-label="Close Tape Emulation panel" onClick={() => setShowTapeEmu(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7090,7 +7090,7 @@ const Imosion: React.FC = () => {
 
       {/* 13. Mid/Side Processing */}
       {showMidSide && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Mid/Side Processing</span>
             <button aria-label="Close Mid/Side panel" onClick={() => setShowMidSide(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7122,7 +7122,7 @@ const Imosion: React.FC = () => {
 
       {/* 14. Sample Rate Convert */}
       {showSRConvert && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Sample Rate Convert</span>
             <button aria-label="Close Sample Rate Convert panel" onClick={() => setShowSRConvert(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7163,7 +7163,7 @@ const Imosion: React.FC = () => {
                 <span style={{ fontSize: 8, color: 'var(--color-success)', fontWeight: 600 }}>OK</span>
               </div>
             ))}
-            <div style={{ marginTop: 8, padding: 6, borderRadius: 3, background: 'rgba(0,0,0,0.2)', textAlign: 'center' }}>
+            <div style={{ marginTop: 8, padding: 6, borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', textAlign: 'center' }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Integrated: -14.2 LUFS | True Peak: -1.0 dBTP</span>
             </div>
           </div>
@@ -7191,7 +7191,7 @@ const Imosion: React.FC = () => {
 
       {/* 17. Plugin Chain Presets */}
       {showChainPreset && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>FX Chain Presets</span>
             <button aria-label="Close FX Chain Presets panel" onClick={() => setShowChainPreset(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7221,10 +7221,10 @@ const Imosion: React.FC = () => {
                   }}
                   onBlur={() => setChainPresetNameDraft(null)}
                   placeholder={`Custom ${chainPresets.length + 1}`}
-                  style={{ flex: 1, padding: '5px 8px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.4)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, outline: 'none' }}
+                  style={{ flex: 1, padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.4))', background: 'var(--color-accent-light, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 10, outline: 'none' }}
                 />
               ) : (
-                <button aria-label="Save current chain as preset" onClick={() => setChainPresetNameDraft('')} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.2)', background: 'rgba(10,132,255,0.08)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Save Current Chain</button>
+                <button aria-label="Save current chain as preset" onClick={() => setChainPresetNameDraft('')} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', background: 'var(--color-accent-light, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Save Current Chain</button>
               )}
             </div>
           </div>
@@ -7256,7 +7256,7 @@ const Imosion: React.FC = () => {
 
       {/* 19. Track Groups */}
       {showTrackGroup && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Track Groups</span>
             <button aria-label="Close Track Groups panel" onClick={() => setShowTrackGroup(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7286,7 +7286,7 @@ const Imosion: React.FC = () => {
 
       {/* 20. Advanced Export */}
       {showExportAdvanced && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Advanced Export</span>
             <button aria-label="Close Advanced Export panel" onClick={() => setShowExportAdvanced(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
@@ -7343,7 +7343,7 @@ const Imosion: React.FC = () => {
       {/* Plugin Browser Modal */}
       {showPluginBrowser && selectedTrackData && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowPluginBrowser(false)}>
-          <div className="modal-content" style={{ width: '320px', maxHeight: '70vh', background: '#1c1c20', borderRadius: '8px', border: '1px solid rgba(48,209,88,0.15)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px rgba(48,209,88,0.2)' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(320px, calc(100vw - 48px))', maxHeight: '70vh', background: '#1c1c20', borderRadius: '8px', border: '1px solid rgba(48,209,88,0.15)', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 1px rgba(48,209,88,0.2)' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(48,209,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(48,209,88,0.08) 0%, transparent 100%)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -7504,7 +7504,7 @@ const Imosion: React.FC = () => {
       {/* Templates Modal */}
       {showTemplates && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowTemplates(false)}>
-          <div className="modal-content" style={{ width: '400px', maxHeight: '70vh', background: 'var(--color-bg-base)', borderRadius: '8px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ width: 'min(400px, calc(100vw - 48px))', maxHeight: '70vh', background: 'var(--color-bg-base)', borderRadius: '8px', border: '1px solid #27272a', overflow: 'hidden' }} onMouseDown={(e) => e.stopPropagation()}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 600 }}>Templates</span>
               <button aria-label="Close" onClick={() => setShowTemplates(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
@@ -7590,7 +7590,7 @@ const Imosion: React.FC = () => {
       {showClipEditor && editingClip && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6500 }} onMouseDown={() => setShowClipEditor(false)}>
           <div className="modal-content" style={{ width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(85vh, calc(100vh - 32px))', background: 'var(--color-bg-base)', borderRadius: '10px', border: '1px solid #27272a', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(10,132,255,0.1), transparent)' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, var(--color-accent-soft, rgba(10,132,255,0.1)), transparent)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                 <span style={{ color: 'var(--color-accent)' }}>{Icon.audio}</span>
                 <span style={{ fontSize: '13px', fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingClip.clip.name}</span>
@@ -7906,8 +7906,8 @@ const Imosion: React.FC = () => {
               <button aria-label="Silence selection" onClick={forgeSilence} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(255,159,10,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(255,159,10,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? 'var(--color-warning)' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Silence</button>
               <button aria-label="Trim to selection" onClick={forgeTrim} disabled={!forgeSelection} style={{ padding: '5px 10px', background: forgeSelection ? 'rgba(191,90,242,0.1)' : '#111113', border: '1px solid', borderColor: forgeSelection ? 'rgba(191,90,242,0.2)' : 'var(--color-bg-elevated)', borderRadius: '3px', color: forgeSelection ? '#bf5af2' : '#3f3f46', fontSize: '10px', fontWeight: 600, cursor: forgeSelection ? 'pointer' : 'not-allowed' }}>Trim to Selection</button>
               <div style={{ width: '1px', height: '20px', background: 'var(--color-bg-hover)' }} />
-              <button aria-label="Increase gain by 6dB" onClick={() => forgeGain(1.5)} style={{ padding: '5px 10px', background: 'rgba(10,132,255,0.1)', border: '1px solid rgba(10,132,255,0.2)', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain +6dB</button>
-              <button aria-label="Decrease gain by 6dB" onClick={() => forgeGain(0.5)} style={{ padding: '5px 10px', background: 'rgba(10,132,255,0.1)', border: '1px solid rgba(10,132,255,0.2)', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain -6dB</button>
+              <button aria-label="Increase gain by 6dB" onClick={() => forgeGain(1.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain +6dB</button>
+              <button aria-label="Decrease gain by 6dB" onClick={() => forgeGain(0.5)} style={{ padding: '5px 10px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.2))', borderRadius: '3px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>Gain -6dB</button>
               <div style={{ flex: 1 }} />
               {forgeSelection && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>Selection: {(forgeSelection.start * 100).toFixed(1)}% - {(forgeSelection.end * 100).toFixed(1)}%</span>}
               <button aria-label="Clear selection" onClick={() => setForgeSelection(null)} style={{ padding: '5px 8px', background: 'var(--color-bg-surface)', border: '1px solid #27272a', borderRadius: '3px', color: 'var(--color-text-tertiary)', fontSize: '9px', cursor: 'pointer' }}>Clear Sel</button>
@@ -8143,7 +8143,7 @@ const Imosion: React.FC = () => {
                 // In a session
                 <div>
                   {/* Session info */}
-                  <div style={{ padding: '12px', background: 'rgba(10,132,255,0.1)', border: '1px solid rgba(10,132,255,0.3)', borderRadius: '6px', marginBottom: '16px' }}>
+                  <div style={{ padding: '12px', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))', borderRadius: '6px', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-accent)' }}>{collaborationSession.name}</span>
                       <span style={{ fontSize: '9px', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.wifi} Live</span>
@@ -8275,7 +8275,7 @@ const Imosion: React.FC = () => {
                 addPluginToTrack(selectedTrack, 'autotune');
                 window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Vocal tuner (${vocalTunerMode}) added to "${track.name}"` } }));
               }
-            }} style={{ marginTop: 8, width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(10,132,255,0.3)', background: 'rgba(10,132,255,0.1)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply to Selected Track</button>
+            }} style={{ marginTop: 8, width: '100%', padding: '6px', borderRadius: 4, border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))', background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>Apply to Selected Track</button>
           </div>
         </div>
       )}
@@ -8307,7 +8307,7 @@ const Imosion: React.FC = () => {
 
       {/* Noise Gate Panel */}
       {showNoiseGate && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Noise Gate</span>
             <button aria-label="Close Noise Gate" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowNoiseGate(false)}><DexIcon name="close" size={14} /></button>
@@ -8331,7 +8331,7 @@ const Imosion: React.FC = () => {
 
       {/* De-Esser Panel */}
       {showDeEsser && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>De-Esser</span>
             <button aria-label="Close De-Esser" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowDeEsser(false)}><DexIcon name="close" size={14} /></button>
@@ -8355,7 +8355,7 @@ const Imosion: React.FC = () => {
 
       {/* Sidechain Panel */}
       {showSidechainPanel && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Sidechain Compression</span>
             <button aria-label="Close Sidechain Compression" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSidechainPanel(false)}><DexIcon name="close" size={14} /></button>
@@ -8404,7 +8404,7 @@ const Imosion: React.FC = () => {
             {compLanes.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8 }}>
                 <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>Record multiple takes to see comp lanes</span>
-                <button aria-label="New Take" onClick={() => setCompLanes(prev => [...prev, { id: `take-${Date.now()}`, name: `Take ${prev.length + 1}`, active: prev.length === 0 }])} style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'rgba(10,132,255,0.15)', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ New Take</button>
+                <button aria-label="New Take" onClick={() => setCompLanes(prev => [...prev, { id: `take-${Date.now()}`, name: `Take ${prev.length + 1}`, active: prev.length === 0 }])} style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-accent-soft, rgba(10,132,255,0.15))', color: 'var(--color-accent)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>+ New Take</button>
               </div>
             ) : (
               <>
@@ -8427,7 +8427,7 @@ const Imosion: React.FC = () => {
 
       {/* Stem Export Panel */}
       {showStemExport && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 420, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(420px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Stem Export</span>
             <button aria-label="Close Stem Export" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowStemExport(false)}><DexIcon name="close" size={14} /></button>
@@ -8453,7 +8453,7 @@ const Imosion: React.FC = () => {
 
       {/* Track Folders Dialog */}
       {showTrackFolderDialog && (
-        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
+        <div style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 6000 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Track Groups</span>
             <button aria-label="Close Track Groups" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrackFolderDialog(false)}><DexIcon name="close" size={14} /></button>
@@ -8650,7 +8650,7 @@ const Imosion: React.FC = () => {
               <div key={t.id} style={{ padding: 8, borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 3 }}>
                 <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{t.name}</div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <select style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
+                  <select style={{ flex: 1, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
                     <option>Master Bus</option>
                     <option>Bus A</option>
                     <option>Bus B</option>
@@ -8665,7 +8665,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: 8, borderRadius: 4, background: 'var(--color-border-subtle)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Input</span>
-                <select style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
+                <select style={{ background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
                   <option>Default Input</option>
                   <option>Input 1-2</option>
                   <option>Input 3-4</option>
@@ -8673,7 +8673,7 @@ const Imosion: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Output</span>
-                <select style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
+                <select style={{ background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 4px' }}>
                   <option>Default Output</option>
                   <option>Output 1-2</option>
                   <option>Output 3-4</option>

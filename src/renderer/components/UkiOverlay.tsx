@@ -1671,7 +1671,7 @@ const UkiOverlay: React.FC = () => {
       maxWidth: 'calc(100vw - 40px)',
       zIndex: zIndex.overlay,
       pointerEvents: 'auto',
-      animation: panelPos ? 'none' : 'ukiOverlayIn 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
+      animation: panelPos ? 'none' : 'ukiOverlayIn 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
     }}>
       <style>{`
         @keyframes ukiOverlayIn {
@@ -1689,10 +1689,10 @@ const UkiOverlay: React.FC = () => {
       `}</style>
 
       <div onMouseDown={handleDragStart} style={{
-        background: 'rgba(255,255,255,0.06)',
+        background: 'var(--color-bg-hover)',
         backdropFilter: 'var(--blur-xl) saturate(180%)',
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-        border: '1px solid rgba(255,255,255,0.10)',
+        border: '1px solid var(--color-border-subtle)',
         borderRadius: 12,
         boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
         overflow: 'hidden',
@@ -1743,7 +1743,7 @@ const UkiOverlay: React.FC = () => {
               marginLeft: state === 'listening' ? 0 : 'auto',
               width: 24, height: 22, borderRadius: 4,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: speakResponses ? 'rgba(10,132,255,0.14)' : 'transparent',
+              background: speakResponses ? 'var(--color-accent-light)' : 'transparent',
               border: 'none', color: speakResponses ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
               cursor: 'pointer', flexShrink: 0,
             }}
@@ -1817,7 +1817,7 @@ const UkiOverlay: React.FC = () => {
               <div>
                 <div style={{
                   fontSize: 10, fontWeight: 600,
-                  color: turn.success ? 'rgba(10,132,255,0.5)' : 'rgba(255,69,58,0.5)',
+                  color: turn.success ? 'var(--color-accent)' : 'var(--color-error)',
                   letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 2,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
@@ -1850,7 +1850,7 @@ const UkiOverlay: React.FC = () => {
                   <div style={{
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
                     lineHeight: 1.5, padding: '6px 8px', marginBottom: 6,
-                    background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid rgba(10,132,255,0.4)',
+                    background: 'var(--color-bg-hover)', borderLeft: '2px solid var(--color-accent-light)',
                     borderRadius: 3,
                   }}>
                     {turn.thoughtSteps && turn.thoughtSteps.length > 0 ? (
@@ -1896,8 +1896,8 @@ const UkiOverlay: React.FC = () => {
             <div style={{
               display: 'flex', flexDirection: 'column', gap: 4,
               padding: '6px 8px', marginBottom: 8,
-              background: 'rgba(10,132,255,0.06)',
-              borderLeft: '2px solid rgba(10,132,255,0.5)',
+              background: 'var(--color-accent-soft)',
+              borderLeft: '2px solid var(--color-accent)',
               borderRadius: 3,
             }}>
               <div style={{
@@ -1906,7 +1906,7 @@ const UkiOverlay: React.FC = () => {
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: 'rgba(10,132,255,0.85)',
+                  background: 'var(--color-accent)',
                   animation: 'ukiPulse 0.9s ease-in-out infinite',
                 }} />
                 <span>Thinking{thoughtSteps.length > 0 ? ` -- step ${thoughtSteps.length}` : ''}</span>
@@ -1928,7 +1928,7 @@ const UkiOverlay: React.FC = () => {
           {(response || streamingResponse) && (
             <div>
               <div style={{
-                fontSize: 10, fontWeight: 600, color: 'rgba(10,132,255,0.6)',
+                fontSize: 10, fontWeight: 600, color: 'var(--color-accent)',
                 letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 4,
               }}>
                 UKI
@@ -1948,8 +1948,8 @@ const UkiOverlay: React.FC = () => {
           {error && (
             <div style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
-              padding: '6px 8px', background: 'rgba(255,69,58,0.08)',
-              borderRadius: 6, border: '1px solid rgba(255,69,58,0.15)',
+              padding: '6px 8px', background: 'var(--color-error-muted, rgba(255,69,58,0.08))',
+              borderRadius: 6, border: '1px solid var(--color-error-muted, rgba(255,69,58,0.15))',
             }}>
               {error}
             </div>
@@ -2110,7 +2110,7 @@ const UkiOverlay: React.FC = () => {
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               transition: 'border-color 0.15s ease, background 0.15s ease',
             }}
-            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(10,132,255,0.55)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-accent)'; e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
             onBlur={e => { e.currentTarget.style.borderColor = 'var(--color-border-subtle)'; e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
             disabled={state === 'processing' || state === 'thinking'}
             aria-label="Ask UKI"
@@ -2121,8 +2121,8 @@ const UkiOverlay: React.FC = () => {
             style={{
               width: 32, height: 32, borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: (inputText.trim() && !isThinking) ? 'rgba(10,132,255,0.28)' : 'transparent',
-              border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'rgba(10,132,255,0.4)' : 'transparent'),
+              background: (inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent',
+              border: '1px solid ' + ((inputText.trim() && !isThinking) ? 'var(--color-accent-light)' : 'transparent'),
               cursor: (inputText.trim() && !isThinking) ? 'pointer' : 'default',
               transition: 'background 0.15s ease, border-color 0.15s ease, transform 0.1s ease',
               flexShrink: 0,
@@ -2133,7 +2133,7 @@ const UkiOverlay: React.FC = () => {
             {isThinking ? (
               <span style={{
                 width: 8, height: 8, borderRadius: '50%',
-                background: 'rgba(10,132,255,0.85)',
+                background: 'var(--color-accent)',
                 animation: 'ukiPulse 0.9s ease-in-out infinite',
               }} />
             ) : (

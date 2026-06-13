@@ -156,7 +156,7 @@ const barStyles: Record<string, React.CSSProperties> = {
     zIndex: 'var(--z-tooltip)',
     display: 'flex',
     flexDirection: 'column',
-    background: 'rgba(30,30,30,0.95)',
+    background: 'var(--color-bg-elevated, rgba(30,30,30,0.95))',
     border: '1px solid var(--color-border)',
     borderRadius: 4,
     padding: '4px 0',
@@ -175,7 +175,7 @@ const barStyles: Record<string, React.CSSProperties> = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   itemActive: {
-    background: 'rgba(100,210,255,0.12)',
+    background: 'var(--color-accent-soft, rgba(100,210,255,0.12))',
     color: 'var(--color-text-primary)',
   },
   freq: {

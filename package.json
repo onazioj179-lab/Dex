@@ -36,9 +36,6 @@
     "test:legacy": "node tests/run-tests.js",
     "package": "npm run build && electron-builder",
     "package:win": "npm run build && electron-builder --win",
-    "package:win:x64": "npm run build && electron-builder --win --x64",
-    "package:win:arm64": "npm run build && electron-builder --win --arm64",
-    "package:win:portable": "npm run build && electron-builder --win portable --x64",
     "package:mac": "npm run build && electron-builder --mac",
     "package:mac:x64": "npm run build && electron-builder --mac --x64",
     "package:mac:arm64": "npm run build && electron-builder --mac --arm64",
@@ -164,18 +161,6 @@
             "x64",
             "arm64"
           ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "publisherName": "Onazi Treasure OJ",
@@ -198,10 +183,7 @@
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
-    },
-    "portable": {
-      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -300,7 +282,7 @@
     "publish": {
       "provider": "github",
       "owner": "onazioj179-lab",
-      "repo": "Dex",
+      "repo": "dex-updates",
       "releaseType": "release"
     }
   }
