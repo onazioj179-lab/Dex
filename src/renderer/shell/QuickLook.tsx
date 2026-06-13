@@ -234,7 +234,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
           fontSize: item.type === 'code' ? 12 : 14,
           lineHeight: 1.6,
           color: 'var(--color-text-primary)',
-          background: item.type === 'code' ? 'rgba(0,0,0,0.3)' : 'transparent',
+          background: item.type === 'code' ? 'var(--color-bg-inset, rgba(0,0,0,0.3))' : 'transparent',
           borderRadius: item.type === 'code' ? 8 : 0,
           padding: item.type === 'code' ? 16 : 0,
           overflowX: 'auto',
@@ -268,7 +268,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
           <div style={{
             width: 64, height: 64, borderRadius: '50%',
-            background: 'rgba(74,158,255,0.15)',
+            background: 'var(--color-accent-light, rgba(74,158,255,0.15))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 24, fontWeight: 600, color: 'var(--color-accent)',
           }}>

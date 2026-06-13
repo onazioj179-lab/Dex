@@ -153,7 +153,7 @@ export function useDropZone<T>(options: {
   }, [accept, onDrop, dropState]);
 
   const dropZoneStyle: React.CSSProperties = dropState.active ? {
-    background: dropState.valid ? 'rgba(74,158,255,0.08)' : 'transparent',
+    background: dropState.valid ? 'var(--color-accent-soft, rgba(74,158,255,0.08))' : 'transparent',
     border: dropState.valid ? '2px solid var(--color-accent)' : '2px solid transparent',
     borderRadius: 6,
     transition: isReduceMotion() ? 'none' : 'background 0.08s ease, border-color 0.08s ease',

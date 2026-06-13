@@ -9,7 +9,7 @@ import { EventEmitter } from 'events';
 import log from 'electron-log';
 import path from 'path';
 import fs from 'fs';
-import Database from 'better-sqlite3';
+import Database from '../native/safeSqlite';
 
 interface HelpArticle {
   id: string;

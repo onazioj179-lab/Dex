@@ -106,11 +106,11 @@ const Achievements: React.FC = () => {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '6px 12px', borderRadius: 8,
-              background: 'rgba(255,255,255,.04)',
+              background: 'var(--color-bg-hover, rgba(255,255,255,.04))',
             }}>
               <DexIcon name={rank.icon} size={16} color="#ff9f0a" />
               <span style={{ fontSize: 12, fontWeight: 600 }}>{rank.title}</span>
-              <div style={{ width: 48, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+              <div style={{ width: 48, height: 3, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.08))', overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, rankProgress)}%`, height: '100%', borderRadius: 2, background: 'var(--color-warning)' }} />
               </div>
             </div>
@@ -122,7 +122,7 @@ const Achievements: React.FC = () => {
       {/* Category Tabs + Search */}
       <div style={{
         padding: '10px 24px', flexShrink: 0,
-        borderBottom: '1px solid rgba(255,255,255,.04)',
+        borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,.04))',
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
         <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
@@ -130,8 +130,8 @@ const Achievements: React.FC = () => {
             <button key={cat.key} onClick={() => setActiveTab(cat.key)} style={{
               padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap',
-              background: activeTab === cat.key ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.03)',
-              color: activeTab === cat.key ? 'var(--color-warning)' : 'rgba(255,255,255,.5)',
+              background: activeTab === cat.key ? 'var(--color-warning-soft, rgba(245,158,11,.15))' : 'var(--color-bg-hover, rgba(255,255,255,.03))',
+              color: activeTab === cat.key ? 'var(--color-warning)' : 'var(--color-text-tertiary, rgba(255,255,255,.5))',
               transition: 'all .15s',
             }}>
               {cat.label}
@@ -143,24 +143,24 @@ const Achievements: React.FC = () => {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '5px 10px', borderRadius: 6,
-            background: 'rgba(255,255,255,.04)',
-            border: '1px solid rgba(255,255,255,.06)',
+            background: 'var(--color-bg-hover, rgba(255,255,255,.04))',
+            border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
             flex: 1, maxWidth: 280,
           }}>
-            <DexIcon name="search" size={12} color="rgba(255,255,255,.35)" />
+            <DexIcon name="search" size={12} color="var(--color-text-tertiary, rgba(255,255,255,.35))" />
             <input
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search..."
               style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontSize: 12, width: '100%' }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,.03)', borderRadius: 6, padding: 2 }}>
+          <div style={{ display: 'flex', gap: 2, background: 'var(--color-bg-hover, rgba(255,255,255,.03))', borderRadius: 6, padding: 2 }}>
             {(['all', 'unlocked', 'locked'] as StatusFilter[]).map(s => (
               <button key={s} onClick={() => setStatusFilter(s)} style={{
                 padding: '4px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
                 fontSize: 11, fontWeight: 500, textTransform: 'capitalize',
-                background: statusFilter === s ? 'rgba(245,158,11,.15)' : 'transparent',
-                color: statusFilter === s ? 'var(--color-warning)' : 'rgba(255,255,255,.45)',
+                background: statusFilter === s ? 'var(--color-warning-soft, rgba(245,158,11,.15))' : 'transparent',
+                color: statusFilter === s ? 'var(--color-warning)' : 'var(--color-text-tertiary, rgba(255,255,255,.45))',
               }}>{s}</button>
             ))}
           </div>
@@ -171,7 +171,7 @@ const Achievements: React.FC = () => {
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
         {filtered.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.35 }}>
-            <DexIcon name="search" size={36} color="rgba(255,255,255,.2)" />
+            <DexIcon name="search" size={36} color="var(--color-text-tertiary, rgba(255,255,255,.2))" />
             <p style={{ marginTop: 10, fontSize: 13 }}>No achievements found</p>
           </div>
         ) : (
@@ -205,21 +205,21 @@ const AchievementCard: React.FC<{
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '10px 12px', borderRadius: 8,
-      background: isUnlocked ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.015)',
-      border: '1px solid rgba(255,255,255,.04)',
+      background: isUnlocked ? 'var(--color-bg-hover, rgba(255,255,255,.04))' : 'var(--color-bg-surface, rgba(255,255,255,.015))',
+      border: '1px solid var(--color-border-subtle, rgba(255,255,255,.04))',
       opacity: isUnlocked ? 1 : 0.55,
-      transition: 'opacity .2s',
+      transition: 'opacity .18s',
     }}>
       {/* Icon */}
       <div style={{
         width: 34, height: 34, borderRadius: 7, flexShrink: 0,
-        background: isUnlocked ? `${meta.color}18` : 'rgba(255,255,255,.04)',
+        background: isUnlocked ? `${meta.color}18` : 'var(--color-bg-hover, rgba(255,255,255,.04))',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <DexIcon
           name={isSecret ? 'help-circle' : achievement.icon}
           size={18}
-          color={isUnlocked ? meta.color : 'rgba(255,255,255,.2)'}
+          color={isUnlocked ? meta.color : 'var(--color-text-tertiary, rgba(255,255,255,.2))'}
         />
       </div>
 
@@ -246,11 +246,11 @@ const AchievementCard: React.FC<{
         {/* Progress bar */}
         {!isUnlocked && prog && (
           <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+            <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'var(--color-border-subtle, rgba(255,255,255,.08))', overflow: 'hidden' }}>
               <div style={{
                 width: `${pct}%`, height: '100%', borderRadius: 2,
                 background: `linear-gradient(90deg, ${meta.color}80, ${meta.color})`,
-                transition: 'width .3s',
+                transition: 'width .18s',
               }} />
             </div>
             <span style={{ fontSize: 9, opacity: 0.4, flexShrink: 0 }}>

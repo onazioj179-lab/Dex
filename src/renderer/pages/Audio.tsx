@@ -820,13 +820,13 @@ export const Audio: React.FC = () => {
         </div>
         
         <div style={styles.playlistList}>
-          <div style={styles.sectionLabel}>Library</div>
+          <div className="dex-label-caps" style={{ padding: '12px 10px 4px' }}>Library</div>
           {playlists.slice(0, 3).map(playlist => (
             <button
               key={playlist.id}
               style={{
                 ...styles.playlistItem,
-                background: selectedPlaylist === playlist.id && libraryView === 'songs' ? 'rgba(10, 132, 255, 0.2)' : 'transparent',
+                background: selectedPlaylist === playlist.id && libraryView === 'songs' ? 'var(--color-accent-light, rgba(10, 132, 255, 0.2))' : 'transparent',
                 color: selectedPlaylist === playlist.id && libraryView === 'songs' ? 'var(--color-accent)' : 'var(--color-text-primary)',
               }}
               onClick={() => { setSelectedPlaylist(playlist.id); setLibraryView('songs'); }}
@@ -838,7 +838,7 @@ export const Audio: React.FC = () => {
             </button>
           ))}
 
-          <div style={styles.sectionLabel}>Browse</div>
+          <div className="dex-label-caps" style={{ padding: '12px 10px 4px' }}>Browse</div>
           {([
             { key: 'artists' as const, icon: 'user', label: 'Artists' },
             { key: 'albums' as const, icon: 'disc', label: 'Albums' },
@@ -849,7 +849,7 @@ export const Audio: React.FC = () => {
               key={view.key}
               style={{
                 ...styles.playlistItem,
-                background: libraryView === view.key ? 'rgba(10, 132, 255, 0.2)' : 'transparent',
+                background: libraryView === view.key ? 'var(--color-accent-light, rgba(10, 132, 255, 0.2))' : 'transparent',
                 color: libraryView === view.key ? 'var(--color-accent)' : 'var(--color-text-primary)',
               }}
               onClick={() => setLibraryView(view.key)}
@@ -860,13 +860,13 @@ export const Audio: React.FC = () => {
             </button>
           ))}
           
-          <div style={styles.sectionLabel}>Playlists</div>
+          <div className="dex-label-caps" style={{ padding: '12px 10px 4px' }}>Playlists</div>
           {playlists.slice(3).map(playlist => (
             <button
               key={playlist.id}
               style={{
                 ...styles.playlistItem,
-                background: selectedPlaylist === playlist.id ? 'rgba(10, 132, 255, 0.2)' : 'transparent',
+                background: selectedPlaylist === playlist.id ? 'var(--color-accent-light, rgba(10, 132, 255, 0.2))' : 'transparent',
                 color: selectedPlaylist === playlist.id ? 'var(--color-accent)' : 'var(--color-text-primary)',
               }}
               onClick={() => setSelectedPlaylist(playlist.id)}
@@ -1087,7 +1087,7 @@ export const Audio: React.FC = () => {
 
         {/* 10-Band Equalizer */}
         {showEqualizer && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 120, transform: 'translateX(-50%)', width: 400, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 120, transform: 'translateX(-50%)', width: 'min(400px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Equalizer</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowEqualizer(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1168,7 +1168,7 @@ export const Audio: React.FC = () => {
 
         {/* Audio Visualizer */}
         {showVisualizer && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: 100, transform: 'translateX(-50)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: 100, transform: 'translateX(-50%)', width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Visualizer</span>
@@ -1186,7 +1186,7 @@ export const Audio: React.FC = () => {
 
         {/* Crossfade Settings */}
         {showCrossfadeSettings && (
-          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 160, transform: 'translateX(-50%)', width: 280, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+          <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', bottom: 160, transform: 'translateX(-50%)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crossfade</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCrossfadeSettings(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1236,8 +1236,8 @@ export const Audio: React.FC = () => {
 
         {/* Metadata Editor */}
         {editingTrack && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={() => setEditingTrack(null)}>
-            <div style={{ width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border)', boxShadow: 'var(--pg-shadow-modal)', animation: 'dex-panel-in 200ms ease-out' }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', inset: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.5))', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={() => setEditingTrack(null)}>
+            <div style={{ width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border)', boxShadow: 'var(--pg-shadow-modal)', animation: 'dex-panel-in 200ms ease-out' }} onMouseDown={e => e.stopPropagation()}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Edit Track Info</span>
                 <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setEditingTrack(null)} aria-label="Close"><DexIcon name="close" size={14} /></button>
@@ -1252,16 +1252,16 @@ export const Audio: React.FC = () => {
                 </div>
                 {(['title', 'artist', 'album', 'genre', 'year', 'composer'] as const).map(field => (
                   <div key={field}>
-                    <label style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{field}</label>
+                    <label className="dex-label-caps">{field}</label>
                     <input
                       type="text"
                       value={editMeta[field]}
                       onChange={e => setEditMeta(prev => ({ ...prev, [field]: e.target.value }))}
-                      style={{ width: '100%', padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: '#fff', fontSize: 13, outline: 'none', marginTop: 3 }}
+                      style={{ width: '100%', padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 13, outline: 'none', marginTop: 3 }}
                     />
                   </div>
                 ))}
-                <button onClick={saveMetadata} style={{ marginTop: 4, padding: '8px 0', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
+                <button onClick={saveMetadata} style={{ marginTop: 4, padding: '8px 0', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
               </div>
             </div>
           </div>
@@ -1411,14 +1411,6 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflow: 'auto',
     padding: '8px',
-  },
-  sectionLabel: {
-    fontSize: '10.5px',
-    fontWeight: 600,
-    color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
-    padding: '12px 10px 4px',
-    letterSpacing: '0.8px',
   },
   playlistItem: {
     display: 'flex',

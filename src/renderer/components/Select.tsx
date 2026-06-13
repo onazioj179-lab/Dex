@@ -199,16 +199,16 @@ export const Select: React.FC<SelectProps> = ({
       gap: 8,
       height: s.height,
       padding: s.padding,
-      background: 'rgba(22,24,28,0.96)',
-      border: `1px solid ${error ? 'var(--color-error)' : isOpen ? 'rgba(10,132,255,0.45)' : 'var(--color-border)'}`,
+      background: 'var(--color-bg-surface)',
+      border: `1px solid ${error ? 'var(--color-error)' : isOpen ? 'var(--color-accent)' : 'var(--color-border)'}`,
       borderRadius: 6,
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
       boxShadow: 'inset 0 0.5px 0 var(--color-bg-hover)',
-      transition: 'all 0.15s',
+      transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
     },
     controlFocused: {
-      boxShadow: `0 0 0 2px ${error ? 'rgba(239, 68, 68, 0.2)' : 'rgba(10,132,255,0.18)'}`,
+      boxShadow: `0 0 0 2px ${error ? 'var(--color-error-muted)' : 'var(--color-accent-muted, var(--color-accent-soft))'}`,
     },
     value: {
       flex: 1,
@@ -237,7 +237,7 @@ export const Select: React.FC<SelectProps> = ({
     arrow: {
       color: 'var(--color-text-muted)',
       fontSize: 10,
-      transition: 'transform 0.2s',
+      transition: 'transform 180ms cubic-bezier(0.4, 0, 0.2, 1)',
       transform: isOpen ? 'rotate(180deg)' : 'rotate(0)',
     },
     menu: {
@@ -246,7 +246,7 @@ export const Select: React.FC<SelectProps> = ({
       left: 0,
       right: 0,
       marginTop: 4,
-      background: 'rgba(18,20,24,0.98)',
+      background: 'var(--color-bg-elevated)',
       border: '1px solid var(--color-border)',
       borderRadius: 6,
       boxShadow: 'var(--pg-shadow-popover)',
@@ -256,11 +256,6 @@ export const Select: React.FC<SelectProps> = ({
     },
     group: {
       padding: '8px 12px 4px',
-      fontSize: 11,
-      fontWeight: 600,
-      color: 'var(--color-text-muted)',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
     },
     option: {
       display: 'flex',
@@ -276,8 +271,8 @@ export const Select: React.FC<SelectProps> = ({
       background: 'var(--color-bg-hover)',
     },
     optionSelected: {
-      background: 'rgba(10,132,255,0.14)',
-      color: '#7cb8ff',
+      background: 'var(--color-accent-light)',
+      color: 'var(--color-accent, #7cb8ff)',
     },
     optionDisabled: {
       opacity: 0.5,
@@ -366,7 +361,7 @@ export const Select: React.FC<SelectProps> = ({
           ) : grouped ? (
             Object.entries(groupedOptions).map(([group, groupOptions]) => (
               <div key={group}>
-                {group && <div style={styles.group}>{group}</div>}
+                {group && <div className="dex-label-caps" style={styles.group}>{group}</div>}
                 {groupOptions.map((option, index) => {
                   const globalIndex = filteredOptions.indexOf(option);
                   return (
@@ -509,8 +504,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       gap: 6,
       minHeight: s.minHeight,
       padding: '6px 12px',
-      background: 'rgba(22,24,28,0.96)',
-      border: `1px solid ${isOpen ? 'rgba(10,132,255,0.45)' : 'var(--color-border)'}`,
+      background: 'var(--color-bg-surface)',
+      border: `1px solid ${isOpen ? 'var(--color-accent)' : 'var(--color-border)'}`,
       borderRadius: 6,
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
@@ -542,7 +537,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       background: 'none',
       outline: 'none',
       fontSize: s.fontSize,
-      color: 'var(--color-text)',
+      color: 'var(--color-text-primary)',
     },
     placeholder: {
       color: 'var(--color-text-muted)',
@@ -554,7 +549,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       left: 0,
       right: 0,
       marginTop: 4,
-      background: 'rgba(18,20,24,0.98)',
+      background: 'var(--color-bg-elevated)',
       border: '1px solid var(--color-border)',
       borderRadius: 6,
       boxShadow: 'var(--pg-shadow-popover)',
@@ -585,7 +580,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
     checkboxChecked: {
       background: 'var(--color-accent)',
       borderColor: 'var(--color-accent)',
-      color: '#fff',
+      color: 'var(--color-text-inverse, #fff)',
     },
   };
 

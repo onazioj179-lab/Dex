@@ -28,7 +28,7 @@ interface ActiveExport {
 // ---------------------------------------------------------------------------
 
 const overlayStyle: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+  position: 'fixed', inset: 0, background: 'var(--color-bg-overlay, rgba(0,0,0,0.7))',
   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
 };
 
@@ -502,10 +502,10 @@ export const ExportDialog: React.FC = memo(() => {
                     </div>
                   )}
                   {job.status === 'complete' && (
-                    <span style={{ fontSize: 10, color: '#3DAF72' }}>Done</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-success, #3DAF72)' }}>Done</span>
                   )}
                   {job.status === 'failed' && (
-                    <span style={{ fontSize: 10, color: '#FF6B6B' }} title={job.error || 'Export failed'}>{job.error || 'Export failed'}</span>
+                    <span style={{ fontSize: 10, color: 'var(--color-error, #FF6B6B)' }} title={job.error || 'Export failed'}>{job.error || 'Export failed'}</span>
                   )}
                   <button
                     aria-label={`Remove export job ${job.outputPath}`}

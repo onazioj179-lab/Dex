@@ -28,6 +28,10 @@ export interface ScrollContainerProps {
   showFadeGradients?: boolean;
   /** Height of fade gradient */
   fadeHeight?: number;
+  /** Solid color the fade blends FROM (should match the container's own
+   *  background, else the fade looks wrong over a differently-coloured panel).
+   *  Defaults to the app base background. Accepts any CSS color / var(). */
+  fadeColor?: string;
   /** Custom class name */
   className?: string;
   /** Custom style */
@@ -50,6 +54,7 @@ export const ScrollContainer: React.FC<ScrollContainerProps> = ({
   children,
   showFadeGradients = true,
   fadeHeight = 16,
+  fadeColor = colors.bg.base,
   className = '',
   style = {},
   onScroll,
@@ -140,7 +145,7 @@ export const ScrollContainer: React.FC<ScrollContainerProps> = ({
             left: 0,
             right: 0,
             height: fadeHeight,
-            background: `linear-gradient(to bottom, ${colors.bg.base} 0%, transparent 100%)`,
+            background: `linear-gradient(to bottom, ${fadeColor} 0%, transparent 100%)`,
             pointerEvents: 'none',
             opacity: showTopFade ? 1 : 0,
             transition: 'opacity 0.15s ease',
@@ -158,7 +163,7 @@ export const ScrollContainer: React.FC<ScrollContainerProps> = ({
             left: 0,
             right: 0,
             height: fadeHeight,
-            background: `linear-gradient(to top, ${colors.bg.base} 0%, transparent 100%)`,
+            background: `linear-gradient(to top, ${fadeColor} 0%, transparent 100%)`,
             pointerEvents: 'none',
             opacity: showBottomFade ? 1 : 0,
             transition: 'opacity 0.15s ease',
@@ -173,16 +178,16 @@ export const ScrollContainer: React.FC<ScrollContainerProps> = ({
           background: transparent;
         }
         .dex-scroll-container > div::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.08);
+          background: var(--color-border-subtle, rgba(255, 255, 255, 0.08));
           border-radius: 2px;
           transition: background 0.15s ease;
         }
         .dex-scroll-container > div:hover::-webkit-scrollbar-thumb,
         .dex-scroll-container > div.scrolling::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.18);
+          background: var(--color-border, rgba(255, 255, 255, 0.18));
         }
         .dex-scroll-container > div::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.25);
+          background: var(--color-border-strong, rgba(255, 255, 255, 0.25));
         }
       `}</style>
     </div>
@@ -299,7 +304,6 @@ export const MomentumScroll: React.FC<MomentumScrollProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [overscroll, setOverscroll] = useState(0);
-  const velocity = useRef(0);
   const lastY = useRef(0);
   const animationId = useRef<number>();
 
@@ -308,7 +312,6 @@ export const MomentumScroll: React.FC<MomentumScrollProps> = ({
       cancelAnimationFrame(animationId.current);
     }
     lastY.current = e.touches[0].clientY;
-    velocity.current = 0;
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -317,7 +320,6 @@ export const MomentumScroll: React.FC<MomentumScrollProps> = ({
 
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - lastY.current;
-    velocity.current = deltaY;
     lastY.current = currentY;
 
     const { scrollTop, scrollHeight, clientHeight } = el;

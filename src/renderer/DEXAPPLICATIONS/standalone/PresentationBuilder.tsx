@@ -410,7 +410,7 @@ const PresentationBuilder: React.FC = () => {
           borderLeft: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)',
           overflowY: 'auto',
         }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+          <div className="dex-label-caps">
             Slide Settings
           </div>
           <label style={fieldLabel}>
@@ -435,7 +435,7 @@ const PresentationBuilder: React.FC = () => {
 
           <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 0' }} />
 
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+          <div className="dex-label-caps">
             Block Properties
           </div>
           {selectedBlock ? (

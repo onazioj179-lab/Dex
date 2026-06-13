@@ -87,7 +87,7 @@ const SimpleToast: React.FC<ToastProps> = ({ notification, onClose }) => {
   }, [onClose]);
   
   const colors = {
-    info: '#007aff',
+    info: 'var(--color-accent)',
     success: 'var(--color-success)',
     warning: 'var(--color-warning)',
     error: 'var(--color-error)',
@@ -479,10 +479,10 @@ const ToastNotification: React.FC<ToastNotificationProps> = memo(({ notification
     return () => clearTimeout(timer);
   }, [onDismiss]);
   
-  const bgColor = notification.type === 'error' ? 'var(--color-error)' 
-    : notification.type === 'success' ? 'var(--color-success)' 
-    : notification.type === 'warning' ? '#ff9500' 
-    : '#007aff';
+  const bgColor = notification.type === 'error' ? 'var(--color-error)'
+    : notification.type === 'success' ? 'var(--color-success)'
+    : notification.type === 'warning' ? 'var(--color-warning)'
+    : 'var(--color-accent)';
   
   return (
     <div

@@ -159,7 +159,7 @@ function NotificationPanel(): React.ReactElement {
         width: '380px',
         maxHeight: '500px',
         background: 'var(--color-bg-surface)',
-        border: '1px solid #3a3a3c',
+        border: '1px solid var(--color-border, #3a3a3c)',
         borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
@@ -171,7 +171,7 @@ function NotificationPanel(): React.ReactElement {
       <div
         style={{
           padding: '12px 16px',
-          borderBottom: '1px solid #2c2c2e',
+          borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -206,7 +206,7 @@ function NotificationPanel(): React.ReactElement {
         ) : (
           Object.entries(grouped).map(([app, items]) => (
             <div key={app}>
-              <div style={{ padding: '8px 16px 4px', color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div className="dex-caps" style={{ padding: '8px 16px 4px', color: 'var(--color-text-secondary)', fontSize: '11px' }}>
                 {app}
               </div>
               {items.map((n) => (
@@ -216,7 +216,7 @@ function NotificationPanel(): React.ReactElement {
                   style={{
                     padding: '10px 16px',
                     cursor: 'pointer',
-                    borderBottom: '1px solid #2c2c2e',
+                    borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
                     background: n.read === 0 ? 'rgba(59,130,246,0.08)' : 'transparent',
                     display: 'flex',
                     gap: '10px',
@@ -224,7 +224,7 @@ function NotificationPanel(): React.ReactElement {
                   }}
                 >
                   {n.read === 0 && (
-                    <div style={{ width: '6px', height: '6px', borderRadius: '3px', background: '#3b82f6', flexShrink: 0, marginTop: '6px' }} />
+                    <div style={{ width: '6px', height: '6px', borderRadius: '3px', background: 'var(--color-accent, #3b82f6)', flexShrink: 0, marginTop: '6px' }} />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: 'var(--color-text-primary)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -259,7 +259,7 @@ function NotificationPanel(): React.ReactElement {
 
 const pillBtnStyle: React.CSSProperties = {
   background: 'none',
-  border: '1px solid #3a3a3c',
+  border: '1px solid var(--color-border, #3a3a3c)',
   borderRadius: '4px',
   color: 'var(--color-text-secondary)',
   fontSize: '11px',
@@ -334,10 +334,10 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
     >
       <div
         style={{
-          width: '640px',
+          width: 'min(640px, calc(100vw - 48px))',
           maxHeight: '70vh',
           background: 'var(--color-bg-surface)',
-          border: '1px solid #3a3a3c',
+          border: '1px solid var(--color-border, #3a3a3c)',
           borderRadius: '12px',
           boxShadow: 'var(--pg-shadow-popover)',
           overflow: 'hidden',
@@ -345,7 +345,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
           flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '16px', borderBottom: '1px solid #2c2c2e' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
           <input
             ref={inputRef}
             value={query}
@@ -354,7 +354,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
             style={{
               width: '100%',
               background: 'var(--color-bg-hover)',
-              border: '1px solid #3a3a3c',
+              border: '1px solid var(--color-border, #3a3a3c)',
               borderRadius: '8px',
               padding: '12px 16px',
               color: 'var(--color-text-primary)',
@@ -398,7 +398,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
                     style={{
                       padding: '10px 16px',
                       cursor: 'pointer',
-                      borderBottom: '1px solid #2c2c2e',
+                      borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -432,7 +432,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
                       padding: '8px 16px',
                       background: 'none',
                       border: 'none',
-                      color: '#3b82f6',
+                      color: 'var(--color-accent, #3b82f6)',
                       fontSize: '12px',
                       cursor: 'pointer',
                       textAlign: 'left',
@@ -445,7 +445,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
             );
           })}
         </div>
-        <div style={{ padding: '8px 16px', borderTop: '1px solid #2c2c2e', color: 'var(--color-text-tertiary)', fontSize: '11px', textAlign: 'center' }}>
+        <div style={{ padding: '8px 16px', borderTop: '1px solid var(--color-border-subtle, #2c2c2e)', color: 'var(--color-text-tertiary)', fontSize: '11px', textAlign: 'center' }}>
           Ctrl+Shift+F to toggle
         </div>
       </div>
@@ -486,7 +486,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
         left: 0,
         right: 0,
         background: 'var(--color-bg-surface)',
-        borderTop: '1px solid #2c2c2e',
+        borderTop: '1px solid var(--color-border-subtle, #2c2c2e)',
         zIndex: 'var(--z-dock)' as any,
         padding: '4px 12px',
         display: 'flex',
@@ -519,7 +519,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
               style={{
                 height: '100%',
                 width: `${task.progressPercent}%`,
-                background: task.status === 'failed' ? 'var(--color-error)' : '#3b82f6',
+                background: task.status === 'failed' ? 'var(--color-error)' : 'var(--color-accent, #3b82f6)',
                 borderRadius: '2px',
                 transition: 'width 0.3s',
               }}
@@ -540,7 +540,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             <button
               onClick={(e) => { e.stopPropagation(); cancelTask(task.id); }}
               aria-label={`Cancel task ${task.name}`}
-              style={{ background: 'none', border: '1px solid #3a3a3c', borderRadius: '3px', color: 'var(--color-text-secondary)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+              style={{ background: 'none', border: '1px solid var(--color-border, #3a3a3c)', borderRadius: '3px', color: 'var(--color-text-secondary)', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -681,7 +681,7 @@ export function ScratchpadOverlay(): React.ReactElement | null {
           width: `${size.width}px`,
           height: `${size.height}px`,
           background: 'var(--color-bg-surface)',
-          border: '1px solid #3a3a3c',
+          border: '1px solid var(--color-border, #3a3a3c)',
           borderRadius: '10px',
           boxShadow: 'var(--pg-shadow-popover)',
           display: 'flex',
@@ -693,7 +693,7 @@ export function ScratchpadOverlay(): React.ReactElement | null {
           onMouseDown={handleMouseDown}
           style={{
             padding: '8px 12px',
-            borderBottom: '1px solid #2c2c2e',
+            borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -722,13 +722,13 @@ export function ScratchpadOverlay(): React.ReactElement | null {
             fontFamily: 'inherit',
           }}
         />
-        <div style={{ padding: '8px 12px', borderTop: '1px solid #2c2c2e', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           {!confirmClear ? (
             <button onClick={() => setConfirmClear(true)} aria-label="Clear scratchpad" style={pillBtnStyle}>Clear</button>
           ) : (
             <button onClick={() => { clearContent(); setConfirmClear(false); }} aria-label="Confirm clear scratchpad" style={{ ...pillBtnStyle, color: 'var(--color-error)' }}>Confirm clear</button>
           )}
-          <button onClick={handleSendToNotes} aria-label="Send scratchpad to Notes" style={{ ...pillBtnStyle, color: '#3b82f6', borderColor: '#3b82f6' }}>Send to Notes</button>
+          <button onClick={handleSendToNotes} aria-label="Send scratchpad to Notes" style={{ ...pillBtnStyle, color: 'var(--color-accent, #3b82f6)', borderColor: 'var(--color-accent, #3b82f6)' }}>Send to Notes</button>
         </div>
       </div>
     </div>
@@ -799,14 +799,14 @@ export function FeedbackPanel(): React.ReactElement | null {
         left: '70px',
         width: '360px',
         background: 'var(--color-bg-surface)',
-        border: '1px solid #3a3a3c',
+        border: '1px solid var(--color-border, #3a3a3c)',
         borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
         overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #2c2c2e' }}>
+      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
         <span style={{ color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 600 }}>Send Feedback</span>
       </div>
       {submitted ? (
@@ -831,7 +831,7 @@ export function FeedbackPanel(): React.ReactElement | null {
                   flex: 1,
                   padding: '6px 4px',
                   background: reportType === t.value ? 'var(--color-bg-hover)' : 'transparent',
-                  border: `1px solid ${reportType === t.value ? '#3b82f6' : '#3a3a3c'}`,
+                  border: `1px solid ${reportType === t.value ? 'var(--color-accent, #3b82f6)' : 'var(--color-border, #3a3a3c)'}`,
                   borderRadius: '4px',
                   color: reportType === t.value ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontSize: '12px',
@@ -850,7 +850,7 @@ export function FeedbackPanel(): React.ReactElement | null {
             style={{
               width: '100%',
               background: 'var(--color-bg-hover)',
-              border: '1px solid #3a3a3c',
+              border: '1px solid var(--color-border, #3a3a3c)',
               borderRadius: '6px',
               color: 'var(--color-text-primary)',
               fontSize: '13px',
@@ -865,7 +865,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               <input type="checkbox" checked={includeSystemInfo} onChange={(e) => setIncludeSystemInfo(e.target.checked)} />
               Include system info
             </label>
-            <button onClick={() => setShowSystemInfo(!showSystemInfo)} aria-label={showSystemInfo ? 'Hide system info' : 'Show system info'} aria-expanded={showSystemInfo} style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer' }}>
+            <button onClick={() => setShowSystemInfo(!showSystemInfo)} aria-label={showSystemInfo ? 'Hide system info' : 'Show system info'} aria-expanded={showSystemInfo} style={{ background: 'none', border: 'none', color: 'var(--color-accent, #3b82f6)', fontSize: '11px', cursor: 'pointer' }}>
               {showSystemInfo ? 'Hide' : 'Show what is included'}
             </button>
           </div>
@@ -886,7 +886,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               marginTop: '12px',
               width: '100%',
               padding: '8px',
-              background: description.trim() ? '#3b82f6' : 'var(--color-bg-hover)',
+              background: description.trim() ? 'var(--color-accent, #3b82f6)' : 'var(--color-bg-hover)',
               border: 'none',
               borderRadius: '6px',
               color: '#fff',
@@ -935,7 +935,7 @@ export function RecycleBinView(): React.ReactElement {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: 'var(--color-text-primary)' }}>
-      <div style={{ padding: '16px', borderBottom: '1px solid #2c2c2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Recycle Bin ({count})</h2>
         {count > 0 && (
           <button
@@ -944,7 +944,7 @@ export function RecycleBinView(): React.ReactElement {
             style={{
               ...pillBtnStyle,
               color: confirmEmpty > 0 ? 'var(--color-error)' : 'var(--color-text-secondary)',
-              borderColor: confirmEmpty > 0 ? 'var(--color-error)' : '#3a3a3c',
+              borderColor: confirmEmpty > 0 ? 'var(--color-error)' : 'var(--color-border, #3a3a3c)',
             }}
           >
             {confirmEmpty === 0 ? 'Empty Recycle Bin' : confirmEmpty === 1 ? 'Confirm?' : 'Absolutely sure?'}
@@ -953,9 +953,9 @@ export function RecycleBinView(): React.ReactElement {
       </div>
       {apps.length > 1 && (
         <div style={{ padding: '8px 16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button onClick={() => setAppFilter('all')} aria-label="Filter: All apps" aria-pressed={appFilter === 'all'} style={{ ...pillBtnStyle, color: appFilter === 'all' ? '#3b82f6' : 'var(--color-text-secondary)' }}>All</button>
+          <button onClick={() => setAppFilter('all')} aria-label="Filter: All apps" aria-pressed={appFilter === 'all'} style={{ ...pillBtnStyle, color: appFilter === 'all' ? 'var(--color-accent, #3b82f6)' : 'var(--color-text-secondary)' }}>All</button>
           {apps.map((a) => (
-            <button key={a} onClick={() => setAppFilter(a)} aria-label={`Filter: ${a}`} aria-pressed={appFilter === a} style={{ ...pillBtnStyle, color: appFilter === a ? '#3b82f6' : 'var(--color-text-secondary)' }}>
+            <button key={a} onClick={() => setAppFilter(a)} aria-label={`Filter: ${a}`} aria-pressed={appFilter === a} style={{ ...pillBtnStyle, color: appFilter === a ? 'var(--color-accent, #3b82f6)' : 'var(--color-text-secondary)' }}>
               {a}
             </button>
           ))}
@@ -968,7 +968,7 @@ export function RecycleBinView(): React.ReactElement {
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Recycle bin is empty</div>
         ) : (
           items.map((item) => (
-            <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid #2c2c2e', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {item.item_name}
@@ -977,7 +977,7 @@ export function RecycleBinView(): React.ReactElement {
                   {item.app} -- {item.item_type} -- Deleted {formatDate(item.deleted_at)} -- {daysLeft(item.expires_at)} days left
                 </div>
               </div>
-              <button onClick={() => handleRestore(item.id)} aria-label={`Restore ${item.item_name}`} style={{ ...pillBtnStyle, color: '#3b82f6' }}>Restore</button>
+              <button onClick={() => handleRestore(item.id)} aria-label={`Restore ${item.item_name}`} style={{ ...pillBtnStyle, color: 'var(--color-accent, #3b82f6)' }}>Restore</button>
               <button onClick={() => permanentlyDelete(item.id)} aria-label={`Permanently delete ${item.item_name}`} style={{ ...pillBtnStyle, color: 'var(--color-error)' }}>Delete</button>
             </div>
           ))
@@ -1015,7 +1015,7 @@ export function BatchActionBar(): React.ReactElement | null {
         left: '50%',
         transform: 'translateX(-50%)',
         background: 'var(--color-bg-surface)',
-        border: '1px solid #3a3a3c',
+        border: '1px solid var(--color-border, #3a3a3c)',
         borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
@@ -1036,8 +1036,8 @@ export function BatchActionBar(): React.ReactElement | null {
           aria-label={`Batch action: ${actionLabels[action] || action}`}
           style={{
             ...pillBtnStyle,
-            color: action === 'delete' ? 'var(--color-error)' : '#3b82f6',
-            borderColor: action === 'delete' ? 'var(--color-error)' : '#3b82f6',
+            color: action === 'delete' ? 'var(--color-error)' : 'var(--color-accent, #3b82f6)',
+            borderColor: action === 'delete' ? 'var(--color-error)' : 'var(--color-accent, #3b82f6)',
           }}
         >
           {actionLabels[action] || action}
@@ -1062,7 +1062,7 @@ export function DetachButton({ appId }: { appId: string }): React.ReactElement {
       aria-label={detached ? 'Reattach to main window' : 'Detach to new window'}
       style={{
         background: 'none',
-        border: '1px solid #3a3a3c',
+        border: '1px solid var(--color-border, #3a3a3c)',
         borderRadius: '4px',
         color: 'var(--color-text-secondary)',
         fontSize: '11px',

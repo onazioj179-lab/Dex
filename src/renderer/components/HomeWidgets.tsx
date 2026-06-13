@@ -15,6 +15,7 @@ import { useRecentFiles } from '../store/useRecentFiles';
 import { sharedTick } from '../services/SharedTick';
 import DexIcon from './DexIcon';
 import { platform } from '../utils';
+import { space, radius, fontSize, zIndex } from '../styles/tokens';
 
 // ======================================================================
 // WIDGET CONTENT RENDERERS
@@ -116,7 +117,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
           top: 6,
           right: 6,
           border: 'none',
-          borderRadius: 6,
+          borderRadius: radius.lg,
           background: 'rgba(255,255,255,0.10)',
           color: 'var(--color-text-secondary)',
           cursor: 'pointer',
@@ -138,10 +139,10 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
             top: 30,
             right: 6,
             width: 170,
-            borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.15)',
-            background: 'rgba(18,18,22,0.92)',
-            padding: 8,
+            borderRadius: radius.xl,
+            border: '1px solid var(--color-border, rgba(255,255,255,0.15))',
+            background: 'var(--color-bg-glass-strong, rgba(18,18,22,0.92))',
+            padding: space[2],
             zIndex: 3,
             boxShadow: 'var(--pg-shadow-panel)',
           }}
@@ -985,14 +986,21 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const widgets = useWidgetStore(s => s.widgets);
   return (
     <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-max)', background: 'rgba(0,0,0,0.4)' }} onMouseDown={onClose} />
+      {/* Flex-centered (whole-pixel) instead of translate(-50%,-50%); width
+          clamps so the picker never overflows small windows. */}
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 'var(--z-max)', background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      >
       <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        zIndex: 'var(--z-max)', width: 380, maxHeight: 440,
+        width: 'min(380px, calc(100vw - 48px))', maxHeight: 'min(440px, calc(100vh - 48px))',
         background: 'rgba(24,24,28,0.60)',
         backdropFilter: 'var(--blur-xl) saturate(180%)',
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-        borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: 12, border: '1px solid var(--color-border, rgba(255,255,255,0.10))',
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 20, overflow: 'auto',
       }}>
@@ -1024,6 +1032,7 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             );
           })}
         </div>
+      </div>
       </div>
     </>
   );

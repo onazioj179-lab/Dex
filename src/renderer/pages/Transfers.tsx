@@ -656,7 +656,7 @@ const Transfers: React.FC = () => {
   ], [sendToDevice, trustedDevices, toggleTrusted, deviceNicknames, setNickname]);
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1C1C20', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px' } as React.CSSProperties}
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-base, #1C1C20)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '13px' } as React.CSSProperties}
       onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
     >
       <style>{`
@@ -672,7 +672,7 @@ const Transfers: React.FC = () => {
       {dragOver && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 'var(--z-modal)',
-          background: 'rgba(10,132,255,0.18)', border: '3px dashed rgba(10,132,255,0.5)',
+          background: 'var(--color-accent-muted, rgba(10,132,255,0.18))', border: '3px dashed var(--color-accent-light, rgba(10,132,255,0.5))',
           borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-accent)' }}>Drop files to {activeTab === 'http' ? 'share via HTTP' : 'transfer'}</div>
@@ -701,7 +701,7 @@ const Transfers: React.FC = () => {
         </div>
         <button onClick={() => setShowSettings(v => !v)} style={{
           padding: '6px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
-          background: showSettings ? 'rgba(10,132,255,0.12)' : 'var(--color-bg-elevated)',
+          background: showSettings ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-bg-elevated)',
           color: showSettings ? 'var(--color-accent)' : 'var(--color-text-muted)',
           fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
         }}>
@@ -848,7 +848,7 @@ const Transfers: React.FC = () => {
             {activeTransfers.length === 0 && pendingDevices.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-muted)', fontSize: 14 }}>
                 <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(50,213,75,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <span style={{ fontSize: 24, color: '#32D54B' }}>{Icons.send}</span>
+                  <span style={{ fontSize: 24, color: 'var(--color-success, #32D54B)' }}>{Icons.send}</span>
                 </div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>No active transfers</div>
                 <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 12 }}>Select a device above to start sharing files</div>
@@ -859,7 +859,7 @@ const Transfers: React.FC = () => {
                       toast.success(`${result.filePaths.length} file(s) ready — select a device to send`);
                     }
                   } catch { /* dialog unavailable */ }
-                }} style={{ padding: '6px 16px', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
+                }} style={{ padding: '6px 16px', borderRadius: 6, background: 'var(--color-accent, #0a84ff)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Select Files to Send</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -991,7 +991,7 @@ const Transfers: React.FC = () => {
                   padding: '20px', borderRadius: 10,
                   background: 'var(--color-bg-surface-solid)', border: '1px solid var(--color-border-subtle)', textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Share URL</div>
+                  <div className="dex-label-caps" style={{ marginBottom: 12 }}>Share URL</div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <div onClick={copyUrl} role="button" tabIndex={0} aria-label="Copy share URL" onKeyDown={e => e.key === 'Enter' && copyUrl()} style={{
                       fontSize: 13, color: 'var(--color-accent)', fontFamily: '"SF Mono", monospace', fontWeight: 600,
@@ -1085,7 +1085,7 @@ const Transfers: React.FC = () => {
       {/* ===== Settings Panel ===== */}
       {showSettings && (
         <div style={{
-          position: 'absolute', right: 16, top: 56, width: 320, zIndex: 2000,
+          position: 'absolute', right: 16, top: 56, width: 'min(320px, calc(100vw - 48px))', zIndex: 2000,
           background: 'var(--color-bg-surface-solid)',
           borderRadius: 10, border: '1px solid var(--color-border)',
           boxShadow: 'var(--pg-shadow-popover)', overflow: 'hidden',
@@ -1183,8 +1183,8 @@ const Transfers: React.FC = () => {
                 {[0, 5, 15, 30, 60].map(v => (
                   <button key={v} onClick={() => setHttpExpiry(v)} style={{
                     flex: 1, padding: '5px', borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                    border: '1px solid ' + (httpExpiry === v ? 'rgba(10,132,255,0.3)' : 'var(--color-border-subtle)'),
-                    background: httpExpiry === v ? 'rgba(10,132,255,0.12)' : 'var(--color-bg-elevated)',
+                    border: '1px solid ' + (httpExpiry === v ? 'var(--color-accent-light, rgba(10,132,255,0.3))' : 'var(--color-border-subtle)'),
+                    background: httpExpiry === v ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-bg-elevated)',
                     color: httpExpiry === v ? 'var(--color-accent)' : 'var(--color-text-muted)',
                   }}>{v === 0 ? 'Off' : `${v}m`}</button>
                 ))}

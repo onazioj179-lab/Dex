@@ -574,7 +574,7 @@ const styles: Record<string, React.CSSProperties> = {
   colCount: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
   colDeleteBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2, opacity: 0.4 },
   cardList: { flex: 1, padding: '8px 8px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 },
-  card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.12s var(--ease-spring)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
+  card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 8, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
   cardTitle: { fontSize: 13, fontWeight: 600, lineHeight: 1.4 },
   cardDesc: { fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, lineHeight: 1.4 },
   cardFooter: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' },

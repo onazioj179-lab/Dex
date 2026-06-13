@@ -214,8 +214,8 @@ const TrackHeader: React.FC<{
       display: 'flex', flexDirection: 'column', justifyContent: 'center',
       padding: '0 6px', borderBottom: '1px solid var(--color-border-subtle)',
       borderRight: '1px solid var(--color-bg-hover)',
-      background: focused ? 'rgba(74,158,255,0.12)' : 'var(--color-bg-base)',
-      outline: focused ? '1px solid rgba(74,158,255,0.45)' : 'none',
+      background: focused ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'var(--color-bg-base)',
+      outline: focused ? '1px solid var(--color-accent-muted, rgba(74,158,255,0.45))' : 'none',
       outlineOffset: -1,
     }}
       tabIndex={0}
@@ -566,7 +566,7 @@ const TimelineToolbar: React.FC = memo(() => {
           style={{
             width: 22, height: 20, fontSize: 10, fontWeight: 600,
             border: '1px solid var(--color-border-subtle)', borderRadius: 2,
-            background: activeTool === t.tool ? 'rgba(74,158,255,0.15)' : 'transparent',
+            background: activeTool === t.tool ? 'var(--color-accent-soft, rgba(74,158,255,0.15))' : 'transparent',
             color: activeTool === t.tool ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
             cursor: 'pointer', padding: 0,
           }}
@@ -585,7 +585,7 @@ const TimelineToolbar: React.FC = memo(() => {
         style={{
           height: 20, fontSize: 9, fontWeight: 600, padding: '0 6px',
           border: '1px solid var(--color-border-subtle)', borderRadius: 2,
-          background: snapEnabled ? 'rgba(74,158,255,0.15)' : 'transparent',
+          background: snapEnabled ? 'var(--color-accent-soft, rgba(74,158,255,0.15))' : 'transparent',
           color: snapEnabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
         }}
         onClick={toggleSnap}

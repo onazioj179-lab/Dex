@@ -920,7 +920,7 @@ export const Files: React.FC = () => {
         </div>
         
         <div style={styles.sidebarSection}>
-          <div style={styles.sectionLabel}>Favorites</div>
+          <div className="dex-label-caps" style={styles.sectionLabel}>Favorites</div>
           {QUICK_ACCESS.map(item => {
             const Icon = Icons[item.icon] || Icons.folder;
             const isActive = selectedLocation === item.path && !activeCollection;
@@ -948,7 +948,7 @@ export const Files: React.FC = () => {
 
         {/* Smart Collections */}
         <div style={styles.sidebarSection}>
-          <div style={styles.sectionLabel}>Smart Collections</div>
+          <div className="dex-label-caps" style={styles.sectionLabel}>Smart Collections</div>
           <button
             style={{
               ...styles.sidebarItem,
@@ -989,7 +989,7 @@ export const Files: React.FC = () => {
 
         {/* Color Tags */}
         <div style={styles.sidebarSection}>
-          <div style={styles.sectionLabel}>Tags</div>
+          <div className="dex-label-caps" style={styles.sectionLabel}>Tags</div>
           {(Object.entries(TAG_COLORS) as [TagColor, string][]).map(([tag, color]) => {
             const count = Object.values(fileTags).filter(t => t === tag).length;
             const isActive = activeTagFilter === tag;
@@ -1014,7 +1014,7 @@ export const Files: React.FC = () => {
 
         {/* Smart Folders */}
         <div style={styles.sidebarSection}>
-          <div style={{ ...styles.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="dex-label-caps" style={{ ...styles.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Smart Folders</span>
             <button
               onClick={saveSmartFolder}
@@ -1122,7 +1122,7 @@ export const Files: React.FC = () => {
             <button
               style={{
                 ...styles.navBtn,
-                background: showFilters ? 'rgba(10, 132, 255, 0.2)' : 'transparent',
+                background: showFilters ? 'var(--color-accent-soft, rgba(10, 132, 255, 0.2))' : 'transparent',
                 color: showFilters ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               }}
               onClick={() => setShowFilters(!showFilters)}
@@ -1351,7 +1351,7 @@ export const Files: React.FC = () => {
         {selectedFiles.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 }}>{selectedFiles.size} selected</span>
-            <button onClick={handleBatchDelete} style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid rgba(255,69,58,0.35)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            <button onClick={handleBatchDelete} style={{ padding: '6px 12px', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <button onClick={() => { selectedFiles.forEach(p => navigator.clipboard.writeText(p)); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
             <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
@@ -1364,7 +1364,7 @@ export const Files: React.FC = () => {
           {loadError ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '8px' }}>
               <div style={{ width: 64, height: 64, borderRadius: 12, background: 'var(--color-error-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff453a" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-error, #ff453a)" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>Failed to load files</span>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 280 }}>{loadError}</span>
@@ -1394,8 +1394,8 @@ export const Files: React.FC = () => {
               {/* Files */}
               {filteredFiles.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '8px' }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 12, background: 'rgba(10,132,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <div style={{ width: 64, height: 64, borderRadius: 12, background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   </div>
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
                   <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)' }}>Drop files here or navigate to another folder</span>
@@ -1491,8 +1491,8 @@ export const Files: React.FC = () => {
             <div style={styles.gridContainer}>
               {filteredFiles.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '8px', gridColumn: '1 / -1' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(10,132,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <div style={{ width: 56, height: 56, borderRadius: 10, background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
                   <span style={{ fontSize: 11, color: 'var(--color-text-secondary, #8a8a8a)' }}>Drop files here to get started</span>

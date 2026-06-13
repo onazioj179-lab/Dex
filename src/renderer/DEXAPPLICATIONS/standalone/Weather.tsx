@@ -241,7 +241,7 @@ const Weather: React.FC = () => {
 
       {/* Hourly Scroll */}
       <div style={s.section}>
-        <div style={s.sectionTitle}>Hourly</div>
+        <div className="dex-label-caps" style={s.sectionTitle}>Hourly</div>
         <div style={s.hourlyScroll}>
           {hourly.map((h, i) => (
             <div key={i} style={s.hourlyItem}>
@@ -255,12 +255,12 @@ const Weather: React.FC = () => {
 
       {/* 7-Day Forecast */}
       <div style={s.section}>
-        <div style={s.sectionTitle}>7-Day Forecast</div>
+        <div className="dex-label-caps" style={s.sectionTitle}>7-Day Forecast</div>
         <div style={s.forecastList}>
           {forecast.map((day, i) => (
             <button
               key={i}
-              style={{ ...s.forecastRow, background: selectedDay === i ? 'rgba(10, 132, 255, 0.15)' : 'transparent' }}
+              style={{ ...s.forecastRow, background: selectedDay === i ? 'var(--color-accent-light, rgba(10, 132, 255, 0.15))' : 'transparent' }}
               onClick={() => setSelectedDay(selectedDay === i ? null : i)}
               aria-label={`${day.day}: ${day.condition}, high ${displayTemp(day.high)}°, low ${displayTemp(day.low)}°`}
             >
@@ -279,7 +279,7 @@ const Weather: React.FC = () => {
       {/* Day Detail Panel */}
       {detail && (
         <div style={s.dayDetail}>
-          <div style={s.sectionTitle}>{forecast[selectedDay!].day} Details</div>
+          <div className="dex-label-caps" style={s.sectionTitle}>{forecast[selectedDay!].day} Details</div>
           <div style={s.detailGrid}>
             <div style={s.detailItem}><span style={s.detailLabel}>High</span><span style={s.detailValue}>{displayTemp(detail.high)}°</span></div>
             <div style={s.detailItem}><span style={s.detailLabel}>Low</span><span style={s.detailValue}>{displayTemp(detail.low)}°</span></div>
@@ -331,7 +331,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBtn: {
     padding: '8px 16px', borderRadius: 6, border: 'none',
-    background: 'var(--color-accent)', color: '#fff', fontSize: 13, fontWeight: 600,
+    background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 13, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   currentCard: {
@@ -365,8 +365,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 20px 12px',
   },
   sectionTitle: {
-    fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)',
-    marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.05em',
+    marginBottom: 8,
   },
   hourlyScroll: {
     display: 'flex', gap: 2, overflowX: 'auto' as const, paddingBottom: 4,

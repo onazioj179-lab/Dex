@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import DexIcon from './DexIcon';
 import { platform } from '../utils';
+import { Modal } from '../ui';
 import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 
 // ============================================================================
@@ -240,12 +241,11 @@ const HelpSearch: React.FC<{
 const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, currentApp }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSection, setExpandedSection] = useState<string | null>('getting-started');
-  const overlayRef = useRef<HTMLDivElement>(null);
 
   // Filter sections/tips based on search
   const filteredSections = useMemo(() => {
     if (!searchQuery.trim()) return HELP_SECTIONS;
-    
+
     const q = searchQuery.toLowerCase();
     return HELP_SECTIONS.map(section => ({
       ...section,
@@ -255,88 +255,20 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
     })).filter(section => section.tips.length > 0);
   }, [searchQuery]);
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    if (!visible) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose?.();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [visible, onClose]);
-
-  // Click outside to close
-  useEffect(() => {
-    if (!visible) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
-        onClose?.();
-      }
-    };
-
-    // Delay adding listener to prevent immediate close
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [visible, onClose]);
-
-  if (!visible) return null;
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        /* Dim scrim only — no full-screen blur behind the overlay. */
-        background: 'rgba(0, 0, 0, 0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: Z_HELP_OVERLAY_BASE,
-        animation: 'fadeInScale 200ms ease-out',
-      }}
-    >
-      <div
-        ref={overlayRef}
-        style={{
-          width: '90%',
-          maxWidth: 560,
-          maxHeight: '80vh',
-          background: 'rgba(22, 22, 26, 0.95)',
-          backdropFilter: 'var(--blur-lg)',
-          WebkitBackdropFilter: 'var(--blur-lg)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: 12,
-          boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '16px 20px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <Modal
+      open={visible}
+      onClose={() => onClose?.()}
+      size="md"
+      zIndexOverride={Z_HELP_OVERLAY_BASE}
+      testIdPrefix="help-overlay"
+      panelStyle={{ maxHeight: '80vh' }}
+      title={
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <DexIcon name="help-circle" size={22} color="var(--color-accent)" />
-            <span style={{ fontSize: 17, fontWeight: 600, color: '#fff' }}>Help & Tips</span>
-          </div>
+            Help & Tips
+          </span>
           <button
             onClick={onClose}
             style={{
@@ -353,112 +285,12 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
           >
             <DexIcon name="close" size={16} color="var(--color-text-primary)" />
           </button>
-        </div>
-
-        {/* Content */}
+        </span>
+      }
+      footer={
         <div
           style={{
             flex: 1,
-            overflow: 'auto',
-            padding: 20,
-          }}
-        >
-          <HelpSearch query={searchQuery} onChange={setSearchQuery} />
-
-          {/* Quick Actions */}
-          {!searchQuery && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 8,
-                marginBottom: 20,
-              }}
-            >
-              <button
-                style={{
-                  background: 'var(--color-accent-muted)',
-                  border: '1px solid rgba(74, 158, 255, 0.2)',
-                  borderRadius: 8,
-                  padding: '14px 10px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <DexIcon name="command" size={20} color="var(--color-accent)" />
-                <span style={{ fontSize: 11, color: '#fff', fontWeight: 500 }}>Shortcuts</span>
-              </button>
-              <button
-                style={{
-                  background: 'var(--color-success-muted)',
-                  border: '1px solid rgba(52, 199, 89, 0.2)',
-                  borderRadius: 8,
-                  padding: '14px 10px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <DexIcon name="tutorial" size={20} color="var(--color-success)" />
-                <span style={{ fontSize: 11, color: '#fff', fontWeight: 500 }}>Tour</span>
-              </button>
-              <button
-                style={{
-                  background: 'var(--color-warning-muted)',
-                  border: '1px solid rgba(255, 159, 10, 0.2)',
-                  borderRadius: 8,
-                  padding: '14px 10px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <DexIcon name="mic" size={20} color="var(--color-warning)" />
-                <span style={{ fontSize: 11, color: '#fff', fontWeight: 500 }}>Ask UKI</span>
-              </button>
-            </div>
-          )}
-
-          {/* Help Sections */}
-          {filteredSections.map(section => (
-            <HelpSectionView
-              key={section.id}
-              section={section}
-              expanded={expandedSection === section.id || !!searchQuery}
-              onToggle={() => setExpandedSection(
-                expandedSection === section.id ? null : section.id
-              )}
-            />
-          ))}
-
-          {/* No Results */}
-          {filteredSections.length === 0 && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: 40,
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              <DexIcon name="search" size={32} color="var(--color-text-muted)" />
-              <p style={{ marginTop: 12, fontSize: 14 }}>No help topics found</p>
-              <p style={{ fontSize: 13, opacity: 0.7 }}>Try different keywords or ask UKI</p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: '12px 20px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -474,8 +306,98 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
           }}>?</kbd> to open help</span>
           <span>ESC to close</span>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <HelpSearch query={searchQuery} onChange={setSearchQuery} />
+
+      {/* Quick Actions */}
+      {!searchQuery && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 8,
+            marginBottom: 20,
+          }}
+        >
+          <button
+            style={{
+              background: 'var(--color-accent-muted)',
+              border: '1px solid rgba(74, 158, 255, 0.2)',
+              borderRadius: 8,
+              padding: '14px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <DexIcon name="command" size={20} color="var(--color-accent)" />
+            <span style={{ fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 500 }}>Shortcuts</span>
+          </button>
+          <button
+            style={{
+              background: 'var(--color-success-muted)',
+              border: '1px solid rgba(52, 199, 89, 0.2)',
+              borderRadius: 8,
+              padding: '14px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <DexIcon name="tutorial" size={20} color="var(--color-success)" />
+            <span style={{ fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 500 }}>Tour</span>
+          </button>
+          <button
+            style={{
+              background: 'var(--color-warning-muted)',
+              border: '1px solid rgba(255, 159, 10, 0.2)',
+              borderRadius: 8,
+              padding: '14px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <DexIcon name="mic" size={20} color="var(--color-warning)" />
+            <span style={{ fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 500 }}>Ask UKI</span>
+          </button>
+        </div>
+      )}
+
+      {/* Help Sections */}
+      {filteredSections.map(section => (
+        <HelpSectionView
+          key={section.id}
+          section={section}
+          expanded={expandedSection === section.id || !!searchQuery}
+          onToggle={() => setExpandedSection(
+            expandedSection === section.id ? null : section.id
+          )}
+        />
+      ))}
+
+      {/* No Results */}
+      {filteredSections.length === 0 && (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: 40,
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          <DexIcon name="search" size={32} color="var(--color-text-muted)" />
+          <p style={{ marginTop: 12, fontSize: 14 }}>No help topics found</p>
+          <p style={{ fontSize: 13, opacity: 0.7 }}>Try different keywords or ask UKI</p>
+        </div>
+      )}
+    </Modal>
   );
 };
 
