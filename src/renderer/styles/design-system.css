@@ -69,10 +69,20 @@
 
   /* Accent -- Vivid Blue */
   --color-accent: #4A9EFF;
-  --color-accent-hover: #6CB2FF;
+  --color-accent-hover: #6CB2FF;        /* lighter -- hover */
+  --color-accent-dark: #2E7DD6;         /* darker -- pressed/active, gradient ends */
   --color-accent-light: rgba(74, 158, 255, 0.14);
   --color-accent-soft: rgba(74, 158, 255, 0.08);
   --color-accent-muted: rgba(74, 158, 255, 0.10);
+
+  /* Translucent neutral surfaces -- subtle fills that must stay see-through
+     (so they sit on glass/wallpaper) and therefore can't map to the opaque
+     --color-bg-* tokens. Theme-flipped below so they no longer hardcode white. */
+  --color-surface-1: rgba(255, 255, 255, 0.03);
+  --color-surface-2: rgba(255, 255, 255, 0.06);
+  --color-surface-3: rgba(255, 255, 255, 0.09);
+  /* Modal/overlay dimming scrim. */
+  --color-scrim: rgba(0, 0, 0, 0.55);
 
   /* Semantic -- Apple HIG Vivid */
   --color-success: #34C759;
@@ -1120,9 +1130,16 @@ html[data-contrast="high"] *:focus-visible {
   /* Accent -- deeper blue for light mode */
   --color-accent: #0066CC;
   --color-accent-hover: #0055B3;
+  --color-accent-dark: #004A99;         /* pressed/active in light mode */
   --color-accent-light: rgba(0, 102, 204, 0.12);
   --color-accent-soft: rgba(0, 102, 204, 0.08);
   --color-accent-muted: rgba(0, 102, 204, 0.10);
+
+  /* Translucent neutral surfaces + scrim -- dark-on-light for light theme. */
+  --color-surface-1: rgba(0, 0, 0, 0.03);
+  --color-surface-2: rgba(0, 0, 0, 0.05);
+  --color-surface-3: rgba(0, 0, 0, 0.08);
+  --color-scrim: rgba(0, 0, 0, 0.35);
 
   /* Semantic -- vibrant for light backgrounds */
   --color-success: #248A3D;
