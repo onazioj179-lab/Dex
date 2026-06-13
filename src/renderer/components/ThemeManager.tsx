@@ -274,7 +274,7 @@ export const ThemeManager: React.FC<ThemeManagerProps> = ({ isOpen, onClose }) =
             onClick={toggleDarkMode}
             style={{
               ...styles.toggleBtn,
-              background: currentTheme.isDark ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+              background: currentTheme.isDark ? 'var(--color-accent-muted, rgba(59, 130, 246, 0.2))' : 'transparent',
             }}
           >
             {Icons.moon}
@@ -284,7 +284,7 @@ export const ThemeManager: React.FC<ThemeManagerProps> = ({ isOpen, onClose }) =
             onClick={toggleDarkMode}
             style={{
               ...styles.toggleBtn,
-              background: !currentTheme.isDark ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+              background: !currentTheme.isDark ? 'var(--color-accent-muted, rgba(59, 130, 246, 0.2))' : 'transparent',
             }}
           >
             {Icons.sun}
@@ -347,8 +347,8 @@ export const ThemeManager: React.FC<ThemeManagerProps> = ({ isOpen, onClose }) =
                     style={{
                       ...styles.colorSwatch,
                       background: color,
-                      boxShadow: currentTheme.accentColor === color 
-                        ? `0 0 0 3px var(--color-bg-primary), 0 0 0 5px ${color}` 
+                      boxShadow: currentTheme.accentColor === color
+                        ? `0 0 0 3px var(--color-bg-elevated, #18181b), 0 0 0 5px ${color}`
                         : 'none',
                     }}
                   >
@@ -373,15 +373,17 @@ const styles: Record<string, React.CSSProperties> = {
     inset: 0,
     background: 'rgba(0, 0, 0, 0.3)',
     zIndex: 'var(--z-max)',
+    // Flex centering -> panel lands on whole pixels (no translate(-50%) blur).
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 'var(--dex-space-6, 24px)',
   },
   panel: {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '500px',
+    // Responsive width: never overflows a small window.
+    width: 'min(500px, 100%)',
     maxHeight: '80vh',
-    background: 'var(--color-bg-primary, #18181b)',
+    background: 'var(--color-bg-elevated, #18181b)',
     borderRadius: '10px',
     border: '1px solid var(--color-border, #27272a)',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',

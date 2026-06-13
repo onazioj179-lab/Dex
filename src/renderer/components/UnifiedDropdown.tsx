@@ -108,7 +108,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     minWidth: 180,
-    maxWidth: 320,
+    maxWidth: 'min(320px, calc(100vw - 48px))',
     background: 'var(--color-bg-glass-strong, rgba(28, 28, 32, 0.92))',
     backdropFilter: 'var(--blur-lg) saturate(180%)',
     WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',

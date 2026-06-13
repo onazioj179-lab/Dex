@@ -160,16 +160,16 @@ const Timer: React.FC = () => {
               cy="140"
               r={radius}
               fill="none"
-              stroke={isComplete ? '#30D158' : 'var(--color-accent)'}
+              stroke={isComplete ? 'var(--color-success, #30D158)' : 'var(--color-accent)'}
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
-              style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+              style={{ transition: 'stroke-dashoffset 0.18s cubic-bezier(0.4,0,0.2,1)' }}
             />
           </svg>
           <div style={s.timeDisplay}>
-            <span style={{ ...s.time, color: isComplete ? '#30D158' : 'var(--color-text-primary)' }}>
+            <span style={{ ...s.time, color: isComplete ? 'var(--color-success, #30D158)' : 'var(--color-text-primary)' }}>
               {formatTime(remaining)}
             </span>
             {isComplete && <span style={s.completeText}>Complete!</span>}
@@ -184,7 +184,7 @@ const Timer: React.FC = () => {
               Start
             </button>
           ) : (
-            <button style={{ ...s.primaryBtn, background: '#FF9500' }} onClick={pause}>
+            <button style={{ ...s.primaryBtn, background: 'var(--color-warning, #FF9500)' }} onClick={pause}>
               <DexIcon name="pause" size={24} />
               Pause
             </button>
@@ -199,9 +199,9 @@ const Timer: React.FC = () => {
       {/* Presets */}
       <div style={s.presetsSection}>
         <div style={s.presetsHeader}>
-          <span style={s.presetsTitle}>Quick Timers</span>
+          <span className="dex-label-caps">Quick Timers</span>
           <button
-            style={{ ...s.customToggle, background: showCustom ? 'var(--color-accent)' : 'transparent', color: showCustom ? '#fff' : 'var(--color-text-secondary)' }}
+            style={{ ...s.customToggle, background: showCustom ? 'var(--color-accent)' : 'transparent', color: showCustom ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-secondary)' }}
             onClick={() => setShowCustom(!showCustom)}
           >
             Custom
@@ -245,7 +245,7 @@ const Timer: React.FC = () => {
                 style={{
                   ...s.presetBtn,
                   background: totalSeconds === preset.seconds ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
-                  color: totalSeconds === preset.seconds ? '#fff' : 'var(--color-text-primary)',
+                  color: totalSeconds === preset.seconds ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-primary)',
                 }}
                 onClick={() => selectPreset(preset)}
               >
@@ -282,9 +282,11 @@ const s: Record<string, React.CSSProperties> = {
   },
   timeDisplay: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
+    inset: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     textAlign: 'center',
   },
   time: {
@@ -296,7 +298,7 @@ const s: Record<string, React.CSSProperties> = {
   completeText: {
     display: 'block',
     fontSize: 14,
-    color: '#30D158',
+    color: 'var(--color-success, #30D158)',
     fontWeight: 600,
     marginTop: 4,
   },
@@ -311,7 +313,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: 8,
     padding: '12px 32px',
     background: 'var(--color-accent)',
-    color: '#fff',
+    color: 'var(--color-text-inverse, #fff)',
     border: 'none',
     borderRadius: 10,
     fontSize: 16,
@@ -341,13 +343,6 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  presetsTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'var(--color-text-secondary)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
   },
   customToggle: {
     padding: '6px 12px',
@@ -408,7 +403,7 @@ const s: Record<string, React.CSSProperties> = {
   setBtn: {
     padding: '10px 20px',
     background: 'var(--color-accent)',
-    color: '#fff',
+    color: 'var(--color-text-inverse, #fff)',
     border: 'none',
     borderRadius: 6,
     fontSize: 14,

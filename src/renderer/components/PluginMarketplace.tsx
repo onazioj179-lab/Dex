@@ -128,7 +128,7 @@ export const PluginMarketplace: React.FC = () => {
       <div style={{ padding: '0 16px 16px', overflowY: 'auto' }}>
         <GlassSurface
           variant="card"
-          style={{ padding: 12, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ padding: 12, marginBottom: 12, border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))' }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>
             Plugin Policy
@@ -264,7 +264,7 @@ const emptyStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: 6,
   border: '1px solid var(--pg-border-strong)',
-  background: 'rgba(0,0,0,0.35)',
+  background: 'var(--color-bg-inset, rgba(0,0,0,0.35))',
   color: 'var(--color-text-primary)',
   marginBottom: 10,
   outline: 'none',
@@ -279,8 +279,8 @@ const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties =
     whiteSpace: 'nowrap', flexShrink: 0,
   };
   if (variant === 'accent') return { ...base, background: 'var(--color-accent)', color: '#fff', borderColor: 'transparent' };
-  if (variant === 'danger') return { ...base, background: 'rgba(255,69,58,0.16)', color: '#ff8a82', borderColor: 'rgba(255,69,58,0.4)' };
-  return { ...base, background: 'rgba(255,255,255,0.04)' };
+  if (variant === 'danger') return { ...base, background: 'var(--color-error-muted, rgba(255,69,58,0.16))', color: 'var(--color-error, #ff8a82)', borderColor: 'var(--color-error, rgba(255,69,58,0.4))' };
+  return { ...base, background: 'var(--color-bg-hover, rgba(255,255,255,0.04))' };
 };
 
 export default PluginMarketplace;

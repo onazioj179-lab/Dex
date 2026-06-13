@@ -175,8 +175,11 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
 
     const handleSpawnFailure = (msg: string) => {
       if (!mounted) return;
+      // Surface the reason immediately so the user (and tests) see WHY the
+      // terminal didn't start, instead of a silent "starting…" while we retry
+      // in the background. `unavailable` is only set once retries are spent.
+      setError(msg);
       if (retriesRef.current >= MAX_SPAWN_RETRIES) {
-        setError(msg);
         setUnavailable(true);
         return;
       }
@@ -394,7 +397,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           whiteSpace: 'pre-wrap', wordBreak: 'break-all',
         }}
       >
-        {error && <div style={{ color: '#ff5f5f' }}>{error}</div>}
+        {error && <div style={{ color: 'var(--color-error, #ff5f5f)' }}>{error}</div>}
         {lines.map(l => (
           <div key={l.id}>
             {l.spans.map((sp, i) => (

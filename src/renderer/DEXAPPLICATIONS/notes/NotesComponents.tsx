@@ -22,7 +22,7 @@ import AutosaveIndicator from '../../components/AutosaveIndicator';
 // ---------------------------------------------------------------------------
 
 const colors = {
-  bg: 'rgba(0,0,0,0.2)',
+  bg: 'var(--color-bg-inset, rgba(0,0,0,0.2))',
   bgHover: 'var(--color-border-subtle)',
   bgSelected: 'rgba(100,210,255,0.08)',
   border: 'var(--color-bg-hover)',
@@ -131,7 +131,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
               }}
               style={{
                 flex: 1,
-                background: 'rgba(0,0,0,0.3)',
+                background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
                 border: `1px solid ${colors.accent}`,
                 borderRadius: 2,
                 color: colors.text,
@@ -210,7 +210,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             placeholder="Folder name"
             style={{
               width: '100%',
-              background: 'rgba(0,0,0,0.3)',
+              background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
               border: `1px solid ${colors.accent}`,
               borderRadius: 3,
               color: colors.text,
@@ -510,7 +510,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
         {pinnedNotes.length > 0 && (
           <>
-            <div style={{ fontSize: 10, color: colors.textMuted, padding: '8px 8px 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className="dex-label-caps" style={{ padding: '8px 8px 4px' }}>
               Pinned
             </div>
             {pinnedNotes.map(renderNoteItem)}
@@ -519,7 +519,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         {unpinnedNotes.length > 0 && (
           <>
             {pinnedNotes.length > 0 && (
-              <div style={{ fontSize: 10, color: colors.textMuted, padding: '8px 8px 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div className="dex-label-caps" style={{ padding: '8px 8px 4px' }}>
                 Notes
               </div>
             )}
@@ -621,7 +621,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
       justifyContent: 'space-between',
       padding: '6px 12px',
       borderBottom: `1px solid ${colors.border}`,
-      background: 'rgba(0,0,0,0.1)',
+      background: 'var(--color-bg-inset, rgba(0,0,0,0.1))',
       flexShrink: 0,
       minHeight: 36,
     }}>
@@ -690,7 +690,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
             {showColorMenu && (
               <div style={{
                 position: 'absolute', top: '100%', right: 0, marginTop: 4,
-                background: 'rgba(30,30,30,0.95)', border: `1px solid ${colors.border}`,
+                background: 'var(--color-bg-elevated, rgba(30,30,30,0.95))', border: `1px solid ${colors.border}`,
                 borderRadius: 4, padding: 6, display: 'flex', gap: 4, zIndex: 'var(--z-max)',
               }}>
                 {COLOR_LABELS.map(c => (
@@ -719,7 +719,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
               top: '100%',
               right: 0,
               marginTop: 4,
-              background: 'rgba(30,30,30,0.95)',
+              background: 'var(--color-bg-elevated, rgba(30,30,30,0.95))',
               border: `1px solid ${colors.border}`,
               borderRadius: 4,
               padding: '4px 0',
@@ -910,7 +910,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
       top: 8,
       right: 12,
       zIndex: 'var(--z-max)',
-      background: 'rgba(30,30,30,0.95)',
+      background: 'var(--color-bg-elevated, rgba(30,30,30,0.95))',
       border: `1px solid ${colors.border}`,
       borderRadius: 6,
       padding: '8px 12px',
@@ -928,7 +928,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
           autoFocus
           style={{
             flex: 1,
-            background: 'rgba(0,0,0,0.3)',
+            background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
             border: `1px solid ${colors.border}`,
             borderRadius: 3,
             color: colors.text,
@@ -963,7 +963,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
             placeholder="Replace with..."
             style={{
               flex: 1,
-              background: 'rgba(0,0,0,0.3)',
+              background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
               border: `1px solid ${colors.border}`,
               borderRadius: 3,
               color: colors.text,
@@ -1064,7 +1064,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
           placeholder="Add tag..."
           style={{
             width: '100%',
-            background: 'rgba(0,0,0,0.2)',
+            background: 'var(--color-bg-inset, rgba(0,0,0,0.2))',
             border: `1px solid ${colors.border}`,
             borderRadius: 3,
             color: colors.text,
@@ -1080,7 +1080,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
             left: 0,
             right: 0,
             marginTop: 2,
-            background: 'rgba(30,30,30,0.95)',
+            background: 'var(--color-bg-elevated, rgba(30,30,30,0.95))',
             border: `1px solid ${colors.border}`,
             borderRadius: 3,
             zIndex: 'var(--z-max)',
@@ -1237,12 +1237,11 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
     >
       <div
         style={{
-          background: 'rgba(35,35,35,0.98)',
+          background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
           border: `1px solid ${colors.border}`,
           borderRadius: 10,
           padding: 24,
-          minWidth: 400,
-          maxWidth: 500,
+          width: 'min(500px, calc(100vw - 48px))',
           maxHeight: '70vh',
           overflow: 'auto',
         }}
@@ -1337,11 +1336,11 @@ export const NoteStats: React.FC<NoteStatsProps> = memo(({
     >
       <div
         style={{
-          background: 'rgba(35,35,35,0.98)',
+          background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
           border: `1px solid ${colors.border}`,
           borderRadius: 10,
           padding: 24,
-          minWidth: 300,
+          width: 'min(300px, calc(100vw - 48px))',
         }}
         onClick={e => e.stopPropagation()}
       >

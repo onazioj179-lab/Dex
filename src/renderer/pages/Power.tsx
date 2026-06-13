@@ -436,7 +436,7 @@ export const Power: React.FC = () => {
 
             {/* CPU Mini Chart */}
             <div style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600 }}>CPU Usage</div>
+              <div className="dex-label-caps" style={{ marginBottom: 8 }}>CPU Usage</div>
               <div style={{ display: 'flex', alignItems: 'end', gap: 1, height: 40 }}>
                 {cpuHistory.map((v, i) => (
                   <div key={i} style={{ flex: 1, height: `${Math.min(100, v)}%`, background: v > 70 ? 'var(--color-error)' : v > 40 ? 'var(--color-warning)' : 'var(--color-accent)', borderRadius: 1, minHeight: 1, opacity: 0.5 + (i / cpuHistory.length) * 0.5, transition: 'height 0.3s' }} />
@@ -476,7 +476,7 @@ export const Power: React.FC = () => {
                     style={{
                       display: 'grid', gridTemplateColumns: '50px 1fr 80px 90px 60px 70px 70px',
                       padding: '7px 12px', cursor: 'pointer',
-                      background: p.pid === selectedPid ? 'rgba(10,132,255,0.15)' : 'transparent',
+                      background: p.pid === selectedPid ? 'var(--color-accent-light, rgba(10,132,255,0.15))' : 'transparent',
                       borderBottom: '1px solid var(--color-border-subtle)',
                       transition: 'background 0.1s',
                       fontSize: 12,
@@ -539,7 +539,7 @@ export const Power: React.FC = () => {
                 { label: 'Voltage', value: `${battery.voltage}V`, color: '#bf5af2' },
               ].map(s => (
                 <div key={s.label} style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 }}>{s.label}</div>
+                  <div className="dex-label-caps" style={{ marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 22, fontWeight: 500, color: s.color }}>{s.value}</div>
                 </div>
               ))}
@@ -639,7 +639,7 @@ export const Power: React.FC = () => {
                 { label: 'Cached', value: `${(memInfo.cached / 1024).toFixed(1)} GB`, total: '', pct: (memInfo.cached / memInfo.total * 100), color: '#64d2ff' },
               ].map(s => (
                 <div key={s.label} style={{ ...glassPanel, padding: 16, borderRadius: 10 }}>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600, marginBottom: 6 }}>{s.label}</div>
+                  <div className="dex-label-caps" style={{ marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 500, color: s.color }}>{s.value}</div>
                   {s.total && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{s.total}</div>}
                   <div style={{ height: 3, background: 'var(--color-bg-hover)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
@@ -755,19 +755,19 @@ export const Power: React.FC = () => {
             )}
 
             <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Automation</div>
+              <div className="dex-label-caps" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)' }}>Automation</div>
               <ControlRow label="Automations" description="Run automated tasks and workflows" checked={automationsEnabled && !panicStopped} onChange={() => setAutomationsEnabled(!automationsEnabled)} disabled={panicStopped} />
               <ControlRow label="Learning" description="Learn from usage patterns" checked={learningEnabled && !panicStopped} onChange={() => setLearningEnabled(!learningEnabled)} disabled={panicStopped} />
             </div>
 
             <div style={{ ...glassPanel, borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Security</div>
+              <div className="dex-label-caps" style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)' }}>Security</div>
               <ControlRow label="Lock DEX" description="Require authentication to access" checked={appLocked} onChange={() => setAppLocked(!appLocked)} />
               <ControlRow label="Safe Mode" description="Disable all extensions and custom scripts" checked={safeMode} onChange={() => setSafeMode(!safeMode)} />
             </div>
 
             <div style={{ ...glassPanel, borderRadius: 10, padding: 16 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 12 }}>Emergency</div>
+              <div className="dex-label-caps" style={{ marginBottom: 12 }}>Emergency</div>
               <button
                 onClick={handlePanicStop}
                 disabled={panicStopped}
@@ -941,7 +941,7 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void; disabled?
 const ControlRow: React.FC<{ label: string; description: string; checked: boolean; onChange: () => void; disabled?: boolean }> = ({ label, description, checked, onChange, disabled }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--color-border-subtle)', opacity: disabled ? 0.5 : 1 }}>
     <div>
-      <div style={{ fontSize: 14, color: '#fff' }}>{label}</div>
+      <div style={{ fontSize: 14, color: 'var(--color-text-primary, #fff)' }}>{label}</div>
       <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{description}</div>
     </div>
     <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} label={label} />

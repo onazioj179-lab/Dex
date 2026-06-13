@@ -351,7 +351,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     },
     container: {
       width: '100%',
-      maxWidth: '560px',
+      maxWidth: 'min(560px, calc(100vw - 48px))',
       background: 'var(--color-bg-elevated)',
       borderRadius: '10px',
       border: '1px solid var(--color-border)',
@@ -392,11 +392,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       padding: '8px',
     },
     category: {
-      fontSize: '11px',
-      fontWeight: 600,
-      color: 'var(--color-text-muted)',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
       padding: '8px 12px 4px',
     },
     item: {
@@ -494,7 +489,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           ) : (
             Object.entries(groupedCommands).map(([category, cmds]) => (
               <div key={category}>
-                <div style={styles.category}>{categoryLabels[category] || category}</div>
+                <div className="dex-label-caps" style={styles.category}>{categoryLabels[category] || category}</div>
                 {cmds.map(cmd => {
                   itemIndex++;
                   const currentIndex = itemIndex;

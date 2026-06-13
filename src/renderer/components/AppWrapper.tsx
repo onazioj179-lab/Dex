@@ -222,7 +222,7 @@ export function AppLoading({ appName, isCreativeApp }: AppLoadingProps): JSX.Ele
               cy="20"
               r="16"
               fill="none"
-              stroke="rgba(255,255,255,0.1)"
+              stroke="var(--color-border-subtle, rgba(255,255,255,0.1))"
               strokeWidth="3"
             />
             <circle
@@ -435,7 +435,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   errorIcon: {
-    color: '#ff453a',
+    color: 'var(--color-error, #ff453a)',
     marginBottom: '16px',
   },
   errorTitle: {
@@ -469,7 +469,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 500,
     color: 'var(--color-text-primary, #ffffff)',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.1))',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -487,8 +487,8 @@ const styles: Record<string, React.CSSProperties> = {
   stackTrace: {
     fontSize: '11px',
     fontFamily: 'monospace',
-    color: '#888',
-    background: 'rgba(0,0,0,0.3)',
+    color: 'var(--color-text-muted, #888)',
+    background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
     padding: '12px',
     borderRadius: '4px',
     overflow: 'auto',
@@ -522,7 +522,7 @@ const styles: Record<string, React.CSSProperties> = {
   progressContainer: {
     width: '200px',
     height: '4px',
-    background: 'rgba(255,255,255,0.1)',
+    background: 'var(--color-border-subtle, rgba(255,255,255,0.1))',
     borderRadius: '2px',
     overflow: 'hidden',
   },

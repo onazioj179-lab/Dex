@@ -17,6 +17,7 @@ import {
   ChatMessage
 } from '../services/CollaborationSystem';
 import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
+import { space, radius, fontSize } from '../styles/tokens';
 
 // ---------------------------------------------------------------------------
 // STYLES (Claude-inspired with DEX colors)
@@ -28,41 +29,41 @@ const styles: Record<string, React.CSSProperties> = {
     right: 0,
     top: 0,
     bottom: 0,
-    width: 380,
-    background: 'linear-gradient(180deg, #1a1a1c 0%, #141416 100%)',
-    borderLeft: '1px solid rgba(255,255,255,0.06)',
+    width: 'min(380px, calc(100vw - 48px))',
+    background: 'linear-gradient(180deg, var(--color-bg-elevated, #1a1a1c) 0%, var(--color-bg-surface, #141416) 100%)',
+    borderLeft: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
     display: 'flex',
     flexDirection: 'column',
     zIndex: Z_DROPDOWN_BASE + 500,
-    boxShadow: '-8px 0 40px rgba(0,0,0,0.3)',
+    boxShadow: '-8px 0 40px var(--color-shadow-strong, rgba(0,0,0,0.3))',
     animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '16px 20px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    padding: `${space[4]}px ${space[5]}px`,
+    borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
     background: 'rgba(255,255,255,0.02)',
   },
   headerLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: space[3],
   },
   headerTitle: {
     fontSize: 15,
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     margin: 0,
   },
   onlineCount: {
-    padding: '4px 8px',
-    fontSize: 11,
+    padding: `${space[1]}px ${space[2]}px`,
+    fontSize: fontSize.xs,
     fontWeight: 600,
-    background: 'rgba(48,209,88,0.15)',
-    color: '#30d158',
-    borderRadius: 8,
+    background: 'var(--color-success-muted, rgba(48,209,88,0.15))',
+    color: 'var(--color-success, #30d158)',
+    borderRadius: radius.xl,
   },
   closeBtn: {
     width: 32,
@@ -72,8 +73,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 6,
-    color: '#8e8e93',
+    borderRadius: radius.lg,
+    color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
@@ -93,10 +94,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 11,
+    fontSize: fontSize.xs,
     fontWeight: 600,
     color: '#fff',
-    border: '2px solid #1a1a1c',
+    border: '2px solid var(--color-bg-elevated, #1a1a1c)',
     position: 'relative',
     flexShrink: 0,
   },
@@ -106,25 +107,25 @@ const styles: Record<string, React.CSSProperties> = {
     right: -1,
     width: 8,
     height: 8,
-    background: '#30d158',
+    background: 'var(--color-success, #30d158)',
     borderRadius: '50%',
-    border: '2px solid #1a1a1c',
+    border: '2px solid var(--color-bg-elevated, #1a1a1c)',
   },
   messagesContainer: {
     flex: 1,
     overflowY: 'auto',
-    padding: '16px 0',
+    padding: `${space[4]}px 0`,
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
   },
   messageGroup: {
-    padding: '0 20px',
+    padding: `0 ${space[5]}px`,
   },
   messageWrapper: {
     display: 'flex',
     gap: 10,
-    marginBottom: 4,
+    marginBottom: space[1],
   },
   messageWrapperOwn: {
     flexDirection: 'row-reverse',
@@ -137,7 +138,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 12,
+    fontSize: fontSize.sm,
     fontWeight: 600,
     color: '#fff',
     flexShrink: 0,
@@ -147,50 +148,50 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '75%',
     padding: '10px 14px',
     borderRadius: 12,
-    fontSize: 14,
+    fontSize: fontSize.base,
     lineHeight: 1.45,
     color: '#fff',
     background: 'rgba(255,255,255,0.08)',
-    borderBottomLeftRadius: 3,
+    borderBottomLeftRadius: radius.sm,
   },
   messageBubbleOwn: {
     background: 'linear-gradient(135deg, #0a84ff, #5e5ce6)',
     borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 3,
+    borderBottomRightRadius: radius.sm,
   },
   messageBubbleSystem: {
     background: 'transparent',
-    color: '#8e8e93',
-    fontSize: 12,
-    padding: '8px 0',
+    color: 'var(--color-text-tertiary, #8e8e93)',
+    fontSize: fontSize.sm,
+    padding: `${space[2]}px 0`,
     textAlign: 'center',
     maxWidth: '100%',
     fontStyle: 'italic',
   },
   messageSender: {
-    fontSize: 11,
+    fontSize: fontSize.xs,
     fontWeight: 600,
-    color: '#8e8e93',
-    marginBottom: 4,
+    color: 'var(--color-text-tertiary, #8e8e93)',
+    marginBottom: space[1],
     marginLeft: 2,
   },
   messageTime: {
     fontSize: 10,
     color: 'rgba(255,255,255,0.3)',
-    marginTop: 4,
+    marginTop: space[1],
     textAlign: 'right',
   },
   messageReactions: {
     display: 'flex',
-    gap: 4,
-    marginTop: 4,
+    gap: space[1],
+    marginTop: space[1],
     flexWrap: 'wrap',
   },
   reaction: {
     padding: '2px 6px',
-    fontSize: 12,
+    fontSize: fontSize.sm,
     background: 'rgba(255,255,255,0.1)',
-    borderRadius: 6,
+    borderRadius: radius.lg,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -203,37 +204,37 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0.7,
   },
   typingIndicator: {
-    padding: '8px 20px',
-    fontSize: 12,
-    color: '#8e8e93',
+    padding: `${space[2]}px ${space[5]}px`,
+    fontSize: fontSize.sm,
+    color: 'var(--color-text-tertiary, #8e8e93)',
     fontStyle: 'italic',
   },
   inputContainer: {
-    padding: '12px 16px 16px',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
+    padding: `${space[3]}px ${space[4]}px ${space[4]}px`,
+    borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
     background: 'rgba(255,255,255,0.02)',
   },
   inputWrapper: {
     display: 'flex',
     alignItems: 'flex-end',
-    gap: 8,
+    gap: space[2],
     background: 'rgba(255,255,255,0.06)',
     borderRadius: 14,
     padding: '6px 6px 6px 16px',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
   },
   inputWrapperFocused: {
     borderColor: 'rgba(10,132,255,0.5)',
-    boxShadow: '0 0 0 3px rgba(10,132,255,0.1)',
+    boxShadow: '0 0 0 3px var(--color-accent-muted, rgba(10,132,255,0.1))',
   },
   textarea: {
     flex: 1,
     background: 'transparent',
     border: 'none',
     outline: 'none',
-    color: '#fff',
-    fontSize: 14,
+    color: 'var(--color-text-primary, #fff)',
+    fontSize: fontSize.base,
     lineHeight: 1.4,
     resize: 'none',
     maxHeight: 100,
@@ -266,24 +267,24 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: '50%',
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
   dateDivider: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '12px 20px',
+    gap: space[3],
+    padding: `${space[3]}px ${space[5]}px`,
   },
   dateDividerLine: {
     flex: 1,
     height: 1,
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--color-border-subtle, rgba(255,255,255,0.06))',
   },
   dateDividerText: {
-    fontSize: 11,
-    color: '#636366',
+    fontSize: fontSize.xs,
+    color: 'var(--color-text-tertiary, #636366)',
     fontWeight: 500,
   },
   emptyState: {
@@ -292,7 +293,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    padding: space[10],
     textAlign: 'center',
   },
   emptyIcon: {
@@ -303,17 +304,17 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: space[4],
   },
   emptyTitle: {
     fontSize: 15,
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     marginBottom: 6,
   },
   emptyDesc: {
     fontSize: 13,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     lineHeight: 1.5,
   },
 };
@@ -484,7 +485,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
         {messages.length === 0 ? (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" strokeWidth="1.5">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary, #8e8e93)" strokeWidth="1.5">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
             </div>
@@ -572,8 +573,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
                         {showReactions === msg.id && (
                           <div style={{
                             display: 'flex',
-                            gap: 4,
-                            marginTop: 4,
+                            gap: space[1],
+                            marginTop: space[1],
                             padding: '4px 6px',
                             background: 'rgba(255,255,255,0.1)',
                             borderRadius: 12,
@@ -619,12 +620,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
         {/* Send Error */}
         {sendError && (
           <div style={{
-            padding: '8px 12px',
-            marginBottom: 8,
-            background: 'rgba(255,69,58,0.15)',
-            borderRadius: 6,
-            color: '#ff453a',
-            fontSize: 12,
+            padding: `${space[2]}px ${space[3]}px`,
+            marginBottom: space[2],
+            background: 'var(--color-error-muted, rgba(255,69,58,0.15))',
+            borderRadius: radius.lg,
+            color: 'var(--color-error, #ff453a)',
+            fontSize: fontSize.sm,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -632,7 +633,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
             <span>{sendError}</span>
             <button
               onClick={() => setSendError(null)}
-              style={{ background: 'none', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 2 }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-error, #ff453a)', cursor: 'pointer', padding: 2 }}
               aria-label="Dismiss"
             >
               x

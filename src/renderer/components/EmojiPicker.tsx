@@ -1001,7 +1001,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   }, [onClose]);
 
   const containerStyle: React.CSSProperties = {
-    width: 352,
+    width: 'min(352px, calc(100vw - 48px))',
     maxHeight: 420,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)',
@@ -1066,11 +1066,6 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
 
   const categoryLabelStyle: React.CSSProperties = {
     padding: `${space[2]}px ${space[1]}px`,
-    fontSize: fontSize.xs,
-    fontWeight: 600,
-    color: 'var(--color-text-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
   };
 
   const skinToneButtonStyle: React.CSSProperties = {
@@ -1180,7 +1175,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
       <div ref={gridRef} style={gridContainerStyle}>
         {filteredCategories.map((cat) => (
           <div key={cat.id} id={`emoji-category-${cat.id}`}>
-            <div style={categoryLabelStyle}>{cat.name}</div>
+            <div className="dex-label-caps" style={categoryLabelStyle}>{cat.name}</div>
             {cat.emojis.length > 0 ? (
               <div style={emojiGridStyle}>
                 {cat.emojis.map((emoji, i) => (

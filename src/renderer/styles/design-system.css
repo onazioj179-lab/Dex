@@ -88,6 +88,12 @@
      here (the boot block mirrors these values). Shadow alphas carry the
      GOAL-6D intensity -40% pass. */
   --color-accent-text: #FFFFFF;
+  /* Alias: some surfaces (e.g. Audio.tsx) reference --color-text-on-accent.
+     The canonical name is --color-accent-text; this alias makes those
+     consumers theme-correct (it inherits the cascaded accent-text value, so
+     it flips to #000 under high-contrast light) instead of dead-falling back
+     to a literal. Prefer --color-accent-text in new code. */
+  --color-text-on-accent: var(--color-accent-text);
   --color-accent-subtle: rgba(74, 158, 255, 0.12);
   --color-shadow-soft: rgba(0, 0, 0, 0.18);
   --color-shadow-strong: rgba(0, 0, 0, 0.30);
@@ -4667,12 +4673,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: 0.8; }
 }
 .animate-check path { animation: successCheck 0.4s var(--ease-out) forwards; }
 
-/* Ripple */
-@keyframes ripple {
-  from { transform: scale(0); opacity: 0.3; }
-  to { transform: scale(2.5); opacity: 0; }
-}
-.ripple-effect { position: relative; overflow: hidden; }
+/* Ripple: retired -- decorative motion with no consumers. */
 
 /* Loading dots */
 @keyframes loadingDots {

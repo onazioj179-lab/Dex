@@ -186,8 +186,7 @@ export const SnapPreview: React.FC<{ zone: SnapZone | null }> = ({ zone }) => {
         boxShadow: '0 0 24px rgba(74,158,255,0.15)',
         pointerEvents: 'none',
         zIndex: 'var(--z-modal)',
-        transition: isReduceMotion() ? 'none' : 'all 0.22s cubic-bezier(0.23, 1, 0.32, 1)',
-        animation: isReduceMotion() ? 'none' : 'dex-snap-zone-pulse 1.5s ease-in-out infinite',
+        transition: isReduceMotion() ? 'none' : 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     />
   );
@@ -782,7 +781,7 @@ const WinButton: React.FC<{
         height: '100%',
         border: 'none',
         background: hovered
-          ? action === 'close' ? '#C42B1C' : 'rgba(255,255,255,0.08)'
+          ? action === 'close' ? '#C42B1C' : 'var(--color-bg-hover, rgba(255,255,255,0.08))'
           : 'transparent',
         color: hovered && action === 'close' ? '#fff' : 'var(--color-text-muted)',
         cursor: 'default',

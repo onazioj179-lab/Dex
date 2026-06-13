@@ -197,7 +197,7 @@ const PDFViewer: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#1a1a1f' }}>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--color-bg-base, #1a1a1f)' }}>
         {filePath ? (
           <>
             <iframe

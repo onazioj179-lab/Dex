@@ -27,40 +27,10 @@ export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonE
   children?: React.ReactNode;
 }
 
-const variantStyle = (variant: ButtonVariant): React.CSSProperties => {
-  switch (variant) {
-    case 'primary':
-      return {
-        background: 'var(--color-accent, #4A9EFF)',
-        color: '#fff',
-        border: '1px solid transparent',
-      };
-    case 'secondary':
-      return {
-        background: 'var(--color-bg-elevated, #1A1A1E)',
-        color: 'var(--color-text-primary, #fff)',
-        border: '1px solid var(--color-border, rgba(255,255,255,0.14))',
-      };
-    case 'ghost':
-      return {
-        background: 'transparent',
-        color: 'var(--color-text-secondary, #B8B8BD)',
-        border: '1px solid transparent',
-      };
-    case 'subtle':
-      return {
-        background: 'var(--color-bg-hover, #1E1E22)',
-        color: 'var(--color-text-primary, #fff)',
-        border: '1px solid transparent',
-      };
-    case 'danger':
-      return {
-        background: 'rgba(255, 69, 58, 0.10)',
-        color: '#FF6B61',
-        border: '1px solid rgba(255, 69, 58, 0.30)',
-      };
-  }
-};
+// Variant colors and hover/active states live in CSS (design-tokens.css,
+// `.dex-btn[data-variant=...]`). Driving them declaratively means states can
+// never get stuck after a re-render mid-hover, themes apply instantly, and
+// caller `style` overrides are never clobbered by mouse handlers.
 
 const sizeStyle = (size: ButtonSize): React.CSSProperties => ({
   height: buttonTokens.height[size],
@@ -78,41 +48,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   fullWidth = false,
   disabled,
   style,
-  onMouseEnter,
-  onMouseLeave,
+  className,
   children,
   ...rest
 }, ref) => {
   const isDisabled = disabled || loading;
-  const v = variantStyle(variant);
   const s = sizeStyle(size);
   return (
     <button
       ref={ref}
       type={rest.type ?? 'button'}
       disabled={isDisabled}
+      className={className ? `dex-btn ${className}` : 'dex-btn'}
       data-variant={variant}
       data-size={size}
-      onMouseEnter={e => {
-        if (!isDisabled) {
-          const el = e.currentTarget;
-          if (variant === 'primary') el.style.background = 'var(--color-accent-hover, #6CB2FF)';
-          else if (variant === 'ghost') el.style.background = 'var(--color-bg-hover, #1E1E22)';
-          else if (variant === 'secondary') el.style.background = 'var(--color-bg-hover, #1E1E22)';
-          else if (variant === 'subtle') el.style.background = 'var(--color-bg-active, #252528)';
-          else if (variant === 'danger') el.style.background = 'rgba(255, 69, 58, 0.18)';
-        }
-        onMouseEnter?.(e);
-      }}
-      onMouseLeave={e => {
-        if (!isDisabled) {
-          (e.currentTarget as HTMLElement).style.background = v.background as string;
-        }
-        onMouseLeave?.(e);
-      }}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        cursor: isDisabled ? 'not-allowed' : 'pointer',
         opacity: isDisabled ? 0.55 : 1,
         borderRadius: radius.md,
         fontFamily: 'inherit',
@@ -120,7 +71,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
         whiteSpace: 'nowrap',
         transition: cssTransitions(['background', 'color', 'border-color', 'opacity'], 'micro'),
         width: fullWidth ? '100%' : undefined,
-        ...v,
         ...s,
         ...style,
       }}

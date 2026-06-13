@@ -162,7 +162,7 @@ const UnitConverter: React.FC = () => {
 
       {/* Quick reference grid */}
       <div style={s.refGrid}>
-        <div style={s.refHeader}>Quick Reference</div>
+        <div className="dex-label-caps" style={s.refHeader}>Quick Reference</div>
         <div style={s.refTable}>
           {[1, 10, 100, 1000].map(val => {
             const base = units[fromIdx].toBase(val);
@@ -247,8 +247,6 @@ const s: Record<string, React.CSSProperties> = {
     borderTop: '1px solid var(--color-border-subtle)',
   },
   refHeader: {
-    fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)',
-    textTransform: 'uppercase', letterSpacing: '0.5px',
     padding: '12px 20px 8px',
   },
   refTable: { flex: 1, overflow: 'auto', padding: '0 20px 16px' },

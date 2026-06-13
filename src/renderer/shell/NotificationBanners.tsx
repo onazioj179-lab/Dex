@@ -242,7 +242,7 @@ const Banner: React.FC<{
       onPointerUp={handlePointerUp}
       onClick={() => onClick?.(notification)}
       style={{
-        width: BANNER_WIDTH,
+        width: `min(${BANNER_WIDTH}px, calc(100vw - 48px))`,
         minHeight: 64,
         borderRadius: 10,
         background: 'var(--color-bg-elevated)',
@@ -253,7 +253,7 @@ const Banner: React.FC<{
         transform: `translateX(${swipeX}px)`,
         opacity: swipeX > 0 ? Math.max(0, 1 - swipeX / BANNER_WIDTH) : 1,
         transition: swipeX === 0 && !isReduceMotion() ? 'transform 0.25s cubic-bezier(0.23,1,0.32,1), opacity 0.25s cubic-bezier(0.23,1,0.32,1)' : 'none',
-        animation: isReduceMotion() ? 'none' : `bannerSlideIn 0.35s cubic-bezier(0.23,1,0.32,1)`,
+        animation: isReduceMotion() ? 'none' : `bannerSlideIn 0.22s cubic-bezier(0.23,1,0.32,1)`,
         position: 'relative',
         touchAction: 'pan-y',
       }}
@@ -327,7 +327,7 @@ const Banner: React.FC<{
                   style={{
                     padding: '4px 10px', borderRadius: 4,
                     background: i === 0 && !notification.undoAction ? 'var(--color-accent)' : 'var(--color-border-subtle)',
-                    color: i === 0 && !notification.undoAction ? '#fff' : 'var(--color-text-secondary)',
+                    color: i === 0 && !notification.undoAction ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
                     border: 'none', fontSize: 11, fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'opacity 0.1s ease',
@@ -595,7 +595,7 @@ export const NotificationCenter: React.FC<{
       {/* Panel slides in from right with smooth spring */}
       <div style={{
         position: 'fixed', top: 30, right: 8, bottom: 8,
-        width: 360, zIndex: 'var(--z-notification)',
+        width: 'min(360px, calc(100vw - 48px))', zIndex: 'var(--z-notification)',
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
         borderRadius: 12,
@@ -603,7 +603,7 @@ export const NotificationCenter: React.FC<{
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
         backdropFilter: 'var(--blur-xl)',
-        animation: isReduceMotion() ? 'none' : 'notifCenterIn 0.28s cubic-bezier(0.23,1,0.32,1)',
+        animation: isReduceMotion() ? 'none' : 'notifCenterIn 0.22s cubic-bezier(0.23,1,0.32,1)',
       }}>
         <style>{`
           @keyframes notifBackdropIn {
@@ -631,7 +631,7 @@ export const NotificationCenter: React.FC<{
             </span>
             {unreadCount > 0 && (
               <span style={{
-                fontSize: 10, fontWeight: 600, color: '#fff',
+                fontSize: 10, fontWeight: 600, color: 'var(--color-accent-text, #fff)',
                 background: 'var(--color-accent)',
                 padding: '2px 6px', borderRadius: 8,
               }}>
@@ -725,7 +725,7 @@ export const NotificationCenter: React.FC<{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '4px 0', marginBottom: 6,
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span className="dex-label-caps" style={{ color: 'var(--color-text-secondary)' }}>
                     {group.source}
                   </span>
                   {group.unreadCount > 0 && (
@@ -795,7 +795,6 @@ export const NotificationCenter: React.FC<{
                     <div style={{
                       width: 8, height: 8, borderRadius: '50%',
                       background: color, flexShrink: 0, marginTop: 4,
-                      boxShadow: `0 0 6px color-mix(in srgb, ${color} 38%, transparent)`,
                     }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>

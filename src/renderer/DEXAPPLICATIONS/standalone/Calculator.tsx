@@ -215,8 +215,8 @@ const Calculator: React.FC = () => {
         color: 'var(--color-text-primary)',
         border: '1px solid var(--color-border-subtle)',
       },
-      op: { 
-        background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)', 
+      op: {
+        background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
         color: 'var(--color-text-inverse)',
         boxShadow: '0 2px 12px rgba(10,132,255,0.4)',
         border: 'none',
@@ -324,7 +324,7 @@ const Calculator: React.FC = () => {
       {showHistory && (
         <div style={styles.historyPanel}>
           <div style={styles.historyHeader}>
-            <span style={styles.historyTitle}>History</span>
+            <span className="dex-label-caps">History</span>
             {history.length > 0 && (
               <button style={styles.clearHistoryBtn} onClick={() => setHistory([])} aria-label="Clear history">Clear</button>
             )}
@@ -479,13 +479,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '16px 20px',
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface)',
-  },
-  historyTitle: {
-    fontSize: '11px',
-    fontWeight: 700,
-    letterSpacing: '0.5px',
-    textTransform: 'uppercase' as const,
-    color: 'var(--color-text-tertiary)',
   },
   clearHistoryBtn: {
     background: 'transparent',

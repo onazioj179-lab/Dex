@@ -32,7 +32,7 @@ interface DowngradeEligibility {
 
 type Phase = 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
 
-const COLOR_BG = 'rgba(28, 28, 30, 0.98)';
+const COLOR_BG = 'var(--color-bg-elevated, rgba(28, 28, 30, 0.98))';
 // Use design tokens so this component themes correctly (incl. light mode) instead
 // of staying hardcoded-dark. COLOR_PRO stays a literal brand gold.
 const COLOR_BORDER = 'var(--color-border)';
@@ -258,7 +258,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
           aria-label="Update options"
           style={{
             marginTop: 8,
-            width: 320,
+            width: 'min(320px, calc(100vw - 48px))',
             background: COLOR_BG,
             border: `1px solid ${COLOR_BORDER}`,
             borderRadius: 10,
@@ -293,7 +293,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
               )}
               {phase === 'downloading' && (
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: 4, background: 'var(--color-border-subtle, rgba(255,255,255,0.08))', borderRadius: 2, overflow: 'hidden' }}>
                     <div
                       style={{
                         width: `${Math.round(progress)}%`,
@@ -336,12 +336,10 @@ export const UpdateNotificationDropdown: React.FC = () => {
               }}
             >
               <div
+                className="dex-caps"
                 style={{
                   fontSize: 11,
-                  fontWeight: 700,
                   color: downgrade.eligible ? COLOR_PRO : COLOR_MUTED,
-                  letterSpacing: 0.4,
-                  textTransform: 'uppercase',
                   marginBottom: 6,
                 }}
               >

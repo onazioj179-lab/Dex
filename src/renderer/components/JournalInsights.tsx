@@ -27,10 +27,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   sectionTitle: {
     fontSize: 10,
-    fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.06em',
     marginBottom: 4,
   },
   card: {
@@ -119,8 +116,6 @@ const S: Record<string, React.CSSProperties> = {
   weeklyStatLabel: {
     fontSize: 8,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.04em',
   },
   topAppRow: {
     display: 'flex',
@@ -295,19 +290,19 @@ const WeeklyReportSection = memo(({ report }: { report: WeeklyReport }) => {
       <div style={S.weeklyStatRow}>
         <div style={S.weeklyStat}>
           <span style={S.weeklyStatValue}>{report.totalEntries}</span>
-          <span style={S.weeklyStatLabel}>Entries</span>
+          <span className="dex-caps" style={S.weeklyStatLabel}>Entries</span>
         </div>
         <div style={S.weeklyStat}>
           <span style={S.weeklyStatValue}>{report.uniqueApps}</span>
-          <span style={S.weeklyStatLabel}>Apps</span>
+          <span className="dex-caps" style={S.weeklyStatLabel}>Apps</span>
         </div>
         <div style={S.weeklyStat}>
           <span style={S.weeklyStatValue}>{report.averageEntriesPerDay}</span>
-          <span style={S.weeklyStatLabel}>Avg/Day</span>
+          <span className="dex-caps" style={S.weeklyStatLabel}>Avg/Day</span>
         </div>
         <div style={S.weeklyStat}>
           <span style={S.weeklyStatValue}>{report.uniqueSessions}</span>
-          <span style={S.weeklyStatLabel}>Sessions</span>
+          <span className="dex-caps" style={S.weeklyStatLabel}>Sessions</span>
         </div>
       </div>
 
@@ -393,7 +388,7 @@ const JournalInsights: React.FC = () => {
       {/* Contextual Insights */}
       {insights.length > 0 && (
         <div>
-          <div style={S.sectionTitle}>Context</div>
+          <div className="dex-caps" style={S.sectionTitle}>Context</div>
           {insights.map((insight, i) => (
             <InsightCard key={i} insight={insight} />
           ))}
@@ -407,7 +402,7 @@ const JournalInsights: React.FC = () => {
       {/* Weekly Report */}
       {weeklyReport && (
         <div>
-          <div style={S.sectionTitle}>Weekly Report</div>
+          <div className="dex-caps" style={S.sectionTitle}>Weekly Report</div>
           <WeeklyReportSection report={weeklyReport} />
         </div>
       )}
@@ -415,7 +410,7 @@ const JournalInsights: React.FC = () => {
       {/* Patterns */}
       {patterns.length > 0 && (
         <div>
-          <div style={S.sectionTitle}>Detected Patterns</div>
+          <div className="dex-caps" style={S.sectionTitle}>Detected Patterns</div>
           {patterns.slice(0, 5).map((pattern, i) => (
             <PatternCard key={i} pattern={pattern} />
           ))}
@@ -430,7 +425,7 @@ const JournalInsights: React.FC = () => {
       {/* Anomalies */}
       {anomalies.length > 0 && (
         <div>
-          <div style={S.sectionTitle}>Usage Anomalies</div>
+          <div className="dex-caps" style={S.sectionTitle}>Usage Anomalies</div>
           {anomalies.slice(0, 5).map((anomaly, i) => (
             <AnomalyCard key={i} anomaly={anomaly} />
           ))}
