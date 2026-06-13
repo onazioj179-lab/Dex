@@ -520,7 +520,7 @@ const DexCode: React.FC = () => {
                 onClick={() => { setFileName(t.fileName); setCode(t.code); }}
                 style={{...S.templateBtn, padding: '6px 8px'}}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-border-subtle, rgba(255,255,255,0.04))')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-inset, var(--color-border-subtle, rgba(255,255,255,0.04)))')}
               >
                 <span style={{ fontSize: 11, fontWeight: 600 }}>{t.label}</span>
               </button>
@@ -878,7 +878,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '8px 10px',
     borderRadius: 6,
     border: '1px solid var(--color-border)',
-    background: 'var(--color-border-subtle, rgba(255,255,255,0.04))',
+    background: 'var(--color-bg-inset, rgba(255,255,255,0.04))',
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     transition: 'background 0.12s',

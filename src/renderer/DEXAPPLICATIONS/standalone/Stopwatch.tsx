@@ -87,9 +87,9 @@ const Stopwatch: React.FC = () => {
       {laps.length > 0 && (
         <div style={s.lapsContainer}>
           <div style={s.lapHeader}>
-            <span style={s.lapHeaderText}>Lap</span>
-            <span style={s.lapHeaderText}>Split</span>
-            <span style={s.lapHeaderText}>Time</span>
+            <span className="dex-label-caps" style={s.lapHeaderText}>Lap</span>
+            <span className="dex-label-caps" style={s.lapHeaderText}>Split</span>
+            <span className="dex-label-caps" style={s.lapHeaderText}>Time</span>
           </div>
           <div style={s.lapList}>
             {laps.map((l, i) => {
@@ -140,11 +140,11 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   btnStart: {
-    background: 'rgba(52,199,89,0.15)', color: 'var(--color-success)',
+    background: 'var(--color-success-muted, rgba(52,199,89,0.15))', color: 'var(--color-success)',
     boxShadow: 'inset 0 0 0 2px rgba(52,199,89,0.3)',
   },
   btnStop: {
-    background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)',
+    background: 'var(--color-error-muted, rgba(255,69,58,0.15))', color: 'var(--color-error)',
     boxShadow: 'inset 0 0 0 2px rgba(255,69,58,0.3)',
   },
   btnLap: {
@@ -164,9 +164,7 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   lapHeaderText: {
-    flex: 1, fontSize: 12, fontWeight: 600,
-    color: 'var(--color-text-muted)', textTransform: 'uppercase',
-    letterSpacing: '0.5px',
+    flex: 1,
   },
   lapList: { flex: 1, overflow: 'auto', padding: '4px 0' },
   lapRow: {

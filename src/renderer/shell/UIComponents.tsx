@@ -55,7 +55,7 @@ export const DexToggle: React.FC<{
         width: w,
         height: h,
         borderRadius: h / 2,
-        background: checked ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+        background: checked ? 'var(--color-accent)' : 'var(--color-bg-active)',
         border: checked ? 'none' : '1px solid var(--color-border)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         position: 'relative',
@@ -74,7 +74,7 @@ export const DexToggle: React.FC<{
         borderRadius: '50%',
         background: '#fff',
         boxShadow: 'var(--pg-shadow-chip)',
-        transition: isReduceMotion() ? 'none' : 'left 0.2s cubic-bezier(0.34,1.56,0.64,1)',
+        transition: isReduceMotion() ? 'none' : 'left 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
       }} />
     </button>
   );
@@ -424,7 +424,7 @@ export const DexButton: React.FC<{
   const bg = (() => {
     switch (variant) {
       case 'primary': return 'var(--color-accent)';
-      case 'danger': return 'rgba(255,69,58,0.9)';
+      case 'danger': return 'var(--color-error, rgba(255,69,58,0.9))';
       case 'ghost': return 'transparent';
       default: return 'var(--color-bg-hover)';
     }
@@ -440,7 +440,8 @@ export const DexButton: React.FC<{
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       style={{
-        padding: '8px 16px',
+        height: 'var(--dex-control-h-md, 32px)',
+        padding: '0 16px',
         borderRadius: 6,
         border: variant === 'ghost' ? '1px solid var(--color-border-subtle)' : 'none',
         background: bg,
@@ -642,7 +643,7 @@ export const DexProgressBar: React.FC<{
         height: '100%',
         borderRadius: height / 2,
         background: color,
-        transition: isReduceMotion() ? 'width 0s' : 'width 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+        transition: isReduceMotion() ? 'width 0s' : 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
         overflow: 'hidden',
       }}>
@@ -845,10 +846,7 @@ export const SectionHeader: React.FC<{
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: 10, ...style,
   }}>
-    <span style={{
-      fontSize: 10, fontWeight: 600, letterSpacing: '0.07em',
-      textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-    }}>
+    <span className="dex-label-caps">
       {label}
     </span>
     {action && <div>{action}</div>}

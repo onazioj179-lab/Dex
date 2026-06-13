@@ -51,7 +51,9 @@ function captureThumbnail(id: string, element: HTMLElement | null | undefined, w
       const y = (rect.top - parentRect.top) * scaleY;
       const w = rect.width * scaleX;
       const h = rect.height * scaleY;
-      ctx.fillStyle = cs.backgroundColor || 'var(--color-border-subtle)';
+      // Canvas 2D can't resolve CSS custom properties; the fallback must be a
+      // literal (this is --color-border-subtle's value) or it silently paints black.
+      ctx.fillStyle = cs.backgroundColor || 'rgba(255,255,255,0.08)';
       ctx.fillRect(x, y, w, h);
     });
 
@@ -254,7 +256,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 height: cardHeight,
                 borderRadius: 10,
                 background: app.id === activeAppId
-                  ? 'rgba(74,158,255,0.12)'
+                  ? 'var(--color-accent-light, rgba(74,158,255,0.12))'
                   : 'var(--color-border-subtle)',
                 border: app.id === activeAppId
                   ? '2px solid var(--color-accent)'
@@ -293,7 +295,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                       top: 6, right: 6,
                       width: 20, height: 20,
                       borderRadius: '50%',
-                      background: 'rgba(192,69,58,0.85)',
+                      background: 'var(--color-error, rgba(192,69,58,0.85))',
                       border: 'none',
                       cursor: 'pointer',
                       display: 'flex',

@@ -19,8 +19,13 @@ const QRCodeGenerator: React.FC = () => {
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  // These are written directly to a <canvas> fillStyle and an <input type="color">,
+  // neither of which can resolve CSS custom properties -- they must be literal
+  // hex. (A prior token sweep set bg to 'var(--color-text-primary)', which a
+  // canvas treats as invalid and an <input type=color> snaps to #000000,
+  // producing an all-black, unscannable QR.)
   const [fgColor, setFgColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('var(--color-text-primary)');
+  const [bgColor, setBgColor] = useState('#ffffff');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const qrData = useMemo(() => {

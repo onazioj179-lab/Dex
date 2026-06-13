@@ -482,7 +482,7 @@ const Calendar: React.FC = () => {
                           style={{
                             ...styles.weekViewCell,
                             ...(isToday(date) ? styles.weekViewCellToday : {}),
-                            ...(isInDragRange(date, hour) ? { background: 'rgba(10, 132, 255, 0.15)' } : {}),
+                            ...(isInDragRange(date, hour) ? { background: 'var(--color-accent-light, rgba(74,158,255,0.15))' } : {}),
                           }}
                           onMouseDown={e => { e.preventDefault(); handleDragStart(date, hour); }}
                           onMouseEnter={() => handleDragMove(date, hour)}
@@ -687,14 +687,13 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
   },
   viewBtnActive: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+    background: 'var(--color-accent)',
     color: 'var(--color-text-inverse)',
-    boxShadow: '0 2px 8px rgba(10,132,255,0.4)',
   },
   addBtn: {
     width: '32px',
     height: '32px',
-    background: 'linear-gradient(180deg, var(--color-success) 0%, #1fa848 100%)',
+    background: 'var(--color-success)',
     border: 'none',
     borderRadius: '4px',
     color: 'var(--color-text-inverse)',
@@ -702,7 +701,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(48,209,88,0.4)',
     transition: 'all 0.15s ease',
   },
   main: {
@@ -715,7 +713,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)',
     borderRight: '1px solid var(--color-border-subtle)',
     overflow: 'hidden',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.18s ease',
   },
   sidebarToggle: {
     position: 'absolute',
@@ -777,13 +775,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   miniDayToday: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+    background: 'var(--color-accent)',
     color: 'var(--color-text-inverse)',
-    boxShadow: '0 2px 6px rgba(10,132,255,0.4)',
   },
   miniDaySelected: {
-    background: 'rgba(10,132,255,0.2)',
-    border: '1px solid rgba(10,132,255,0.4)',
+    background: 'var(--color-accent-light, rgba(74,158,255,0.2))',
+    border: '1px solid var(--color-accent-soft, rgba(74,158,255,0.4))',
   },
   dayEvents: {
     marginTop: '12px',
@@ -892,7 +889,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dayCellSelected: {
     background: 'var(--color-accent-light)',
-    boxShadow: 'inset 0 0 0 1px rgba(59,130,246,0.3)',
+    boxShadow: 'inset 0 0 0 1px var(--color-accent-soft, rgba(74,158,255,0.3))',
   },
   dayNumber: {
     fontSize: '12px',
@@ -901,7 +898,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary)',
   },
   dayNumberToday: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+    background: 'var(--color-accent)',
     color: 'var(--color-text-inverse)',
     width: '24px',
     height: '24px',
@@ -909,7 +906,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(10,132,255,0.5)',
   },
   dayEventsPreview: {
     display: 'flex',
@@ -979,7 +975,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1,
   },
   weekViewDayNumToday: {
-    background: 'linear-gradient(180deg, var(--color-accent) 0%, #0060df 100%)',
+    background: 'var(--color-accent)',
     color: 'var(--color-text-inverse)',
     width: '28px',
     height: '28px',
@@ -987,7 +983,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(10,132,255,0.5)',
     fontSize: '13px',
   },
   weekViewBody: {
@@ -1025,7 +1020,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '48px',
   },
   weekViewCellToday: {
-    background: 'rgba(59,130,246,0.04)',
+    background: 'var(--color-accent-soft, rgba(74,158,255,0.04))',
   },
   weekViewEvent: {
     borderRadius: '3px',
@@ -1183,14 +1178,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   saveBtn: {
     padding: '8px 16px',
-    background: 'linear-gradient(180deg, var(--color-success) 0%, #1fa848 100%)',
+    background: 'var(--color-success)',
     border: 'none',
     borderRadius: '4px',
     color: 'var(--color-text-inverse)',
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(48,209,88,0.4)',
     transition: 'all 0.15s ease',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
   },

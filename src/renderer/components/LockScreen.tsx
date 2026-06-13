@@ -14,6 +14,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { sharedTick } from '../services/SharedTick';
+import { space, radius, fontSize, fontWeight } from '../styles/tokens';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -29,6 +30,12 @@ const PIN_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
 
 const SHAKE_DURATION = 520;
 const ERROR_DISPLAY_MS = 3000;
+
+// Numpad keys shrink on narrow windows so the 3-column grid never overflows.
+const NUMPAD_KEY_SIZE = 'clamp(56px, 12vw, 72px)';
+
+// Auth widgets cap at their design width but never exceed the window.
+const AUTH_MAX_WIDTH = 'min(320px, calc(100vw - 48px))';
 
 // -----------------------------------------------------------------------------
 // Animated Background - runs as a login background effect
@@ -355,7 +362,7 @@ export const LockScreen: React.FC = () => {
         {/* Welcome mode: just show hint to continue */}
         {isWelcomeMode && (
           <div style={{ textAlign: 'center', animation: 'fadeInUp 1s ease-out 0.5s both' }}>
-            <div style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>
+            <div style={{ fontSize: 13, fontWeight: fontWeight.normal, color: 'var(--color-text-tertiary)', letterSpacing: '0.02em' }}>
               Click anywhere or press any key
             </div>
           </div>
@@ -369,9 +376,9 @@ export const LockScreen: React.FC = () => {
           {/* Lockout Warning */}
           {lockoutStatus.isLockedOut && (
             <div style={styles.lockoutBanner} role="alert">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginRight: 8, flexShrink: 0 }}>
-                <path d="M8 1L1 14h14L8 1z" stroke="#ff9f0a" strokeWidth="1.5" fill="none" />
-                <path d="M8 6v4M8 11.5v.5" stroke="#ff9f0a" strokeWidth="1.5" strokeLinecap="round" />
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginRight: space[2], flexShrink: 0 }}>
+                <path d="M8 1L1 14h14L8 1z" stroke="var(--color-warning, #ff9f0a)" strokeWidth="1.5" fill="none" />
+                <path d="M8 6v4M8 11.5v.5" stroke="var(--color-warning, #ff9f0a)" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
               {lockoutMessage}
             </div>
@@ -483,7 +490,7 @@ export const LockScreen: React.FC = () => {
                 </button>
               </div>
               {capsLockOn && !showPassword && (
-                <div style={{ fontSize: 11, color: 'rgba(255,214,10,0.85)', textAlign: 'center', marginTop: -4, marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                <div style={{ fontSize: fontSize.xs, color: 'rgba(255,214,10,0.85)', textAlign: 'center', marginTop: -space[1], marginBottom: space[1], display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22V12M12 12L7 17M12 12l5 5"/><rect x="5" y="3" width="14" height="6" rx="1"/></svg>
                   Caps Lock is on
                 </div>
@@ -555,7 +562,7 @@ export const LockScreen: React.FC = () => {
           {/* Recovery code link */}
           {(method.includes('pin') || method.includes('password')) && !showRecovery && (
             <button
-              style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: '12px', cursor: 'pointer', marginTop: '12px', padding: '4px 8px' }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', fontSize: fontSize.sm, cursor: 'pointer', marginTop: space[3], padding: `${space[1]}px ${space[2]}px` }}
               onClick={() => setShowRecovery(true)}
             >
               Forgot PIN / Password?
@@ -564,8 +571,8 @@ export const LockScreen: React.FC = () => {
 
           {/* Recovery code input */}
           {showRecovery && (
-            <div style={{ marginTop: '16px', width: '100%', maxWidth: '280px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            <div style={{ marginTop: space[4], width: '100%', maxWidth: 'min(280px, calc(100vw - 48px))' }}>
+              <div style={{ fontSize: fontSize.sm, color: 'var(--color-text-secondary)', marginBottom: space[2], textAlign: 'center' }}>
                 Enter a recovery code
               </div>
               <input
@@ -574,21 +581,21 @@ export const LockScreen: React.FC = () => {
                 onChange={e => setRecoveryCode(e.target.value.toUpperCase())}
                 placeholder="XXXX-XXXX"
                 style={{
-                  width: '100%', padding: '12px', background: 'var(--color-border-subtle)',
-                  border: '1px solid var(--color-border)', borderRadius: '8px',
-                  color: '#fff', fontSize: '16px', textAlign: 'center',
+                  width: '100%', padding: space[3], background: 'var(--color-border-subtle)',
+                  border: '1px solid var(--color-border)', borderRadius: radius.xl,
+                  color: 'var(--color-text-primary, #fff)', fontSize: fontSize.lg, textAlign: 'center',
                   fontFamily: 'monospace', letterSpacing: '2px',
-                  outline: 'none',
+                  outline: 'none', boxSizing: 'border-box',
                 }}
                 onKeyDown={e => e.key === 'Enter' && handleRecoverySubmit()}
               />
-              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: space[2], marginTop: '10px', justifyContent: 'center' }}>
                 <button
                   onClick={handleRecoverySubmit}
                   disabled={isLoading || !recoveryCode.trim()}
                   style={{
-                    padding: '8px 20px', borderRadius: '6px', border: 'none',
-                    background: 'rgba(74,158,255,0.3)', color: '#fff', fontSize: '13px',
+                    padding: `${space[2]}px ${space[5]}px`, borderRadius: radius.lg, border: 'none',
+                    background: 'rgba(74,158,255,0.3)', color: 'var(--color-accent-text, #fff)', fontSize: '13px',
                     cursor: 'pointer', opacity: (!recoveryCode.trim() || isLoading) ? 0.5 : 1,
                   }}
                 >
@@ -597,7 +604,7 @@ export const LockScreen: React.FC = () => {
                 <button
                   onClick={() => { setShowRecovery(false); setRecoveryCode(''); }}
                   style={{
-                    padding: '8px 20px', borderRadius: '6px', border: 'none',
+                    padding: `${space[2]}px ${space[5]}px`, borderRadius: radius.lg, border: 'none',
                     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
                     fontSize: '13px', cursor: 'pointer',
                   }}
@@ -616,8 +623,9 @@ export const LockScreen: React.FC = () => {
           position: 'fixed', top: 0, left: 0, right: 0,
           zIndex: 'var(--z-max)', padding: '10px 20px',
           background: 'linear-gradient(135deg, rgba(255,159,10,0.95), rgba(255,69,58,0.9))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-          fontSize: '13px', fontWeight: 600, color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: space[3],
+          fontSize: '13px', fontWeight: fontWeight.semibold, color: '#fff',
+          flexWrap: 'wrap', textAlign: 'center',
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
@@ -626,9 +634,9 @@ export const LockScreen: React.FC = () => {
           <button
             onClick={() => setIdleWarning(null)}
             style={{
-              padding: '4px 14px', borderRadius: '4px', border: '1px solid var(--color-text-tertiary)',
-              background: 'var(--color-border)', color: '#fff', fontSize: '12px',
-              cursor: 'pointer', fontWeight: 600,
+              padding: '4px 14px', borderRadius: radius.md, border: '1px solid var(--color-text-tertiary)',
+              background: 'var(--color-border)', color: '#fff', fontSize: fontSize.sm,
+              cursor: 'pointer', fontWeight: fontWeight.semibold,
             }}
           >
             Stay Active
@@ -659,13 +667,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 48,
+    gap: `clamp(${space[6]}px, 6vh, ${space[12]}px)`,
+    maxWidth: '100%',
+    maxHeight: '100%',
+    padding: `${space[4]}px ${space[6]}px`,
+    boxSizing: 'border-box',
+    overflowY: 'auto',
   },
   clockSection: {
     textAlign: 'center',
   },
   time: {
-    fontSize: 72,
+    fontSize: 'clamp(44px, 10vw, 72px)',
     fontWeight: 200,
     color: 'var(--color-text-primary)',
     letterSpacing: -2,
@@ -673,44 +686,45 @@ const styles: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
   ampm: {
-    fontSize: 20,
-    fontWeight: 400,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.normal,
     color: 'var(--color-text-secondary)',
-    marginLeft: 8,
+    marginLeft: space[2],
     verticalAlign: 'super',
   },
   date: {
     fontSize: 17,
-    fontWeight: 400,
+    fontWeight: fontWeight.normal,
     color: 'var(--color-text-secondary)',
-    marginTop: 8,
+    marginTop: space[2],
   },
   authSection: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
-    minWidth: 280,
+    gap: space[4],
+    minWidth: 'min(280px, calc(100vw - 48px))',
+    maxWidth: '100%',
   },
   authLabel: {
     fontSize: 15,
-    fontWeight: 500,
+    fontWeight: fontWeight.medium,
     color: 'var(--color-text-secondary)',
-    marginBottom: 4,
+    marginBottom: space[1],
     textAlign: 'center',
   },
   lockoutBanner: {
     display: 'flex',
     alignItems: 'center',
     padding: '10px 16px',
-    borderRadius: 8,
-    background: 'rgba(255,159,10,0.12)',
+    borderRadius: radius.xl,
+    background: 'var(--color-warning-muted, rgba(255,159,10,0.12))',
     border: '1px solid rgba(255,159,10,0.25)',
     color: 'var(--color-warning)',
     fontSize: 13,
-    fontWeight: 500,
-    marginBottom: 8,
-    maxWidth: 320,
+    fontWeight: fontWeight.medium,
+    marginBottom: space[2],
+    maxWidth: AUTH_MAX_WIDTH,
     textAlign: 'center',
   },
 
@@ -719,12 +733,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 20,
+    gap: space[5],
   },
   pinDots: {
     display: 'flex',
     gap: 14,
-    marginBottom: 4,
+    marginBottom: space[1],
   },
   pinDot: {
     width: 14,
@@ -735,24 +749,24 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s ease',
   },
   pinDotFilled: {
-    background: '#ffffff',
+    background: 'var(--color-text-primary, #ffffff)',
     borderColor: 'var(--color-text-primary)',
     boxShadow: '0 0 8px var(--color-text-tertiary)',
   },
   numpad: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 72px)',
-    gap: 12,
+    gridTemplateColumns: `repeat(3, ${NUMPAD_KEY_SIZE})`,
+    gap: space[3],
     justifyContent: 'center',
   },
   numpadKey: {
-    width: 72,
-    height: 72,
+    width: NUMPAD_KEY_SIZE,
+    height: NUMPAD_KEY_SIZE,
     borderRadius: '50%',
     border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-primary)',
-    fontSize: 28,
+    fontSize: fontSize['3xl'],
     fontWeight: 300,
     display: 'flex',
     alignItems: 'center',
@@ -762,8 +776,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   numpadSpacer: {
-    width: 72,
-    height: 72,
+    width: NUMPAD_KEY_SIZE,
+    height: NUMPAD_KEY_SIZE,
   },
 
   // Password
@@ -772,7 +786,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: 14,
-    width: 320,
+    width: AUTH_MAX_WIDTH,
   },
   passwordField: {
     position: 'relative',
@@ -781,11 +795,11 @@ const styles: Record<string, React.CSSProperties> = {
   passwordInput: {
     width: '100%',
     height: 48,
-    borderRadius: 10,
+    borderRadius: radius['2xl'],
     border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-primary)',
-    fontSize: 16,
+    fontSize: fontSize.lg,
     padding: '0 44px 0 16px',
     outline: 'none',
     boxSizing: 'border-box',
@@ -793,9 +807,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toggleVisibility: {
     position: 'absolute',
-    right: 8,
-    top: '50%',
-    transform: 'translateY(-50%)',
+    right: space[2],
+    top: 0,
+    bottom: 0,
     background: 'none',
     border: 'none',
     color: 'var(--color-text-tertiary)',
@@ -808,12 +822,12 @@ const styles: Record<string, React.CSSProperties> = {
   unlockBtn: {
     width: '100%',
     height: 44,
-    borderRadius: 8,
+    borderRadius: radius.xl,
     border: 'none',
     background: 'var(--color-accent)',
     color: 'var(--color-text-primary)',
     fontSize: 15,
-    fontWeight: 600,
+    fontWeight: fontWeight.semibold,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     fontFamily: 'inherit',
@@ -828,24 +842,24 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
+    gap: space[4],
   },
   biometricBtn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
+    gap: space[4],
     background: 'none',
     border: 'none',
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
-    padding: 20,
+    padding: space[5],
     borderRadius: 14,
     transition: 'background 0.15s ease',
   },
   biometricLabel: {
     fontSize: 15,
-    fontWeight: 500,
+    fontWeight: fontWeight.medium,
     color: 'var(--color-text-secondary)',
   },
 
@@ -855,22 +869,22 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'var(--color-accent)',
     fontSize: 13,
-    fontWeight: 500,
+    fontWeight: fontWeight.medium,
     cursor: 'pointer',
-    padding: '4px 8px',
-    marginTop: 4,
+    padding: `${space[1]}px ${space[2]}px`,
+    marginTop: space[1],
     fontFamily: 'inherit',
   },
   errorMsg: {
     color: 'var(--color-error)',
     fontSize: 13,
-    fontWeight: 500,
+    fontWeight: fontWeight.medium,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: space[1],
   },
   attemptsMsg: {
     color: 'var(--color-text-tertiary)',
-    fontSize: 12,
+    fontSize: fontSize.sm,
     textAlign: 'center',
   },
 };
@@ -885,38 +899,6 @@ const lockScreenCSS = `
   }
   [role="dialog"][aria-label="Lock Screen"] > div:last-child {
     -webkit-app-region: no-drag;
-  }
-
-  @keyframes lockGradientShift {
-    0% { background-position: 0% 50%; }
-    25% { background-position: 100% 50%; }
-    50% { background-position: 100% 0%; }
-    75% { background-position: 0% 100%; }
-    100% { background-position: 0% 50%; }
-  }
-
-  @keyframes lockFloat0 {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    33% { transform: translate(-40%, -60%) scale(1.1); }
-    66% { transform: translate(-60%, -40%) scale(0.9); }
-  }
-  @keyframes lockFloat1 {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    50% { transform: translate(-55%, -45%) scale(1.15); }
-  }
-  @keyframes lockFloat2 {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    40% { transform: translate(-45%, -55%) scale(1.08); }
-    80% { transform: translate(-55%, -48%) scale(0.95); }
-  }
-  @keyframes lockFloat3 {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    50% { transform: translate(-48%, -55%) scale(1.12); }
-  }
-  @keyframes lockFloat4 {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    35% { transform: translate(-55%, -48%) scale(1.06); }
-    70% { transform: translate(-46%, -52%) scale(0.94); }
   }
 
   @keyframes lock-shake {
@@ -943,7 +925,7 @@ const lockScreenCSS = `
   }
 
   .lock-numpad-key:focus-visible {
-    box-shadow: 0 0 0 2px #0a84ff;
+    box-shadow: 0 0 0 2px var(--color-accent, #0a84ff);
   }
 
   .lock-password-input:focus {

@@ -48,7 +48,7 @@ const styles = {
   },
   addBtn: {
     padding: '4px 12px', background: 'var(--color-accent)',
-    border: 'none', borderRadius: 4, color: '#fff', fontSize: 12,
+    border: 'none', borderRadius: 4, color: 'var(--color-text-inverse, #fff)', fontSize: 12,
     cursor: 'pointer', fontWeight: 500,
   },
   modItem: {
@@ -373,7 +373,7 @@ const ModifierItem = memo(({ mod, onRemove, onMove, onUpdate, onToggle, onCollap
           <button style={styles.iconBtn} title="Move Down" aria-label="Move modifier down" onClick={e => { e.stopPropagation(); onMove('down'); }}>▼</button>
           <button style={styles.iconBtn} title="Duplicate" aria-label="Duplicate modifier" onClick={e => { e.stopPropagation(); onDuplicate(); }}>⧉</button>
           {onApply && <button style={styles.iconBtn} title="Apply" aria-label="Apply modifier" onClick={e => { e.stopPropagation(); onApply(); }}>Apply</button>}
-          <button style={{ ...styles.iconBtn, color: hovered ? '#ff453a' : undefined }} title="Remove" aria-label="Remove modifier"
+          <button style={{ ...styles.iconBtn, color: hovered ? 'var(--color-error, #ff453a)' : undefined }} title="Remove" aria-label="Remove modifier"
             onClick={e => { e.stopPropagation(); onRemove(); }}>x</button>
         </div>
         <span style={{ fontSize: 12, marginLeft: 4 }}>{mod.expanded ? '▼' : '▶'}</span>

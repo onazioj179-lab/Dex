@@ -292,7 +292,7 @@ const PixelArt: React.FC = () => {
               style={{
                 width: 28, height: 28, borderRadius: 3,
                 background: c, cursor: 'pointer',
-                border: c === color ? '2px solid var(--color-text-primary)' : '1px solid rgba(255,255,255,0.08)',
+                border: c === color ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
                 padding: 0,
               }}
               title={c}
@@ -335,7 +335,7 @@ const PixelArt: React.FC = () => {
                 onClick={() => setCurrentFrame(i)}
                 style={{
                   width: 56, height: 56, padding: 0, borderRadius: 3,
-                  background: '#1a1a1f', cursor: 'pointer',
+                  background: 'var(--color-bg-base, #1a1a1f)', cursor: 'pointer',
                   border: i === currentFrame ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
                 }}

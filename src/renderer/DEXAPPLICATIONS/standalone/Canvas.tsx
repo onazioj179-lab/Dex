@@ -384,7 +384,7 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   sizeBtnActive: {
-    background: 'rgba(10, 132, 255, 0.15)',
+    background: 'var(--color-accent-soft, rgba(74, 158, 255, 0.15))',
     color: 'var(--color-accent)',
   },
   actionGroup: {

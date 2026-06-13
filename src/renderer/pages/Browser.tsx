@@ -1605,7 +1605,7 @@ export const Browser: React.FC = () => {
             <div style={styles.panelList}>
               {groupedHistory.map(group => (
                 <div key={group.label}>
-                  <div style={{ padding: '8px 12px 4px', fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>
+                  <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>
                     {group.label}
                   </div>
                   {group.entries.map(h => (
@@ -1856,7 +1856,7 @@ export const Browser: React.FC = () => {
 
             {/* TrackBlock Stats */}
             <div style={{ marginTop: 12, padding: '12px 0 4px', borderTop: '1px solid var(--color-border-subtle)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div className="dex-label-caps" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
@@ -1977,7 +1977,7 @@ export const Browser: React.FC = () => {
                     <input name="expiry" required placeholder="MM/YY" autoComplete="off" maxLength={5}
                       style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+                      <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                       <button type="button" aria-label="Cancel adding card" onClick={() => setShowAddCard(false)} style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
                     </div>
                   </form>
@@ -2017,7 +2017,7 @@ export const Browser: React.FC = () => {
           <div style={{ color: 'var(--color-text-muted)', marginBottom: '10px' }}>Username: {savePrompt.username}</div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => { savePassword(savePrompt.domain, savePrompt.username, savePrompt.password); setSavePrompt(null); }}
-              style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Save</button>
+              style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
             <button onClick={() => setSavePrompt(null)}
               style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Never</button>
           </div>
@@ -2070,7 +2070,7 @@ export const Browser: React.FC = () => {
               inset: 0,
               zIndex: 'var(--z-modal)',
               display: 'flex',
-              background: 'rgba(8,8,10,0.9)',
+              background: 'var(--color-bg-overlay, rgba(8,8,10,0.9))',
             } : {
               position: 'absolute',
               inset: 0,
@@ -2127,7 +2127,7 @@ export const Browser: React.FC = () => {
         {readingMode && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 100,
-            background: 'rgba(12,12,16,0.96)', overflowY: 'auto',
+            background: 'var(--color-bg-overlay, rgba(12,12,16,0.96))', overflowY: 'auto',
             display: 'flex', justifyContent: 'center', padding: '40px 20px',
           }}>
             <div style={{ maxWidth: 680, width: '100%' }}>
@@ -2656,7 +2656,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     padding: '40px',
     zIndex: 1,
-    background: 'radial-gradient(ellipse at 50% 40%, rgba(74,158,255,0.04) 0%, transparent 70%)',
+    background: 'radial-gradient(ellipse at 50% 40%, var(--color-accent-soft, rgba(74,158,255,0.08)) 0%, transparent 70%)',
   },
   brand: {
     fontSize: '38px',
@@ -2730,7 +2730,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     top: '4px',
     right: '4px',
-    background: 'rgba(0,0,0,0.3)',
+    background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
     border: 'none',
     color: 'var(--color-text-primary)',
     cursor: 'pointer',

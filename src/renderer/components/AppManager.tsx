@@ -2572,7 +2572,7 @@ export const AppManager: React.FC = () => {
               style={{
                 height: 38, display: 'flex', alignItems: 'center', gap: 8,
                 padding: '0 14px', cursor: 'grab', userSelect: 'none',
-                background: useGlass ? 'rgba(28,28,32,0.55)' : '#1C1C20',
+                background: useGlass ? 'rgba(28,28,32,0.55)' : 'var(--color-bg-elevated, #1C1C20)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
                 justifyContent: 'center',
                 touchAction: 'none',
@@ -2776,7 +2776,7 @@ export const AppManager: React.FC = () => {
                         border: '1px solid var(--color-border)', borderRadius: 10,
                         padding: '10px 10px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5,
                         boxShadow: 'var(--pg-shadow-context), inset 0 0.5px 0 var(--color-border-subtle)',
-                        width: 240,
+                        width: 'min(240px, calc(100vw - 48px))',
                         animation: 'fadeIn 0.18s ease',
                       } as React.CSSProperties}>
                         <div style={{ gridColumn: '1 / -1', fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2, paddingLeft: 2 }}>Snap Layout</div>
@@ -3591,16 +3591,20 @@ export const AppManager: React.FC = () => {
             style={{
               width: size, height: size,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent',
-              border: 'none', borderRadius: 9999, cursor: 'pointer',
+              // Focused app reads as a clear accent-tinted square -- the one,
+              // unambiguous "this app is in front" affordance. Background apps
+              // are transparent (their running state is the dot below). A
+              // rounded square (not a full circle) is the bespoke DEX shape.
+              background: isActive ? 'var(--color-accent-soft)' : 'transparent',
+              border: 'none', borderRadius: 12, cursor: 'pointer',
               position: 'relative', padding: 0,
               touchAction: 'manipulation',
               color: item.color,
               opacity: isMinimized ? 0.5 : 1,
               transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), background 0.15s ease, opacity 0.25s ease',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isActive ? 'var(--color-accent-soft)' : 'transparent'; }}
           >
             {AppIconPngs[item.id] ? (
               <AppIconImg appId={item.id} size={size - 8} />
@@ -3616,10 +3620,14 @@ export const AppManager: React.FC = () => {
               data-dock-running-dot
               style={{
                 position: 'absolute', bottom: -3, left: '50%',
-                width: isActive ? 5 : 4, height: isActive ? 5 : 4,
-                borderRadius: '50%', transform: 'translateX(-50%)',
-                background: isActive ? item.color : 'var(--color-text-tertiary)',
-                boxShadow: isActive ? `0 0 5px ${item.color}80` : 'none',
+                transform: 'translateX(-50%)',
+                // Active: a crisp accent underline bar (paired with the icon's
+                // accent-tint background = one unmistakable focused state).
+                // Background-running: a small neutral dot. No glow -- the
+                // indicator is exact, never a decorative wash.
+                width: isActive ? 14 : 4, height: isActive ? 2.5 : 4,
+                borderRadius: 9999,
+                background: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                 opacity: isMinimized ? 0.5 : 1,
                 transition: 'width var(--motion-dock-hover), height var(--motion-dock-hover), background var(--motion-dock-hover), opacity var(--motion-dock-hover)',
                 pointerEvents: 'none',
@@ -4503,9 +4511,8 @@ export const AppManager: React.FC = () => {
               borderRadius: 10,
               pointerEvents: 'none',
               zIndex: 4000,
-              transition: 'all 0.2s cubic-bezier(0.2,0.9,0.3,1)',
+              transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
               boxShadow: '0 0 20px rgba(59,130,246,0.1)',
-              animation: 'dex-snap-zone-pulse 1.5s ease-in-out infinite',
             }}
           />
         );
@@ -4671,7 +4678,9 @@ export const AppManager: React.FC = () => {
               flexDirection: geom.flexDirection,
               alignItems: 'center', gap: 8,
               padding: `${geom.paddingY + 4}px ${geom.paddingX + 8}px`,
-              borderRadius: 9999,
+              // Deliberate rounded-rect, not a full pill -- reads as bespoke
+              // DEX chrome rather than a generic OS dock.
+              borderRadius: 20,
               overflow: 'visible',
               maxWidth: geom.flexDirection === 'row' ? '96vw' : undefined,
               maxHeight: geom.flexDirection === 'column' ? '96vh' : undefined,
@@ -4696,9 +4705,9 @@ export const AppManager: React.FC = () => {
               style={{
                 width: 40, height: 40,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: showAppMenu ? 'var(--color-border-subtle)' : 'transparent',
-                border: 'none', borderRadius: 8, cursor: 'pointer',
-                transition: 'background 0.25s ease',
+                background: showAppMenu ? 'var(--color-accent-soft)' : 'transparent',
+                border: 'none', borderRadius: 12, cursor: 'pointer',
+                transition: 'background 0.2s cubic-bezier(0.4,0,0.2,1)',
                 padding: 0, touchAction: 'manipulation',
                 outline: 'none',
                 WebkitAppRegion: 'no-drag',
@@ -4730,16 +4739,15 @@ export const AppManager: React.FC = () => {
                   style={{
                     width: 36, height: 36,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: isUkiActive ? 'rgba(10,132,255,0.20)' : 'transparent',
-                    border: 'none', borderRadius: 8, cursor: 'pointer',
-                    transition: 'all 0.25s ease',
+                    background: isUkiActive ? 'var(--color-accent-soft)' : 'transparent',
+                    border: 'none', borderRadius: 12, cursor: 'pointer',
+                    transition: 'background 0.2s cubic-bezier(0.4,0,0.2,1)',
                     padding: 0, touchAction: 'manipulation',
                     outline: 'none',
                     WebkitAppRegion: 'no-drag',
-                    animation: isUkiActive ? 'ukiPulse 1.5s ease-in-out infinite' : 'none',
                   } as React.CSSProperties}
-                  onMouseEnter={e => { if (!isUkiActive) (e.currentTarget as HTMLElement).style.background = 'var(--color-border-subtle)'; }}
-                  onMouseLeave={e => { if (!isUkiActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  onMouseEnter={e => { if (!isUkiActive) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isUkiActive ? 'var(--color-accent-soft)' : 'transparent'; }}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isUkiActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -4749,7 +4757,7 @@ export const AppManager: React.FC = () => {
                   </svg>
                 </button>
                 {isUkiActive && (
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-accent)', boxShadow: '0 0 6px #0A84FF' }} />
+                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-accent)' }} />
                 )}
           </div>
           {dockSeparator('sep-uki')}
@@ -4998,7 +5006,7 @@ export const AppManager: React.FC = () => {
                       padding: '7px 4px', borderRadius: 10, width: '100%',
                       background: 'transparent',
                       border: 'none', cursor: 'pointer',
-                      transition: 'transform 0.3s cubic-bezier(0.23,1,0.32,1)',
+                      transition: 'transform 0.18s cubic-bezier(0.23,1,0.32,1)',
                     }}
                   >
                     <div style={{
@@ -5117,7 +5125,7 @@ export const AppManager: React.FC = () => {
             border: '1px solid var(--color-border)',
             borderRadius: 10, padding: 4,
             boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
-            animation: 'ctxMenuIn 0.3s cubic-bezier(0.23,1,0.32,1)',
+            animation: 'ctxMenuIn 0.18s cubic-bezier(0.23,1,0.32,1)',
             transformOrigin: 'bottom left',
           }}>
             {(() => {

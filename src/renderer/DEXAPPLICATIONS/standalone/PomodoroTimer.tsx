@@ -122,7 +122,7 @@ const PomodoroTimer: React.FC = () => {
               strokeDasharray={`${strokeDash} ${circleC}`}
               strokeLinecap="round"
               transform="rotate(-90 120 120)"
-              style={{ transition: 'stroke-dasharray 0.3s ease' }} />
+              style={{ transition: 'stroke-dasharray 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
           </svg>
           <div style={s.timerText}>
             <div style={{ fontSize: 48, fontWeight: 200, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
@@ -162,7 +162,7 @@ const PomodoroTimer: React.FC = () => {
             <div key={i} style={{
               width: 10, height: 10, borderRadius: '50%',
               background: i < (completedSessions % 4) ? accentColor : 'var(--color-border)',
-              transition: 'background 0.3s ease',
+              transition: 'background 0.18s cubic-bezier(0.4,0,0.2,1)',
             }} />
           ))}
         </div>
@@ -204,7 +204,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   primaryBtn: {
     width: 120, height: 48, borderRadius: 24, border: 'none',
-    color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer',
+    color: 'var(--color-text-inverse, #fff)', fontSize: 16, fontWeight: 600, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   secondaryBtn: {

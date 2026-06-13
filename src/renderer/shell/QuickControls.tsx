@@ -131,7 +131,7 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
           position: 'absolute', top: 2, right: 2,
           width: 5, height: 5, borderRadius: '50%',
           background: 'var(--color-warning, #ffb020)',
-          boxShadow: '0 0 4px rgba(255, 176, 32, 0.6)',
+          boxShadow: '0 0 4px color-mix(in srgb, var(--color-warning, #ffb020) 60%, transparent)',
         }} />
       )}
     </button>
@@ -224,13 +224,13 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
               onClick={() => setMode(m)}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 8,
-                background: selected ? 'rgba(74,158,255,0.10)' : 'transparent',
-                border: `1px solid ${selected ? 'rgba(74,158,255,0.30)' : 'transparent'}`,
+                background: selected ? 'var(--color-accent-muted, rgba(74,158,255,0.10))' : 'transparent',
+                border: `1px solid ${selected ? 'color-mix(in srgb, var(--color-accent, #4A9EFF) 30%, transparent)' : 'transparent'}`,
                 borderRadius: 4, padding: '6px 8px', cursor: 'pointer', textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.12s, border-color 0.12s',
               }}
-              onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+              onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover, rgba(255,255,255,0.04))'; }}
               onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <span style={{
@@ -328,8 +328,8 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', padding: '8px 10px',
-          background: enabled ? 'rgba(61,166,106,0.10)' : 'rgba(255,255,255,0.03)',
-          border: `1px solid ${enabled ? 'rgba(61,166,106,0.30)' : 'var(--color-border)'}`,
+          background: enabled ? 'var(--color-success-muted, rgba(61,166,106,0.10))' : 'var(--color-bg-hover, rgba(255,255,255,0.03))',
+          border: `1px solid ${enabled ? 'color-mix(in srgb, var(--color-success, #3DA66A) 30%, transparent)' : 'var(--color-border)'}`,
           borderRadius: 4, cursor: busy ? 'wait' : 'pointer',
           color: 'var(--color-text-primary)',
           marginBottom: 8,

@@ -11,6 +11,23 @@
 > stability, discoverability, maintainability. The full program and its live
 > status are in [REFINEMENT.md](REFINEMENT.md); the Tauri migration below is
 > its Priority 1 engine.
+>
+> **v5.5 "DEX Sharp" UI program (started 2026-06-12).** Owner direction: a
+> unique, mature, precise external identity — not a macOS/Windows clone. Sharp
+> type (tight heading tracking, spaced uppercase micro-labels), discrete radii,
+> ONE 28/32/40 control rhythm, hairline borders that stay one device pixel at
+> high DPI, functional motion only (150-220ms standard curve, no bounce, no
+> decorative effects), responsive-by-construction overlays, light-mode parity.
+> Batch 1 (foundation + shell + entry surfaces) and Batch 2 (platform-wide
+> app/page sweep, ~35 files incl. all standalone + creative apps + Settings/
+> Browser/Audio/Files/Gallery) are both done and verified — details in
+> [TAURI-MIGRATION.md](TAURI-MIGRATION.md) "Renderer slice 2026-06-12".
+> Remaining (Batch 3, foundation): `--color-accent-dark` token, translucent
+> neutral/scrim tokens (unblocks ~45+ subtle-surface sites that can't map to
+> opaque bg tokens), structural flex-centering of the ~37 wrapper-less creative
+> modals (currently width-guarded), Axl accent migration off macOS system-blue,
+> and AppManager inline-SVG -> DexIcon consolidation. All are tracked, none
+> block shipping; the platform is consistent and operational as-is.
 
 ## Next major phase: uki AI + intelligence everywhere (owner brief, 2026-06-09)
 

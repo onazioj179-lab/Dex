@@ -979,7 +979,7 @@ export const Gallery: React.FC = () => {
         </div>
         {!sidebarCollapsed && (
         <div style={styles.albumList}>
-          <div style={styles.sectionLabel}>Library</div>
+          <div className="dex-label-caps" style={styles.sectionLabel}>Library</div>
           {ALBUMS.slice(0, 4).map(album => (
             <button
               key={album.id}
@@ -997,7 +997,7 @@ export const Gallery: React.FC = () => {
               <span style={styles.albumCount}>{albumCounts[album.id as keyof typeof albumCounts] ?? 0}</span>
             </button>
           ))}
-          <div style={styles.sectionLabel}>Albums</div>
+          <div className="dex-label-caps" style={styles.sectionLabel}>Albums</div>
           {ALBUMS.slice(4).map(album => (
             <button
               key={album.id}
@@ -1271,7 +1271,8 @@ export const Gallery: React.FC = () => {
 
       {/* Smart Albums */}
       {showSmartAlbums && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 380, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+        <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(380px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Smart Albums</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSmartAlbums(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1290,11 +1291,12 @@ export const Gallery: React.FC = () => {
             <button aria-label="Add new smart album" onClick={() => setSmartAlbumRules(r => [...r, { name: 'New Smart Album', rule: '', count: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border-subtle)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginTop: 6 }}>+ New Smart Album</button>
           </div>
         </div>
+        </div>
       )}
 
       {/* EXIF Panel */}
       {showExifPanel && selectedMedia && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 300, top: 80, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", right: 300, top: 80, width: 'min(260px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>EXIF / Metadata</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowExifPanel(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1322,7 +1324,7 @@ export const Gallery: React.FC = () => {
 
       {/* Face Detection */}
       {showFaceDetection && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 80, top: 80, width: 240, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", left: 80, top: 80, width: 'min(240px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Face Groups</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowFaceDetection(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1354,7 +1356,7 @@ export const Gallery: React.FC = () => {
 
       {/* Tag System */}
       {showTagSystem && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 120, width: 240, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", right: 20, top: 120, width: 'min(240px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Tags</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTagSystem(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1380,7 +1382,7 @@ export const Gallery: React.FC = () => {
 
       {/* Quick Adjustments */}
       {showQuickAdjust && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, top: 80, width: 250, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", right: 20, top: 80, width: 'min(250px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Quick Adjust</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowQuickAdjust(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1424,7 +1426,8 @@ export const Gallery: React.FC = () => {
 
       {/* Crop & Rotate */}
       {showCropRotate && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 300, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+        <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crop & Rotate</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropRotate(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1475,11 +1478,13 @@ export const Gallery: React.FC = () => {
             }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Save Edited Copy</button>
           </div>
         </div>
+        </div>
       )}
 
       {/* One-Click Presets */}
       {showPresets && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+        <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>One-Click Presets</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowPresets(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1495,11 +1500,13 @@ export const Gallery: React.FC = () => {
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {/* Compare Mode */}
       {showCompareMode && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 500, height: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+        <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(500px, calc(100vw - 48px))', height: 340, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', display: 'flex', flexDirection: 'column', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Compare Mode</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCompareMode(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1515,11 +1522,13 @@ export const Gallery: React.FC = () => {
             </div>
           </div>
         </div>
+        </div>
       )}
 
       {/* Slideshow Mode */}
       {showSlideshow && (
-        <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 320, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)' }}>
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+        <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(320px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Slideshow</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSlideshow(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1539,6 +1548,7 @@ export const Gallery: React.FC = () => {
             </div>
             <button onClick={startSlideshow} aria-label="Start slideshow" style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><DexIcon name="play" size={12} /> Start Slideshow</button>
           </div>
+        </div>
         </div>
       )}
 
@@ -1872,7 +1882,7 @@ export const Gallery: React.FC = () => {
                     { color: 'var(--color-warning)', name: 'Yellow' },
                     { color: 'var(--color-success)', name: 'Green' },
                     { color: 'var(--color-accent)', name: 'Blue' },
-                    { color: '#BF5AF2', name: 'Purple' },
+                    { color: 'var(--color-tag-purple, #BF5AF2)', name: 'Purple' },
                     { color: 'var(--color-text-tertiary)', name: 'Grey' },
                   ].map(({ color, name }) => (
                     <button

@@ -119,7 +119,7 @@ function CurvesEditor({ onChange }: { onChange: (patch: Partial<AdjustmentParams
         ref={svgRef}
         width="100%"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        style={{ display: 'block', background: 'rgba(0,0,0,0.35)', border: '1px solid var(--color-border)', borderRadius: 6, touchAction: 'none', cursor: dragIdx !== null ? 'grabbing' : 'crosshair' }}
+        style={{ display: 'block', background: 'var(--color-bg-inset, rgba(0,0,0,0.35))', border: '1px solid var(--color-border)', borderRadius: 6, touchAction: 'none', cursor: dragIdx !== null ? 'grabbing' : 'crosshair' }}
         onClick={addPoint}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

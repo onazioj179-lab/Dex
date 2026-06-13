@@ -178,16 +178,16 @@ export const ScrollContainer: React.FC<ScrollContainerProps> = ({
           background: transparent;
         }
         .dex-scroll-container > div::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.08);
+          background: var(--color-border-subtle, rgba(255, 255, 255, 0.08));
           border-radius: 2px;
           transition: background 0.15s ease;
         }
         .dex-scroll-container > div:hover::-webkit-scrollbar-thumb,
         .dex-scroll-container > div.scrolling::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.18);
+          background: var(--color-border, rgba(255, 255, 255, 0.18));
         }
         .dex-scroll-container > div::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.25);
+          background: var(--color-border-strong, rgba(255, 255, 255, 0.25));
         }
       `}</style>
     </div>

@@ -4373,15 +4373,12 @@ textarea {
   to   { opacity: 1; }
 }
 
-/* Modal content scale-in */
-[style*="position: fixed"] > [style*="border-radius"] {
-  animation: modalContentIn 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-@keyframes modalContentIn {
-  from { opacity: 0; transform: scale(0.97) translateY(6px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
+/* Modal content scale-in: REMOVED. The old heuristic
+   `[style*="position: fixed"] > [style*="border-radius"]` animated `transform`
+   on arbitrary inline-styled elements, which OVERRODE any element's own
+   transform (e.g. translate(-50%,-50%) centering) for the animation's
+   duration -- content visibly jumped, then snapped into place. Modal entrance
+   animation now lives on .dex-modal-panel (design-tokens.css). */
 
 /* Smooth list item hover/focus */
 .dex-app-container [role="listitem"],
@@ -4396,72 +4393,61 @@ textarea {
 }
 
 /* ================================================================
-   ENHANCED INTERACTIVE STATES - Depth & Feel
+   INTERACTIVE STATES - token-driven, opt-in, zero-specificity
+   ----------------------------------------------------------------
+   Rewritten from the old "enhanced" layer, which caused systemic
+   glitches:
+   - universal `filter: brightness()` hover/active created stacking
+     contexts, shifted icon colors and blurred text during repaints;
+   - a second press transform fought the canonical one in
+     design-tokens.css, so press feedback was inconsistent;
+   - `button[aria-label]:hover` washed translucent white over EVERY
+     labeled button, destroying variant colors;
+   - `[aria-label*="close"]` heuristics turned any button whose label
+     merely mentioned "close" red on hover;
+   - hardcoded rgba() whites/blues broke light mode;
+   - `!important` on menuitem/selected blocked component theming.
+   All states below use theme tokens and :where() (specificity 0) so
+   any component's own styling always wins. Opt-in classes keep their
+   normal specificity but pull from tokens.
    ================================================================ */
 
-/* Universal button highlight on hover - adds depth */
-button:not(:disabled):hover,
-[role="button"]:not([aria-disabled="true"]):hover {
-  filter: brightness(1.08);
+/* Hover feedback for otherwise-unstyled controls. Specificity 0: any
+   component hover rule or inline background wins. No filters ever. */
+:where(.dex-clickable, [data-clickable]):hover {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
 }
 
-/* Pressed state depth */
-button:not(:disabled):active,
-[role="button"]:not([aria-disabled="true"]):active {
-  filter: brightness(0.95);
-  transform: scale(0.98);
-}
-
-/* Enhanced hover glow for primary actions */
-.dex-btn-primary:hover,
-button[data-variant="primary"]:hover {
-  box-shadow: 0 2px 12px rgba(10, 132, 255, 0.25), 0 0 0 1px rgba(10, 132, 255, 0.2);
-}
-
-/* Smooth hover background for clickable items */
-.dex-clickable:hover,
-[data-clickable]:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* Enhanced list item hover with left accent */
-.dex-list-item:hover,
-[data-list-item]:hover {
-  background: rgba(255, 255, 255, 0.05);
+/* List item hover with left accent (opt-in) */
+:where(.dex-list-item, [data-list-item]):hover {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.05));
   box-shadow: inset 3px 0 0 var(--color-accent, #0A84FF);
-}
-
-/* Icon button hover glow */
-.dex-icon-btn:hover,
-button[aria-label]:not([aria-label=""]):hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
 }
 
 /* Toolbar button active indicator */
 .dex-toolbar-btn.active,
 .dex-toolbar-btn[aria-pressed="true"] {
-  background: rgba(10, 132, 255, 0.15);
+  background: var(--color-accent-muted, rgba(10, 132, 255, 0.15));
   color: var(--color-accent, #0A84FF);
 }
 
-/* Card hover lift effect */
+/* Card hover lift (opt-in via .dex-card, integer translate = no blur) */
 .dex-card:hover,
 [data-card]:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.3));
 }
 
-/* Sidebar item hover */
+/* Sidebar item hover -- background only; the old padding shift caused
+   layout jitter on every hover. */
 .dex-sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  padding-left: calc(var(--sidebar-padding, 12px) + 2px);
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
 }
 
 /* Tab hover underline preview */
 .dex-tab:hover:not(.active) {
   color: var(--color-text-primary);
-  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 -2px 0 var(--color-border, rgba(255, 255, 255, 0.15));
 }
 
 /* Active tab accent */
@@ -4470,19 +4456,19 @@ button[aria-label]:not([aria-label=""]):hover {
   box-shadow: inset 0 -2px 0 var(--color-accent, #0A84FF);
 }
 
-/* Input field focus glow */
-input:focus,
-textarea:focus,
-select:focus {
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2), inset 0 0 0 1px rgba(10, 132, 255, 0.4);
+/* Input focus: keyboard-driven only (:focus-visible), token colors.
+   The old `input:focus` glow double-ringed every mouse click and
+   overrode component focus designs. */
+:where(input, textarea, select):focus-visible {
+  box-shadow: 0 0 0 3px var(--color-accent-light, rgba(10, 132, 255, 0.2));
   border-color: var(--color-accent, #0A84FF);
 }
 
 /* Dropdown/select hover */
-select:hover:not(:disabled),
+:where(select):hover:not(:disabled),
 .dex-select:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.2));
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
 }
 
 /* Slider/range hover */
@@ -4491,32 +4477,23 @@ input[type="range"]:hover::-webkit-slider-thumb {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Toggle switch hover glow */
-.dex-toggle:hover,
-[role="switch"]:hover {
-  box-shadow: 0 0 8px rgba(10, 132, 255, 0.2);
-}
-
-/* Context menu item hover */
-[role="menuitem"]:hover {
-  background: rgba(10, 132, 255, 0.15) !important;
-  color: var(--color-text-primary) !important;
+/* Context menu item hover -- no !important; menus may theme themselves */
+:where([role="menuitem"]):hover {
+  background: var(--color-accent-muted, rgba(10, 132, 255, 0.15));
+  color: var(--color-text-primary);
 }
 
 /* File/folder item hover */
-.file-item:hover,
-.folder-item:hover,
-[data-file-item]:hover {
-  background: rgba(255, 255, 255, 0.06);
+:where(.file-item, .folder-item, [data-file-item]):hover {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
   border-radius: var(--radius-md);
 }
 
-/* Selected state highlight */
-[aria-selected="true"],
-.selected,
-[data-selected="true"] {
-  background: rgba(10, 132, 255, 0.12) !important;
-  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.25);
+/* Selected state highlight -- zero specificity, no !important, so
+   tabs/lists with their own selection styling keep it. */
+:where([aria-selected="true"], [data-selected="true"]) {
+  background: var(--color-accent-muted, rgba(10, 132, 255, 0.12));
+  box-shadow: inset 0 0 0 1px var(--color-accent-light, rgba(10, 132, 255, 0.25));
 }
 
 /* Focused within containers */
@@ -4525,53 +4502,47 @@ input[type="range"]:hover::-webkit-slider-thumb {
   color: var(--color-accent, #0A84FF);
 }
 
-/* Navigation arrows hover */
+/* Navigation arrows hover (opt-in classes only) */
 .nav-arrow:hover,
 [data-nav-arrow]:hover {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(1.1);
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.12));
 }
 
-/* Close/action button hover states */
-.close-btn:hover,
-[aria-label*="close" i]:hover,
-[aria-label*="Close" i]:hover {
-  background: rgba(255, 69, 58, 0.15);
-  color: #FF453A;
+/* Window-control hovers: explicit opt-in classes only. The old
+   [aria-label*="close"] heuristics hit unrelated buttons. */
+.dex-window-close:hover {
+  background: var(--color-error-muted, rgba(255, 69, 58, 0.15));
+  color: var(--color-error, #FF453A);
 }
-
-/* Minimize button hover */
-[aria-label*="minimize" i]:hover,
-[aria-label*="Minimize" i]:hover {
+.dex-window-minimize:hover {
   background: rgba(255, 214, 10, 0.15);
   color: #FFD60A;
 }
-
-/* Maximize button hover */
-[aria-label*="maximize" i]:hover,
-[aria-label*="Maximize" i]:hover {
-  background: rgba(48, 209, 88, 0.15);
-  color: #30D158;
+.dex-window-maximize:hover {
+  background: var(--color-success-muted, rgba(48, 209, 88, 0.15));
+  color: var(--color-success, #30D158);
 }
 
-/* Smooth transitions for all interactive elements */
-button, [role="button"], a, input, select, textarea,
-[tabindex]:not([tabindex="-1"]) {
-  transition: 
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.1s ease,
-    filter 0.1s ease,
-    opacity 0.15s ease;
+/* Smooth transitions: design-tokens.css already applies the canonical
+   token transition to button/a/input/select at specificity 0. Extend the
+   same timing to the remaining interactive roles only (no `filter`,
+   which forced compositing everywhere). */
+:where(textarea, [role="button"], [tabindex]:not([tabindex="-1"])) {
+  transition:
+    background-color var(--dex-transition, 180ms ease),
+    color var(--dex-transition, 180ms ease),
+    border-color var(--dex-transition, 180ms ease),
+    box-shadow var(--dex-transition, 180ms ease),
+    transform var(--dex-transition, 180ms ease),
+    opacity var(--dex-transition, 180ms ease);
 }
 
-/* Ensure buttons are always clickable (override any accidental blocking) */
-button:not(:disabled),
-[role="button"]:not([aria-disabled="true"]) {
+/* Buttons read as clickable. (No `pointer-events: auto !important` --
+   it broke components that legitimately disable pointer events, e.g.
+   during drags or beneath scrims.) */
+:where(button):not(:disabled),
+:where([role="button"]):not([aria-disabled="true"]) {
   cursor: pointer;
-  pointer-events: auto !important;
 }
 
 /* ================================================================
@@ -4606,16 +4577,6 @@ button:not(:disabled),
   animation: appWindowEnter 0.2s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
-/* Subtle pulsing glow for active elements */
-@keyframes subtleGlow {
-  0%, 100% { box-shadow: 0 0 0 rgba(10, 132, 255, 0); }
-  50% { box-shadow: 0 0 12px rgba(10, 132, 255, 0.2); }
-}
-
-.active-glow {
-  animation: subtleGlow 2s ease-in-out infinite;
-}
-
 /* Smooth slide-in for panels */
 @keyframes slideInLeft {
   from { transform: translateX(-20px); opacity: 0; }
@@ -4642,66 +4603,16 @@ button:not(:disabled),
 .slide-in-up { animation: slideInUp 0.2s ease-out forwards; }
 .slide-in-down { animation: slideInDown 0.2s ease-out forwards; }
 
-/* Ripple effect for buttons */
-@keyframes ripple {
-  from {
-    transform: scale(0);
-    opacity: 0.4;
-  }
-  to {
-    transform: scale(2.5);
-    opacity: 0;
-  }
-}
+/* Ripple / shine / glow / pulse effects: removed. Decorative motion that
+   nothing in the product used; DEX motion is functional only (state changes,
+   entrances), 150-220ms on the standard curve. */
 
-.ripple-effect::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%);
-  border-radius: inherit;
-  pointer-events: none;
-  transform: scale(0);
-  opacity: 0;
-}
-
-.ripple-effect:active::after {
-  animation: ripple 0.4s ease-out;
-}
-
-/* Hover shine effect for cards */
-.hover-shine {
-  position: relative;
-  overflow: hidden;
-}
-
-.hover-shine::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255,255,255,0.08),
-    transparent
-  );
-  transition: left 0.5s ease;
-  pointer-events: none;
-}
-
-.hover-shine:hover::before {
-  left: 100%;
-}
-
-/* Enhanced focus ring */
+/* Keyboard focus ring -- single canonical ring from the token layer
+   (theme-aware; --dex-focus-ring flips with light mode). !important is
+   intentional: it must beat inline `outline: none` for accessibility. */
 :focus-visible {
   outline: none;
-  box-shadow: 
-    0 0 0 2px var(--color-bg-primary, #1E1E1E),
-    0 0 0 4px var(--color-accent, #0A84FF) !important;
+  box-shadow: var(--dex-focus-ring, 0 0 0 2px #0c0c0e, 0 0 0 4px #4a9eff) !important;
 }
 
 /* Smooth tooltip animations */
@@ -4712,16 +4623,6 @@ button:not(:disabled),
 
 [data-tooltip]::after {
   animation: tooltipFadeIn 0.15s ease-out;
-}
-
-/* Badge pulse animation */
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-}
-
-.badge-pulse {
-  animation: badgePulse 1.5s ease-in-out infinite;
 }
 
 /* Notification slide */

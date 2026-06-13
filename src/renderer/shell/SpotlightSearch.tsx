@@ -121,7 +121,7 @@ const ResultItem: React.FC<{
       style={{
         display: 'flex', alignItems: 'center',
         width: '100%', height: 40, padding: '0 10px',
-        background: isSelected ? 'rgba(59,130,246,0.35)' : 'transparent',
+        background: isSelected ? 'color-mix(in srgb, var(--color-accent, #3b82f6) 35%, transparent)' : 'transparent',
         border: 'none', borderRadius: 8, cursor: 'pointer',
         transition: isReduceMotion() ? 'none' : 'background 0.15s ease, transform 0.12s ease',
         position: 'relative', gap: 10,
@@ -135,7 +135,7 @@ const ResultItem: React.FC<{
         background: isSelected ? 'var(--color-border)' : (result.color ? `${result.color}18` : 'var(--color-bg-hover)'),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
-        color: isSelected ? '#fff' : 'var(--color-text-secondary)',
+        color: isSelected ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
         transition: 'background 0.1s ease, color 0.1s ease',
       }}>
         <CategoryIcon category={result.category} />
@@ -145,7 +145,7 @@ const ResultItem: React.FC<{
       <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <div style={{
           fontSize: 13, fontWeight: isSelected ? 500 : 400,
-          color: isSelected ? '#fff' : 'var(--color-text-secondary)',
+          color: isSelected ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           transition: 'color 0.1s ease',
         }}>
@@ -288,13 +288,13 @@ const VoiceMicButton: React.FC<VoiceMicButtonProps> = memo(({ onTranscript }) =>
       title={listening ? 'Listening… click to stop' : 'Voice search'}
       style={{
         width: 28, height: 28, borderRadius: 14,
-        background: listening ? 'rgba(255,69,58,0.95)' : 'rgba(120,120,128,0.24)',
+        background: listening ? 'var(--color-error, rgba(255,69,58,0.95))' : 'rgba(120,120,128,0.24)',
         border: 'none', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: listening ? '#fff' : 'rgba(235,235,245,0.85)',
         transition: 'background 0.15s ease, transform 0.15s ease',
         flexShrink: 0,
-        boxShadow: listening ? '0 0 0 4px rgba(255,69,58,0.18)' : 'none',
+        boxShadow: listening ? '0 0 0 4px color-mix(in srgb, var(--color-error, #FF453A) 18%, transparent)' : 'none',
       }}
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -365,11 +365,11 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           0.94
         );
         spring.onUpdate((v) => {
-          el.style.transform = `translateX(-50%) scale(${v})`;
+          el.style.transform = `scale(${v})`;
           el.style.opacity = String(Math.min(1, (v - 0.94) / 0.06));
         });
         spring.onComplete(() => {
-          el.style.transform = 'translateX(-50%) scale(1)';
+          el.style.transform = 'scale(1)';
           el.style.opacity = '1';
         });
         scaleSpring.current = spring;
@@ -639,13 +639,10 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           >
             {groupedResults.map(group => (
               <div key={group.category}>
-                <div style={{
+                <div className="dex-label-caps" style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '6px 12px 3px',
-                  fontSize: 10, fontWeight: 600,
-                  color: 'var(--color-text-tertiary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  fontSize: 10,
                 }}>
                   <CategoryIcon category={group.category} />
                   {CATEGORY_LABELS[group.category]}
@@ -688,15 +685,17 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         }}
       />
 
-      {/* Search container */}
+      {/* Search container — centered by a full-size flex wrapper (no translateX) */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 'var(--z-spotlight)',
+        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+        paddingTop: '16vh', pointerEvents: 'none',
+      }}>
       <div
         ref={containerRef}
         style={{
-          position: 'fixed',
-          top: '16vh',
-          left: '50%',
-          transform: 'translateX(-50%) scale(1)',
-          zIndex: 'var(--z-spotlight)',
+          transform: 'scale(1)',
+          pointerEvents: 'auto',
           width: 'min(640px, 90vw)',
           maxHeight: 520,
           display: 'flex', flexDirection: 'column',
@@ -784,13 +783,10 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           >
             {groupedResults.map(group => (
               <div key={group.category}>
-                <div style={{
+                <div className="dex-label-caps" style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '6px 12px 3px',
-                  fontSize: 10, fontWeight: 600,
-                  color: 'var(--color-text-tertiary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  fontSize: 10,
                 }}>
                   <CategoryIcon category={group.category} />
                   {CATEGORY_LABELS[group.category]}
@@ -856,6 +852,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           ))}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Keyframe + scrollbar injection */}

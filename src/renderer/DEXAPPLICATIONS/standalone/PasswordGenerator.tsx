@@ -147,12 +147,12 @@ const PasswordGenerator: React.FC = () => {
   return (
     <div style={styles.container} role="region" aria-label="Password Generator">
       <style>{`
-        .pwgen-btn:hover { filter: brightness(1.2); transform: scale(1.02); }
+        .pwgen-btn:hover { filter: brightness(1.2); }
         .pwgen-btn:active { transform: scale(0.98); }
         .pwgen-action:hover { background: var(--color-border-subtle) !important; }
         .pwgen-history-item:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border) !important; }
         .pwgen-toggle:hover { background: var(--color-bg-hover) !important; }
-        .pwgen-clear:hover { background: rgba(255,69,58,0.12) !important; }
+        .pwgen-clear:hover { background: var(--color-error-muted, rgba(255,69,58,0.12)) !important; }
       `}</style>
       {/* Header */}
       <div style={styles.header}>
@@ -208,7 +208,7 @@ const PasswordGenerator: React.FC = () => {
         {/* Length Slider */}
         <div style={styles.section}>
           <div style={styles.sectionHeader}>
-            <span style={styles.sectionTitle}>Length</span>
+            <span className="dex-label-caps" style={styles.sectionTitle}>Length</span>
             <span style={styles.lengthValue}>{length}</span>
           </div>
           <div style={styles.sliderContainer}>
@@ -229,7 +229,7 @@ const PasswordGenerator: React.FC = () => {
 
         {/* Options */}
         <div style={styles.section}>
-          <span style={styles.sectionTitle}>Characters</span>
+          <span className="dex-label-caps" style={styles.sectionTitle}>Characters</span>
           <div style={styles.optionsGrid}>
             <Toggle label="Uppercase A-Z" active={options.uppercase} onToggle={() => setOptions(p => ({ ...p, uppercase: !p.uppercase }))} />
             <Toggle label="Lowercase a-z" active={options.lowercase} onToggle={() => setOptions(p => ({ ...p, lowercase: !p.lowercase }))} />
@@ -242,7 +242,7 @@ const PasswordGenerator: React.FC = () => {
         {showHistory && (
           <div style={styles.historyPanel}>
             <div style={styles.historyHeader}>
-              <span style={styles.sectionTitle}>History</span>
+              <span className="dex-label-caps" style={styles.sectionTitle}>History</span>
               {history.length > 0 && (
                 <button className="pwgen-clear" style={styles.clearBtn} onClick={clearAll} aria-label="Clear all history">Clear All</button>
               )}
@@ -410,13 +410,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     marginBottom: '12px',
   },
-  sectionTitle: {
-    fontSize: '10px',
-    fontWeight: 700,
-    color: 'var(--color-text-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
+  sectionTitle: {},
   lengthValue: {
     fontSize: '24px',
     fontWeight: 700,

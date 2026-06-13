@@ -257,7 +257,7 @@ const NoiseGenerator: React.FC = () => {
           {[0, 15, 30, 60, 90, 120].map(m => (
             <button
               key={m}
-              style={{ ...st.timerBtn, background: timer === m ? 'rgba(10,132,255,0.25)' : 'transparent', color: timer === m ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+              style={{ ...st.timerBtn, background: timer === m ? 'var(--color-accent-light, rgba(10,132,255,0.25))' : 'transparent', color: timer === m ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
               onClick={() => setTimer(m)}
               aria-label={m === 0 ? 'No timer' : `${m} minutes`}
             >
@@ -270,13 +270,13 @@ const NoiseGenerator: React.FC = () => {
       {/* Mix Toggle */}
       <div style={st.mixToggle}>
         <button
-          style={{ ...st.mixBtn, background: !mixMode ? 'rgba(10,132,255,0.2)' : 'transparent', color: !mixMode ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+          style={{ ...st.mixBtn, background: !mixMode ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'transparent', color: !mixMode ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
           onClick={() => { setMixMode(false); if (playing) { stopAll(); } }}
         >
           Single
         </button>
         <button
-          style={{ ...st.mixBtn, background: mixMode ? 'rgba(10,132,255,0.2)' : 'transparent', color: mixMode ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+          style={{ ...st.mixBtn, background: mixMode ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'transparent', color: mixMode ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
           onClick={() => { setMixMode(true); if (playing) { stopAll(); } }}
         >
           Mix
@@ -339,7 +339,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   playBtn: {
     width: 56, height: 56, borderRadius: '50%', border: 'none',
-    color: '#fff', fontSize: 20, cursor: 'pointer',
+    color: 'var(--color-text-inverse, #fff)', fontSize: 20, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
   },

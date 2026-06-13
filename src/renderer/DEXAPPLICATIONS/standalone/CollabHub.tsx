@@ -38,8 +38,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '16px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(255,255,255,0.02)',
+    borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.02))',
   },
   headerLeft: {
     display: 'flex',
@@ -77,10 +77,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 16px',
     fontSize: 13,
     fontWeight: 500,
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.08))',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
     borderRadius: 8,
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -96,7 +96,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 4,
     padding: '12px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.04))',
   },
   tab: {
     padding: '10px 20px',
@@ -105,7 +105,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: 6,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     display: 'flex',
@@ -113,8 +113,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
   },
   tabActive: {
-    background: 'rgba(255,255,255,0.08)',
-    color: '#fff',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.08))',
+    color: 'var(--color-text-primary, #fff)',
   },
   tabBadge: {
     padding: '2px 6px',
@@ -137,8 +137,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   card: {
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'var(--color-bg-elevated, linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%))',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
     borderRadius: 12,
     padding: 20,
     cursor: 'pointer',
@@ -168,7 +168,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: 4,
-    color: '#636366',
+    color: 'var(--color-text-muted, #636366)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     opacity: 0,
@@ -176,12 +176,12 @@ const styles: Record<string, React.CSSProperties> = {
   cardTitle: {
     fontSize: 15,
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     marginBottom: 4,
   },
   cardMeta: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     display: 'flex',
     alignItems: 'center',
     gap: 12,
@@ -206,7 +206,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '2px solid #1a1a1c',
   },
   cardAvatarMore: {
-    background: 'rgba(255,255,255,0.1)',
+    background: 'var(--color-bg-active, rgba(255,255,255,0.1))',
     fontSize: 9,
   },
   cardFooter: {
@@ -214,7 +214,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 12,
-    borderTop: '1px solid rgba(255,255,255,0.06)',
+    borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
   },
   cardAppBadge: {
     padding: '4px 10px',
@@ -234,10 +234,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
     border: 'none',
     borderRadius: 6,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
@@ -262,12 +262,12 @@ const styles: Record<string, React.CSSProperties> = {
   emptyTitle: {
     fontSize: 18,
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     marginBottom: 8,
   },
   emptyDesc: {
     fontSize: 14,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     maxWidth: 320,
     lineHeight: 1.5,
     marginBottom: 24,
@@ -282,8 +282,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 14,
     padding: '14px 16px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
     borderRadius: 10,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -303,12 +303,12 @@ const styles: Record<string, React.CSSProperties> = {
   checkpointName: {
     fontSize: 14,
     fontWeight: 500,
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     marginBottom: 2,
   },
   checkpointMeta: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
   },
   checkpointActions: {
     display: 'flex',
@@ -319,17 +319,17 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 10,
     padding: '10px 16px',
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
     borderRadius: 10,
     marginBottom: 20,
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
   },
   searchInput: {
     flex: 1,
     background: 'transparent',
     border: 'none',
     outline: 'none',
-    color: '#fff',
+    color: 'var(--color-text-primary, #fff)',
     fontSize: 14,
   },
   filterChips: {
@@ -341,17 +341,17 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 14px',
     fontSize: 12,
     fontWeight: 500,
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
+    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',
     borderRadius: 14,
-    color: '#8e8e93',
+    color: 'var(--color-text-tertiary, #8e8e93)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
   filterChipActive: {
-    background: 'rgba(10,132,255,0.15)',
-    borderColor: 'rgba(10,132,255,0.3)',
-    color: '#0a84ff',
+    background: 'var(--color-accent-soft, rgba(10,132,255,0.15))',
+    borderColor: 'var(--color-accent-muted, rgba(10,132,255,0.3))',
+    color: 'var(--color-accent-text, #0a84ff)',
   },
   errorBanner: {
     display: 'flex',
@@ -360,15 +360,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 20px',
     margin: '0 24px 16px',
     background: 'linear-gradient(135deg, rgba(255,69,58,0.15), rgba(255,69,58,0.08))',
-    border: '1px solid rgba(255,69,58,0.3)',
+    border: '1px solid var(--color-error-muted, rgba(255,69,58,0.3))',
     borderRadius: 10,
     fontSize: 13,
-    color: '#ff453a',
+    color: 'var(--color-error, #ff453a)',
   },
   loadingOverlay: {
     position: 'absolute',
     inset: 0,
-    background: 'rgba(0,0,0,0.5)',
+    background: 'var(--color-bg-inset, rgba(0,0,0,0.5))',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -629,8 +629,8 @@ const CollabHub: React.FC = () => {
           <button
             style={styles.actionBtn}
             onClick={() => setShowChat(projectList[0]?.id || null)}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.12))'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.08))'; }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -767,13 +767,13 @@ const CollabHub: React.FC = () => {
                     style={styles.card}
                     onClick={() => handleOpenProject(project)}
                     onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                      e.currentTarget.style.borderColor = 'var(--color-border, rgba(255,255,255,0.15))';
                       e.currentTarget.style.transform = 'translateY(-2px)';
                       const menuBtn = e.currentTarget.querySelector('[data-menu-btn]') as HTMLElement;
                       if (menuBtn) menuBtn.style.opacity = '1';
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                      e.currentTarget.style.borderColor = 'var(--color-border-subtle, rgba(255,255,255,0.08))';
                       e.currentTarget.style.transform = 'translateY(0)';
                       const menuBtn = e.currentTarget.querySelector('[data-menu-btn]') as HTMLElement;
                       if (menuBtn) menuBtn.style.opacity = '0';
@@ -831,8 +831,8 @@ const CollabHub: React.FC = () => {
                           style={styles.cardActionBtn}
                           onClick={e => { e.stopPropagation(); setShowShare(project.id); }}
                           title="Share"
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#fff'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#8e8e93'; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.12))'; e.currentTarget.style.color = 'var(--color-text-primary, #fff)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.06))'; e.currentTarget.style.color = 'var(--color-text-tertiary, #8e8e93)'; }}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -843,8 +843,8 @@ const CollabHub: React.FC = () => {
                           style={styles.cardActionBtn}
                           onClick={e => { e.stopPropagation(); setShowChat(project.id); }}
                           title="Chat"
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#fff'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#8e8e93'; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.12))'; e.currentTarget.style.color = 'var(--color-text-primary, #fff)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.06))'; e.currentTarget.style.color = 'var(--color-text-tertiary, #8e8e93)'; }}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -880,8 +880,8 @@ const CollabHub: React.FC = () => {
                 <div
                   key={cp.id}
                   style={styles.checkpointItem}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(255,255,255,0.08))'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.04))'; }}
                 >
                   <div style={styles.checkpointIcon}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
@@ -899,8 +899,8 @@ const CollabHub: React.FC = () => {
                     <button
                       style={styles.cardActionBtn}
                       title="Restore"
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(48,209,88,0.2)'; e.currentTarget.style.color = '#30d158'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#8e8e93'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-success-muted, rgba(48,209,88,0.2))'; e.currentTarget.style.color = 'var(--color-success, #30d158)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-bg-hover, rgba(255,255,255,0.06))'; e.currentTarget.style.color = 'var(--color-text-tertiary, #8e8e93)'; }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
@@ -937,24 +937,24 @@ const CollabHub: React.FC = () => {
                     alignItems: 'flex-start',
                     gap: 14,
                     padding: '14px 16px',
-                    background: item.actionable 
+                    background: item.actionable
                       ? 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))'
-                      : 'rgba(255,255,255,0.04)',
-                    border: item.actionable 
-                      ? '1px solid rgba(255,159,10,0.2)' 
-                      : '1px solid rgba(255,255,255,0.06)',
+                      : 'var(--color-bg-hover, rgba(255,255,255,0.04))',
+                    border: item.actionable
+                      ? '1px solid var(--color-warning-muted, rgba(255,159,10,0.2))'
+                      : '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
                     borderRadius: 10,
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={e => { 
-                    e.currentTarget.style.background = item.actionable 
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = item.actionable
                       ? 'linear-gradient(135deg, rgba(255,159,10,0.15), rgba(255,159,10,0.08))'
-                      : 'rgba(255,255,255,0.08)'; 
+                      : 'var(--color-bg-active, rgba(255,255,255,0.08))';
                   }}
-                  onMouseLeave={e => { 
-                    e.currentTarget.style.background = item.actionable 
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = item.actionable
                       ? 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))'
-                      : 'rgba(255,255,255,0.04)'; 
+                      : 'var(--color-bg-hover, rgba(255,255,255,0.04))';
                   }}
                 >
                   <div style={{

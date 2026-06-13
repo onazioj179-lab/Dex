@@ -127,23 +127,23 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
         top: adjustedPos.y,
         zIndex: 'var(--z-context-menu)' as any,
         minWidth: 180,
-        maxWidth: 280,
+        maxWidth: 'min(280px, calc(100vw - 16px))',
         maxHeight: 'calc(100vh - 32px)',
         overflowY: 'auto',
         padding: '5px 0',
         borderRadius: 10,
-        background: 'rgba(22,22,26,1)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px rgba(255,255,255,0.06), var(--pg-gloss-top)',
-        animation: 'ctxFadeIn 0.15s cubic-bezier(0.23, 1, 0.32, 1)',
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+        boxShadow: 'var(--pg-shadow-popover), 0 0 0 0.5px var(--color-border-subtle), var(--pg-gloss-top)',
+        animation: 'ctxFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
       } as React.CSSProperties}
     >
       <style>{`@keyframes ctxFadeIn { from { opacity:0; transform:scale(0.96) translateY(-2px); } to { opacity:1; transform:scale(1) translateY(0); } }
 .dex-ctx-item { background: transparent; transition: all 0.1s ease; }
-.dex-ctx-item:hover:not([aria-disabled="true"]) { background: rgba(10,132,255,0.18); }
-.dex-ctx-item:active:not([aria-disabled="true"]) { background: rgba(10,132,255,0.25); }
+.dex-ctx-item:hover:not([aria-disabled="true"]) { background: var(--color-accent-light); }
+.dex-ctx-item:active:not([aria-disabled="true"]) { background: var(--color-accent-muted, var(--color-accent-light)); }
 .dex-ctx-sub { background: transparent; transition: all 0.1s ease; }
-.dex-ctx-sub:hover:not([aria-disabled="true"]) { background: rgba(10,132,255,0.18); }`}</style>
+.dex-ctx-sub:hover:not([aria-disabled="true"]) { background: var(--color-accent-light); }`}</style>
       {items.map((item, i) => {
         if (item.divider && !item.label) {
           return <div key={item.id ?? ('div-' + i)} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 8px' }} />;
@@ -216,9 +216,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                   position: 'absolute', top: -4,
                   left: subDir === 'right' ? '100%' : undefined,
                   right: subDir === 'left' ? '100%' : undefined,
-                  minWidth: 160, maxHeight: 320, overflowY: 'auto',
+                  minWidth: 160, maxWidth: 'min(220px, calc(100vw - 16px))', maxHeight: 320, overflowY: 'auto',
                   padding: '5px 0', borderRadius: 8,
-                  background: 'rgba(30,30,34,0.98)',
+                  background: 'var(--color-bg-elevated)',
                   border: '1px solid var(--color-border)',
                   boxShadow: 'var(--pg-shadow-panel)',
                 }}>
@@ -231,9 +231,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '6px 12px', margin: '0 4px', borderRadius: 4,
                         fontSize: 13, fontWeight: 500, cursor: sub.disabled ? 'default' : 'pointer',
-                        color: sub.danger ? 'var(--color-error, #ff453a)' : sub.disabled ? 'var(--color-text-tertiary)' : '#fff',
+                        color: sub.danger ? 'var(--color-error, #ff453a)' : sub.disabled ? 'var(--color-text-tertiary)' : 'var(--color-text-primary, #fff)',
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(10,132,255,0.2)')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-accent-light)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       {sub.icon && <span style={{ display: 'flex', width: 16, justifyContent: 'center', opacity: 0.7 }}>{sub.icon}</span>}
