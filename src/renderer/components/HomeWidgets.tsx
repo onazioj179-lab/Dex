@@ -11,7 +11,11 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { useWidgetStore, WIDGET_TEMPLATES, type Widget, type WidgetType } from '../store/widgetStore';
-import { useRecentFiles } from '../store/useRecentFiles';
+import { useRecentFiles, type RecentFile } from '../store/useRecentFiles';
+import { useNotesStore } from '../store/notesStore';
+import { useDockPins } from '../store/dockPinStore';
+import { APP_DEFINITIONS } from '../store/runningApps';
+import { usePatternLearning, type Suggestion } from '../services/usePatternLearning';
 import { sharedTick } from '../services/SharedTick';
 import DexIcon from './DexIcon';
 import { platform } from '../utils';
@@ -1130,3 +1134,616 @@ export const HomeWidgets: React.FC = () => {
     </>
   );
 };
+
+// ======================================================================
+// HOME DASHBOARD (DEX 5.5) — the brief's seven-widget set.
+// ----------------------------------------------------------------------
+// A compact, flat (DEX Sharp) dashboard that surfaces live system state
+// with real data and honest empty states. Every card is keyboard- and
+// click-navigable to the relevant app. No glass/blur, no decoration:
+// var(--dex-font-ui), design tokens, sharp type, thin hairlines.
+//
+// Data sources (all reused, nothing fabricated):
+//   Recent Projects  — useRecentFiles (creative-app / .dexproject entries)
+//   Recent Notes     — useNotesStore  -> dexnotes:list
+//   Current Tasks    — dex-tasks       (capability:storage / localStorage)
+//   Active Workflows — window.dex.workflows.getAll() / dex-workflows
+//   Rewind Summary   — window.dex.rewind.getDaySummary(today)
+//   AI Suggestions   — patterns:getSuggestions (local pattern engine)
+//   Pinned Apps      — useDockPins (dockPinStore)
+// ======================================================================
+
+const navigateToApp = (appId: string): void => {
+  window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId } }));
+};
+
+// --- Shared card chrome -------------------------------------------------
+
+const CARD_BG = 'var(--color-bg-elevated, #1a1a1e)';
+const CARD_BORDER = '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))';
+
+const dashCardStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 0,
+  minHeight: 150,
+  background: CARD_BG,
+  border: CARD_BORDER,
+  borderRadius: 10,
+  padding: '12px 14px',
+  fontFamily: 'var(--dex-font-ui)',
+  overflow: 'hidden',
+};
+
+const DashCardHeader: React.FC<{
+  title: string;
+  icon: string;
+  appId: string;
+  count?: number | string;
+}> = ({ title, icon, appId, count }) => (
+  <button
+    type="button"
+    onClick={() => navigateToApp(appId)}
+    className="dex-hover-bg"
+    aria-label={`Open ${title}`}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+      background: 'transparent', border: 'none', padding: '0 0 8px', margin: 0,
+      cursor: 'pointer', textAlign: 'left', color: 'var(--color-text-secondary)',
+    }}
+  >
+    <DexIcon name={icon} size={13} color="var(--color-text-tertiary)" />
+    <span className="dex-label-caps" style={{ flex: 1 }}>{title}</span>
+    {count !== undefined && count !== '' && (
+      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+    )}
+    <DexIcon name="chevron-right" size={13} color="var(--color-text-muted, #6b6b70)" />
+  </button>
+);
+
+const DashEmpty: React.FC<{ icon: string; label: string; hint?: string }> = ({ icon, label, hint }) => (
+  <div style={{
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', gap: 6, padding: '8px 4px', textAlign: 'center',
+  }}>
+    <DexIcon name={icon} size={20} color="var(--color-text-muted, #6b6b70)" />
+    <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{label}</span>
+    {hint && <span style={{ fontSize: 11, color: 'var(--color-text-muted, #6b6b70)', lineHeight: 1.4, maxWidth: 200 }}>{hint}</span>}
+  </div>
+);
+
+/** Flat, single-line row used by most list widgets. */
+const DashRow: React.FC<{
+  primary: string;
+  secondary?: string;
+  meta?: string;
+  icon?: string;
+  iconColor?: string;
+  onClick: () => void;
+  title?: string;
+}> = ({ primary, secondary, meta, icon, iconColor, onClick, title }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="dex-hover-bg"
+    title={title ?? primary}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+      padding: '6px 6px', margin: '0 -6px', border: 'none', borderRadius: 6,
+      background: 'transparent', cursor: 'pointer', textAlign: 'left',
+      color: 'var(--color-text-primary)',
+    }}
+  >
+    {icon && <DexIcon name={icon} size={14} color={iconColor ?? 'var(--color-text-tertiary)'} />}
+    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <span style={{ fontSize: 12.5, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primary}</span>
+      {secondary && <span style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{secondary}</span>}
+    </span>
+    {meta && <span style={{ fontSize: 10.5, color: 'var(--color-text-muted, #6b6b70)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{meta}</span>}
+  </button>
+);
+
+function relativeTime(ts: number): string {
+  if (!ts || !Number.isFinite(ts)) return '';
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return 'now';
+  const min = Math.floor(diff / 60_000);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d`;
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// --- 1. Recent Projects -------------------------------------------------
+// No central recent-projects channel exists in the renderer; .dexproject
+// files are opened ad-hoc by the creative apps. We honestly derive recent
+// projects from the unified recent-files store: entries that are .dexproject
+// manifests or were opened by a creative/project app. Degrades to a clean
+// empty state when none are present. (FLAGGED: a first-class recent-projects
+// subsystem would be the proper long-term source.)
+
+const PROJECT_APP_IDS = new Set(['videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl', 'nexus', 'dexcode']);
+
+const RecentProjectsWidget: React.FC = () => {
+  const recentFiles = useRecentFiles(s => s.recentFiles);
+  const projects = useMemo(() => {
+    const seen = new Set<string>();
+    const out: RecentFile[] = [];
+    for (const f of recentFiles) {
+      const isProject = /\.dexproject$/i.test(f.path) || /\.dexproj$/i.test(f.path) || PROJECT_APP_IDS.has(f.appId);
+      if (!isProject) continue;
+      const key = (f.path || f.name).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(f);
+      if (out.length >= 4) break;
+    }
+    return out;
+  }, [recentFiles]);
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Recent Projects" icon="folder" appId="files" count={projects.length || undefined} />
+      {projects.length === 0 ? (
+        <DashEmpty icon="folder" label="No recent projects" hint="Projects you open in the creative apps appear here." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {projects.map((p, i) => {
+            const def = APP_DEFINITIONS[p.appId];
+            return (
+              <DashRow
+                key={p.path + i}
+                primary={p.name.replace(/\.(dexproject|dexproj)$/i, '')}
+                secondary={def?.name ?? 'Project'}
+                meta={relativeTime(p.openedAt)}
+                icon={def?.icon ?? 'folder'}
+                iconColor={def?.color && !def.color.startsWith('var') ? def.color : 'var(--color-accent)'}
+                title={p.path}
+                onClick={() => navigateToApp(PROJECT_APP_IDS.has(p.appId) ? p.appId : 'files')}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 2. Recent Notes ----------------------------------------------------
+
+const RecentNotesWidget: React.FC = () => {
+  const notes = useNotesStore(s => s.notes);
+  const loadNotes = useNotesStore(s => s.loadNotes);
+  const selectNote = useNotesStore(s => s.selectNote);
+
+  useEffect(() => {
+    // Hydrate once if the Notes store has not been initialised yet.
+    if (useNotesStore.getState().notes.length === 0) {
+      void loadNotes(null);
+    }
+  }, [loadNotes]);
+
+  const recent = useMemo(
+    () => [...notes].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)).slice(0, 4),
+    [notes],
+  );
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Recent Notes" icon="notes" appId="notes" count={notes.length || undefined} />
+      {recent.length === 0 ? (
+        <DashEmpty icon="notes" label="No notes yet" hint="Create a note and it shows up here." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {recent.map(n => {
+            const preview = (n.plain_text || '').replace(/\s+/g, ' ').trim();
+            return (
+              <DashRow
+                key={n.id}
+                primary={n.title?.trim() || 'Untitled note'}
+                secondary={preview || undefined}
+                meta={relativeTime(n.updated_at)}
+                icon={n.pinned ? 'pin' : 'file-text'}
+                iconColor={n.pinned ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
+                onClick={() => { selectNote(n.id); navigateToApp('notes'); }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 3. Current Tasks ---------------------------------------------------
+// Reuses the exact persistence the Tasks app uses (dex-tasks via the
+// capability storage bridge, localStorage fallback). Read-only here.
+
+interface DashTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string | null;
+}
+
+async function loadDashTasks(): Promise<DashTask[]> {
+  try {
+    const stored = await (window as any).electron?.invoke?.('capability:storage:get', 'dex-tasks');
+    if (Array.isArray(stored)) return stored as DashTask[];
+  } catch { /* fall through to localStorage */ }
+  try {
+    const raw = localStorage.getItem('dex-tasks');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as DashTask[];
+    }
+  } catch { /* none */ }
+  return [];
+}
+
+const PRIORITY_COLOR: Record<DashTask['priority'], string> = {
+  high: 'var(--color-error)',
+  medium: 'var(--color-warning)',
+  low: 'var(--color-text-tertiary)',
+};
+
+function formatDueShort(due: string | null): string | undefined {
+  if (!due) return undefined;
+  const d = new Date(due);
+  if (!Number.isFinite(d.getTime())) return undefined;
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  const tom = new Date(today); tom.setDate(tom.getDate() + 1);
+  if (d.toDateString() === tom.toDateString()) return 'Tomorrow';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+const CurrentTasksWidget: React.FC = () => {
+  const [tasks, setTasks] = useState<DashTask[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => { void loadDashTasks().then(t => { if (alive) setTasks(t); }); };
+    refresh();
+    const tickId = `home-tasks-${Date.now()}`;
+    sharedTick.subscribe(tickId, refresh, 30000);
+    return () => { alive = false; sharedTick.unsubscribe(tickId); };
+  }, []);
+
+  const open = useMemo(() => {
+    const pOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    return tasks
+      .filter(t => !t.completed)
+      .sort((a, b) => {
+        const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        if (da !== db) return da - db;
+        return (pOrder[a.priority] ?? 2) - (pOrder[b.priority] ?? 2);
+      })
+      .slice(0, 4);
+  }, [tasks]);
+
+  const openCount = tasks.filter(t => !t.completed).length;
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Current Tasks" icon="check-square" appId="tasks" count={openCount || undefined} />
+      {open.length === 0 ? (
+        <DashEmpty icon="check-square" label="All clear" hint="No open tasks. Add one in Tasks." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {open.map(t => (
+            <DashRow
+              key={t.id}
+              primary={t.title}
+              meta={formatDueShort(t.dueDate)}
+              icon="circle"
+              iconColor={PRIORITY_COLOR[t.priority] ?? 'var(--color-text-tertiary)'}
+              onClick={() => navigateToApp('tasks')}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 4. Active Workflows ------------------------------------------------
+
+interface DashWorkflow { id: string; name: string; steps?: number; lastRun?: string | number | null; }
+
+async function loadDashWorkflows(): Promise<DashWorkflow[]> {
+  try {
+    const remote = await (window as any).dex?.workflows?.getAll?.();
+    if (Array.isArray(remote) && remote.length > 0) return remote as DashWorkflow[];
+  } catch { /* fall through */ }
+  try {
+    const raw = localStorage.getItem('dex-workflows');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as DashWorkflow[];
+    }
+  } catch { /* none */ }
+  return [];
+}
+
+const ActiveWorkflowsWidget: React.FC = () => {
+  const [workflows, setWorkflows] = useState<DashWorkflow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void loadDashWorkflows().then(w => { if (alive) setWorkflows(w); });
+    return () => { alive = false; };
+  }, []);
+
+  const top = useMemo(() => {
+    return [...workflows]
+      .sort((a, b) => {
+        const ra = a.lastRun ? new Date(a.lastRun).getTime() : 0;
+        const rb = b.lastRun ? new Date(b.lastRun).getTime() : 0;
+        return rb - ra;
+      })
+      .slice(0, 4);
+  }, [workflows]);
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Active Workflows" icon="workflows" appId="workflows" count={workflows.length || undefined} />
+      {top.length === 0 ? (
+        <DashEmpty icon="workflows" label="No workflows" hint="Build an automation in Workflows." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {top.map(w => {
+            const ran = w.lastRun ? new Date(w.lastRun).getTime() : 0;
+            return (
+              <DashRow
+                key={w.id}
+                primary={w.name || 'Untitled workflow'}
+                secondary={typeof w.steps === 'number' ? `${w.steps} step${w.steps === 1 ? '' : 's'}` : undefined}
+                meta={ran ? relativeTime(ran) : undefined}
+                icon="play"
+                iconColor="var(--color-accent)"
+                onClick={() => navigateToApp('workflows')}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 5. Rewind Summary --------------------------------------------------
+// Uses the existing Rewind day-summary channel for a compact "today" view.
+// Degrades to a tasteful empty state when Rewind is off-platform or has no
+// data for today.
+
+interface DashDaySummary {
+  totalEntries: number;
+  byType: Record<string, number>;
+  topApps: { name: string; count: number }[];
+}
+
+const RewindSummaryWidget: React.FC = () => {
+  const [summary, setSummary] = useState<DashDaySummary | null | 'unavailable'>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const api = (window as any).dex?.rewind;
+      if (!api?.getDaySummary) { if (alive) setSummary('unavailable'); return; }
+      try {
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const s = await api.getDaySummary(dateStr);
+        if (!alive) return;
+        if (s && typeof s.totalEntries === 'number') {
+          setSummary({ totalEntries: s.totalEntries, byType: s.byType || {}, topApps: Array.isArray(s.topApps) ? s.topApps : [] });
+        } else {
+          setSummary({ totalEntries: 0, byType: {}, topApps: [] });
+        }
+      } catch { if (alive) setSummary('unavailable'); }
+    };
+    void load();
+    const tickId = `home-rewind-${Date.now()}`;
+    sharedTick.subscribe(tickId, () => { void load(); }, 120000);
+    return () => { alive = false; sharedTick.unsubscribe(tickId); };
+  }, []);
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Rewind Summary" icon="rewind" appId="rewind" />
+      {summary === 'unavailable' ? (
+        <DashEmpty icon="rewind" label="Rewind is off" hint="Open Rewind to start capturing your day." />
+      ) : summary === null ? (
+        <DashEmpty icon="rewind" label="Loading today…" />
+      ) : summary.totalEntries === 0 ? (
+        <DashEmpty icon="rewind" label="Nothing captured today" hint="Your day timeline will build as you work." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 26, fontWeight: 300, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              {summary.totalEntries}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>moments today</span>
+          </div>
+          {summary.topApps.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span className="dex-label-caps" style={{ fontSize: 10 }}>Top apps</span>
+              {summary.topApps.slice(0, 3).map((a, i) => {
+                const max = summary.topApps[0]?.count || 1;
+                const pct = Math.max(8, Math.round((a.count / max) * 100));
+                return (
+                  <div key={a.name + i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                    <span style={{ width: 56, height: 4, borderRadius: 2, background: 'var(--color-bg-hover, rgba(255,255,255,0.08))', overflow: 'hidden', flexShrink: 0 }}>
+                      <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent)', borderRadius: 2 }} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 6. AI Suggestions --------------------------------------------------
+// Reuses the local pattern-learning engine (patterns:getSuggestions). This
+// is real, on-device behaviour learning — NOT fabricated model output. When
+// the engine has no signal yet, it degrades to an honest empty state.
+
+const SUGGESTION_REASON_LABEL: Record<Suggestion['reason'], string> = {
+  time_pattern: 'Usual for this time',
+  sequence: 'Often opened next',
+  frequent: 'Frequently used',
+  context: 'Fits your context',
+};
+
+const AiSuggestionsWidget: React.FC = () => {
+  const { getSuggestions } = usePatternLearning();
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const result = await getSuggestions({ limit: 4 });
+        if (alive) setSuggestions(Array.isArray(result) ? result : []);
+      } catch { if (alive) setSuggestions([]); }
+    };
+    void load();
+    const tickId = `home-suggest-${Date.now()}`;
+    sharedTick.subscribe(tickId, () => { void load(); }, 60000);
+    return () => { alive = false; sharedTick.unsubscribe(tickId); };
+  }, [getSuggestions]);
+
+  const appSuggestions = useMemo(
+    () => (suggestions || []).filter(s => s.type === 'app' && APP_DEFINITIONS[s.target]).slice(0, 4),
+    [suggestions],
+  );
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Suggestions" icon="zap" appId="home" />
+      {suggestions === null ? (
+        <DashEmpty icon="zap" label="Learning…" />
+      ) : appSuggestions.length === 0 ? (
+        <DashEmpty icon="zap" label="Nothing to suggest yet" hint="DEX learns your patterns as you work — locally." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {appSuggestions.map((s, i) => {
+            const def = APP_DEFINITIONS[s.target];
+            return (
+              <DashRow
+                key={s.target + i}
+                primary={def?.name ?? s.target}
+                secondary={SUGGESTION_REASON_LABEL[s.reason] ?? 'Suggested'}
+                meta={s.confidence ? `${Math.round(s.confidence * 100)}%` : undefined}
+                icon={def?.icon ?? 'zap'}
+                iconColor={def?.color && !def.color.startsWith('var') ? def.color : 'var(--color-accent)'}
+                onClick={() => navigateToApp(s.target)}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 7. Pinned Apps -----------------------------------------------------
+// Reuses the dock pinning store so Home and the Dock stay in sync.
+
+const PinnedAppsWidget: React.FC = () => {
+  const pins = useDockPins(s => s.pins);
+  const apps = useMemo(() => {
+    return [...pins]
+      .sort((a, b) => a.position - b.position)
+      .map(p => ({ id: p.id, def: APP_DEFINITIONS[p.id] }))
+      .filter((x): x is { id: string; def: NonNullable<typeof x.def> } => !!x.def && x.id !== 'home')
+      .slice(0, 8);
+  }, [pins]);
+
+  return (
+    <div style={dashCardStyle}>
+      <DashCardHeader title="Pinned Apps" icon="grid" appId="home" count={apps.length || undefined} />
+      {apps.length === 0 ? (
+        <DashEmpty icon="grid" label="No pinned apps" hint="Pin apps to the dock to see them here." />
+      ) : (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
+          alignContent: 'start', flex: 1, paddingTop: 2,
+        }}>
+          {apps.map(({ id, def }) => {
+            const tinted = !!def.color && !def.color.startsWith('var');
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => navigateToApp(id)}
+                className="dex-hover-bg"
+                aria-label={`Open ${def.name}`}
+                title={def.name}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                  padding: '8px 2px', border: 'none', borderRadius: 8,
+                  background: 'transparent', cursor: 'pointer',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                <span style={{
+                  width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: tinted ? `${def.color}22` : 'var(--color-bg-hover, rgba(255,255,255,0.08))',
+                  color: tinted ? def.color : 'var(--color-accent)',
+                }}>
+                  <DexIcon name={def.icon as any} size={18} color="currentColor" />
+                </span>
+                <span style={{ fontSize: 10, lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-tertiary)' }}>
+                  {def.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Dashboard grid -----------------------------------------------------
+
+/**
+ * The DEX 5.5 Home dashboard: a responsive, flat grid of the seven brief
+ * widgets. Rendered inside the Home scroll area. Auto-fills columns so it
+ * stays compact on narrow windows and spreads on wide ones, with no
+ * clutter and no fixed magic widths.
+ */
+export const HomeDashboard: React.FC = () => {
+  return (
+    <div
+      role="region"
+      aria-label="Home dashboard"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))',
+        gap: 12,
+        width: '100%',
+        fontFamily: 'var(--dex-font-ui)',
+      }}
+    >
+      <RecentProjectsWidget />
+      <RecentNotesWidget />
+      <CurrentTasksWidget />
+      <ActiveWorkflowsWidget />
+      <RewindSummaryWidget />
+      <AiSuggestionsWidget />
+      <PinnedAppsWidget />
+    </div>
+  );
+};
+HomeDashboard.displayName = 'HomeDashboard';

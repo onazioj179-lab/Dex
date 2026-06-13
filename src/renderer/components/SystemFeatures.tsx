@@ -12,7 +12,8 @@
 import React, { useEffect, useCallback, useState, memo } from 'react';
 import { useAppSubsystem } from '../store/appSubsystem';
 import { initializeTheme, toggleTheme, getCurrentTheme } from './ThemeManager';
-import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
+import { notify } from '../services/notify';
+import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 
 // ==================== SIMPLE NOTIFICATION SYSTEM ====================
 interface SimpleNotification {
@@ -35,6 +36,16 @@ const notificationStore = {
       timestamp: Date.now(),
       read: false,
     };
+    // Consolidation (DEX 5.5): route through the single unified path so this
+    // shows the unified banner and persists to the hub (bell/center). The local
+    // list is retained only as a back-compat shim for existing subscribers; the
+    // parallel toast stack + overlay this module used to render are retired.
+    void notify({
+      title: notification.title,
+      body: notification.message,
+      icon: notification.type,
+      source: 'System',
+    });
     this.notifications = [newNotification, ...this.notifications].slice(0, 50);
     this.notify();
     return newNotification;
@@ -72,46 +83,6 @@ const useSimpleNotifications = () => {
     add: notificationStore.add.bind(notificationStore),
     markRead: notificationStore.markRead.bind(notificationStore),
   };
-};
-
-// ==================== SIMPLE TOAST COMPONENT ====================
-interface ToastProps {
-  notification: SimpleNotification;
-  onClose: () => void;
-}
-
-const SimpleToast: React.FC<ToastProps> = ({ notification, onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-  
-  const colors = {
-    info: 'var(--color-accent)',
-    success: 'var(--color-success)',
-    warning: 'var(--color-warning)',
-    error: 'var(--color-error)',
-  };
-  
-  return (
-    <div style={{
-      padding: '12px 16px',
-      background: 'var(--color-bg-elevated, #2a2a2a)',
-      borderRadius: 6,
-      boxShadow: 'var(--pg-shadow-tooltip)',
-      borderLeft: `3px solid ${colors[notification.type]}`,
-      minWidth: 280,
-      maxWidth: 360,
-      pointerEvents: 'auto',
-    }}>
-      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary, #fff)' }}>
-        {notification.title}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--color-text-secondary, #888)', marginTop: 4 }}>
-        {notification.message}
-      </div>
-    </div>
-  );
 };
 
 // ==================== KEYBOARD SHORTCUTS HANDLER ====================
@@ -173,10 +144,11 @@ const useGlobalShortcuts = (
 export const SystemFeatures: React.FC = memo(() => {
   // UI state
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   // App state - use correct store API
   const { launchApp } = useAppSubsystem();
-  const { notifications, add: addNotification, markRead } = useSimpleNotifications();
+  // Notifications are surfaced through the unified path (services/notify); this
+  // module only raises them via addNotification now.
+  const { add: addNotification } = useSimpleNotifications();
   
   // Initialize theme on mount
   useEffect(() => {
@@ -189,11 +161,15 @@ export const SystemFeatures: React.FC = memo(() => {
   // Handlers
   const handleGlobalSearchToggle = useCallback(() => {
     setShowGlobalSearch(prev => !prev);
-    setShowNotifications(false);
   }, []);
   
   const handleNotificationsToggle = useCallback(() => {
-    setShowNotifications(prev => !prev);
+    // Consolidation (DEX 5.5): open the ONE unified notification center (the
+    // hub-backed bell panel) instead of this module's retired parallel overlay.
+    const store = useNotificationCenterStore.getState();
+    const next = !store.panelOpen;
+    store.setPanelOpen(next);
+    if (next) store.loadNotifications();
     setShowGlobalSearch(false);
   }, []);
   
@@ -240,9 +216,6 @@ export const SystemFeatures: React.FC = memo(() => {
     handleThemeToggle
   );
   
-  // Get visible notifications for toasts
-  const unreadNotifications = notifications.filter(n => !n.read).slice(0, 3);
-  
   return (
     <>
       {/* Global Search Overlay */}
@@ -252,43 +225,20 @@ export const SystemFeatures: React.FC = memo(() => {
           onLaunchApp={handleLaunchApp}
         />
       )}
-      
-      {/* Notification Center Overlay */}
-      {showNotifications && (
-        <NotificationCenterOverlay
-          notifications={notifications}
-          onClose={() => setShowNotifications(false)}
-          onMarkRead={markRead}
-        />
-      )}
-      
-      {/* Toast Notifications */}
-      <div style={toastContainerStyles}>
-        {unreadNotifications.map((notification, index) => (
-          <ToastNotification
-            key={notification.id}
-            notification={notification}
-            onDismiss={() => markRead(notification.id)}
-            offset={index}
-          />
-        ))}
-      </div>
+
+      {/*
+        Consolidation (DEX 5.5): the parallel toast stack and the local
+        NotificationCenterOverlay this module used to render are retired. All
+        notifications now flow through the single unified path — the top-right
+        banner stack (AppManager) for transient surfacing and the hub-backed
+        bell/center for grouped, prioritized, persistent history. The
+        Ctrl+Shift+N shortcut opens that unified center.
+      */}
     </>
   );
 });
 
 SystemFeatures.displayName = 'SystemFeatures';
-
-const toastContainerStyles: React.CSSProperties = {
-  position: 'fixed',
-  bottom: 20,
-  right: 20,
-  display: 'flex',
-  flexDirection: 'column-reverse',
-  gap: 8,
-  zIndex: Z_HELP_OVERLAY_BASE,
-  pointerEvents: 'none',
-};
 
 // ==================== ADDITIONAL OVERLAY COMPONENTS ====================
 
@@ -409,104 +359,5 @@ const GlobalSearchOverlay: React.FC<GlobalSearchOverlayProps> = memo(({ onClose,
 });
 
 GlobalSearchOverlay.displayName = 'GlobalSearchOverlay';
-
-// Notification Center Overlay
-interface NotificationCenterOverlayProps {
-  notifications: SimpleNotification[];
-  onClose: () => void;
-  onMarkRead: (id: string) => void;
-}
-
-const NotificationCenterOverlay: React.FC<NotificationCenterOverlayProps> = memo(({ 
-  notifications, onClose, onMarkRead 
-}) => {
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-  
-  return (
-    <div style={launcherStyles.overlay} onMouseDown={onClose}>
-      <div style={{ ...launcherStyles.container, width: 360 }} onMouseDown={e => e.stopPropagation()}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border, var(--color-border))' }}>
-          <h3 style={{ margin: 0, fontSize: 16 }}>Notifications</h3>
-        </div>
-        <div style={{ maxHeight: 400, overflow: 'auto' }}>
-          {notifications.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', opacity: 0.5 }}>
-              No notifications
-            </div>
-          ) : (
-            notifications.map(n => (
-              <div
-                key={n.id}
-                onClick={() => onMarkRead(n.id)}
-                style={{
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--color-border, var(--color-bg-hover))',
-                  cursor: 'pointer',
-                  opacity: n.read ? 0.5 : 1,
-                }}
-              >
-                <div style={{ fontWeight: 500, marginBottom: 4 }}>{n.title}</div>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>{n.message}</div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-NotificationCenterOverlay.displayName = 'NotificationCenterOverlay';
-
-
-
-// Toast Notification
-interface ToastNotificationProps {
-  notification: SimpleNotification;
-  onDismiss: () => void;
-  offset: number;
-}
-
-const ToastNotification: React.FC<ToastNotificationProps> = memo(({ notification, onDismiss, offset }) => {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-  
-  const bgColor = notification.type === 'error' ? 'var(--color-error)'
-    : notification.type === 'success' ? 'var(--color-success)'
-    : notification.type === 'warning' ? 'var(--color-warning)'
-    : 'var(--color-accent)';
-  
-  return (
-    <div
-      style={{
-        padding: '12px 16px',
-        background: 'var(--color-bg-elevated, #2a2a2a)',
-        borderRadius: 6,
-        boxShadow: 'var(--pg-shadow-tooltip)',
-        borderLeft: `3px solid ${bgColor}`,
-        maxWidth: 320,
-        pointerEvents: 'auto',
-        transform: `translateY(${offset * -8}px)`,
-        opacity: 1 - offset * 0.2,
-        zIndex: Z_HELP_OVERLAY_BASE - offset,
-        cursor: 'pointer',
-      }}
-      onClick={onDismiss}
-    >
-      <div style={{ fontWeight: 500, marginBottom: 2 }}>{notification.title}</div>
-      <div style={{ fontSize: 12, opacity: 0.7 }}>{notification.message}</div>
-    </div>
-  );
-});
-
-ToastNotification.displayName = 'ToastNotification';
 
 export default SystemFeatures;

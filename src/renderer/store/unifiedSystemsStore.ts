@@ -12,6 +12,14 @@
 // ==========================================================================
 
 import { create } from 'zustand';
+import {
+  type NotificationRecord as PolicyRecord,
+  type NotificationGroup as PolicyGroup,
+  type NotificationPriority,
+  sortByPriority,
+  groupBySource,
+} from '../../shared/notifications/group';
+import { readHubMeta } from '../services/notify';
 
 // ==========================================================================
 // IPC Helper
@@ -37,6 +45,54 @@ export interface NotificationRecord {
   read: number;
   delivery: string;
   timestamp: number;
+  /** Decoded from the persisted `action` _dexMeta envelope (see services/notify). */
+  priority: NotificationPriority;
+  icon: 'info' | 'success' | 'warning' | 'error';
+  /** Grouping key — the _dexMeta.source, falling back to `app`. */
+  source: string;
+}
+
+/** A source group for the Notification Center (grouping = finding 2). */
+export interface NotificationCenterGroup {
+  source: string;
+  items: NotificationRecord[];
+  topPriority: NotificationPriority;
+  latestTs: number;
+  unreadCount: number;
+}
+
+/**
+ * Decode the priority/icon/source the unified service encoded into the hub
+ * `action` JSON. Records that predate the envelope (or come straight from the
+ * OS hub) degrade to sensible defaults so nothing throws.
+ */
+function decodeRecord(raw: any): NotificationRecord {
+  const meta = readHubMeta(raw?.action);
+  return {
+    id: raw?.id,
+    app: raw?.app ?? 'System',
+    title: raw?.title ?? '',
+    body: raw?.body ?? '',
+    action: raw?.action ?? null,
+    read: typeof raw?.read === 'number' ? raw.read : 0,
+    delivery: raw?.delivery ?? 'all',
+    timestamp: typeof raw?.timestamp === 'number' ? raw.timestamp : Date.now(),
+    priority: meta?.priority ?? 'normal',
+    icon: meta?.icon ?? 'info',
+    source: meta?.source ?? raw?.app ?? 'System',
+  };
+}
+
+/** Map a store record to the shared policy shape (group.ts / center.ts). */
+function toPolicyRecord(n: NotificationRecord): PolicyRecord {
+  return {
+    id: String(n.id),
+    title: n.title,
+    body: n.body,
+    source: n.source,
+    priority: n.priority,
+    ts: n.timestamp,
+  };
 }
 
 interface NotificationCenterState {
@@ -49,6 +105,10 @@ interface NotificationCenterState {
   loadNotifications: () => Promise<void>;
   loadUnreadCount: () => Promise<void>;
   sendNotification: (app: string, title: string, body: string, action?: any) => Promise<void>;
+  /** Priority-ordered flat list (urgent first, then most recent). */
+  getOrdered: () => NotificationRecord[];
+  /** Source-grouped, priority-ordered view for the center (finding 2). */
+  getGroups: () => NotificationCenterGroup[];
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   clearAll: () => Promise<void>;
@@ -68,7 +128,8 @@ export const useNotificationCenterStore = create<NotificationCenterState>((set, 
   loadNotifications: async () => {
     set({ loading: true });
     const data = await invoke('notification-center:getAll', 200);
-    set({ notifications: data || [], loading: false });
+    const decoded = Array.isArray(data) ? data.map(decodeRecord) : [];
+    set({ notifications: decoded, loading: false });
   },
 
   loadUnreadCount: async () => {
@@ -79,6 +140,29 @@ export const useNotificationCenterStore = create<NotificationCenterState>((set, 
   sendNotification: async (app, title, body, action) => {
     await invoke('notification-center:send', { app, title, body, action });
     await get().loadUnreadCount();
+  },
+
+  getOrdered: () => {
+    const { notifications } = get();
+    const order = sortByPriority(notifications.map(toPolicyRecord));
+    const byId = new Map(notifications.map((n) => [String(n.id), n]));
+    return order.map((r) => byId.get(r.id)).filter(Boolean) as NotificationRecord[];
+  },
+
+  getGroups: () => {
+    const { notifications } = get();
+    const byId = new Map(notifications.map((n) => [String(n.id), n]));
+    const policyGroups: PolicyGroup[] = groupBySource(notifications.map(toPolicyRecord));
+    return policyGroups.map((g) => {
+      const items = g.items.map((r) => byId.get(r.id)).filter(Boolean) as NotificationRecord[];
+      return {
+        source: g.source,
+        items,
+        topPriority: g.topPriority,
+        latestTs: g.latestTs,
+        unreadCount: items.reduce((n, it) => (it.read === 0 ? n + 1 : n), 0),
+      };
+    });
   },
 
   markRead: async (id) => {

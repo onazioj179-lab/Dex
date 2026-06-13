@@ -12,6 +12,13 @@
 > status are in [REFINEMENT.md](REFINEMENT.md); the Tauri migration below is
 > its Priority 1 engine.
 >
+> **DEX 5.5 system-refinement brief (owner, 2026-06-13)** is reconciled,
+> status-mapped, and sequenced in [DEX-5.5.md](DEX-5.5.md) — the release-level
+> umbrella plan. Much of its visual / security / native-foundation scope already
+> shipped (full-flat UI, Dex-font, per-app sweep, security+leak audit, native
+> search/AI-routing/rewind/notification crates). The remaining user-visible value
+> is sequenced there, led by a unified search UI.
+>
 > **v5.5 "DEX Sharp" UI program (started 2026-06-12).** Owner direction: a
 > unique, mature, precise external identity — not a macOS/Windows clone. Sharp
 > type (tight heading tracking, spaced uppercase micro-labels), discrete radii,

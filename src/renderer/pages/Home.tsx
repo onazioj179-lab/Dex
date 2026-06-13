@@ -18,7 +18,7 @@ import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
 import { glassPanel, glassOverlay } from '../styles/glassMenu';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { useRecentFiles } from '../store/useRecentFiles';
-import { HomeWidgets } from '../components/HomeWidgets';
+import { HomeWidgets, HomeDashboard } from '../components/HomeWidgets';
 import { useWidgetStore } from '../store/widgetStore';
 import DexIcon from '../components/DexIcon';
 import { Z_CONTEXT_MENU, Z_MODAL } from '../utils/zIndexTokens';
@@ -647,6 +647,17 @@ export const Home: React.FC = () => {
         )}
 
         {/* Quick Access Apps removed -- launch apps from dock or apps menu (Ctrl+Space). */}
+
+        {/* DEX 5.5 Home dashboard -- the seven-widget brief set (recent
+            projects/notes, current tasks, active workflows, rewind summary,
+            AI suggestions, pinned apps). Compact, flat, real data. */}
+        <div style={{
+          marginTop: 18,
+          padding: '0 24px',
+          animation: 'fadeIn 0.35s ease-out 0.08s both',
+        }}>
+          <HomeDashboard />
+        </div>
 
         {/* Recents */}
         {recents.length > 0 && (

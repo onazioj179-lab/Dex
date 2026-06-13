@@ -38,6 +38,8 @@ import AiProviderSettings from '../components/AiProviderSettings';
 import PolicyViewer from '../components/PolicyViewer';
 import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
+import DeveloperSection from './settingsPanels/DeveloperSection';
+import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 
@@ -49,6 +51,8 @@ interface SettingSection {
   id: string;
   name: string;
   icon: React.ReactNode;
+  /** Extra synonyms so the search box can match a section by intent. */
+  keywords?: string;
 }
 
 // ===========================================================================
@@ -192,6 +196,12 @@ const Icons = {
       <path d="M5 21v-1a7 7 0 0 1 14 0v1"/>
     </svg>
   ),
+  developer: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <polyline points="16 18 22 12 16 6"/>
+      <polyline points="8 6 2 12 8 18"/>
+    </svg>
+  ),
 };
 
 const SECTIONS: SettingSection[] = [
@@ -201,7 +211,7 @@ const SECTIONS: SettingSection[] = [
   { id: 'sound', name: 'Sound', icon: Icons.sound },
   { id: 'display', name: 'Display', icon: Icons.display },
   { id: 'notifications', name: 'Notifications', icon: Icons.notifications },
-  { id: 'privacy', name: 'Privacy & Security', icon: Icons.privacy },
+  { id: 'privacy', name: 'Privacy & Security', icon: Icons.privacy, keywords: 'security firewall encryption password pin biometric vpn malware lock' },
   { id: 'network', name: 'Network', icon: Icons.network },
   { id: 'performance', name: 'Performance', icon: Icons.performance },
   { id: 'systemMonitor', name: 'System Monitor', icon: Icons.systemMonitor },
@@ -214,11 +224,12 @@ const SECTIONS: SettingSection[] = [
   { id: 'files', name: 'Files', icon: Icons.files },
   { id: 'storage', name: 'Storage & Data', icon: Icons.storage },
   { id: 'browser', name: 'Browser', icon: Icons.browser },
-  { id: 'uki', name: 'UKI & Memory', icon: Icons.uki },
-  { id: 'aiproviders', name: 'AI Providers', icon: Icons.uki },
-  { id: 'creativeapps', name: 'Creative Suite', icon: Icons.creativeapps },
-  { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.plugins },
-  { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.nexus },
+  { id: 'uki', name: 'UKI & Memory', icon: Icons.uki, keywords: 'ai assistant voice memory recall wake word intelligence' },
+  { id: 'aiproviders', name: 'AI Providers', icon: Icons.uki, keywords: 'ai artificial intelligence model api key openai anthropic claude gpt llm smart router' },
+  { id: 'creativeapps', name: 'Creative Suite', icon: Icons.creativeapps, keywords: 'prism flux forge axl imosion video editor creative apps' },
+  { id: 'plugins', name: 'Plugin Marketplace', icon: Icons.plugins, keywords: 'plugin extension addon marketplace install developer' },
+  { id: 'developer', name: 'Developer', icon: Icons.developer, keywords: 'developer api sdk plugin debug diagnostics prompt console advanced build' },
+  { id: 'nexus', name: 'Nexus Biometrics', icon: Icons.nexus, keywords: 'biometric face fingerprint identity nexus' },
   { id: 'updates', name: 'Updates', icon: Icons.updates },
   { id: 'account', name: 'Account', icon: Icons.account },
   { id: 'about', name: 'About', icon: Icons.about },
@@ -229,9 +240,10 @@ const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
   { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
-  { label: 'Intelligence', ids: ['uki', 'aiproviders'] },
+  { label: 'AI', ids: ['aiproviders', 'uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
-  { label: 'Extensions', ids: ['plugins', 'nexus'] },
+  { label: 'Developer', ids: ['developer', 'plugins'] },
+  { label: 'Extensions', ids: ['nexus'] },
   { label: 'Info', ids: ['updates', 'about'] },
   { label: 'Account', ids: ['account'] },
   { label: 'Owner', ids: ['creator'] },
@@ -1767,6 +1779,12 @@ export const Settings: React.FC = () => {
   const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
   const [settingsSearch, setSettingsSearch] = useState('');
+  // Keyboard-driven cursor into the flat search results (-1 = nothing focused).
+  const [searchCursor, setSearchCursor] = useState(0);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  // When a search result jumps to a section, remember which control to scroll
+  // to + flash once the new section has rendered.
+  const pendingScrollRef = React.useRef<string | null>(null);
   const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => loadSettings() || DEFAULT_SETTINGS);
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
@@ -1777,6 +1795,142 @@ export const Settings: React.FC = () => {
   // stable across category switches (renderShellSettings used to call this
   // conditionally which violated the Rules of Hooks).
   const shellPrefs = useShellPreferences();
+
+  // =========================================================================
+  // SEARCH-FIRST SETTINGS (DEX 5.5)
+  // A prominent, fuzzy search over every setting's label + description +
+  // section + keywords. Typing surfaces matching controls (each tagged with
+  // the section it lives in); Enter/click jumps to that section and scrolls
+  // the control into view. Behavior of every setting is unchanged — this is
+  // purely discoverability.
+  // =========================================================================
+
+  // Lightweight subsequence fuzzy match: every char of the query appears in
+  // order somewhere in the haystack. Returns a score (lower = tighter) or -1.
+  const fuzzyScore = useCallback((haystack: string, needle: string): number => {
+    if (!needle) return 0;
+    const h = haystack.toLowerCase();
+    const exact = h.indexOf(needle);
+    if (exact !== -1) return exact; // contiguous matches rank best (by position)
+    let hi = 0;
+    let firstHit = -1;
+    let gaps = 0;
+    let lastHit = -1;
+    for (let ni = 0; ni < needle.length; ni++) {
+      const ch = needle[ni];
+      let found = -1;
+      while (hi < h.length) {
+        if (h[hi] === ch) { found = hi; hi++; break; }
+        hi++;
+      }
+      if (found === -1) return -1;
+      if (firstHit === -1) firstHit = found;
+      if (lastHit !== -1 && found > lastHit + 1) gaps += found - lastHit - 1;
+      lastHit = found;
+    }
+    // Penalise scattered matches so contiguous/early hits win, but still match.
+    return 1000 + firstHit + gaps;
+  }, []);
+
+  const searchResults = useMemo<{ entry: SettingIndexEntry; section?: SettingSection; score: number }[]>(() => {
+    const raw = settingsSearch.trim().toLowerCase();
+    if (!raw) return [];
+    return SETTINGS_INDEX
+      .map(entry => {
+        const sec = sectionMap.get(entry.section);
+        const fields = [
+          entry.label,
+          entry.desc || '',
+          sec?.name || '',
+          sec?.keywords || '',
+          entry.keywords || '',
+        ];
+        // Best (lowest) score across fields, weighted so a label hit beats a
+        // keyword hit. -1 means no field matched.
+        let best = -1;
+        const weights = [0, 40, 80, 220, 260];
+        fields.forEach((f, i) => {
+          const s = fuzzyScore(f, raw);
+          if (s !== -1) {
+            const weighted = s + weights[i];
+            if (best === -1 || weighted < best) best = weighted;
+          }
+        });
+        return { entry, section: sec, score: best };
+      })
+      .filter(r => r.score !== -1)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 40);
+  }, [settingsSearch, fuzzyScore]);
+
+  // Keep the keyboard cursor inside the current result set.
+  useEffect(() => { setSearchCursor(0); }, [settingsSearch]);
+
+  // Jump to a section, optionally remembering a control to scroll to + flash.
+  const jumpToSection = useCallback((sectionId: string, scrollLabel?: string) => {
+    pendingScrollRef.current = scrollLabel || null;
+    setActiveSection(sectionId);
+  }, []);
+
+  // After a jump re-renders the new section, scroll to + briefly flash the
+  // matched control. The data-setting-search attribute is added to the shared
+  // toggle/slider/select rows, so most controls resolve; section-level results
+  // simply land at the top of the section.
+  useEffect(() => {
+    const label = pendingScrollRef.current;
+    if (!label) return;
+    pendingScrollRef.current = null;
+    const id = window.requestAnimationFrame(() => {
+      try {
+        const esc = (window as any).CSS?.escape ? (window as any).CSS.escape(label) : label.replace(/"/g, '\\"');
+        const node = document.querySelector<HTMLElement>(`[data-setting-search="${esc}"]`)
+          || document.querySelector<HTMLElement>(`[data-setting-row="${esc}"]`);
+        const row = node?.closest<HTMLElement>('[data-setting-row]') || node;
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.style.transition = 'background-color 0.2s ease';
+          const prev = row.style.backgroundColor;
+          row.style.backgroundColor = 'var(--color-accent-soft, rgba(10,132,255,0.14))';
+          window.setTimeout(() => { row.style.backgroundColor = prev; }, 1100);
+        }
+      } catch { /* best-effort scroll */ }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [activeSection]);
+
+  // Activate the currently-focused (or first) search result.
+  const activateSearchResult = useCallback((index?: number) => {
+    if (searchResults.length === 0) return;
+    const i = Math.max(0, Math.min(index ?? searchCursor, searchResults.length - 1));
+    const r = searchResults[i];
+    jumpToSection(r.entry.section, r.entry.label);
+    setSettingsSearch('');
+    setSearchCursor(0);
+  }, [searchResults, searchCursor, jumpToSection]);
+
+  // Keyboard handling for the search box: arrows move the cursor, Enter jumps,
+  // Escape clears (or blurs when already empty).
+  const onSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSearchCursor(c => Math.min(c + 1, Math.max(0, searchResults.length - 1)));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSearchCursor(c => Math.max(c - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      activateSearchResult();
+    } else if (e.key === 'Escape') {
+      if (settingsSearch) { e.preventDefault(); setSettingsSearch(''); }
+      else { searchInputRef.current?.blur(); }
+    }
+  }, [searchResults.length, activateSearchResult, settingsSearch]);
+
+  // Focus the search box when Settings mounts so users can type immediately.
+  useEffect(() => {
+    const t = window.setTimeout(() => searchInputRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, []);
 
   const openPolicyViewer = useCallback((slug: PolicySlug) => {
     setPolicyViewerInitial(slug);
@@ -2087,9 +2241,9 @@ export const Settings: React.FC = () => {
   const renderToggle = (key: keyof typeof DEFAULT_SETTINGS, label: string, description: string) => {
     const changed = isSettingChanged(key, settings[key]);
     return (
-      <div style={styles.settingRow}>
+      <div style={styles.settingRow} data-setting-row={label}>
         <div style={styles.settingInfo}>
-          <span style={{ ...styles.settingLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span data-setting-search={label} style={{ ...styles.settingLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
             {label}
             {changed && (
               <span 
@@ -3382,9 +3536,9 @@ export const Settings: React.FC = () => {
     unit: string = '',
     step: number = 1,
   ) => (
-    <div style={styles.settingRow}>
+    <div style={styles.settingRow} data-setting-row={label}>
       <div style={styles.settingInfo}>
-        <span style={styles.settingLabel}>{label}</span>
+        <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -3414,9 +3568,9 @@ export const Settings: React.FC = () => {
     description: string,
     options: { value: string; label: string }[],
   ) => (
-    <div style={styles.settingRow}>
+    <div style={styles.settingRow} data-setting-row={label}>
       <div style={styles.settingInfo}>
-        <span style={styles.settingLabel}>{label}</span>
+        <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
       </div>
       <select
@@ -4327,6 +4481,7 @@ export const Settings: React.FC = () => {
       case 'aiproviders': return <AiProviderSettings />;
       case 'creativeapps': return renderCreativeAppsSettings();
       case 'plugins': return <PluginMarketplace />;
+      case 'developer': return <DeveloperSection onNavigate={jumpToSection} styles={styles} />;
       case 'nexus': return <NexusBiometrics />;
       case 'updates': return <UpdateManagerSection />;
       case 'account': return <AccountSettingsCard />;
@@ -4372,19 +4527,149 @@ export const Settings: React.FC = () => {
         </div>
 
         <div style={{ padding: '0 12px 8px' }}>
-          <input
-            type="text"
-            placeholder="Search settings..."
-            value={settingsSearch}
-            onChange={e => setSettingsSearch(e.target.value)}
+          <div
             style={{
-              width: '100%', padding: '6px 10px', fontSize: 12,
-              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
-              borderRadius: 4, color: 'var(--color-text-primary)', outline: 'none',
-              boxSizing: 'border-box' as const,
+              position: 'relative', display: 'flex', alignItems: 'center',
+              background: 'var(--color-bg-hover)',
+              border: `1px solid ${settingsSearch ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
+              borderRadius: 5, transition: 'border-color 0.12s ease',
             }}
-          />
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2"
+              style={{ position: 'absolute', left: 9, pointerEvents: 'none' }} aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              role="searchbox"
+              placeholder="Search all settings..."
+              aria-label="Search all settings"
+              aria-controls="settings-search-results"
+              autoComplete="off"
+              spellCheck={false}
+              value={settingsSearch}
+              onChange={e => setSettingsSearch(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+              style={{
+                width: '100%', padding: '7px 26px 7px 27px', fontSize: 12,
+                background: 'transparent', border: 'none',
+                color: 'var(--color-text-primary)', outline: 'none',
+                fontFamily: 'var(--dex-font-ui, inherit)',
+                boxSizing: 'border-box' as const,
+              }}
+            />
+            {settingsSearch && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => { setSettingsSearch(''); searchInputRef.current?.focus(); }}
+                style={{
+                  position: 'absolute', right: 6, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', width: 16, height: 16, padding: 0,
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Search results — every matching control, tagged by section. */}
+        {settingsSearch.trim() && (
+          <div
+            id="settings-search-results"
+            role="listbox"
+            aria-label="Settings search results"
+            style={{
+              margin: '0 12px 8px', borderRadius: 6, overflow: 'hidden',
+              border: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-bg-surface)',
+              maxHeight: 320, overflowY: 'auto',
+            }}
+          >
+            <div style={{
+              padding: '6px 10px', fontSize: 10, fontWeight: 600,
+              color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const,
+              letterSpacing: 'var(--dex-tracking-label, 0.08em)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+              position: 'sticky', top: 0, background: 'var(--color-bg-surface)', zIndex: 1,
+            }}>
+              {searchResults.length > 0
+                ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`
+                : 'No matches'}
+            </div>
+            {searchResults.length === 0 ? (
+              <div style={{ padding: '16px 12px', textAlign: 'center' as const }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                  No settings match &ldquo;{settingsSearch.trim()}&rdquo;
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  Try a different term, like &ldquo;theme&rdquo;, &ldquo;privacy&rdquo;, or &ldquo;AI&rdquo;.
+                </div>
+              </div>
+            ) : (
+              searchResults.map((r, i) => {
+                const active = i === searchCursor;
+                return (
+                  <button
+                    key={`${r.entry.section}:${r.entry.label}:${i}`}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onMouseEnter={() => setSearchCursor(i)}
+                    onClick={() => activateSearchResult(i)}
+                    style={{
+                      display: 'flex', width: '100%', alignItems: 'flex-start',
+                      gap: 8, padding: '8px 10px', textAlign: 'left' as const,
+                      border: 'none', cursor: 'pointer',
+                      borderBottom: '1px solid var(--color-border-subtle)',
+                      background: active ? 'var(--pg-row-active, var(--color-bg-hover))' : 'transparent',
+                    }}
+                  >
+                    <span style={{
+                      marginTop: 1, flexShrink: 0,
+                      color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                      display: 'flex',
+                    }}>
+                      {React.cloneElement(
+                        (r.section?.icon as React.ReactElement) || Icons.general,
+                        { width: 15, height: 15 } as any,
+                      )}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        display: 'block', fontSize: 12.5, fontWeight: 500,
+                        color: 'var(--color-text-primary)',
+                        whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>{r.entry.label}</span>
+                      {r.entry.desc && (
+                        <span style={{
+                          fontSize: 10.5, color: 'var(--color-text-secondary)',
+                          lineHeight: 1.35, marginTop: 1, overflow: 'hidden',
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any,
+                        } as React.CSSProperties}>{r.entry.desc}</span>
+                      )}
+                      <span style={{
+                        display: 'inline-block', marginTop: 3, fontSize: 9.5, fontWeight: 600,
+                        textTransform: 'uppercase' as const, letterSpacing: '0.04em',
+                        color: 'var(--color-text-tertiary)',
+                        padding: '1px 6px', borderRadius: 3,
+                        background: 'var(--color-bg-hover)',
+                      }}>{r.section?.name || r.entry.section}</span>
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {/* Import/Export buttons */}
         <div style={{ padding: '0 12px 8px', display: 'flex', gap: 6 }}>
@@ -4439,29 +4724,51 @@ export const Settings: React.FC = () => {
         
         <div style={styles.sectionList}>
           {(() => {
-            const q = settingsSearch.toLowerCase();
+            const q = settingsSearch.trim().toLowerCase();
             if (q) {
-              const filtered = SECTIONS.filter(s => s.name.toLowerCase().includes(q));
-              return filtered.map(section => (
-                <button
-                  key={section.id}
-                  className="settings-nav"
-                  data-active={activeSection === section.id ? 'true' : undefined}
-                  aria-current={activeSection === section.id ? 'page' : undefined}
-                  aria-label={`Navigate to ${section.name} settings`}
-                  style={{
-                    ...styles.sectionItem,
-                    background: activeSection === section.id ? 'var(--pg-row-active)' : 'transparent',
-                    color: activeSection === section.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                    boxShadow: activeSection === section.id ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
-                    fontWeight: activeSection === section.id ? 600 : 500,
-                  }}
-                  onClick={() => setActiveSection(section.id)}
-                >
-                  <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-accent)' : 'currentColor' }}>{section.icon}</span>
-                  <span>{section.name}</span>
-                </button>
-              ));
+              // A section is relevant if its own name/keywords match the query
+              // OR it owns at least one matched setting. Ordered by SECTIONS so
+              // the list stays stable.
+              const matchedSectionIds = new Set(searchResults.map(r => r.entry.section));
+              const filtered = SECTIONS.filter(s =>
+                matchedSectionIds.has(s.id)
+                || s.name.toLowerCase().includes(q)
+                || (s.keywords ? s.keywords.toLowerCase().includes(q) : false),
+              );
+              if (filtered.length === 0) {
+                return (
+                  <div style={{ padding: '12px 14px', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                    No matching sections.
+                  </div>
+                );
+              }
+              return (
+                <React.Fragment>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: '12px 14px 4px' }}>
+                    Sections ({filtered.length})
+                  </div>
+                  {filtered.map(section => (
+                    <button
+                      key={section.id}
+                      className="settings-nav"
+                      data-active={activeSection === section.id ? 'true' : undefined}
+                      aria-current={activeSection === section.id ? 'page' : undefined}
+                      aria-label={`Navigate to ${section.name} settings`}
+                      style={{
+                        ...styles.sectionItem,
+                        background: activeSection === section.id ? 'var(--pg-row-active)' : 'transparent',
+                        color: activeSection === section.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                        boxShadow: activeSection === section.id ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
+                        fontWeight: activeSection === section.id ? 600 : 500,
+                      }}
+                      onClick={() => jumpToSection(section.id)}
+                    >
+                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-accent)' : 'currentColor' }}>{section.icon}</span>
+                      <span>{section.name}</span>
+                    </button>
+                  ))}
+                </React.Fragment>
+              );
             }
             return SECTION_CATEGORIES.map(cat => {
               const items = cat.ids.map(id => sectionMap.get(id)).filter(Boolean) as SettingSection[];

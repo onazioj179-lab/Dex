@@ -41,6 +41,7 @@ import type { GestureEvent } from '../shell/GestureEngine';
 import { gestureRecognizer, initializeTouchSystem } from '../utils/TouchInputSystem';
 import { AppOverview } from '../shell/AppOverview';
 import { NotificationBanners, NotificationCenter, useBannerNotifications } from '../shell/NotificationBanners';
+import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { getDockReflectionStyle } from '../shell/WallpaperAccent';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
 import StageManager, { STAGE_STRIP_WIDTH } from '../shell/StageManager';
@@ -792,7 +793,40 @@ export const AppManager: React.FC = () => {
   // -- Shell interaction layers --------------------------------------------
   const [showOverview, setShowOverview] = useState(false);
   const [showNotifCenter, setShowNotifCenter] = useState(false);
+  // Transient banner stack only (top-right). History/center is now hub-backed.
   const bannerNotifications = useBannerNotifications();
+
+  // Single, persistent notification center backed by the unified hub
+  // (notification-center:* channels -> dex.db). The in-memory banner history is
+  // no longer the center's source of truth; this store survives reloads and is
+  // grouped + priority-ordered via the shared policy.
+  const hubNotifications = useNotificationCenterStore(s => s.notifications);
+  const hubUnreadCount = useNotificationCenterStore(s => s.unreadCount);
+  const hubLoadNotifications = useNotificationCenterStore(s => s.loadNotifications);
+  const hubLoadUnreadCount = useNotificationCenterStore(s => s.loadUnreadCount);
+  const hubMarkRead = useNotificationCenterStore(s => s.markRead);
+  const hubClearAll = useNotificationCenterStore(s => s.clearAll);
+  const hubGetOrdered = useNotificationCenterStore(s => s.getOrdered);
+
+  // Refresh hub state whenever the center opens; keep the badge count warm.
+  useEffect(() => { hubLoadUnreadCount(); }, [hubLoadUnreadCount]);
+  useEffect(() => { if (showNotifCenter) hubLoadNotifications(); }, [showNotifCenter, hubLoadNotifications]);
+
+  // Map persisted hub records to the BannerNotification shape the existing
+  // (DEX Sharp) NotificationCenter renders. Priority-ordered via the store.
+  const centerNotifications = useMemo(() => {
+    void hubNotifications; // re-derive when the underlying list changes
+    return hubGetOrdered().map((n) => ({
+      id: String(n.id),
+      title: n.title,
+      body: n.body || undefined,
+      icon: n.icon,
+      priority: n.priority,
+      source: n.source,
+      timestamp: n.timestamp,
+      read: n.read !== 0,
+    }));
+  }, [hubNotifications, hubGetOrdered]);
 
   // Wire the app-wide 'dex-notification' CustomEvent to the banner system.
   // Dispatchers across the app (shortcuts, workflows, app lifecycle in
@@ -4122,7 +4156,7 @@ export const AppManager: React.FC = () => {
         {/* Quick Controls -- network mode + permission pills with popovers */}
         <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
 
-        {/* Notification Center bell */}
+        {/* Notification Center bell -- opens the single hub-backed center */}
         <button
           onClick={() => setShowNotifCenter(v => !v)}
           title="Notification Center"
@@ -4140,7 +4174,7 @@ export const AppManager: React.FC = () => {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
           </svg>
-          {bannerNotifications.history.length > 0 && (
+          {hubUnreadCount > 0 && (
             <span style={{
               position: 'absolute', top: 0, right: 0,
               width: 6, height: 6, borderRadius: '50%',
@@ -5249,11 +5283,13 @@ export const AppManager: React.FC = () => {
         onDismiss={bannerNotifications.dismiss}
       />
 
-      {/* Notification Center slide-in panel */}
+      {/* Notification Center slide-in panel -- single hub-backed center
+          (persistent, grouped, priority-ordered). */}
       <NotificationCenter
         open={showNotifCenter}
-        notifications={bannerNotifications.history}
-        onClearAll={bannerNotifications.clearHistory}
+        notifications={centerNotifications}
+        onClearAll={() => { void hubClearAll(); }}
+        onMarkAsRead={(id) => { const n = Number(id); if (!Number.isNaN(n)) void hubMarkRead(n); }}
         onClose={() => setShowNotifCenter(false)}
       />
 
