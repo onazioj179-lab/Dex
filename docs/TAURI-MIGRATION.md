@@ -110,6 +110,29 @@ NumberInput, ColorPicker, EnhancedKnob, RichTextInput) don't react to light
 mode. Needs careful per-consumer migration (some feed canvas fillStyle,
 which can't resolve CSS vars). Plus: finish the partial wave-3/4/5 sweeps.
 
+**Renderer slice (2026-06-13): v5.5 "DEX Sharp" batch 4 (foundation + finish)
+— PR #24.** Did the highest-leverage light-mode fix safely: `tokens.colors`
+(styles/tokens.ts) now maps to CSS vars (old dark literals as fallbacks) — its
+~247 inline-style consumers across 23 files become theme-aware; proven safe
+first (zero canvas/hex-concat/equality consumers, verified by grep). New
+foundation tokens (dark+light): --color-accent-dark (wired into primary button
+:active), --color-surface-1/2/3 (translucent neutrals), --color-scrim (wired
+into the Modal backdrop + CommandPalette + UnifiedSystems). Fixed a real
+app-wide bug: App.tsx applied a stored sentinel 'var(--color-accent)' to
+--color-accent (circular self-reference -> property empty everywhere -> every
+var(--color-accent) fell back to hardcoded dark-blue, so accent never themed to
+light); now validated as a real color before applying. Finished the
+limit-interrupted sweeps by hand: CommandPalette + UnifiedSystems clean;
+CollabHub made theme-aware (was a dark-only gradient app); Learn + DexCode
+stragglers done. Confirmed system/productivity/browser/files/creative/polish/
+prism/flux subdirs are pure .ts (nothing to sweep). Verified: tsc clean, vite
+build clean, full unit suite GREEN (5584 passed, terminal test now passing),
+light-mode token resolution + accent theming confirmed live in preview.
+Remaining (lower-priority, none block shipping): broad --color-surface-*
+adoption across subtle-surface sites, structural flex-centering of the
+width-guarded creative modals, Axl accent migration, AppManager inline-SVG ->
+DexIcon.
+
 **Renderer slice (2026-06-09): uki chat app finished on top of `uki-chat:*`.**
 `DEXAPPLICATIONS/standalone/Uki.tsx` (app id `uki`, wired into AppManager +
 appSubsystem + AppIcon `sparkle`) is now feature-complete against the native
