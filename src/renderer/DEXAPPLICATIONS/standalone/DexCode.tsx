@@ -855,7 +855,7 @@ const S: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: 22,
     letterSpacing: '-0.03em',
-    fontWeight: 700,
+    fontWeight: 600,
   },
   subtitle: {
     margin: 0,

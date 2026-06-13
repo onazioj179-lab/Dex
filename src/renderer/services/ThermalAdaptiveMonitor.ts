@@ -35,6 +35,10 @@ let lastFrameTs = 0;
 let cleanFrameCount = 0;
 let rafHandle = 0;
 let longTasksInWindow = 0;
+// Long-task observer + its decay interval are created lazily in start() and
+// torn down in stop() so a start/stop/start cycle doesn't leak duplicates.
+let longTaskObserver: PerformanceObserver | null = null;
+let longTaskDecayInterval: ReturnType<typeof setInterval> | null = null;
 
 function setLevel(next: ThermalLevel, reason: string): void {
   if (next === currentLevel) return;
@@ -102,7 +106,8 @@ export function startThermalAdaptiveMonitor(): void {
         // Decay the long-task count on a slow timer so old jank doesn't linger
       });
       try { obs.observe({ entryTypes: ['longtask'] }); } catch { /* not supported */ }
-      setInterval(() => { longTasksInWindow = Math.max(0, longTasksInWindow - 1); }, 1500);
+      longTaskObserver = obs;
+      longTaskDecayInterval = setInterval(() => { longTasksInWindow = Math.max(0, longTasksInWindow - 1); }, 1500);
     }
   } catch { /* */ }
 
@@ -125,6 +130,8 @@ export function stopThermalAdaptiveMonitor(): void {
   started = false;
   if (rafHandle) cancelAnimationFrame(rafHandle);
   rafHandle = 0;
+  if (longTaskObserver) { longTaskObserver.disconnect(); longTaskObserver = null; }
+  if (longTaskDecayInterval) { clearInterval(longTaskDecayInterval); longTaskDecayInterval = null; }
   frameTimes = [];
   lastFrameTs = 0;
 }

@@ -46,7 +46,7 @@ const S: Record<string, React.CSSProperties> = {
     width: '100%',
     background: 'var(--color-bg-base, #161618)',
     color: 'var(--color-text-primary, #e0e0e0)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -965,7 +965,7 @@ const DexNotes: React.FC = () => {
             border: '1px solid var(--color-border)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#e5e5ea', marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: '#e5e5ea', marginBottom: 8 }}>
               Move to Trash?
             </div>
             <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>

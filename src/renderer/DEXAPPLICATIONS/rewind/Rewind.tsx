@@ -1214,7 +1214,7 @@ const timer = setInterval(check, 15000);
       {releaseNotesModal && (
         <div style={S.lightboxOverlay} role="dialog" aria-label="Release notes" aria-modal="true" onMouseDown={() => setReleaseNotesModal(null)}>
           <div style={{ ...S.aboutCard, maxWidth: 640, textAlign: 'left' as const }} onMouseDown={e => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Release notes {releaseNotesModal.version}</div>
+            <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 8 }}>Release notes {releaseNotesModal.version}</div>
             <div style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' as const, maxHeight: 360, overflowY: 'auto' }}>
               {releaseNotesModal.notes || 'No release notes available.'}
             </div>
@@ -1375,7 +1375,7 @@ const timer = setInterval(check, 15000);
       {aboutModal && (
         <div style={S.lightboxOverlay} onMouseDown={() => setAboutModal(false)}>
           <div style={S.aboutCard} onMouseDown={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>DEX Rewind</div>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 8 }}>DEX Rewind</div>
             <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 12 }}>Version {appVersion}</div>
             <div style={{ fontSize: 12, lineHeight: 1.5, opacity: 0.8 }}>
               Activity logger and search for your desktop -- all data stays local.
@@ -1423,7 +1423,7 @@ const timer = setInterval(check, 15000);
           flexShrink: 0,
         }}>
           {/* Mini tab strip - iOS segmented control style */}
-          <div style={{ display: 'flex', gap: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 3, padding: 2, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 1, background: 'var(--color-surface-1)', borderRadius: 3, padding: 2, flexShrink: 0 }}>
             {(['timeline', 'search'] as const).map(t => (
               <button
                 key={t}
@@ -1951,7 +1951,7 @@ const timer = setInterval(check, 15000);
             value={journalDraft.title}
             onChange={e => setJournalDraft(d => ({ ...d, title: e.target.value }))}
             style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
               borderRadius: 6, padding: '8px 12px', color: 'inherit', fontSize: 13, fontWeight: 600,
               outline: 'none', fontFamily: 'inherit',
             }}
@@ -1963,7 +1963,7 @@ const timer = setInterval(check, 15000);
             onChange={e => setJournalDraft(d => ({ ...d, body: e.target.value }))}
             rows={4}
             style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
               borderRadius: 6, padding: '10px 12px', color: 'inherit', fontSize: 13, lineHeight: 1.6,
               outline: 'none', resize: 'vertical', fontFamily: 'inherit', minHeight: 80,
             }}
@@ -1994,7 +1994,7 @@ const timer = setInterval(check, 15000);
             value={journalDraft.tags}
             onChange={e => setJournalDraft(d => ({ ...d, tags: e.target.value }))}
             style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border-subtle)',
+              background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
               borderRadius: 6, padding: '6px 12px', color: 'inherit', fontSize: 12,
               outline: 'none', fontFamily: 'inherit',
             }}
@@ -2125,7 +2125,7 @@ const timer = setInterval(check, 15000);
                 {entry.tags.map(tag => (
                   <span key={tag} style={{
                     fontSize: 10, padding: '2px 6px', borderRadius: 3,
-                    background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted, #71717a)',
+                    background: 'var(--color-surface-2)', color: 'var(--text-muted, #71717a)',
                   }}>
                     {tag}
                   </span>
@@ -2524,7 +2524,7 @@ const timer = setInterval(check, 15000);
                 gap: 8,
                 padding: '6px 8px',
                 borderRadius: 4,
-                background: 'rgba(255,255,255,0.03)',
+                background: 'var(--color-surface-1)',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>
                 <div>
@@ -2659,7 +2659,7 @@ const timer = setInterval(check, 15000);
                 <div key={entry.id || idx} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '4px 8px', borderRadius: 3,
-                  background: 'rgba(255,255,255,0.02)',
+                  background: 'var(--color-surface-1)',
                   fontSize: 11,
                 }}>
                   <span style={{
@@ -2701,7 +2701,7 @@ const timer = setInterval(check, 15000);
 
 // Status view inline helpers
 const statusCardStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)',
+  background: 'var(--color-surface-1)',
   border: '1px solid rgba(255,255,255,0.06)',
   borderRadius: 8,
   padding: '14px 16px',
@@ -2744,7 +2744,7 @@ const S: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     background: 'var(--rewind-bg, var(--color-bg-base, #0D0D0D))',
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
-    fontFamily: 'var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
+    fontFamily: 'var(--dex-font-ui)',
     overflow: 'hidden',
   },
 
@@ -2770,7 +2770,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 1,
-    background: 'rgba(255,255,255,0.03)',
+    background: 'var(--color-surface-1)',
     borderRadius: 4,
     padding: 2,
     border: '1px solid rgba(255,255,255,0.04)',
@@ -2955,7 +2955,7 @@ const S: Record<string, React.CSSProperties> = {
     gap: 8,
   },
   dateBtn: {
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--color-surface-2)',
     border: 'none',
     borderRadius: 4,
     color: 'var(--color-text-primary, #f5f5f7)',
@@ -2976,7 +2976,7 @@ const S: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
   },
   filterBtn: {
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--color-surface-2)',
     border: '1px solid rgba(255,255,255,0.05)',
     borderRadius: 3,
     color: 'rgba(255,255,255,0.55)',
@@ -2999,7 +2999,7 @@ const S: Record<string, React.CSSProperties> = {
     gap: 10,
     padding: '10px 12px',
     borderRadius: 4,
-    background: 'rgba(255,255,255,0.02)',
+    background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.04)',
   },
   entryIcon: {
@@ -3053,12 +3053,12 @@ const S: Record<string, React.CSSProperties> = {
     gap: 8,
     padding: '6px 10px',
     borderRadius: 4,
-    background: 'rgba(255,255,255,0.03)',
+    background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.06)',
   },
   searchInput: {
     flex: 1,
-    background: 'rgba(255,255,255,0.03)',
+    background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.05)',
     borderRadius: 3,
     outline: 'none',
@@ -3079,7 +3079,7 @@ const S: Record<string, React.CSSProperties> = {
 
   // Buttons
   headerBtn: {
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--color-surface-2)',
     border: '1px solid rgba(255,255,255,0.05)',
     borderRadius: 3,
     color: 'var(--rewind-text, var(--color-text-primary, #EBEBEB))',
@@ -3092,7 +3092,7 @@ const S: Record<string, React.CSSProperties> = {
   insightCard: {
     padding: '12px 14px',
     borderRadius: 4,
-    background: 'rgba(255,255,255,0.025)',
+    background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.05)',
   },
   statBox: {
@@ -3136,7 +3136,7 @@ const S: Record<string, React.CSSProperties> = {
   // Exclude
   excludeInput: {
     flex: 1,
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--color-surface-2)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 4,
     padding: '4px 8px',
@@ -3150,7 +3150,7 @@ const S: Record<string, React.CSSProperties> = {
     gap: 4,
     padding: '2px 8px',
     borderRadius: 4,
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--color-surface-2)',
     fontSize: 11,
   },
   excludeRemove: {
@@ -3165,7 +3165,7 @@ const S: Record<string, React.CSSProperties> = {
 
   // Select
   select: {
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--color-surface-2)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 4,
     color: 'var(--color-text-primary, #f5f5f7)',
@@ -3197,7 +3197,7 @@ const S: Record<string, React.CSSProperties> = {
   screenshotCard: {
     borderRadius: 4,
     overflow: 'hidden',
-    background: 'rgba(255,255,255,0.02)',
+    background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.05)',
     cursor: 'pointer',
   },
@@ -3213,7 +3213,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255,255,255,0.02)',
+    background: 'var(--color-surface-1)',
     fontSize: 14,
     opacity: 0.3,
   },

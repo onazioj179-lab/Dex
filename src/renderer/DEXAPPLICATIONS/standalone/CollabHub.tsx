@@ -31,7 +31,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     background: 'linear-gradient(180deg, var(--color-bg-elevated, #1a1a1c) 0%, var(--color-bg-base, #0d0d0f) 100%)',
     color: 'var(--color-text-primary, #fff)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
   },
   header: {
     display: 'flex',
@@ -58,7 +58,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     fontSize: 18,
-    fontWeight: 700,
+    fontWeight: 600,
+    letterSpacing: '-0.01em',
     margin: 0,
     background: 'linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%)',
     WebkitBackgroundClip: 'text',

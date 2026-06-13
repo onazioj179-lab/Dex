@@ -1378,8 +1378,6 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     display: 'flex',
     background: 'var(--pg-surface)',
-    backdropFilter: 'var(--blur-xl) saturate(180%)',
-    WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
     fontSize: '13px',

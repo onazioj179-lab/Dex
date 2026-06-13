@@ -1479,7 +1479,7 @@ export const TitleInput: React.FC<TitleInputProps> = memo(({ title, onChange, re
         fontSize: 24,
         fontWeight: 700,
         padding: '16px 32px 8px',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: 'var(--dex-font-ui)',
       }}
     />
   );

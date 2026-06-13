@@ -291,7 +291,7 @@ const controlsBarStyle: React.CSSProperties = {
 };
 
 const timecodeStyle: React.CSSProperties = {
-  fontSize: 11, fontFamily: '"SF Mono", "Cascadia Code", "JetBrains Mono", monospace',
+  fontSize: 11, fontFamily: 'var(--font-mono)',
   fontVariantNumeric: 'tabular-nums slashed-zero', color: 'var(--color-text-primary)',
   minWidth: 72, textAlign: 'center', letterSpacing: '0.02em', flexShrink: 0,
 };

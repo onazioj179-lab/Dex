@@ -49,10 +49,12 @@
   --color-bg-hover: #1E1E22;
   --color-bg-active: #252528;
   --color-bg-overlay: #0E0E10;
-  /* Glass fills — DEX 6.0 reduced-glass redesign (GOAL-6D): transparency -50%
-     for readability (alpha raised so surfaces read closer to solid). */
-  --color-bg-glass: rgba(22, 22, 24, 0.86);
-  --color-bg-glass-strong: rgba(26, 26, 30, 0.93);
+  /* "Glass" fills — DEX Sharp full-flat (2026-06-13): now fully OPAQUE solid
+     surfaces (owner direction: strip the glass, place surfaces solidly). Kept
+     under the same token names so the ~hundreds of existing consumers go solid
+     with no per-site edits. Was rgba(22,22,24,0.86)/rgba(26,26,30,0.93). */
+  --color-bg-glass: #161618;
+  --color-bg-glass-strong: #1A1A1E;
   --color-bg-blur: #121214;
   --color-bg-secondary: #121214;
   --color-bg-elevated: #1A1A1E;
@@ -333,11 +335,14 @@
      Glass/Blur Effects
      ───────────────────────────────────────────────────────────────────────── */
   
-  /* DEX 6.0 reduced-glass redesign (GOAL-6D): blur -60% for clarity. */
-  --blur-sm: blur(2px);
-  --blur-md: blur(4px);
-  --blur-lg: blur(8px);
-  --blur-xl: blur(13px);
+  /* DEX Sharp full-flat (2026-06-13): backdrop blur disabled platform-wide.
+     Surfaces are solid/placed, so every `var(--blur-*)` consumer (inline or in
+     CSS) renders with no frost and no GPU compositing cost. Restore the GOAL-6D
+     values (2/4/8/13px) here to bring frosted glass back. */
+  --blur-sm: blur(0px);
+  --blur-md: blur(0px);
+  --blur-lg: blur(0px);
+  --blur-xl: blur(0px);
   --saturate: saturate(180%);
   
   /* ─────────────────────────────────────────────────────────────────────────
@@ -487,8 +492,8 @@
   --shadow-ambient-2: 0 8px 32px rgba(0,0,0,0.15);
   --shadow-ambient-3: 0 16px 48px rgba(0,0,0,0.20);
   
-  /* 922. Surface materials (visionOS-style) */
-  --surface-glass: rgba(22, 22, 26, 0.85);
+  /* Surface materials — DEX Sharp full-flat: opaque (was rgba(22,22,26,0.85)). */
+  --surface-glass: #16161A;
   --surface-frosted: rgba(255, 255, 255, 0.08);
   --surface-tinted: rgba(74, 158, 255, 0.12);
   --surface-matte: rgba(30, 30, 34, 0.95);
@@ -1110,9 +1115,9 @@ html[data-contrast="high"] *:focus-visible {
   --color-bg-hover: #E2E2E5;
   --color-bg-active: #D8D8DC;
   --color-bg-overlay: #F7F7F9;
-  /* GOAL-6D transparency -50% pass (light theme). */
-  --color-bg-glass: rgba(245, 245, 248, 0.93);
-  --color-bg-glass-strong: rgba(240, 240, 243, 0.96);
+  /* DEX Sharp full-flat (light theme): opaque solid surfaces. */
+  --color-bg-glass: #F5F5F8;
+  --color-bg-glass-strong: #F0F0F3;
   --color-bg-blur: #F2F2F4;
   --color-bg-secondary: #EDEDED;
   --color-bg-elevated: #FFFFFF;
@@ -4109,7 +4114,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: var(--radius-2xl);
   padding: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  font-family: var(--dex-font-ui);
   user-select: none;
 }
 

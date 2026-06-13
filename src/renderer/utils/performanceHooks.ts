@@ -518,6 +518,6 @@ export const DEX_THEME = {
   transitionSlow: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
   
   // Font
-  fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+  fontFamily: 'var(--dex-font-ui)',
   fontMono: '"SF Mono", Monaco, Consolas, "Liberation Mono", monospace',
 } as const;

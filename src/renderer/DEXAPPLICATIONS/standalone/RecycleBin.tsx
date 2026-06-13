@@ -229,7 +229,7 @@ const RecycleBin: React.FC = () => {
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>Trash</div>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Trash</div>
             <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
               {totalCount} {totalCount === 1 ? 'item' : 'items'} &middot; auto-deleted after 30 days
             </div>

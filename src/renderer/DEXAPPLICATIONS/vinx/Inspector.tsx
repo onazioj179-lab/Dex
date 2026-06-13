@@ -54,7 +54,7 @@ const propertyLabelStyle: React.CSSProperties = {
 const numberInputStyle: React.CSSProperties = {
   flex: 1, height: 20, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
   borderRadius: 2, padding: '0 4px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
-  textAlign: 'right', fontFamily: '"SF Mono", "Cascadia Code", "JetBrains Mono", monospace',
+  textAlign: 'right', fontFamily: 'var(--font-mono)',
   fontVariantNumeric: 'tabular-nums slashed-zero',
   minWidth: 0,
 };

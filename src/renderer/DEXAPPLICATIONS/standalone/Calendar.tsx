@@ -609,7 +609,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     background: 'var(--color-bg-base)',
     color: 'var(--color-text-primary)',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
     overflow: 'hidden',
   },
   header: {
@@ -1103,7 +1103,7 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
     transition: 'all 0.15s ease',
     fontWeight: 500,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
   timeRow: {
     display: 'flex',
@@ -1119,7 +1119,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     fontSize: '12px',
     fontWeight: 500,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
   timeSep: {
     color: 'var(--color-text-muted)',
@@ -1155,7 +1155,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '70px',
     outline: 'none',
     fontWeight: 500,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
   modalFooter: {
     display: 'flex',
@@ -1174,7 +1174,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
   saveBtn: {
     padding: '8px 16px',
@@ -1186,7 +1186,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: 'var(--dex-font-ui)',
   },
 };
 

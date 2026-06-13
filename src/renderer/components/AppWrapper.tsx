@@ -423,7 +423,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     background: 'var(--color-bg-base, #1a1a1c)',
     color: 'var(--color-text-primary, #ffffff)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'var(--dex-font-ui)',
     zIndex: 1000,
   },
   errorContent: {

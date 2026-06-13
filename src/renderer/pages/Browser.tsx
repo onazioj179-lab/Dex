@@ -269,6 +269,31 @@ export const Browser: React.FC = () => {
   const createTabRef = useRef<((background?: boolean) => void) | null>(null);
   const refreshRef = useRef<(() => void) | null>(null);
 
+  // Reconcile credential-capture message listeners against live tabs. Bulk-close
+  // paths (closeAllTabs / closeTabsToRight / closeOtherTabs) drop tabs without
+  // visiting closeTab, so their per-tab 'message' listeners would otherwise leak
+  // and keep firing for dead tabs. Remove any handler whose tab is gone, and on
+  // unmount drain whatever remains.
+  useEffect(() => {
+    const liveIds = new Set(tabs.map(t => t.id));
+    for (const [id, handler] of credMsgHandlersRef.current) {
+      if (!liveIds.has(id)) {
+        window.removeEventListener('message', handler);
+        credMsgHandlersRef.current.delete(id);
+      }
+    }
+  }, [tabs]);
+
+  useEffect(() => {
+    const handlers = credMsgHandlersRef.current;
+    return () => {
+      for (const handler of handlers.values()) {
+        window.removeEventListener('message', handler);
+      }
+      handlers.clear();
+    };
+  }, []);
+
   // Keep the active and pinned tabs resident; unload older background tabs once
   // the tab count exceeds the memory budget so the browser stays responsive.
   useEffect(() => {
@@ -2179,8 +2204,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
     padding: '4px 8px',
     background: 'var(--pg-toolbar)',
-    backdropFilter: 'var(--blur-lg) saturate(170%)',
-    WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)',
     borderBottom: '1px solid var(--pg-border)',
     WebkitAppRegion: 'drag',
     minHeight: '34px',
@@ -2316,8 +2339,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
     padding: '4px 8px 5px',
     background: 'var(--pg-toolbar)',
-    backdropFilter: 'var(--blur-lg) saturate(170%)',
-    WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)',
     borderBottom: '1px solid var(--pg-border)',
   },
   navBtnSmall: {

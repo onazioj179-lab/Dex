@@ -657,7 +657,9 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           }} />
         )}
 
-        {/* Title bar -- premium glass */}
+        {/* Title bar -- DEX Sharp: a solid "placed" toolbar (like a native OS
+            title bar), not floating glass. Opaque surface + hairline base; no
+            backdrop-filter so window edges stay crisp and there is no GPU blur. */}
         <div
           onPointerDown={handleTitlePointerDown}
           onDoubleClick={handleMaximizeClick}
@@ -666,10 +668,8 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: isActive ? 'var(--pg-toolbar)' : 'var(--pg-surface)',
-            backdropFilter: 'var(--blur-lg) saturate(170%)',
-            WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)',
-            borderBottom: '1px solid var(--pg-border)',
+            background: isActive ? 'var(--color-bg-elevated)' : 'var(--color-bg-surface)',
+            borderBottom: '1px solid var(--color-border-subtle)',
             boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
             flexShrink: 0,
             position: 'relative',

@@ -881,7 +881,7 @@ const Prism: React.FC = () => {
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
       </div>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>PRISM</div>
+        <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>PRISM</div>
         <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Open an image or create a new canvas to get started</span>
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
@@ -2562,7 +2562,7 @@ const Prism: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
-    logo: { fontSize: '12px', fontWeight: 800, color: '#ff375f', letterSpacing: '-0.2px' },
+    logo: { fontSize: '12px', fontWeight: 600, color: '#ff375f', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
     btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease', whiteSpace: 'nowrap', flexShrink: 0 },
@@ -2577,7 +2577,7 @@ const Prism: React.FC = () => {
     sidebar: { width: '240px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     panel: { borderBottom: '1px solid var(--color-border-subtle)' },
     panelHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--color-bg-surface)', cursor: 'pointer' },
-    panelTitle: { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#ff375f', letterSpacing: '1px' },
+    panelTitle: { fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#ff375f', letterSpacing: '1px' },
     panelContent: { padding: '10px', flex: 1, overflowY: 'auto', minHeight: 0 },
     layerItem: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-border-subtle)', borderRadius: '6px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.12s ease' },
     layerItemSelected: { background: '#2e1520', border: '1px solid #4a2035' },

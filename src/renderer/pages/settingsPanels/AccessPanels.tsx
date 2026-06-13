@@ -64,7 +64,7 @@ const BTN_PRIMARY: React.CSSProperties = {
 const TEXTAREA: React.CSSProperties = {
   width: '100%',
   minHeight: 70,
-  fontFamily: 'ui-monospace, "SF Mono", monospace',
+  fontFamily: 'var(--font-mono)',
   fontSize: 11,
   padding: 8,
   borderRadius: 4,
@@ -327,7 +327,7 @@ export const SnapLayoutsPanel: React.FC = () => {
           <div key={i} style={ROW}>
             <div style={LABEL}>{s.label}</div>
             <kbd style={{
-              fontFamily: 'ui-monospace, monospace',
+              fontFamily: 'var(--font-mono)',
               fontSize: 11,
               padding: '3px 8px',
               borderRadius: 3,

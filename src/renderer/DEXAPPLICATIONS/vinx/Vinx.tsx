@@ -1977,7 +1977,7 @@ const VinxEditor: React.FC = () => {
                     <span style={{ fontSize: 11, color: job.status === 'complete' ? 'var(--color-success)' : job.status === 'encoding' ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{job.status}</span>
                   </div>
                   <div style={{ height: 3, borderRadius: 2, background: 'var(--color-bg-hover)' }}>
-                    <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent)', width: `${job.progress}%`, transition: 'width 0.3s' }} />
+                    <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent)', width: `${job.progress}%`, transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)' }} />
                   </div>
                 </div>
               ))
@@ -2149,7 +2149,7 @@ const VinxEditor: React.FC = () => {
                   {group.shortcuts.map(([key, action]) => (
                     <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{action}</span>
-                      <kbd style={{ padding: '2px 8px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'monospace' }}>{key}</kbd>
+                      <kbd style={{ padding: '2px 8px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>{key}</kbd>
                     </div>
                   ))}
                 </div>
@@ -2161,7 +2161,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Timecode Overlay (HUD in viewer) */}
       {timecodeOverlayEnabled && (
-        <div style={{ position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)', padding: '4px 12px', background: 'rgba(0,0,0,0.7)', borderRadius: 4, fontSize: 14, fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', zIndex: 90, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)', padding: '4px 12px', background: 'rgba(0,0,0,0.7)', borderRadius: 4, fontSize: 14, fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', zIndex: 90, pointerEvents: 'none' }}>
           {formatTimecode(currentFrame, project.frameRate)}
         </div>
       )}

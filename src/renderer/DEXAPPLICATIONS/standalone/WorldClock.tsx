@@ -236,7 +236,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '12px 20px', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
     flexShrink: 0,
   },
-  title: { fontSize: 16, fontWeight: 700 },
+  title: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em' },
   toolbarRight: { display: 'flex', gap: 6 },
   toggleBtn: {
     padding: '5px 10px', borderRadius: 4, border: 'none',

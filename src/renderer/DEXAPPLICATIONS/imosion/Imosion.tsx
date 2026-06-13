@@ -1818,7 +1818,7 @@ const TrackChannelStrip = memo<{
         </svg>
       </div>
       <input type="range" min="-1" max="1" step="0.01" value={track.pan} onChange={(e) => onUpdate({ pan: parseFloat(e.target.value) })} style={{ width: '100%', marginTop: '4px' }} />
-      <span style={{ fontSize: '8px', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>{track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}</span>
+      <span style={{ fontSize: '8px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>{track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}</span>
     </div>
     <div style={{ flex: 1, padding: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <span style={{ fontSize: '7px', color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Vol</span>
@@ -1842,7 +1842,7 @@ const TrackChannelStrip = memo<{
         </div>
         <input type="range" min="0" max="1.5" step="0.01" value={track.volume} onChange={(e) => onUpdate({ volume: parseFloat(e.target.value) })} style={{ position: 'absolute', width: '100%', maxHeight: '120px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} />
       </div>
-      <span style={{ fontSize: '9px', color: track.color, fontFamily: 'monospace', marginTop: '4px' }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(1)} dB</span>
+      <span style={{ fontSize: '9px', color: track.color, fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(1)} dB</span>
     </div>
     <div style={{ padding: '6px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'center', gap: '4px' }}>
       <button aria-label="Mute" onClick={(e) => { e.stopPropagation(); onUpdate({ muted: !track.muted }); }} style={{ width: '22px', height: '18px', borderRadius: '2px', border: '1px solid', borderColor: track.muted ? 'rgba(10,132,255,0.4)' : 'var(--color-border-default)', background: track.muted ? 'var(--color-accent)' : 'var(--color-bg-tertiary)', color: track.muted ? '#fff' : 'var(--color-text-muted)', cursor: 'pointer', fontSize: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name="volume-x" size={10} /></button>
@@ -5050,7 +5050,7 @@ const Imosion: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <img src={new URL('../../../../appicons/imosion.png', import.meta.url).href} alt="Imosion" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>Imosion</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>Imosion</span>
           </div>
           <AutosaveIndicator state={autosaveState} lastSavedAt={autosaveLastSavedAt} />
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
@@ -5175,11 +5175,11 @@ const Imosion: React.FC = () => {
             )}
             {/* Count-in countdown */}
             {isCountingIn && (
-              <span style={{ padding: '2px 8px', borderRadius: '3px', background: '#2a1840', color: '#bf5af2', fontSize: '12px', fontWeight: 700, fontFamily: '"SF Mono", monospace', animation: 'pulse 0.5s ease-in-out infinite' }}>{countInRemaining}</span>
+              <span style={{ padding: '2px 8px', borderRadius: '3px', background: '#2a1840', color: '#bf5af2', fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono)', animation: 'pulse 0.5s ease-in-out infinite' }}>{countInRemaining}</span>
             )}
             {/* Recording elapsed timer */}
             {isRecording && (
-              <span style={{ padding: '2px 6px', borderRadius: '3px', background: '#3a1818', border: '1px solid #4a2020', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, fontFamily: '"SF Mono", monospace', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ padding: '2px 6px', borderRadius: '3px', background: '#3a1818', border: '1px solid #4a2020', color: 'var(--color-error)', fontSize: '10px', fontWeight: 600, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-error)', animation: 'pulse 1s ease-in-out infinite' }} />
                 {Math.floor(recordElapsed / 60).toString().padStart(2, '0')}:{Math.floor(recordElapsed % 60).toString().padStart(2, '0')}
               </span>
@@ -5190,12 +5190,12 @@ const Imosion: React.FC = () => {
           <div data-testid="imosion-transport" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-bg-base)', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
             <div onClick={() => setTimeDisplayMode(m => m === 'time' ? 'bars' : 'time')} title="Click to toggle" style={{ padding: '4px 14px', cursor: 'pointer', borderRight: '1px solid var(--color-bg-hover)', minWidth: '110px', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>{timeDisplayMode === 'time' ? 'TIME' : 'BARS'}</div>
-              <div style={{ fontFamily: '"SF Mono", Consolas, monospace', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '0.5px' }}>{formatTime(currentTime)}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '0.5px' }}>{formatTime(currentTime)}</div>
             </div>
             {!beginnerMode && <>
             <div style={{ padding: '4px 10px', borderRight: '1px solid var(--color-bg-hover)', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>BPM</div>
-              <input data-testid="bpm-display" type="number" value={bpm} onChange={(e) => setBpm(Math.max(40, Math.min(300, parseInt(e.target.value) || 120)))} style={{ width: '42px', background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 600, textAlign: 'center', fontFamily: '"SF Mono", monospace' }} />
+              <input data-testid="bpm-display" type="number" value={bpm} onChange={(e) => setBpm(Math.max(40, Math.min(300, parseInt(e.target.value) || 120)))} style={{ width: '42px', background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 600, textAlign: 'center', fontFamily: 'var(--font-mono)' }} />
             </div>
             <div style={{ padding: '4px 8px', textAlign: 'center' }}>
               <div style={{ fontSize: '7px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px', marginBottom: '1px' }}>KEY</div>
@@ -5226,7 +5226,7 @@ const Imosion: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#636366" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
             <input type="range" min="0" max="1" step="0.01" value={masterSettings.volume} onChange={(e) => setMasterSettings(s => ({ ...s, volume: parseFloat(e.target.value) }))} style={{ width: '56px' }} />
-            <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: '"SF Mono", monospace', minWidth: '24px', textAlign: 'right' }}>{Math.round(masterSettings.volume * 100)}%</span>
+            <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', minWidth: '24px', textAlign: 'right' }}>{Math.round(masterSettings.volume * 100)}%</span>
           </div>
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* Export */}
@@ -5263,7 +5263,7 @@ const Imosion: React.FC = () => {
           <div style={{ flex: 1, height: '3px', background: 'var(--color-border-subtle)', borderRadius: '2px', overflow: 'hidden', maxWidth: '140px' }}>
             <div style={{ height: '100%', width: `${inputLevel * 100}%`, background: inputLevel > 0.85 ? 'var(--color-error)' : inputLevel > 0.6 ? 'var(--color-warning)' : '#3a3a3c', transition: 'width 0.05s', borderRadius: '2px' }} />
           </div>
-          <span style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: '"SF Mono", monospace', minWidth: '35px' }}>{inputLevel > 0 ? `${Math.round((inputLevel - 1) * 60)}dB` : '-dB'}</span>
+          <span style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: 'var(--font-mono)', minWidth: '35px' }}>{inputLevel > 0 ? `${Math.round((inputLevel - 1) * 60)}dB` : '-dB'}</span>
         </div>
       )}
 
@@ -5307,7 +5307,7 @@ const Imosion: React.FC = () => {
                     <div style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', marginTop: '1px', display: 'flex', alignItems: 'center', gap: 3 }}>
                       {!beginnerMode && track.plugins.length > 0 && <span style={{ background: 'var(--color-bg-hover)', padding: '0 3px', borderRadius: 2 }}>{track.plugins.length} FX</span>}
                       {track.output !== 'master' && <span style={{ color: track.color + '80' }}>→ {buses.find(b => b.id === track.output)?.name || 'Bus'}</span>}
-                      <span style={{ fontFamily: '"SF Mono", monospace' }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(0)}dB</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(0)}dB</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '2px' }}>
@@ -5359,7 +5359,7 @@ const Imosion: React.FC = () => {
                 <button aria-label="Zoom Out" onClick={() => setZoom(z => Math.max(10, z / 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }} title="Zoom Out (Ctrl+Minus)">{Icon.zoomOut}</button>
                 <button aria-label="Reset Zoom" onClick={() => setZoom(40)} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px', fontSize: '9px', color: 'var(--color-text-muted)' }} title="Reset Zoom">1:1</button>
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontFamily: '"SF Mono", monospace', minWidth: '36px', background: 'var(--color-bg-tertiary)', padding: '4px 8px', borderRadius: '3px', textAlign: 'center' }}>{Math.round(zoom)}px</span>
+              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: '36px', background: 'var(--color-bg-tertiary)', padding: '4px 8px', borderRadius: '3px', textAlign: 'center' }}>{Math.round(zoom)}px</span>
               <div className="divider" />
               <button aria-label="Split" onClick={() => setClipEdit(e => ({ ...e, mode: e.mode === 'split' ? 'none' : 'split' }))} className={`btn ${clipEdit.mode === 'split' ? 'btn-active' : ''}`}>{Icon.scissors} Split</button>
             </div>
@@ -5396,7 +5396,7 @@ const Imosion: React.FC = () => {
                 return (
                   <React.Fragment key={`br-${i}`}>
                     <div style={{ position: 'absolute', left: `${x}px`, bottom: 0, width: '1px', height: showLabel ? '10px' : '6px', background: showLabel ? 'var(--color-text-tertiary)' : 'var(--color-border)' }} />
-                    {showLabel && <div style={{ position: 'absolute', left: `${x + 4}px`, top: '3px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: '"SF Mono", Consolas, monospace', fontWeight: 600, whiteSpace: 'nowrap' }}>{i + 1}</div>}
+                    {showLabel && <div style={{ position: 'absolute', left: `${x + 4}px`, top: '3px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', fontWeight: 600, whiteSpace: 'nowrap' }}>{i + 1}</div>}
                     {showBeatTicks && [1,2,3].map(b => (
                       <div key={`bt-${i}-${b}`} style={{ position: 'absolute', left: `${x + b * beatPx}px`, bottom: 0, width: '1px', height: '4px', background: 'var(--color-border-subtle)' }} />
                     ))}
@@ -5704,7 +5704,7 @@ const Imosion: React.FC = () => {
                       </svg>
                     </div>
                     <input type="range" min="-1" max="1" step="0.01" value={track.pan} onChange={(e) => updateTrack(track.id, { pan: parseFloat(e.target.value) })} style={{ width: '100%', marginTop: '4px' }} />
-                    <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}</span>
+                    <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.abs(Math.round(track.pan * 100))}` : `R${Math.round(track.pan * 100)}`}</span>
                   </div>
 
                   {/* Volume Fader */}
@@ -5729,7 +5729,7 @@ const Imosion: React.FC = () => {
                         }
                       }} onDoubleClick={() => updateTrack(track.id, { volume: 1 })} style={{ position: 'absolute', width: '100%', maxHeight: '120px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} title="Hold Shift for fine control. Double-click to reset." />
                     </div>
-                    <span style={{ fontSize: '9px', color: track.volume > 1.01 ? 'var(--color-warning)' : track.color, fontFamily: 'monospace', marginTop: '4px', fontWeight: track.volume > 1.01 ? 700 : 400 }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(1)} dB</span>
+                    <span style={{ fontSize: '9px', color: track.volume > 1.01 ? 'var(--color-warning)' : track.color, fontFamily: 'var(--font-mono)', marginTop: '4px', fontWeight: track.volume > 1.01 ? 700 : 400 }}>{track.volume > 1 ? '+' : ''}{((track.volume - 1) * 60).toFixed(1)} dB</span>
                   </div>
 
                   {/* Controls */}
@@ -5774,7 +5774,7 @@ const Imosion: React.FC = () => {
                       </svg>
                     </div>
                     <input type="range" min="-1" max="1" step="0.01" value={bus.pan} onChange={(e) => updateBus(bus.id, { pan: parseFloat(e.target.value) })} style={{ width: '100%', marginTop: '4px' }} />
-                    <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{bus.pan === 0 ? 'C' : bus.pan < 0 ? `L${Math.abs(Math.round(bus.pan * 100))}` : `R${Math.round(bus.pan * 100)}`}</span>
+                    <span style={{ fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{bus.pan === 0 ? 'C' : bus.pan < 0 ? `L${Math.abs(Math.round(bus.pan * 100))}` : `R${Math.round(bus.pan * 100)}`}</span>
                   </div>
 
                   {/* Volume Fader + VU Meter */}
@@ -5795,7 +5795,7 @@ const Imosion: React.FC = () => {
                       </div>
                       <input type="range" min="0" max="1.5" step="0.01" value={bus.volume} onChange={(e) => updateBus(bus.id, { volume: parseFloat(e.target.value) })} style={{ position: 'absolute', width: '100%', maxHeight: '120px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} />
                     </div>
-                    <span style={{ fontSize: '9px', color: bus.color, fontFamily: 'monospace', marginTop: '4px' }}>{bus.volume > 1 ? '+' : ''}{((bus.volume - 1) * 60).toFixed(1)} dB</span>
+                    <span style={{ fontSize: '9px', color: bus.color, fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{bus.volume > 1 ? '+' : ''}{((bus.volume - 1) * 60).toFixed(1)} dB</span>
                   </div>
 
                   {/* Controls */}
@@ -5822,7 +5822,7 @@ const Imosion: React.FC = () => {
                     </div>
                     <input type="range" min="0" max="1" step="0.01" value={masterSettings.volume} onChange={(e) => setMasterSettings(s => ({ ...s, volume: parseFloat(e.target.value) }))} style={{ position: 'absolute', width: '100%', maxHeight: '140px', height: '100%', WebkitAppearance: 'slider-vertical', writingMode: 'vertical-lr', opacity: 0.01, cursor: 'pointer' }} />
                   </div>
-                  <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'monospace', marginTop: '8px', fontWeight: 600 }}>{((masterSettings.volume - 1) * 60).toFixed(1)} dB</span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'var(--font-mono)', marginTop: '8px', fontWeight: 600 }}>{((masterSettings.volume - 1) * 60).toFixed(1)} dB</span>
                 </div>
 
                 {/* Master Controls */}
@@ -5861,7 +5861,7 @@ const Imosion: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Swing</span>
                   <input type="range" min="0" max="100" value={beatSwing} onChange={e => setBeatSwing(Number(e.target.value))} style={{ width: 60 }} />
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'monospace', width: 24, textAlign: 'right' }}>{beatSwing}%</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', width: 24, textAlign: 'right' }}>{beatSwing}%</span>
                 </div>
                 <button aria-label="Randomize" onClick={randomizeBeatPattern} style={{ padding: '3px 8px', background: 'rgba(255,159,10,0.1)', border: '1px solid rgba(255,159,10,0.2)', borderRadius: '3px', color: 'var(--color-warning)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Random</button>
                 <button aria-label="Clear" onClick={clearBeatPattern} style={{ padding: '3px 8px', background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '3px', color: 'var(--color-error)', fontSize: '9px', fontWeight: 600, cursor: 'pointer' }}>Clear</button>
@@ -6061,7 +6061,7 @@ const Imosion: React.FC = () => {
                     const inScale = isNoteInScale(noteNum, musicalKey, musicalScale);
                     return (
                       <div key={noteNum} style={{ height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '4px', background: black ? '#080809' : (noteNum % 12 === 0 ? 'var(--color-border-subtle)' : 'transparent'), borderBottom: noteNum % 12 === 0 ? '1px solid #27272a' : '1px solid #141417', cursor: 'pointer' }}>
-                        <span style={{ fontSize: '7px', fontFamily: '"SF Mono", monospace', color: inScale ? (black ? 'var(--color-text-secondary)' : '#d4d4d8') : '#3f3f46', fontWeight: noteNum % 12 === 0 ? 600 : 400 }}>{midiNoteName(noteNum)}</span>
+                        <span style={{ fontSize: '7px', fontFamily: 'var(--font-mono)', color: inScale ? (black ? 'var(--color-text-secondary)' : '#d4d4d8') : '#3f3f46', fontWeight: noteNum % 12 === 0 ? 600 : 400 }}>{midiNoteName(noteNum)}</span>
                       </div>
                     );
                   })}
@@ -6205,7 +6205,7 @@ const Imosion: React.FC = () => {
                 setPianoRollNotes(prev => [...prev, ...newNotes]);
               };
               return (
-                <div style={{ position: 'absolute', top: 56, right: 12, width: 250, background: 'rgba(12,12,14,0.96)', border: '1px solid #27272a', borderRadius: 6, padding: 10, zIndex: 20, boxShadow: 'var(--pg-shadow-context)', backdropFilter: 'var(--blur-md)' }}>
+                <div style={{ position: 'absolute', top: 56, right: 12, width: 250, background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: 6, padding: 10, zIndex: 20, boxShadow: 'var(--pg-shadow-context)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#64d2ff' }}>Chord Trigger</span>
                     <button aria-label="Close Chord Trigger" onClick={() => setShowChordTrigger(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
@@ -6336,8 +6336,8 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Stereo Image</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Width</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.stereoWidth}%</span></div><input type="range" min="0" max="200" value={masterSettings.stereoWidth} onChange={e => setMasterSettings(s => ({ ...s, stereoWidth: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>M/S Balance</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.midSideBalance > 0 ? '+' : ''}{masterSettings.midSideBalance}</span></div><input type="range" min="-100" max="100" value={masterSettings.midSideBalance} onChange={e => setMasterSettings(s => ({ ...s, midSideBalance: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Width</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.stereoWidth}%</span></div><input type="range" min="0" max="200" value={masterSettings.stereoWidth} onChange={e => setMasterSettings(s => ({ ...s, stereoWidth: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>M/S Balance</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.midSideBalance > 0 ? '+' : ''}{masterSettings.midSideBalance}</span></div><input type="range" min="-100" max="100" value={masterSettings.midSideBalance} onChange={e => setMasterSettings(s => ({ ...s, midSideBalance: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /></div>
                   </div>
                 </div>
                 
@@ -6345,9 +6345,9 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-success)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tone</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Low Shelf</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.lowShelf > 0 ? '+' : ''}{masterSettings.lowShelf} dB</span></div><input type="range" min="-12" max="12" step="0.5" value={masterSettings.lowShelf} onChange={e => setMasterSettings(s => ({ ...s, lowShelf: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>High Shelf</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.highShelf > 0 ? '+' : ''}{masterSettings.highShelf} dB</span></div><input type="range" min="-12" max="12" step="0.5" value={masterSettings.highShelf} onChange={e => setMasterSettings(s => ({ ...s, highShelf: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Bass Enhance</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.bassEnhance}%</span></div><input type="range" min="0" max="100" value={masterSettings.bassEnhance} onChange={e => setMasterSettings(s => ({ ...s, bassEnhance: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Low Shelf</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.lowShelf > 0 ? '+' : ''}{masterSettings.lowShelf} dB</span></div><input type="range" min="-12" max="12" step="0.5" value={masterSettings.lowShelf} onChange={e => setMasterSettings(s => ({ ...s, lowShelf: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>High Shelf</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.highShelf > 0 ? '+' : ''}{masterSettings.highShelf} dB</span></div><input type="range" min="-12" max="12" step="0.5" value={masterSettings.highShelf} onChange={e => setMasterSettings(s => ({ ...s, highShelf: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Bass Enhance</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.bassEnhance}%</span></div><input type="range" min="0" max="100" value={masterSettings.bassEnhance} onChange={e => setMasterSettings(s => ({ ...s, bassEnhance: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
                   </div>
                 </div>
                 
@@ -6355,9 +6355,9 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Multiband</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Low</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.multiband.lowGain > 0 ? '+' : ''}{masterSettings.multiband.lowGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.lowGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, lowGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Mid</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.multiband.midGain > 0 ? '+' : ''}{masterSettings.multiband.midGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.midGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, midGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>High</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.multiband.highGain > 0 ? '+' : ''}{masterSettings.multiband.highGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.highGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, highGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Low</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.multiband.lowGain > 0 ? '+' : ''}{masterSettings.multiband.lowGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.lowGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, lowGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Mid</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.multiband.midGain > 0 ? '+' : ''}{masterSettings.multiband.midGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.midGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, midGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>High</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.multiband.highGain > 0 ? '+' : ''}{masterSettings.multiband.highGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.highGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, highGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
                   </div>
                 </div>
                 
@@ -6365,7 +6365,7 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: '#ff375f', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Character</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Analog Warmth</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.analogWarmth}%</span></div><input type="range" min="0" max="100" value={masterSettings.analogWarmth} onChange={e => setMasterSettings(s => ({ ...s, analogWarmth: +e.target.value }))} style={{ width: '100%', accentColor: '#ff375f' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Analog Warmth</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.analogWarmth}%</span></div><input type="range" min="0" max="100" value={masterSettings.analogWarmth} onChange={e => setMasterSettings(s => ({ ...s, analogWarmth: +e.target.value }))} style={{ width: '100%', accentColor: '#ff375f' }} /></div>
                   </div>
                 </div>
                 
@@ -6373,8 +6373,8 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-error)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Loudness</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Target</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.loudnessTarget} LUFS</span></div><input type="range" min="-24" max="0" value={masterSettings.loudnessTarget} onChange={e => setMasterSettings(s => ({ ...s, loudnessTarget: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Ceiling</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{masterSettings.limiterCeiling.toFixed(1)} dB</span></div><input type="range" min="-6" max="0" step="0.1" value={masterSettings.limiterCeiling} onChange={e => setMasterSettings(s => ({ ...s, limiterCeiling: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Target</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.loudnessTarget} LUFS</span></div><input type="range" min="-24" max="0" value={masterSettings.loudnessTarget} onChange={e => setMasterSettings(s => ({ ...s, loudnessTarget: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /></div>
+                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Ceiling</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.limiterCeiling.toFixed(1)} dB</span></div><input type="range" min="-6" max="0" step="0.1" value={masterSettings.limiterCeiling} onChange={e => setMasterSettings(s => ({ ...s, limiterCeiling: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /></div>
                     <button aria-label="Toggle Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ padding: '6px 10px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? 'rgba(255,69,58,0.15)' : '#0f0f12', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Limiter {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
                   </div>
                 </div>
@@ -6666,7 +6666,7 @@ const Imosion: React.FC = () => {
                 <button aria-label="Phase" onClick={() => updateTrack(selectedTrackData.id, { phase: !selectedTrackData.phase })} style={{ padding: '4px 8px', background: selectedTrackData.phase ? 'rgba(255,69,58,0.2)' : '#111114', border: '1px solid', borderColor: selectedTrackData.phase ? 'rgba(255,69,58,0.3)' : '#1f1f23', borderRadius: '4px', color: selectedTrackData.phase ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '4px' }}>{Icon.phase} Phase</button>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Trim:</span>
                 <input type="range" min="-24" max="24" step="0.5" value={selectedTrackData.trim} onChange={(e) => updateTrack(selectedTrackData.id, { trim: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', width: '32px', textAlign: 'right', fontFamily: '"SF Mono", monospace' }}>{selectedTrackData.trim.toFixed(1)}</span>
+                <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', width: '32px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{selectedTrackData.trim.toFixed(1)}</span>
               </div>
               
               {/* Sends */}
@@ -6738,7 +6738,7 @@ const Imosion: React.FC = () => {
                           ) : (
                             <>
                               <input type="range" min={param.min} max={param.max} step={(param.max - param.min) / 100} value={plugin.params[param.key] ?? param.default} onChange={(e) => updatePluginParam(selectedTrackData.id, plugin.id, param.key, parseFloat(e.target.value))} style={{ flex: 1 }} />
-                              <span style={{ width: '32px', fontSize: '8px', color: lib.color, textAlign: 'right', fontFamily: 'monospace' }}>{(plugin.params[param.key] ?? param.default).toFixed(param.max > 100 ? 0 : 1)}</span>
+                              <span style={{ width: '32px', fontSize: '8px', color: lib.color, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{(plugin.params[param.key] ?? param.default).toFixed(param.max > 100 ? 0 : 1)}</span>
                             </>
                           )}
                         </div>
@@ -7347,7 +7347,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(48,209,88,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(48,209,88,0.08) 0%, transparent 100%)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>Audio FX</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>Audio FX</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>— {selectedTrackData.name}</span>
               </div>
               <button aria-label="Close" onClick={() => setShowPluginBrowser(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '2px' }}>{Icon.close}</button>
@@ -7415,7 +7415,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: '14px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(48,209,88,0.1), transparent)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ color: 'var(--color-success)' }}>{Icon.store}</span>
-                <span style={{ fontSize: '14px', fontWeight: 700 }}>Plugin Store</span>
+                <span style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '-0.01em' }}>Plugin Store</span>
               </div>
               <button aria-label="Close" onClick={() => setShowPluginStore(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icon.close}</button>
             </div>
@@ -7754,9 +7754,9 @@ const Imosion: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Stretch:</span>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#64d2ff', padding: '2px 6px', background: 'var(--color-bg-elevated)', borderRadius: '2px', fontFamily: 'monospace' }}>{((1 / (editingClip.clip.speedMultiplier || 1)) * 100).toFixed(1)}%</span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#64d2ff', padding: '2px 6px', background: 'var(--color-bg-elevated)', borderRadius: '2px', fontFamily: 'var(--font-mono)' }}>{((1 / (editingClip.clip.speedMultiplier || 1)) * 100).toFixed(1)}%</span>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Duration:</span>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'monospace' }}>{(editingClip.clip.duration / (editingClip.clip.speedMultiplier || 1)).toFixed(2)}s</span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{(editingClip.clip.duration / (editingClip.clip.speedMultiplier || 1)).toFixed(2)}s</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -7808,20 +7808,20 @@ const Imosion: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Freq ratio:</span>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-warning)', fontFamily: 'monospace', padding: '2px 6px', background: 'var(--color-bg-elevated)', borderRadius: '2px' }}>{Math.pow(2, editingClip.clip.pitch / 12).toFixed(4)}x</span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-warning)', fontFamily: 'var(--font-mono)', padding: '2px 6px', background: 'var(--color-bg-elevated)', borderRadius: '2px' }}>{Math.pow(2, editingClip.clip.pitch / 12).toFixed(4)}x</span>
                   </div>
                 </div>
                 {/* Coarse pitch (semitones) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', width: '40px' }}>Coarse</span>
                   <input type="range" min="-24" max="24" step="1" value={editingClip.clip.pitch} onChange={(e) => setClipPitch(editingClip.trackId, editingClip.clip.id, parseInt(e.target.value))} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '9px', color: 'var(--color-warning)', width: '32px', textAlign: 'right', fontFamily: 'monospace' }}>{editingClip.clip.pitch > 0 ? '+' : ''}{editingClip.clip.pitch}st</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-warning)', width: '32px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.pitch > 0 ? '+' : ''}{editingClip.clip.pitch}st</span>
                 </div>
                 {/* Fine pitch (cents) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '9px', color: 'var(--color-text-tertiary)', width: '40px' }}>Fine</span>
                   <input type="range" min="-100" max="100" step="1" value={Math.round(((editingClip.clip.pitch % 1) || 0) * 100)} onChange={(e) => setClipPitch(editingClip.trackId, editingClip.clip.id, Math.trunc(editingClip.clip.pitch) + parseInt(e.target.value) / 100)} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '9px', color: '#bf5af2', width: '32px', textAlign: 'right', fontFamily: 'monospace' }}>{Math.round(((editingClip.clip.pitch % 1) || 0) * 100)}ct</span>
+                  <span style={{ fontSize: '9px', color: '#bf5af2', width: '32px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{Math.round(((editingClip.clip.pitch % 1) || 0) * 100)}ct</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                   {PITCH_PRESETS.map(preset => (
@@ -7853,17 +7853,17 @@ const Imosion: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', width: '65px' }}>Gain</span>
                   <input type="range" min="0" max="2" step="0.01" value={editingClip.clip.gain} onChange={(e) => updateClip(editingClip.trackId, editingClip.clip.id, { gain: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '10px', color: 'var(--color-accent)', width: '45px', textAlign: 'right', fontFamily: 'monospace' }}>{editingClip.clip.gain > 1 ? '+' : ''}{((editingClip.clip.gain - 1) * 100).toFixed(0)}%</span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-accent)', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.gain > 1 ? '+' : ''}{((editingClip.clip.gain - 1) * 100).toFixed(0)}%</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', width: '65px' }}>Fade In</span>
                   <input type="range" min="0" max="5" step="0.01" value={editingClip.clip.fadeIn} onChange={(e) => updateClip(editingClip.trackId, editingClip.clip.id, { fadeIn: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '10px', color: '#64d2ff', width: '45px', textAlign: 'right', fontFamily: 'monospace' }}>{editingClip.clip.fadeIn.toFixed(2)}s</span>
+                  <span style={{ fontSize: '10px', color: '#64d2ff', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.fadeIn.toFixed(2)}s</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', width: '65px' }}>Fade Out</span>
                   <input type="range" min="0" max="5" step="0.01" value={editingClip.clip.fadeOut} onChange={(e) => updateClip(editingClip.trackId, editingClip.clip.id, { fadeOut: parseFloat(e.target.value) })} style={{ flex: 1 }} />
-                  <span style={{ fontSize: '10px', color: '#64d2ff', width: '45px', textAlign: 'right', fontFamily: 'monospace' }}>{editingClip.clip.fadeOut.toFixed(2)}s</span>
+                  <span style={{ fontSize: '10px', color: '#64d2ff', width: '45px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{editingClip.clip.fadeOut.toFixed(2)}s</span>
                 </div>
               </div>
 
@@ -7888,7 +7888,7 @@ const Imosion: React.FC = () => {
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #1f1f23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-base)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
                 <div style={{ width: '6px', height: '20px', background: '#ff375f', borderRadius: '3px' }} />
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#ff375f', letterSpacing: 0, flexShrink: 0 }}>FORGE</span>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#ff375f', letterSpacing: 0, flexShrink: 0 }}>FORGE</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>Audio Editor</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', padding: '2px 8px', background: 'var(--color-bg-surface)', borderRadius: '3px' }}>{forgeClip.clip.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-disabled)' }}>{forgeClip.clip.duration.toFixed(2)}s | {forgeClip.clip.waveform.length} samples</span>
@@ -7980,7 +7980,7 @@ const Imosion: React.FC = () => {
               {/* Time ruler at bottom */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '20px', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
                 {Array.from({ length: 11 }).map((_, i) => (
-                  <span key={i} style={{ position: 'absolute', left: `${i * 10}%`, fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{(forgeClip.clip.duration * i / 10).toFixed(2)}s</span>
+                  <span key={i} style={{ position: 'absolute', left: `${i * 10}%`, fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{(forgeClip.clip.duration * i / 10).toFixed(2)}s</span>
                 ))}
               </div>
             </div>
@@ -8046,7 +8046,7 @@ const Imosion: React.FC = () => {
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-text-tertiary)', marginBottom: '6px', textTransform: 'uppercase' }}>
                   <span>Normalize Level</span>
-                  <span style={{ color: 'var(--color-warning)', fontFamily: 'monospace' }}>{exportSettings.normalizeLevel} dB</span>
+                  <span style={{ color: 'var(--color-warning)', fontFamily: 'var(--font-mono)' }}>{exportSettings.normalizeLevel} dB</span>
                 </label>
                 <input type="range" min="-6" max="0" step="0.1" value={exportSettings.normalizeLevel} onChange={(e) => setExportSettings(s => ({ ...s, normalizeLevel: parseFloat(e.target.value) }))} style={{ width: '100%' }} />
               </div>
@@ -8068,7 +8068,7 @@ const Imosion: React.FC = () => {
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>Exporting...</span>
-                    <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'monospace' }}>{Math.round(exportProgress)}%</span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>{Math.round(exportProgress)}%</span>
                   </div>
                   <div style={{ height: '6px', background: 'var(--color-bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${exportProgress}%`, background: 'linear-gradient(90deg, #30d158, #30d158)', transition: 'width 0.3s' }} />
@@ -8688,7 +8688,7 @@ const Imosion: React.FC = () => {
       {showHelp && (
         <div style={{ position: 'fixed', right: 20, top: 60, width: 340, maxHeight: 'calc(100vh - 100px)', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>Imosion Help & Shortcuts</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>Imosion Help & Shortcuts</span>
             <button aria-label="Close Help" onClick={() => setShowHelp(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 4 }}>{Icon.close}</button>
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px' }}>
@@ -8697,7 +8697,7 @@ const Imosion: React.FC = () => {
               {[['Space', 'Play / Pause'], ['R', 'Record'], ['L', 'Toggle Loop'], ['Home', 'Rewind to start']].map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
-                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>
+                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{key}</kbd>
                 </div>
               ))}
             </div>
@@ -8706,7 +8706,7 @@ const Imosion: React.FC = () => {
               {([[`${_plat.isMac?'⌘':'Ctrl'}+Z`, 'Undo'], [`${_plat.isMac?'⌘':'Ctrl'}+Y`, 'Redo'], [`${_plat.isMac?'⌘':'Ctrl'}+C`, 'Copy clip'], [`${_plat.isMac?'⌘':'Ctrl'}+V`, 'Paste clip'], ['Delete', 'Delete selected'], [`${_plat.isMac?'⌘':'Ctrl'}+A`, 'Select all']] as [string,string][]).map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
-                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>
+                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{key}</kbd>
                 </div>
               ))}
             </div>
@@ -8715,7 +8715,7 @@ const Imosion: React.FC = () => {
               {[['1', 'Arrange view'], ['2', 'Mixer view'], ['3', 'Beat Maker'], ['4', 'Piano Roll']].map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
-                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>
+                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{key}</kbd>
                 </div>
               ))}
             </div>
@@ -8724,7 +8724,7 @@ const Imosion: React.FC = () => {
               {([[`${_plat.isMac?'⌘':'Ctrl'}+T`, 'Add new track'], ['M', 'Mute selected track'], ['S', 'Solo selected track'], [`${_plat.isMac?'⌘':'Ctrl'}+Shift+N`, 'Rename track']] as [string,string][]).map(([key, desc]) => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>{desc}</span>
-                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: '"SF Mono", monospace' }}>{key}</kbd>
+                  <kbd style={{ padding: '1px 6px', borderRadius: 3, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{key}</kbd>
                 </div>
               ))}
             </div>
