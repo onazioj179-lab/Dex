@@ -323,7 +323,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'var(--color-scrim, rgba(0,0,0,0.6))',
         zIndex: 'var(--z-dock)' as any,
         display: 'flex',
         justifyContent: 'center',
@@ -811,7 +811,7 @@ export function FeedbackPanel(): React.ReactElement | null {
       </div>
       {submitted ? (
         <div style={{ padding: '20px 16px' }}>
-          <div style={{ color: '#22c55e', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>Report saved</div>
+          <div style={{ color: 'var(--color-success, #22c55e)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>Report saved</div>
           <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', wordBreak: 'break-all' }}>{savedPath}</div>
           <div style={{ color: 'var(--color-text-tertiary)', fontSize: '12px', marginTop: '8px' }}>
             You can send this file to the DEX support channel.
@@ -889,7 +889,10 @@ export function FeedbackPanel(): React.ReactElement | null {
               background: description.trim() ? 'var(--color-accent, #3b82f6)' : 'var(--color-bg-hover)',
               border: 'none',
               borderRadius: '6px',
-              color: '#fff',
+              // Active -> on accent (accent-text); inactive -> on bg-hover
+              // (secondary text). A single color can't satisfy both across
+              // themes (white would vanish on the light inactive surface).
+              color: description.trim() ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
               fontSize: '13px',
               fontWeight: 500,
               cursor: description.trim() ? 'pointer' : 'not-allowed',
