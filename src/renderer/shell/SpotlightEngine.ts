@@ -15,6 +15,7 @@
 
 import { sharedTick } from '../services/SharedTick';
 import { useXenonStore } from '../store/xenonStore';
+import { useRunningApps } from '../store/runningApps';
 
 export type SpotlightCategory =
   | 'top'
@@ -24,6 +25,11 @@ export type SpotlightCategory =
   | 'notes'
   | 'tasks'
   | 'files'
+  | 'projects'
+  | 'workflows'
+  | 'commands'
+  | 'screenshots'
+  | 'conversations'
   | 'actions'
   | 'calculator'
   | 'web';
@@ -863,6 +869,9 @@ export class SpotlightEngine {
   private _onRefresh: (() => void) | null = null;
   private _xenonThrottle: 'none' | 'light' | 'moderate' | 'aggressive' | 'emergency' = 'none';
   private _xenonMemPressure: 'normal' | 'moderate' | 'aggressive' = 'normal';
+  // Active project (cached from window.dex.projects.getActive); used to boost
+  // results that belong to the project the user is currently working in.
+  private _activeProjectId: string | null = null;
 
   constructor() {
     this._loadUsageFrequency();
@@ -1021,9 +1030,87 @@ export class SpotlightEngine {
 
     // Fetch real files from filesystem via IPC
     this._fetchFilesFromBackend();
+    // Fetch projects + workflows via their existing channels. These are small,
+    // bounded lists, so they live in the synchronous index (refreshed on the
+    // 60s tick) and stay searchable instantly per keystroke — no async fanout.
+    this._fetchProjectsFromBackend();
+    this._fetchWorkflowsFromBackend();
+    // Refresh which project is currently active so ranking can boost its items.
+    this._refreshActiveProject();
 
     this._index = items;
     this._onRefresh?.();
+  }
+
+  /** Resolve the active project id (cached) so ranking can boost its members. */
+  private async _refreshActiveProject(): Promise<void> {
+    try {
+      const active = await (window as any).dex?.projects?.getActive?.();
+      this._activeProjectId = active?.id ?? null;
+    } catch { this._activeProjectId = null; }
+  }
+
+  /** Projects from the native store (window.dex.projects.getAll). */
+  private async _fetchProjectsFromBackend(): Promise<void> {
+    try {
+      const projects = await (window as any).dex?.projects?.getAll?.();
+      if (!Array.isArray(projects)) return; // null under Tauri parity -> omit
+      const next: IndexedItem[] = [];
+      for (const p of projects) {
+        const name = p?.name || 'Untitled Project';
+        const id = `project-${p?.id || name}`;
+        if (this._index.some(item => item.id === id)) continue;
+        next.push({
+          id,
+          category: 'projects',
+          title: name,
+          subtitle: 'Project',
+          searchText: `${name} project`.toLowerCase(),
+          icon: 'kanban',
+          color: p?.color || '#5E5CE6',
+          // Carry the project id so ranking can detect the active project.
+          action: () => this._launchAppWithContext('kanban', p?.id),
+          frequency: this._usageFrequency.get(id) || 0,
+          lastUsed: p?.lastAccessed ? Number(p.lastAccessed) : 0,
+        });
+      }
+      if (next.length > 0) {
+        this._index = [...this._index, ...next];
+        this._onRefresh?.();
+      }
+    } catch { /* projects channel unavailable -> omit source */ }
+  }
+
+  /** Workflows from the native store (window.dex.workflows.getAll). */
+  private async _fetchWorkflowsFromBackend(): Promise<void> {
+    try {
+      const dex = (window as any).dex;
+      // Prefer the richer Phase-20 store, fall back to the legacy list.
+      const workflows = await (dex?.workflow?.getAll?.() ?? dex?.workflows?.getAll?.());
+      if (!Array.isArray(workflows)) return; // null under Tauri parity -> omit
+      const next: IndexedItem[] = [];
+      for (const w of workflows) {
+        const name = w?.name || w?.title || 'Untitled Workflow';
+        const id = `workflow-${w?.id || name}`;
+        if (this._index.some(item => item.id === id)) continue;
+        next.push({
+          id,
+          category: 'workflows',
+          title: name,
+          subtitle: w?.description ? String(w.description).slice(0, 80) : 'Workflow',
+          searchText: `${name} ${w?.description || ''} workflow automation`.toLowerCase(),
+          icon: 'workflows',
+          color: '#BF5AF2',
+          action: () => this._launchAppWithContext('workflows', w?.id),
+          frequency: this._usageFrequency.get(id) || 0,
+          lastUsed: w?.updatedAt || w?.lastRun || w?.createdAt || 0,
+        });
+      }
+      if (next.length > 0) {
+        this._index = [...this._index, ...next];
+        this._onRefresh?.();
+      }
+    } catch { /* workflows channel unavailable -> omit source */ }
   }
 
   private async _fetchFilesFromBackend(): Promise<void> {
@@ -1127,6 +1214,9 @@ export class SpotlightEngine {
     // 5. Apply co-occurrence boost + usage frequency multiplier
     this._applyCoBoost(results);
     this._applyFrequencyBoost(results);
+    // Boost by recency + active project / foreground app so the unified surface
+    // surfaces what the user is working in right now (relevance + recency + context).
+    this._applyContextBoost(results);
 
     // 6. Add keyboard shortcut hints to results
     this._addKeyboardHints(results);
@@ -1134,11 +1224,20 @@ export class SpotlightEngine {
     // 7. Sort by score
     results.sort((a, b) => b.score - a.score);
 
-    // 8. Deduplicate (type-ahead may overlap with index results)
+    // 8. Deduplicate (type-ahead may overlap with index results) and cap each
+    // source so no single section (e.g. many matching notes/screenshots) floods
+    // the unified surface — keeps the grouped-by-source layout balanced.
     const seen = new Set<string>();
+    const perCategory = new Map<SpotlightCategory, number>();
+    const PER_CATEGORY_LIMIT = 6;
     const deduped: SpotlightResult[] = [];
     for (const r of results) {
-      if (!seen.has(r.id)) { seen.add(r.id); deduped.push(r); }
+      if (seen.has(r.id)) continue;
+      const count = perCategory.get(r.category) || 0;
+      if (r.category !== 'calculator' && count >= PER_CATEGORY_LIMIT) continue;
+      seen.add(r.id);
+      perCategory.set(r.category, count + 1);
+      deduped.push(r);
     }
 
     // 9. Mark top result
@@ -1157,10 +1256,13 @@ export class SpotlightEngine {
       this._searchFilesAsync(q);
       if (!this._isThrottled()) {
         this._searchDeepAsync(q);
+        // Query-driven sources: screenshots, conversations and plugin commands.
+        // Each degrades independently (null/throw -> source omitted).
+        this._searchSourcesAsync(q);
       }
     }
 
-    return deduped.slice(0, 28);
+    return deduped.slice(0, 32);
   }
 
   /** Resolve user and built-in aliases */
@@ -1461,6 +1563,63 @@ export class SpotlightEngine {
     }
   }
 
+  /**
+   * Boost results by recency and by whether they belong to the active project
+   * or the foreground app. This is the unified-surface ranking layer: the index
+   * score (relevance) is multiplied by small, capped factors so a strong textual
+   * match still wins, but ties break toward what the user is working in now.
+   */
+  private _applyContextBoost(results: SpotlightResult[]): void {
+    const now = Date.now();
+    // Foreground app id (reused from the running-apps store — no new state).
+    let currentAppId = '';
+    try { currentAppId = useRunningApps.getState().currentAppId || ''; } catch { /* store unavailable */ }
+    const activeProjectId = this._activeProjectId;
+
+    // Map each result id back to its indexed item for lastUsed + action context.
+    const byId = new Map(this._index.map(i => [i.id, i]));
+
+    for (const result of results) {
+      const item = byId.get(result.id);
+
+      // Recency: items touched in the last ~30 days get up to +25% (linear decay).
+      const lastUsed = item?.lastUsed ?? 0;
+      if (lastUsed > 0) {
+        const ageDays = (now - lastUsed) / 86400000;
+        if (ageDays >= 0 && ageDays < 30) {
+          result.score *= 1 + 0.25 * (1 - ageDays / 30);
+        }
+      }
+
+      // Foreground-app affinity: a result that opens (or lives in) the app the
+      // user is currently looking at is more likely the one they want. Apps and
+      // launch actions match on their own id; other items match via the appId
+      // their action navigates to (best-effort, from the id prefix).
+      if (currentAppId) {
+        const ownerApp =
+          result.id.startsWith('action-launch-') ? result.id.replace('action-launch-', '')
+          : result.category === 'apps' ? result.title.toLowerCase().replace(/\s/g, '')
+          : result.id.startsWith('workflow-') ? 'workflows'
+          : result.id.startsWith('project-') ? 'kanban'
+          : result.id.startsWith('screenshot-') ? 'rewind'
+          : result.id.startsWith('conversation-') ? 'uki'
+          : result.id.startsWith('command-') ? 'rewind'
+          : result.id.startsWith('note-') ? 'notes'
+          : result.id.startsWith('task-') ? 'tasks'
+          : result.id.startsWith('file-') || result.id.startsWith('intel-') ? 'files'
+          : '';
+        if (ownerApp && ownerApp === currentAppId) {
+          result.score *= 1.15;
+        }
+      }
+
+      // Active-project affinity: the currently-active project ranks above peers.
+      if (activeProjectId && result.id === `project-${activeProjectId}`) {
+        result.score *= 1.3;
+      }
+    }
+  }
+
   // -- Usage tracking ------------------------------------------------------
 
   recordSelection(query: string, resultId: string): void {
@@ -1570,39 +1729,50 @@ export class SpotlightEngine {
 
       const result = await dexSearch.query(query, {
         scopes: ['dex', 'computer'],
-        limit: 15,
-        types: ['file', 'setting', 'app', 'action'],
+        limit: 20,
+        // Ask the global content index for every source it can return so the
+        // unified surface reflects notes/tasks/projects/workflows too, not just
+        // files. Unknown types degrade to the generic 'actions' bucket below.
+        types: ['file', 'setting', 'app', 'action', 'note', 'task', 'project', 'workflow', 'screenshot', 'conversation'],
       });
 
       if (seq !== this._deepSearchSeq) return; // stale
       if (!result?.results || !Array.isArray(result.results)) return;
+
+      // Map a global-index result type onto a Spotlight category + the app that
+      // owns it. Centralised so the icon/color/navigation stay consistent.
+      const DEEP_TYPE_MAP: Record<string, { category: SpotlightCategory; app: string; icon: string; color: string }> = {
+        file: { category: 'files', app: 'files', icon: 'files', color: '#5B8FBF' },
+        setting: { category: 'settings', app: 'settings', icon: 'settings', color: '#8E8E93' },
+        app: { category: 'apps', app: 'home', icon: 'forge', color: 'var(--color-accent)' },
+        note: { category: 'notes', app: 'notes', icon: 'notes', color: 'var(--color-warning)' },
+        task: { category: 'tasks', app: 'tasks', icon: 'tasks', color: 'var(--color-warning)' },
+        project: { category: 'projects', app: 'kanban', icon: 'kanban', color: '#5E5CE6' },
+        workflow: { category: 'workflows', app: 'workflows', icon: 'workflows', color: '#BF5AF2' },
+        screenshot: { category: 'screenshots', app: 'rewind', icon: 'gallery', color: '#FF375F' },
+        conversation: { category: 'conversations', app: 'uki', icon: 'collabhub', color: '#5E5CE6' },
+      };
 
       let added = false;
       for (const item of result.results) {
         const id = `deep-${item.id || item.title}`;
         if (this._index.some(i => i.id === id)) continue;
 
-        const category: SpotlightCategory =
-          item.type === 'file' ? 'files' :
-          item.type === 'setting' ? 'settings' :
-          item.type === 'app' ? 'apps' :
-          'actions';
+        const mapped = DEEP_TYPE_MAP[item.type] ?? { category: 'actions' as SpotlightCategory, app: 'home', icon: 'forge', color: 'var(--color-accent)' };
 
         this._index.push({
           id,
-          category,
+          category: mapped.category,
           title: item.title,
           subtitle: item.subtitle || item.path || item.scope,
           searchText: `${item.title} ${item.subtitle || ''} ${item.path || ''}`.toLowerCase(),
-          icon: category === 'files' ? 'files' : category === 'settings' ? 'settings' : 'forge',
-          color: category === 'files' ? '#5B8FBF' : category === 'settings' ? '#8E8E93' : 'var(--color-accent)',
+          icon: mapped.icon,
+          color: mapped.color,
           action: () => {
-            if (item.path) {
+            if (item.path && mapped.category === 'files') {
               this._launchAppWithContext('files', item.path);
-            } else if (item.category === 'setting') {
-              this._launchAppWithContext('settings', item.id);
             } else {
-              this._launchAppWithContext(item.category || 'home', item.id);
+              this._launchAppWithContext(mapped.app, item.id);
             }
           },
           frequency: 0,
@@ -1649,6 +1819,110 @@ export class SpotlightEngine {
       }
       if (added) this._onRefresh?.();
     } catch { /* File Intelligence not available */ }
+  }
+
+  /**
+   * Query-driven sources that have no synchronous cache: plugin commands,
+   * Rewind screenshots, and UKI conversations/memory. Each is queried through
+   * its EXISTING channel, guarded so a null result (Tauri parity) or a throw
+   * just omits that source — the rest of the surface is unaffected.
+   */
+  private _sourcesSeq = 0;
+  private async _searchSourcesAsync(query: string): Promise<void> {
+    const seq = ++this._sourcesSeq;
+    const dex = (window as any).dex;
+    if (!dex) return;
+    const q = query.toLowerCase();
+    const added = { value: false };
+
+    const pushItem = (item: IndexedItem) => {
+      if (this._index.some(i => i.id === item.id)) return;
+      this._index.push(item);
+      added.value = true;
+    };
+
+    // -- Plugin commands (Rewind plugin host) -------------------------------
+    const commands = (async () => {
+      try {
+        const cmds = await dex?.rewind?.getPluginCommands?.();
+        if (seq !== this._sourcesSeq || !Array.isArray(cmds)) return;
+        for (const c of cmds) {
+          const name = c?.name;
+          if (!name) continue;
+          // Local filter — getPluginCommands returns the full list, not a search.
+          if (!name.toLowerCase().includes(q) && !(c?.pluginId || '').toLowerCase().includes(q)) continue;
+          const pluginId = c.pluginId || 'plugin';
+          pushItem({
+            id: `command-${pluginId}-${name}`,
+            category: 'commands',
+            title: name,
+            subtitle: `Command · ${pluginId}`,
+            searchText: `${name} ${pluginId} command`.toLowerCase(),
+            icon: 'forge',
+            color: 'var(--color-accent)',
+            action: () => { dex?.rewind?.runPluginCommand?.(pluginId, name)?.catch?.(() => {}); },
+            frequency: 0,
+            lastUsed: 0,
+          });
+        }
+      } catch { /* commands unavailable -> omit */ }
+    })();
+
+    // -- Screenshots (Rewind, last 7 days) ----------------------------------
+    const screenshots = (async () => {
+      try {
+        const shots = await dex?.rewind?.getScreenshots?.();
+        if (seq !== this._sourcesSeq || !Array.isArray(shots)) return;
+        for (const s of shots.slice(0, 40)) {
+          const label = s?.appName || s?.title || s?.windowTitle || 'Screenshot';
+          const hay = `${label} ${s?.ocrText || s?.text || ''}`.toLowerCase();
+          if (!hay.includes(q)) continue;
+          const path = s?.filepath || s?.path || s?.id;
+          const id = `screenshot-${path || label}`;
+          const ts = s?.timestamp ? Number(s.timestamp) : 0;
+          pushItem({
+            id,
+            category: 'screenshots',
+            title: label,
+            subtitle: ts ? new Date(ts).toLocaleString() : 'Screenshot',
+            searchText: hay,
+            icon: 'gallery',
+            color: '#FF375F',
+            action: () => this._launchAppWithContext('rewind', path),
+            frequency: 0,
+            lastUsed: ts,
+          });
+        }
+      } catch { /* screenshots unavailable -> omit */ }
+    })();
+
+    // -- Conversations / UKI memory -----------------------------------------
+    const conversations = (async () => {
+      try {
+        const hits = await dex?.uki?.memorySearch?.(query, 12);
+        if (seq !== this._sourcesSeq || !Array.isArray(hits)) return;
+        for (const h of hits) {
+          const title = h?.summary || h?.title || h?.content || 'Conversation';
+          const id = `conversation-${h?.id || title}`;
+          const ts = h?.timestamp ? Number(h.timestamp) : (h?.createdAt ? Number(h.createdAt) : 0);
+          pushItem({
+            id,
+            category: 'conversations',
+            title: String(title).slice(0, 90),
+            subtitle: h?.appId ? `UKI · ${h.appId}` : 'UKI conversation',
+            searchText: `${title} ${h?.category || ''}`.toLowerCase(),
+            icon: 'collabhub',
+            color: '#5E5CE6',
+            action: () => this._launchAppWithContext('uki', h?.id),
+            frequency: 0,
+            lastUsed: ts,
+          });
+        }
+      } catch { /* uki memory unavailable -> omit */ }
+    })();
+
+    await Promise.allSettled([commands, screenshots, conversations]);
+    if (seq === this._sourcesSeq && added.value) this._onRefresh?.();
   }
 
   private _copyToClipboard(text: string): void {

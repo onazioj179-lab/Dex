@@ -26,6 +26,7 @@ import {
   useLocalizationStore,
   useMultiWindowStore,
 } from '../store/unifiedSystemsStore';
+import { persistToHub, normalizeIcon, normalizePriority } from '../services/notify';
 
 // ==========================================================================
 // NOTIFICATION BELL
@@ -116,19 +117,22 @@ export function NotificationBell(): React.ReactElement {
   );
 }
 
+// Severity dot colors for the center, by decoded notification icon.
+const NOTIF_ICON_COLORS: Record<string, string> = {
+  info: 'var(--color-accent)',
+  success: 'var(--color-success)',
+  warning: 'var(--color-warning)',
+  error: 'var(--color-error)',
+};
+
 function NotificationPanel(): React.ReactElement {
-  const { notifications, markRead, markAllRead, clearAll, deleteNotification, doNotDisturb } =
+  const { notifications, markRead, markAllRead, clearAll, deleteNotification, doNotDisturb, getGroups } =
     useNotificationCenterStore();
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const grouped = React.useMemo(() => {
-    const groups: Record<string, typeof notifications> = {};
-    for (const n of notifications) {
-      if (!groups[n.app]) groups[n.app] = [];
-      groups[n.app].push(n);
-    }
-    return groups;
-  }, [notifications]);
+  // Grouped by source (the _dexMeta source, falling back to app) and ordered by
+  // priority then recency — one shared policy with the banners (finding 2).
+  const groups = React.useMemo(() => getGroups(), [notifications, getGroups]);
 
   const handleNotificationClick = (n: typeof notifications[0]) => {
     if (n.read === 0) markRead(n.id);
@@ -204,12 +208,30 @@ function NotificationPanel(): React.ReactElement {
             No notifications
           </div>
         ) : (
-          Object.entries(grouped).map(([app, items]) => (
-            <div key={app}>
-              <div className="dex-caps" style={{ padding: '8px 16px 4px', color: 'var(--color-text-secondary)', fontSize: '11px' }}>
-                {app}
+          groups.map((group) => (
+            <div key={group.source}>
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 16px 4px',
+                }}
+              >
+                <span className="dex-caps" style={{ color: 'var(--color-text-secondary)', fontSize: '11px' }}>
+                  {group.source}
+                </span>
+                {group.unreadCount > 0 && (
+                  <span style={{
+                    fontSize: '9px', fontWeight: 600, color: 'var(--color-accent)',
+                    background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
+                    padding: '1px 5px', borderRadius: '6px',
+                  }}>
+                    {group.unreadCount} new
+                  </span>
+                )}
               </div>
-              {items.map((n) => (
+              {group.items.map((n) => {
+                const dot = NOTIF_ICON_COLORS[n.icon] || 'var(--color-accent)';
+                return (
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
@@ -223,12 +245,27 @@ function NotificationPanel(): React.ReactElement {
                     alignItems: 'flex-start',
                   }}
                 >
-                  {n.read === 0 && (
-                    <div style={{ width: '6px', height: '6px', borderRadius: '3px', background: 'var(--color-accent, #3b82f6)', flexShrink: 0, marginTop: '6px' }} />
-                  )}
+                  <div
+                    style={{
+                      width: '6px', height: '6px', borderRadius: '3px',
+                      background: dot, flexShrink: 0, marginTop: '6px',
+                      opacity: n.read === 0 ? 1 : 0.4,
+                    }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: 'var(--color-text-primary)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {n.title}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <span style={{ color: 'var(--color-text-primary)', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+                        {n.title}
+                      </span>
+                      {(n.priority === 'urgent' || n.priority === 'high') && (
+                        <span style={{
+                          fontSize: '9px', fontWeight: 700, flexShrink: 0,
+                          textTransform: 'uppercase', letterSpacing: '0.04em',
+                          color: n.priority === 'urgent' ? 'var(--color-error)' : 'var(--color-warning)',
+                        }}>
+                          {n.priority}
+                        </span>
+                      )}
                     </div>
                     {n.body && (
                       <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -248,7 +285,8 @@ function NotificationPanel(): React.ReactElement {
                     x
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ))
         )}
@@ -1090,11 +1128,13 @@ export function UnifiedSystemsProvider({ children }: { children: React.ReactNode
     useScratchpadStore.getState().loadState();
     useTaskQueueStore.getState().loadTasks();
 
-    const handleNewNotification = (_e: any, record: any) => {
+    const refreshCenter = () => {
       const store = useNotificationCenterStore.getState();
       if (store.panelOpen) store.loadNotifications();
       store.loadUnreadCount();
     };
+
+    const handleNewNotification = (_e: any, _record: any) => { refreshCenter(); };
     const handleUnreadCount = (_e: any, count: number) => {
       useNotificationCenterStore.setState({ unreadCount: count });
     };
@@ -1105,16 +1145,43 @@ export function UnifiedSystemsProvider({ children }: { children: React.ReactNode
       useNotificationCenterStore.setState({ doNotDisturb: active });
     };
 
+    // Single backing store: every app-wide `dex-notification` banner is also
+    // persisted to the unified hub so it survives reload and surfaces in the
+    // bell/center. Events raised through services/notify already persist
+    // themselves (flagged `_dexPersisted`); legacy dispatchers do not, so we
+    // persist those here. Degrades silently when the hub channel is missing.
+    const handleBannerEvent = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      if (!d || !d.title || d._dexPersisted) return;
+      void persistToHub(
+        {
+          title: String(d.title),
+          body: d.body != null ? String(d.body) : undefined,
+          source: d.source != null ? String(d.source) : undefined,
+          icon: normalizeIcon(d.icon ?? d.type),
+          priority: normalizePriority(d.priority),
+          action: d.action,
+        },
+        normalizeIcon(d.icon ?? d.type),
+        normalizePriority(d.priority),
+      ).then(refreshCenter);
+    };
+
     (window as any).dex?.on('notification-center:new', handleNewNotification);
     (window as any).dex?.on('notification-center:unread-count', handleUnreadCount);
     (window as any).dex?.on('notification-center:dnd-changed', handleDndChanged);
     (window as any).dex?.on('recycle-bin:count', handleRecycleBinCount);
+    window.addEventListener('dex-notification', handleBannerEvent as EventListener);
+    // notify() persists, then asks the center to refresh via this event.
+    window.addEventListener('dex-notification-persisted', refreshCenter as EventListener);
 
     return () => {
       (window as any).dex?.off('notification-center:new', handleNewNotification);
       (window as any).dex?.off('notification-center:unread-count', handleUnreadCount);
       (window as any).dex?.off('notification-center:dnd-changed', handleDndChanged);
       (window as any).dex?.off('recycle-bin:count', handleRecycleBinCount);
+      window.removeEventListener('dex-notification', handleBannerEvent as EventListener);
+      window.removeEventListener('dex-notification-persisted', refreshCenter as EventListener);
     };
   }, []);
 
