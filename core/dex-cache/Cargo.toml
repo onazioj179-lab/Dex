@@ -1,0 +1,9 @@
+[package]
+name = "dex-cache"
+description = "DEX 6.0 native cache manager — bounded LRU + per-entry TTL, one shared primitive (GOAL-6A)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]

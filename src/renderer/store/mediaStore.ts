@@ -10,6 +10,7 @@
 // ===========================================================================
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 export type MediaType = 'audio' | 'video' | 'gallery' | null;
 
@@ -78,6 +79,8 @@ export const useMediaStore = create<MediaState>((set) => ({
 
 // Selector-based subscriptions (item 146)
 export const useMediaPlaying = () => useMediaStore(s => s.isPlaying);
-export const useMediaProgress = () => useMediaStore(s => ({ currentTime: s.currentTime, duration: s.duration }));
-export const useMediaVolume = () => useMediaStore(s => ({ volume: s.volume, muted: s.muted }));
-export const useCurrentMediaInfo = () => useMediaStore(s => ({ id: s.currentMediaId, title: s.currentMediaTitle, type: s.currentMediaType }));
+// useShallow so these object-returning selectors only re-render when their own
+// fields change, not on every unrelated media-store update.
+export const useMediaProgress = () => useMediaStore(useShallow(s => ({ currentTime: s.currentTime, duration: s.duration })));
+export const useMediaVolume = () => useMediaStore(useShallow(s => ({ volume: s.volume, muted: s.muted })));
+export const useCurrentMediaInfo = () => useMediaStore(useShallow(s => ({ id: s.currentMediaId, title: s.currentMediaTitle, type: s.currentMediaType })));

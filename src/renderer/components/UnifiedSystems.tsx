@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { DexLoader } from './LoadingStates';
 import {
   useNotificationCenterStore,
   useGlobalSearchStore,
@@ -27,21 +28,31 @@ import {
   useMultiWindowStore,
 } from '../store/unifiedSystemsStore';
 import { persistToHub, normalizeIcon, normalizePriority } from '../services/notify';
+import { sharedTick } from '../services/SharedTick';
 
 // ==========================================================================
 // NOTIFICATION BELL
 // ==========================================================================
 export function NotificationBell(): React.ReactElement {
-  const { unreadCount, panelOpen, setPanelOpen, loadNotifications, loadUnreadCount } =
-    useNotificationCenterStore();
+  // Subscribe field-by-field rather than to the whole store: this bell is
+  // always mounted in the shell chrome, so a whole-store subscription would
+  // re-render it on every unrelated notification-store change (e.g. the full
+  // list hydrating). Actions are stable zustand refs.
+  const unreadCount = useNotificationCenterStore(s => s.unreadCount);
+  const panelOpen = useNotificationCenterStore(s => s.panelOpen);
+  const setPanelOpen = useNotificationCenterStore(s => s.setPanelOpen);
+  const loadNotifications = useNotificationCenterStore(s => s.loadNotifications);
+  const loadUnreadCount = useNotificationCenterStore(s => s.loadUnreadCount);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadUnreadCount();
-    const interval = setInterval(() => {
-      if (!document.hidden) loadUnreadCount();
-    }, 10000);
-    return () => clearInterval(interval);
+    // Shared tick instead of an independent 10s timer with a manual hidden-check:
+    // SharedTick already throttles to a reduced cadence while the window is
+    // hidden and catches up on focus, so the unread badge stays fresh without a
+    // dedicated always-running timer or the redundant document.hidden guard.
+    sharedTick.subscribe('notif-unread', () => loadUnreadCount(), 10_000);
+    return () => sharedTick.unsubscribe('notif-unread');
   }, []);
 
   useEffect(() => {
@@ -1004,7 +1015,7 @@ export function RecycleBinView(): React.ReactElement {
       )}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 var(--space-4)' }}>
         {loading ? (
-          <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
+          <DexLoader variant="panel" style={{ padding: 'var(--space-10)', minHeight: 0 }} />
         ) : items.length === 0 ? (
           <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Recycle bin is empty</div>
         ) : (

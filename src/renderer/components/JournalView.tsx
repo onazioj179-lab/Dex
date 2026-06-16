@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useCallback, useRef, useState, memo, useMemo } from 'react';
+import { DexLoader } from './LoadingStates';
 import {
   useJournalStore,
   type JournalEntry,
@@ -494,7 +495,7 @@ const ByAppView: React.FC = () => {
                   <EntryRow key={entry.id} entry={entry} />
                 ))}
                 {entries.length === 0 && loading && (
-                  <div style={{ padding: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-tertiary)' }}>Loading...</div>
+                  <DexLoader variant="inline" style={{ padding: 'var(--space-2)' }} />
                 )}
                 {hasMore && (
                   <button style={S.loadMoreBtn} onClick={loadMore} disabled={loading}>
@@ -567,7 +568,7 @@ const BySessionView: React.FC = () => {
                   <EntryRow key={entry.id} entry={entry} />
                 ))}
                 {entries.length === 0 && loading && (
-                  <div style={{ padding: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-tertiary)' }}>Loading...</div>
+                  <DexLoader variant="inline" style={{ padding: 'var(--space-2)' }} />
                 )}
                 {hasMore && (
                   <button style={S.loadMoreBtn} onClick={loadMore} disabled={loading}>

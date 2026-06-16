@@ -18,7 +18,7 @@ use tantivy::schema::{
     Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, STORED, STRING, TEXT,
 };
 use tantivy::tokenizer::{LowerCaser, NgramTokenizer, TextAnalyzer};
-use tantivy::{doc, Index, IndexWriter, TantivyDocument};
+use tantivy::{doc, Index, IndexWriter, TantivyDocument, Term};
 
 /// One search result, shaped to match the renderer's file-result contract.
 #[derive(Serialize, Clone, Debug)]
@@ -45,6 +45,11 @@ pub struct SearchIndex {
     f_content: Field,
     f_modified: Field,
     f_size: Field,
+    /// Hot cache of recent `query -> results`, shared across cheap clones (Arc) and
+    /// CLEARED on every write (index_path / upsert / remove / clear). Invalidate-on-
+    /// write means a cached result can never be stale; it only saves repeat-query
+    /// Tantivy work between mutations. Bounded (LRU) so it can't grow unbounded.
+    query_cache: std::sync::Arc<std::sync::Mutex<dex_cache::Cache<String, Vec<FileHit>>>>,
 }
 
 /// Text-ish extensions whose contents we full-text index (bounded size).
@@ -79,6 +84,34 @@ fn read_text_content(path: &Path, size: u64) -> String {
     std::fs::read_to_string(path).unwrap_or_default()
 }
 
+/// Build the indexable field tuple for one file: (path, name, ext, modified,
+/// size, content). Returns `None` if the path is not a readable regular file.
+/// Shared by the single-file upsert path so it stays in lock-step with the
+/// bulk `index_path` document shape.
+fn file_record(path: &Path) -> Option<(String, String, String, u64, u64, String)> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    let size = meta.len();
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let name = path
+        .file_name()
+        .map(|x| x.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let ext = path
+        .extension()
+        .map(|x| x.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let content = read_text_content(path, size);
+    Some((path.to_string_lossy().to_string(), name, ext, modified, size, content))
+}
+
 impl SearchIndex {
     /// Open (or create) an on-disk index at `dir`.
     pub fn open_or_create(dir: &Path) -> Result<Self, String> {
@@ -107,7 +140,24 @@ impl SearchIndex {
         .filter(LowerCaser)
         .build();
         index.tokenizers().register("dex_prefix", tokenizer);
-        Ok(Self { index, f_path, f_name, f_ext, f_content, f_modified, f_size })
+        Ok(Self {
+            index,
+            f_path,
+            f_name,
+            f_ext,
+            f_content,
+            f_modified,
+            f_size,
+            query_cache: std::sync::Arc::new(std::sync::Mutex::new(dex_cache::Cache::new(64))),
+        })
+    }
+
+    /// Drop every cached query result. Called after any write so the next search
+    /// recomputes against the current index (invalidate-on-write).
+    fn invalidate_cache(&self) {
+        if let Ok(mut c) = self.query_cache.lock() {
+            c.clear();
+        }
     }
 
     /// Number of indexed documents.
@@ -123,6 +173,7 @@ impl SearchIndex {
         let mut writer: IndexWriter = self.index.writer(50_000_000).map_err(|e| e.to_string())?;
         writer.delete_all_documents().map_err(|e| e.to_string())?;
         writer.commit().map_err(|e| e.to_string())?;
+        self.invalidate_cache();
         Ok(())
     }
 
@@ -162,7 +213,47 @@ impl SearchIndex {
                 .map_err(|e| e.to_string())?;
         }
         writer.commit().map_err(|e| e.to_string())?;
+        self.invalidate_cache();
         Ok(n)
+    }
+
+    /// Index or re-index a single file (upsert by exact path). Any prior document
+    /// for the same path is deleted in the same commit, so re-indexing a changed
+    /// file never duplicates it and the index stays live WITHOUT a full rebuild --
+    /// the hook a file-watcher needs. Returns `Ok(false)` when the path is not an
+    /// indexable regular file.
+    pub fn upsert_file(&self, path: &Path) -> Result<bool, String> {
+        let (path_str, name, ext, modified, size, content) = match file_record(path) {
+            Some(rec) => rec,
+            None => return Ok(false),
+        };
+        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        // delete-then-add in one commit: the new doc has a higher opstamp than the
+        // delete, so it survives while the previous version (older opstamp) is removed.
+        writer.delete_term(Term::from_field_text(self.f_path, &path_str));
+        writer
+            .add_document(doc!(
+                self.f_path => path_str,
+                self.f_name => name,
+                self.f_ext => ext,
+                self.f_content => content,
+                self.f_modified => modified,
+                self.f_size => size,
+            ))
+            .map_err(|e| e.to_string())?;
+        writer.commit().map_err(|e| e.to_string())?;
+        self.invalidate_cache();
+        Ok(true)
+    }
+
+    /// Remove a single file from the index by exact path. A no-op (still `Ok`) if
+    /// the path was never indexed -- safe to call on any delete event.
+    pub fn remove_path(&self, path: &Path) -> Result<(), String> {
+        let mut writer: IndexWriter = self.index.writer(15_000_000).map_err(|e| e.to_string())?;
+        writer.delete_term(Term::from_field_text(self.f_path, &path.to_string_lossy()));
+        writer.commit().map_err(|e| e.to_string())?;
+        self.invalidate_cache();
+        Ok(())
     }
 
     /// Query the index. Prefix-friendly (each term gets a trailing `*`); falls
@@ -171,6 +262,13 @@ impl SearchIndex {
         let q = query.trim().to_lowercase();
         if q.is_empty() {
             return Vec::new();
+        }
+        // Cache key folds in the limit (different limits = different result sets).
+        let cache_key = format!("{}\u{1f}{}", limit, q);
+        if let Ok(mut c) = self.query_cache.lock() {
+            if let Some(hits) = c.get(&cache_key) {
+                return hits.clone();
+            }
         }
         let reader = match self.index.reader() {
             Ok(r) => r,
@@ -210,6 +308,11 @@ impl SearchIndex {
                     score,
                 });
             }
+        }
+        // Cache the freshly-computed result; any write clears this (see
+        // invalidate_cache), so what we store here can never be served stale.
+        if let Ok(mut c) = self.query_cache.lock() {
+            c.insert(cache_key, hits.clone());
         }
         hits
     }
@@ -313,6 +416,72 @@ mod tests {
         let hits = idx.search("brown", 10);
         assert!(hits.iter().any(|h| h.name == "notes.txt"), "content search should find notes.txt");
         assert!(!hits.iter().any(|h| h.name == "other.txt"));
+    }
+
+    #[test]
+    fn upsert_replaces_without_duplicating() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        let f = data_dir.path().join("live.txt");
+        std::fs::write(&f, b"alpha content").unwrap();
+
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        assert!(idx.upsert_file(&f).unwrap());
+        assert_eq!(idx.count(), 1);
+        assert!(idx.search("alpha", 10).iter().any(|h| h.name == "live.txt"));
+
+        // Re-write the file and upsert again: still ONE doc, new content searchable,
+        // the old content gone.
+        std::fs::write(&f, b"beta content").unwrap();
+        assert!(idx.upsert_file(&f).unwrap());
+        assert_eq!(idx.count(), 1, "upsert must replace, not duplicate");
+        assert!(idx.search("beta", 10).iter().any(|h| h.name == "live.txt"));
+        assert!(idx.search("alpha", 10).is_empty(), "stale content should be gone");
+
+        // A directory (or missing path) is not an indexable file.
+        assert!(!idx.upsert_file(data_dir.path()).unwrap());
+    }
+
+    #[test]
+    fn remove_path_deletes_one_file() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        std::fs::write(data_dir.path().join("alpha.txt"), b"alpha unique").unwrap();
+        std::fs::write(data_dir.path().join("bravo.txt"), b"bravo unique").unwrap();
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        idx.index_path(data_dir.path(), 100).unwrap();
+        assert_eq!(idx.count(), 2);
+
+        idx.remove_path(&data_dir.path().join("alpha.txt")).unwrap();
+        assert_eq!(idx.count(), 1);
+        assert!(idx.search("alpha", 10).is_empty(), "removed file should not match");
+        assert!(idx.search("bravo", 10).iter().any(|h| h.name == "bravo.txt"));
+
+        // Removing an absent path is a no-op (still Ok), leaving the index intact.
+        idx.remove_path(&data_dir.path().join("ghost.txt")).unwrap();
+        assert_eq!(idx.count(), 1);
+    }
+
+    #[test]
+    fn query_cache_is_invalidated_on_write() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        std::fs::write(data_dir.path().join("alpha.txt"), b"x").unwrap();
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        idx.index_path(data_dir.path(), 100).unwrap();
+
+        // Prime the cache with a query that currently has no "beta" match.
+        assert!(idx.search("beta", 10).is_empty());
+
+        // Add a matching file and upsert it. If the cache were NOT invalidated,
+        // the next search would serve the stale empty result.
+        let f = data_dir.path().join("beta.txt");
+        std::fs::write(&f, b"x").unwrap();
+        assert!(idx.upsert_file(&f).unwrap());
+        assert!(
+            idx.search("beta", 10).iter().any(|h| h.name == "beta.txt"),
+            "write must invalidate the query cache — no stale empty result"
+        );
     }
 
     #[test]

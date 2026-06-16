@@ -13,7 +13,7 @@ import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { ResizablePanel } from '../../components/ResizablePanel';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave } from '../../utils/useAutoSave';
+import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
 import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
@@ -406,7 +406,9 @@ const Flux: React.FC = () => {
     const updated = recordAppUsage(eng, 'flux');
     saveEngagement(checkAchievements(updated).state);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useAutoSave('flux', useCallback(() => ({ isDirty: true }), []), isDirty, 30_000);
+  // Crash-recovery autosave is wired further down, after the document state
+  // (layers/settings) is declared — at this point those are not yet in scope,
+  // which is why this used to save a useless `{ isDirty: true }` placeholder.
   // Header autosave status: "Saving..." while edits are landing, then "Saved".
   const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
@@ -539,6 +541,19 @@ const Flux: React.FC = () => {
   const [history, setHistory] = useState<Array<{ layers: Layer[]; timestamp: number; description: string }>>([]);
   const [redoStack, setRedoStack] = useState<Array<{ layers: Layer[]; timestamp: number; description: string }>>([]);
   const isRestoringRef = useRef(false);
+
+  // Crash-recovery autosave for the actual document. Mirrors saveProject's
+  // serialization: non-string layer content (HTMLImageElement/Video) is dropped
+  // since it can't be JSON-persisted, so the recovered project keeps structure,
+  // timing, transforms and text/shape/path content. Settings live in the
+  // separate flux-workspace persistence below, so restore only rehydrates layers.
+  useAutoSave('flux', useCallback(() => ({
+    version: 1,
+    appId: 'flux',
+    layers: layers.map(l => ({ ...l, content: typeof l.content === 'string' ? l.content : undefined })),
+    settings: { fps, duration, canvasSize, is3DMode },
+    timestamp: Date.now(),
+  }), [layers, fps, duration, canvasSize, is3DMode]), isDirty, 30_000);
   
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -775,6 +790,20 @@ const Flux: React.FC = () => {
     }, 500);
     return () => { if (fluxSaveTimerRef.current) clearTimeout(fluxSaveTimerRef.current); };
   }, [activeTool, fps, duration, canvasSize, viewScale, is3DMode, activeTab, showTimeline, zoom]);
+
+  // Restore the last auto-saved document (layers) after a crash/close. Workspace
+  // settings are owned by the flux-workspace persistence above, so only the
+  // layer document is rehydrated here to avoid clobbering them.
+  useEffect(() => {
+    try {
+      const snap = loadAutoSave<{ appId?: string; layers?: Layer[] }>('flux');
+      if (snap && snap.appId === 'flux' && Array.isArray(snap.layers) && snap.layers.length > 0) {
+        setLayers(snap.layers);
+        setSelectedLayerId(snap.layers[0].id);
+      }
+    } catch { /* ignore corrupt autosave */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ===== HISTORY TRACKING (debounced) =====
   const fluxHistoryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

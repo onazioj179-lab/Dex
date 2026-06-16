@@ -336,9 +336,17 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-const root = document.getElementById('root')!;
+const container = document.getElementById('root')!;
 
-ReactDOM.createRoot(root).render(
+// Reuse a single React root across module re-evaluations. Vite HMR (and any
+// accidental double-import) can re-run this module; calling createRoot() twice
+// on the same node warns and can detach the tree. Caching the root on the
+// window keeps exactly one root for the node -- a single createRoot in
+// production, and a clean re-render (not a re-mount) on hot updates.
+const rootHost = window as unknown as { __dexReactRoot?: ReturnType<typeof ReactDOM.createRoot> };
+const root = rootHost.__dexReactRoot ?? (rootHost.__dexReactRoot = ReactDOM.createRoot(container));
+
+root.render(
   <RootErrorBoundary>
     <App />
   </RootErrorBoundary>

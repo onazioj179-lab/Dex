@@ -11,6 +11,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import DexIcon from './DexIcon';
+import { DexLoader } from './LoadingStates';
 import { useDropdownPosition } from '../hooks/useDropdownPosition';
 
 // ==================== TYPES ====================
@@ -346,7 +347,7 @@ export const Select: React.FC<SelectProps> = ({
           </span>
         )}
 
-        {loading && <span>Loading...</span>}
+        {loading && <DexLoader variant="inline" />}
         {clearable && currentValue && !loading && (
           <button style={styles.clearButton} onClick={handleClear} aria-label="Clear selection">
             <DexIcon name="close" size={12} />
@@ -358,7 +359,7 @@ export const Select: React.FC<SelectProps> = ({
       {isOpen && (
         <div ref={menuRef} style={{ ...styles.menu, ...menuStyle }}>
           {loading ? (
-            <div style={styles.loading}>Loading...</div>
+            <div style={styles.loading}><DexLoader variant="inline" /></div>
           ) : filteredOptions.length === 0 ? (
             <div style={styles.empty}>No options found</div>
           ) : grouped ? (

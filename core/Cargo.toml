@@ -19,6 +19,7 @@ members = [
     "dex-rewind",
     "dex-scanner",
     "dex-ai-runtime",
+    "dex-cache",
 ]
 
 [workspace.package]

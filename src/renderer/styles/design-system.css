@@ -60,6 +60,17 @@
   --color-bg-elevated: #1A1A1E;
   --color-bg-tertiary: #1E1E22;
 
+  /* Home desktop surface -- unified workspace legibility (v5.5 Desktop initiative).
+     The Home is one desktop surface, not a stack of opaque cards. Content sits on
+     the wallpaper; a soft scrim (NOT a hard bordered card, NOT washed-out glass)
+     plus an inherited text-shadow keeps widgets, dashboard panels, and shortcuts
+     readable on any wallpaper -- resolving the earlier full-transparency attempt
+     that left content unreadable. No backdrop-filter: cheap on every perf tier. */
+  --dex-desktop-scrim: rgba(12, 12, 14, 0.30);
+  --dex-desktop-scrim-hover: rgba(18, 18, 22, 0.46);
+  --dex-desktop-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  --dex-desktop-object-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+
   /* Text -- Crisp whites with visible secondary */
   --color-text-primary: #FFFFFF;
   --color-text-secondary: #B8B8BD;

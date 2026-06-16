@@ -46,6 +46,36 @@ import {
 const TURNS_KEY = 'uki:mem:turns';
 const WORKFLOWS_KEY = 'uki:mem:workflows';
 const MAX_TURNS = 200;
+// Workflows are user/learned recipes kept in the (small) localStorage budget, so
+// they are capped and quality-scored rather than allowed to grow without bound.
+// (A true multi-GB memory store would need IndexedDB / native dex.db; this layer
+// is localStorage-backed, so the cap is a count, not the brief's 10 GB figure.)
+const MAX_WORKFLOWS = 100;
+
+/**
+ * Retention score for a workflow (higher = keep). Recency is the live signal:
+ * it decays on a ~30-day scale from the record's last touch. Frequency (useCount)
+ * is read with diminishing returns so a future "workflow used" hook can bump it
+ * without a schema change; until such a consumer exists it is simply 0. Semantic
+ * *relevance* is a query-time concern handled by `./index_search` /
+ * `./semanticSearch`, not eviction.
+ */
+function workflowScore(w: UkiWorkflowRecord, now: number): number {
+  const lastTouch = w.lastUsedTs ?? w.updatedTs ?? w.createdTs ?? now;
+  const ageDays = Math.max(0, (now - lastTouch) / 86_400_000);
+  const recency = Math.exp(-ageDays / 30);
+  const frequency = Math.log2(1 + (w.useCount ?? 0));
+  return recency + 0.5 * frequency;
+}
+
+/** Drop the lowest-scoring workflows until the list fits the cap. */
+function enforceWorkflowCap(list: UkiWorkflowRecord[]): UkiWorkflowRecord[] {
+  if (list.length <= MAX_WORKFLOWS) return list;
+  const now = Date.now();
+  return [...list]
+    .sort((a, b) => workflowScore(b, now) - workflowScore(a, now))
+    .slice(0, MAX_WORKFLOWS);
+}
 
 // ---------- turns ----------
 
@@ -96,17 +126,26 @@ export async function saveWorkflow(
 ): Promise<UkiWorkflowRecord> {
   const list = await listWorkflows();
   const now = Date.now();
-  const id = `wf_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  // Dedup by title (case-insensitive): re-saving a recipe UPDATES it in place
+  // and preserves its accrued usage, instead of silently appending a duplicate
+  // and growing the store unbounded.
+  const norm = title.trim().toLowerCase();
+  const existing = list.find((w) => w.title.trim().toLowerCase() === norm);
   const record: UkiWorkflowRecord = {
     schemaVersion: SCHEMA_VERSION,
-    id,
+    id: existing?.id ?? `wf_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
     title,
     steps,
     triggers,
-    createdTs: now,
+    createdTs: existing?.createdTs ?? now,
     updatedTs: now,
+    useCount: existing?.useCount ?? 0,
+    lastUsedTs: existing?.lastUsedTs ?? now,
   };
-  await cache.setAsync(WORKFLOWS_KEY, list.concat(record));
+  const next = existing
+    ? list.map((w) => (w.id === existing.id ? record : w))
+    : list.concat(record);
+  await cache.setAsync(WORKFLOWS_KEY, enforceWorkflowCap(next));
   return record;
 }
 

@@ -11,6 +11,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 // ============================================================================
 // Types
@@ -397,12 +398,12 @@ export function useBatteryStatus(): {
   isOnBattery: boolean;
   timeRemaining: number | null;
 } {
-  return usePowerStore(state => ({
+  return usePowerStore(useShallow(state => ({
     level: state.batteryLevel,
     isCharging: state.isCharging,
     isOnBattery: state.isOnBattery,
     timeRemaining: state.estimatedTimeRemaining,
-  }));
+  })));
 }
 
 // ============================================================================

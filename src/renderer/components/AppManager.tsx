@@ -20,9 +20,8 @@ import { useRecentFiles } from '../store/useRecentFiles';
 import { useAppTransition } from '../utils/motionHooks';
 import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
 import { useUkiStore } from '../store/ukiStore';
-import { liquidGlassDock, glassModal, adaptiveShadow } from '../styles/glassMenu';
-import { computeDockGeometry, getDockReservedInsets } from '../../shared/shell/dockGeometry';
-import { useShellPreferences } from '../store/shellPreferencesStore';
+import { glassModal, adaptiveShadow } from '../styles/glassMenu';
+import FloatingLauncher from './FloatingLauncher';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
@@ -43,7 +42,6 @@ import { gestureRecognizer, initializeTouchSystem } from '../utils/TouchInputSys
 import { AppOverview } from '../shell/AppOverview';
 import { NotificationBanners, NotificationCenter, useBannerNotifications } from '../shell/NotificationBanners';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
-import { getDockReflectionStyle } from '../shell/WallpaperAccent';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
 import StageManager, { STAGE_STRIP_WIDTH } from '../shell/StageManager';
 import AppSwitcher from '../shell/AppSwitcher';
@@ -397,16 +395,6 @@ const Icons: Record<string, JSX.Element> = {
   search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
 };
 
-// -- Dock configuration ----------------------------------------------------
-// Helper: convert hex color to r,g,b string for rgba()
-const hexToRgb = (hex: string): string => {
-  const h = hex.replace('#', '');
-  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-};
-
-interface DockItem { id: AppId; label: string; color: string }
-
 // All apps for Launchpad -- full DEX app surface organized by category.
 // Keep aligned with APP_DEFINITIONS in src/renderer/store/runningApps.ts.
 const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
@@ -656,19 +644,9 @@ export const AppManager: React.FC = () => {
   } = useRunningApps();
   const sendAssetToApp = useCreativeSuite(s => s.sendToApp);
 
-  // Dock pinning store
-  const { pins: dockPins, pinApp, unpinApp, reorder: reorderDockPins, isPinned: isDockPinned, mode: dockMode, magnificationScale, iconSize: dockIconSize } = useDockPins();
-  // Dock magnification (the gaussian hover swell/lift) is HARD-DISABLED per owner
-  // direction: the dock must stay perfectly still — never grow, shift, or "move
-  // out of place" under the cursor. Forced off here (not read from the store) so
-  // every consumer below (mousemove handler, willChange) sees it off regardless
-  // of any previously-saved setting.
-  const dockMagnification = false;
-
-  // Shell preferences (movable + compact taskbar) — read reactively so edge /
-  // preset changes from Settings re-render the dock immediately.
-  const dockEdgePref = useShellPreferences((s) => s.dockEdge);
-  const dockPresetPref = useShellPreferences((s) => s.dockPreset);
+  // App pinning store. The dock was removed in favour of the FloatingLauncher,
+  // but pin/unpin is still used by the Launchpad context menu ("Add to Dock").
+  const { pinApp, unpinApp, isPinned: isDockPinned } = useDockPins();
 
   // Ctrl+K -> CommandPalette (App.tsx). Ctrl+Space -> UKI panel. No legacy unified search overlay.
   const [showAppMenu, setShowAppMenu] = useState(false);
@@ -679,8 +657,7 @@ export const AppManager: React.FC = () => {
   const [showSpotlight, setShowSpotlight] = useState(false);
   const [appMenuSearch, setAppMenuSearch] = useState('');
   const appMenuSearchRef = useRef<HTMLInputElement>(null);
-  const [taskbarVisible, setTaskbarVisible] = useState(true);
-  // Immersive focus: hide the top bar (the dock already auto-hides) so an open
+  // Immersive focus: hide the top bar so an open
   // app gets the full DEX frame with zero chrome — "clear the screen to
   // concentrate". Toggled with Ctrl+Shift+F, exited with Escape or the pill.
   // Only meaningful inside an app; navigating Home always shows chrome.
@@ -782,21 +759,6 @@ export const AppManager: React.FC = () => {
       ipcRenderer.removeListener?.('dex:system-lock', onSystemLock);
     };
   }, []);
-  const dockRef = useRef<HTMLDivElement>(null);
-  const dockHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Hover-intent for the bottom trigger zone — defers showDock() until cursor
-  // dwells with low velocity, preventing accidental popups when the user just
-  // sweeps past the bottom edge on the way to something else.
-  const dockIntentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dockIntentSampleRef = useRef<{ t: number; x: number; y: number } | null>(null);
-  const dockMouseX = useRef<number | null>(null);
-  const lastMenuCloseRef = useRef<number>(0);
-  // Dock context menu
-  const [dockCtx, setDockCtx] = useState<{ appId: string; x: number; y: number } | null>(null);
-  const dockCtxRef = useRef<{ appId: string; x: number; y: number } | null>(null);
-  dockCtxRef.current = dockCtx;
-  const dockLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dockTouchReorderRef = useRef<{ appId: AppId; startX: number; startY: number; dragging: boolean; fromIndex: number; toIndex: number; el: HTMLElement | null } | null>(null);
   // Launchpad context menu (right-click on apps in grid)
   const [launchpadCtx, setLaunchpadCtx] = useState<{ appId: string; label: string; x: number; y: number } | null>(null);
 
@@ -1023,10 +985,6 @@ export const AppManager: React.FC = () => {
     return null;
   }, []);
 
-  // -- Dock hover preview state -----------------------------------------------
-  const [dockPreview, setDockPreview] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [dockPreviewPinnedId, setDockPreviewPinnedId] = useState<string | null>(null);
-  const [dockPeekAnnouncement, setDockPeekAnnouncement] = useState('');
 
   // -- Stage Manager (macOS Tahoe) -- off by default, user activates in Settings ----
   const [stageManagerOn, setStageManagerOn] = useState(() => {
@@ -1074,18 +1032,22 @@ export const AppManager: React.FC = () => {
     const el = contentRef.current;
     const w = el ? el.clientWidth : window.innerWidth;
     const h = el ? el.clientHeight : window.innerHeight;
+    // The dock was removed in favour of the floating launcher, which floats
+    // above content and reserves NO layout space -- so maximized / snapped
+    // windows fill the whole work area. Only the Stage Manager strip reserves.
     return getWorkspaceBounds(
       { width: w, height: h },
       {
         topReserve: 0,
         dockReserve: 0,
         leftReserve: stageOffset,
+        rightReserve: 0,
         padding,
         minWidth: 320,
         minHeight: 260,
       },
     );
-  }, [stageOffset, showAppTabBar, runningApps.length, dockMode, dockEdgePref, dockPresetPref]);
+  }, [stageOffset, showAppTabBar, runningApps.length]);
 
   // Maximizing means "fill the work area" -- below the chrome, above the pinned
   // dock -- not "cover the whole viewport". This is what stops a maximized
@@ -1219,13 +1181,6 @@ export const AppManager: React.FC = () => {
     return () => timers.forEach(clearTimeout);
   }, [splashVisible]);
 
-  // Show the dock after splash screen dismisses
-  useEffect(() => {
-    if (splashVisible) return;
-    setTaskbarVisible(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [splashVisible]);
-
 
 
   // Smooth cross-fade on app switch
@@ -1307,23 +1262,17 @@ export const AppManager: React.FC = () => {
     [currentAppId],
   );
 
-  // -- Publish dock-reserved insets as CSS variables so the inline app surface
-  //    and floating windows size their bounds without ever clipping under the
-  //    dock. Reserve only when the dock is pinned -- on the desktop / over
-  //    windowed apps, never in a fullscreen app (it hides there). Keyed to
-  //    dockMode + inFullscreenApp (stable), NOT taskbarVisible (which flickers
-  //    with hover and collapsed the insets to 0 mid-session). --
+  // -- Publish reserved insets as CSS variables so the inline app surface and
+  //    floating windows size their bounds correctly. The floating launcher
+  //    reserves NO layout space (it floats above content and is dragged out of
+  //    the way), so all insets are zero -- windows fill the whole work area. --
   useEffect(() => {
-    // New floating dock reserves NO layout space -- it floats above content and
-    // is dragged out of the way as needed, so windows fill the whole work area.
-    const dockPinned = false;
-    const insets = getDockReservedInsets(dockEdgePref, dockPresetPref, dockPinned);
     const root = document.documentElement;
-    root.style.setProperty('--dex-reserved-top', `${insets.top}px`);
-    root.style.setProperty('--dex-reserved-right', `${insets.right}px`);
-    root.style.setProperty('--dex-reserved-bottom', `${insets.bottom}px`);
-    root.style.setProperty('--dex-reserved-left', `${insets.left}px`);
-  }, [dockEdgePref, dockPresetPref, dockMode, inFullscreenApp]);
+    root.style.setProperty('--dex-reserved-top', '0px');
+    root.style.setProperty('--dex-reserved-right', '0px');
+    root.style.setProperty('--dex-reserved-bottom', '0px');
+    root.style.setProperty('--dex-reserved-left', '0px');
+  }, []);
 
   // When the dock hides for a fullscreen app (or returns on the desktop), the
   // work area changes -- re-fit maximized creative windows to the CURRENT work
@@ -1344,172 +1293,13 @@ export const AppManager: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inFullscreenApp]);
 
-  // Helper: check if any dropdown/menu is currently open (used by dock auto-hide)
-  const isAnyMenuOpen = useCallback((): boolean => {
-    return !!document.querySelector('[role="menu"], [role="listbox"], .dropdown:not([hidden]), .context-menu:not([hidden]), [data-state="open"]');
-  }, []);
-
-  // Auto-hide dock: show on bottom hover, hide after leaving
-  // When any window is maximized, dock hides immediately
-  const showDock = useCallback(() => {
-    // Always able to reveal -- the dock hides in fullscreen apps, so a deliberate
-    // edge-dwell / Show Dock handle must be able to bring it back.
-    if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
-    setTaskbarVisible(true);
-  }, []);
-
-  // -- New floating dock: always visible, drag-to-place anywhere --------------
-  // Replaces the old edge-snap + auto-hide + hover-intent model. The dock is a
-  // small pill that floats ABOVE everything (incl. maximized apps), reserves no
-  // layout space, and can be grabbed by its blank area and dropped anywhere.
-  // Position persists in localStorage; default (dockPos === null) is bottom-
-  // centre. Ctrl+Shift+D re-summons it to the default spot.
-  const [dockPos, setDockPos] = useState<{ x: number; y: number } | null>(() => {
-    try { const r = localStorage.getItem('dex-dock-free-pos'); return r ? JSON.parse(r) : null; } catch { return null; }
-  });
-  const dockDragRef = useRef<{ pointerId: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const handleDockDragStart = useCallback((e: React.PointerEvent) => {
-    // Buttons / inputs / open menus keep working -- only the blank pill drags.
-    if ((e.target as HTMLElement).closest('button, input, a, [role="menu"], [role="listbox"]')) return;
-    const wrap = dockRef.current?.parentElement as HTMLElement | null;
-    if (!wrap) return;
-    const rect = wrap.getBoundingClientRect();
-    e.preventDefault();
-    const handle = e.currentTarget as HTMLElement;
-    try { handle.setPointerCapture(e.pointerId); } catch { /* capture unavailable */ }
-    handle.style.cursor = 'grabbing';
-    dockDragRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top };
-  }, []);
-  const handleDockDragMove = useCallback((e: React.PointerEvent) => {
-    const d = dockDragRef.current;
-    if (!d) return;
-    const pill = dockRef.current as HTMLElement | null;
-    const pw = pill ? pill.offsetWidth : 200;
-    const ph = pill ? pill.offsetHeight : 48;
-    const nx = Math.max(4, Math.min(window.innerWidth - pw - 4, d.origX + (e.clientX - d.startX)));
-    const ny = Math.max(4, Math.min(window.innerHeight - ph - 4, d.origY + (e.clientY - d.startY)));
-    setDockPos({ x: nx, y: ny });
-  }, []);
-  const handleDockDragEnd = useCallback((e: React.PointerEvent) => {
-    const d = dockDragRef.current;
-    if (!d) return;
-    dockDragRef.current = null;
-    const handle = e.currentTarget as HTMLElement;
-    try { handle.releasePointerCapture(d.pointerId); } catch { /* already released */ }
-    handle.style.cursor = 'grab';
-    setDockPos(p => { try { if (p) localStorage.setItem('dex-dock-free-pos', JSON.stringify(p)); } catch { /* quota */ } return p; });
-  }, []);
-
-  // Hover-intent gate for bottom trigger zone. Requires cursor to dwell ~280ms
-  // with average velocity below 0.35 px/ms before revealing the dock. The longer,
-  // stricter gate keeps the dock from popping up while the user is *working* near
-  // the bottom of an app (a brief pause on a bottom-edge control/scrollbar no
-  // longer triggers it) — only a deliberate move-to-edge-and-rest reveals it.
-  const cancelDockIntent = useCallback(() => {
-    if (dockIntentTimerRef.current) { clearTimeout(dockIntentTimerRef.current); dockIntentTimerRef.current = null; }
-    dockIntentSampleRef.current = null;
-  }, []);
-  const beginDockIntent = useCallback((e: React.PointerEvent | React.MouseEvent) => {
-    // Always honor pen/touch immediately — those are intentional.
-    const isPen = 'pointerType' in e && (e as React.PointerEvent).pointerType !== 'mouse';
-    if (isPen || taskbarVisible) { showDock(); return; }
-    dockIntentSampleRef.current = { t: performance.now(), x: e.clientX, y: e.clientY };
-    if (dockIntentTimerRef.current) clearTimeout(dockIntentTimerRef.current);
-    dockIntentTimerRef.current = setTimeout(() => {
-      dockIntentTimerRef.current = null;
-      // Velocity check happens in trackDockIntent on every move; if no move
-      // arrived (cursor is resting), velocity is 0 — definitely intentional.
-      showDock();
-    }, 280);
-  }, [taskbarVisible, showDock]);
-  const trackDockIntent = useCallback((e: React.PointerEvent | React.MouseEvent) => {
-    const sample = dockIntentSampleRef.current;
-    if (!sample || !dockIntentTimerRef.current) return;
-    const dt = performance.now() - sample.t;
-    if (dt < 1) return;
-    const dx = e.clientX - sample.x;
-    const dy = e.clientY - sample.y;
-    const v = Math.sqrt(dx * dx + dy * dy) / dt;
-    // Refresh sample baseline so velocity is computed over the last hop.
-    dockIntentSampleRef.current = { t: performance.now(), x: e.clientX, y: e.clientY };
-    // If still moving fast, restart the dwell window to require a fresh pause.
-    if (v > 0.35) {
-      clearTimeout(dockIntentTimerRef.current);
-      dockIntentTimerRef.current = setTimeout(() => {
-        dockIntentTimerRef.current = null;
-        showDock();
-      }, 280);
-    }
-  }, [showDock]);
-  const scheduleDockHide = useCallback(() => {
-    // Pinned on the desktop / over windowed apps; allowed to hide in a fullscreen
-    // app OR whenever an app is maximized (PiP reveal-on-hover, then re-hide).
-    if (dockMode === 'always-visible' && !inFullscreenApp && !anyWindowMaximized) return;
-    if (dockHideTimerRef.current) clearTimeout(dockHideTimerRef.current);
-    // Delay before hiding allows user to return and see smooth transition
-    dockHideTimerRef.current = setTimeout(() => {
-      if (showAppMenuRef.current) return;
-      // Anchored persistence: never hide while the user is actively dragging a
-      // dock icon (touch reorder in progress) — the dock stays put while in use.
-      if (dockTouchReorderRef.current?.dragging) return;
-      // Don't hide if any menu/dropdown is open in any app
-      if (isAnyMenuOpen()) return;
-      // Don't hide if a menu just closed (200ms grace period)
-      if (Date.now() - lastMenuCloseRef.current < 200) return;
-      setTaskbarVisible(false);
-    }, 450); // 450ms — gentle delay so a brief overshoot does not hide the dock
-  }, [dockMode, inFullscreenApp, anyWindowMaximized, isAnyMenuOpen]);
-
-  // Dock visibility policy: pinned (shown) on the Home desktop and over windowed
-  // apps; the moment a FULLSCREEN app comes to the front it tucks away so the app
-  // owns the whole screen (reveal at the bottom edge / Show Dock handle). Other
-  // dock modes still hide on maximize.
-  useEffect(() => {
-    // PiP-style: the moment an app is maximized -- a fullscreen creative app OR
-    // any floating window blown up to fill the screen -- the dock tucks away so
-    // the app owns the whole screen. Reveal it by dwelling at the bottom edge /
-    // the Show Dock handle. Maximize wins over the pinned "always-visible" mode;
-    // otherwise the dock stays pinned on the desktop and over windowed apps.
-    if (inFullscreenApp || anyWindowMaximized) {
-      setTaskbarVisible(false);
-    } else if (dockMode === 'always-visible') {
-      setTaskbarVisible(true);
-    }
-  }, [dockMode, anyWindowMaximized, inFullscreenApp]);
-
-  // Keep dock visible whenever any overlay menu is open (prevents auto-hide race condition)
-  useEffect(() => {
-    if (showAppMenu || showOverview || dockCtx) {
-      if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
-      setTaskbarVisible(true);
-    } else {
-      lastMenuCloseRef.current = Date.now();
-    }
-  }, [showAppMenu, showOverview, dockCtx]);
-
-  // Cleanup dock timer on unmount to prevent memory leaks
-  useEffect(() => {
-    // Start with dock hidden - show on hover
-    if (dockMode !== 'always-visible') {
-      setTaskbarVisible(false);
-    }
-    return () => {
-      if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
-      if (dockIntentTimerRef.current) { clearTimeout(dockIntentTimerRef.current); dockIntentTimerRef.current = null; }
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Self-heal on window focus / visibility return.
   // If the user "left DEX" (alt-tab / sleep / minimize) and came back to a
-  // wallpaper-only screen, force-restore home and briefly show the dock so
-  // they always land somewhere useful.
+  // wallpaper-only screen, force-restore home so they always land somewhere useful.
   useEffect(() => {
     const heal = () => {
       if (typeof document === 'undefined') return;
       if (document.visibilityState !== 'visible') return;
-      // Always re-show the dock on return so user has anchor controls.
-      if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
-      setTaskbarVisible(true);
       // If the store points to an app that is not mounted anymore, fail-safe to home.
       if (currentAppId !== 'home' && !mountedAppsRef.current.has(currentAppId as AppId)) {
         mountedAppsRef.current.add('home');
@@ -1540,15 +1330,34 @@ export const AppManager: React.FC = () => {
     };
   }, [currentAppId, setCurrentRunningApp]);
 
+  // Keep the native search index fresh: a debounced `search:sync` on window focus
+  // (and once on mount). Fire-and-forget + caught — in the Tauri shell this runs
+  // the native snapshot-diff index_sync (incremental, no full rebuild); in Electron
+  // the self-maintaining indexer just acknowledges it. Throttled so rapid focus
+  // flutter can't spam it.
+  useEffect(() => {
+    let lastSync = 0;
+    const MIN_GAP_MS = 30_000;
+    const sync = () => {
+      const now = Date.now();
+      if (now - lastSync < MIN_GAP_MS) return;
+      lastSync = now;
+      try { window.dex?.invoke?.('search:sync').catch(() => { /* no-op / no handler */ }); }
+      catch { /* bridge unavailable */ }
+    };
+    sync(); // initial refresh on mount
+    const onFocus = () => sync();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
   // Idle fallback policy: when DEX enters idle/background modes and later
   // resumes, always land on Home instead of risking a wallpaper-only state.
   // This keeps user context stable even after long idle / sleep transitions.
   useEffect(() => {
     const snapHome = () => {
-      if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
       mountedAppsRef.current.add('home');
       setCurrentRunningApp('home');
-      setTaskbarVisible(true);
       forceUpdate(n => n + 1);
     };
 
@@ -1571,71 +1380,10 @@ export const AppManager: React.FC = () => {
     };
   }, [setCurrentRunningApp]);
 
-  // Global mouse position tracking for dock hide fallback
-  // Ensures dock hides when mouse moves away from bottom edge region
-  useEffect(() => {
-    if (dockMode === 'always-visible' && !inFullscreenApp && !anyWindowMaximized) return;
-    let rafId: number | null = null;
-    
-    // Helper: check if any dropdown/menu is currently open
-    const isAnyMenuOpen = (): boolean => {
-      return !!document.querySelector('[role="menu"], [role="listbox"], .dropdown:not([hidden]), .context-menu:not([hidden]), [data-state="open"]');
-    };
-    
-    // Magnetic retention zone — when dock is visible, use the dock's actual
-    // bounding box plus generous padding instead of a fixed center band so the
-    // user can move freely along the entire dock without losing it.
-    const RETAIN_PAD_TOP = 48;     // grace zone above the dock
-    const RETAIN_PAD_SIDES = 80;   // grace zone left/right (covers magnification overflow)
-    const RETAIN_PAD_BOTTOM = 24;  // grace below in case of edge overscroll
-
-    const handleGlobalMove = (e: MouseEvent) => {
-      // Only check when dock is visible
-      if (!taskbarVisible) return;
-      // Don't hide if menu is open (dock menu or any app menu)
-      if (showAppMenuRef.current || dockCtxRef.current || isAnyMenuOpen()) return;
-
-      const dockEl = dockRef.current;
-      let inRetainZone = false;
-      if (dockEl) {
-        const r = dockEl.getBoundingClientRect();
-        inRetainZone =
-          e.clientX >= r.left - RETAIN_PAD_SIDES &&
-          e.clientX <= r.right + RETAIN_PAD_SIDES &&
-          e.clientY >= r.top - RETAIN_PAD_TOP &&
-          e.clientY <= r.bottom + RETAIN_PAD_BOTTOM;
-      } else {
-        // Fallback: bottom 96px strip when ref not yet bound.
-        inRetainZone = e.clientY >= window.innerHeight - 96;
-      }
-
-      if (!inRetainZone) {
-        // Cursor left the retention zone — schedule hide.
-        if (!dockHideTimerRef.current) {
-          scheduleDockHide();
-        }
-      } else {
-        // Cursor came back inside — cancel any pending hide.
-        if (dockHideTimerRef.current) {
-          clearTimeout(dockHideTimerRef.current);
-          dockHideTimerRef.current = null;
-        }
-      }
-    };
-    // Throttle to 60fps using rAF
-    const throttledMove = (e: MouseEvent) => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        handleGlobalMove(e);
-        rafId = null;
-      });
-    };
-    document.addEventListener('mousemove', throttledMove, { passive: true });
-    return () => {
-      document.removeEventListener('mousemove', throttledMove);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, [taskbarVisible, dockMode, anyWindowMaximized, inFullscreenApp, scheduleDockHide]);
+  // (Removed) Global cursor-tracking auto-hide. The dock is permanently visible
+  // and static, so there is no retention zone and nothing hides when the cursor
+  // moves away from the bottom edge. This was the main "moves on contact"
+  // behaviour -- the dock now simply stays put.
 
   // Clock + Battery for status row
   useEffect(() => {
@@ -1868,15 +1616,14 @@ export const AppManager: React.FC = () => {
   const menuAutoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (menuAutoCloseRef.current) clearTimeout(menuAutoCloseRef.current);
-    if (showAppMenu || showOverview || dockCtx) {
+    if (showAppMenu || showOverview) {
       menuAutoCloseRef.current = setTimeout(() => {
         setShowAppMenu(false);
         setShowOverview(false);
-        setDockCtx(null);
       }, 30000);
     }
     return () => { if (menuAutoCloseRef.current) clearTimeout(menuAutoCloseRef.current); };
-  }, [showAppMenu, showOverview, dockCtx]);
+  }, [showAppMenu, showOverview]);
 
   // Memory pressure -- reduce background footprint without closing user apps.
   // Running apps remain mounted and resumable; only closed/non-running warm mounts
@@ -2526,13 +2273,6 @@ export const AppManager: React.FC = () => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'n') { e.preventDefault(); setCurrentApp('notes' as AppId); return; }
       // Ctrl+Shift+T -- quick-open Tasks app
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') { e.preventDefault(); setCurrentApp('tasks' as AppId); return; }
-      if (e.key === 'F11') {
-        e.preventDefault();
-        const { mode, setMode } = useDockPins.getState();
-        const cycle: Record<string, 'always-visible' | 'auto-hide' | 'floating'> = { 'always-visible': 'auto-hide', 'auto-hide': 'floating', 'floating': 'always-visible' };
-        const next = cycle[mode]; setMode(next); if (next === 'always-visible') setTaskbarVisible(true);
-        return;
-      }
       // F3 or Ctrl+Up -- App Overview (Mission Control)
       if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp')) { e.preventDefault(); setShowOverview(p => !p); return; }
 
@@ -2557,13 +2297,6 @@ export const AppManager: React.FC = () => {
         if (e.key === 'ArrowRight') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top-right'); return; }
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
-        e.preventDefault();
-        const { mode, setMode } = useDockPins.getState();
-        const cycle: Record<string, 'always-visible' | 'auto-hide' | 'floating'> = { 'always-visible': 'auto-hide', 'auto-hide': 'floating', 'floating': 'always-visible' };
-        const next = cycle[mode]; setMode(next); if (next === 'always-visible') setTaskbarVisible(true);
-        return;
-      }
       // Ctrl+W -- close current app (go home)
       if ((e.ctrlKey || e.metaKey) && e.key === 'w') { e.preventDefault(); if (currentAppId !== 'home') { handleCloseApp(currentAppId); setCurrentApp('home'); } return; }
       // Escape leaves immersive focus first, before any app-level Escape handling.
@@ -2577,14 +2310,6 @@ export const AppManager: React.FC = () => {
       }
       // Ctrl+Shift+W -- close all apps
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'W') { e.preventDefault(); handleCloseAllApps(); return; }
-      // Ctrl+Shift+D -- re-summon the floating dock to its default spot (handy if
-      // it was dragged into a corner / off where you can see it).
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
-        e.preventDefault();
-        try { localStorage.removeItem('dex-dock-free-pos'); } catch { /* noop */ }
-        setDockPos(null);
-        return;
-      }
       // Ctrl+Shift+E -- detach/reattach current app as floating window
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
         e.preventDefault();
@@ -2613,25 +2338,6 @@ export const AppManager: React.FC = () => {
             });
           }
         }
-        return;
-      }
-      // T12-025: global DockPeek hotkey on currently focused dock item
-      if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'd') {
-        const focusedDockBtn = document.activeElement as HTMLButtonElement | null;
-        const appIdAttr = focusedDockBtn?.getAttribute('data-dock-app-id');
-        if (appIdAttr) {
-          e.preventDefault();
-          openDockPeek(appIdAttr as AppId, focusedDockBtn);
-          setDockPreviewPinnedId(appIdAttr);
-        }
-        return;
-      }
-      // Item 147: Alt+D -- focus dock for keyboard navigation
-      if (e.altKey && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-        const firstBtn = dockRef.current?.querySelector<HTMLButtonElement>('[data-dock-app-id]');
-        if (firstBtn) firstBtn.focus();
-        showDock();
         return;
       }
       const ctrlMap: Record<string, AppId> = { '1': 'home', '2': 'settings', '3': 'files', '4': 'notes', '5': 'tasks', '6': 'browser', '7': 'gallery', '8': 'calendar', '9': 'kanban' };
@@ -2961,15 +2667,26 @@ export const AppManager: React.FC = () => {
     const container = splitContainerRef.current;
     if (!container) return;
     const isH = splitMode === 'horizontal';
+    // rAF-batch the ratio updates so a fast drag coalesces to one setState per
+    // frame instead of one per pointermove event (consistent with the window
+    // drag/resize handlers below).
+    let rafId = 0;
+    let pendingPct = 0;
+    const flush = () => { rafId = 0; setSplitRatio(pendingPct); };
     const onMove = (ev: PointerEvent) => {
       if (!splitDragging.current || !container) return;
       const rect = container.getBoundingClientRect();
       const pos = isH ? ev.clientX - rect.left : ev.clientY - rect.top;
       const total = isH ? rect.width : rect.height;
-      const pct = Math.min(80, Math.max(20, (pos / total) * 100));
-      setSplitRatio(pct);
+      pendingPct = Math.min(80, Math.max(20, (pos / total) * 100));
+      if (!rafId) rafId = requestAnimationFrame(flush);
     };
-    const onUp = () => { splitDragging.current = false; document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
+    const onUp = () => {
+      splitDragging.current = false;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
   }, [splitMode]);
@@ -3843,391 +3560,6 @@ export const AppManager: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, mountedAppsSafeSnapshot.join(',')]);
 
-  // -- Dock rendering ------------------------------------------------------
-  // Build dock items from pinned store
-  const dockItems: DockItem[] = useMemo(() => {
-    return dockPins
-      .sort((a, b) => a.position - b.position)
-      .map(pin => {
-        const def = APP_DEFINITIONS[pin.id];
-        const lp = LAUNCHPAD_APPS.find(a => a.id === pin.id);
-        return {
-          id: pin.id as AppId,
-          label: def?.name || lp?.label || pin.id,
-          color: def?.color || lp?.color || '#8A8A8A',
-        };
-      });
-  }, [dockPins]);
-
-  const openDockPeek = useCallback((appId: AppId, anchorEl?: HTMLElement | null) => {
-    const source = anchorEl || dockRef.current?.querySelector<HTMLElement>(`[data-dock-app-id="${appId}"]`);
-    if (!source) return;
-    const rect = source.getBoundingClientRect();
-    setDockPreview({ id: appId, x: rect.left + rect.width / 2, y: rect.top });
-    const appName = dockItems.find(d => d.id === appId)?.label || APP_DEFINITIONS[appId]?.name || appId;
-    setDockPeekAnnouncement(`Dock peek opened for ${appName}`);
-  }, [dockItems]);
-
-  const dockMagRafRef = useRef(0);
-  const handleDockMouseMove = useCallback((e: React.MouseEvent) => {
-    dockMouseX.current = e.clientX;
-    // Apply magnification directly via style transforms (no state updates)
-    if (dockMagnification && dockRef.current) {
-      const mx = e.clientX;
-      cancelAnimationFrame(dockMagRafRef.current);
-      dockMagRafRef.current = requestAnimationFrame(() => {
-        if (!dockRef.current) return;
-        const items = dockRef.current.querySelectorAll<HTMLElement>('[data-dock-item]');
-        const dockRect = dockRef.current.getBoundingClientRect();
-        // Gentler magnification (owner direction): a broad, soft lift that GLIDES
-        // with the cursor instead of a sharp pop bleeding left-to-center. A wider
-        // sigma spreads the swell across neighbours; the short transition smooths
-        // frame-to-frame motion. Safe to transition now because centres come from
-        // layout offsets (offsetLeft), NOT transformed rects, so there is no
-        // scale-feedback loop to cause jitter.
-        const sigma = 60;
-        const influence = 120;
-        const centers: number[] = [];
-        for (let i = 0; i < items.length; i++) {
-          centers[i] = dockRect.left + items[i].offsetLeft + items[i].offsetWidth / 2;
-        }
-        // Then batch-write transforms
-        for (let i = 0; i < items.length; i++) {
-          const dist = Math.abs(mx - centers[i]);
-          const scale = dist <= influence
-            ? 1 + (magnificationScale - 1) * 0.22 * Math.exp(-(dist * dist) / (2 * sigma * sigma))
-            : 1;
-          const roundedScale = Math.round(scale * 1000) / 1000;
-          if (items[i].dataset.dockScale === String(roundedScale)) continue;
-          items[i].dataset.dockScale = String(roundedScale);
-          items[i].style.transition = 'transform 0.18s cubic-bezier(0.22,1,0.36,1)';
-          items[i].style.transform = `scale(${roundedScale})`;
-        }
-      });
-    }
-  }, [dockMagnification, magnificationScale]);
-
-  const handleDockMouseLeave = useCallback(() => {
-    dockMouseX.current = null;
-    if (dockRef.current) {
-      const items = dockRef.current.querySelectorAll<HTMLElement>('[data-dock-item]');
-      items.forEach(el => {
-        el.style.transition = 'transform 0.22s cubic-bezier(0.23,1,0.32,1)';
-        el.style.transform = 'scale(1)';
-        el.dataset.dockScale = '1';
-      });
-    }
-    scheduleDockHide();
-  }, [scheduleDockHide]);
-
-  const openDockApp = useCallback((appId: AppId, buttonEl: HTMLElement | null) => {
-    // Removed bounce animation - cleaner look
-    if (minimizedApps.has(appId)) {
-      restoreFloatingApp(appId);
-    }
-
-    setCurrentApp(appId);
-  }, [minimizedApps, restoreFloatingApp, setCurrentApp]);
-
-  const handleDockFileDrop = useCallback((appId: AppId, e: React.DragEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const files = Array.from(e.dataTransfer.files || []);
-    if (files.length === 0) return;
-
-    openDockApp(appId, e.currentTarget);
-    const target = DOCK_FILE_DROP_TARGETS[appId];
-    if (!target) {
-      window.dispatchEvent(new CustomEvent('dex-toast', {
-        detail: { type: 'info', message: `${APP_DEFINITIONS[appId]?.name || appId} does not support direct file drop routing yet.` },
-      }));
-      return;
-    }
-
-    let delivered = 0;
-    for (const file of files.slice(0, 10)) {
-      const path = (file as File & { path?: string }).path || file.name;
-      const kind = inferAssetKindFromPath(path);
-      const ok = sendAssetToApp({
-        id: `dock-drop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        kind,
-        name: file.name,
-        sourceApp: 'files',
-        data: path,
-        mimeType: file.type || undefined,
-        metadata: { via: 'dock-drop' },
-        createdAt: Date.now(),
-      }, target);
-      if (ok) delivered++;
-    }
-
-    if (delivered > 0) {
-      window.dispatchEvent(new CustomEvent('dex-toast', {
-        detail: { type: 'success', message: `Sent ${delivered} file${delivered > 1 ? 's' : ''} to ${APP_DEFINITIONS[appId]?.name || appId}` },
-      }));
-    } else {
-      window.dispatchEvent(new CustomEvent('dex-toast', {
-        detail: { type: 'warning', message: `No compatible files were routed to ${APP_DEFINITIONS[appId]?.name || appId}` },
-      }));
-    }
-  }, [openDockApp, sendAssetToApp]);
-
-  // Shortcut hints for dock tooltips — platform-aware modifier key
-  const _M = platform.isMac ? '⌘' : 'Ctrl';
-  const _O = platform.isMac ? '⌥' : 'Alt';
-  const dockShortcut: Record<string, string> = {
-    home: `${_M}+1`, settings: `${_M}+2`, files: `${_M}+3`, notes: `${_M}+4`, tasks: `${_M}+5`,
-    browser: `${_M}+6`, gallery: `${_M}+7`, calendar: `${_M}+8`, kanban: `${_M}+9`,
-    videoeditor: `${_O}+V`, imosion: `${_O}+I`, prism: `${_O}+R`, flux: `${_O}+F`, forge: `${_O}+G`,
-    power: `${_O}+P`, calculator: `${_O}+C`, transfers: `${_O}+T`,
-  };
-
-  // Item 145: Arrow key navigation within dock
-  const handleDockKeyDown = useCallback((e: React.KeyboardEvent, items: DockItem[]) => {
-    const idx = items.findIndex(i => i.id === (document.activeElement as HTMLElement)?.closest('[data-dock-item]')?.querySelector('button')?.getAttribute('data-dock-app-id') || '');
-    if (idx < 0) return;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      const next = (idx + 1) % items.length;
-      const btns = dockRef.current?.querySelectorAll<HTMLButtonElement>('[data-dock-app-id]');
-      btns?.[next]?.focus();
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prev = (idx - 1 + items.length) % items.length;
-      const btns = dockRef.current?.querySelectorAll<HTMLButtonElement>('[data-dock-app-id]');
-      btns?.[prev]?.focus();
-    }
-  }, []);
-
-  const renderDockItems = (items: DockItem[]) =>
-    items.map((item) => {
-      // Wrap each dock item render in try-catch for fault isolation
-      // If one dock item fails, show placeholder instead of crashing entire dock
-      try {
-        const isActive = currentApp === item.id;
-        const isRunning = runningApps.some(a => a.id === item.id);
-        const isMinimized = minimizedApps.has(item.id);
-        const isDetached = detachedApps.has(item.id);
-        const size = dockIconSize;
-        const shortcut = dockShortcut[item.id];
-
-        // Running-state indicator: a subtle dot beneath running apps, brighter
-        // and accent-tinted for the active app (rendered below, absolute so it
-        // adds no layout shift and scales with dock magnification).
-
-        return (
-        <div key={item.id} data-dock-item style={{
-          position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-          // Smooth ease-out (no overshoot) — overshoot easing on a transform
-          // that's also being driven by mousemove magnification produced
-          // visible jitter. This easing only applies on hover-leave reset.
-          transition: 'transform 0.2s cubic-bezier(0.23,1,0.32,1)',
-          transformOrigin: 'bottom center',
-          willChange: dockMagnification ? 'transform' : 'auto',
-        }}
-        >
-
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              // Non-primary mouse button (right/middle) -> let onContextMenu handle it.
-              if (e.pointerType === 'mouse' && e.button !== 0) return;
-              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
-              // Long-press opens the context menu on touch only; mouse uses right-click.
-              if (e.pointerType === 'touch') {
-                dockLongPressTimerRef.current = setTimeout(() => {
-                  setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
-                }, 420);
-              }
-              // Drag-to-reorder for BOTH mouse and touch. Launch is deferred to
-              // pointer-up when no drag happened, so a plain click still opens the app.
-              {
-                const startIndex = items.findIndex((d) => d.id === item.id);
-                dockTouchReorderRef.current = {
-                  appId: item.id,
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  dragging: false,
-                  fromIndex: startIndex,
-                  toIndex: startIndex,
-                  el: e.currentTarget as HTMLElement,
-                };
-              }
-              e.currentTarget.setPointerCapture?.(e.pointerId);
-            }}
-            onPointerMove={(e) => {
-              const gesture = dockTouchReorderRef.current;
-              if (!gesture || gesture.appId !== item.id) return;
-
-              const dx = e.clientX - gesture.startX;
-              const dy = e.clientY - gesture.startY;
-              const moved = Math.hypot(dx, dy);
-              if (moved > 6 && dockLongPressTimerRef.current) {
-                clearTimeout(dockLongPressTimerRef.current);
-                dockLongPressTimerRef.current = null;
-              }
-              if (!gesture.dragging && moved > 14) {
-                gesture.dragging = true;
-              }
-              if (!gesture.dragging || !dockRef.current) return;
-
-              const isHorizontalDock = dockEdgePref === 'bottom' || dockEdgePref === 'top';
-              // Live feedback: the dragged icon follows the pointer along the dock
-              // axis. The dock order is NOT mutated mid-drag -- doing that made the
-              // icon "walk" to the end because indices recomputed against a layout
-              // that kept shifting underneath the gesture. We only record the
-              // intended slot and commit ONE reorder on drop.
-              if (gesture.el) {
-                gesture.el.style.transition = 'none';
-                gesture.el.style.transform = isHorizontalDock ? `translateX(${dx}px)` : `translateY(${dy}px)`;
-                gesture.el.style.zIndex = '5';
-              }
-
-              const buttons = Array.from(dockRef.current.querySelectorAll<HTMLButtonElement>('[data-dock-app-id]'));
-              if (buttons.length < 2) return;
-              const pointerAxis = isHorizontalDock ? e.clientX : e.clientY;
-              let toIndex = gesture.fromIndex;
-              let closest = Number.POSITIVE_INFINITY;
-              buttons.forEach((btn, idx) => {
-                // Skip the icon being dragged -- it is translated to follow the
-                // pointer, so it would always measure as the nearest to itself.
-                if (btn.getAttribute('data-dock-app-id') === gesture.appId) return;
-                const rect = btn.getBoundingClientRect();
-                const center = isHorizontalDock ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
-                const dist = Math.abs(pointerAxis - center);
-                if (dist < closest) {
-                  closest = dist;
-                  toIndex = idx;
-                }
-              });
-              gesture.toIndex = toIndex;
-            }}
-            onPointerUp={(e) => {
-              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
-              dockLongPressTimerRef.current = null;
-              const gesture = dockTouchReorderRef.current;
-              if (gesture && gesture.appId === item.id) {
-                if (gesture.el) {
-                  gesture.el.style.transform = '';
-                  gesture.el.style.zIndex = '';
-                  gesture.el.style.transition = '';
-                }
-                if (gesture.dragging) {
-                  // One stable commit: original slot -> drop slot.
-                  if (gesture.toIndex !== gesture.fromIndex && gesture.fromIndex >= 0 && gesture.toIndex >= 0) {
-                    reorderDockPins(gesture.fromIndex, gesture.toIndex);
-                  }
-                } else {
-                  openDockApp(item.id, e.currentTarget);
-                }
-              }
-              dockTouchReorderRef.current = null;
-            }}
-            onPointerCancel={() => {
-              if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
-              dockLongPressTimerRef.current = null;
-              const gesture = dockTouchReorderRef.current;
-              if (gesture?.el) {
-                gesture.el.style.transform = '';
-                gesture.el.style.zIndex = '';
-                gesture.el.style.transition = '';
-              }
-              dockTouchReorderRef.current = null;
-            }}
-            onClick={(e) => {
-              if (e.detail !== 0) return;
-              openDockApp(item.id, e.currentTarget);
-            }}
-            onDoubleClick={(e) => { e.stopPropagation(); if (item.id !== currentApp) enterSplit(item.id); }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
-            }}
-            onDragOver={(e) => {
-              if ((e.dataTransfer?.types || []).includes('Files')) e.preventDefault();
-            }}
-            onDrop={(e) => handleDockFileDrop(item.id, e)}
-            onKeyDown={(e) => handleDockKeyDown(e, items)}
-            data-dock-app-id={item.id}
-            data-dock-icon={item.id}
-            data-running-app={isRunning ? 'true' : undefined}
-            aria-label={`Open ${item.label}${isRunning ? ' (running)' : ''}${isMinimized ? ' (minimized)' : ''}${shortcut ? ` - ${shortcut}` : ''}`}
-            aria-current={isActive ? 'true' : undefined}
-            style={{
-              width: size, height: size,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              // No background highlight on the dock -- hard-coded transparent for
-              // every state (active AND hover). The owner does not want the accent
-              // square or a hover square. The icon glyph, the magnification lift,
-              // and the running/active dot below are the only affordances.
-              background: 'transparent',
-              border: 'none', borderRadius: 12, cursor: 'pointer',
-              position: 'relative', padding: 0,
-              touchAction: 'manipulation',
-              color: item.color,
-              opacity: isMinimized ? 0.5 : 1,
-              transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
-            }}
-          >
-            {AppIconPngs[item.id] ? (
-              <AppIconImg appId={item.id} size={size - 8} />
-            ) : (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color }}>
-                {Icons[item.id] || <DexIcon name={APP_DEFINITIONS[item.id]?.icon || item.id} size={18} color={item.color} />}
-              </span>
-            )}
-          </button>
-          {(isRunning || isActive) && (
-            <span
-              aria-hidden="true"
-              data-dock-running-dot
-              style={{
-                position: 'absolute', bottom: -3, left: '50%',
-                transform: 'translateX(-50%)',
-                // Active: a crisp accent underline bar (paired with the icon's
-                // accent-tint background = one unmistakable focused state).
-                // Background-running: a small neutral dot. No glow -- the
-                // indicator is exact, never a decorative wash.
-                width: isActive ? 14 : 4, height: isActive ? 2.5 : 4,
-                borderRadius: 9999,
-                background: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                opacity: isMinimized ? 0.5 : 1,
-                transition: 'width var(--motion-dock-hover), height var(--motion-dock-hover), background var(--motion-dock-hover), opacity var(--motion-dock-hover)',
-                pointerEvents: 'none',
-              }}
-            />
-          )}
-        </div>
-      );
-      } catch (err) {
-        // Dock item render failed — show placeholder to maintain dock layout
-        console.warn(`[Dock] Failed to render item ${item.id}:`, err);
-        return (
-          <div
-            key={item.id}
-            data-dock-item
-            style={{
-              width: dockIconSize,
-              height: dockIconSize,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--color-bg-surface)',
-              borderRadius: 10,
-              border: '1px dashed var(--color-border)',
-              color: 'var(--color-text-muted)',
-              fontSize: 10,
-            }}
-          >
-            ?
-          </div>
-        );
-      }
-    });
-
-  const dockSeparator = (key: string) => (
-    <div key={key} style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 6px', flexShrink: 0, alignSelf: 'center', borderRadius: 2 }} />
-  );
 
   // APP_MENU_CATEGORIES is computed once at module scope — no useMemo needed
   const APP_MENU_CATEGORIES = MODULE_APP_MENU_CATEGORIES;
@@ -4915,21 +4247,9 @@ export const AppManager: React.FC = () => {
   // RENDER
   // ======================================================================
 
-  // OS-grade dock space reservation: when the dock is pinned (always-visible)
-  // and shown, the inline app surface reserves the dock's footprint on its edge
-  // so app content (toolbars, status bars, panels) is never clipped under the
-  // floating dock. Auto-hide keeps overlay behavior (the dock slides away on leave).
-  const dockReservesSpace = dockMode === 'always-visible' && !inFullscreenApp;
-  const dockReserveStyle: React.CSSProperties = {
-    marginTop: dockReservesSpace && dockEdgePref === 'top' ? 'var(--dex-reserved-top)' : undefined,
-    marginBottom: dockReservesSpace && dockEdgePref === 'bottom' ? 'var(--dex-reserved-bottom)' : undefined,
-    marginLeft: dockReservesSpace && dockEdgePref === 'left' ? 'var(--dex-reserved-left)' : undefined,
-    marginRight: dockReservesSpace && dockEdgePref === 'right' ? 'var(--dex-reserved-right)' : undefined,
-    // No margin transition: animating the work-area margin made getShellWorkspace
-    // read a MOVING TARGET for ~320ms, so a window opened/maximized right after a
-    // dock pin or fullscreen toggle got sized to a transient box and could land
-    // out of bounds. Instant resize keeps the work area always-settled.
-  };
+  // The dock was removed in favour of the FloatingLauncher (a draggable orb that
+  // floats over content and reserves NO space). So the app surface uses the full
+  // work area -- no reserved edge strip.
 
   return (
     <div role="application" aria-label="DEX Desktop" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', fontFamily: 'var(--font-family)', overflow: 'hidden', minWidth: 360 }}>
@@ -5025,7 +4345,6 @@ export const AppManager: React.FC = () => {
           background: 'transparent',
           borderRadius: 0,
           contain: 'layout style',
-          ...dockReserveStyle,
         }}>
           {keepAliveElements}
         </div>
@@ -5038,7 +4357,6 @@ export const AppManager: React.FC = () => {
           // block for position:fixed floating windows so they anchor to the split
           // area and can't escape to the viewport / out of bounds.
           contain: 'layout style',
-          ...dockReserveStyle,
         }}>
           {/* Primary pane */}
           <div style={{
@@ -5144,311 +4462,6 @@ export const AppManager: React.FC = () => {
 
       {/* Floating Dock -- position fixed so it floats freely, no black bar */}
       {/* Dock hover preview -- simple name tooltip */}
-      {dockPreview && (() => {
-        const previewApp = [...dockItems].find(d => d.id === dockPreview.id);
-        if (!previewApp) return null;
-        const isAppRunning = runningApps.some(a => a.id === previewApp.id);
-        const isAppActive = currentApp === previewApp.id;
-        const isAppMinimized = minimizedApps.has(previewApp.id);
-        const isPeekPinned = dockPreviewPinnedId === previewApp.id;
-        const recentForApp = recentFiles.find((f) => f.appId === previewApp.id);
-        const shortcut = dockShortcut[previewApp.id];
-        return (
-          <div style={{
-            position: 'fixed',
-            left: dockPreview.x,
-            top: dockPreview.y - 8,
-            transform: 'translate(-50%, -100%)',
-            zIndex: 5002,
-            background: 'var(--color-bg-elevated)',
-            borderRadius: 8,
-            border: '1px solid var(--color-border)',
-            padding: '7px 14px',
-            pointerEvents: 'auto',
-            boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
-            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-            animation: isReduceMotion() ? 'none' : 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
-          } as React.CSSProperties}>
-            <div style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewApp.color, background: `${previewApp.color}18`, flexShrink: 0 }}>
-              {AppIconPngs[previewApp.id]
-                ? <AppIconImg appId={previewApp.id} size={20} />
-                : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[previewApp.id] || <DexIcon name={APP_DEFINITIONS[previewApp.id]?.icon || previewApp.id} size={18} color={previewApp.color} />}</span>}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>{previewApp.label}</span>
-              <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>
-                {isAppActive ? 'Active' : isAppMinimized ? 'Minimized' : isAppRunning ? 'Running' : ''}
-                {shortcut ? `${isAppRunning || isAppActive || isAppMinimized ? ' · ' : ''}${shortcut}` : ''}
-              </span>
-            </div>
-            <button
-              type="button"
-              aria-label={isPeekPinned ? `Unpin Dock peek for ${previewApp.label}` : `Pin Dock peek for ${previewApp.label}`}
-              onClick={() => {
-                if (isPeekPinned) {
-                  setDockPreviewPinnedId(null);
-                  setDockPreview(null);
-                } else {
-                  setDockPreviewPinnedId(previewApp.id);
-                }
-              }}
-              style={{
-                border: '1px solid var(--color-border)',
-                borderRadius: 6,
-                background: isPeekPinned ? 'var(--color-accent)' : 'var(--color-bg-surface)',
-                color: isPeekPinned ? '#fff' : 'var(--color-text-primary)',
-                fontSize: 10,
-                padding: '3px 7px',
-                cursor: 'pointer',
-              }}
-            >
-              {isPeekPinned ? 'Pinned' : 'Pin'}
-            </button>
-            <button
-              type="button"
-              aria-label={`Open ${previewApp.label} from Dock peek`}
-              onClick={() => {
-                openDockApp(previewApp.id as AppId, null);
-                setDockPreviewPinnedId(null);
-                setDockPreview(null);
-              }}
-              style={{
-                border: '1px solid var(--color-border)',
-                borderRadius: 6,
-                background: 'var(--color-bg-surface)',
-                color: 'var(--color-text-primary)',
-                fontSize: 10,
-                padding: '3px 7px',
-                cursor: 'pointer',
-              }}
-            >
-              Open
-            </button>
-            {recentForApp && (
-              <button
-                type="button"
-                aria-label={`Open recent file ${recentForApp.name} for ${previewApp.label}`}
-                onClick={async () => {
-                  try {
-                    await window.electron?.invoke?.('shell:openPath', recentForApp.path);
-                    window.dispatchEvent(new CustomEvent('dex-toast', {
-                      detail: { type: 'success', message: `Opened recent: ${recentForApp.name}` },
-                    }));
-                  } catch {
-                    window.dispatchEvent(new CustomEvent('dex-toast', {
-                      detail: { type: 'error', message: `Could not open recent file: ${recentForApp.name}` },
-                    }));
-                  }
-                }}
-                style={{
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 6,
-                  background: 'var(--color-bg-surface)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: 10,
-                  padding: '3px 7px',
-                  cursor: 'pointer',
-                  maxWidth: 140,
-                }}
-              >
-                Open Recent
-              </button>
-            )}
-          </div>
-        );
-      })()}
-      <div aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>
-        {dockPeekAnnouncement}
-      </div>
-      {/* No bottom shelf/scrim: it read as a dark band + contrast line between the
-          app edge and the dock. The dock carries its own shadow for grounding, so
-          the bottom stays clean -- app, a small clear gap, then the dock. */}
-      <div
-        style={(() => {
-          // Always-visible floating dock. Default = bottom-centre; once dragged,
-          // dockPos holds an explicit top/left. Floats above everything and
-          // reserves no layout space, so it is reachable at any time.
-          const base: React.CSSProperties = {
-            position: 'fixed',
-            zIndex: 'var(--z-dock)' as unknown as number,
-            display: 'flex', justifyContent: 'center',
-            opacity: 1,
-            pointerEvents: 'auto',
-          };
-          if (dockPos) {
-            return { ...base, left: dockPos.x, top: dockPos.y, transform: 'none' };
-          }
-          return { ...base, left: '50%', bottom: 12, transform: 'translateX(-50%)' };
-        })()}
-      >
-        <div
-          ref={dockRef}
-          role="toolbar"
-          aria-label="Application dock"
-          data-dock-container=""
-          data-dock-edge={dockEdgePref}
-          data-dock-preset={dockPresetPref}
-          onPointerDown={handleDockDragStart}
-          onPointerMove={handleDockDragMove}
-          onPointerUp={handleDockDragEnd}
-          onPointerCancel={handleDockDragEnd}
-          style={{
-            ...liquidGlassDock,
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center', gap: 4,
-            padding: '6px 10px',
-            // Deliberate rounded-rect, not a full pill -- reads as bespoke
-            // DEX chrome rather than a generic OS dock.
-            borderRadius: 15,
-            overflow: 'visible',
-            maxWidth: '96vw',
-            position: 'relative',
-            contain: 'layout style',
-            isolation: 'isolate',
-            // Grab the blank pill area to drag the whole dock anywhere.
-            cursor: 'grab',
-            touchAction: 'none',
-          } as React.CSSProperties}
-        >
-          {/* Wallpaper color reflection on dock */}
-          <div style={getDockReflectionStyle()} />
-          {/* App Menu Button */}
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <button
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setShowAppMenu(p => !p);
-              }}
-              aria-label="Open App Menu"
-              data-dex-launchpad
-              style={{
-                width: 34, height: 34,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: showAppMenu ? 'var(--color-accent-soft)' : 'transparent',
-                border: 'none', borderRadius: 12, cursor: 'pointer',
-                transition: 'background 0.2s cubic-bezier(0.4,0,0.2,1)',
-                padding: 0, touchAction: 'manipulation',
-                outline: 'none',
-                WebkitAppRegion: 'no-drag',
-              } as React.CSSProperties}
-            >
-              {/* Modern app launcher icon — 4 rounded squares */}
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ transition: 'opacity 0.25s ease', pointerEvents: 'none' }}>
-                <rect x="1" y="1" width="7" height="7" rx="2" fill={showAppMenu ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ transition: 'fill 0.25s ease' }} />
-                <rect x="10" y="1" width="7" height="7" rx="2" fill={showAppMenu ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ transition: 'fill 0.25s ease' }} />
-                <rect x="1" y="10" width="7" height="7" rx="2" fill={showAppMenu ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ transition: 'fill 0.25s ease' }} />
-                <rect x="10" y="10" width="7" height="7" rx="2" fill={showAppMenu ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ transition: 'fill 0.25s ease' }} />
-              </svg>
-            </button>
-          </div>
-          {/* Search Button -- opens the spotlight / app menu focused on the search field */}
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <button
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                // Open the shared Spotlight overlay -- real search + results.
-                setShowAppMenu(false);
-                setShowSpotlight(true);
-              }}
-              aria-label="Search"
-              title="Search (Spotlight)"
-              style={{
-                width: 32, height: 32,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'transparent',
-                border: 'none', borderRadius: 10, cursor: 'pointer',
-                transition: 'background 0.2s cubic-bezier(0.4,0,0.2,1)',
-                padding: 0, touchAction: 'manipulation',
-                outline: 'none',
-                WebkitAppRegion: 'no-drag',
-              } as React.CSSProperties}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7"/>
-                <path d="M21 21l-4.3-4.3"/>
-              </svg>
-            </button>
-          </div>
-          {dockSeparator('sep-menu')}
-          {/* UKI Mic Button */}
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <button
-                  onClick={() => {
-                    const dex = (window as any).dex;
-                    if (dex?.uki?.toggle) {
-                      dex.uki.toggle();
-                    }
-                    // Also toggle panel visibility for text input
-                    useUkiStore.getState().togglePanel();
-                  }}
-                  aria-label={isUkiActive ? 'Close UKI' : 'Open UKI'}
-                  title="UKI Voice Assistant"
-                  style={{
-                    width: 32, height: 32,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: isUkiActive ? 'var(--color-accent-soft)' : 'transparent',
-                    border: 'none', borderRadius: 10, cursor: 'pointer',
-                    transition: 'background 0.2s cubic-bezier(0.4,0,0.2,1)',
-                    padding: 0, touchAction: 'manipulation',
-                    outline: 'none',
-                    WebkitAppRegion: 'no-drag',
-                  } as React.CSSProperties}
-                  onMouseEnter={e => { if (!isUkiActive) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isUkiActive ? 'var(--color-accent-soft)' : 'transparent'; }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isUkiActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    <line x1="12" y1="19" x2="12" y2="23"/>
-                    <line x1="8" y1="23" x2="16" y2="23"/>
-                  </svg>
-                </button>
-                {isUkiActive && (
-                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-accent)' }} />
-                )}
-          </div>
-          {/* App launcher icons are tucked into the App Menu (the grid already
-              lists every app + has search). This keeps the dock tiny and floating
-              -- just App Menu, Search, and UKI. Open any app from the grid or with
-              its Ctrl+number shortcut. */}
-          {void dockItems}
-          {/* Close All Button -- Item 148: improved with tooltip */}
-          {hasRunningNonHome && (
-            <>
-              {dockSeparator('sep-close')}
-              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <button
-                  onClick={handleCloseAllApps}
-                  title="Close all apps"
-                  aria-label={`Close all ${runningApps.filter(a => a.id !== 'home').length} running apps`}
-                  style={{
-                    width: 28, height: 28,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'transparent',
-                    border: 'none', borderRadius: 6, cursor: 'pointer',
-                    transition: 'transform 0.25s cubic-bezier(0.23,1,0.32,1)',
-                    padding: 0, touchAction: 'manipulation',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                  onPointerDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.92)'; }}
-                  onPointerUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
-                  onPointerLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
 
       {/* Old bottom hover-trigger / auto-hide reveal strip removed: the dock is
           now always visible and freely draggable, so there is nothing to reveal. */}
@@ -5481,60 +4494,40 @@ export const AppManager: React.FC = () => {
             data-dex-app-menu-panel
             role="dialog"
             aria-label="App menu"
-            style={(() => {
-              // Anchor the menu to the dock wherever it has been dragged: centre
-              // it on the dock and open above it; if the dock sits in the top half
-              // of the screen, open below instead. Everything is clamped to the
-              // viewport so the menu is always fully visible.
-              const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
-              const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
-              const r = dockRef.current?.getBoundingClientRect();
-              const cx = r ? r.left + r.width / 2 : vw / 2;
-              const half = Math.min(560, vw * 0.9) / 2;
-              const left = Math.max(half + 8, Math.min(vw - half - 8, cx));
-              const openBelow = !!r && r.top < vh * 0.45;
-              const vpos: React.CSSProperties = openBelow
-                ? { top: (r ? r.bottom : 60) + 10 }
-                : { bottom: vh - (r ? r.top : vh - 60) + 10 };
-              return {
+            style={{
+              // Own system, not the dock: a STATIC, dead-centred panel. Same
+              // location, dimensions, and alignment every time it opens -- no
+              // edge anchoring, no dock-relative math, nothing that moves.
               position: 'fixed',
-              left,
-              ...vpos,
-              transform: 'translateX(-50%)',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
               zIndex: 9700,
-              width: 'min(560px, 90vw)',
-              maxHeight: 'calc(100vh - 120px)',
+              width: 'min(520px, 92vw)',
+              maxHeight: 'min(620px, calc(100vh - 96px))',
               overflowY: 'auto',
               overflowX: 'hidden',
-              scrollBehavior: 'smooth',
               scrollbarWidth: 'none',
               WebkitOverflowScrolling: 'touch',
               overscrollBehaviorY: 'contain',
               background: 'var(--color-bg-elevated, #1c1c1e)',
-              backdropFilter: 'none',
-              WebkitBackdropFilter: 'none',
-              border: '1px solid rgba(255, 255, 255, 0.14)',
-              borderRadius: 10,
-              padding: 'var(--space-5) var(--space-5) var(--space-4)',
-              boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
-              animation: 'appMenuSlideUp 0.22s cubic-bezier(0.23,1,0.32,1)',
-              } as React.CSSProperties;
-            })()}
+              border: '1px solid var(--color-border)',
+              borderRadius: 12,
+              padding: 'var(--space-4)',
+              boxShadow: 'var(--pg-shadow-modal)',
+              // Precision motion: pure opacity fade, no movement / scale / bounce.
+              animation: 'appMenuFade 0.15s ease-out',
+            } as React.CSSProperties}
           >
             <style>{`
-              @keyframes appMenuSlideUp { 
-                from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
-                to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-              }
+              @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
-            {/* Pure launcher grid -- search now lives on the dock (Spotlight),
-                so the app menu is just a clean grid of every app. */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>All Apps</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>All Apps</span>
               <button
                 onClick={() => { setShowAppMenu(false); setShowSpotlight(true); }}
                 aria-label="Search"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '5px 10px', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '4px 9px', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
                 Search
@@ -5543,15 +4536,18 @@ export const AppManager: React.FC = () => {
             {(() => {
               const filtered = Array.from(new Map(LAUNCHPAD_APPS.map(app => [app.id, app])).values());
               return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 4, justifyItems: 'center' }}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', columnGap: 2, rowGap: 4 }}
               aria-label="All applications"
               data-launchpad-grid=""
               onKeyDown={(e) => {
-                // Item 150: Grid arrow key navigation in app menu
+                // Grid arrow-key navigation. Columns are derived from the actual
+                // wrapped layout (buttons sharing the first row's offsetTop), so
+                // Up/Down move a true row regardless of viewport width.
                 const btns = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
                 const idx = btns.indexOf(document.activeElement as HTMLButtonElement);
-                if (idx < 0) return;
-                const cols = 5;
+                if (idx < 0 || btns.length === 0) return;
+                const firstTop = btns[0].offsetTop;
+                const cols = Math.max(1, btns.filter(b => b.offsetTop === firstTop).length);
                 let next = idx;
                 if (e.key === 'ArrowRight') next = (idx + 1) % btns.length;
                 else if (e.key === 'ArrowLeft') next = (idx - 1 + btns.length) % btns.length;
@@ -5581,30 +4577,32 @@ export const AppManager: React.FC = () => {
                       e.stopPropagation();
                       setLaunchpadCtx({ appId: app.id, label: app.label, x: e.clientX, y: e.clientY });
                     }}
-                    className="dex-hover-lift"
+                    // Stable hover: a background tint only -- the icon never moves
+                    // under the cursor (no lift / scale / bounce). The target stays
+                    // exactly where the user aimed.
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'var(--color-bg-hover)' : 'transparent'; }}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      padding: '7px 4px', borderRadius: 10, width: '100%',
-                      background: 'transparent',
+                      padding: '8px 4px', borderRadius: 10, width: '100%',
+                      background: isActive ? 'var(--color-bg-hover)' : 'transparent',
                       border: 'none', cursor: 'pointer',
-                      transition: 'transform 0.18s cubic-bezier(0.23,1,0.32,1)',
+                      transition: 'background 0.12s ease',
                     }}
                   >
                     <div style={{
                       color: app.color,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: 42, height: 42,
+                      width: 40, height: 40,
                       borderRadius: 10,
-                      // No glass tile behind the icon — the icon stands on its own.
                       background: 'transparent',
                       border: 'none',
                       boxShadow: isActive ? `0 0 0 1.5px ${app.color}66` : 'none',
-                      transition: 'box-shadow 0.25s cubic-bezier(0.23,1,0.32,1), transform 0.25s ease',
                       overflow: 'hidden',
                     }}>
-                      {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={38} /> : icon}
+                      {AppIconPngs[app.id] ? <AppIconImg appId={app.id} size={36} /> : icon}
                     </div>
-                    <span style={{ fontSize: 10, color: isActive ? '#fff' : 'var(--color-text-secondary)', fontWeight: isActive ? 600 : 400, textAlign: 'center', lineHeight: 1.2, letterSpacing: '-0.01em' }}>{app.label}</span>
+                    <span style={{ fontSize: 10, color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: isActive ? 600 : 400, textAlign: 'center', lineHeight: 1.2, letterSpacing: '-0.01em' }}>{app.label}</span>
                     {isRunning && (
                       <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-text-secondary)', marginTop: -3 }} />
                     )}
@@ -5621,7 +4619,7 @@ export const AppManager: React.FC = () => {
       {/* Launchpad App Context Menu (Add/Remove from Dock) */}
       {launchpadCtx && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 5005 }} onMouseDown={() => setLaunchpadCtx(null)} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9800 }} onMouseDown={() => setLaunchpadCtx(null)} />
           <div
             role="menu"
             className="dex-surface-overlay"
@@ -5641,7 +4639,7 @@ export const AppManager: React.FC = () => {
               // Material (background/border/shadow) now comes from the unified
               // .dex-surface-overlay class — the canonical overlay surface for
               // context menus. Blur is perf-tier/thermal gated automatically.
-              zIndex: 5006, minWidth: 180,
+              zIndex: 9801, minWidth: 180,
               borderRadius: 10, padding: 4,
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
@@ -5683,129 +4681,16 @@ export const AppManager: React.FC = () => {
         </>
       )}
 
-      {/* Dock Context Menu (pin/unpin/split) */}
-      {dockCtx && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 5005 }} onMouseDown={() => setDockCtx(null)} tabIndex={-1} onKeyDown={e => { if (e.key === 'Escape') setDockCtx(null); }} />
-          <style>{`@keyframes ctxMenuIn { from { opacity: 0; transform: translateY(-100%) scale(0.92); } to { opacity: 1; transform: translateY(-100%) scale(1); } }`}</style>
-          <div role="menu" aria-label={`${getLabel(dockCtx.appId)} options`} onKeyDown={e => {
-            if (e.key === 'Escape') setDockCtx(null);
-            // Item 149: Arrow key navigation in context menu
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault();
-              const items = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
-              const idx = items.indexOf(document.activeElement as HTMLButtonElement);
-              const next = e.key === 'ArrowDown' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
-              items[next]?.focus();
-            }
-          }} style={{
-            position: 'fixed', left: dockCtx.x, top: dockCtx.y - 8,
-            transform: 'translateY(-100%)',
-            zIndex: 5006, minWidth: 170,
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 10, padding: 4,
-            boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
-            animation: 'ctxMenuIn 0.18s cubic-bezier(0.23,1,0.32,1)',
-            transformOrigin: 'bottom left',
-          }}>
-            {(() => {
-              const appId = dockCtx.appId;
-              const label = getLabel(appId);
-              const pinned = isDockPinned(appId);
-              const isPermanent = PERMANENT_PINS.includes(appId);
-              const dockIndex = dockItems.findIndex((d) => d.id === appId);
-              const items: { label: string; action: () => void; danger?: boolean; separator?: boolean }[] = [];
-              if (appId !== 'home') {
-                items.push({ label: detachedApps.has(appId) ? 'Focus Window' : 'Open in Window', action: () => { openAppInWindow(appId as AppId); setDockCtx(null); } });
-              }
-              if (appId !== currentApp) {
-                items.push({ label: `Split with ${label}`, action: () => { enterSplit(appId as AppId); setDockCtx(null); } });
-              }
-              if (appId !== 'home' && runningApps.some(a => a.id === appId)) {
-                if (detachedApps.has(appId)) {
-                  items.push({ label: 'Reattach Window', action: () => { reattachApp(appId as AppId); setDockCtx(null); } });
-                  // Tiling options for detached windows
-                  items.push({ label: 'Tile Left', action: () => { tileWindow(appId as AppId, 'left'); setDockCtx(null); } });
-                  items.push({ label: 'Tile Right', action: () => { tileWindow(appId as AppId, 'right'); setDockCtx(null); } });
-                  items.push({ label: 'Maximize', action: () => { tileWindow(appId as AppId, 'maximize'); setDockCtx(null); } });
-                } else {
-                  items.push({ label: 'Detach Window', action: () => { detachApp(appId as AppId); setDockCtx(null); } });
-                  items.push({ label: 'Tile Left', action: () => { tileWindow(appId as AppId, 'left'); setDockCtx(null); } });
-                  items.push({ label: 'Tile Right', action: () => { tileWindow(appId as AppId, 'right'); setDockCtx(null); } });
-                }
-              }
-              if (detachedApps.size >= 2) {
-                items.push({ label: 'Auto-Tile All Windows', action: () => { autoTileAll(); setDockCtx(null); }, separator: true });
-              }
-              if (dockIndex > 0) {
-                items.push({
-                  label: 'Move Left in Dock',
-                  action: () => { reorderDockPins(dockIndex, dockIndex - 1); setDockCtx(null); },
-                });
-              }
-              if (dockIndex >= 0 && dockIndex < dockItems.length - 1) {
-                items.push({
-                  label: 'Move Right in Dock',
-                  action: () => { reorderDockPins(dockIndex, dockIndex + 1); setDockCtx(null); },
-                });
-              }
-              if (pinned && !isPermanent) {
-                items.push({ label: 'Unpin from Dock', action: () => { unpinApp(appId); setDockCtx(null); } });
-              } else if (!pinned) {
-                items.push({ label: 'Pin to Dock', action: () => { pinApp(appId); setDockCtx(null); } });
-              }
-              if (runningApps.some(a => a.id === appId) && appId !== 'home') {
-                items.push({ label: `Close ${label}`, action: () => { handleCloseApp(appId); setDockCtx(null); }, danger: true });
-              }
-              if (runningApps.length > 0) {
-                items.push({ label: 'Close All Apps', action: () => { closeAllApps(); setDockCtx(null); }, danger: true });
-              }
-              // Dock visibility toggle
-              const isAlwaysVisible = dockMode === 'always-visible';
-              items.push({
-                label: isAlwaysVisible ? 'Auto-Hide Dock' : 'Keep Dock Visible',
-                action: () => {
-                  const { setMode } = useDockPins.getState();
-                  if (isAlwaysVisible) {
-                    setMode('auto-hide');
-                  } else {
-                    setMode('always-visible');
-                    setTaskbarVisible(true);
-                  }
-                  setDockCtx(null);
-                },
-                separator: true,
-              });
-              return items.map((item, i) => (
-                <React.Fragment key={i}>
-                  {item.separator && <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '3px var(--space-2)' }} />}
-                  <button
-                    role="menuitem"
-                    onClick={item.action}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '7px 14px', fontSize: 13, fontWeight: 400, borderRadius: 6,
-                      color: item.danger ? 'var(--color-error)' : 'var(--color-text-primary)',
-                      background: 'transparent', border: 'none', cursor: 'pointer',
-                      transition: 'background 0.25s cubic-bezier(0.23,1,0.32,1)',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    {item.label}
-                  </button>
-                </React.Fragment>
-              ));
-            })()}
-          </div>
-        </>
-      )}
 
 
 
       {/* Achievement unlock toasts -- visible globally */}
 
+
+      {/* Floating Launcher -- a draggable orb, placeable anywhere, that opens the
+          app grid + search. A stable alternative to the fixed dock that never
+          shifts as apps open/close. */}
+      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
 
       {/* App Switcher HUD -- Ctrl+Tab visual overlay */}
       <AppSwitcher visible={switcherVisible} apps={runningApps} selectedIndex={switcherIndex} />
