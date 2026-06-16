@@ -14,6 +14,7 @@
 // ==========================================================================
 
 import { create } from 'zustand';
+import { sharedTick } from './SharedTick';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -317,9 +318,13 @@ function startMemoryReporting(): void {
     }
   };
   report();
-  const reportInterval = setInterval(report, 10_000);
+  // Ride the shared tick instead of a dedicated 10s reporter: memory reports are
+  // background telemetry to the main process, so they pause while the window is
+  // hidden (the renderer is idle then) and resume on focus -- one shared runtime
+  // timer for the whole shell rather than another always-running interval.
+  sharedTick.subscribe('perf-mem-report', report, 10_000);
   if (typeof window !== 'undefined') {
-    window.addEventListener('unload', () => clearInterval(reportInterval));
+    window.addEventListener('unload', () => sharedTick.unsubscribe('perf-mem-report'));
   }
 }
 

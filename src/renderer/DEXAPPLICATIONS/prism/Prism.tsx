@@ -351,7 +351,10 @@ const Prism: React.FC = () => {
     { id: 'layer-text', name: 'Title Text', type: 'text', visible: true, locked: false, opacity: 1, blendMode: 'normal' as BlendMode, x: 660, y: 480, width: 600, height: 80, rotation: 0, textContent: 'PRISM', fontSize: 72, fontFamily: 'system-ui', color: 'var(--color-text-primary)', effects: [{ type: 'dropShadow', enabled: true, settings: { color: '#000000', offsetX: 4, offsetY: 4, blur: 12, opacity: 0.6 } }] },
   ]);
   const [selectedLayerId, setSelectedLayerId] = useState<string>('layer-text');
-  useAutoSave('prism', useCallback(() => ({ layers, selectedLayerId, activeTool }), [layers, selectedLayerId, activeTool]), isDirty, 30_000);
+  // Crash-recovery autosave is wired below, after canvasSize + adjustments are
+  // declared, so the snapshot can include them (they were previously lost on a
+  // crash). It reads a ref so the heavy data-URL layer payload is serialized only
+  // on the autosave tick, not on every brush stroke or slider drag.
   // Surface autosave lifecycle in the header. While there are unsaved edits we
   // show "Saving...", then settle to "Saved <relative>" once edits stop landing.
   const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');
@@ -395,6 +398,14 @@ const Prism: React.FC = () => {
   const [temperature, setTemperature] = useState(0);
   const [tint, setTint] = useState(0);
   const [vibrance, setVibrance] = useState(0);
+
+  // Crash-recovery autosave snapshot (relocated here so canvasSize + adjustments
+  // are in scope). getData reads a ref so the large data-URL layer payload is
+  // serialized only on the 30s tick / hide / unmount, never per edit.
+  const prismSnapshotRef = useRef({ layers, selectedLayerId, activeTool, canvasSize, adjustments: { brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance } });
+  prismSnapshotRef.current = { layers, selectedLayerId, activeTool, canvasSize, adjustments: { brightness, contrast, saturation, hue, exposure, highlights, shadows, temperature, tint, vibrance } };
+  const getPrismSnapshot = useCallback(() => prismSnapshotRef.current, []);
+  useAutoSave('prism', getPrismSnapshot, isDirty, 30_000);
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number; layerId: string | null }>({ visible: false, x: 0, y: 0, layerId: null });
@@ -771,11 +782,26 @@ const Prism: React.FC = () => {
     // Without this, a crash would lose all user layer edits even though
     // useAutoSave was writing them to dex-autosave-prism every 30s.
     try {
-      const recovered = loadAutoSave<{ layers?: Layer[]; selectedLayerId?: string; activeTool?: typeof activeTool }>('prism');
+      const recovered = loadAutoSave<{ layers?: Layer[]; selectedLayerId?: string; activeTool?: typeof activeTool; canvasSize?: { width: number; height: number }; adjustments?: Record<string, number> }>('prism');
       if (recovered?.layers && Array.isArray(recovered.layers) && recovered.layers.length > 0) {
         setLayers(recovered.layers);
         if (recovered.selectedLayerId) setSelectedLayerId(recovered.selectedLayerId);
         if (recovered.activeTool) setActiveTool(recovered.activeTool);
+        if (recovered.canvasSize?.width && recovered.canvasSize?.height) setCanvasSize(recovered.canvasSize);
+        // Global color adjustments were previously lost on a crash.
+        const a = recovered.adjustments;
+        if (a) {
+          if (typeof a.brightness === 'number') setBrightness(a.brightness);
+          if (typeof a.contrast === 'number') setContrast(a.contrast);
+          if (typeof a.saturation === 'number') setSaturation(a.saturation);
+          if (typeof a.hue === 'number') setHue(a.hue);
+          if (typeof a.exposure === 'number') setExposure(a.exposure);
+          if (typeof a.highlights === 'number') setHighlights(a.highlights);
+          if (typeof a.shadows === 'number') setShadows(a.shadows);
+          if (typeof a.temperature === 'number') setTemperature(a.temperature);
+          if (typeof a.tint === 'number') setTint(a.tint);
+          if (typeof a.vibrance === 'number') setVibrance(a.vibrance);
+        }
       }
     } catch (e) { console.warn('[Prism] Failed to restore layers from autosave:', e); }
 

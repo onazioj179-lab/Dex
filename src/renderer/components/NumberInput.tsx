@@ -93,18 +93,26 @@ export const NumberInput: React.FC<NumberInputProps> = ({
   useEffect(() => {
     if (!isDragging) return;
 
+    let rafId = 0;
+    let pending = startValue.current;
+    const flush = () => { rafId = 0; onChange(pending); };
+
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startX.current;
-      
+
       // Fine adjustment with Shift
       const sensitivity = e.shiftKey ? 0.1 : 1;
       const delta = Math.round(deltaX * sensitivity) * step;
       const newValue = Math.max(min, Math.min(max, startValue.current + delta));
-      
-      onChange(Number(newValue.toFixed(precision)));
+
+      // Coalesce to one onChange per frame instead of one per mousemove.
+      pending = Number(newValue.toFixed(precision));
+      if (!rafId) rafId = requestAnimationFrame(flush);
     };
 
     const handleMouseUp = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      onChange(pending); // commit the final value
       setIsDragging(false);
     };
 
@@ -112,6 +120,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };

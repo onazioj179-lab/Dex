@@ -24,6 +24,7 @@
 // `toCommandRegistry` -- it does NOT introduce a parallel registry type.
 
 import type { CommandRegistry, PaletteCommand } from './registry';
+import { resolveCommands, bestResolution, type CommandMatch } from './resolve';
 
 /** A keybinding in both desktop families. Either side may be omitted. */
 export interface DexShortcut {
@@ -234,23 +235,41 @@ export function matchTerminalCommand(
   return null;
 }
 
-/** Best natural-language match for UKI, or null. Cheap substring/keyword scan. */
+/**
+ * Best natural-language match for UKI, or null. Delegates to the shared fuzzy
+ * resolver so UKI tolerates typos ("noets"), partial words ("calc"), reordering
+ * ("notes open") and filler ("can you open notes please") -- while still
+ * returning null for noise. A conservative threshold keeps it safe to ACT on:
+ * we only surface a command when the resolver is reasonably sure.
+ */
 export function findByUtterance(cmds: DexCommand[], text: string): DexCommand | null {
-  const t = text.toLowerCase().trim();
-  if (!t) return null;
-  let best: DexCommand | null = null;
-  let bestScore = 0;
-  for (const c of cmds) {
-    let score = 0;
-    for (const phrase of c.uki ?? []) {
-      if (t === phrase) score = Math.max(score, 100);
-      else if (t.includes(phrase)) score = Math.max(score, 60 + phrase.length);
-    }
-    if (c.label.toLowerCase() === t) score = Math.max(score, 90);
-    for (const kw of c.keywords ?? []) {
-      if (kw && t.includes(kw.toLowerCase())) score = Math.max(score, 30 + kw.length);
-    }
-    if (score > bestScore) { bestScore = score; best = c; }
+  const best = bestResolution(cmds, text, { minScore: 0.5 });
+  return best ? best.command : null;
+}
+
+/**
+ * Ranked suggestions for the terminal's `dex <query>` autocomplete. With an empty
+ * query it lists the catalog head (the "what can I type?" affordance). Backed by
+ * the same resolver as UKI, so terminal completion is typo-tolerant too.
+ */
+export function suggestDexCommands(
+  cmds: DexCommand[],
+  query: string,
+  limit = 7,
+): CommandMatch<DexCommand>[] {
+  const q = query.trim();
+  if (!q) {
+    return cmds.slice(0, limit).map((command) => ({ command, score: 1, matchedOn: 'all' }));
   }
-  return bestScore > 0 ? best : null;
+  return resolveCommands(cmds, q, { limit, minScore: 0.4 });
+}
+
+/**
+ * For an unrecognised `dex <typo>`, the single command the user most likely
+ * meant (or null). Used to print a "did you mean: dex <name>?" hint instead of a
+ * dead-end error. Requires real confidence so we never misdirect.
+ */
+export function didYouMean(cmds: DexCommand[], query: string): DexCommand | null {
+  const best = bestResolution(cmds, query, { minScore: 0.55 });
+  return best && best.confidence !== 'low' ? best.command : null;
 }

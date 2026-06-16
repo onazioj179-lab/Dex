@@ -16,6 +16,16 @@
  */
 
 import { SCHEMA_VERSION, type UkiContextSnapshotRecord } from './schemas';
+import { useRecentFiles } from '../store/useRecentFiles';
+
+/** Names of the most recently opened files (newest first), best-effort. */
+function readRecentFileNames(limit = 5): string[] {
+  try {
+    return useRecentFiles.getState().recentFiles.slice(0, limit).map((f) => f.name);
+  } catch {
+    return [];
+  }
+}
 
 interface RunningAppsLike {
   getState: () => {
@@ -50,6 +60,7 @@ export function snapshot(extras: Partial<UkiContextSnapshotRecord> = {}): UkiCon
     ts: Date.now(),
     foregroundAppId: ra.currentAppId,
     openAppIds: ra.runningApps?.map((a) => a.id) ?? [],
+    recentFiles: readRecentFileNames(),
     ...extras,
   };
 }
@@ -58,6 +69,8 @@ export interface LiveContext {
   foregroundAppId?: string;
   openAppIds: readonly string[];
   sessionHistory: readonly string[];
+  /** Names of the most recently opened files (newest first) — recent activity. */
+  recentFiles: readonly string[];
   online: boolean;
   localTime: string;
 }
@@ -68,6 +81,7 @@ export function liveContext(): LiveContext {
     foregroundAppId: ra.currentAppId,
     openAppIds: ra.runningApps?.map((a) => a.id) ?? [],
     sessionHistory: ra.sessionHistory ?? [],
+    recentFiles: readRecentFileNames(),
     online: typeof navigator !== 'undefined' ? navigator.onLine : true,
     localTime: new Date().toLocaleString(),
   };

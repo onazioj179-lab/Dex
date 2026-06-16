@@ -11,6 +11,7 @@
 
 import React, { Component, Suspense, ReactNode, useState, useEffect, useCallback } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
+import { DexLoader } from './LoadingStates';
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -188,82 +189,27 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 // ---------------------------------------------------------------------------
 
 export function AppLoading({ appName, isCreativeApp }: AppLoadingProps): JSX.Element {
-  const [dots, setDots] = useState('');
+  // Creative apps take longer to mount, so we show a determinate-feeling ramp
+  // (it eases toward 90% and the real mount replaces it). Light apps get a clean
+  // indeterminate mark — no fake progress.
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    if (isReduceMotion()) return;
-
-    const dotInterval = setInterval(() => {
-      setDots(d => d.length >= 3 ? '' : d + '.');
-    }, 600);
-
-    if (isCreativeApp) {
-      const progressInterval = setInterval(() => {
-        setProgress(p => Math.min(p + 10, 90));
-      }, 450);
-      return () => {
-        clearInterval(dotInterval);
-        clearInterval(progressInterval);
-      };
-    }
-
-    return () => clearInterval(dotInterval);
+    if (!isCreativeApp || isReduceMotion()) return;
+    const progressInterval = setInterval(() => {
+      setProgress(p => Math.min(p + 10, 90));
+    }, 450);
+    return () => clearInterval(progressInterval);
   }, [isCreativeApp]);
 
   return (
     <div className="dex-app-loading" style={styles.loadingContainer}>
-      <div style={styles.loadingContent}>
-        {/* Spinner */}
-        <div style={styles.spinner}>
-          <svg width="40" height="40" viewBox="0 0 40 40">
-            <circle
-              cx="20"
-              cy="20"
-              r="16"
-              fill="none"
-              stroke="var(--color-border-subtle, rgba(255,255,255,0.1))"
-              strokeWidth="3"
-            />
-            <circle
-              cx="20"
-              cy="20"
-              r="16"
-              fill="none"
-              stroke="var(--color-accent, #0a84ff)"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray="80"
-              strokeDashoffset="60"
-              style={{ animation: 'spin 0.8s linear infinite' }}
-            />
-          </svg>
-        </div>
-
-        {/* Text */}
-        <p style={styles.loadingText}>
-          Opening {appName}{dots}
-        </p>
-
-        {/* Progress bar for creative apps */}
-        {isCreativeApp && (
-          <div style={styles.progressContainer}>
-            <div 
-              style={{
-                ...styles.progressBar,
-                width: `${progress}%`,
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Keyframe animation */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      <DexLoader
+        variant="panel"
+        label={`Opening ${appName}`}
+        sublabel={isCreativeApp ? 'Preparing workspace…' : undefined}
+        progress={isCreativeApp ? progress : undefined}
+      />
     </div>
   );
 }
@@ -321,48 +267,13 @@ export function AppWrapper({
 
 // ---------------------------------------------------------------------------
 // CREATIVE APP SKELETON
-// Specialized loading skeleton for creative apps
 // ---------------------------------------------------------------------------
-
-interface SkeletonProps {
-  type: 'timeline' | 'canvas' | 'mixer' | 'toolbar' | 'panel';
-}
-
-export function CreativeAppSkeleton({ type }: SkeletonProps): JSX.Element {
-  const skeletonStyle = {
-    ...styles.skeleton,
-    animation: 'pulse 1.5s ease-in-out infinite',
-  };
-
-  switch (type) {
-    case 'timeline':
-      return (
-        <div style={{ ...skeletonStyle, height: '120px', marginTop: 'auto' }} />
-      );
-    case 'canvas':
-      return (
-        <div style={{ ...skeletonStyle, flex: 1, margin: 'var(--space-2)' }} />
-      );
-    case 'mixer':
-      return (
-        <div style={{ display: 'flex', gap: '4px', padding: 'var(--space-2)' }}>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} style={{ ...skeletonStyle, width: '60px', height: '200px' }} />
-          ))}
-        </div>
-      );
-    case 'toolbar':
-      return (
-        <div style={{ ...skeletonStyle, height: '40px' }} />
-      );
-    case 'panel':
-      return (
-        <div style={{ ...skeletonStyle, width: '250px', height: '100%' }} />
-      );
-    default:
-      return <div style={skeletonStyle} />;
-  }
-}
+// The ONE creative-app loading skeleton lives in `./CreativeAppSkeleton.tsx`
+// (full per-app-type chrome mockups: image / audio / video editors, etc.). A
+// second, thinner `CreativeAppSkeleton` used to live here with a different
+// `type` enum and shadowed that name while going entirely unused -- it was
+// removed so there is a single source of truth. Import it directly:
+//   import { CreativeAppSkeleton } from './CreativeAppSkeleton';
 
 // ---------------------------------------------------------------------------
 // HOOK: useAppRecovery
@@ -503,39 +414,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     background: 'var(--color-bg-base, #1a1a1c)',
-  },
-  loadingContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 'var(--space-4)',
-  },
-  spinner: {
-    animation: 'spin 0.8s linear infinite',
-  },
-  loadingText: {
-    fontSize: '14px',
-    color: 'var(--color-text-muted, #707070)',
-    minWidth: '150px',
-    textAlign: 'center',
-  },
-  progressContainer: {
-    width: '200px',
-    height: '4px',
-    background: 'var(--color-border-subtle, rgba(255,255,255,0.1))',
-    borderRadius: '2px',
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    background: 'var(--color-accent, #0a84ff)',
-    borderRadius: '2px',
-    transition: 'width 200ms ease-out',
-  },
-  skeleton: {
-    background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%)',
-    backgroundSize: '200% 100%',
-    borderRadius: '3px',
   },
 };
 

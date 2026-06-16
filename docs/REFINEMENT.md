@@ -1133,3 +1133,37 @@ keyboard already covers the same shortcuts, palette/Spotlight already derive app
 launches from APP_DEFINITIONS. tsc clean; watermark OK; 19 catalog tests green.
 STILL open (lower value, working surfaces): feed the catalog's ACTION commands into
 the palette/Spotlight lists, and the keydown-from-catalog dedup refactor.
+
+## Dock positioning freedom + alignment (owner brief, 2026-06-16)
+
+Owner brief: dock mobility (drag/snap to edges + bottom alignment), interaction
+reliability, reordering, apps-menu parity, visual/perf. RECON: most of it already
+existed -- magnification is HARD-DISABLED (line 661: the "icons move under the
+cursor" glitch is already fixed), reorder works (drag + context-menu move),
+drag-vs-click is launch-on-pointer-up, the dock is already compact (4px/6px pad,
+radius 13). The real GAP: a parallel session had hardcoded the dock to bottom-centre
+for stability ("never moves"), which removed mobility, and dockGeometry had no
+ALIGNMENT (bottom always centred).
+
+Built + verified live (dock is renderer-only, so the preview exercises it):
+- **Alignment in dockGeometry** (`shared/shell/dockGeometry.ts`): new `DockAlign`
+  = start | center | end. `computeDockGeometry` now anchors along the edge:
+  bottom+center == the prior `translateX(-50%)` midpoint (back-compat), start/end
+  anchor to a fixed corner. `normalizeDockAlign` added. The five brief positions =
+  bottom+center / bottom+start / bottom+end / left+center / right+center.
+- **Persisted `dockAlign` pref** (`shellPreferencesStore`): mirrors dockEdge
+  (default/hydrate/action/persist). Saved to `dex-shell-preferences-v1` -> restores
+  after restart/update/crash.
+- **Geometry-driven dock again** (`AppManager`): the outer wrapper was hardcoded
+  bottom-centre; now uses `computeDockGeometry({edge, align, preset})` for position +
+  a STATIC transform (no transition) so STABILITY IS PRESERVED -- the dock only
+  relocates on an explicit user pick, never drifts/jumps during use. Inner container
+  lays out column for left/right edges (maxHeight) vs row for bottom/top (maxWidth).
+- **"Dock Position" in the dock context menu**: five items (Bottom Center/Left/Right,
+  Left Side, Right Side), active one check-marked, each sets edge+align via the store.
+
+Verified live: dock moves bottom-center -> left edge (column) -> bottom-left
+(left:4) -> bottom-right (right:4) -> back to centred; persistence confirmed in
+localStorage; no error boundary. 22 dockGeometry unit tests (added alignment +
+normalizeDockAlign), tsc clean. The brief's reliability/visual/perf items were
+largely already addressed (magnification off, compact dock, pointer-up launch).

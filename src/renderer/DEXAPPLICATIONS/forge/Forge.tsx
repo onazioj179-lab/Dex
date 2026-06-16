@@ -8,7 +8,7 @@ import { useRunningApps } from '../../store/runningApps';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
-import { useAutoSave } from '../../utils/useAutoSave';
+import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useToastHelpers } from '../../components/Toast';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
@@ -283,6 +283,14 @@ const Forge: React.FC = () => {
 
   // ===== STATE =====
   const [jobs, setJobs] = useState<Job[]>(() => {
+    // Recover from the actual autosave key. Previously this read 'forge-jobs',
+    // which nothing ever writes (useAutoSave persists to 'dex-autosave-forge'),
+    // so the queue was never actually restored.
+    try {
+      const recovered = loadAutoSave<{ jobs?: Job[] }>('forge');
+      if (recovered?.jobs && Array.isArray(recovered.jobs) && recovered.jobs.length > 0) return recovered.jobs;
+    } catch { /* ignore */ }
+    // Legacy key fallback for queues saved before the autosave unification.
     try { const saved = localStorage.getItem('forge-jobs'); if (saved) { const parsed = JSON.parse(saved); if (Array.isArray(parsed) && parsed.length > 0) return parsed; } } catch { /* ignore */ }
     return [];
   });
@@ -290,7 +298,13 @@ const Forge: React.FC = () => {
   const [presets, setPresets] = useState<Preset[]>(() => {
     try { const saved = localStorage.getItem('forge-custom-presets'); return saved ? [...DEFAULT_PRESETS, ...JSON.parse(saved)] : DEFAULT_PRESETS; } catch { return DEFAULT_PRESETS; }
   });
-  useAutoSave('forge', useCallback(() => ({ jobs, presets }), [jobs, presets]), isDirty, 30_000);
+  // Strip outputBlobUrl before persisting: blob: URLs are per-session and become
+  // dangling references after a reload, so a recovered "completed" job would show
+  // a broken download link. Everything else (metadata, settings, progress) keeps.
+  useAutoSave('forge', useCallback(() => ({
+    jobs: jobs.map(j => { const copy = { ...j }; delete copy.outputBlobUrl; return copy; }),
+    presets,
+  }), [jobs, presets]), isDirty, 30_000);
   // Queue autosave status surfaced in the header. The encode queue has no manual
   // save, so this reassures the user their queue/presets are being persisted.
   const [autosaveState, setAutosaveState] = useState<AutosaveState>('idle');

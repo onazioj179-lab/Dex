@@ -225,18 +225,28 @@ export function useGlobalUndo(appName: string) {
     [appName]
   );
 
+  // These were previously fresh inline arrows on every render. Any consumer that
+  // put one in a useEffect dependency array (e.g. Canvas's clear-on-mount guard)
+  // would re-run that effect every render; since clear()/undo()/redo() notify
+  // subscribers -> setState -> re-render, that produced an infinite render loop.
+  // Stable identities make them safe to depend on.
+  const undo = useCallback(() => undoManager.undo(), []);
+  const redo = useCallback(() => undoManager.redo(), []);
+  const undoToPoint = useCallback((idx: number) => undoManager.undoToPoint(idx), []);
+  const clear = useCallback(() => undoManager.clear(), []);
+
   return {
     push,
     pushAndExecute,
-    undo: () => undoManager.undo(),
-    redo: () => undoManager.redo(),
-    undoToPoint: (idx: number) => undoManager.undoToPoint(idx),
+    undo,
+    redo,
+    undoToPoint,
     canUndo: state.index >= 0,
     canRedo: state.index < state.stack.length - 1,
     history: state.stack,
     currentIndex: state.index,
     recentHistory: undoManager.getRecentHistory(20),
-    clear: () => undoManager.clear(),
+    clear,
   };
 }
 

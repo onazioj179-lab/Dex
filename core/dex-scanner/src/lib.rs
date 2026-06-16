@@ -11,6 +11,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct DupGroup {
@@ -28,8 +29,9 @@ const SKIP_DIRS: &[&str] = &[
     "coverage", "vendor", "__pycache__",
 ];
 
-/// Bounded depth-first walk returning (path, size) for files.
-fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64)> {
+/// Bounded depth-first walk returning (path, size, modified_secs) for files.
+/// The mtime is carried so change-detection snapshots can reuse the one walk.
+fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64, u64)> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     let cap_scan = max.saturating_mul(4);
@@ -55,7 +57,13 @@ fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64)> {
                 }
                 stack.push(entry.path());
             } else {
-                out.push((entry.path(), meta.len()));
+                let modified = meta
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                out.push((entry.path(), meta.len(), modified));
                 if out.len() >= max {
                     break;
                 }
@@ -76,7 +84,7 @@ fn hash_file(path: &Path) -> Option<String> {
 /// Find groups of byte-identical files under `root` (bounded to `max` files).
 pub fn find_duplicates(root: &Path, max: usize) -> Vec<DupGroup> {
     let mut by_size: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-    for (path, size) in walk(root, max) {
+    for (path, size, _modified) in walk(root, max) {
         if size > 0 {
             by_size.entry(size).or_default().push(path);
         }
@@ -149,7 +157,7 @@ pub struct TypeGroup {
 /// Group files under `root` by category (count + total size + paths), largest first.
 pub fn group_by_type(root: &Path, max: usize) -> Vec<TypeGroup> {
     let mut map: HashMap<&'static str, (usize, u64, Vec<String>)> = HashMap::new();
-    for (path, size) in walk(root, max) {
+    for (path, size, _modified) in walk(root, max) {
         let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         let entry = map.entry(categorize(&name)).or_default();
         entry.0 += 1;
@@ -167,6 +175,71 @@ pub fn group_by_type(root: &Path, max: usize) -> Vec<TypeGroup> {
         .collect();
     out.sort_by(|a, b| b.count.cmp(&a.count));
     out
+}
+
+// ---------------------------------------------------------------------------
+// Change detection — the basis of native file monitoring. Take a `Snapshot` of a
+// tree, take another later, and `diff_snapshots` reports exactly what was added,
+// modified, or removed. A watcher feeds those paths to the search index's
+// `upsert_file` / `remove_path` so the index stays live without a full rebuild.
+// ---------------------------------------------------------------------------
+
+/// A lightweight per-file fingerprint: byte size + mtime (seconds). A change to
+/// either marks the file modified — cheap and avoids hashing on every poll.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct FileStamp {
+    pub size: u64,
+    pub modified: u64,
+}
+
+/// State of a tree at one moment: path -> stamp.
+pub type Snapshot = HashMap<String, FileStamp>;
+
+/// Capture a `{path -> stamp}` snapshot of `root` (bounded to `max` files).
+pub fn scan_snapshot(root: &Path, max: usize) -> Snapshot {
+    walk(root, max)
+        .into_iter()
+        .map(|(path, size, modified)| {
+            (path.to_string_lossy().to_string(), FileStamp { size, modified })
+        })
+        .collect()
+}
+
+/// The paths that changed between two snapshots of the same tree.
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct SnapshotDiff {
+    pub added: Vec<String>,
+    pub modified: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+impl SnapshotDiff {
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.modified.is_empty() && self.removed.is_empty()
+    }
+}
+
+/// Diff `old` -> `new`: present only in `new` = added; in both with a changed
+/// stamp = modified; present only in `old` = removed. Each list is sorted so the
+/// result is deterministic.
+pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> SnapshotDiff {
+    let mut d = SnapshotDiff::default();
+    for (path, stamp) in new {
+        match old.get(path) {
+            None => d.added.push(path.clone()),
+            Some(prev) if prev != stamp => d.modified.push(path.clone()),
+            _ => {}
+        }
+    }
+    for path in old.keys() {
+        if !new.contains_key(path) {
+            d.removed.push(path.clone());
+        }
+    }
+    d.added.sort();
+    d.modified.sort();
+    d.removed.sort();
+    d
 }
 
 #[cfg(test)]
@@ -213,6 +286,41 @@ mod tests {
         std::fs::write(dir.path().join("a.txt"), b"AAAA").unwrap();
         std::fs::write(dir.path().join("b.txt"), b"BBBB").unwrap(); // same size, different bytes
         assert!(find_duplicates(dir.path(), 1000).is_empty());
+    }
+
+    #[test]
+    fn snapshot_diff_detects_add_modify_remove() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.txt");
+        let b = dir.path().join("b.txt");
+        std::fs::write(&a, b"one").unwrap();
+        std::fs::write(&b, b"two").unwrap();
+        let snap1 = scan_snapshot(dir.path(), 1000);
+        assert_eq!(snap1.len(), 2);
+
+        // Add c, modify a (size changes -> detected regardless of mtime resolution),
+        // remove b.
+        std::fs::write(dir.path().join("c.txt"), b"three").unwrap();
+        std::fs::write(&a, b"one-much-longer-now").unwrap();
+        std::fs::remove_file(&b).unwrap();
+        let snap2 = scan_snapshot(dir.path(), 1000);
+
+        let d = diff_snapshots(&snap1, &snap2);
+        assert_eq!(d.added.len(), 1, "exactly c.txt added");
+        assert!(d.added[0].ends_with("c.txt"));
+        assert_eq!(d.modified.len(), 1, "exactly a.txt modified");
+        assert!(d.modified[0].ends_with("a.txt"));
+        assert_eq!(d.removed.len(), 1, "exactly b.txt removed");
+        assert!(d.removed[0].ends_with("b.txt"));
+        assert!(!d.is_empty());
+    }
+
+    #[test]
+    fn identical_snapshots_diff_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"x").unwrap();
+        let s = scan_snapshot(dir.path(), 1000);
+        assert!(diff_snapshots(&s, &s.clone()).is_empty());
     }
 
     #[test]

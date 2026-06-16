@@ -8,7 +8,7 @@
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
-import { Terminal } from '../../components/Terminal';
+import { TerminalTabs } from '../../components/TerminalTabs';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
 import { highlightDexScript } from './dexCode/highlight';
@@ -746,7 +746,7 @@ const DexCode: React.FC = () => {
 
         {terminalOpen && (
           <div style={{ height: 240, padding: '0 var(--space-3) var(--space-3)', flexShrink: 0 }}>
-            <Terminal onClose={() => setTerminalOpen(false)} />
+            <TerminalTabs onClose={() => setTerminalOpen(false)} />
           </div>
         )}
       </section>
