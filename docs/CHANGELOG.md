@@ -12,6 +12,44 @@ public document short and focused on what has actually shipped to users now.
 
 ---
 
+## v5.5.0 — System refinement: search, calm, and consistency (2026-06-13)
+
+A refinement release. Nothing new to learn — everything is faster, calmer, and
+more finished end to end.
+
+### New
+
+- **One search for everything.** A single palette fans across notes, files,
+  tasks, projects, workflows, commands, screenshots, and conversations, ranked by
+  relevance, recency, and what you are working on right now.
+- **A real Home.** A dashboard of recent projects and notes, current tasks,
+  active workflows, a rewind summary, AI suggestions, and pinned apps — with
+  honest empty states.
+- **Search-first Settings.** Type what you want to change and jump straight to the
+  control, with new AI and Developer sections surfacing existing toggles.
+
+### Improvements
+
+- **Calmer notifications.** Every alert now flows through one center — grouped by
+  source, prioritized by severity, and persistent — instead of scattered popups.
+- **Deeper, smoother creative apps.** Across Prism, Flux, Imosion, Axl, Vinx, and
+  the whiteboard: zoom-to-cursor, snappier timelines and playback, viewport-aware
+  menus, honest empty states, and editing that stays out of your way.
+- **Lighter under the hood.** Duplicate internal systems (caches, motion, file
+  watching) were consolidated and dead code removed, so DEX does the same work
+  with less overhead.
+- **Privacy stated plainly.** DEX is free for everyone; in plain words, it uses
+  limited, privacy-protective usage data to keep improving, and never your
+  private files or secrets. No ads, no paid tiers, no selling your data. Updated
+  Privacy Policy and Terms (v2.2.0); re-consent prompted on first launch.
+
+### Fixes
+
+- Fixed double-undo, scrub-past-end, and an easing double-application in the
+  motion editor; a playhead desync and a frozen spectrum analyzer in the audio
+  studio; a hooks-order crash on timeline scroll in the video editor; HiDPI
+  rendering and stuck-drawing issues on the canvases; and several listener leaks.
+
 ## v5.1.0 — Free for everyone, compact mode & a sharper system (2026-06-11)
 
 ### New

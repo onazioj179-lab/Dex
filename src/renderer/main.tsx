@@ -79,8 +79,15 @@ initCompositorHealth();
     }
   } catch { /* ignore */ }
   try {
-    const compact = localStorage.getItem('dex-density-compact') === 'true';
-    document.documentElement.style.setProperty('--density-scale', compact ? '0.85' : '1');
+    // Apply the saved UI density before first paint to avoid a reflow once
+    // comfortPrefs.initComfort() runs at React mount. Canonical store is
+    // 'dex:comfort'; the value maps straight to the data-density attribute that
+    // the consolidated density tokens in design-system.css consume.
+    const raw = localStorage.getItem('dex:comfort');
+    const density = raw ? (JSON.parse(raw).density as string) : undefined;
+    if (density === 'compact' || density === 'comfortable') {
+      document.documentElement.setAttribute('data-density', density);
+    }
   } catch { /* ignore */ }
 })();
 
@@ -300,7 +307,7 @@ class RootErrorBoundary extends React.Component<
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100vh', background: '#0a0a0f', color: '#e5e5ea', fontFamily: 'var(--dex-font-ui)', gap: 16,
+          height: '100vh', background: '#0a0a0f', color: '#e5e5ea', fontFamily: 'var(--dex-font-ui)', gap: 'var(--space-4)',
         }}>
           <div style={{
             width: 64, height: 64, borderRadius: 12,
@@ -318,7 +325,7 @@ class RootErrorBoundary extends React.Component<
             style={{
               padding: '10px 28px', background: 'var(--color-accent)', color: '#fff',
               border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
-              cursor: 'pointer', marginTop: 8,
+              cursor: 'pointer', marginTop: 'var(--space-2)',
               boxShadow: '0 4px 16px rgba(10,132,255,0.35)',
             }}
           >Reload DEX</button>

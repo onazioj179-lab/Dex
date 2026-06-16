@@ -414,8 +414,8 @@ const panelStyles: Record<string, React.CSSProperties> = {
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '10px 12px',
+    gap: 'var(--space-2)',
+    padding: '10px var(--space-3)',
     borderBottom: '1px solid var(--color-border, var(--color-border))',
   },
   title: {
@@ -429,7 +429,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary, #777)',
   },
   clearBtn: {
-    padding: '2px 8px',
+    padding: '2px var(--space-2)',
     fontSize: 11,
     background: 'transparent',
     border: '1px solid var(--color-border, var(--color-text-tertiary))',
@@ -446,7 +446,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '8px 12px',
+    padding: 'var(--space-2) var(--space-3)',
     cursor: 'pointer',
     transition: 'background 0.15s',
     borderBottom: '1px solid var(--color-border-subtle, var(--color-bg-hover))',

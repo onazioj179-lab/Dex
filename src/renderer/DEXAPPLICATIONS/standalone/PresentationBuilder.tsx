@@ -333,7 +333,7 @@ const PresentationBuilder: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left sidebar — slide list */}
         <div style={{
-          ...premiumGlassSidebar, width: 200, padding: 8, gap: 6, overflowY: 'auto',
+          ...premiumGlassSidebar, width: 200, padding: 'var(--space-2)', gap: 6, overflowY: 'auto',
         }}>
           <button onClick={addSlide} style={{
             ...toolbarBtn, width: '100%', justifyContent: 'center',
@@ -386,7 +386,7 @@ const PresentationBuilder: React.FC = () => {
         {/* Center — canvas */}
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 24, overflow: 'auto', background: 'var(--color-bg-base)',
+          padding: 'var(--space-6)', overflow: 'auto', background: 'var(--color-bg-base)',
         }}>
           <div className="dex-presentation-print" style={{ display: 'flex', flexDirection: 'column' }}>
             {/* Print: render all slides */}
@@ -406,7 +406,7 @@ const PresentationBuilder: React.FC = () => {
 
         {/* Right panel — properties */}
         <div style={{
-          width: 240, padding: 14, gap: 12, display: 'flex', flexDirection: 'column',
+          width: 240, padding: 14, gap: 'var(--space-3)', display: 'flex', flexDirection: 'column',
           borderLeft: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)',
           overflowY: 'auto',
         }}>
@@ -492,7 +492,7 @@ const PresentationBuilder: React.FC = () => {
                   />
                 </label>
               )}
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <label style={{ ...fieldLabel, flex: 1 }}>
                   <span>X</span>
                   <input type="number" value={Math.round(selectedBlock.x)} onChange={e => updateBlock(selectedBlock.id, { x: Number(e.target.value) })} style={fieldInput} />
@@ -502,7 +502,7 @@ const PresentationBuilder: React.FC = () => {
                   <input type="number" value={Math.round(selectedBlock.y)} onChange={e => updateBlock(selectedBlock.id, { y: Number(e.target.value) })} style={fieldInput} />
                 </label>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <label style={{ ...fieldLabel, flex: 1 }}>
                   <span>W</span>
                   <input type="number" value={Math.round(selectedBlock.width)} onChange={e => updateBlock(selectedBlock.id, { width: Number(e.target.value) })} style={fieldInput} />
@@ -527,7 +527,7 @@ const PresentationBuilder: React.FC = () => {
 
 const toolbarBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '6px 12px', borderRadius: 6, fontSize: 12,
+  padding: '6px var(--space-3)', borderRadius: 6, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
@@ -537,7 +537,7 @@ const fieldLabel: React.CSSProperties = {
 };
 
 const fieldInput: React.CSSProperties = {
-  padding: '6px 8px', borderRadius: 4, fontSize: 12,
+  padding: '6px var(--space-2)', borderRadius: 4, fontSize: 12,
   background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)',
 };

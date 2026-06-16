@@ -14,6 +14,7 @@
 
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { Folder, NoteListItem, NoteAttachment, NoteTemplate, SortField, SortDirection, ViewMode, EditorMode } from '../../store/notesStore';
+import { useFocusTrap } from '../../utils/useFocusTrap';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../../components/ContextMenu';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
 
@@ -33,6 +34,7 @@ const colors = {
   accentDim: 'rgba(100,210,255,0.2)',
   danger: 'var(--color-error)',
   pin: 'var(--color-warning)',
+  star: 'var(--color-warning)',
 };
 
 // ---------------------------------------------------------------------------
@@ -104,7 +106,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            padding: '5px 8px',
+            padding: '5px var(--space-2)',
             paddingLeft: 8 + depth * 16,
             borderRadius: 3,
             cursor: 'pointer',
@@ -175,7 +177,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          padding: '6px 8px',
+          padding: '6px var(--space-2)',
           borderRadius: 3,
           cursor: 'pointer',
           background: selectedFolderId === null ? colors.bgSelected : 'transparent',
@@ -197,7 +199,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
 
       {/* New folder input */}
       {creatingIn !== false && (
-        <div style={{ padding: '4px 8px' }}>
+        <div style={{ padding: '4px var(--space-2)' }}>
           <input
             ref={inputRef}
             value={newFolderName}
@@ -215,7 +217,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
               borderRadius: 3,
               color: colors.text,
               fontSize: 13,
-              padding: '4px 8px',
+              padding: '4px var(--space-2)',
               outline: 'none',
             }}
           />
@@ -228,7 +230,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          padding: '6px 8px',
+          padding: '6px var(--space-2)',
           borderRadius: 3,
           cursor: 'pointer',
           color: colors.textDim,
@@ -256,6 +258,7 @@ interface NoteListPanelProps {
   onCreate: () => void;
   onDelete: (noteId: string) => void;
   onTogglePin: (noteId: string) => void;
+  onToggleFavorite?: (noteId: string) => void;
   onDuplicate?: (noteId: string) => void;
   onSetColor?: (noteId: string, color: string | null) => void;
   sortField: SortField;
@@ -275,6 +278,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   onCreate,
   onDelete,
   onTogglePin,
+  onToggleFavorite,
   onDuplicate,
   onSetColor,
   sortField,
@@ -287,8 +291,28 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   onSearchChange,
 }) => {
   const { menuState, show: showCtx, close: closeCtx } = useContextMenu();
-  const pinnedNotes = notes.filter(n => n.pinned);
-  const unpinnedNotes = notes.filter(n => !n.pinned);
+  // Partition into three sections, each note appearing once: Favorites first,
+  // then Pinned (non-favorite), then everything else. Favorites take priority
+  // so a starred note surfaces at the very top regardless of pin state.
+  const favoriteNotes = notes.filter(n => n.favorite);
+  const pinnedNotes = notes.filter(n => n.pinned && !n.favorite);
+  const otherNotes = notes.filter(n => !n.pinned && !n.favorite);
+
+  // Progressive rendering for large note collections (DEX 5.5 scroll audit):
+  // favorites/pinned are inherently small and render in full; the unbounded
+  // "other" list is windowed and grows on scroll, so a library of thousands of
+  // notes stays light. The window resets when the result set changes.
+  const OTHER_PAGE = 80;
+  const [visibleOther, setVisibleOther] = useState(OTHER_PAGE);
+  useEffect(() => { setVisibleOther(OTHER_PAGE); }, [searchQuery, notes.length]);
+  const handleListScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) {
+      setVisibleOther(v => (v < otherNotes.length ? v + OTHER_PAGE : v));
+    }
+  }, [otherNotes.length]);
+  const visibleOtherNotes = otherNotes.slice(0, visibleOther);
+  const remainingOther = otherNotes.length - visibleOtherNotes.length;
 
   const formatDate = (ts: number) => {
     const d = new Date(ts);
@@ -309,6 +333,9 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       { id: 'open', label: 'Open Note', onClick: () => onSelect(note.id) },
       { id: 'pin', label: note.pinned ? 'Unpin' : 'Pin to Top', onClick: () => onTogglePin(note.id) },
     ];
+    if (onToggleFavorite) {
+      items.push({ id: 'fav', label: note.favorite ? 'Remove from Favorites' : 'Add to Favorites', onClick: () => onToggleFavorite(note.id) });
+    }
     if (onDuplicate) items.push({ id: 'dup', label: 'Duplicate', onClick: () => onDuplicate(note.id) });
     if (onSetColor) {
       items.push({ id: 'div-color', label: '', divider: true });
@@ -331,12 +358,13 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
     return (
       <div
         key={note.id}
+        className="dn-note-item"
         onContextMenu={e => {
           onSelect(note.id);
           showCtx(e, buildNoteCtxItems(note));
         }}
         style={{
-          padding: viewMode === 'compact' ? '6px 10px' : '10px 12px',
+          padding: viewMode === 'compact' ? '6px 10px' : '8px 12px',
           borderRadius: 4,
           cursor: 'pointer',
           background: isSelected ? colors.bgSelected : 'transparent',
@@ -359,6 +387,23 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
             {note.locked ? '[Locked] ' : ''}{note.title || 'Untitled'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {onToggleFavorite && (
+              <button
+                aria-label={note.favorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                title={note.favorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                className={`dn-star${note.favorite ? ' dn-star-on' : ''}`}
+                onClick={e => { e.stopPropagation(); onToggleFavorite(note.id); }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  color: note.favorite ? colors.star : colors.textDim,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill={note.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
+            )}
             {note.pinned ? (
               <span
                 style={{ fontSize: 10, color: colors.pin, cursor: 'pointer' }}
@@ -404,7 +449,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Search */}
-      <div style={{ padding: '8px 8px 4px', flexShrink: 0 }}>
+      <div style={{ padding: 'var(--space-2) var(--space-2) 4px', flexShrink: 0 }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -449,7 +494,11 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         color: colors.textDim,
         flexShrink: 0,
       }}>
-        <span>{notes.length} note{notes.length !== 1 ? 's' : ''}</span>
+        <span>
+          {searchQuery.trim()
+            ? `${notes.length} match${notes.length !== 1 ? 'es' : ''}`
+            : `${notes.length} note${notes.length !== 1 ? 's' : ''}`}
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {onViewModeChange && (
             <div style={{ display: 'flex', gap: 1, marginRight: 4 }}>
@@ -507,40 +556,64 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       </div>
 
       {/* Note list */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
+      <div className="dex-scroll-fade-y" style={{ flex: 1, overflow: 'auto', padding: '0 4px' }} onScroll={handleListScroll}>
+        {favoriteNotes.length > 0 && (
+          <>
+            <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-2) 4px', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: colors.star }}>
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              Favorites
+            </div>
+            {favoriteNotes.map(renderNoteItem)}
+          </>
+        )}
         {pinnedNotes.length > 0 && (
           <>
-            <div className="dex-label-caps" style={{ padding: '8px 8px 4px' }}>
+            <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-2) 4px' }}>
               Pinned
             </div>
             {pinnedNotes.map(renderNoteItem)}
           </>
         )}
-        {unpinnedNotes.length > 0 && (
+        {otherNotes.length > 0 && (
           <>
-            {pinnedNotes.length > 0 && (
-              <div className="dex-label-caps" style={{ padding: '8px 8px 4px' }}>
+            {(favoriteNotes.length > 0 || pinnedNotes.length > 0) && (
+              <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-2) 4px' }}>
                 Notes
               </div>
             )}
-            {unpinnedNotes.map(renderNoteItem)}
+            {visibleOtherNotes.map(renderNoteItem)}
+            {remainingOther > 0 && (
+              <button
+                onClick={() => setVisibleOther(v => v + OTHER_PAGE)}
+                style={{
+                  display: 'block', width: '100%', margin: '6px 0 10px',
+                  padding: '7px 10px', fontSize: 12, color: colors.textDim,
+                  background: 'transparent', border: `1px solid ${colors.border}`,
+                  borderRadius: 4, cursor: 'pointer',
+                }}
+              >
+                Load {Math.min(OTHER_PAGE, remainingOther)} more ({remainingOther} remaining)
+              </button>
+            )}
           </>
         )}
         {notes.length === 0 && (
-          <div style={{ padding: 20, textAlign: 'center', color: colors.textMuted, fontSize: 13 }}>
-            No notes yet
+          <div style={{ padding: 'var(--space-5)', textAlign: 'center', color: colors.textMuted, fontSize: 13 }}>
+            {searchQuery.trim() ? `No notes match "${searchQuery.trim()}"` : 'No notes yet'}
           </div>
         )}
       </div>
 
       {/* New note button */}
-      <div style={{ padding: 8, flexShrink: 0 }}>
+      <div style={{ padding: 'var(--space-2)', flexShrink: 0 }}>
         <button
           aria-label="Create new note"
           onClick={onCreate}
           style={{
             width: '100%',
-            padding: '8px 0',
+            padding: 'var(--space-2) 0',
             background: colors.accentDim,
             border: 'none',
             borderRadius: 4,
@@ -619,7 +692,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '6px 12px',
+      padding: '6px var(--space-3)',
       borderBottom: `1px solid ${colors.border}`,
       background: 'var(--color-bg-inset, rgba(0,0,0,0.1))',
       flexShrink: 0,
@@ -730,7 +803,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
                 <div
                   key={fmt}
                   style={{
-                    padding: '6px 12px',
+                    padding: '6px var(--space-3)',
                     fontSize: 12,
                     color: colors.text,
                     cursor: 'pointer',
@@ -763,6 +836,8 @@ const ToolbarIconButton: React.FC<{
     aria-label={label}
     title={label}
     onClick={onClick}
+    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
     style={{
       width: 26,
       height: 26,
@@ -770,7 +845,7 @@ const ToolbarIconButton: React.FC<{
       alignItems: 'center',
       justifyContent: 'center',
       border: 'none',
-      borderRadius: 3,
+      borderRadius: 4,
       background: active ? colors.accentDim : 'transparent',
       color: danger ? colors.danger : active ? colors.accent : colors.textDim,
       cursor: 'pointer',
@@ -913,7 +988,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
       background: 'var(--color-bg-elevated, rgba(30,30,30,0.95))',
       border: `1px solid ${colors.border}`,
       borderRadius: 6,
-      padding: '8px 12px',
+      padding: 'var(--space-2) var(--space-3)',
       display: 'flex',
       flexDirection: 'column',
       gap: 6,
@@ -933,7 +1008,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
             borderRadius: 3,
             color: colors.text,
             fontSize: 13,
-            padding: '4px 8px',
+            padding: '4px var(--space-2)',
             outline: 'none',
           }}
           onKeyDown={e => {
@@ -968,7 +1043,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
               borderRadius: 3,
               color: colors.text,
               fontSize: 13,
-              padding: '4px 8px',
+              padding: '4px var(--space-2)',
               outline: 'none',
             }}
           />
@@ -1024,7 +1099,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
   }, [tags, onAdd]);
 
   return (
-    <div style={{ padding: '8px 12px' }}>
+    <div style={{ padding: 'var(--space-2) var(--space-3)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
         {tags.map(tag => (
           <span
@@ -1036,7 +1111,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
               fontSize: 11,
               color: colors.accent,
               background: colors.accentDim,
-              padding: '2px 8px',
+              padding: '2px var(--space-2)',
               borderRadius: 8,
             }}
           >
@@ -1069,7 +1144,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
             borderRadius: 3,
             color: colors.text,
             fontSize: 12,
-            padding: '4px 8px',
+            padding: '4px var(--space-2)',
             outline: 'none',
           }}
         />
@@ -1089,7 +1164,7 @@ export const TagEditor: React.FC<TagEditorProps> = memo(({
               <div
                 key={s}
                 style={{
-                  padding: '4px 8px',
+                  padding: '4px var(--space-2)',
                   fontSize: 12,
                   color: colors.text,
                   cursor: 'pointer',
@@ -1132,12 +1207,12 @@ export const AttachmentPanel: React.FC<AttachmentPanelProps> = memo(({
   };
 
   return (
-    <div style={{ padding: '8px 12px' }}>
+    <div style={{ padding: 'var(--space-2) var(--space-3)' }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 8,
+        marginBottom: 'var(--space-2)',
       }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: colors.text }}>
           Attachments ({attachments.length})
@@ -1155,7 +1230,7 @@ export const AttachmentPanel: React.FC<AttachmentPanelProps> = memo(({
         >+ Add</button>
       </div>
       {attachments.length === 0 && (
-        <div style={{ fontSize: 12, color: colors.textMuted, padding: '8px 0' }}>
+        <div style={{ fontSize: 12, color: colors.textMuted, padding: 'var(--space-2) 0' }}>
           No attachments
         </div>
       )}
@@ -1165,7 +1240,7 @@ export const AttachmentPanel: React.FC<AttachmentPanelProps> = memo(({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 'var(--space-2)',
             padding: '6px 0',
             borderBottom: `1px solid ${colors.border}`,
           }}
@@ -1221,6 +1296,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
   onClose,
   visible,
 }) => {
+  const trapRef = useFocusTrap<HTMLDivElement>(visible);
   if (!visible) return null;
 
   return (
@@ -1240,18 +1316,19 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
           background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
           border: `1px solid ${colors.border}`,
           borderRadius: 10,
-          padding: 24,
+          padding: 'var(--space-6)',
           width: 'min(500px, calc(100vw - 48px))',
           maxHeight: '70vh',
           overflow: 'auto',
         }}
+        ref={trapRef}
         onClick={e => e.stopPropagation()}
       >
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 16,
+          marginBottom: 'var(--space-4)',
         }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>Choose a Template</span>
           <button
@@ -1260,12 +1337,12 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
             style={{ background: 'none', border: 'none', color: colors.textDim, cursor: 'pointer', fontSize: 18 }}
           >x</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {templates.map(tmpl => (
             <div
               key={tmpl.id}
               style={{
-                padding: '12px 16px',
+                padding: 'var(--space-3) var(--space-4)',
                 borderRadius: 6,
                 background: 'var(--color-border-subtle)',
                 border: `1px solid ${colors.border}`,
@@ -1285,7 +1362,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = memo(({
             </div>
           ))}
           {templates.length === 0 && (
-            <div style={{ padding: 20, textAlign: 'center', color: colors.textMuted, fontSize: 13 }}>
+            <div style={{ padding: 'var(--space-5)', textAlign: 'center', color: colors.textMuted, fontSize: 13 }}>
               No templates available
             </div>
           )}
@@ -1339,7 +1416,7 @@ export const NoteStats: React.FC<NoteStatsProps> = memo(({
           background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
           border: `1px solid ${colors.border}`,
           borderRadius: 10,
-          padding: 24,
+          padding: 'var(--space-6)',
           width: 'min(300px, calc(100vw - 48px))',
         }}
         onClick={e => e.stopPropagation()}
@@ -1348,7 +1425,7 @@ export const NoteStats: React.FC<NoteStatsProps> = memo(({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 16,
+          marginBottom: 'var(--space-4)',
         }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>Notes Statistics</span>
           <button
@@ -1357,7 +1434,7 @@ export const NoteStats: React.FC<NoteStatsProps> = memo(({
             style={{ background: 'none', border: 'none', color: colors.textDim, cursor: 'pointer', fontSize: 18 }}
           >x</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {items.map(item => (
             <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13, color: colors.textDim }}>{item.label}</span>
@@ -1391,7 +1468,7 @@ export const TableOfContents: React.FC<TableOfContentsProps> = memo(({ headings,
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div style={{ padding: '8px 12px' }}>
+    <div style={{ padding: 'var(--space-2) var(--space-3)' }}>
       <div
         style={{
           display: 'flex',
@@ -1478,7 +1555,7 @@ export const TitleInput: React.FC<TitleInputProps> = memo(({ title, onChange, re
         color: 'var(--color-text-primary)',
         fontSize: 24,
         fontWeight: 700,
-        padding: '16px 32px 8px',
+        padding: 'var(--space-4) var(--space-8) var(--space-2)',
         fontFamily: 'var(--dex-font-ui)',
       }}
     />

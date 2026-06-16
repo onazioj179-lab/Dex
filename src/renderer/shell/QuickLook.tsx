@@ -126,14 +126,14 @@ export const QuickLook: React.FC<QuickLookProps> = ({
       >
         {/* Header */}
         <div style={{
-          padding: '12px 16px',
+          padding: 'var(--space-3) var(--space-4)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid var(--color-bg-hover)',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <TypeIcon type={currentItem.type} />
             <span id="quicklook-title" style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
               {currentItem.title}
@@ -163,7 +163,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
         <div style={{
           flex: 1,
           overflow: 'auto',
-          padding: 16,
+          padding: 'var(--space-4)',
           minHeight: 200,
         }}>
           <QuickLookContent item={currentItem} />
@@ -172,12 +172,12 @@ export const QuickLook: React.FC<QuickLookProps> = ({
         {/* Navigation hint */}
         {items.length > 1 && (
           <div style={{
-            padding: '8px 16px',
+            padding: 'var(--space-2) var(--space-4)',
             borderTop: '1px solid var(--color-bg-hover)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 16,
+            gap: 'var(--space-4)',
             flexShrink: 0,
           }}>
             <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
@@ -219,7 +219,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     case 'audio':
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '32px 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-8) 0' }}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
           <audio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} />
         </div>
@@ -245,9 +245,9 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     case 'folder':
       return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 'var(--space-3)' }}>
           {item.content.split('\n').filter(Boolean).map((name, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 8 }}>
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 'var(--space-2)' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', textAlign: 'center', wordBreak: 'break-all' }}>{name}</span>
             </div>
@@ -257,15 +257,15 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     case 'task':
       return (
-        <div style={{ padding: 8 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 12 }}>{item.title}</div>
+        <div style={{ padding: 'var(--space-2)' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 'var(--space-3)' }}>{item.title}</div>
           <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--color-text-secondary)', whiteSpace: 'pre-wrap' }}>{item.content}</div>
         </div>
       );
 
     case 'contact':
       return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)' }}>
           <div style={{
             width: 64, height: 64, borderRadius: '50%',
             background: 'var(--color-accent-light, rgba(74,158,255,0.15))',
@@ -283,7 +283,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     default:
       return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--color-text-muted)', fontSize: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-10)', color: 'var(--color-text-muted)', fontSize: 14 }}>
           No preview available
         </div>
       );

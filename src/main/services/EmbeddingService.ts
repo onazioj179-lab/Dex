@@ -15,6 +15,14 @@
 // The fallback is honest: it captures lexical similarity well enough for
 // near-duplicate detection and rough clustering, but it is NOT semantic.
 // When the ONNX path is wired the API contract stays the same.
+//
+// Role (audit FINDING 9): this is the single VECTOR SOURCE for UKI search. Its
+// vectors feed the cosine index primitive src/shared/uki/embeddings.ts, which
+// is the semantic half of the one search facade
+// src/renderer/uki/semanticSearch.ts (the lexical half being
+// src/renderer/uki/index_search.ts). Renderer consumers reach these vectors via
+// the `embedding:compute` / `embedding:compute-batch` IPC; do not stand up a
+// second embedding backend — extend this service instead.
 // =============================================================================
 
 import { ipcMain } from 'electron';

@@ -735,7 +735,7 @@ export const IntegrityPanel: React.FC = () => {
 
 const panelStyles: Record<string, React.CSSProperties> = {
   container: {
-    padding: 12,
+    padding: 'var(--space-3)',
     background: 'var(--color-bg-surface)',
     borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
@@ -743,8 +743,8 @@ const panelStyles: Record<string, React.CSSProperties> = {
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 'var(--space-2)',
+    marginBottom: 'var(--space-3)',
   },
   healthDot: {
     width: 8,
@@ -767,13 +767,13 @@ const panelStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 'var(--space-3)',
   },
   issue: {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    padding: '6px 8px',
+    padding: '6px var(--space-2)',
     borderRadius: 3,
     background: 'var(--color-bg-inset)',
     borderLeft: '2px solid',
@@ -790,11 +790,11 @@ const panelStyles: Record<string, React.CSSProperties> = {
   },
   actions: {
     display: 'flex',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   button: {
     flex: 1,
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     borderRadius: 4,
     border: '1px solid var(--color-border-default)',
     background: 'var(--color-bg-surface)',

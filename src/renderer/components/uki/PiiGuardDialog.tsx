@@ -7,14 +7,19 @@
 /**
  * PiiGuardDialog - confirm-before-send dialog that surfaces detected PII /
  * secrets in a prompt and lets the user choose to send raw, send redacted,
- * or cancel. Built on top of `ConfirmDialog` for visual consistency.
+ * or cancel.
+ *
+ * Renders through the canonical ui/Modal surface (portal, backdrop, Escape,
+ * focus trap, scroll lock, --z-modal layer) instead of hand-rolling its own
+ * fixed-inset overlay. Escape / backdrop map to cancel.
  */
 
 // DEX v3.8.9 wave B - UKI trust UI
 
 import React from 'react';
 import { Button } from '../../ui/Button';
-import { colors, fontSize, fontWeight, radius, space, modal } from '../../styles/tokens';
+import { Modal } from '../../ui/Modal';
+import { colors, fontSize, fontWeight, radius, space } from '../../styles/tokens';
 
 export interface PiiFinding {
   /** Type label, e.g. "email", "api-key", "ssn". */
@@ -42,35 +47,23 @@ export interface PiiGuardDialogProps {
 export function PiiGuardDialog({
   open, raw, redacted, findings, onSendRedacted, onSendRaw, onCancel,
 }: PiiGuardDialogProps) {
-  if (!open) return null;
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Sensitive data detected"
-      data-testid="pii-guard-dialog"
-      style={{
-        position: 'fixed', inset: 0, zIndex: modal.zIndex,
-        background: modal.backdropColor,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: space[4],
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    <Modal
+      open={open}
+      onClose={onCancel}
+      size="md"
+      title="Sensitive data detected"
+      testIdPrefix="pii-guard"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onCancel} data-testid="pii-cancel">Cancel</Button>
+          <Button variant="secondary" onClick={onSendRaw} data-testid="pii-send-raw">Send original</Button>
+          <Button variant="primary" onClick={onSendRedacted} data-testid="pii-send-redacted">Send redacted</Button>
+        </>
+      }
     >
-      <div style={{
-        background: colors.bg.surface,
-        borderRadius: modal.borderRadius,
-        padding: modal.padding,
-        width: modal.width.md,
-        maxWidth: '100%',
-        maxHeight: modal.maxHeight,
-        overflowY: 'auto',
-        boxShadow: 'var(--pg-shadow-popover)',
-      }}>
-        <h2 style={{ margin: 0, fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.text.primary }}>
-          Sensitive data detected
-        </h2>
-        <p style={{ marginTop: space[2], color: colors.text.secondary, fontSize: fontSize.sm }}>
+      <div data-testid="pii-guard-dialog">
+        <p style={{ margin: 0, color: colors.text.secondary, fontSize: fontSize.sm }}>
           We found {findings.length} item{findings.length === 1 ? '' : 's'} that look sensitive.
           Choose how to send this prompt to the model.
         </p>
@@ -95,14 +88,8 @@ export function PiiGuardDialog({
           <Pane title="Redacted (safe)" body={redacted} tone="success" />
           <Pane title="Original" body={raw} tone="warning" />
         </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: space[2], marginTop: space[4] }}>
-          <Button variant="secondary" onClick={onCancel} data-testid="pii-cancel">Cancel</Button>
-          <Button variant="secondary" onClick={onSendRaw} data-testid="pii-send-raw">Send original</Button>
-          <Button variant="primary" onClick={onSendRedacted} data-testid="pii-send-redacted">Send redacted</Button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

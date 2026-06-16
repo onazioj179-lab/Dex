@@ -901,22 +901,22 @@ export const Workflows: React.FC = () => {
             {/* Workflow Grid */}
             <div style={styles.workflowGrid}>
               {loading ? (
-                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px var(--space-5)', fontSize: '14px', color: 'var(--color-text-muted)' }}>
                   Loading workflows...
                 </div>
               ) : filteredWorkflows.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' as const }}>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px var(--space-5)', textAlign: 'center' as const }}>
                   <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'var(--color-bg-hover, rgba(255,255,255,0.03))', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))', transform: 'rotate(45deg)' }}>
                     <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-text-muted)' }}><DexIcon name="zap" size={24} /></span>
                   </div>
-                  <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '16px', color: 'var(--color-text-primary)' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 600, marginTop: 'var(--space-4)', color: 'var(--color-text-primary)' }}>
                     {searchQuery ? 'No shortcuts found' : 'No shortcuts yet'}
                   </div>
-                  <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
+                  <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginTop: 'var(--space-2)' }}>
                     {searchQuery ? `No results for "${searchQuery}"` : 'Create your first shortcut to automate tasks'}
                   </div>
                   {!searchQuery && (
-                    <button style={{ ...styles.createBtn, marginTop: '16px' }} onClick={createWorkflow}>
+                    <button style={{ ...styles.createBtn, marginTop: 'var(--space-4)' }} onClick={createWorkflow}>
                       {Icons.plus} <span>New Shortcut</span>
                     </button>
                   )}
@@ -983,7 +983,7 @@ export const Workflows: React.FC = () => {
             {/* Templates Dropdown */}
             {showTemplates && (
               <div style={styles.templatesPanel}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 12 }}>Templates</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 'var(--space-3)' }}>Templates</div>
                 {WORKFLOW_TEMPLATES.map((tmpl, i) => (
                   <button
                     key={i}
@@ -1007,7 +1007,7 @@ export const Workflows: React.FC = () => {
                     <div style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: 'var(--color-bg-hover, rgba(255,255,255,0.03))', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))', transform: 'rotate(45deg)' }}>
                       <span style={{ transform: 'rotate(-45deg)', color: 'var(--color-accent)' }}><DexIcon name="zap" size={24} /></span>
                     </div>
-                    <span style={{ fontSize: 16, fontWeight: 600, marginTop: 16 }}>Add actions to build your workflow</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, marginTop: 'var(--space-4)' }}>Add actions to build your workflow</span>
                     <span style={{ color: 'var(--color-text-muted)', fontSize: 13, marginTop: 4 }}>Click actions from the panel or use a template to start</span>
                   </div>
                 ) : (
@@ -1085,7 +1085,7 @@ export const Workflows: React.FC = () => {
                 {selectedNode ? (
                   /* Node Configuration */
                   <div style={styles.configPanel}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Configure</div>
                       <button
                         style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: 4 }}
@@ -1096,9 +1096,9 @@ export const Workflows: React.FC = () => {
                       </button>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4 }}>{selectedNode.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 16 }}>{selectedNode.category}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-4)' }}>{selectedNode.category}</div>
                     {ACTION_BLOCKS.find(a => a.id === selectedNode.actionId)?.configFields?.map(field => (
-                      <div key={field.key} style={{ marginBottom: 12 }}>
+                      <div key={field.key} style={{ marginBottom: 'var(--space-3)' }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>{field.label}</label>
                         {field.type === 'select' ? (
                           <select
@@ -1124,8 +1124,8 @@ export const Workflows: React.FC = () => {
                     )}
 
                     {/* Connections info */}
-                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--color-bg-hover)' }}>
-                      <div className="dex-label-caps" style={{ marginBottom: 8 }}>CONNECTIONS</div>
+                    <div style={{ marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-bg-hover)' }}>
+                      <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>CONNECTIONS</div>
                       {connections.filter(c => c.from === selectedNode.id || c.to === selectedNode.id).map((c, i) => {
                         const otherNode = nodes.find(n => n.id === (c.from === selectedNode.id ? c.to : c.from));
                         return (
@@ -1152,7 +1152,7 @@ export const Workflows: React.FC = () => {
                     <div style={styles.libraryHeader}>
                       <span style={styles.libraryTitle}>Actions</span>
                     </div>
-                    <div style={{ padding: '8px 8px 0' }}>
+                    <div style={{ padding: 'var(--space-2) var(--space-2) 0' }}>
                       <div style={styles.actionSearchBox}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                           <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -1209,26 +1209,26 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   sidebarTitle: { fontSize: '12px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' },
-  sidebarContent: { flex: 1, overflow: 'auto', padding: '8px' },
+  sidebarContent: { flex: 1, overflow: 'auto', padding: 'var(--space-2)' },
   sidebarItem: {
-    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '4px',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) 10px', borderRadius: '4px',
     border: 'none', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left',
     background: 'transparent', color: 'var(--color-text-primary)',
   },
   sidebarCount: { marginLeft: 'auto', fontSize: '12px', color: 'var(--color-text-muted)' },
   sectionLabel: {
     fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)',
-    textTransform: 'uppercase', padding: '16px 12px 8px', letterSpacing: '0.5px',
+    textTransform: 'uppercase', padding: 'var(--space-4) var(--space-3) var(--space-2)', letterSpacing: '0.5px',
   },
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '12px 20px', borderBottom: '1px solid var(--color-border)',
-    gap: 12, minWidth: 0,
+    padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border)',
+    gap: 'var(--space-3)', minWidth: 0,
   },
   headerLeft: { minWidth: 0 },
   headerRight: {
-    display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px',
+    display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 'var(--space-2)',
     minWidth: 0, maxWidth: '100%', overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
   title: { fontSize: '18px', fontWeight: 600, letterSpacing: '-0.01em', marginBottom: '2px' },
@@ -1243,18 +1243,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px', outline: 'none', width: '150px', minWidth: 0,
   },
   createBtn: {
-    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '6px',
+    display: 'flex', alignItems: 'center', gap: '6px', padding: 'var(--space-2) var(--space-4)', borderRadius: '6px',
     border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-inverse)',
     fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
   },
   workflowGrid: {
-    flex: 1, overflow: 'auto', padding: '24px',
+    flex: 1, overflow: 'auto', padding: 'var(--space-6)',
     display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '16px', alignContent: 'start',
+    gap: 'var(--space-4)', alignContent: 'start',
   },
   workflowCard: {
-    background: 'var(--color-bg-elevated)', borderRadius: '6px', padding: '20px',
-    display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0,
+    background: 'var(--color-bg-elevated)', borderRadius: '6px', padding: 'var(--space-5)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0,
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardIcon: {
@@ -1271,7 +1271,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardDescription: { fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.4, overflowWrap: 'anywhere' },
   cardFooter: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)',
+    marginTop: 'auto', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-border-subtle)',
   },
   cardMeta: { fontSize: '12px', color: 'var(--color-text-muted)' },
   runBtn: {
@@ -1283,12 +1283,12 @@ const styles: Record<string, React.CSSProperties> = {
   // Editor
   editor: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' as const, minWidth: 0 },
   editorHeader: {
-    display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px var(--space-4)',
     borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)',
     minWidth: 0, overflowX: 'auto', overflowY: 'visible', scrollbarWidth: 'thin',
   },
   backBtn: {
-    padding: '6px 12px', borderRadius: '4px', border: 'none',
+    padding: '6px var(--space-3)', borderRadius: '4px', border: 'none',
     background: 'var(--color-bg-hover)', color: 'var(--color-accent)',
     cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 4,
     whiteSpace: 'nowrap', flexShrink: 0,
@@ -1298,7 +1298,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px', fontWeight: 600, outline: 'none', minWidth: 140,
   },
   editorActions: {
-    display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0,
   },
   runEditorBtn: {
     padding: '6px 14px', borderRadius: '6px', border: 'none',
@@ -1316,11 +1316,11 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute' as const, top: 52, right: 16, zIndex: 'var(--z-modal)',
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)', borderRadius: 10,
-    padding: 16, width: 'min(280px, calc(100% - 32px))', maxHeight: 'min(420px, calc(100% - 68px))',
+    padding: 'var(--space-4)', width: 'min(280px, calc(100% - 32px))', maxHeight: 'min(420px, calc(100% - 68px))',
     overflow: 'auto', boxShadow: 'var(--pg-shadow-panel)', boxSizing: 'border-box' as const,
   },
   templateCard: {
-    display: 'block', width: '100%', textAlign: 'left' as const, padding: '10px 12px',
+    display: 'block', width: '100%', textAlign: 'left' as const, padding: '10px var(--space-3)',
     borderRadius: 6, border: 'none', background: 'var(--color-border-subtle)',
     cursor: 'pointer', marginBottom: 6,
   },
@@ -1341,19 +1341,19 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', background: 'var(--color-bg-secondary)',
     minWidth: 220, maxWidth: '42%', flexShrink: 0,
   },
-  configPanel: { padding: 16, overflowY: 'auto' as const, flex: 1 },
+  configPanel: { padding: 'var(--space-4)', overflowY: 'auto' as const, flex: 1 },
   configInput: {
-    width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--color-border)',
+    width: '100%', padding: 'var(--space-2) 10px', borderRadius: 6, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
     boxSizing: 'border-box' as const,
   },
   configSelect: {
-    width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--color-border)',
+    width: '100%', padding: 'var(--space-2) 10px', borderRadius: 6, border: '1px solid var(--color-border)',
     background: 'var(--color-border-subtle)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer',
     boxSizing: 'border-box' as const,
   },
   actionLibrary: { display: 'flex', flexDirection: 'column', flex: 1 },
-  libraryHeader: { padding: '14px 16px', borderBottom: '1px solid var(--color-border)' },
+  libraryHeader: { padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border)' },
   libraryTitle: { fontSize: '14px', fontWeight: 600 },
   actionSearchBox: {
     display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
@@ -1364,9 +1364,9 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1, background: 'transparent', border: 'none', color: 'var(--color-text-primary)',
     fontSize: 12, outline: 'none',
   },
-  actionList: { flex: 1, overflow: 'auto', padding: '8px' },
+  actionList: { flex: 1, overflow: 'auto', padding: 'var(--space-2)' },
   actionItem: {
-    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px var(--space-3)',
     borderRadius: '6px', cursor: 'pointer', marginBottom: '4px',
     background: 'var(--color-bg-elevated)', border: 'none', width: '100%',
     textAlign: 'left' as const, color: 'var(--color-text-primary)', minWidth: 0,

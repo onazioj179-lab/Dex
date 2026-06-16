@@ -504,7 +504,7 @@ html[data-perf-tier="low"] .ambient-glow, html[data-perf-tier="low"] [class*="gr
   display: none !important;
 }
 html[data-perf-tier="low"] ::-webkit-scrollbar { width: 4px; background: transparent; }
-html[data-perf-tier="low"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+html[data-perf-tier="low"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: var(--radius-xs); }
 /* Low: keep text crisp */
 html[data-perf-tier="low"] { -webkit-font-smoothing: antialiased !important; -moz-osx-font-smoothing: grayscale !important; text-rendering: optimizeLegibility !important; }
 /* Low: flat borders instead of shadows */
@@ -776,20 +776,21 @@ button, a, input, select, textarea,
 
 /* -- App open/close: scale + fade for a native-OS feel -------------------- */
 @keyframes dex-app-open {
-  0%   { opacity: 0; transform: scale(0.94) translateY(8px); }
-  60%  { opacity: 1; transform: scale(1.01) translateY(-1px); }
+  /* Gentle macOS-style decelerate -- no overshoot. The old 60% keyframe scaled
+     to 1.01 then settled back, which read as a cheap "boing" on every launch. */
+  0%   { opacity: 0; transform: scale(0.96) translateY(6px); }
   100% { opacity: 1; transform: scale(1)    translateY(0); }
 }
 @keyframes dex-app-close {
   0%   { opacity: 1; transform: scale(1)    translateY(0); }
-  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
+  100% { opacity: 0; transform: scale(0.96) translateY(4px); }
 }
 .dex-app-opening {
-  animation: dex-app-open 0.32s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation: dex-app-open 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   will-change: transform, opacity;
 }
 .dex-app-closing {
-  animation: dex-app-close 0.18s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  animation: dex-app-close 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   will-change: transform, opacity;
   pointer-events: none;
 }
@@ -1092,7 +1093,7 @@ html[data-dex-idle-state="extended-idle"] [data-app-state="background"] {
   width: 3px;
   height: 0;
   background: var(--color-accent);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   transform: translateY(-50%);
   transition: height 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -2662,14 +2663,14 @@ textarea,
 .transfer-progress {
   height: 4px;
   background: var(--bg-inset);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
   background: var(--accent);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   transition: width 0.3s ease;
 }
 
@@ -2843,7 +2844,7 @@ textarea,
 .learning-progress {
   height: 4px;
   background: var(--bg-inset);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
@@ -3500,6 +3501,63 @@ textarea,
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEX RESPONSIVE SHELL (v6.0) — flexible on narrow, vertical, small, and short
+   viewports. The live shell (topbar + dock) is inline-styled with no class
+   names, so the legacy `.top-bar-*`/`.nav-items` breakpoints above never match
+   it. These rules instead target stable role/aria/data hooks the shell actually
+   exposes, and use !important only where an inline value must be overridden to
+   adapt. App frames (.dex-app-container) already fill [role="main"] via inset:0,
+   so every app stays merged inside the DEX frame at any size.
+   Hooks: [data-tauri-drag-region] = top bar · [aria-label="Application dock"] =
+   dock · [role="main"] = content · .dex-app-container = app frame.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The dock is a horizontal pill with overflow:visible — its items must never
+   squish; on tight widths it scrolls within the viewport cap instead. */
+[aria-label="Application dock"] > * { flex-shrink: 0; }
+
+/* Narrow / small screens: cap the dock to the viewport and scroll within it so
+   every app stays reachable; tighten chrome padding. */
+@media (max-width: 720px) {
+  [aria-label="Application dock"] {
+    max-width: calc(100vw - 12px) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 5px !important;
+    padding: 6px 10px !important;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  [aria-label="Application dock"]::-webkit-scrollbar { height: 0; display: none; }
+  [data-tauri-drag-region] { padding-left: 8px !important; padding-right: 8px !important; }
+}
+
+/* Very narrow (phone-width / split view): shrink the dock footprint further. */
+@media (max-width: 460px) {
+  [aria-label="Application dock"] {
+    gap: 3px !important;
+    padding: 5px 8px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* Short viewports (landscape phones, stacked split-screens): trim chrome height
+   so app content keeps the room. */
+@media (max-height: 560px) {
+  [data-tauri-drag-region] { height: 30px !important; }
+  [aria-label="Application dock"] {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+}
+
+/* Tall / vertical (portrait) screens: content already flex-fills the height;
+   make sure app frames can scroll their own content rather than clipping. */
+@media (orientation: portrait) {
+  [role="main"] .dex-app-container { min-height: 0; }
+}
+
 /* ── Fractional DPI & High-Density Screens ────────────────────────────────── */
 
 @media (-webkit-min-device-pixel-ratio: 1.25),
@@ -4012,7 +4070,7 @@ progress::-webkit-progress-value,
 mark {
   background: rgba(10, 132, 255, 0.25);
   color: inherit;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   padding: 0 2px;
 }
 
@@ -5071,7 +5129,7 @@ html.focus-mode,
   z-index: 100000;
   text-decoration: none;
   font-weight: 600;
-  border-radius: 0 0 6px 0;
+  border-radius: 0 0 var(--radius-lg) 0;
 }
 
 .dex-skip-link:focus {
@@ -5368,7 +5426,7 @@ html[style*="font-size: 120"] * {
   width: 10px;
   height: 10px;
   background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.15) 50%);
-  border-radius: 0 0 3px 0;
+  border-radius: 0 0 var(--radius-sm) 0;
 }
 
 .dex-resize-handle[data-corner="sw"],
@@ -5591,6 +5649,12 @@ html[style*="font-size: 120"] * {
 .dex-scroll-fade.scrolled-right::after,
 [data-scroll-fade][data-scrolled-right]::after {
   opacity: 1;
+}
+
+/* Vertical soft-edge fade for scrolling lists (matches Home.tsx gradient) */
+.dex-scroll-fade-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 18px), transparent 100%);
 }
 
 /* =============================================================================

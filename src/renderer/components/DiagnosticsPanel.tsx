@@ -14,6 +14,12 @@
  *   - Recent logs (LogsPanel embed)
  *
  * W6#307-310: observability overlay
+ *
+ * NOTE: Deliberately NOT routed through the shell ModalHost / ui/Modal. This is
+ * a corner-anchored (bottom-right), backdrop-less panel meant to coexist with
+ * the live app (MiniPulse toggles it), not a centered, screen-dimming dialog.
+ * Forcing it onto the modal surface would change its placement and block the
+ * shell underneath -- a regression. It is a separate overlay surface by design.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -94,7 +100,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '10px var(--space-4)', borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
         <span style={{ color: 'var(--pg-text-primary, #e2e8f0)', fontWeight: 600, fontSize: 13, letterSpacing: '0.02em' }}>
           System Diagnostics
@@ -114,11 +120,11 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         )}
       </div>
 
-      <div style={{ overflowY: 'auto', flex: 1, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ overflowY: 'auto', flex: 1, padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {/* Memory row */}
         <section aria-label="Memory">
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Memory</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             <Stat label="Heap used" value={heap ? formatMB(heap.value) : '--'} />
             <Stat label="Heartbeats" value={heartbeat ? String(heartbeat.value) : '--'} />
             <Stat label="Freezes" value={freezes ? String(freezes.value) : '0'} warn={(freezes?.value ?? 0) > 0} />
@@ -129,7 +135,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         {renderBudgets.length > 0 && (
           <section aria-label="Render budgets">
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Render Budgets</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
               {renderBudgets.map(s => (
                 <Stat key={s.name} label={s.name.replace('renderer.render.', '')} value={`${s.value.toFixed(1)} ms`} warn={s.value > 16.67} />
               ))}
@@ -149,7 +155,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
                   display: 'flex', justifyContent: 'space-between',
                   fontSize: 11, fontVariantNumeric: 'tabular-nums',
                   color: p.durationMs > 500 ? 'var(--status-error, #ef4444)' : 'var(--pg-text-secondary, #9ca3af)',
-                  padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 3,
+                  padding: '2px var(--space-2)', background: 'rgba(255,255,255,0.03)', borderRadius: 3,
                 }}>
                   <span style={{ fontFamily: 'ui-monospace, monospace' }}>{p.name}</span>
                   <span style={{ fontWeight: 600 }}>{p.durationMs} ms</span>
@@ -174,7 +180,7 @@ const Stat: React.FC<StatProps> = ({ label, value, warn }) => (
   <div style={{
     background: 'rgba(255,255,255,0.04)',
     borderRadius: 4,
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     border: `1px solid ${warn ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.06)'}`,
   }}>
     <div style={{ fontSize: 10, color: 'var(--pg-text-tertiary)', marginBottom: 2 }}>{label}</div>

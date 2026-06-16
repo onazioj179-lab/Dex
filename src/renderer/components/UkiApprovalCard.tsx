@@ -37,8 +37,8 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
       role="dialog"
       aria-label="Approve plan"
       style={{
-        margin: '8px 0',
-        padding: 12,
+        margin: 'var(--space-2) 0',
+        padding: 'var(--space-3)',
         borderRadius: 8,
         background: 'rgba(248, 81, 73, 0.08)',
         border: `1px solid ${riskColor[plan.risk] || '#666'}`,
@@ -46,7 +46,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
         fontSize: 13,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
         <span
           aria-label={`Risk: ${plan.risk}`}
           style={{
@@ -57,7 +57,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
         <strong>Approve {plan.steps.length}-step plan</strong>
         <span style={{ marginLeft: 'auto', opacity: 0.6, fontSize: 11 }}>{plan.risk}</span>
       </div>
-      <div style={{ opacity: 0.85, marginBottom: 8, fontStyle: 'italic' }}>
+      <div style={{ opacity: 0.85, marginBottom: 'var(--space-2)', fontStyle: 'italic' }}>
         &ldquo;{plan.utterance}&rdquo;
       </div>
       <ol style={{ margin: '0 0 10px 18px', padding: 0 }}>
@@ -69,12 +69,12 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           </li>
         ))}
       </ol>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
         <button
           type="button"
           onClick={onDeny}
           style={{
-            padding: '4px 12px', borderRadius: 4,
+            padding: '4px var(--space-3)', borderRadius: 4,
             border: '1px solid rgba(127,127,127,0.4)',
             background: 'transparent', color: 'inherit', cursor: 'pointer',
           }}
@@ -85,7 +85,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           type="button"
           onClick={onApprove}
           style={{
-            padding: '4px 12px', borderRadius: 4,
+            padding: '4px var(--space-3)', borderRadius: 4,
             border: 'none', background: '#238636', color: '#fff', cursor: 'pointer',
             fontWeight: 600,
           }}

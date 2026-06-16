@@ -4,9 +4,9 @@
 // =============================================================================
 //! Executes a workflow/automation definition: an ordered list of steps run over
 //! a string-keyed context, with `${var}` interpolation. Pure logic (no IO), so
-//! it is fully unit-testable. Step types: setVar, transform, concat, condition
-//! (a gate that stops the run when unmet), and log. Unknown step types are
-//! skipped gracefully so newer renderer node types never hard-fail.
+//! it is fully unit-testable. Step types: setVar, transform, concat, math,
+//! condition (a gate that stops the run when unmet), and log. Unknown step types
+//! are skipped gracefully so newer renderer node types never hard-fail.
 
 use serde_json::{json, Map, Value};
 
@@ -52,6 +52,10 @@ fn eval_condition(ctx: &Map<String, Value>, step: &Value) -> bool {
         "exists" => ctx.contains_key(var),
         "gt" => num(&actual) > num(&expected),
         "lt" => num(&actual) < num(&expected),
+        "gte" => num(&actual) >= num(&expected),
+        "lte" => num(&actual) <= num(&expected),
+        "startsWith" => value_to_string(&actual).starts_with(&value_to_string(&expected)),
+        "endsWith" => value_to_string(&actual).ends_with(&value_to_string(&expected)),
         _ => true,
     }
 }
@@ -101,6 +105,7 @@ pub fn run(definition: &Value, inputs: &Value) -> Value {
                         "trim" => cur.trim().to_string(),
                         "reverse" => cur.chars().rev().collect(),
                         "replace" => cur.replace(&s("from"), &s("to")),
+                        "length" => cur.chars().count().to_string(),
                         _ => cur,
                     };
                     ctx.insert(var, Value::String(out));
@@ -112,6 +117,25 @@ pub fn run(definition: &Value, inputs: &Value) -> Value {
                     let parts = step.get("parts").and_then(|p| p.as_array()).cloned().unwrap_or_default();
                     let joined: String = parts.iter().map(|p| resolve(&value_to_string(p), &ctx)).collect();
                     ctx.insert(into, Value::String(joined));
+                }
+            }
+            "math" => {
+                let var = s("var");
+                if !var.is_empty() {
+                    let cur = ctx.get(&var).map(num).unwrap_or(0.0);
+                    let operand = match step.get("value") {
+                        Some(Value::String(t)) => resolve(t, &ctx).trim().parse::<f64>().unwrap_or(0.0),
+                        Some(v) => num(v),
+                        None => 0.0,
+                    };
+                    let result = match s("op").as_str() {
+                        "add" => cur + operand,
+                        "sub" => cur - operand,
+                        "mul" => cur * operand,
+                        "div" => if operand != 0.0 { cur / operand } else { cur },
+                        _ => cur,
+                    };
+                    ctx.insert(var, json!(result));
                 }
             }
             "condition" => {
@@ -183,5 +207,54 @@ mod tests {
         let out = run(&json!({}), &json!({}));
         assert_eq!(out["success"], json!(false));
         assert_eq!(out["stepsRun"], json!(0));
+    }
+
+    #[test]
+    fn math_step_and_gte_condition() {
+        let def = json!({ "steps": [
+            { "type": "setVar", "name": "n", "value": "10" },
+            { "type": "math", "var": "n", "op": "add", "value": 5 },
+            { "type": "math", "var": "n", "op": "mul", "value": 2 },
+            { "type": "condition", "var": "n", "op": "gte", "value": 30 },
+            { "type": "setVar", "name": "ok", "value": "yes" }
+        ]});
+        let out = run(&def, &json!({}));
+        assert_eq!(out["context"]["n"], json!(30.0));
+        assert_eq!(out["context"]["ok"], json!("yes"));
+        assert_eq!(out["success"], json!(true));
+    }
+
+    #[test]
+    fn math_div_by_zero_is_safe() {
+        let def = json!({ "steps": [
+            { "type": "setVar", "name": "x", "value": "8" },
+            { "type": "math", "var": "x", "op": "div", "value": 0 }
+        ]});
+        let out = run(&def, &json!({}));
+        assert_eq!(out["context"]["x"], json!(8.0)); // unchanged, not NaN/Inf
+    }
+
+    #[test]
+    fn length_transform_and_prefix_condition() {
+        let def = json!({ "steps": [
+            { "type": "setVar", "name": "s", "value": "hello" },
+            { "type": "condition", "var": "s", "op": "startsWith", "value": "he" },
+            { "type": "transform", "var": "s", "op": "length" }
+        ]});
+        let out = run(&def, &json!({}));
+        assert_eq!(out["context"]["s"], json!("5"));
+        assert_eq!(out["success"], json!(true));
+    }
+
+    #[test]
+    fn lte_condition_stops_when_unmet() {
+        let def = json!({ "steps": [
+            { "type": "setVar", "name": "x", "value": "100" },
+            { "type": "condition", "var": "x", "op": "lte", "value": 50 },
+            { "type": "setVar", "name": "reached", "value": "yes" }
+        ]});
+        let out = run(&def, &json!({}));
+        assert_eq!(out["success"], json!(false));
+        assert!(out["context"].get("reached").is_none());
     }
 }

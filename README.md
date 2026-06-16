@@ -1,6 +1,6 @@
 # DEX — your calm, all-in-one desktop
 
-> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 5.1.0 · Copyright (c) 2026 · DEX Software License Agreement v1.0
+> Created by Onazi Treasure OJ &lt;onazi75@gmail.com&gt; · Version 5.5.0 · Copyright (c) 2026 · DEX Software License Agreement v1.0
 
 **DEX is one app that replaces a dozen — and it's 100% free.** Notes, tasks,
 files, a browser, a calendar, drawing, photo and video editing, music, a
@@ -66,7 +66,7 @@ unlock features.
 
 ## Download DEX
 
-**Latest release: v5.1.0** ·
+**Latest release: v5.5.0** ·
 [All downloads & notes →](https://github.com/onazioj179-lab/Dex/releases/latest)
 
 | Platform | Download |
@@ -84,21 +84,27 @@ unlock features.
 
 ---
 
-## What's new in 5.1
+## What's new in 5.5
 
-- **DEX is now 100% free.** Every feature on every tier is unlocked for everyone
-  — no trial, no quotas, no payment.
-- **Compact mode.** Press `Ctrl+Shift+M` to shrink DEX to a small always-on-top
-  pill in the corner and keep working beside it. Your apps stay running, and
-  expanding returns you exactly where you were.
-- **Workspace recovery.** If a session ends unexpectedly, DEX offers to restore
-  your workspace in one click. Crashed apps recover on their own, and the window
-  remembers its size and position across launches.
-- **A sharper, more alive system.** Crisper corners everywhere, a reimagined
-  Nexus, better note-taking (wiki-links and an outline), a high-contrast theme,
-  and controls that respond to every press.
-- **Instant updates.** New versions download quietly in the background and
-  install on quit, so you're always current.
+5.5 is a refinement release — nothing new to learn, everything more finished:
+faster, calmer, and more consistent end to end.
+
+- **One search for everything.** A single palette fans across notes, files,
+  tasks, projects, workflows, commands, screenshots, and conversations, ranked by
+  relevance, recency, and what you're working on right now.
+- **Calmer notifications.** Every alert now flows through one center — grouped by
+  source, prioritized by importance, and persistent, instead of scattered popups.
+- **Search-first Settings.** Type what you want to change and jump straight to the
+  control. New AI and Developer sections surface the right toggles.
+- **A real Home.** A dashboard of your recent projects and notes, current tasks,
+  active workflows, a rewind summary, and pinned apps — with honest empty states.
+- **Deeper, smoother creative apps.** Across the suite (Prism, Flux, Imosion,
+  Axl, Vinx, the whiteboard) — zoom-to-cursor, snappier timelines, fixed leaks,
+  and editing that stays out of your way.
+- **Lighter under the hood.** Duplicate internal systems (caches, motion, file
+  watching) were consolidated, so DEX does the same work with less overhead.
+- **Still free for everyone, now stated plainly.** See "Your data, in plain
+  words" below.
 
 See the full history in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
@@ -127,20 +133,28 @@ first for anything that changes your data.
 
 ---
 
-## Your privacy, in plain words
+## Your data, in plain words
 
-- Your work lives **on your computer**. Notes, files, and your screen are not
-  uploaded anywhere by default.
-- The assistant runs **on your machine**. No required cloud account.
-- **Cloud sync is optional** — you choose what syncs, if anything.
-- **Analytics is off by default.** Turn it on and it's anonymous; turn it off any
-  time.
-- **Permissions ask first.** Microphone, camera, screen capture, files, and the
-  clipboard each prompt the first time, then remember your answer.
-- **You control your data with clear, opt-in settings.** DEX is free, with no
-  required account and no feature held back.
+DEX is free for everyone. To keep it improving, DEX uses **limited, privacy-
+protective usage data** — and never your private files or secrets. No ads, no
+selling your data, no paywalled features.
 
-Details: [PRIVACY.md](PRIVACY.md) · [TERMS.md](TERMS.md) · in-app
+- **Your work stays on your computer.** Notes, files, and your screen live on
+  your device; they are not uploaded by default.
+- **DEX collects limited diagnostics and usage signals** — crashes, performance,
+  and which features get used — to fix problems and make the system better. This
+  is how a free product keeps getting better, and it's the trade for "free for
+  all."
+- **Your private content is never collected.** Passwords, vault items, file
+  contents, the clipboard, and full screenshots are off-limits by default, and
+  DEX warns you before anything sensitive could be captured.
+- **The assistant runs on your machine.** No required cloud account. Cloud sync is
+  optional — you choose what syncs, if anything.
+- **You stay in control.** Turn product analytics on or off, disable cloud sync,
+  and export or delete your local data any time. Permissions (microphone, camera,
+  screen, files, clipboard) ask first, then remember your answer.
+
+Full details: [PRIVACY.md](PRIVACY.md) · [TERMS.md](TERMS.md) · in-app
 **Settings → Privacy & Security**.
 
 ---

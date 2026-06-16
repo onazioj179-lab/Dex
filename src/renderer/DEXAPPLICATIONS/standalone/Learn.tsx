@@ -120,31 +120,31 @@ const ROOT: React.CSSProperties = {
   overflow: 'hidden',
 };
 const HEADER: React.CSSProperties = {
-  padding: '20px 24px 14px', flexShrink: 0,
+  padding: 'var(--space-5) var(--space-6) 14px', flexShrink: 0,
   background: 'var(--color-bg-surface-solid, #1C1C1E)',
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 const CONTENT: React.CSSProperties = {
-  flex: 1, overflowY: 'auto', padding: '16px 24px 28px',
+  flex: 1, overflowY: 'auto', padding: 'var(--space-4) var(--space-6) 28px',
   display: 'flex', flexDirection: 'column', gap: 18,
 };
 const CARD: React.CSSProperties = {
   background: 'var(--color-bg-elevated, rgba(255,255,255,.04))',
-  borderRadius: 10, padding: '16px 18px',
+  borderRadius: 10, padding: 'var(--space-4) 18px',
   border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
 };
 // Subtle row dividers shared across cards.
 const ROW_DIVIDER = '1px solid var(--color-border-subtle, rgba(255,255,255,.04))';
 const CARD_TITLE: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, textTransform: 'uppercase' as const,
-  letterSpacing: '0.04em', opacity: 0.5, marginBottom: 12,
+  letterSpacing: '0.04em', opacity: 0.5, marginBottom: 'var(--space-3)',
 };
 const STAT_ROW: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '6px 0', fontSize: 13,
 };
 const BAR_BG: React.CSSProperties = {
-  flex: 1, height: 4, borderRadius: 2, marginLeft: 12,
+  flex: 1, height: 4, borderRadius: 2, marginLeft: 'var(--space-3)',
   background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden',
 };
 const TAB_STYLE = (active: boolean): React.CSSProperties => ({
@@ -389,11 +389,11 @@ const Learn: React.FC = () => {
                 <div style={CARD_TITLE}>Suggestions</div>
                 {suggestions.slice(0, 5).map((s, i) => (
                   <div key={i} style={{
-                    padding: '8px 0', borderBottom: i < suggestions.length - 1 ? ROW_DIVIDER : 'none',
+                    padding: 'var(--space-2) 0', borderBottom: i < suggestions.length - 1 ? ROW_DIVIDER : 'none',
                     display: 'flex', alignItems: 'center', gap: 10,
                   }}>
                     <div style={{
-                      width: 28, height: 28, borderRadius: 5,
+                      width: 28, height: 28, borderRadius: 4,
                       background: 'rgba(94,92,230,.15)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     }}>
@@ -411,8 +411,8 @@ const Learn: React.FC = () => {
 
             {/* Empty state when no data yet */}
             {rankedPages.length === 0 && rankedActions.length === 0 && (
-              <div style={{ ...CARD, textAlign: 'center' as const, padding: '28px 20px' }}>
-                <div style={{ opacity: 0.25, marginBottom: 8 }}>
+              <div style={{ ...CARD, textAlign: 'center' as const, padding: '28px var(--space-5)' }}>
+                <div style={{ opacity: 0.25, marginBottom: 'var(--space-2)' }}>
                   <DexIcon name="activity" size={32} color="currentColor" />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Start exploring DEX</div>
@@ -444,7 +444,7 @@ const Learn: React.FC = () => {
                             <React.Fragment key={ki}>
                               {ki > 0 && <span style={{ fontSize: 10, opacity: 0.3, lineHeight: '22px' }}>+</span>}
                               <span style={{
-                                padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                                padding: '2px var(--space-2)', fontSize: 11, fontWeight: 600,
                                 background: 'var(--color-bg-hover, rgba(255,255,255,.08))', borderRadius: 4,
                                 border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
                                 fontFamily: 'var(--font-mono, monospace)',
@@ -454,7 +454,7 @@ const Learn: React.FC = () => {
                           ))
                         ) : (
                           <span style={{
-                            padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                            padding: '2px var(--space-2)', fontSize: 11, fontWeight: 600,
                             background: 'var(--color-bg-hover, rgba(255,255,255,.08))', borderRadius: 4,
                             border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
                             fontFamily: 'var(--font-mono, monospace)',
@@ -475,7 +475,7 @@ const Learn: React.FC = () => {
             {/* App tips cards */}
             {APP_TIPS_DATA.map(app => (
               <div key={app.app} style={CARD}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                   <div style={{
                     width: 24, height: 24, borderRadius: 4,
                     background: `${app.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -487,7 +487,7 @@ const Learn: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {app.tips.map((tip, i) => (
                     <div key={i} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 8,
+                      display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
                       padding: '5px 0',
                       borderBottom: i < app.tips.length - 1 ? ROW_DIVIDER : 'none',
                     }}>
@@ -620,7 +620,7 @@ const Learn: React.FC = () => {
                     padding: '10px 0',
                     borderBottom: i < suggestions.length - 1 ? ROW_DIVIDER : 'none',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</span>
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(94,92,230,.15)', color: '#7d7aff' }}>{s.type}</span>
                       <span style={{ fontSize: 10, opacity: 0.4, marginLeft: 'auto' }}>{Math.round(s.confidence * 100)}%</span>
@@ -633,24 +633,19 @@ const Learn: React.FC = () => {
 
             {/* Empty insights state */}
             {suggestions.length === 0 && Object.keys(hourlyPatterns).length === 0 && Object.keys(dayPatterns).length === 0 && (
-              <div style={{ ...CARD, textAlign: 'center' as const, padding: 32, opacity: 0.5 }}>
+              <div style={{ ...CARD, textAlign: 'center' as const, padding: 'var(--space-8)', opacity: 0.5 }}>
                 <DexIcon name="brain" size={24} color="currentColor" />
-                <p style={{ marginTop: 8, fontSize: 13 }}>
-                  Keep using DEX to build insights. The pattern engine learns over time.
-                </p>
+                <p style={{ marginTop: 'var(--space-2)', fontSize: 13 }}>No insights yet</p>
               </div>
             )}
 
             {/* Data Management */}
             <div style={CARD}>
               <div style={CARD_TITLE}>Data Management</div>
-              <p style={{ fontSize: 12, opacity: 0.45, marginBottom: 12 }}>
-                All learning data is stored locally on this device. Nothing leaves your machine.
-              </p>
               <button
                 onClick={handleReset}
                 style={{
-                  padding: '8px 16px', fontSize: 12, fontWeight: 500, borderRadius: 6,
+                  padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 500, borderRadius: 6,
                   border: '1px solid var(--color-error-muted, rgba(255,69,58,.3))', background: 'var(--color-error-muted, rgba(255,69,58,.08))',
                   color: 'var(--color-error)', cursor: 'pointer',
                 }}
@@ -711,7 +706,7 @@ const Learn: React.FC = () => {
                     key={profile.id}
                     onClick={() => changePowerProfile(profile.id)}
                     style={{
-                      padding: '14px 16px',
+                      padding: '14px var(--space-4)',
                       borderRadius: 8,
                       border: powerProfile === profile.id ? `2px solid ${profile.color}` : '2px solid transparent',
                       background: powerProfile === profile.id ? `${profile.color}15` : 'var(--color-bg-hover, rgba(255,255,255,.03))',
@@ -728,7 +723,7 @@ const Learn: React.FC = () => {
                     </div>
                     <div style={{ fontSize: 11, opacity: 0.5, lineHeight: 1.4 }}>{profile.description}</div>
                     {powerProfile === profile.id && (
-                      <div style={{ marginTop: 8, display: 'flex', gap: 8, fontSize: 10, opacity: 0.6 }}>
+                      <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-2)', fontSize: 10, opacity: 0.6 }}>
                         <span>CPU: {profile.cpuLimit}%</span>
                         <span>GPU: {profile.gpuLimit}%</span>
                       </div>
@@ -741,7 +736,7 @@ const Learn: React.FC = () => {
             {/* Restriction Controls */}
             <div style={CARD}>
               <div style={CARD_TITLE}>Operation Mode</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>
                     {restrictedMode ? 'Restricted Mode' : 'Unrestricted Mode'}
@@ -755,7 +750,7 @@ const Learn: React.FC = () => {
                 <button
                   onClick={toggleRestrictions}
                   style={{
-                    padding: '8px 16px', fontSize: 12, fontWeight: 600, borderRadius: 6,
+                    padding: 'var(--space-2) var(--space-4)', fontSize: 12, fontWeight: 600, borderRadius: 6,
                     border: 'none', cursor: 'pointer',
                     background: restrictedMode ? 'rgba(255,69,58,.15)' : 'rgba(48,209,88,.15)',
                     color: restrictedMode ? '#FF453A' : '#30D158',
@@ -767,7 +762,7 @@ const Learn: React.FC = () => {
               </div>
               
               {/* Quick actions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
                 {[
                   { label: 'Clear Cache', icon: 'trash', action: 'cache:clear' },
                   { label: 'Optimize', icon: 'zap', action: 'system:optimize' },
@@ -777,7 +772,7 @@ const Learn: React.FC = () => {
                     key={item.label}
                     onClick={() => (window as any).electron?.invoke?.(item.action)}
                     style={{
-                      padding: '10px 12px', borderRadius: 6, border: 'none',
+                      padding: '10px var(--space-3)', borderRadius: 6, border: 'none',
                       background: 'var(--color-bg-hover, rgba(255,255,255,.05))', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       fontSize: 11, color: 'inherit', transition: 'background 0.15s ease',
@@ -788,28 +783,6 @@ const Learn: React.FC = () => {
                     <DexIcon name={item.icon as any} size={14} />
                     {item.label}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Performance Tips */}
-            <div style={CARD}>
-              <div style={CARD_TITLE}>Performance Tips</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { tip: 'Close unused apps to free up memory', condition: memoryUsage > 70 },
-                  { tip: 'Switch to Power Saver mode for longer battery life', condition: !isCharging && batteryLevel < 50 },
-                  { tip: 'Enable Performance mode for demanding creative work', condition: cpuUsage > 60 },
-                  { tip: 'Your system is running optimally', condition: cpuUsage < 40 && memoryUsage < 50 },
-                ].filter(t => t.condition).map((item, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 6,
-                    background: 'rgba(94,92,230,.1)',
-                  }}>
-                    <DexIcon name="info" size={14} color="#5E5CE6" />
-                    <span style={{ fontSize: 12, opacity: 0.8 }}>{item.tip}</span>
-                  </div>
                 ))}
               </div>
             </div>

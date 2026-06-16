@@ -35,8 +35,8 @@ const S: Record<string, React.CSSProperties> = {
   toolbar: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '8px 12px',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) var(--space-3)',
     borderBottom: '1px solid var(--color-bg-hover)',
     flexShrink: 0,
   },
@@ -84,7 +84,7 @@ const S: Record<string, React.CSSProperties> = {
   entriesPane: {
     flex: 1,
     overflowY: 'auto',
-    padding: '8px 12px',
+    padding: 'var(--space-2) var(--space-3)',
   },
   insightsPane: {
     width: 280,
@@ -93,14 +93,14 @@ const S: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   dateHeader: {
-    padding: '12px 0 4px 0',
+    padding: 'var(--space-3) 0 4px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
     marginBottom: 4,
   },
   entryRow: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 'var(--space-2)',
     padding: '5px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
     fontSize: 12,
@@ -138,8 +138,8 @@ const S: Record<string, React.CSSProperties> = {
   loadMoreBtn: {
     display: 'block',
     width: '100%',
-    padding: '8px 0',
-    margin: '8px 0',
+    padding: 'var(--space-2) 0',
+    margin: 'var(--space-2) 0',
     fontSize: 11,
     fontWeight: 500,
     border: '1px solid var(--color-bg-hover)',
@@ -154,19 +154,19 @@ const S: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    padding: 'var(--space-10)',
     color: 'var(--color-text-tertiary)',
     fontSize: 13,
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   appSection: {
-    marginBottom: 8,
+    marginBottom: 'var(--space-2)',
   },
   appHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '8px 0',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) 0',
     cursor: 'pointer',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
@@ -186,7 +186,7 @@ const S: Record<string, React.CSSProperties> = {
     marginLeft: 'auto',
   },
   sessionCard: {
-    padding: '10px 12px',
+    padding: '10px var(--space-3)',
     marginBottom: 6,
     borderRadius: 6,
     border: '1px solid var(--color-bg-hover)',
@@ -200,7 +200,7 @@ const S: Record<string, React.CSSProperties> = {
   sessionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 'var(--space-2)',
     marginBottom: 4,
   },
   sessionId: {
@@ -221,25 +221,25 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border)',
     borderRadius: 8,
-    padding: 16,
+    padding: 'var(--space-4)',
     zIndex: 100,
     boxShadow: 'var(--pg-shadow-popover)',
   },
   manageSectionTitle: {
     fontSize: 11,
     color: 'var(--color-text-secondary)',
-    marginBottom: 8,
-    marginTop: 12,
+    marginBottom: 'var(--space-2)',
+    marginTop: 'var(--space-3)',
   },
   manageRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 'var(--space-2)',
     marginBottom: 6,
   },
   manageDateInput: {
     flex: 1,
-    padding: '4px 8px',
+    padding: '4px var(--space-2)',
     fontSize: 11,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)',
@@ -248,7 +248,7 @@ const S: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   manageActionBtn: {
-    padding: '5px 12px',
+    padding: '5px var(--space-3)',
     fontSize: 11,
     fontWeight: 500,
     border: '1px solid var(--color-border)',
@@ -260,7 +260,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   // Note: For disabled buttons, apply inline: style={{...S.manageActionBtn, opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'pointer'}}
   manageDangerBtn: {
-    padding: '5px 12px',
+    padding: '5px var(--space-3)',
     fontSize: 11,
     fontWeight: 600,
     border: '1px solid var(--color-error-muted, rgba(255,59,48,0.3))',
@@ -271,7 +271,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   manageSelect: {
     flex: 1,
-    padding: '4px 8px',
+    padding: '4px var(--space-2)',
     fontSize: 11,
     background: 'var(--color-border-subtle)',
     border: '1px solid var(--color-border-subtle)',
@@ -286,8 +286,8 @@ const S: Record<string, React.CSSProperties> = {
   },
   statsRow: {
     display: 'flex',
-    gap: 16,
-    padding: '8px 12px',
+    gap: 'var(--space-4)',
+    padding: 'var(--space-2) var(--space-3)',
     borderBottom: '1px solid var(--color-border-subtle)',
     flexShrink: 0,
   },
@@ -494,7 +494,7 @@ const ByAppView: React.FC = () => {
                   <EntryRow key={entry.id} entry={entry} />
                 ))}
                 {entries.length === 0 && loading && (
-                  <div style={{ padding: 8, fontSize: 11, color: 'var(--color-text-tertiary)' }}>Loading...</div>
+                  <div style={{ padding: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-tertiary)' }}>Loading...</div>
                 )}
                 {hasMore && (
                   <button style={S.loadMoreBtn} onClick={loadMore} disabled={loading}>
@@ -562,12 +562,12 @@ const BySessionView: React.FC = () => {
               </div>
             </div>
             {isSelected && (
-              <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
+              <div style={{ paddingLeft: 'var(--space-3)', paddingBottom: 'var(--space-2)' }}>
                 {entries.map(entry => (
                   <EntryRow key={entry.id} entry={entry} />
                 ))}
                 {entries.length === 0 && loading && (
-                  <div style={{ padding: 8, fontSize: 11, color: 'var(--color-text-tertiary)' }}>Loading...</div>
+                  <div style={{ padding: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-tertiary)' }}>Loading...</div>
                 )}
                 {hasMore && (
                   <button style={S.loadMoreBtn} onClick={loadMore} disabled={loading}>
@@ -641,7 +641,7 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   return (
     <div style={S.managePanel} onClick={e => e.stopPropagation()}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>Manage History</span>
         <button
           aria-label="Close history manager"
@@ -653,13 +653,13 @@ const ManageHistoryPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </div>
 
       {stats && (
-        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
           {stats.totalEntries} total entries -- {stats.totalApps} apps -- {stats.totalSessions} sessions
         </div>
       )}
 
       {lastResult && (
-        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 8, padding: '4px 8px', background: 'var(--color-success-muted, rgba(48,209,88,0.08))', borderRadius: 3 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-success)', marginBottom: 'var(--space-2)', padding: '4px var(--space-2)', background: 'var(--color-success-muted, rgba(48,209,88,0.08))', borderRadius: 3 }}>
           {lastResult}
         </div>
       )}

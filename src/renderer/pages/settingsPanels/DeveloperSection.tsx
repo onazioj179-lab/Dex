@@ -71,7 +71,7 @@ const DeveloperSection: React.FC<DeveloperSectionProps> = ({ onNavigate, styles 
   return (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Developer</h3>
-      <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
         Everything for building on DEX in one place. These open the existing
         sections that own each capability.
       </p>

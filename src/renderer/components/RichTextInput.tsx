@@ -388,7 +388,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
         spellCheck={spellCheck}
         style={{
           width: '100%',
-          padding: '10px 12px',
+          padding: '10px var(--space-3)',
           background: colors.bg.inset,
           border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius.md,
@@ -428,7 +428,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
                 selectSuggestion(suggestion);
               }}
               style={{
-                padding: '8px 12px',
+                padding: 'var(--space-2) var(--space-3)',
                 cursor: 'pointer',
                 background: i === suggestionIndex ? colors.bg.hover : 'transparent',
                 color: colors.text.primary,
@@ -446,7 +446,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
         <div
           style={{
             display: 'flex',
-            gap: 12,
+            gap: 'var(--space-3)',
             marginTop: 6,
             fontSize: 11,
             color: colors.text.tertiary,

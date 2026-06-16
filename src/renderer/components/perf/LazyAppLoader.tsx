@@ -67,10 +67,10 @@ export function LazyAppLoadFailure({ appId, error }: { appId: string; error?: un
     <div
       data-testid={`lazy-app-load-failure-${appId}`}
       role="alert"
-      style={{ padding: 24, color: 'var(--color-text-secondary, #B8B8BD)' }}
+      style={{ padding: 'var(--space-6)', color: 'var(--color-text-secondary, #B8B8BD)' }}
     >
       <strong>Could not load {appId}.</strong>
-      <div style={{ marginTop: 8, fontSize: 12 }}>
+      <div style={{ marginTop: 'var(--space-2)', fontSize: 12 }}>
         {error ? String((error as { message?: string }).message ?? error) : 'The app bundle is unavailable. Try again or reinstall.'}
       </div>
     </div>

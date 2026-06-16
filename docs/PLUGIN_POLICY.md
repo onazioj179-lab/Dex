@@ -1,7 +1,6 @@
 # DEX Plugin and Marketplace Policy
 
 **Effective date:** 2026-05-06  
-**Version:** 1.0.0  
 **Contact:** onazi75@gmail.com
 
 Plugins can make DEX more powerful, but they can also create security, privacy, reliability, and legal risk. This policy applies to plugin developers, plugin publishers, plugin users, and marketplace submissions.

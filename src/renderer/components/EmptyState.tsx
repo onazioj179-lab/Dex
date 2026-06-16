@@ -43,16 +43,16 @@ const baseStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   textAlign: 'center',
-  gap: 12,
-  padding: '32px 24px',
+  gap: 'var(--space-3)',
+  padding: 'var(--space-8) var(--space-6)',
   color: 'var(--color-text-secondary)',
   minHeight: 160,
 };
 
 const compactStyle: React.CSSProperties = {
   ...baseStyle,
-  padding: '16px 12px',
-  gap: 8,
+  padding: 'var(--space-4) var(--space-3)',
+  gap: 'var(--space-2)',
   minHeight: 96,
 };
 
@@ -82,7 +82,7 @@ const iconStyle: React.CSSProperties = {
 
 const actionRowStyle: React.CSSProperties = {
   display: 'flex',
-  gap: 8,
+  gap: 'var(--space-2)',
   marginTop: 4,
   flexWrap: 'wrap',
   justifyContent: 'center',

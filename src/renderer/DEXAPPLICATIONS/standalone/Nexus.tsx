@@ -2481,7 +2481,7 @@ const Nexus: React.FC = () => {
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px',
+        padding: 'var(--space-2) var(--space-3)',
         gap: 10,
         minWidth: 0,
         maxWidth: '100%',
@@ -2494,7 +2494,7 @@ const Nexus: React.FC = () => {
         pointerEvents: 'none',
       }}>
         {/* Title + node count */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto', minWidth: 0, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', pointerEvents: 'auto', minWidth: 0, flexShrink: 0 }}>
           <div style={{
             width: 24, height: 24, borderRadius: 6,
             background: 'rgba(100,210,255,0.08)',
@@ -2608,7 +2608,7 @@ const Nexus: React.FC = () => {
               border: `1px solid rgba(100,210,255,0.18)`,
               borderTop: 'none',
               borderRadius: '0 0 8px 8px',
-              padding: '12px',
+              padding: 'var(--space-3)',
               zIndex: 30,
             }}>
               <div style={{ color: 'rgba(216,226,240,0.58)', fontSize: 10, fontWeight: 700, letterSpacing: 0.6, fontFamily: 'var(--dex-font-ui)', textAlign: 'center' }}>
@@ -2629,15 +2629,15 @@ const Nexus: React.FC = () => {
               overflowY: 'auto',
               zIndex: 30,
             }}>
-              <div style={{ padding: '4px 12px 6px', color: GLOW, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'var(--dex-font-ui)', borderBottom: '1px solid rgba(100,210,255,0.1)', marginBottom: 2 }}>
+              <div style={{ padding: '4px var(--space-3) 6px', color: GLOW, fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'var(--dex-font-ui)', borderBottom: '1px solid rgba(100,210,255,0.1)', marginBottom: 2 }}>
                 {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
               </div>
               {searchResults.map((file, i) => (
                 <div
                   key={file.path + i}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '6px 12px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                    padding: '6px var(--space-3)', cursor: 'pointer',
                     transition: 'background 0.1s',
                     background: i === searchSelectedIdx ? `rgba(100,210,255,0.12)` : 'transparent',
                     borderLeft: i === searchSelectedIdx ? `2px solid ${ICE_BLUE}` : '2px solid transparent',
@@ -2684,7 +2684,7 @@ const Nexus: React.FC = () => {
           style={{
             pointerEvents: 'auto',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 26, height: 26, borderRadius: 7,
+            width: 26, height: 26, borderRadius: 6,
             background: 'rgba(100,210,255,0.06)',
             border: `1px solid rgba(100,210,255,0.18)`,
             color: 'rgba(216,226,240,0.72)',
@@ -2768,7 +2768,7 @@ const Nexus: React.FC = () => {
           aria-label="Browse folder"
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', height: 24,
+            padding: '3px var(--space-2)', height: 24,
             background: 'rgba(100,210,255,0.1)',
             border: `1px solid ${ICE_BLUE}55`,
             color: ICE_BLUE,
@@ -2814,7 +2814,7 @@ const Nexus: React.FC = () => {
           { label: 'DEPTH', value: String(Math.round(cameraRef.current.zoom)), color: GLOW },
         ].map((item) => (
           <div key={item.label} style={{
-            padding: '4px 8px',
+            padding: '4px var(--space-2)',
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
             borderLeft: `2px solid ${item.color}`,
@@ -2841,7 +2841,7 @@ const Nexus: React.FC = () => {
           { label: 'GRID', status: filesLoaded ? 'MAPPED' : 'LOADING', color: filesLoaded ? ELECTRIC : AMBER },
         ].map((item) => (
           <div key={item.label} style={{
-            padding: '4px 8px',
+            padding: '4px var(--space-2)',
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
             borderRight: `2px solid ${item.color}`,
@@ -2889,7 +2889,7 @@ const Nexus: React.FC = () => {
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '8px 10px',
+            padding: 'var(--space-2) 10px',
             borderBottom: `1px solid rgba(100,210,255,0.12)`,
           }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: ICE_BLUE, letterSpacing: 2, textTransform: 'uppercase' }}>UKI WEB RESULTS</div>
@@ -2909,7 +2909,7 @@ const Nexus: React.FC = () => {
               }}
               style={{
                 display: 'block', width: '100%', textAlign: 'left',
-                padding: '8px 10px',
+                padding: 'var(--space-2) 10px',
                 background: 'transparent',
                 border: 'none', borderBottom: '1px solid rgba(100,210,255,0.08)',
                 cursor: 'pointer',
@@ -2927,34 +2927,6 @@ const Nexus: React.FC = () => {
         </div>
       )}
 
-      {/* -- Hints Legend (Bottom-Right) -- */}
-      <div style={{
-        position: 'absolute', bottom: 56, right: 12,
-        display: 'flex', flexDirection: 'column', gap: 2,
-        pointerEvents: 'none', zIndex: 12,
-        fontFamily: 'var(--dex-font-ui)',
-        opacity: 0.5,
-        maxWidth: 'min(160px, 34vw)',
-      }}>
-        {[
-          { key: 'DRAG', desc: 'ROTATE' },
-          { key: 'SCROLL', desc: 'ZOOM' },
-          { key: 'CLICK', desc: 'SELECT NODE' },
-          { key: 'ESC', desc: 'DESELECT' },
-          { key: '/', desc: 'SEARCH' },
-        ].map(h => (
-          <div key={h.key} style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-            <span style={{ fontSize: 8, color: 'var(--color-text-tertiary)', letterSpacing: 1, fontWeight: 600 }}>{h.desc}</span>
-            <span style={{
-              fontSize: 8, color: ICE_BLUE, fontWeight: 700, letterSpacing: 0.5,
-              padding: '1px 4px',
-              border: `1px solid rgba(100,210,255,0.18)`,
-              borderRadius: 4,
-              background: 'rgba(11,18,28,0.7)',
-            }}>{h.key}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };
@@ -2967,7 +2939,7 @@ const modeBtnBase: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 4,
-  padding: '4px 8px',
+  padding: '4px var(--space-2)',
   border: `1px solid rgba(100,210,255,0.14)`,
   borderRadius: 6,
   cursor: 'pointer',

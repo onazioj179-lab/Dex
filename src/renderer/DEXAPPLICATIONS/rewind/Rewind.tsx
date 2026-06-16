@@ -1214,7 +1214,7 @@ const timer = setInterval(check, 15000);
       {releaseNotesModal && (
         <div style={S.lightboxOverlay} role="dialog" aria-label="Release notes" aria-modal="true" onMouseDown={() => setReleaseNotesModal(null)}>
           <div style={{ ...S.aboutCard, maxWidth: 640, textAlign: 'left' as const }} onMouseDown={e => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 8 }}>Release notes {releaseNotesModal.version}</div>
+            <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 'var(--space-2)' }}>Release notes {releaseNotesModal.version}</div>
             <div style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' as const, maxHeight: 360, overflowY: 'auto' }}>
               {releaseNotesModal.notes || 'No release notes available.'}
             </div>
@@ -1291,7 +1291,7 @@ const timer = setInterval(check, 15000);
               placeholder="Type a command or search activity"
               style={{
                 width: '100%',
-                padding: '14px 16px',
+                padding: '14px var(--space-4)',
                 fontSize: 16,
                 background: 'transparent',
                 border: 'none',
@@ -1301,7 +1301,7 @@ const timer = setInterval(check, 15000);
               }}
             />
 
-            <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: 8 }}>
+            <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: 'var(--space-2)' }}>
               {filteredPaletteCommands.length > 0 ? (
                 filteredPaletteCommands.map((cmd, idx) => (
                   <button
@@ -1314,7 +1314,7 @@ const timer = setInterval(check, 15000);
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 2,
-                      padding: '10px 12px',
+                      padding: '10px var(--space-3)',
                       borderRadius: 6,
                       border: 'none',
                       background: commandIndex === idx ? 'rgba(74,158,255,0.15)' : 'transparent',
@@ -1339,7 +1339,7 @@ const timer = setInterval(check, 15000);
                     style={{
                       width: '100%',
                       textAlign: 'left',
-                      padding: '10px 12px',
+                      padding: '10px var(--space-3)',
                       borderRadius: 6,
                       border: 'none',
                       background: commandIndex === idx ? 'rgba(74,158,255,0.15)' : 'transparent',
@@ -1352,7 +1352,7 @@ const timer = setInterval(check, 15000);
                   </button>
                 ))
               ) : (
-                <div style={{ fontSize: 12, opacity: 0.6, padding: 12 }}>No matching commands or activity results.</div>
+                <div style={{ fontSize: 12, opacity: 0.6, padding: 'var(--space-3)' }}>No matching commands or activity results.</div>
               )}
             </div>
           </div>
@@ -1375,12 +1375,12 @@ const timer = setInterval(check, 15000);
       {aboutModal && (
         <div style={S.lightboxOverlay} onMouseDown={() => setAboutModal(false)}>
           <div style={S.aboutCard} onMouseDown={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 8 }}>DEX Rewind</div>
-            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 12 }}>Version {appVersion}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 'var(--space-2)' }}>DEX Rewind</div>
+            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Version {appVersion}</div>
             <div style={{ fontSize: 12, lineHeight: 1.5, opacity: 0.8 }}>
               Activity logger and search for your desktop -- all data stays local.
             </div>
-            <button style={{ ...S.headerBtn, marginTop: 16 }} onClick={() => setAboutModal(false)} aria-label="Close about">Close</button>
+            <button style={{ ...S.headerBtn, marginTop: 'var(--space-4)' }} onClick={() => setAboutModal(false)} aria-label="Close about">Close</button>
           </div>
         </div>
       )}
@@ -1419,7 +1419,7 @@ const timer = setInterval(check, 15000);
         {/* -- Search / Timeline tab strip + inline search -- */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 14,
-          padding: '16px 20px 12px',
+          padding: 'var(--space-4) var(--space-5) var(--space-3)',
           flexShrink: 0,
         }}>
           {/* Mini tab strip - iOS segmented control style */}
@@ -1428,7 +1428,7 @@ const timer = setInterval(check, 15000);
               <button
                 key={t}
                 style={{
-                  padding: '4px 12px', borderRadius: 2, border: 'none', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                  padding: '4px var(--space-3)', borderRadius: 2, border: 'none', fontSize: 11, fontWeight: 500, cursor: 'pointer',
                   background: overviewSection === t ? 'rgba(255,255,255,0.08)' : 'transparent',
                   color: overviewSection === t ? 'var(--text-primary, #fafafa)' : 'var(--text-muted, #71717a)',
                 }}
@@ -1452,7 +1452,7 @@ const timer = setInterval(check, 15000);
                 placeholder="Search activity"
                 autoFocus
               />
-              <button style={{ ...S.searchBtn, height: 40, padding: '0 20px' }} onClick={doSearch} aria-label="Search">Search</button>
+              <button style={{ ...S.searchBtn, height: 40, padding: '0 var(--space-5)' }} onClick={doSearch} aria-label="Search">Search</button>
             </div>
           )}
 
@@ -1464,7 +1464,7 @@ const timer = setInterval(check, 15000);
                   key={t}
                   style={{
                     ...S.filterBtn,
-                    padding: '8px 14px',
+                    padding: 'var(--space-2) 14px',
                     borderRadius: 8,
                     fontSize: 12,
                     ...(filterType === t ? { background: 'rgba(74,158,255,0.15)', color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))' } : {}),
@@ -1480,7 +1480,7 @@ const timer = setInterval(check, 15000);
         </div>
 
         {/* -- Main scrollable area -- */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px 20px' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-3) var(--space-5) var(--space-5)' }}>
 
           {/* TIMELINE entries */}
           {overviewSection === 'timeline' && (
@@ -1496,7 +1496,7 @@ const timer = setInterval(check, 15000);
               )}
               {!loading && timeline.length === 0 && (
                 <div style={S.emptyState}>
-                  <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.3 }}>
+                  <div style={{ fontSize: 28, marginBottom: 'var(--space-3)', opacity: 0.3 }}>
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Nothing recorded yet</div>
@@ -1570,7 +1570,7 @@ const timer = setInterval(check, 15000);
           {overviewSection === 'timeline' && (
             <div style={{ marginTop: 18 }}>
               <button
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary, #e4e4e7)', fontSize: 12, fontWeight: 600, padding: '0 0 8px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary, #e4e4e7)', fontSize: 12, fontWeight: 600, padding: '0 0 var(--space-2)' }}
                 onClick={() => setStatsExpanded(v => !v)}
                 aria-label="Toggle today at a glance"
               >
@@ -1617,9 +1617,9 @@ const timer = setInterval(check, 15000);
 
           {/* -- SCREENSHOTS strip (collapsible) -- */}
           {overviewSection === 'timeline' && screenshots.length > 0 && (
-            <div style={{ marginTop: 18, paddingBottom: 24 }}>
+            <div style={{ marginTop: 18, paddingBottom: 'var(--space-6)' }}>
               <button
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary, #e4e4e7)', fontSize: 12, fontWeight: 600, padding: '0 0 8px' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary, #e4e4e7)', fontSize: 12, fontWeight: 600, padding: '0 0 var(--space-2)' }}
                 onClick={() => setShotsExpanded(v => !v)}
                 aria-label="Toggle screenshots"
               >
@@ -1627,7 +1627,7 @@ const timer = setInterval(check, 15000);
                 Screenshots ({screenshots.length})
               </button>
               {shotsExpanded && (
-                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto', paddingBottom: 'var(--space-2)' }}>
                   {screenshots.slice(0, 12).map(ss => {
                     const dataUrl = screenshotData[ss.id];
                     return (
@@ -1660,7 +1660,7 @@ const timer = setInterval(check, 15000);
 
   function renderTimeline() {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', height: '100%' }}>
         <div style={S.viewHeader}>
           <span style={S.viewTitle}>Timeline</span>
         </div>
@@ -1696,7 +1696,7 @@ const timer = setInterval(check, 15000);
         {/* Work sessions — idle-gap grouped, then day-bucketed with relative
             headings + human labels (shared/rewind/timelineView.ts). */}
         {!loading && sessionDays.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 4px' }} aria-label="Work sessions">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: '0 4px 4px' }} aria-label="Work sessions">
             {sessionDays.map(day => (
               <div key={day.dayTs}>
                 <div className="dex-label-caps" style={{ fontSize: 10, margin: '2px 0 6px' }}>
@@ -1730,7 +1730,7 @@ const timer = setInterval(check, 15000);
         {/* Entries */}
         <div style={S.entryList} role="list" aria-label="Timeline entries">
           {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 'var(--space-2) 0' }}>
               {[1,2,3,4,5].map(i => (
                 <div key={i} className="dex-skeleton" style={{ height: 52, borderRadius: 6 }} />
               ))}
@@ -1738,7 +1738,7 @@ const timer = setInterval(check, 15000);
           )}
           {!loading && timeline.length === 0 && (
             <div style={S.emptyState}>
-              <div style={{ fontSize: 14, marginBottom: 8, fontWeight: 600 }}>No activity recorded</div>
+              <div style={{ fontSize: 14, marginBottom: 'var(--space-2)', fontWeight: 600 }}>No activity recorded</div>
               <div style={{ fontSize: 11, opacity: 0.5 }}>
                 {isRecording ? 'Events will appear as you use your computer' : 'Recording is paused'}
               </div>
@@ -1772,7 +1772,7 @@ const timer = setInterval(check, 15000);
 
   function renderSearch() {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', height: '100%' }}>
         <div style={S.viewHeader}>
           <span style={S.viewTitle}>Search</span>
         </div>
@@ -1790,23 +1790,18 @@ const timer = setInterval(check, 15000);
           <button style={S.searchBtn} onClick={doSearch} aria-label="Search">Search</button>
         </div>
 
-        {/* Search hint */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, opacity: 0.4, padding: '0 4px' }}>
-          <span>Tip: use words like copied, opened, file, screenshot to filter by type</span>
-        </div>
-
         {/* Results */}
         <div style={S.entryList}>
           {loading && <div style={S.emptyState}>Searching...</div>}
           {!loading && searchResults.length === 0 && searchQuery && (
             <div style={S.emptyState}>
-              <div style={{ fontSize: 14, marginBottom: 8, fontWeight: 600 }}>No results found</div>
+              <div style={{ fontSize: 14, marginBottom: 'var(--space-2)', fontWeight: 600 }}>No results found</div>
               <div style={{ fontSize: 11, opacity: 0.5 }}>Try different keywords or a broader query</div>
             </div>
           )}
           {!loading && searchResults.length === 0 && !searchQuery && (
             <div style={S.emptyState}>
-              <div style={{ fontSize: 14, marginBottom: 8, fontWeight: 600 }}>Search your activity</div>
+              <div style={{ fontSize: 14, marginBottom: 'var(--space-2)', fontWeight: 600 }}>Search your activity</div>
               <div style={{ fontSize: 11, opacity: 0.5 }}>
                 Find anything you did -- apps opened, text copied, files changed, websites visited
               </div>
@@ -1920,7 +1915,7 @@ const timer = setInterval(check, 15000);
     const olderEntries = filtered.filter(e => !todayEntries.includes(e));
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', padding: '16px 20px 20px', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', overflow: 'auto', padding: 'var(--space-4) var(--space-5) var(--space-5)', flex: 1, minHeight: 0 }}>
         {/* Header */}
         <div style={S.viewHeader}>
           <span style={S.viewTitle}>Journal</span>
@@ -1952,7 +1947,7 @@ const timer = setInterval(check, 15000);
             onChange={e => setJournalDraft(d => ({ ...d, title: e.target.value }))}
             style={{
               background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
-              borderRadius: 6, padding: '8px 12px', color: 'inherit', fontSize: 13, fontWeight: 600,
+              borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'inherit', fontSize: 13, fontWeight: 600,
               outline: 'none', fontFamily: 'inherit',
             }}
             aria-label="Journal entry title"
@@ -1964,19 +1959,19 @@ const timer = setInterval(check, 15000);
             rows={4}
             style={{
               background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
-              borderRadius: 6, padding: '10px 12px', color: 'inherit', fontSize: 13, lineHeight: 1.6,
+              borderRadius: 6, padding: '10px var(--space-3)', color: 'inherit', fontSize: 13, lineHeight: 1.6,
               outline: 'none', resize: 'vertical', fontFamily: 'inherit', minHeight: 80,
             }}
             aria-label="Journal entry body"
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted, #71717a)', marginRight: 4 }}>Mood:</span>
             {(Object.keys(MOOD_MAP) as JournalEntry['mood'][]).map(m => (
               <button
                 key={m}
                 onClick={() => setJournalDraft(d => ({ ...d, mood: m }))}
                 style={{
-                  padding: '3px 8px', borderRadius: 4, border: '1px solid',
+                  padding: '3px var(--space-2)', borderRadius: 4, border: '1px solid',
                   fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
                   borderColor: journalDraft.mood === m ? MOOD_MAP[m].color : 'rgba(255,255,255,0.1)',
                   background: journalDraft.mood === m ? `${MOOD_MAP[m].color}20` : 'transparent',
@@ -1995,12 +1990,12 @@ const timer = setInterval(check, 15000);
             onChange={e => setJournalDraft(d => ({ ...d, tags: e.target.value }))}
             style={{
               background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
-              borderRadius: 6, padding: '6px 12px', color: 'inherit', fontSize: 12,
+              borderRadius: 6, padding: '6px var(--space-3)', color: 'inherit', fontSize: 12,
               outline: 'none', fontFamily: 'inherit',
             }}
             aria-label="Tags"
           />
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
             {journalEditing && (
               <button
                 onClick={() => { setJournalEditing(null); setJournalDraft({ title: '', body: '', mood: 'neutral', tags: '' }); }}
@@ -2042,7 +2037,7 @@ const timer = setInterval(check, 15000);
                     key={act.id}
                     onClick={() => linkActivityToJournal(journalEditing, act.id)}
                     style={{
-                      padding: '3px 8px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
+                      padding: '3px var(--space-2)', borderRadius: 4, fontSize: 10, cursor: 'pointer',
                       border: `1px solid ${linked ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)'}`,
                       background: linked ? 'rgba(74,158,255,0.12)' : 'transparent',
                       color: linked ? 'var(--color-accent)' : 'var(--text-muted, #71717a)',
@@ -2077,8 +2072,8 @@ const timer = setInterval(check, 15000);
 
         {/* Empty state */}
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted, #71717a)' }}>
-            <div style={{ marginBottom: 8, opacity: 0.4 }}><DexIcon name="pencil" size={32} /></div>
+          <div style={{ textAlign: 'center', padding: 'var(--space-10) 0', color: 'var(--text-muted, #71717a)' }}>
+            <div style={{ marginBottom: 'var(--space-2)', opacity: 0.4 }}><DexIcon name="pencil" size={32} /></div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>
               {journalFilter === 'pinned' ? 'No pinned entries' : 'No journal entries yet'}
             </div>
@@ -2099,9 +2094,9 @@ const timer = setInterval(check, 15000);
 
     return (
       <div key={entry.id} style={{ ...S.insightCard, position: 'relative' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
               {entry.title && (
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #fafafa)' }}>
                   {entry.title}
@@ -2188,12 +2183,12 @@ const timer = setInterval(check, 15000);
 
   function renderSettings() {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', padding: '16px 20px 20px', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', overflow: 'auto', padding: 'var(--space-4) var(--space-5) var(--space-5)', flex: 1, minHeight: 0 }}>
         <div style={S.viewHeader}><span style={S.viewTitle}>Settings</span></div>
 
         {/* Recording toggle */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Recording</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Recording</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12 }}>Background activity logging</span>
             <button
@@ -2214,9 +2209,9 @@ const timer = setInterval(check, 15000);
 
         {/* Tracking categories */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>What to Track</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>What to Track</div>
           {settings && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {([
                 { key: 'trackApps', label: 'Active Windows', desc: 'Record which apps and windows you use' },
                 { key: 'trackBrowser', label: 'Browser Tabs', desc: 'Record browser tab titles' },
@@ -2249,8 +2244,8 @@ const timer = setInterval(check, 15000);
 
         {/* Screenshot settings */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Screenshots</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Screenshots</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 12 }}>Periodic Screenshots</div>
@@ -2271,7 +2266,7 @@ const timer = setInterval(check, 15000);
               </button>
             </div>
             {settings?.screenshotsEnabled && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <span style={{ fontSize: 12 }}>Capture every</span>
                 <select
                   style={S.select}
@@ -2298,11 +2293,11 @@ const timer = setInterval(check, 15000);
 
         {/* Excluded apps */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Excluded Apps</div>
-          <div style={{ fontSize: 10, opacity: 0.4, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Excluded Apps</div>
+          <div style={{ fontSize: 10, opacity: 0.4, marginBottom: 'var(--space-2)' }}>
             Activity from these apps will not be recorded (process name, case-insensitive)
           </div>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
             <input
               style={S.excludeInput}
               value={newExclude}
@@ -2327,8 +2322,8 @@ const timer = setInterval(check, 15000);
 
         {/* Retention */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Data Retention</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Data Retention</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <span style={{ fontSize: 12 }}>Keep data for</span>
             <select
               style={S.select}
@@ -2346,11 +2341,11 @@ const timer = setInterval(check, 15000);
 
         {/* Appearance */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Appearance</div>
-          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Appearance</div>
+          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 'var(--space-2)' }}>
             Default: dark. Theme applies immediately and saves automatically.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-2)' }}>
             {([
               { id: 'dark', label: 'Dark' },
               { id: 'darker', label: 'Darker' },
@@ -2370,7 +2365,7 @@ const timer = setInterval(check, 15000);
                     background: preset.surface,
                     color: preset.text,
                     cursor: 'pointer',
-                    padding: 8,
+                    padding: 'var(--space-2)',
                     textAlign: 'left',
                     display: 'flex',
                     flexDirection: 'column',
@@ -2390,7 +2385,7 @@ const timer = setInterval(check, 15000);
           </div>
 
           {themeName === 'custom' && (
-            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 8 }}>
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 'var(--space-2)' }}>
               {([
                 ['background', 'Background'],
                 ['surface', 'Surface'],
@@ -2419,8 +2414,8 @@ const timer = setInterval(check, 15000);
 
         {/* Notifications */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Notifications</div>
-          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Notifications</div>
+          <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 'var(--space-2)' }}>
             Default: normal. Controls Rewind notification verbosity for status and plugin messages.
           </div>
           <select
@@ -2436,9 +2431,9 @@ const timer = setInterval(check, 15000);
 
         {/* Storage info */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Storage</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Storage</div>
           {storageInfo ? (
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 }}>
+            <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', fontSize: 12 }}>
               <div style={S.statBox}>
                 <div style={S.statNum}>{storageInfo.totalFiles}</div>
                 <div style={S.statLabel}>Days</div>
@@ -2465,8 +2460,8 @@ const timer = setInterval(check, 15000);
 
         {/* Phase 5: Backup scheduler */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Backups</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Backups</div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12 }}>Schedule:</span>
             <select
               style={S.select}
@@ -2485,7 +2480,7 @@ const timer = setInterval(check, 15000);
             <button aria-label="Backup now" style={S.headerBtn} onClick={runBackupNow}>Backup Now</button>
             <button aria-label="Restore from backup" style={S.headerBtn} onClick={restoreFromBackup}>Restore from Backup</button>
           </div>
-          <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>
+          <div style={{ marginTop: 'var(--space-2)', fontSize: 11, opacity: 0.55 }}>
             Last backup: {backupSettings?.lastBackupAt ? new Date(backupSettings.lastBackupAt).toLocaleString() : 'Never'}
             {backupSettings?.lastBackupSizeBytes ? ` (${formatBytes(backupSettings.lastBackupSizeBytes)})` : ''}
           </div>
@@ -2496,11 +2491,11 @@ const timer = setInterval(check, 15000);
 
         {/* Phase 5: Workspace profiles */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Workspace Profiles</div>
-          <div style={{ marginBottom: 8, fontSize: 11, opacity: 0.55 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Workspace Profiles</div>
+          <div style={{ marginBottom: 'var(--space-2)', fontSize: 11, opacity: 0.55 }}>
             Active profile: {activeWorkspaceProfile?.name || 'Work'}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
             <input
               style={S.excludeInput}
               value={newProfileName}
@@ -2521,8 +2516,8 @@ const timer = setInterval(check, 15000);
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 8,
-                padding: '6px 8px',
+                gap: 'var(--space-2)',
+                padding: '6px var(--space-2)',
                 borderRadius: 4,
                 background: 'var(--color-surface-1)',
                 border: '1px solid rgba(255,255,255,0.06)',
@@ -2543,8 +2538,8 @@ const timer = setInterval(check, 15000);
 
         {/* Phase 7: Plugins */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Plugins</div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Plugins</div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
             <button
               aria-label="Open plugins folder"
               style={S.headerBtn}
@@ -2576,11 +2571,11 @@ const timer = setInterval(check, 15000);
               <div key={plugin.id} style={{
                 border: '1px solid var(--color-border-subtle)',
                 borderRadius: 6,
-                padding: 8,
+                padding: 'var(--space-2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 8,
+                gap: 'var(--space-2)',
               }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>
@@ -2611,8 +2606,8 @@ const timer = setInterval(check, 15000);
 
         {/* Phase 4: Security & Integrity */}
         <div style={S.insightCard}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Security</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Security</div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' as const, marginBottom: 'var(--space-2)' }}>
             <button
               aria-label="Run integrity check"
               style={S.headerBtn}
@@ -2650,15 +2645,15 @@ const timer = setInterval(check, 15000);
         {/* Audit Log Panel */}
         {showAuditLog && auditLog.length > 0 && (
           <div style={S.insightCard}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Audit Log</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)' }}>Audit Log</div>
             <div style={{
               maxHeight: 300, overflowY: 'auto', display: 'flex',
               flexDirection: 'column', gap: 4,
             }}>
               {auditLog.map((entry: { id?: string; action?: string; timestamp?: number; detail?: string; user?: string }, idx: number) => (
                 <div key={entry.id || idx} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '4px 8px', borderRadius: 3,
+                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                  padding: '4px var(--space-2)', borderRadius: 3,
                   background: 'var(--color-surface-1)',
                   fontSize: 11,
                 }}>
@@ -2681,8 +2676,8 @@ const timer = setInterval(check, 15000);
 
         {/* Danger zone */}
         <div style={{ ...S.insightCard, borderColor: 'rgba(255,59,48,0.2)' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--color-error)' }}>Danger Zone</div>
-          <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-error)' }}>Danger Zone</div>
+          <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 'var(--space-2)' }}>
             This permanently deletes all Rewind data including screenshots. This cannot be undone.
           </div>
           <button aria-label="Delete all Rewind data" style={S.dangerBtn} onClick={deleteAllData}>
@@ -2691,7 +2686,7 @@ const timer = setInterval(check, 15000);
         </div>
 
         {/* Footer */}
-        <div style={{ fontSize: 10, opacity: 0.3, textAlign: 'center' as const, paddingBottom: 16 }}>
+        <div style={{ fontSize: 10, opacity: 0.3, textAlign: 'center' as const, paddingBottom: 'var(--space-4)' }}>
           All data stays on this machine. No cloud. No accounts. AI runs locally via Ollama.
         </div>
       </div>
@@ -2704,7 +2699,7 @@ const statusCardStyle: React.CSSProperties = {
   background: 'var(--color-surface-1)',
   border: '1px solid rgba(255,255,255,0.06)',
   borderRadius: 8,
-  padding: '14px 16px',
+  padding: '14px var(--space-4)',
   display: 'flex',
   flexDirection: 'column',
   gap: 6,
@@ -2799,15 +2794,15 @@ const S: Record<string, React.CSSProperties> = {
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 'var(--space-3)',
     flexShrink: 0,
     minWidth: 120,
     justifyContent: 'flex-end',
   },
   sidebarBrand: {
-    padding: '0 16px 12px',
+    padding: '0 var(--space-4) var(--space-3)',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    marginBottom: 12,
+    marginBottom: 'var(--space-3)',
   },
   brandName: {
     fontSize: 14,
@@ -2816,7 +2811,7 @@ const S: Record<string, React.CSSProperties> = {
     color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))',
   },
   profileArea: {
-    padding: '0 16px 16px',
+    padding: '0 var(--space-4) var(--space-4)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -2869,7 +2864,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'none',
     border: 'none',
     color: 'var(--color-text-primary, #f5f5f7)',
-    padding: '8px 12px',
+    padding: 'var(--space-2) var(--space-3)',
     fontSize: 12,
     textAlign: 'left' as const,
     cursor: 'pointer',
@@ -2881,7 +2876,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    padding: '0 8px',
+    padding: '0 var(--space-2)',
   },
   navItem: {
     display: 'block',
@@ -2891,7 +2886,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     color: 'rgba(255,255,255,0.5)',
     cursor: 'pointer',
-    padding: '8px 12px',
+    padding: 'var(--space-2) var(--space-3)',
     fontSize: 12,
     fontWeight: 500,
     textAlign: 'left' as const,
@@ -2905,7 +2900,7 @@ const S: Record<string, React.CSSProperties> = {
 
   // Sidebar footer
   sidebarFooter: {
-    padding: '12px 16px 0',
+    padding: 'var(--space-3) var(--space-4) 0',
     borderTop: '1px solid rgba(255,255,255,0.06)',
     display: 'flex',
     flexDirection: 'column',
@@ -2939,7 +2934,7 @@ const S: Record<string, React.CSSProperties> = {
 
   // View header
   viewHeader: {
-    marginBottom: 8,
+    marginBottom: 'var(--space-2)',
   },
   viewTitle: {
     fontSize: 18,
@@ -2952,7 +2947,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   dateBtn: {
     background: 'var(--color-surface-2)',
@@ -2997,7 +2992,7 @@ const S: Record<string, React.CSSProperties> = {
   entryCard: {
     display: 'flex',
     gap: 10,
-    padding: '10px 12px',
+    padding: '10px var(--space-3)',
     borderRadius: 4,
     background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.04)',
@@ -3027,7 +3022,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   entryMeta: {
     display: 'flex',
-    gap: 8,
+    gap: 'var(--space-2)',
     fontSize: 11,
     opacity: 0.55,
     marginTop: 4,
@@ -3043,14 +3038,14 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 13,
     opacity: 0.5,
     textAlign: 'center' as const,
-    padding: 20,
+    padding: 'var(--space-5)',
   },
 
   // Search
   searchBar: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 'var(--space-2)',
     padding: '6px 10px',
     borderRadius: 4,
     background: 'var(--color-surface-1)',
@@ -3090,7 +3085,7 @@ const S: Record<string, React.CSSProperties> = {
 
   // Insight cards
   insightCard: {
-    padding: '12px 14px',
+    padding: 'var(--space-3) 14px',
     borderRadius: 4,
     background: 'var(--color-surface-1)',
     border: '1px solid rgba(255,255,255,0.05)',
@@ -3139,7 +3134,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-surface-2)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 4,
-    padding: '4px 8px',
+    padding: '4px var(--space-2)',
     color: 'var(--color-text-primary, #f5f5f7)',
     fontSize: 11,
     outline: 'none',
@@ -3148,7 +3143,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
-    padding: '2px 8px',
+    padding: '2px var(--space-2)',
     borderRadius: 4,
     background: 'var(--color-surface-2)',
     fontSize: 11,
@@ -3169,7 +3164,7 @@ const S: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 4,
     color: 'var(--color-text-primary, #f5f5f7)',
-    padding: '4px 8px',
+    padding: '4px var(--space-2)',
     fontSize: 11,
     outline: 'none',
     cursor: 'pointer',
@@ -3191,7 +3186,7 @@ const S: Record<string, React.CSSProperties> = {
   screenshotGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: 8,
+    gap: 'var(--space-2)',
     padding: '4px 0',
   },
   screenshotCard: {
@@ -3218,7 +3213,7 @@ const S: Record<string, React.CSSProperties> = {
     opacity: 0.3,
   },
   screenshotInfo: {
-    padding: '6px 8px',
+    padding: '6px var(--space-2)',
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: 10,
@@ -3273,7 +3268,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface-solid, #161618)',
     border: '1px solid rgba(255,255,255,0.10)',
     borderRadius: 10,
-    padding: '24px 28px',
+    padding: 'var(--space-6) 28px',
     textAlign: 'center' as const,
     maxWidth: 320,
     cursor: 'default',

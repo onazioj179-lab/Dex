@@ -1443,9 +1443,9 @@ export const Browser: React.FC = () => {
 
         {/* Tab Groups header bar */}
         {tabGroups.size > 0 && (
-          <div style={{ display: 'flex', gap: 4, padding: '2px 8px', background: 'var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+          <div style={{ display: 'flex', gap: 4, padding: '2px var(--space-2)', background: 'var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
             {Array.from(tabGroups.entries()).map(([gid, group]) => (
-              <div key={gid} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, background: `${group.color}22`, cursor: 'pointer' }}
+              <div key={gid} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px var(--space-2)', borderRadius: 4, background: `${group.color}22`, cursor: 'pointer' }}
                 onClick={() => { const firstTab = group.tabIds[0]; if (firstTab) setActiveTab(firstTab); }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color }} />
@@ -1630,7 +1630,7 @@ export const Browser: React.FC = () => {
             <div style={styles.panelList}>
               {groupedHistory.map(group => (
                 <div key={group.label}>
-                  <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>
+                  <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>
                     {group.label}
                   </div>
                   {group.entries.map(h => (
@@ -1880,21 +1880,21 @@ export const Browser: React.FC = () => {
             </div>
 
             {/* TrackBlock Stats */}
-            <div style={{ marginTop: 12, padding: '12px 0 4px', borderTop: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3) 0 4px', borderTop: '1px solid var(--color-border-subtle)' }}>
               <div className="dex-label-caps" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
                 TrackBlock Stats — This Session
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                 {[
                   { label: 'Trackers Blocked', value: blockedCount, color: 'var(--color-warning)' },
                   { label: 'HTTPS Upgrades', value: browserSettings.forceHttps ? history.filter(h => h.url?.startsWith('https')).length : 0, color: 'var(--color-success)' },
                   { label: 'Fingerprints', value: browserSettings.fingerprintProtection ? Math.floor(blockedCount * 0.3) : 0, color: '#bf5af2' },
                   { label: 'Cookies Blocked', value: browserSettings.blockThirdPartyCookies ? Math.floor(blockedCount * 0.6) : 0, color: 'var(--color-accent)' },
                 ].map(stat => (
-                  <div key={stat.label} style={{ padding: '10px 12px', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
+                  <div key={stat.label} style={{ padding: '10px var(--space-3)', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
                     <div style={{ fontSize: 18, fontWeight: 600, color: stat.color }}>{stat.value.toLocaleString()}</div>
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{stat.label}</div>
                   </div>
@@ -1919,7 +1919,7 @@ export const Browser: React.FC = () => {
               aria-label="Passwords tab"
               aria-pressed={keychainTab === 'passwords'}
               style={{
-                flex: 1, padding: '8px', fontSize: '12px', border: 'none', cursor: 'pointer',
+                flex: 1, padding: 'var(--space-2)', fontSize: '12px', border: 'none', cursor: 'pointer',
                 background: keychainTab === 'passwords' ? 'var(--color-bg-hover)' : 'transparent',
                 color: keychainTab === 'passwords' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 borderBottom: keychainTab === 'passwords' ? '2px solid var(--color-accent)' : '2px solid transparent',
@@ -1932,7 +1932,7 @@ export const Browser: React.FC = () => {
               aria-label="Cards tab"
               aria-pressed={keychainTab === 'cards'}
               style={{
-                flex: 1, padding: '8px', fontSize: '12px', border: 'none', cursor: 'pointer',
+                flex: 1, padding: 'var(--space-2)', fontSize: '12px', border: 'none', cursor: 'pointer',
                 background: keychainTab === 'cards' ? 'var(--color-bg-hover)' : 'transparent',
                 color: keychainTab === 'cards' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 borderBottom: keychainTab === 'cards' ? '2px solid var(--color-accent)' : '2px solid transparent',
@@ -1941,19 +1941,19 @@ export const Browser: React.FC = () => {
               Cards ({savedCards.length})
             </button>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-2)' }}>
             {/* Passwords tab */}
             {keychainTab === 'passwords' && (
               <>
                 {savedPasswords.length === 0 && (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                  <div style={{ padding: 'var(--space-5)', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '12px' }}>
                     No saved passwords yet. Log in to a site and DEX will offer to save.
                   </div>
                 )}
                 {savedPasswords.map(p => (
                   <div key={p.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px', borderRadius: '4px', marginBottom: '4px',
+                    padding: 'var(--space-2)', borderRadius: '4px', marginBottom: '4px',
                     background: 'var(--color-bg-secondary)', fontSize: '12px',
                   }}>
                     <div style={{ overflow: 'hidden' }}>
@@ -1977,7 +1977,7 @@ export const Browser: React.FC = () => {
                     onClick={() => setShowAddCard(true)}
                     aria-label="Add payment card"
                     style={{
-                      width: '100%', padding: '8px', marginBottom: '8px', borderRadius: '4px',
+                      width: '100%', padding: 'var(--space-2)', marginBottom: 'var(--space-2)', borderRadius: '4px',
                       border: '1px dashed var(--color-border-subtle)', background: 'transparent',
                       color: 'var(--color-accent)', cursor: 'pointer', fontSize: '12px',
                     }}
@@ -1994,13 +1994,13 @@ export const Browser: React.FC = () => {
                     saveCard(label, fd.get('cardName') as string || '', num, fd.get('expiry') as string || '');
                     setShowAddCard(false);
                     e.currentTarget.reset();
-                  }} style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', fontSize: '12px' }}>
+                  }} style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: 'var(--space-3)', fontSize: '12px' }}>
                     <input name="cardName" required placeholder="Cardholder name" autoComplete="off"
-                      style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
+                      style={{ padding: '6px var(--space-2)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <input name="cardNumber" required placeholder="Card number" autoComplete="off" maxLength={19}
-                      style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
+                      style={{ padding: '6px var(--space-2)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <input name="expiry" required placeholder="MM/YY" autoComplete="off" maxLength={5}
-                      style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
+                      style={{ padding: '6px var(--space-2)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', fontSize: '12px' }} />
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button type="submit" aria-label="Save card" style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
                       <button type="button" aria-label="Cancel adding card" onClick={() => setShowAddCard(false)} style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
@@ -2010,7 +2010,7 @@ export const Browser: React.FC = () => {
                 {savedCards.map(c => (
                   <div key={c.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px', borderRadius: '4px', marginBottom: '4px',
+                    padding: 'var(--space-2)', borderRadius: '4px', marginBottom: '4px',
                     background: 'var(--color-bg-secondary)', fontSize: '12px',
                   }}>
                     <div>
@@ -2035,12 +2035,12 @@ export const Browser: React.FC = () => {
         <div style={{
           position: 'absolute', top: '80px', right: '12px', zIndex: 'var(--z-modal)',
           background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)',
-          borderRadius: '8px', padding: '14px 16px', boxShadow: 'var(--pg-shadow-tooltip)',
+          borderRadius: '8px', padding: '14px var(--space-4)', boxShadow: 'var(--pg-shadow-tooltip)',
           width: '280px', fontSize: '12px',
         }}>
-          <div style={{ fontWeight: 600, marginBottom: '8px', color: 'var(--color-text-primary)' }}>Save password for {savePrompt.domain}?</div>
+          <div style={{ fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-text-primary)' }}>Save password for {savePrompt.domain}?</div>
           <div style={{ color: 'var(--color-text-muted)', marginBottom: '10px' }}>Username: {savePrompt.username}</div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button onClick={() => { savePassword(savePrompt.domain, savePrompt.username, savePrompt.password); setSavePrompt(null); }}
               style={{ flex: 1, padding: '6px', borderRadius: '4px', border: 'none', background: 'var(--color-accent)', color: 'var(--color-accent-text, #fff)', cursor: 'pointer', fontSize: '12px' }}>Save</button>
             <button onClick={() => setSavePrompt(null)}
@@ -2153,7 +2153,7 @@ export const Browser: React.FC = () => {
           <div style={{
             position: 'absolute', inset: 0, zIndex: 100,
             background: 'var(--color-bg-overlay, rgba(12,12,16,0.96))', overflowY: 'auto',
-            display: 'flex', justifyContent: 'center', padding: '40px 20px',
+            display: 'flex', justifyContent: 'center', padding: 'var(--space-10) var(--space-5)',
           }}>
             <div style={{ maxWidth: 680, width: '100%' }}>
               <button
@@ -2161,8 +2161,8 @@ export const Browser: React.FC = () => {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                  borderRadius: 6, padding: '6px 12px', color: 'var(--color-text-secondary)',
-                  cursor: 'pointer', fontSize: 12, marginBottom: 24,
+                  borderRadius: 6, padding: '6px var(--space-3)', color: 'var(--color-text-secondary)',
+                  cursor: 'pointer', fontSize: 12, marginBottom: 'var(--space-6)',
                 }}
               >
                 {Icon.back} Exit Reading Mode
@@ -2202,7 +2202,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '4px 8px',
+    padding: '4px var(--space-2)',
     background: 'var(--pg-toolbar)',
     borderBottom: '1px solid var(--pg-border)',
     WebkitAppRegion: 'drag',
@@ -2240,7 +2240,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '3px 8px',
+    padding: '3px var(--space-2)',
     borderRadius: '4px',
     cursor: 'pointer',
     maxWidth: '180px',
@@ -2337,7 +2337,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '4px 8px 5px',
+    padding: '4px var(--space-2) 5px',
     background: 'var(--pg-toolbar)',
     borderBottom: '1px solid var(--pg-border)',
   },
@@ -2400,7 +2400,7 @@ const styles: Record<string, React.CSSProperties> = {
   dropdownItem: {
     display: 'block',
     width: '100%',
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     background: 'transparent',
     border: 'none',
     color: 'var(--color-text-primary)',
@@ -2457,7 +2457,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   emptyPanel: {
-    padding: '24px',
+    padding: 'var(--space-6)',
     textAlign: 'center',
     fontSize: '12px',
     color: 'var(--color-text-muted)',
@@ -2469,8 +2469,8 @@ const styles: Record<string, React.CSSProperties> = {
   historyRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '8px 14px',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) 14px',
     cursor: 'pointer',
     borderBottom: '1px solid var(--color-border-subtle)',
     transition: 'background 0.1s',
@@ -2564,7 +2564,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     background: 'var(--color-bg-hover)',
     borderRadius: '10px',
-    padding: '5px 12px',
+    padding: '5px var(--space-3)',
   },
   findInput: {
     background: 'transparent',
@@ -2624,7 +2624,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 14px',
+    padding: 'var(--space-2) 14px',
     cursor: 'pointer',
   },
   toggleTrack: {
@@ -2675,7 +2675,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '40px',
+    padding: 'var(--space-10)',
     zIndex: 1,
     background: 'radial-gradient(ellipse at 50% 40%, var(--color-accent-soft, rgba(74,158,255,0.08)) 0%, transparent 70%)',
   },
@@ -2694,7 +2694,7 @@ const styles: Record<string, React.CSSProperties> = {
   searchBox: {
     width: '100%',
     maxWidth: '520px',
-    marginTop: '24px',
+    marginTop: 'var(--space-6)',
   },
   searchInput: {
     width: '100%',
@@ -2710,8 +2710,8 @@ const styles: Record<string, React.CSSProperties> = {
   favoriteGrid: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
-    marginTop: '24px',
+    gap: 'var(--space-2)',
+    marginTop: 'var(--space-6)',
     justifyContent: 'center',
     maxWidth: '520px',
   },
@@ -2779,7 +2779,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '14px',
-    padding: '32px',
+    padding: 'var(--space-8)',
     textAlign: 'center',
   },
   errorText: {
@@ -2799,7 +2799,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'filter 0.12s',
   },
   errorBtnAlt: {
-    padding: '8px 18px',
+    padding: 'var(--space-2) 18px',
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
     borderRadius: '8px',
@@ -2828,7 +2828,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     width: '100%',
-    padding: '8px 14px',
+    padding: 'var(--space-2) 14px',
     background: 'transparent',
     border: 'none',
     color: 'var(--color-text-primary)',

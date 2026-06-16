@@ -5,6 +5,14 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 
+// NOTE: Deliberately NOT routed through the shell ModalHost / ui/Modal yet.
+// PolicyViewer doubles as an inline embed (compact mode returns bare content
+// with no overlay) and, when shown as a dialog, uses Z_HELP_OVERLAY_MAX so it
+// can stack above the Help overlay that opens it. Both concerns sit outside the
+// standard modal layer; migrating risks the embedded path and the stacking
+// guarantee. TODO: split the overlay shell from the content and route only the
+// standalone-dialog path through the host once the host supports a higher
+// zIndex override / nested-over-overlay use.
 import React, { useMemo, useState } from 'react';
 import {
   DATA_CATEGORIES,
@@ -46,7 +54,7 @@ function renderPolicyBody(body: string): React.ReactNode {
       return <h2 key={index} style={{ fontSize: 18, margin: '0 0 10px', color: 'var(--pg-text-primary)' }}>{line.slice(2)}</h2>;
     }
     if (line.startsWith('## ')) {
-      return <h3 key={index} style={{ fontSize: 13, margin: '16px 0 6px', color: 'var(--color-accent, #4A9EFF)' }}>{line.slice(3)}</h3>;
+      return <h3 key={index} style={{ fontSize: 13, margin: 'var(--space-4) 0 6px', color: 'var(--color-accent, #4A9EFF)' }}>{line.slice(3)}</h3>;
     }
     if (!line.trim()) return <div key={index} style={{ height: 6 }} />;
     return <p key={index} style={{ fontSize: 12, lineHeight: 1.6, margin: '0 0 7px', color: 'var(--pg-text-secondary, #cbd5e1)' }}>{line}</p>;
@@ -61,7 +69,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
 
   const content = (
     <div style={{ ...panel, width: compact ? '100%' : 760, maxWidth: 'calc(100vw - 32px)', maxHeight: compact ? undefined : '84vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+      <div style={{ padding: '14px var(--space-4)', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700 }}>DEX Legal & Privacy</div>
           <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', marginTop: 3 }}>
@@ -73,7 +81,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
         )}
       </div>
 
-      <div style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         {POLICY_DOCUMENTS.map(policy => (
           <button key={policy.slug} onClick={() => setActive(policy.slug)} style={tabButton(active === policy.slug)}>
             {policy.title}
@@ -81,23 +89,23 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
         ))}
       </div>
 
-      <div style={{ overflow: 'auto', padding: 16 }}>
-        <section style={{ marginBottom: 16 }}>
+      <div style={{ overflow: 'auto', padding: 'var(--space-4)' }}>
+        <section style={{ marginBottom: 'var(--space-4)' }}>
           <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
             Summary
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{selected.title} v{selected.version}</div>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 'var(--space-3)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{selected.title}</div>
             <div style={{ fontSize: 12, color: 'var(--pg-text-secondary, #cbd5e1)', lineHeight: 1.55 }}>{selected.summary}</div>
           </div>
         </section>
 
         {active === 'privacy' && (
-          <section style={{ marginBottom: 16 }}>
+          <section style={{ marginBottom: 'var(--space-4)' }}>
             <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
               Data Categories
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 'var(--space-2)' }}>
               {DATA_CATEGORIES.map(category => (
                 <div key={category.id} style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pg-text-primary)' }}>{category.label}</div>
@@ -123,7 +131,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
   if (compact) return content;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="DEX legal and privacy policy viewer" style={{ position: 'fixed', inset: 0, zIndex: Z_HELP_OVERLAY_MAX, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div role="dialog" aria-modal="true" aria-label="DEX legal and privacy policy viewer" style={{ position: 'fixed', inset: 0, zIndex: Z_HELP_OVERLAY_MAX, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)' }}>
       {content}
     </div>
   );

@@ -45,7 +45,7 @@ const ShimmerBlock: React.FC<{ width?: string; height?: string; rounded?: boolea
 const ImageEditorSkeleton: React.FC = () => (
   <div style={{ display: 'flex', height: '100%', gap: 1 }}>
     {/* Left toolbar */}
-    <div style={{ width: 48, background: 'var(--color-bg-secondary)', padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ width: 48, background: 'var(--color-bg-secondary)', padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       {Array(8).fill(0).map((_, i) => <ShimmerBlock key={i} width="32px" height="32px" />)}
     </div>
     {/* Canvas area */}
@@ -56,7 +56,7 @@ const ImageEditorSkeleton: React.FC = () => (
       </div>
     </div>
     {/* Right panel */}
-    <div style={{ width: 240, background: 'var(--color-bg-secondary)', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ width: 240, background: 'var(--color-bg-secondary)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
       <ShimmerBlock height="24px" />
       <ShimmerBlock height="120px" />
       <ShimmerBlock height="24px" />
@@ -68,7 +68,7 @@ const ImageEditorSkeleton: React.FC = () => (
 const AudioEditorSkeleton: React.FC = () => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
     {/* Transport bar */}
-    <div style={{ height: 56, background: 'var(--color-bg-secondary)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
+    <div style={{ height: 56, background: 'var(--color-bg-secondary)', padding: 'var(--space-2) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
       <ShimmerBlock width="120px" height="32px" />
       <ShimmerBlock width="200px" height="32px" />
       <div style={{ flex: 1 }} />
@@ -77,23 +77,23 @@ const AudioEditorSkeleton: React.FC = () => (
     {/* Timeline area */}
     <div style={{ flex: 1, display: 'flex' }}>
       {/* Track headers */}
-      <div style={{ width: 180, background: 'var(--color-bg-secondary)', padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ width: 180, background: 'var(--color-bg-secondary)', padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {Array(6).fill(0).map((_, i) => (
-          <div key={i} style={{ height: 60, display: 'flex', flexDirection: 'column', gap: 4, padding: 8, background: 'var(--color-bg-tertiary)', borderRadius: 4 }}>
+          <div key={i} style={{ height: 60, display: 'flex', flexDirection: 'column', gap: 4, padding: 'var(--space-2)', background: 'var(--color-bg-tertiary)', borderRadius: 4 }}>
             <ShimmerBlock height="16px" width="80%" />
             <ShimmerBlock height="24px" width="60%" />
           </div>
         ))}
       </div>
       {/* Waveform area */}
-      <div style={{ flex: 1, background: 'var(--color-bg-primary)', padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ flex: 1, background: 'var(--color-bg-primary)', padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {Array(6).fill(0).map((_, i) => (
           <ShimmerBlock key={i} height="60px" rounded={false} />
         ))}
       </div>
     </div>
     {/* Mixer */}
-    <div style={{ height: 120, background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)', padding: 12, display: 'flex', gap: 8 }}>
+    <div style={{ height: 120, background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)', padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)' }}>
       {Array(8).fill(0).map((_, i) => (
         <div key={i} style={{ width: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <ShimmerBlock width="40px" height="80px" />
@@ -108,18 +108,18 @@ const VideoEditorSkeleton: React.FC = () => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
     <div style={{ flex: 1, display: 'flex' }}>
       {/* Media bin */}
-      <div style={{ width: 220, background: 'var(--color-bg-secondary)', padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ width: 220, background: 'var(--color-bg-secondary)', padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <ShimmerBlock height="24px" width="60%" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
           {Array(6).fill(0).map((_, i) => <ShimmerBlock key={i} height="80px" />)}
         </div>
       </div>
       {/* Preview */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'var(--color-bg-base)', padding: 16 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'var(--color-bg-base)', padding: 'var(--space-4)' }}>
         <ShimmerBlock width="70%" height="60%" />
       </div>
       {/* Inspector */}
-      <div style={{ width: 260, background: 'var(--color-bg-secondary)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ width: 260, background: 'var(--color-bg-secondary)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <ShimmerBlock height="24px" />
         <ShimmerBlock height="100px" />
         <ShimmerBlock height="24px" />
@@ -127,7 +127,7 @@ const VideoEditorSkeleton: React.FC = () => (
       </div>
     </div>
     {/* Timeline */}
-    <div style={{ height: 180, background: 'var(--color-bg-tertiary)', borderTop: '1px solid var(--color-border)', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ height: 180, background: 'var(--color-bg-tertiary)', borderTop: '1px solid var(--color-border)', padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 4 }}>
       <ShimmerBlock height="24px" />
       {Array(3).fill(0).map((_, i) => <ShimmerBlock key={i} height="40px" rounded={false} />)}
     </div>
@@ -135,15 +135,15 @@ const VideoEditorSkeleton: React.FC = () => (
 );
 
 const GenericSkeleton: React.FC = () => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 16, gap: 16 }}>
-    <div style={{ display: 'flex', gap: 8 }}>
+  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 'var(--space-4)', gap: 'var(--space-4)' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
       <ShimmerBlock width="120px" height="32px" />
       <ShimmerBlock width="80px" height="32px" />
       <div style={{ flex: 1 }} />
       <ShimmerBlock width="100px" height="32px" />
     </div>
-    <div style={{ flex: 1, display: 'flex', gap: 16 }}>
-      <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ flex: 1, display: 'flex', gap: 'var(--space-4)' }}>
+      <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {Array(5).fill(0).map((_, i) => <ShimmerBlock key={i} height="36px" />)}
       </div>
       <div style={{ flex: 1 }}>
@@ -180,7 +180,7 @@ export const CreativeAppSkeleton: React.FC<CreativeAppSkeletonProps> = ({ type, 
           left: '50%',
           transform: 'translateX(-50%)',
           background: 'var(--color-bg-elevated)',
-          padding: '8px 16px',
+          padding: 'var(--space-2) var(--space-4)',
           borderRadius: 6,
           fontSize: 13,
           color: 'var(--color-text-secondary)',

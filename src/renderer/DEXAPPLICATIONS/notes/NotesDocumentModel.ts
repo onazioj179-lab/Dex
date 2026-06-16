@@ -150,7 +150,7 @@ function nodeToHTML(node: DocNode): string {
       return `<h${level}>${inner}</h${level}>`;
     }
     case 'blockquote':
-      return `<blockquote>${inner}</blockquote>`;
+      return blockquoteToHTML(node, inner);
     case 'code_block':
       return `<pre><code>${inner}</code></pre>`;
     case 'horizontal_rule':
@@ -179,6 +179,55 @@ function nodeToHTML(node: DocNode): string {
     default:
       return inner;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Callout blocks: GitHub-style "> [!NOTE]" / "> [!WARNING]" / "> [!TIP]"
+// ---------------------------------------------------------------------------
+// A blockquote whose first line opens with a [!TYPE] marker renders as a
+// coloured callout box instead of a plain quote. The rendered blockquote keeps
+// a data-callout attribute so it round-trips: htmlToDoc reads that attribute
+// back into a leading "[!TYPE]" paragraph, regenerating the same doc model.
+// Supported types map to theme tokens: NOTE -> accent, WARNING -> warning,
+// TIP -> success. Detection is case-insensitive; an optional inline title may
+// follow the marker on the same line (e.g. "[!TIP] Pro tip").
+
+const CALLOUT_TYPES: Record<string, { label: string }> = {
+  note: { label: 'Note' },
+  warning: { label: 'Warning' },
+  tip: { label: 'Tip' },
+};
+
+const CALLOUT_MARKER_RE = /^\s*\[!(note|warning|tip)\]\s*(.*)$/i;
+
+/** First text content carried by a blockquote's content, used for marker detection. */
+function blockquoteLeadText(node: DocNode): string {
+  const first = (node.content || [])[0];
+  if (!first) return '';
+  return nodeText(first);
+}
+
+function blockquoteToHTML(node: DocNode, inner: string): string {
+  const lead = blockquoteLeadText(node);
+  const m = lead.match(CALLOUT_MARKER_RE);
+  if (!m) return `<blockquote>${inner}</blockquote>`;
+
+  const type = m[1].toLowerCase();
+  const inlineTitle = (m[2] || '').trim();
+  const meta = CALLOUT_TYPES[type];
+  const label = inlineTitle || meta.label;
+
+  // Rebuild the body without the marker paragraph (the header replaces it).
+  const body = nodesToHTML((node.content || []).slice(1));
+  const header =
+    `<div class="callout-title" contenteditable="false">` +
+    `<span class="callout-icon" aria-hidden="true"></span>` +
+    `<span class="callout-label">${escapeHTML(label)}</span></div>`;
+  return (
+    `<blockquote class="callout callout-${type}" data-callout="${type}"` +
+    (inlineTitle ? ` data-callout-title="${escapeAttr(inlineTitle)}"` : '') +
+    `>${header}<div class="callout-body">${body || '<p><br></p>'}</div></blockquote>`
+  );
 }
 
 function wrapMark(html: string, mark: Mark): string {
@@ -239,8 +288,25 @@ function parseElement(el: Element): DocNode | null {
     case 'h4': return { type: 'heading', attrs: { level: 4 }, content: parseInline(el) };
     case 'h5': return { type: 'heading', attrs: { level: 5 }, content: parseInline(el) };
     case 'h6': return { type: 'heading', attrs: { level: 6 }, content: parseInline(el) };
-    case 'blockquote':
+    case 'blockquote': {
+      // Callout blockquotes carry data-callout; reconstruct the leading
+      // "[!TYPE] title" paragraph from the attribute and parse only the body,
+      // so the marker survives the round-trip without the rendered header
+      // leaking its label text back into the document.
+      const callout = el.getAttribute('data-callout');
+      if (callout && CALLOUT_TYPES[callout.toLowerCase()]) {
+        const type = callout.toLowerCase();
+        const title = el.getAttribute('data-callout-title') || '';
+        const marker = `[!${type.toUpperCase()}]${title ? ` ${title}` : ''}`;
+        const bodyEl = el.querySelector('.callout-body');
+        const bodyNodes = bodyEl ? parseChildren(bodyEl) : [];
+        return {
+          type: 'blockquote',
+          content: [{ type: 'paragraph', text: marker }, ...bodyNodes],
+        };
+      }
       return { type: 'blockquote', content: parseChildren(el) };
+    }
     case 'pre': {
       const code = el.querySelector('code');
       const text = (code || el).textContent || '';

@@ -41,7 +41,7 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const searchBarStyle: React.CSSProperties = {
-  height: 28, display: 'flex', alignItems: 'center', padding: '0 8px',
+  height: 28, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)',
   borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
 };
 
@@ -52,7 +52,7 @@ const searchInputStyle: React.CSSProperties = {
 };
 
 const listItemStyle = (selected: boolean): React.CSSProperties => ({
-  display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-2)', cursor: 'pointer',
   background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'transparent',
   borderBottom: '1px solid var(--color-border-subtle)',
 });
@@ -69,14 +69,14 @@ const thumbnailStyle: React.CSSProperties = {
 };
 
 const effectItemStyle = (selected: boolean): React.CSSProperties => ({
-  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px var(--space-2)', cursor: 'pointer',
   background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.12))' : 'transparent',
   borderBottom: '1px solid var(--color-border-subtle)',
   fontSize: 11, color: 'var(--color-text-primary)',
 });
 
 const categoryHeaderStyle: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)',
+  padding: '6px var(--space-2)', fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '0.05em',
   borderBottom: '1px solid var(--color-border-subtle)',
 };
@@ -341,7 +341,7 @@ const MediaTab: React.FC = memo(() => {
       {bins.length > 0 && (
         <div style={{ flexShrink: 0, borderBottom: '1px solid var(--color-border-subtle)' }}>
           {bins.filter(b => !b.parentId).map(bin => (
-            <div key={bin.id} style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11, color: 'var(--color-text-secondary)' }}
+            <div key={bin.id} style={{ padding: '2px var(--space-2)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11, color: 'var(--color-text-secondary)' }}
               onClick={() => toggleBin(bin.id)}>
               <FolderIcon expanded={bin.expanded} />
               <span>{bin.name}</span>
@@ -351,7 +351,7 @@ const MediaTab: React.FC = memo(() => {
       )}
 
       {/* Media List/Grid */}
-      <div style={{ flex: 1, overflow: 'auto', padding: viewMode === 'grid' ? 4 : 0 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: viewMode === 'grid' ? 4 : 0 }}>
         {viewMode === 'grid' ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {filtered.map(item => (
@@ -376,7 +376,7 @@ const MediaTab: React.FC = memo(() => {
           ))
         )}
         {filtered.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+          <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
             {search ? 'No results' : 'Import media to get started'}
           </div>
         )}
@@ -402,7 +402,7 @@ const MediaTab: React.FC = memo(() => {
             aria-label="Delete media item"
             style={{
               display: 'block', width: '100%', textAlign: 'left',
-              background: 'transparent', border: 'none', padding: '8px 14px',
+              background: 'transparent', border: 'none', padding: 'var(--space-2) 14px',
               color: 'var(--color-error, #ff5f57)', cursor: 'pointer',
             }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
@@ -502,7 +502,7 @@ const EffectsTab: React.FC = memo(() => {
       <div style={searchBarStyle}>
         <input style={searchInputStyle} placeholder="Search effects..." aria-label="Search effects" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {Array.from(grouped.entries()).map(([category, effects]) => (
           <div key={category}>
             <div style={categoryHeaderStyle}>{category}</div>
@@ -564,7 +564,7 @@ const TransitionsTab: React.FC = memo(() => {
       <div style={searchBarStyle}>
         <input style={searchInputStyle} placeholder="Search transitions..." aria-label="Search transitions" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {Array.from(grouped.entries()).map(([group, transitions]) => (
           <div key={group}>
             <div style={categoryHeaderStyle}>{group}</div>
@@ -602,7 +602,7 @@ const TitlesTab: React.FC = memo(() => {
 
   return (
     <div style={panelStyle}>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {TITLE_PRESETS.map(preset => (
           <div
             key={preset.id}
@@ -650,9 +650,9 @@ const AudioTab: React.FC = memo(() => {
 
   return (
     <div style={panelStyle}>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {audioItems.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+          <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
             No audio files imported
           </div>
         )}

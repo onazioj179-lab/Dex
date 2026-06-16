@@ -211,7 +211,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
           alignItems: 'center',
           width,
           height: 28,
-          padding: '0 8px',
+          padding: '0 var(--space-2)',
           background: isEditing ? colors.bg.inset : colors.bg.hover,
           border: `1px solid ${isDragging ? colors.accent.default : colors.border.subtle}`,
           borderRadius: radius.sm,
@@ -318,7 +318,7 @@ export const CoordinateInput: React.FC<CoordinateInputProps> = ({
   labels = { x: 'X', y: 'Y' },
 }) => {
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
       <NumberInput
         value={x}
         onChange={(v) => onChange(v, y)}
@@ -402,7 +402,7 @@ export const SizeInput: React.FC<SizeInputProps> = ({
   }, [linked, width, height]);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
       <NumberInput
         value={width}
         onChange={handleWidthChange}

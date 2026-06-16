@@ -209,7 +209,7 @@ const ColorSlider: React.FC<ColorSliderProps> = ({
   const percent = ((value - min) / (max - min)) * 100;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
       <span style={{ fontSize: 11, color: colors.text.secondary, width: 12 }}>
         {label}
       </span>
@@ -425,7 +425,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 'var(--space-3)',
         padding: compact ? 12 : 0,
         background: compact ? colors.bg.surface : 'transparent',
         borderRadius: compact ? radius.md : 0,
@@ -484,7 +484,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       )}
 
       {/* Hex input and eyedropper */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
         <div style={{ ...swatchStyle(value), flexShrink: 0 }} />
         
         <input
@@ -495,7 +495,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           style={{
             flex: 1,
             height: 28,
-            padding: '0 8px',
+            padding: '0 var(--space-2)',
             background: colors.bg.inset,
             border: `1px solid ${colors.border.subtle}`,
             borderRadius: radius.sm,

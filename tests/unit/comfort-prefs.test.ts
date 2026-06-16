@@ -20,6 +20,8 @@ beforeEach(() => {
   const root = document.documentElement;
   root.removeAttribute('data-reduce-motion');
   root.removeAttribute('data-contrast');
+  root.removeAttribute('data-density');
+  root.removeAttribute('data-darkroom');
   root.style.removeProperty('--dex-text-scale');
   root.style.removeProperty('font-size');
 });
@@ -66,5 +68,41 @@ describe('comfortPrefs.setComfort', () => {
     setComfort({ contrast: 'high' });
     expect(loadComfort().contrast).toBe('high');
     expect(document.documentElement.getAttribute('data-contrast')).toBe('high');
+  });
+});
+
+describe('comfortPrefs density / dark-room', () => {
+  it('resolveComfort passes valid density through and defaults invalid', () => {
+    const os = { reducedMotion: false, highContrast: false };
+    expect(resolveComfort({ ...DEFAULT_COMFORT, density: 'compact' }, os).density).toBe('compact');
+    expect(resolveComfort({ ...DEFAULT_COMFORT, density: 'comfortable' }, os).density).toBe('comfortable');
+    // unknown value falls back to the no-op default
+    expect(resolveComfort({ ...DEFAULT_COMFORT, density: 'huge' as never }, os).density).toBe('default');
+  });
+
+  it('applyComfort writes data-density only when non-default', () => {
+    const root = document.documentElement;
+    applyComfort({ reduceMotion: false, highContrast: false, textScale: 1, density: 'compact', darkroom: false });
+    expect(root.getAttribute('data-density')).toBe('compact');
+    // back to default clears the attribute
+    applyComfort({ reduceMotion: false, highContrast: false, textScale: 1, density: 'default', darkroom: false });
+    expect(root.getAttribute('data-density')).toBeNull();
+  });
+
+  it('applyComfort toggles data-darkroom', () => {
+    const root = document.documentElement;
+    applyComfort({ reduceMotion: false, highContrast: false, textScale: 1, density: 'default', darkroom: true });
+    expect(root.getAttribute('data-darkroom')).toBe('on');
+    applyComfort({ reduceMotion: false, highContrast: false, textScale: 1, density: 'default', darkroom: false });
+    expect(root.getAttribute('data-darkroom')).toBeNull();
+  });
+
+  it('setComfort persists density and dark-room', () => {
+    setComfort({ density: 'comfortable', darkroom: true });
+    const saved = loadComfort();
+    expect(saved.density).toBe('comfortable');
+    expect(saved.darkroom).toBe(true);
+    expect(document.documentElement.getAttribute('data-density')).toBe('comfortable');
+    expect(document.documentElement.getAttribute('data-darkroom')).toBe('on');
   });
 });

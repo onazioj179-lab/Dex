@@ -192,7 +192,7 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--space-2)',
                   transition: 'background 0.12s',
                 }}
                 className="dex-send-to-item"

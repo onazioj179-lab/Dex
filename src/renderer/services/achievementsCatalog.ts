@@ -494,7 +494,7 @@ const APPS: [string, string, string][] = [
 //  ACHIEVEMENT CATALOG -- 5000 Achievements
 // ==========================================================================
 
-export const ACHIEVEMENTS: Achievement[] = [
+const ACHIEVEMENTS_RAW: Achievement[] = [
 
   // === EXPLORER (100) -- App discovery & exploration =======================
 
@@ -4822,6 +4822,27 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'chain-eternal-flame', title: 'Eternal Flame', description: 'Maintain a 1000-day streak', icon: 'flame', category: 'streak', condition: s => s.currentStreak >= 1000, points: 10000, rarity: 'mythic' },
   { id: 'chain-infinity', title: 'Infinity', description: 'Reach 100000 total sessions', icon: 'infinity', category: 'mastery', condition: s => s.totalSessions >= 100000, points: 10000, rarity: 'mythic', secret: true },
 ];
+
+// Some generators (appVeteran across multiple app loops, a few *-deep tiers)
+// emitted colliding ids -- 70 exact-duplicate ids out of 5248. Duplicate ids
+// break the Trophies grid's React keys (duplicated/omitted rows = the blank/
+// skeleton render seen live) AND corrupt unlock accounting: the unlock Set
+// dedupes, so a collision can never be fully earned and by-id stats miscount.
+// Collapse to the first occurrence so the exported catalog is unique at the
+// single source of truth -- every consumer (checkAchievements, getTotalPoints,
+// getAchievementStats, the Trophies UI) reads this deduped list.
+function dedupeById(list: Achievement[]): Achievement[] {
+  const seen = new Set<string>();
+  const out: Achievement[] = [];
+  for (const a of list) {
+    if (seen.has(a.id)) continue;
+    seen.add(a.id);
+    out.push(a);
+  }
+  return out;
+}
+
+export const ACHIEVEMENTS: Achievement[] = dedupeById(ACHIEVEMENTS_RAW);
 
 // -- Category metadata ----------------------------------------------------
 

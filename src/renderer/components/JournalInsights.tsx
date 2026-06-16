@@ -22,8 +22,8 @@ const S: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex',
     flexDirection: 'column',
-    padding: 12,
-    gap: 12,
+    padding: 'var(--space-3)',
+    gap: 'var(--space-3)',
   },
   sectionTitle: {
     fontSize: 10,
@@ -31,7 +31,7 @@ const S: Record<string, React.CSSProperties> = {
     marginBottom: 4,
   },
   card: {
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     borderRadius: 4,
     border: '1px solid var(--color-bg-hover)',
     background: 'var(--color-border-subtle)',
@@ -78,7 +78,7 @@ const S: Record<string, React.CSSProperties> = {
     marginRight: 4,
   },
   weeklySection: {
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     borderRadius: 4,
     border: '1px solid rgba(10,132,255,0.12)',
     background: 'rgba(10,132,255,0.04)',
@@ -100,7 +100,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   weeklyStatRow: {
     display: 'flex',
-    gap: 12,
+    gap: 'var(--space-3)',
     marginBottom: 6,
   },
   weeklyStat: {
@@ -144,7 +144,7 @@ const S: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   actionBtn: {
-    padding: '3px 8px',
+    padding: '3px var(--space-2)',
     fontSize: 10,
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 3,
@@ -154,7 +154,7 @@ const S: Record<string, React.CSSProperties> = {
     marginTop: 4,
   },
   refreshBtn: {
-    padding: '3px 8px',
+    padding: '3px var(--space-2)',
     fontSize: 10,
     border: '1px solid rgba(10,132,255,0.2)',
     borderRadius: 3,
@@ -321,7 +321,7 @@ const WeeklyReportSection = memo(({ report }: { report: WeeklyReport }) => {
       )}
 
       {expanded && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 'var(--space-2)' }}>
           {report.peakDay && (
             <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
               Peak: {report.peakDay.date} ({report.peakDay.count} entries)

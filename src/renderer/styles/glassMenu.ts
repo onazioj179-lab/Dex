@@ -112,14 +112,15 @@ export const glassButtonHover: React.CSSProperties = {
   borderColor: 'var(--color-text-tertiary)',
 };
 
-/** Dock surface. DEX Sharp full-flat: a solid, placed bar (like a native OS
- * dock/taskbar in its opaque mode) rather than frosted glass — no blur, opaque
- * elevated surface. Depth comes from the drop shadow + a hairline top rim. */
+/** Dock surface. DEX Sharp 2.0: a thin, crisp, dark bar — deliberately darker
+ * than the app surfaces so it reads as bespoke chrome that recedes against the
+ * wallpaper instead of a washed-out light slab. No blur; depth is a tight,
+ * contained shadow + a hairline rim. Not bleachy. */
 export const liquidGlassDock: React.CSSProperties = {
-  background: 'var(--color-bg-elevated)',
-  border: '1px solid var(--color-border-subtle)',
+  background: '#0E0E11',
+  border: '1px solid var(--color-border)',
   borderRadius: 9999,
-  boxShadow: '0 14px 48px rgba(0,0,0,0.25), 0 4px 14px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.06)',
+  boxShadow: '0 8px 22px rgba(0,0,0,0.55), inset 0 0.5px 0 rgba(255,255,255,0.05)',
 };
 
 /** Liquid glass for interactive buttons */
@@ -164,7 +165,7 @@ export const liquidGlassAppMenu: React.CSSProperties = {
   background: 'var(--color-bg-glass-strong, rgba(20, 20, 22, 0.93))',
   ...adaptiveBlur(24, 190),
   border: '1px solid var(--color-border)',
-  borderRadius: 16,
+  borderRadius: 10,
   boxShadow: '0 12px 40px rgba(0,0,0,0.26), 0 0 0 0.5px var(--color-bg-hover), inset 0 0.5px 0 var(--color-border-subtle)',
 };
 
@@ -173,7 +174,7 @@ export const glassNotification: React.CSSProperties = {
   background: 'var(--color-bg-glass-strong, rgba(22, 22, 24, 0.94))',
   ...adaptiveBlur(20, 180),
   border: '1px solid var(--color-border)',
-  borderRadius: 12,
+  borderRadius: 8,
   boxShadow: '0 8px 32px rgba(0,0,0,0.23), inset 0 0.5px 0 var(--color-border)',
   transition: 'transform 0.4s cubic-bezier(0.23,1,0.32,1), opacity 0.4s cubic-bezier(0.23,1,0.32,1)',
 };
@@ -203,7 +204,7 @@ export const glassModal: React.CSSProperties = {
   background: 'var(--color-bg-glass-strong, rgba(20, 20, 22, 0.96))',
   ...adaptiveBlur(28, 200),
   border: '1px solid rgba(255,255,255,0.10)',
-  borderRadius: 12,
+  borderRadius: 10,
   boxShadow: '0 16px 64px rgba(0,0,0,0.33), 0 4px 16px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.06)',
 };
 
@@ -242,8 +243,8 @@ export const premiumGlassToolbar: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  padding: '8px 12px',
-  minHeight: 44,
+  padding: '6px 10px',
+  minHeight: 40,
 };
 
 /** Premium glass card: small contained surface for stats/info blocks. */
@@ -319,7 +320,7 @@ const GLASS_PRESETS: Record<GlassIntensity, {
     border: '1px solid var(--color-border)',
     highlight: 'inset 0 0.5px 0 var(--color-text-tertiary), inset 0 -0.5px 0 rgba(0,0,0,0.04)',
     shadow: '0 4px 16px rgba(0,0,0,0.11)',
-    radius: 14,
+    radius: 10,
   },
   heavy: {
     bg: 'var(--color-border)',
@@ -327,7 +328,7 @@ const GLASS_PRESETS: Record<GlassIntensity, {
     border: '1px solid var(--color-text-tertiary)',
     highlight: 'inset 0 1px 0 var(--color-text-tertiary), inset 0 -0.5px 0 rgba(0,0,0,0.05)',
     shadow: '0 8px 32px rgba(0,0,0,0.15), 0 0 0 0.5px var(--color-border-subtle)',
-    radius: 18,
+    radius: 10,
   },
 };
 

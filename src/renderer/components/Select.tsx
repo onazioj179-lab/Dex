@@ -182,8 +182,8 @@ export const Select: React.FC<SelectProps> = ({
 
   const sizes = {
     sm: { height: 32, fontSize: 12, padding: '0 10px' },
-    md: { height: 40, fontSize: 14, padding: '0 12px' },
-    lg: { height: 48, fontSize: 16, padding: '0 16px' },
+    md: { height: 40, fontSize: 14, padding: '0 var(--space-3)' },
+    lg: { height: 48, fontSize: 16, padding: '0 var(--space-4)' },
   };
 
   const s = sizes[size];
@@ -196,7 +196,7 @@ export const Select: React.FC<SelectProps> = ({
     control: {
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
+      gap: 'var(--space-2)',
       height: s.height,
       padding: s.padding,
       background: 'var(--color-bg-surface)',
@@ -255,13 +255,13 @@ export const Select: React.FC<SelectProps> = ({
       zIndex: 2400,
     },
     group: {
-      padding: '8px 12px 4px',
+      padding: 'var(--space-2) var(--space-3) 4px',
     },
     option: {
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '10px 12px',
+      padding: '10px var(--space-3)',
       fontSize: s.fontSize,
       color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
@@ -299,11 +299,11 @@ export const Select: React.FC<SelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 20,
+      padding: 'var(--space-5)',
       color: 'var(--color-text-muted)',
     },
     empty: {
-      padding: 20,
+      padding: 'var(--space-5)',
       textAlign: 'center',
       color: 'var(--color-text-muted)',
       fontSize: 13,
@@ -503,7 +503,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       flexWrap: 'wrap',
       gap: 6,
       minHeight: s.minHeight,
-      padding: '6px 12px',
+      padding: '6px var(--space-3)',
       background: 'var(--color-bg-surface)',
       border: `1px solid ${isOpen ? 'var(--color-accent)' : 'var(--color-border)'}`,
       borderRadius: 6,
@@ -515,7 +515,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: 4,
-      padding: '2px 8px',
+      padding: '2px var(--space-2)',
       background: 'var(--color-border-subtle)',
       borderRadius: 3,
       fontSize: s.fontSize - 2,
@@ -561,7 +561,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '10px 12px',
+      padding: '10px var(--space-3)',
       fontSize: s.fontSize,
       color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',

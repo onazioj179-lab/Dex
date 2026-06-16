@@ -373,7 +373,7 @@ const Calendar: React.FC = () => {
                   <div style={styles.eventsList}>
                     {getEventsForDate(selectedDate).length === 0 ? (
                       <div style={styles.noEvents}>
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.35, marginBottom: 8 }}>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.35, marginBottom: 'var(--space-2)' }}>
                           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                         </svg>
                         <div>No events for this day</div>
@@ -553,7 +553,7 @@ const Calendar: React.FC = () => {
                   onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })}
                 />
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
                 {(['none', 'daily', 'weekly', 'monthly', 'yearly'] as const).map(r => (
                   <button
                     key={r}
@@ -616,7 +616,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 16px',
+    padding: 'var(--space-3) var(--space-4)',
     height: '44px',
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface-solid, #1C1C1E)',
@@ -624,12 +624,12 @@ const styles: Record<string, React.CSSProperties> = {
   headerLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: 'var(--space-3)',
   },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--space-2)',
   },
   todayBtn: {
     padding: '6px 14px',
@@ -652,7 +652,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
     color: 'var(--color-text-tertiary)',
-    padding: '6px 8px',
+    padding: '6px var(--space-2)',
     borderRadius: '4px',
     cursor: 'pointer',
     display: 'flex',
@@ -674,7 +674,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px',
   },
   viewBtn: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     border: 'none',
     borderRadius: '3px',
     background: 'transparent',
@@ -724,17 +724,17 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border-default)',
     borderLeft: 'none',
     borderRadius: '0 4px 4px 0',
-    padding: '8px 4px',
+    padding: 'var(--space-2) 4px',
     color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
     zIndex: 10,
     boxShadow: 'var(--shadow-md)',
   },
   miniCal: {
-    marginBottom: '16px',
+    marginBottom: 'var(--space-4)',
     background: 'var(--color-bg-surface)',
     borderRadius: '6px',
-    padding: '12px',
+    padding: 'var(--space-3)',
     border: '1px solid var(--color-border-subtle)',
   },
   miniHeader: {
@@ -783,7 +783,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-accent-soft, rgba(74,158,255,0.4))',
   },
   dayEvents: {
-    marginTop: '12px',
+    marginTop: 'var(--space-3)',
   },
   dayEventsHeader: {
     marginBottom: '10px',
@@ -803,7 +803,7 @@ const styles: Record<string, React.CSSProperties> = {
   noEvents: {
     color: 'var(--color-text-muted)',
     fontSize: '11px',
-    padding: '24px 0',
+    padding: 'var(--space-6) 0',
     fontWeight: 500,
     display: 'flex',
     flexDirection: 'column',
@@ -813,7 +813,7 @@ const styles: Record<string, React.CSSProperties> = {
   eventItem: {
     background: 'var(--color-bg-surface)',
     borderRadius: '4px',
-    padding: '10px 12px',
+    padding: '10px var(--space-3)',
     borderLeft: '3px solid',
     position: 'relative',
     boxShadow: 'var(--shadow-sm)',
@@ -849,20 +849,20 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    padding: '16px',
-    marginLeft: '12px',
+    padding: 'var(--space-4)',
+    marginLeft: 'var(--space-3)',
   },
   weekHeader: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
-    marginBottom: '8px',
+    marginBottom: 'var(--space-2)',
   },
   weekDay: {
     textAlign: 'center',
     fontSize: '10px',
     color: 'var(--color-text-muted)',
     fontWeight: 600,
-    padding: '8px',
+    padding: 'var(--space-2)',
     letterSpacing: '0.5px',
     textTransform: 'uppercase' as const,
   },
@@ -879,7 +879,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dayCell: {
     background: 'var(--color-bg-surface)',
-    padding: '8px',
+    padding: 'var(--space-2)',
     minHeight: '80px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -954,7 +954,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
-    padding: '8px 0 6px',
+    padding: 'var(--space-2) 0 6px',
     gap: '2px',
     borderRight: '1px solid var(--color-border-subtle)',
   },
@@ -1000,7 +1000,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'flex-end',
-    paddingRight: '8px',
+    paddingRight: 'var(--space-2)',
     paddingTop: '2px',
     borderRight: '1px solid var(--color-border-subtle)',
   },
@@ -1067,7 +1067,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 20px',
+    padding: 'var(--space-4) var(--space-5)',
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface)',
   },
@@ -1083,21 +1083,21 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary)',
     fontSize: '16px',
     cursor: 'pointer',
-    padding: '4px 8px',
+    padding: '4px var(--space-2)',
     borderRadius: '3px',
     transition: 'all 0.15s ease',
   },
   modalBody: {
-    padding: '16px 20px',
+    padding: 'var(--space-4) var(--space-5)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: 'var(--space-3)',
   },
   input: {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: '4px',
-    padding: '12px 14px',
+    padding: 'var(--space-3) 14px',
     color: 'var(--color-text-primary)',
     fontSize: '13px',
     outline: 'none',
@@ -1115,7 +1115,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: '4px',
-    padding: '10px 12px',
+    padding: '10px var(--space-3)',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
     fontWeight: 500,
@@ -1128,7 +1128,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   colorPicker: {
     display: 'flex',
-    gap: '8px',
+    gap: 'var(--space-2)',
   },
   colorBtn: {
     width: '28px',
@@ -1148,7 +1148,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: '4px',
-    padding: '12px 14px',
+    padding: 'var(--space-3) 14px',
     color: 'var(--color-text-primary)',
     fontSize: '12px',
     resize: 'none',
@@ -1161,11 +1161,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '10px',
-    padding: '16px 20px',
+    padding: 'var(--space-4) var(--space-5)',
     borderTop: '1px solid var(--color-border-subtle)',
   },
   cancelBtn: {
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     background: 'transparent',
     border: '1px solid var(--color-border-default)',
     borderRadius: '4px',
@@ -1177,7 +1177,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--dex-font-ui)',
   },
   saveBtn: {
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     background: 'var(--color-success)',
     border: 'none',
     borderRadius: '4px',

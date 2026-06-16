@@ -10,12 +10,13 @@
  * Connected to real file system via IPC
  */
 
-import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 
 // ===========================================================================
 // TYPES
@@ -36,8 +37,10 @@ interface Task {
   id: string;
   title: string;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
+  priority: 'none' | 'low' | 'medium' | 'high';
   dueDate: Date | null;
+  /** Optional time-of-day for the due date, stored as "HH:MM" (24h). Persists as a plain string. */
+  dueTime?: string | null;
   list: string;
   notes: string;
   subtasks?: { id: string; title: string; completed: boolean }[];
@@ -227,8 +230,40 @@ export const Tasks: React.FC = () => {
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'done'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | Task['priority']>('all');
+  const [recentlyCompleted, setRecentlyCompleted] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'priority' | 'date' | 'name' | 'manual'>('priority');
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  // -- uki context: let the assistant see what the user is doing in Tasks.
+  // Registered once; a latest-value ref (refreshed every render) keeps the
+  // resolver reading live state without re-registering. Mirrors the Notes
+  // resolver so uki has the same awareness across the productivity apps.
+  const ukiCtxRef = useRef({ tasks, expandedTask, searchQuery, statusFilter, priorityFilter });
+  useEffect(() => { ukiCtxRef.current = { tasks, expandedTask, searchQuery, statusFilter, priorityFilter }; });
+  useEffect(() => {
+    registerUkiAppContext('tasks', () => {
+      const c = ukiCtxRef.current;
+      const active = c.tasks.filter(t => !t.completed).length;
+      const focused = c.expandedTask ? c.tasks.find(t => t.id === c.expandedTask) : undefined;
+      return {
+        appId: 'tasks',
+        focusedItemId: focused?.id,
+        currentFile: focused?.title,
+        selectionText: focused ? `${focused.title}${focused.completed ? ' (done)' : ''}` : undefined,
+        custom: {
+          total: c.tasks.length,
+          active,
+          done: c.tasks.length - active,
+          search: c.searchQuery || undefined,
+          statusFilter: c.statusFilter,
+          priorityFilter: c.priorityFilter,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('tasks');
+  }, []);
   const dragIdRef = React.useRef<string | null>(null);
   const newTaskInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -245,13 +280,29 @@ export const Tasks: React.FC = () => {
   }, []);
   // Load tasks from backend on mount
   useEffect(() => {
+    // Drain any tasks uki chat queued ("add a task: ...") and clear the queue, so
+    // the task lands here for real whether Tasks was opened by us or already open.
+    const drainPending = (): Task[] => {
+      let q: unknown = [];
+      try { q = JSON.parse(localStorage.getItem('dex-uki-pending-tasks') || '[]'); } catch { q = []; }
+      if (!Array.isArray(q) || q.length === 0) return [];
+      localStorage.removeItem('dex-uki-pending-tasks');
+      return q
+        .map((item: { title?: unknown }) => (item && item.title ? String(item.title).trim() : ''))
+        .filter(Boolean)
+        .map((title: string): Task => ({ id: crypto.randomUUID(), title, completed: false, priority: 'medium', dueDate: null, list: 'personal', notes: '' }));
+    };
     const loadTasks = async () => {
       setIsLoading(true);
       const loadedTasks = await loadTasksFromBackend();
-      setTasks(loadedTasks);
+      const pending = drainPending();
+      setTasks(pending.length ? [...pending, ...loadedTasks] : loadedTasks);
       setIsLoading(false);
     };
     loadTasks();
+    const onPending = () => { const p = drainPending(); if (p.length) setTasks(prev => [...p, ...prev]); };
+    window.addEventListener('uki:tasks-pending', onPending);
+    return () => window.removeEventListener('uki:tasks-pending', onPending);
   }, []);
 
   // Save to backend and localStorage when tasks change
@@ -266,6 +317,11 @@ export const Tasks: React.FC = () => {
 
   const filteredTasks = useMemo(() => tasks.filter(task => {
     if (!showCompleted && task.completed) return false;
+    // Status filter (all / active / done)
+    if (statusFilter === 'active' && task.completed) return false;
+    if (statusFilter === 'done' && !task.completed) return false;
+    // Priority filter
+    if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -281,7 +337,7 @@ export const Tasks: React.FC = () => {
       default:
         return task.list === selectedList;
     }
-  }), [tasks, showCompleted, selectedList, searchQuery]);
+  }), [tasks, showCompleted, selectedList, searchQuery, statusFilter, priorityFilter]);
 
   const reorderTasks = useCallback((sourceId: string, targetId: string) => {
     setTasks(prev => {
@@ -305,10 +361,27 @@ export const Tasks: React.FC = () => {
         return aDate - bDate;
       }
       if (sortBy === 'name') return a.title.localeCompare(b.title);
-      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-      return (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
+      return (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
     });
   }, [filteredTasks, sortBy]);
+
+  // Progressive rendering for large task lists (DEX 5.5 scroll audit). Manual
+  // sort enables drag-reorder, which needs every row present, so windowing only
+  // applies to the computed (non-manual) sort modes.
+  const TASKS_PER_PAGE = 60;
+  const [taskVisibleCount, setTaskVisibleCount] = useState(TASKS_PER_PAGE);
+  const tasksWindowed = sortBy !== 'manual';
+  useEffect(() => { setTaskVisibleCount(TASKS_PER_PAGE); }, [sortBy, sortedTasks.length]);
+  const visibleTasks = tasksWindowed ? sortedTasks.slice(0, taskVisibleCount) : sortedTasks;
+  const remainingTasks = sortedTasks.length - visibleTasks.length;
+  const handleTaskScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (!tasksWindowed) return;
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 220) {
+      setTaskVisibleCount(v => (v < sortedTasks.length ? v + TASKS_PER_PAGE : v));
+    }
+  }, [tasksWindowed, sortedTasks.length]);
 
   const clearCompleted = () => setTasks(prev => prev.filter(t => !t.completed));
 
@@ -316,6 +389,9 @@ export const Tasks: React.FC = () => {
     const task = tasks.find(t => t.id === id);
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
     if (task && !task.completed) {
+      // Trigger the brief completion animation, then clear the flag so it can replay.
+      setRecentlyCompleted(id);
+      window.setTimeout(() => setRecentlyCompleted(prev => (prev === id ? null : prev)), 400);
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: 1 } }));
     }
   };
@@ -402,15 +478,24 @@ export const Tasks: React.FC = () => {
   const cyclePriority = (id: string) => {
     setTasks(tasks.map(t => {
       if (t.id !== id) return t;
-      const order: Task['priority'][] = ['low', 'medium', 'high'];
+      // P1 (high) -> P2 (medium) -> P3 (low) -> P4 (none) -> back to P1.
+      const order: Task['priority'][] = ['high', 'medium', 'low', 'none'];
       const idx = order.indexOf(t.priority);
-      return { ...t, priority: order[(idx + 1) % 3] };
+      return { ...t, priority: order[(idx + 1) % order.length] };
     }));
+  };
+
+  const setPriority = (id: string, priority: Task['priority']) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, priority } : t));
+  };
+
+  const setDueTime = (id: string, time: string) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, dueTime: time || null } : t));
   };
 
   const buildTaskCtxItems = useCallback((task: Task): ContextMenuItem[] => [
     { id: 'toggle', label: task.completed ? 'Mark Incomplete' : 'Mark Complete', onClick: () => toggleTask(task.id) },
-    { id: 'priority', label: `Priority: ${task.priority}`, shortcut: 'P', onClick: () => cyclePriority(task.id) },
+    { id: 'priority', label: `Priority: ${getPriorityLabel(task.priority)}`, shortcut: 'P', onClick: () => cyclePriority(task.id) },
     { id: 'div1', label: '', divider: true },
     { id: 'expand', label: 'Edit Details', onClick: () => setExpandedTask(task.id) },
     { id: 'div2', label: '', divider: true },
@@ -449,19 +534,61 @@ export const Tasks: React.FC = () => {
     switch (priority) {
       case 'high': return 'var(--color-error)';
       case 'medium': return 'var(--color-warning)';
-      case 'low': return 'var(--color-text-tertiary, #8e8e93)';
+      case 'low': return 'var(--color-accent)';
+      case 'none': return 'var(--color-text-muted)';
     }
   };
 
-  const formatDueDate = (date: Date | null): string => {
+  // P1 = highest. Maps the semantic priority to the macOS-style P-label/badge.
+  const getPriorityLabel = (priority: Task['priority']): string => {
+    switch (priority) {
+      case 'high': return 'P1';
+      case 'medium': return 'P2';
+      case 'low': return 'P3';
+      case 'none': return 'P4';
+    }
+  };
+
+  // A task is overdue when its due date/time is in the past and it is not yet done.
+  const getDueDateTime = (task: Task): Date | null => {
+    if (!task.dueDate) return null;
+    const d = new Date(task.dueDate);
+    if (task.dueTime) {
+      const [h, m] = task.dueTime.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) d.setHours(h, m, 0, 0);
+    }
+    return d;
+  };
+
+  const isOverdue = (task: Task): boolean => {
+    if (task.completed) return false;
+    const due = getDueDateTime(task);
+    return due !== null && due.getTime() < Date.now();
+  };
+
+  const formatDueDate = (date: Date | null, time?: string | null): string => {
     if (!date) return '';
     const today = new Date();
     const taskDate = new Date(date);
-    if (taskDate.toDateString() === today.toDateString()) return 'Today';
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (taskDate.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-    return taskDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    let label: string;
+    if (taskDate.toDateString() === today.toDateString()) {
+      label = 'Today';
+    } else {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      label = taskDate.toDateString() === tomorrow.toDateString()
+        ? 'Tomorrow'
+        : taskDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+    if (time) {
+      const [h, m] = time.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        const t = new Date();
+        t.setHours(h, m, 0, 0);
+        label += ` ${t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      }
+    }
+    return label;
   };
 
   return (
@@ -475,6 +602,12 @@ export const Tasks: React.FC = () => {
         ::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--color-border); }
         input:focus { outline: none; }
+        @keyframes dexTaskComplete {
+          0% { transform: scale(1); }
+          40% { transform: scale(1.015); background: var(--color-success-muted, rgba(48,209,88,0.1)); }
+          100% { transform: scale(1); }
+        }
+        .dex-task-complete { animation: dexTaskComplete 0.4s ease; }
       `}</style>
       {/* Sidebar */}
       <div style={styles.sidebar}>
@@ -544,7 +677,7 @@ export const Tasks: React.FC = () => {
             onChange={(e) => setSortBy(e.target.value as 'priority' | 'date' | 'name' | 'manual')}
             aria-label="Sort tasks by"
             style={{
-              padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+              padding: '4px var(--space-2)', borderRadius: 4, fontSize: 11, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               color: 'var(--color-text-secondary)', cursor: 'pointer', outline: 'none',
               fontFamily: 'inherit',
@@ -567,19 +700,71 @@ export const Tasks: React.FC = () => {
           )}
         </div>
         {/* Search Bar */}
-        <div style={{ padding: '0 16px 8px' }}>
+        <div style={{ padding: '0 var(--space-4) var(--space-2)' }}>
           <input
             type="text"
             placeholder="Search tasks... (Ctrl+F)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              width: '100%', padding: '8px 12px', borderRadius: 6,
+              width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
               fontFamily: 'inherit', boxSizing: 'border-box',
             }}
           />
+        </div>
+
+        {/* Filter Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '0 var(--space-4) var(--space-2)', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Status:</span>
+          {([
+            { id: 'all', label: 'All' },
+            { id: 'active', label: 'Active' },
+            { id: 'done', label: 'Done' },
+          ] as const).map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setStatusFilter(opt.id)}
+              aria-label={`Filter by status: ${opt.label}`}
+              style={{
+                padding: '3px 10px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 11, cursor: 'pointer',
+                border: '1px solid var(--color-border-subtle)',
+                background: statusFilter === opt.id ? 'var(--color-accent-light)' : 'var(--color-bg-hover)',
+                color: statusFilter === opt.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                fontWeight: statusFilter === opt.id ? 600 : 400, fontFamily: 'inherit',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, marginLeft: 'var(--space-2)' }}>Priority:</span>
+          {([
+            { id: 'all', label: 'All' },
+            { id: 'high', label: 'P1' },
+            { id: 'medium', label: 'P2' },
+            { id: 'low', label: 'P3' },
+            { id: 'none', label: 'P4' },
+          ] as const).map(opt => {
+            const active = priorityFilter === opt.id;
+            const accent = opt.id === 'all' ? 'var(--color-accent)' : getPriorityColor(opt.id);
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setPriorityFilter(opt.id)}
+                aria-label={`Filter by priority: ${opt.label}`}
+                style={{
+                  padding: '3px 10px', borderRadius: 'var(--radius-sm, 4px)', fontSize: 11, cursor: 'pointer',
+                  border: `1px solid ${active ? accent : 'var(--color-border-subtle)'}`,
+                  background: 'var(--color-bg-hover)',
+                  color: active ? accent : 'var(--color-text-secondary)',
+                  fontWeight: active ? 600 : 400, fontFamily: 'inherit',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Calendar View */}
@@ -598,8 +783,8 @@ export const Tasks: React.FC = () => {
             new Date(t.dueDate).getDate() === day
           );
           return (
-            <div style={{ padding: '0 16px 12px', borderBottom: '1px solid var(--color-bg-hover)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ padding: '0 var(--space-4) var(--space-3)', borderBottom: '1px solid var(--color-bg-hover)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                 <button onClick={() => setCalendarMonth(new Date(year, month - 1, 1))} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 16 }} aria-label="Previous month"><DexIcon name="chevron-left" size={16} /></button>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                   {calendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
@@ -658,7 +843,7 @@ export const Tasks: React.FC = () => {
             onChange={(e) => setNewTaskDue(e.target.value)}
             aria-label="Due date"
             style={{
-              padding: '4px 8px', borderRadius: 4,
+              padding: '4px var(--space-2)', borderRadius: 4,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               color: 'var(--color-text-secondary)', fontSize: 12,
               outline: 'none', fontFamily: 'inherit',
@@ -671,7 +856,7 @@ export const Tasks: React.FC = () => {
         </div>
 
         {/* Task Templates */}
-        <div style={{ display: 'flex', gap: 4, padding: '0 20px 6px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, padding: '0 var(--space-5) 6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: '24px', marginRight: 4 }}>Templates:</span>
           {TASK_TEMPLATES.map((t, i) => (
             <button
@@ -679,7 +864,7 @@ export const Tasks: React.FC = () => {
               onClick={() => applyTemplate(i)}
               className="dex-hover-bg"
               style={{
-                padding: '3px 8px', borderRadius: 4,
+                padding: '3px var(--space-2)', borderRadius: 4,
                 background: 'var(--color-border-subtle)',
                 border: '1px solid var(--color-bg-hover)',
                 color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500,
@@ -692,18 +877,19 @@ export const Tasks: React.FC = () => {
         </div>
 
         {/* Task List */}
-        <div style={styles.taskList}>
+        <div className="dex-scroll-fade-y" style={styles.taskList} onScroll={handleTaskScroll}>
           {isLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-4) 0' }}>
               {[1,2,3].map(i => (
                 <div key={i} style={{ height: 48, borderRadius: 8, background: 'var(--color-border-subtle)', animation: 'pulse 1.5s ease-in-out infinite' }} />
               ))}
             </div>
           ) : (
           <>
-          {sortedTasks.map(task => (
+          {visibleTasks.map(task => (
             <div key={task.id}>
               <div
+                className={recentlyCompleted === task.id ? 'dex-task-complete' : undefined}
                 draggable={sortBy === 'manual'}
                 onDragStart={() => { dragIdRef.current = task.id; }}
                 onDragOver={e => { if (sortBy !== 'manual') return; e.preventDefault(); setDragOverId(task.id); }}
@@ -740,6 +926,26 @@ export const Tasks: React.FC = () => {
                   {task.completed && <Icons.check />}
                 </button>
                 
+                {/* Priority badge (P1 error, P2 warning, P3 accent, P4 muted) */}
+                <span
+                  style={{
+                    flexShrink: 0,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.02em',
+                    padding: '2px 5px',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    color: getPriorityColor(task.priority),
+                    border: `1px solid ${getPriorityColor(task.priority)}`,
+                    background: 'transparent',
+                    lineHeight: 1.2,
+                    opacity: task.priority === 'none' ? 0.6 : 1,
+                  }}
+                  title={`Priority: ${getPriorityLabel(task.priority)}`}
+                >
+                  {getPriorityLabel(task.priority)}
+                </span>
+
                 <div style={styles.taskContent}>
                   <span style={{
                     ...styles.taskTitle,
@@ -750,8 +956,16 @@ export const Tasks: React.FC = () => {
                       <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--color-accent)', fontWeight: 500 }}>{task.recurring}</span>
                     )}
                   </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {task.dueDate && <span style={styles.taskDue}>{formatDueDate(task.dueDate)}</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    {task.dueDate && (
+                      <span style={{
+                        ...styles.taskDue,
+                        color: isOverdue(task) ? 'var(--color-error)' : styles.taskDue.color,
+                        fontWeight: isOverdue(task) ? 600 : undefined,
+                      }}>
+                        {isOverdue(task) ? 'Overdue · ' : ''}{formatDueDate(task.dueDate, task.dueTime)}
+                      </span>
+                    )}
                     {(task.subtasks?.length ?? 0) > 0 && (
                       <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
                         {task.subtasks!.filter(s => s.completed).length}/{task.subtasks!.length} subtasks
@@ -759,11 +973,11 @@ export const Tasks: React.FC = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <button
                   style={styles.priorityBtn}
                   onClick={(e) => { e.stopPropagation(); cyclePriority(task.id); }}
-                  title={`Priority: ${task.priority}`}
+                  title={`Priority: ${getPriorityLabel(task.priority)} (click to cycle)`}
                 >
                   <Icons.flag color={getPriorityColor(task.priority)} />
                 </button>
@@ -779,20 +993,59 @@ export const Tasks: React.FC = () => {
 
               {/* Expanded task detail panel */}
               {expandedTask === task.id && (
-                <div style={{ padding: '8px 24px 16px 58px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' }}>
+                <div style={{ padding: 'var(--space-2) var(--space-6) var(--space-4) 58px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' }}>
                   {/* Description */}
-                  <div style={{ marginBottom: 12 }}>
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Description</div>
                     <textarea
                       value={task.description || ''}
                       onChange={(e) => setDescription(task.id, e.target.value)}
                       placeholder="Add a description..."
-                      style={{ width: '100%', minHeight: 48, padding: 8, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+                      style={{ width: '100%', minHeight: 48, padding: 'var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
                     />
                   </div>
 
+                  {/* Priority + Due time */}
+                  <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Priority</div>
+                      <select
+                        value={task.priority}
+                        onChange={(e) => setPriority(task.id, e.target.value as Task['priority'])}
+                        aria-label="Set task priority"
+                        style={{
+                          padding: '4px var(--space-2)', borderRadius: 4, fontSize: 12, fontFamily: 'inherit',
+                          border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)',
+                          color: getPriorityColor(task.priority), fontWeight: 600, cursor: 'pointer', outline: 'none',
+                        }}
+                      >
+                        <option value="high">P1 - High</option>
+                        <option value="medium">P2 - Medium</option>
+                        <option value="low">P3 - Low</option>
+                        <option value="none">P4 - None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Due time</div>
+                      <input
+                        type="time"
+                        value={task.dueTime || ''}
+                        onChange={(e) => setDueTime(task.id, e.target.value)}
+                        disabled={!task.dueDate}
+                        aria-label="Set due time"
+                        title={task.dueDate ? 'Time of day for the due date' : 'Set a due date first'}
+                        style={{
+                          padding: '4px var(--space-2)', borderRadius: 4, fontSize: 12, fontFamily: 'inherit',
+                          border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)',
+                          color: 'var(--color-text-primary)', cursor: task.dueDate ? 'pointer' : 'not-allowed',
+                          outline: 'none', opacity: task.dueDate ? 1 : 0.5, colorScheme: 'dark',
+                        }}
+                      />
+                    </div>
+                  </div>
+
                   {/* Recurring */}
-                  <div style={{ marginBottom: 12 }}>
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Repeat</div>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {(['none', 'daily', 'weekly', 'monthly'] as const).map(r => (
@@ -811,7 +1064,7 @@ export const Tasks: React.FC = () => {
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Subtasks</div>
                     {(task.subtasks || []).map(sub => (
-                      <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                      <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px 0' }}>
                         <button
                           aria-label={sub.completed ? `Mark subtask "${sub.title}" incomplete` : `Complete subtask "${sub.title}"`}
                           onClick={() => toggleSubtask(task.id, sub.id)}
@@ -834,7 +1087,7 @@ export const Tasks: React.FC = () => {
                         onChange={e => setSubtaskInput(e.target.value)}
                         placeholder="Add subtask..."
                         onKeyDown={e => { if (e.key === 'Enter') addSubtask(task.id); }}
-                        style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit' }}
+                        style={{ flex: 1, padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit' }}
                       />
                       <button onClick={() => addSubtask(task.id)} aria-label="Add subtask" style={{ padding: '4px 10px', borderRadius: 4, border: '1px solid var(--color-accent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+</button>
                     </div>
@@ -843,10 +1096,18 @@ export const Tasks: React.FC = () => {
               )}
             </div>
           ))}
-          
+          {remainingTasks > 0 && (
+            <button
+              onClick={() => setTaskVisibleCount(v => v + TASKS_PER_PAGE)}
+              style={{ display: 'block', width: '100%', margin: '6px 0 10px', padding: 'var(--space-2) 10px', fontSize: 12, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer' }}
+            >
+              Load {Math.min(TASKS_PER_PAGE, remainingTasks)} more ({remainingTasks} remaining)
+            </button>
+          )}
+
           {sortedTasks.length === 0 && (
             <div style={styles.empty}>
-              <div style={{ width: 72, height: 72, borderRadius: 14, background: 'var(--color-success-muted, rgba(48,209,88,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <div style={{ width: 72, height: 72, borderRadius: 14, background: 'var(--color-success-muted, rgba(48,209,88,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #30d158)" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               </div>
               <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>
@@ -858,7 +1119,7 @@ export const Tasks: React.FC = () => {
               <button
                 onClick={() => newTaskInputRef.current?.focus()}
                 style={{
-                  marginTop: 12, padding: '8px 20px', borderRadius: 6,
+                  marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-5)', borderRadius: 6,
                   background: 'var(--color-accent, #0a84ff)', color: '#fff',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer',
@@ -915,7 +1176,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
   },
   lists: {
-    padding: '8px',
+    padding: 'var(--space-2)',
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
@@ -924,7 +1185,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '8px 12px',
+    padding: 'var(--space-2) var(--space-3)',
     borderRadius: '6px',
     border: 'none',
     cursor: 'pointer',
@@ -952,7 +1213,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 20px',
+    padding: 'var(--space-3) var(--space-5)',
     borderBottom: '1px solid var(--color-border)',
   },
   headerTitle: {
@@ -983,8 +1244,8 @@ const styles: Record<string, React.CSSProperties> = {
   addTask: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '16px 24px',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-4) var(--space-6)',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   addInput: {
@@ -1013,13 +1274,13 @@ const styles: Record<string, React.CSSProperties> = {
   taskList: {
     flex: 1,
     overflow: 'auto',
-    padding: '8px 0',
+    padding: 'var(--space-2) 0',
   },
   taskItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '12px 24px',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-3) var(--space-6)',
     transition: 'background 0.1s',
   },
   checkbox: {

@@ -62,7 +62,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '10px 12px 8px',
+    padding: '10px var(--space-3) var(--space-2)',
     flexShrink: 0,
   },
   sidebarTitle: {
@@ -134,7 +134,7 @@ const S: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   rightPanelHeader: {
-    padding: '10px 12px',
+    padding: '10px var(--space-3)',
     fontSize: 11,
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
@@ -510,6 +510,22 @@ const DexNotes: React.FC = () => {
     [notes],
   );
 
+  // -- In-notes search: filter the visible list as the user types -------
+  // The store's setSearchQuery also fires a backend full-text search, but the
+  // list pane renders this `notes` array, so a live client-side filter is what
+  // actually narrows what the user sees -- instant, no IPC round-trip, and it
+  // matches across title, preview text, and tags. Empty query => full list.
+  const visibleNotes = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return notes;
+    // Support multi-term AND search ("project todo" matches notes with both).
+    const terms = q.split(/\s+/);
+    return notes.filter(n => {
+      const haystack = `${n.title || ''}\n${n.plain_text || ''}\n${(n.tags || []).join(' ')}`.toLowerCase();
+      return terms.every(t => haystack.includes(t));
+    });
+  }, [notes, searchQuery]);
+
   // -- Outline / table of contents --------------------------------------
   const headings = React.useMemo(() => {
     if (!activeNote?.content) return [];
@@ -574,7 +590,7 @@ const DexNotes: React.FC = () => {
           </div>
           <button
             onClick={() => { setInitFailed(false); createAttempted.current = false; store.initialize(); }}
-            style={{ padding: '6px 16px', background: 'var(--color-accent-light, rgba(10,132,255,0.15))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+            style={{ padding: '6px var(--space-4)', background: 'var(--color-accent-light, rgba(10,132,255,0.15))', border: '1px solid var(--color-accent-muted, rgba(10,132,255,0.3))', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
           >
             Retry
           </button>
@@ -631,6 +647,11 @@ const DexNotes: React.FC = () => {
         .dexnotes-app .dn-tree-acts button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; border-radius: 3px; }
         .dexnotes-app .dn-swatch { transition: transform 0.12s ease; }
         .dexnotes-app .dn-swatch:hover { transform: scale(1.15); }
+        /* Favorite star: hidden until the note row is hovered; always shown once on. */
+        .dexnotes-app .dn-star { opacity: 0; transition: opacity 0.12s ease, transform 0.12s ease; }
+        .dexnotes-app .dn-note-item:hover .dn-star { opacity: 0.55; }
+        .dexnotes-app .dn-star.dn-star-on { opacity: 1; }
+        .dexnotes-app .dn-star:hover { opacity: 1 !important; transform: scale(1.15); }
         .dexnotes-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
         .dexnotes-app ::-webkit-scrollbar { width: 6px; height: 6px; }
         .dexnotes-app ::-webkit-scrollbar-track { background: transparent; }
@@ -656,7 +677,7 @@ const DexNotes: React.FC = () => {
 
               </div>
             </div>
-            <div style={S.sidebarBody}>
+            <div className="dex-scroll-fade-y" style={S.sidebarBody}>
               <FolderTree
                 folders={folders}
                 selectedFolderId={selectedFolderId}
@@ -730,8 +751,8 @@ const DexNotes: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            paddingTop: 12,
-            gap: 8,
+            paddingTop: 'var(--space-3)',
+            gap: 'var(--space-2)',
             flexShrink: 0,
             borderRight: '1px solid var(--color-border-subtle)',
           }}
@@ -753,12 +774,13 @@ const DexNotes: React.FC = () => {
         <>
           <div style={{ ...S.listPane, width: listResizer.width }}>
             <NoteListPanel
-              notes={notes}
+              notes={visibleNotes}
               selectedNoteId={selectedNoteId}
               onSelect={store.selectNote}
               onCreate={() => store.createNote()}
               onDelete={handleDeleteWithConfirm}
               onTogglePin={store.togglePin}
+              onToggleFavorite={store.toggleFavorite}
               sortField={sortField}
               sortDirection={sortDirection}
               onSortFieldChange={store.setSortField}
@@ -859,7 +881,7 @@ const DexNotes: React.FC = () => {
             <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>Select or create a note</div>
             <button
               onClick={() => { createAttempted.current = false; store.createNote(); }}
-              style={{ padding: '6px 16px', background: 'var(--color-accent-light, rgba(10,132,255,0.12))', border: '1px solid var(--color-accent-soft, rgba(10,132,255,0.2))', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+              style={{ padding: '6px var(--space-4)', background: 'var(--color-accent-light, rgba(10,132,255,0.12))', border: '1px solid var(--color-accent-soft, rgba(10,132,255,0.2))', borderRadius: 4, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
             >New Note</button>
           </div>
         )}
@@ -867,7 +889,7 @@ const DexNotes: React.FC = () => {
 
       {/* -- Right Panel (Tags, Attachments, Links) ------------------ */}
       {showRightPanel && activeNote && (
-        <div style={S.rightPanel}>
+        <div className="dex-scroll-fade-y" style={S.rightPanel}>
           <div style={S.rightPanelHeader}>Note Details</div>
           <TableOfContents headings={headings} onJump={handleJumpToHeading} />
           <div style={{ height: 1, background: 'var(--color-bg-hover)' }} />
@@ -887,7 +909,7 @@ const DexNotes: React.FC = () => {
           <div style={{ height: 1, background: 'var(--color-bg-hover)' }} />
           {/* Backlinks */}
           {activeNote.backlinks && activeNote.backlinks.length > 0 && (
-            <div style={{ padding: '8px 12px' }}>
+            <div style={{ padding: 'var(--space-2) var(--space-3)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                 Backlinks ({activeNote.backlinks.length})
               </div>
@@ -930,7 +952,7 @@ const DexNotes: React.FC = () => {
               color: 'var(--color-text-tertiary)',
               cursor: 'pointer',
               fontSize: 11,
-              padding: '4px 8px',
+              padding: '4px var(--space-2)',
             }}
             title={showRightPanel ? 'Hide details' : 'Show details'}
           >
@@ -960,24 +982,24 @@ const DexNotes: React.FC = () => {
           background: 'rgba(0,0,0,0.7)',
         }} onClick={cancelDelete}>
           <div style={{
-            background: 'rgba(44,44,46,0.96)', borderRadius: 10,
-            padding: '24px 28px', maxWidth: 340, width: '90%',
+            background: 'var(--color-bg-elevated)', borderRadius: 10,
+            padding: 'var(--space-6) 28px', maxWidth: 340, width: '90%',
             border: '1px solid var(--color-border)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: '#e5e5ea', marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', color: '#e5e5ea', marginBottom: 'var(--space-2)' }}>
               Move to Trash?
             </div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-5)', lineHeight: 1.5 }}>
               &ldquo;{notes.find(n => n.id === confirmDeleteId)?.title || 'Untitled'}&rdquo; will be moved to Trash and automatically deleted after 30 days.
             </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
               <button onClick={cancelDelete} style={{
-                padding: '7px 16px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
+                padding: '7px var(--space-4)', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
                 background: 'var(--color-border-subtle)', color: '#e5e5ea', cursor: 'pointer',
               }}>Cancel</button>
               <button onClick={confirmDelete} style={{
-                padding: '7px 16px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
+                padding: '7px var(--space-4)', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
                 background: 'rgba(255,69,58,0.2)', color: 'var(--color-error)', cursor: 'pointer',
               }}>Move to Trash</button>
             </div>
@@ -990,7 +1012,7 @@ const DexNotes: React.FC = () => {
         <div style={{
           position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
           zIndex: 'var(--z-notification)', display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 16px', borderRadius: 8,
+          padding: '10px var(--space-4)', borderRadius: 8,
           background: 'var(--color-bg-surface-solid, #2C2C2E)',
           border: '1px solid var(--color-border-subtle)',
           boxShadow: 'var(--pg-shadow-panel)',

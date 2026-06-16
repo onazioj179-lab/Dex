@@ -173,6 +173,23 @@ class MediaCacheImpl {
 /** Process-wide singleton. */
 export const mediaCache = new MediaCacheImpl();
 
+// Consolidation (FINDING 11): CacheRegistry is the owner/registrar of all
+// renderer caches, MediaCache included. Register here so registry-driven
+// pressure relief (HeapMonitor -> flushAll, IdleResourceBalancer) flushes this
+// cache, and diagnostics (getCacheSnapshot) can observe its live byte size,
+// without MediaCache's callers needing to know about the registry.
+void import('./CacheRegistry').then(({ registerCache }) => {
+  registerCache({
+    name: 'MediaCache',
+    flush: () => {
+      const before = mediaCache.getStats().bytes;
+      mediaCache.clear();
+      return before;
+    },
+    sizeBytes: () => mediaCache.getStats().bytes,
+  });
+}).catch(() => { /* ignore -- registry not available (e.g. SSR/test) */ });
+
 // Cooperative shrink under memory pressure -- subscribe lazily to avoid a
 // hard import cycle with the renderer-only event bus during SSR/test runs.
 if (typeof window !== 'undefined') {

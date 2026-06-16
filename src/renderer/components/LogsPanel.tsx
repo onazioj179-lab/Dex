@@ -169,7 +169,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 3,
             color: 'var(--pg-text-primary, #fff)',
-            padding: '2px 8px',
+            padding: '2px var(--space-2)',
             fontSize: 11,
             fontFamily: 'inherit',
             width: 140,
@@ -179,7 +179,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
           onClick={clear}
           aria-label="Clear log entries"
           title="Clear"
-          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 3, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px 8px', fontSize: 10, fontFamily: 'inherit' }}
+          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 3, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px var(--space-2)', fontSize: 10, fontFamily: 'inherit' }}
         >
           Clear
         </button>
@@ -195,7 +195,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
         aria-label="Log output"
       >
         {visible.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 24, color: 'var(--pg-text-tertiary, rgba(255,255,255,0.3))' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--pg-text-tertiary, rgba(255,255,255,0.3))' }}>
             No entries
           </div>
         )}
@@ -204,7 +204,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
             key={entry.id}
             style={{
               display: 'flex',
-              gap: 8,
+              gap: 'var(--space-2)',
               padding: '1px 10px',
               borderBottom: '1px solid rgba(255,255,255,0.03)',
               lineHeight: 1.6,

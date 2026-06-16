@@ -16,9 +16,9 @@ import { useViewportStore } from '../stores/viewportStore';
 import { useUIStore, type PanelTab } from '../stores/uiStore';
 
 const PropertiesPanel: React.FC = () => {
-  const { project, pushUndo, setPartMaterial, updatePartTransform, duplicatePart, deletePart, togglePartVisibility, addConstraint } = useProjectStore();
+  const { project, pushUndo, setPartMaterial, updatePartTransform, duplicatePart, deletePart, togglePartVisibility, addConstraint, solveConstraints } = useProjectStore();
   const { selectedPartId, setSelectedPartId } = useViewportStore();
-  const { panelTab, setPanelTab } = useUIStore();
+  const { panelTab, setPanelTab, showToast } = useUIStore();
 
   const selectedPart = project.assembly.parts.find(p => p.id === selectedPartId) || null;
   const parts = project.assembly.parts;
@@ -30,16 +30,22 @@ const PropertiesPanel: React.FC = () => {
 
   const handleAddConstraint = useCallback(() => {
     if (!selectedPartId || !constraintPartB) return;
+    // addConstraint runs the solver internally; surface the result so the user
+    // knows whether parts snapped or the constraint set is over-defined.
     addConstraint(constraintType, selectedPartId, constraintPartB, constraintValue);
-  }, [selectedPartId, constraintPartB, constraintType, constraintValue, addConstraint]);
+    const res = solveConstraints();
+    showToast(res.unsatisfied > 0
+      ? `${constraintType} added -- ${res.unsatisfied} unsatisfied`
+      : res.moved > 0 ? `${constraintType} solved -- ${res.moved} part(s) moved` : `${constraintType} constraint added`);
+  }, [selectedPartId, constraintPartB, constraintType, constraintValue, addConstraint, solveConstraints, showToast]);
 
   return (
-    <div style={{ width: 240, display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderLeft: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderLeft: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
       {/* Panel tabs - Blender N-panel style */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset, rgba(0,0,0,0.15))' }}>
         {(['properties', 'material', 'constraints'] as PanelTab[]).map(tab => (
           <button key={tab} onClick={() => setPanelTab(tab)}
-            style={{ flex: 1, padding: '8px 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: panelTab === tab ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: panelTab === tab ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: panelTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: panelTab === tab ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: panelTab === tab ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: panelTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             {tab === 'properties' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}
             {tab === 'material' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a10.68 10.68 0 0 0-.94 2.06c-.47 1.58-.79 3.27-.79 5 0 3.31 2.69 6 6 6"/><path d="M7.08 16a10.68 10.68 0 0 0-.94 2.06C5.67 19.64 5.35 21.33 5.35 23"/><circle cx="7.5" cy="10.5" r="2.5"/></svg>}
             {tab === 'constraints' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
@@ -48,7 +54,7 @@ const PropertiesPanel: React.FC = () => {
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-2) 10px' }}>
         {/* Properties tab */}
         {panelTab === 'properties' && selectedPart && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -58,7 +64,7 @@ const PropertiesPanel: React.FC = () => {
             </div>
 
             {(['position', 'rotation', 'scale'] as (keyof Transform)[]).map(key => (
-              <div key={key} style={{ background: 'var(--color-border-subtle)', borderRadius: 4, padding: '6px 8px' }}>
+              <div key={key} style={{ background: 'var(--color-border-subtle)', borderRadius: 4, padding: '6px var(--space-2)' }}>
                 <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
                   {key === 'position' && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>}
                   {key === 'rotation' && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>}
@@ -82,7 +88,7 @@ const PropertiesPanel: React.FC = () => {
               </div>
             ))}
 
-            <div style={{ padding: '8px', background: 'var(--color-border-subtle)', borderRadius: 4 }}>
+            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4 }}>
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 5, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                 OBJECT DATA
@@ -97,17 +103,17 @@ const PropertiesPanel: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => duplicatePart(selectedPart.id)} style={{ flex: 1, fontSize: 9, padding: '5px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <button onClick={() => duplicatePart(selectedPart.id)} style={{ flex: 1, fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 Duplicate
               </button>
-              <button onClick={() => { deletePart(selectedPart.id); setSelectedPartId(null); }} style={{ flex: 1, fontSize: 9, padding: '5px 8px', background: 'var(--color-error-muted, rgba(255,68,58,0.08))', border: '1px solid var(--color-error-muted, rgba(255,68,58,0.15))', borderRadius: 4, color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <button onClick={() => { deletePart(selectedPart.id); setSelectedPartId(null); }} style={{ flex: 1, fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-error-muted, rgba(255,68,58,0.08))', border: '1px solid var(--color-error-muted, rgba(255,68,58,0.15))', borderRadius: 4, color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Delete
               </button>
             </div>
             <button onClick={() => togglePartVisibility(selectedPart.id)}
-              style={{ fontSize: 9, padding: '5px 8px', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: selectedPart.visible ? 'var(--color-text-primary)' : 'var(--color-warning)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              style={{ fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: selectedPart.visible ? 'var(--color-text-primary)' : 'var(--color-warning)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               {selectedPart.visible ? (
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               ) : (
@@ -119,7 +125,7 @@ const PropertiesPanel: React.FC = () => {
         )}
 
         {panelTab === 'properties' && !selectedPart && (
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '20px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: 'var(--space-5) 0', textAlign: 'center' }}>
             Select a part to view properties
           </div>
         )}
@@ -131,7 +137,7 @@ const PropertiesPanel: React.FC = () => {
             {MATERIAL_DB.map(mat => (
               <button key={mat.id} onClick={() => setPartMaterial(selectedPart.id, mat)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', fontSize: 10,
+                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px var(--space-2)', fontSize: 10,
                   background: selectedPart.material.id === mat.id ? 'var(--color-accent-light)' : 'transparent',
                   border: selectedPart.material.id === mat.id ? '1px solid var(--color-accent-muted)' : '1px solid transparent',
                   borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-primary)', width: '100%', textAlign: 'left' as const,
@@ -148,7 +154,7 @@ const PropertiesPanel: React.FC = () => {
 
         {/* Constraints tab */}
         {panelTab === 'constraints' && selectedPart && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>ADD CONSTRAINT</div>
             <select value={constraintType} onChange={e => setConstraintType(e.target.value as ConstraintType)}
               style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }}>
@@ -169,15 +175,15 @@ const PropertiesPanel: React.FC = () => {
                 style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
             )}
             <button onClick={handleAddConstraint} disabled={!constraintPartB}
-              style={{ padding: '6px 12px', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 4, cursor: constraintPartB ? 'pointer' : 'default' }}>
+              style={{ padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 4, cursor: constraintPartB ? 'pointer' : 'default' }}>
               Apply Constraint
             </button>
 
             {project.assembly.constraints.filter(c => c.partA === selectedPartId || c.partB === selectedPartId).length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginTop: 8 }}>ACTIVE CONSTRAINTS</div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>ACTIVE CONSTRAINTS</div>
                 {project.assembly.constraints.filter(c => c.partA === selectedPartId || c.partB === selectedPartId).map(c => (
-                  <div key={c.id} style={{ fontSize: 10, padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div key={c.id} style={{ fontSize: 10, padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ color: c.satisfied ? 'var(--color-success)' : 'var(--color-error)' }}>{c.satisfied ? '\u2713' : '\u2717'}</span>
                     <span style={{ color: 'var(--color-text-secondary)' }}>{c.type}</span>
                     {c.value > 0 && <span style={{ color: 'var(--color-text-tertiary)' }}>({c.value})</span>}

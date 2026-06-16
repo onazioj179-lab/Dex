@@ -7,17 +7,33 @@
 // UKI Semantic Search Facade
 //
 // Roadmap reference: docs/DEX_OS_PRODUCTION_ROADMAP.md §1 (UKI backend).
-// This is the single entry point UI components should import for "find
-// something across UKI memory". Internally it currently delegates to the
-// existing lexical inverted index in `index_search.ts`. When the native
-// uki_store ships (phase 4.5/4.6) the implementation will fan out to
-// vector + FTS5 + lexical and merge by reciprocal rank — without callers
-// changing.
+//
+// SINGLE FACADE (audit FINDING 9): this is the ONE entry point UI components
+// import for "find something across UKI memory". UI must not call the
+// `index_search.ts` lexical store directly — go through `semanticSearch()` so
+// the backend can change underneath without touching callers.
+//
+// HYBRID CONTRACT — lexical and semantic are ONE system, not two parallel
+// search stacks:
+//   - lexical backend:  ./index_search.ts (inverted index over apps,
+//     shortcuts, workflows, turns, and cold archive summaries). Always on in
+//     the renderer; this is what we delegate to today (`source: 'lexical'`).
+//   - semantic backend: vectors from the main-process EmbeddingService
+//     (src/main/services/EmbeddingService.ts, hash-128 / onnx) stored in the
+//     pure cosine index primitive src/shared/uki/embeddings.ts. Gated off via
+//     getBackendStatus() until the phase 4.5 native uki_store + embedder ship.
+// When `semantic`/`vector` flip on, this facade fans out to BOTH backends and
+// merges by reciprocal rank into one ranked SemanticHit[] — the two indexes
+// are complementary halves of a single hybrid retriever, never a duplicate.
+// Callers do not change; the swap stays a single-file edit here.
 //
 // Keeping this layer thin and stable makes the eventual swap a single-file
 // edit and gives tests one stable surface to assert on.
 // =============================================================================
 
+// Lexical half of the hybrid retriever (see HYBRID CONTRACT above). This is
+// the only place `index_search` is consumed for "find"; the semantic half
+// (shared/uki/embeddings + EmbeddingService) merges in here when enabled.
 import { query as lexicalQuery, type UkiHit } from './index_search';
 
 export type SearchMode = 'auto' | 'lexical' | 'semantic' | 'hybrid';

@@ -63,7 +63,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(({
           border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border, rgba(255,255,255,0.14))'}`,
           borderRadius: radius.md,
           height: inputTokens.height[inputSize],
-          padding: '0 8px',
+          padding: '0 var(--space-2)',
           gap: 6,
           transition: FOCUS_TRANSITION,
         }}

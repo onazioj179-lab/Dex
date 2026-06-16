@@ -9,6 +9,10 @@
 // Any module that maintains an in-memory cache registers an entry here.
 // HeapMonitor calls flushAll() when memory pressure is high so individual
 // caches don't need to know about each other.
+//
+// Consolidation (FINDING 11): this registry is the single owner/registrar of
+// renderer caches. MediaCache self-registers on import (see MediaCache.ts), so
+// registry-driven flush + diagnostics cover it like every other cache.
 // =============================================================================
 
 export interface CacheEntry {

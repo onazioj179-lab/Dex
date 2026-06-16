@@ -159,20 +159,22 @@ export function listHomeLayoutSnapshots(): string[] {
 
 interface WidgetStoreState {
   widgets: Widget[];
-  editMode: boolean;
+  /** Whether the "Add widget" picker overlay is open. Widgets are always
+   *  directly draggable/resizable on hover, so there is no global edit mode --
+   *  this is the only piece of widget UI that needs a shared open/closed flag. */
+  pickerOpen: boolean;
   addWidget: (type: WidgetType) => void;
   removeWidget: (id: string) => void;
   moveWidget: (id: string, x: number, y: number) => void;
   resizeWidget: (id: string, width: number, height: number) => void;
-  toggleEditMode: () => void;
-  setEditMode: (v: boolean) => void;
+  setPickerOpen: (v: boolean) => void;
   /** Save a named Home layout snapshot (Phase 15). */
   snapshotLayout: (label?: string) => void;
 }
 
 export const useWidgetStore = create<WidgetStoreState>((set, get) => ({
   widgets: loadWidgets(),
-  editMode: false,
+  pickerOpen: false,
 
   addWidget: (type) => {
     const template = WIDGET_TEMPLATES.find(t => t.type === type);
@@ -219,8 +221,7 @@ export const useWidgetStore = create<WidgetStoreState>((set, get) => ({
     set({ widgets: next });
   },
 
-  toggleEditMode: () => set(s => ({ editMode: !s.editMode })),
-  setEditMode: (v) => set({ editMode: v }),
+  setPickerOpen: (v) => set({ pickerOpen: v }),
 
   snapshotLayout: (label = 'snapshot') => {
     saveHomeLayoutSnapshot(get().widgets, label);

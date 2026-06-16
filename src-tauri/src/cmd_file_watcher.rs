@@ -24,11 +24,196 @@
 //! back to the UI), which the current tauriCompat layer no-ops. Only the config
 //! insert (`addFolder`) and the on-demand `importFile` are in scope.
 
+use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Mutex;
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::native_ops::{detect_media_type, fp_to_string, now_ms, with_conn};
+
+/// Live filesystem watchers, keyed by `watched_folders.id`. A `notify` watcher
+/// stops when dropped, so removing the entry tears the watch down. Registered as
+/// Tauri-managed state in `setup()`.
+pub type FileWatchState = Mutex<HashMap<i64, notify::RecommendedWatcher>>;
+
+/// Map an extension (with leading dot) to a media type, mirroring the Electron
+/// `FileWatcherManager.getMediaType` sets exactly (video/audio/image, else None).
+fn get_media_type(ext: &str) -> Option<&'static str> {
+    const VIDEO: &[&str] = &[".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv"];
+    const AUDIO: &[&str] = &[".mp3", ".wav", ".flac", ".ogg", ".aac", ".opus", ".m4a"];
+    const IMAGE: &[&str] = &[".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".tiff"];
+    let lower = ext.to_lowercase();
+    if VIDEO.contains(&lower.as_str()) {
+        return Some("video");
+    }
+    if AUDIO.contains(&lower.as_str()) {
+        return Some("audio");
+    }
+    if IMAGE.contains(&lower.as_str()) {
+        return Some("image");
+    }
+    None
+}
+
+fn ext_with_dot(name: &str) -> String {
+    Path::new(name)
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default()
+}
+
+/// `matchesFilter` parity: "all" matches everything; otherwise the file must be a
+/// known media type present in the comma-separated filter list.
+fn matches_filter(filename: &str, filter_str: &str) -> bool {
+    if filter_str == "all" {
+        return true;
+    }
+    let media_type = match get_media_type(&ext_with_dot(filename)) {
+        Some(t) => t,
+        None => return false,
+    };
+    filter_str
+        .split(',')
+        .map(|f| f.trim().to_lowercase())
+        .any(|f| f == media_type || f == "all")
+}
+
+/// `handleNewFile` parity: when a matching media file appears, either auto-import
+/// it into `media_library` or push a `file-watcher:newFile` event to the renderer.
+fn handle_new_file(
+    app: &tauri::AppHandle,
+    folder_id: i64,
+    file_types: &str,
+    import_behavior: &str,
+    path: &Path,
+) {
+    if !path.is_file() {
+        return; // deletes / directories / vanished temp files
+    }
+    let filename = match path.file_name() {
+        Some(n) => n.to_string_lossy().to_string(),
+        None => return,
+    };
+    if !matches_filter(&filename, file_types) {
+        return;
+    }
+    let filepath = path.to_string_lossy().to_string();
+
+    if import_behavior == "auto-import" {
+        // Mirror the Electron auto-import INSERT (8 explicit columns, type =
+        // getMediaType||'file', dedupe on filepath).
+        let media_type = get_media_type(&ext_with_dot(&filename)).unwrap_or("file");
+        let size = std::fs::metadata(&filepath).map(|m| m.len() as i64).unwrap_or(0);
+        let now = now_ms();
+        with_conn(app, |conn| {
+            let _ = conn.execute(
+                "INSERT INTO media_library (filepath, filename, type, size, imported_by, last_used, use_count, timestamp)
+                 VALUES (?, ?, ?, ?, 'file-watcher', ?, 1, ?)
+                 ON CONFLICT(filepath) DO NOTHING",
+                params![filepath, filename, media_type, size, now, now],
+            );
+            Value::Null
+        });
+    } else {
+        crate::native_ops::emit_event(
+            app,
+            "file-watcher:newFile",
+            &json!({ "folderId": folder_id, "filepath": filepath, "filename": filename }),
+        );
+    }
+}
+
+/// Start a live watcher for one configured folder (idempotent per folder id).
+/// New/renamed files in the folder run through `handle_new_file`.
+fn start_watch(
+    app: &tauri::AppHandle,
+    folder_id: i64,
+    folder_path: String,
+    file_types: String,
+    import_behavior: String,
+) {
+    if !Path::new(&folder_path).exists() {
+        return;
+    }
+    let state = app.state::<FileWatchState>();
+    let mut map = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return,
+    };
+    if map.contains_key(&folder_id) {
+        return; // already watching
+    }
+    let app_handle = app.clone();
+    let watch_path = folder_path.clone();
+    let watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            // fs.watch fired on 'rename' (create/delete); notify's create + name
+            // events are the equivalent. handle_new_file's is_file() guard drops
+            // the delete half, matching the Electron existsSync check.
+            if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(_))) {
+                for p in &event.paths {
+                    handle_new_file(&app_handle, folder_id, &file_types, &import_behavior, p);
+                }
+            }
+        }
+    });
+    if let Ok(mut w) = watcher {
+        if w.watch(Path::new(&watch_path), RecursiveMode::NonRecursive).is_ok() {
+            map.insert(folder_id, w);
+        }
+    }
+}
+
+/// Stop and drop the live watcher for a folder id (no-op if none).
+fn stop_watch(app: &tauri::AppHandle, folder_id: i64) {
+    let state = app.state::<FileWatchState>();
+    let mut map = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return,
+    };
+    map.remove(&folder_id);
+}
+
+/// Start watchers for every persisted folder. Called once in `setup()` after the
+/// shared db is open and schemas are ensured (mirrors `startWatching()` on boot).
+pub fn start_all(app: tauri::AppHandle) {
+    let folders: Vec<(i64, String, String, String)> = {
+        let state = app.state::<crate::db::DbState>();
+        let guard = match state.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        let conn = match guard.as_ref() {
+            Some(c) => c,
+            None => return,
+        };
+        let mut stmt = match conn
+            .prepare("SELECT id, folder_path, file_types, import_behavior FROM watched_folders")
+        {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let rows = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        });
+        match rows {
+            Ok(rs) => rs.filter_map(|r| r.ok()).collect(),
+            Err(_) => return,
+        }
+    };
+    for (id, path, types, behavior) in folders {
+        start_watch(&app, id, path, types, behavior);
+    }
+}
 
 /// Read one watched_folders row by folder_path into the WatchedFolder shape.
 /// Column order / casing matches `file_watcher.rs::row_to_json` (SELECT *).
@@ -115,7 +300,7 @@ fn add_folder(app: &tauri::AppHandle, args: &Value) -> Value {
         None => return Value::Null, // canceled / no selection
     };
 
-    with_conn(app, |conn| {
+    let row = with_conn(app, |conn| {
         // Mirror the TS upsert: insert the new folder, or on a UNIQUE(folder_path)
         // conflict update its file_types + import_behavior (created_at unchanged).
         let res = conn.execute(
@@ -128,7 +313,23 @@ fn add_folder(app: &tauri::AppHandle, args: &Value) -> Value {
             return Value::Null;
         }
         folder_row(conn, &folder_path)
-    })
+    });
+
+    // Start the live watcher for the freshly configured folder (matches the TS
+    // addFolder, which calls watchFolder after the upsert). Restart it if the
+    // folder was re-added with a changed behavior/filter.
+    if let Some(id) = row.get("id").and_then(|v| v.as_i64()) {
+        let types = row.get("file_types").and_then(|v| v.as_str()).unwrap_or("all").to_string();
+        let behavior = row
+            .get("import_behavior")
+            .and_then(|v| v.as_str())
+            .unwrap_or("notify-only")
+            .to_string();
+        let fp = row.get("folder_path").and_then(|v| v.as_str()).unwrap_or(&folder_path).to_string();
+        stop_watch(app, id);
+        start_watch(app, id, fp, types, behavior);
+    }
+    row
 }
 
 /// `file-watcher:importFile` — importFile(filepath, filename). Stats the file on
@@ -194,6 +395,17 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "file-watcher:addFolder" => add_folder(app, args),
         "file-watcher:importFile" => import_file(app, args),
+        // removeWatchedFolder(id) -> boolean. Routed here (not the pure-DB
+        // file_watcher module) so the live watcher is torn down alongside the
+        // persisted DELETE — the side effect the TS removeWatchedFolder performs.
+        "file-watcher:removeFolder" => {
+            let id = args.get(0).and_then(|v| v.as_i64()).unwrap_or(0);
+            stop_watch(app, id);
+            with_conn(app, |conn| {
+                let _ = conn.execute("DELETE FROM watched_folders WHERE id = ?", params![id]);
+                Value::Bool(true)
+            })
+        }
         _ => Value::Null,
     }
 }

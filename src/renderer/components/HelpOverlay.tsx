@@ -148,7 +148,7 @@ const HelpSectionView: React.FC<{
   expanded: boolean;
   onToggle: () => void;
 }> = memo(({ section, expanded, onToggle }) => (
-  <div style={{ marginBottom: 8 }}>
+  <div style={{ marginBottom: 'var(--space-2)' }}>
     <button
       onClick={onToggle}
       style={{
@@ -156,7 +156,7 @@ const HelpSectionView: React.FC<{
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        padding: '12px 14px',
+        padding: 'var(--space-3) 14px',
         background: 'rgba(255, 255, 255, 0.04)',
         border: '1px solid rgba(255, 255, 255, 0.08)',
         borderRadius: 8,
@@ -175,8 +175,8 @@ const HelpSectionView: React.FC<{
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 8,
-          padding: '12px 0 0 0',
+          gap: 'var(--space-2)',
+          padding: 'var(--space-3) 0 0 0',
           animation: 'fadeInUp 200ms ease-out',
         }}
       >
@@ -205,7 +205,7 @@ const HelpSearch: React.FC<{
       background: 'rgba(255, 255, 255, 0.06)',
       borderRadius: 8,
       border: '1px solid rgba(255, 255, 255, 0.1)',
-      marginBottom: 16,
+      marginBottom: 'var(--space-4)',
     }}
   >
     <DexIcon name="search" size={16} color="var(--color-text-muted)" />
@@ -316,8 +316,8 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 8,
-            marginBottom: 20,
+            gap: 'var(--space-2)',
+            marginBottom: 'var(--space-5)',
           }}
         >
           <button
@@ -388,12 +388,12 @@ const HelpOverlay: React.FC<HelpOverlayProps> = ({ visible = false, onClose, cur
         <div
           style={{
             textAlign: 'center',
-            padding: 40,
+            padding: 'var(--space-10)',
             color: 'var(--color-text-muted)',
           }}
         >
           <DexIcon name="search" size={32} color="var(--color-text-muted)" />
-          <p style={{ marginTop: 12, fontSize: 14 }}>No help topics found</p>
+          <p style={{ marginTop: 'var(--space-3)', fontSize: 14 }}>No help topics found</p>
           <p style={{ fontSize: 13, opacity: 0.7 }}>Try different keywords or ask UKI</p>
         </div>
       )}
@@ -462,7 +462,7 @@ export const HelpTooltip: React.FC<TooltipProps> = memo(({
             WebkitBackdropFilter: 'var(--blur-md)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: 6,
-            padding: '8px 12px',
+            padding: 'var(--space-2) var(--space-3)',
             fontSize: 12,
             color: '#fff',
             whiteSpace: 'nowrap',

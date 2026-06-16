@@ -146,8 +146,10 @@ export class InputHandler {
   private handleMeasure(e: PointerEvent) {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left - this.canvas.width / 2;
-    const my = -(e.clientY - rect.top - this.canvas.height / 2);
+    // Center on the CSS-pixel rect (not canvas.width/height, which are in device
+    // pixels) so measure points stay correct on HiDPI displays, matching hitTest.
+    const mx = e.clientX - rect.left - rect.width / 2;
+    const my = -(e.clientY - rect.top - rect.height / 2);
 
     if (!this.state.measureStart) {
       this.state.measureStart = vec3(mx, my, 0);
@@ -162,8 +164,11 @@ export class InputHandler {
 
   private hitTest(mx: number, my: number): string | null {
     if (!this.canvas || !this.project) return null;
-    const cx = this.canvas.width / 2;
-    const cy = this.canvas.height / 2;
+    // mx/my arrive in CSS pixels (from getBoundingClientRect), so center on the
+    // CSS-pixel size rather than canvas.width/height (device pixels) for HiDPI.
+    const rect = this.canvas.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
 
     for (const part of [...this.project.assembly.parts].reverse()) {
       const px = cx + part.transform.position.x;

@@ -35,6 +35,15 @@ const PALETTE: string[] = [
   '#065ab5', '#754665', '#ff6e59', '#ff9d81',
 ];
 
+// Single source of truth for tool hotkeys, shared by the keydown handler and
+// the toolbar tooltips so the advertised key always matches the bound key.
+const TOOL_HOTKEY: Record<Tool, string> = {
+  pencil: 'B',
+  eraser: 'E',
+  fill: 'G',
+  eyedropper: 'I',
+};
+
 const makeBlankFrame = (size: GridSize): Frame =>
   Array.from({ length: size }, () => Array.from({ length: size }, () => null as Pixel));
 
@@ -171,6 +180,35 @@ const PixelArt: React.FC = () => {
   };
   const onMouseUp = () => { isDrawingRef.current = false; };
 
+  // Release the drawing flag on a window-level mouseup. Without this, pressing
+  // on the canvas, dragging off it, and releasing outside left isDrawingRef
+  // stuck true, so the next hover-over would resume painting without a click.
+  useEffect(() => {
+    const stop = () => { isDrawingRef.current = false; };
+    window.addEventListener('mouseup', stop);
+    return () => window.removeEventListener('mouseup', stop);
+  }, []);
+
+  // Conventional pixel-editor tool hotkeys (derived from TOOL_HOTKEY). These
+  // mirror the toolbar buttons and are ignored while typing in a form control
+  // so the size <select> etc. keep their native behaviour.
+  useEffect(() => {
+    const byKey: Record<string, Tool> = {};
+    (Object.keys(TOOL_HOTKEY) as Tool[]).forEach(t => { byKey[TOOL_HOTKEY[t].toLowerCase()] = t; });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) return;
+      const next = byKey[e.key.toLowerCase()];
+      if (next) {
+        e.preventDefault();
+        setTool(next);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Frames
   const addFrame = useCallback(() => {
     if (frames.length >= MAX_FRAMES) return;
@@ -227,8 +265,8 @@ const PixelArt: React.FC = () => {
     a.remove();
   }, [frame, size, currentFrame]);
 
-  // Build mini-thumbnail for a frame
-  const renderThumb = (f: Frame): string => {
+  // Build a data-URL thumbnail for a single frame.
+  const renderThumb = useCallback((f: Frame): string => {
     const off = document.createElement('canvas');
     off.width = size;
     off.height = size;
@@ -241,7 +279,12 @@ const PixelArt: React.FC = () => {
       }
     }
     return off.toDataURL('image/png');
-  };
+  }, [size]);
+
+  // Memoize the thumbnail strip so toDataURL only runs when the frames (or grid
+  // size) actually change. Previously every render - including tool/color
+  // switches that touch no pixels - rebuilt an offscreen canvas per frame.
+  const thumbs = useMemo(() => frames.map(renderThumb), [frames, renderThumb]);
 
   return (
     <div style={{
@@ -249,13 +292,16 @@ const PixelArt: React.FC = () => {
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
       fontFamily: 'var(--font-system)',
     }}>
-      <div style={{ ...premiumGlassToolbar, padding: '8px 12px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      <div style={{ ...premiumGlassToolbar, padding: 'var(--space-2) var(--space-3)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <DexIcon name="palette" size={18} color="var(--color-text-primary)" />
           {(['pencil', 'eraser', 'fill', 'eyedropper'] as Tool[]).map(t => (
             <button
               key={t}
               onClick={() => setTool(t)}
+              // Surface the keyboard hotkey in the tooltip so the shortcut is
+              // discoverable from the button the user is already looking at.
+              title={`${t} (${TOOL_HOTKEY[t]})`}
               style={{
                 ...toolBtn,
                 background: tool === t ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
@@ -303,7 +349,7 @@ const PixelArt: React.FC = () => {
         {/* Canvas area */}
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 16, overflow: 'auto',
+          padding: 'var(--space-4)', overflow: 'auto',
         }}>
           <canvas
             ref={canvasRef}
@@ -323,12 +369,12 @@ const PixelArt: React.FC = () => {
 
       {/* Frame strip */}
       <div style={{
-        display: 'flex', gap: 8, padding: 10,
+        display: 'flex', gap: 'var(--space-2)', padding: 10,
         borderTop: '1px solid var(--color-border-subtle)',
         background: 'var(--color-bg-elevated)', alignItems: 'center', overflowX: 'auto',
       }}>
-        {frames.map((f, i) => {
-          const src = renderThumb(f);
+        {frames.map((_f, i) => {
+          const src = thumbs[i];
           return (
             <div key={i} style={{ position: 'relative' }}>
               <button
@@ -360,7 +406,7 @@ const PixelArt: React.FC = () => {
             ...toolBtn, height: 56, minWidth: 56, justifyContent: 'center',
           }}>+ Frame</button>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <span style={{ width: 18, height: 18, borderRadius: 3, background: color, border: '1px solid var(--color-border-subtle)' }} />
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{color}</span>
         </div>
@@ -376,7 +422,7 @@ const toolBtn: React.CSSProperties = {
   border: '1px solid var(--color-border-subtle)', cursor: 'pointer',
 };
 const selectStyle: React.CSSProperties = {
-  padding: '6px 8px', borderRadius: 4, fontSize: 12,
+  padding: '6px var(--space-2)', borderRadius: 4, fontSize: 12,
   background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
   border: '1px solid var(--color-border-subtle)',
 };

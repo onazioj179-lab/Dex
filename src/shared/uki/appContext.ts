@@ -77,6 +77,11 @@ export function formatContextForPrompt(snap: AppContextSnapshot, maxChars = 800)
   if (snap.selectionText) lines.push(`selection:\n${truncate(snap.selectionText, 400)}`);
   if (snap.custom) {
     for (const [k, v] of Object.entries(snap.custom)) {
+      // Skip empty extras: undefined/null/'' values should never produce a noisy
+      // "key:" line -- and never reach truncate(undefined). JSON.stringify returns
+      // undefined for an undefined input, which previously threw here and broke
+      // the whole uki prompt the moment any resolver supplied an undefined extra.
+      if (v === undefined || v === null || v === '') continue;
       lines.push(`${k}: ${truncate(stringify(v), 120)}`);
     }
   }
@@ -84,8 +89,9 @@ export function formatContextForPrompt(snap: AppContextSnapshot, maxChars = 800)
   return joined.length > maxChars ? joined.slice(0, maxChars - 1) + '…' : joined;
 }
 
-function truncate(s: string, n: number): string { return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+function truncate(s: string, n: number): string { const str = String(s ?? ''); return str.length > n ? str.slice(0, n - 1) + '…' : str; }
 function stringify(v: unknown): string {
+  if (v === undefined || v === null) return '';
   if (typeof v === 'string') return v;
-  try { return JSON.stringify(v); } catch { return String(v); }
+  try { return JSON.stringify(v) ?? ''; } catch { return String(v); }
 }

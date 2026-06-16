@@ -43,6 +43,10 @@ const STORAGE_KEY = 'dex-window-manifest';
 const DEBOUNCE_MS = 1500;
 let pending: ReturnType<typeof setTimeout> | null = null;
 let lastWritten: WindowManifest | null = null;
+// The most recent snapshot handed to scheduleWrite but not yet flushed -- so
+// flush() can persist the LATEST change. (The old flush wrote the previously-
+// committed manifest and silently dropped the pending one before exit/crash.)
+let pendingWindows: { windows: WindowSnapshot[]; stageId?: string } | null = null;
 
 export function captureManifest(windows: WindowSnapshot[], stageId?: string): WindowManifest {
   return {
@@ -55,6 +59,7 @@ export function captureManifest(windows: WindowSnapshot[], stageId?: string): Wi
 
 /** Schedule a debounced write to localStorage. Safe to call on every change. */
 export function scheduleWrite(windows: WindowSnapshot[], stageId?: string): void {
+  pendingWindows = { windows, stageId };
   if (pending) clearTimeout(pending);
   pending = setTimeout(() => {
     pending = null;
@@ -62,6 +67,7 @@ export function scheduleWrite(windows: WindowSnapshot[], stageId?: string): void
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(manifest));
       lastWritten = manifest;
+      pendingWindows = null;
     } catch { /* storage full -- ignore */ }
   }, DEBOUNCE_MS);
 }
@@ -84,8 +90,12 @@ export function flush(): void {
   if (!pending) return;
   clearTimeout(pending);
   pending = null;
-  if (lastWritten) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(lastWritten)); } catch { /* ignore */ }
+  // Persist the PENDING snapshot (the most recent change) -- the old code wrote
+  // lastWritten, dropping whatever changed since the last committed write.
+  const data = pendingWindows ?? (lastWritten ? { windows: lastWritten.windows, stageId: lastWritten.stageId } : null);
+  pendingWindows = null;
+  if (data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(captureManifest(data.windows, data.stageId))); } catch { /* ignore */ }
   }
 }
 

@@ -218,7 +218,6 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const [maximized, setMaximized] = useState(initialState?.maximized ?? false);
   const [snapZone, setSnapZone] = useState<SnapZone | null>(initialState?.snapZone ?? null);
   const [previewZone, setPreviewZone] = useState<SnapZone | null>(null);
-  const [edgeGlow, setEdgeGlow] = useState<string | null>(null);
   const [sizeTooltip, setSizeTooltip] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -556,11 +555,6 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     onMaximize(id);
   }, [id, maximized, onMaximize]);
 
-  // Edge hover glow
-  const handleEdgeHover = useCallback((edge: string | null) => {
-    setEdgeGlow(edge);
-  }, []);
-
   // -----------------------------------------------------------------------
   // RENDER
   // -----------------------------------------------------------------------
@@ -635,27 +629,16 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           // webkit-app-region handled by CSS on [data-floating-window]
         }}
       >
-        {/* Resize handles */}
+        {/* Resize handles -- bare hit zones + cursor affordance only. DEX 5.5:
+            no edge glow/highlight overlay. The resize experience is invisible;
+            users already understand resizing and don't need it re-explained. */}
         {!maximized && edges.map(dir => (
           <div
             key={dir}
             style={edgeStyle(dir)}
             onPointerDown={(e) => handleResizePointerDown(dir, e)}
-            onPointerEnter={() => handleEdgeHover(dir)}
-            onPointerLeave={() => handleEdgeHover(null)}
           />
         ))}
-
-        {/* Edge glow */}
-        {edgeGlow && !maximized && (
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: 10, pointerEvents: 'none',
-            border: '1px solid var(--color-accent)',
-            opacity: 0.4,
-            zIndex: 2,
-            transition: 'opacity 0.1s ease',
-          }} />
-        )}
 
         {/* Title bar -- DEX Sharp: a solid "placed" toolbar (like a native OS
             title bar), not floating glass. Opaque surface + hairline base; no
@@ -731,7 +714,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           position: 'fixed',
           left: sizeTooltip.x,
           top: sizeTooltip.y,
-          padding: '4px 8px',
+          padding: '4px var(--space-2)',
           borderRadius: 4,
           background: 'rgba(0,0,0,0.80)',
           color: 'var(--color-text-primary)',
