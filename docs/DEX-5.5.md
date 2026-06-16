@@ -434,3 +434,37 @@ work so we deepen rather than re-churn:
   consistency axis is therefore appropriately complete.
 - **UKI context mesh / action routing, scroll virtualization (Notes/Tasks done),
   density, cohesion, architecture** — continue on the native + context tracks.
+
+## Precision UI, Density & Operational Simplicity (owner brief, 2026-06-15)
+
+Two more continuation docs (Visual Balance/Density/Precision + Operational
+Simplicity/Creative Completion/Scale) + screenshot. Status-mapped:
+- **Widget Freedom (remove Arrange/Add-widget controls -> direct manipulation)** —
+  DONE + preview-verified (2026-06-15). The separate "Arrange" mode was already
+  gone; now the persistent "Add widget" button is removed too (`HomeWidgets.tsx`).
+  Adding is the OS-like right-click on the desktop -> "Add Widget" (the Home
+  desktop context menu already wired it; verified the menu item opens the picker
+  with 5 widget types). Drag-reposition / resize / remove were already direct.
+- **Alignment / visual rhythm / border + radius consistency / visual weight /
+  surface philosophy / unified design language** — substantially DONE via the
+  DEX Sharp program (full-flat de-glassing, ONE 28/32/40 control rhythm, discrete
+  radii, hairline borders, token system, content-over-chrome). Further density
+  calibration should be measured per-screen, not a blind churn (quality bar).
+- **Density calibration (reduce oversized cards/panels/dock)** — INVESTIGATED
+  + measured (2026-06-15): tried tightening the Home bento rows 168->150, but the
+  preview measurement showed the cards are CONTENT-sized, not oversized — 150 clips
+  real content (Recent Notes needs ~176px, Pinned Apps ~270px). Reverted. The
+  "empty/oversized" look is the empty-STATE widgets (no projects/workflows/rewind
+  data yet) filling their cells, which is honest. So a blind row reduction is the
+  wrong fix (the "measured, don't churn" rule earned its keep). REAL bug found:
+  the Pinned Apps card clips ~122px of its icons at its 1-row `wide` span (needs
+  ~270px) — flagged for a targeted fix (span 2 rows or cap/scroll the icon grid).
+- **Direct manipulation / text reduction in creative apps** — partial; NEW sweep.
+- **Progressive disclosure (Task Manager detail levels)** — DONE (level 1/2/3).
+- **UKI intelligence (workspace awareness, intent, agentic reliability)** — in
+  flight via `appContextRegistry` + the planner; deepening is ongoing.
+- **Creative suite completion (AXL / Nexus / CAD / Rewind / Journal audits),
+  large-scale handling, search + asset infra** — large per-app multi-session work;
+  native search (Tantivy) + list virtualization already in.
+Verifiable renderer/UX items lead; do-not-force where a unified model does not fit
+(see the creative-zoom + audio-sink + keys findings).

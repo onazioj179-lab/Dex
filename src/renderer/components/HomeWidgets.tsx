@@ -1206,33 +1206,11 @@ export const HomeWidgets: React.FC = () => {
         </div>
       )}
 
-      {/* Add-widget affordance (normal view) — a single quiet button so adding
-          a widget stays discoverable. Repositioning/resizing/removing are direct
-          (hover the widget itself), so there is no separate "Arrange" mode. */}
-      {widgets.filter(w => w.visible).length > 0 && (
-        <div style={{ position: 'absolute', bottom: 80, right: 20, zIndex: 20 }}>
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="dex-hover-bg"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: 'var(--space-2) 14px', borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.16)',
-              background: 'rgba(24,24,28,0.58)',
-              backdropFilter: 'var(--blur-xl) saturate(180%)',
-              WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              boxShadow: 'var(--pg-shadow-context)',
-            }}
-            aria-label="Add widget"
-            title="Add widget"
-          >
-            <DexIcon name="plus" size={14} color="rgba(255,255,255,0.9)" />
-            Add widget
-          </button>
-        </div>
-      )}
-
+      {/* No persistent "Add widget" button (Widget Freedom initiative): the
+          workspace is the editor. Repositioning/resizing/removing are direct
+          (touch the widget), and adding is the OS-like right-click on the
+          desktop -> "Add Widget" (Home desktop context menu), which opens the
+          picker below. No permanent arrange/add chrome. */}
       {pickerOpen && <WidgetPicker onClose={() => setPickerOpen(false)} />}
     </>
   );
@@ -1899,6 +1877,10 @@ export const HomeDashboard: React.FC = () => {
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+        // Bento rows kept at 168px: measured (2026-06-15) that the cards are
+        // content-sized, not oversized — tighter rows clip real content (Recent
+        // Notes needs ~176, Pinned Apps ~270). The "empty" look is empty-STATE
+        // widgets (no data yet), which is honest, not a density bug.
         gridAutoRows: '168px',
         gridAutoFlow: 'dense',
         gridAutoColumns: '1fr',
