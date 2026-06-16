@@ -279,6 +279,11 @@ class TimelineCache {
 
 class EffectProcessor {
   private effectCache: Map<string, unknown> = new Map();
+  // Each cached value is a full-resolution ImageData buffer (megabytes), so an
+  // unbounded cache leaks heavily across an editing session. Bound it with a
+  // small LRU (insertion-ordered Map; hits re-insert to the tail, sets evict
+  // the head once over the cap).
+  private static readonly MAX_EFFECT_CACHE = 24;
 
   /**
    * Apply an effect chain to image data
@@ -294,6 +299,9 @@ class EffectProcessor {
       const cacheKey = `${effect.id}-${JSON.stringify(effect.params)}`;
       const cached = this.effectCache.get(cacheKey);
       if (cached) {
+        // LRU bump: move this key to the tail so it survives eviction.
+        this.effectCache.delete(cacheKey);
+        this.effectCache.set(cacheKey, cached);
         result = cached as ImageData;
         continue;
       }
@@ -314,8 +322,12 @@ class EffectProcessor {
           break;
       }
 
-      // Cache result
+      // Cache result (bounded LRU — evict the oldest once over the cap)
       this.effectCache.set(cacheKey, result);
+      if (this.effectCache.size > EffectProcessor.MAX_EFFECT_CACHE) {
+        const oldest = this.effectCache.keys().next().value;
+        if (oldest !== undefined) this.effectCache.delete(oldest);
+      }
     }
 
     return result;
@@ -336,6 +348,10 @@ class EffectProcessor {
 
 class WaveformGenerator {
   private waveformCache: Map<string, Float32Array> = new Map();
+  // Bound the waveform cache (Float32Arrays per audio buffer) so it can't grow
+  // without limit across a long audio-editing session. Same LRU discipline as
+  // EffectProcessor.
+  private static readonly MAX_WAVEFORM_CACHE = 32;
 
   /**
    * Generate waveform data for visualization
@@ -347,7 +363,12 @@ class WaveformGenerator {
   ): Promise<Float32Array> {
     const cacheKey = `${audioBuffer.length}-${samplesPerPixel}-${channel}`;
     const cached = this.waveformCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      // LRU bump.
+      this.waveformCache.delete(cacheKey);
+      this.waveformCache.set(cacheKey, cached);
+      return cached;
+    }
 
     const channelData = audioBuffer.getChannelData(channel);
     const pixelCount = Math.ceil(channelData.length / samplesPerPixel);
@@ -376,6 +397,10 @@ class WaveformGenerator {
     });
 
     this.waveformCache.set(cacheKey, waveform);
+    if (this.waveformCache.size > WaveformGenerator.MAX_WAVEFORM_CACHE) {
+      const oldest = this.waveformCache.keys().next().value;
+      if (oldest !== undefined) this.waveformCache.delete(oldest);
+    }
     return waveform;
   }
 

@@ -6,6 +6,7 @@
  * file events, browser tabs. All local, no cloud, no accounts.
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { DexLoader } from '../../components/LoadingStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { RewindViewErrorBoundary } from './RewindViewErrorBoundary';
 import { getBundledAppVersion } from '../../utils/appVersion';
@@ -2498,7 +2499,7 @@ const timer = setInterval(check, 15000);
               )}
             </div>
           ) : (
-            <div style={{ fontSize: 11, opacity: 0.4 }}>Loading...</div>
+            <DexLoader variant="inline" label="Loading…" />
           )}
         </div>
 

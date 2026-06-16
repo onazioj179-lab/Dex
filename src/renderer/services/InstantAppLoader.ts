@@ -10,6 +10,7 @@
 // =============================================================================
 
 import { lazy } from 'react';
+import { sharedTick } from './SharedTick';
 
 // ---------------------------------------------------------------------------
 // APP PRELOAD CACHE
@@ -309,8 +310,9 @@ export function setLoadingState(appId: string, state: 'loading' | 'ready' | 'err
 // CLEANUP
 // ---------------------------------------------------------------------------
 
-// Store interval ID for cleanup
-let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+// Tracks whether the shared-tick cleanup subscription is active.
+const CLEANUP_TICK_ID = 'instant-loader-cleanup';
+let cleanupActive = false;
 
 /**
  * Clear old preloaded modules to free memory
@@ -328,15 +330,18 @@ export function cleanupPreloadCache(): void {
  * Stop the cleanup interval (for testing or shutdown)
  */
 export function stopCleanupInterval(): void {
-  if (cleanupIntervalId) {
-    clearInterval(cleanupIntervalId);
-    cleanupIntervalId = null;
+  if (cleanupActive) {
+    sharedTick.unsubscribe(CLEANUP_TICK_ID);
+    cleanupActive = false;
   }
 }
 
-// Cleanup every 10 minutes
+// Cleanup every 10 minutes -- on the shared runtime tick rather than a dedicated
+// background timer. This is a low-frequency maintenance sweep, so pausing while
+// the window is hidden (and catching up on focus) is exactly right.
 if (typeof window !== 'undefined') {
-  cleanupIntervalId = setInterval(cleanupPreloadCache, 10 * 60 * 1000);
+  sharedTick.subscribe(CLEANUP_TICK_ID, cleanupPreloadCache, 10 * 60 * 1000);
+  cleanupActive = true;
 }
 
 export default {

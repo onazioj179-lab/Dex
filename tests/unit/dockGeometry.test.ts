@@ -6,69 +6,12 @@
 // =============================================================================
 import { describe, it, expect } from 'vitest';
 import {
-  computeDockGeometry,
   normalizeDockEdge,
   normalizeDockPreset,
-  nearestEdge,
+  normalizeDockAlign,
 } from '../../src/shared/shell/dockGeometry';
 
 describe('dockGeometry', () => {
-  describe('computeDockGeometry', () => {
-    it('positions bottom dock with row layout', () => {
-      const g = computeDockGeometry({ edge: 'bottom', preset: 'regular', visible: true });
-      expect(g.flexDirection).toBe('row');
-      expect(g.positionStyle.bottom).toBeDefined();
-      expect(g.positionStyle.left).toBe('50%');
-      expect(g.visibleTransform).toContain('translateX(-50%)');
-      expect(g.hiddenTransform).toContain('translateY(');
-    });
-
-    it('positions top dock with row layout', () => {
-      const g = computeDockGeometry({ edge: 'top', preset: 'regular', visible: true });
-      expect(g.flexDirection).toBe('row');
-      expect(g.positionStyle.top).toBeDefined();
-      expect(g.hiddenTransform).toContain('-');
-    });
-
-    it('positions left dock with column layout', () => {
-      const g = computeDockGeometry({ edge: 'left', preset: 'regular', visible: true });
-      expect(g.flexDirection).toBe('column');
-      expect(g.positionStyle.left).toBeDefined();
-      expect(g.positionStyle.top).toBe('50%');
-      expect(g.visibleTransform).toContain('translateY(-50%)');
-    });
-
-    it('positions right dock with column layout', () => {
-      const g = computeDockGeometry({ edge: 'right', preset: 'regular', visible: true });
-      expect(g.flexDirection).toBe('column');
-      expect(g.positionStyle.right).toBeDefined();
-    });
-
-    it('compact preset shrinks icons + padding', () => {
-      const compact = computeDockGeometry({ edge: 'bottom', preset: 'compact', visible: true });
-      const regular = computeDockGeometry({ edge: 'bottom', preset: 'regular', visible: true });
-      expect(compact.iconSize).toBeLessThan(regular.iconSize);
-      expect(compact.paddingX).toBeLessThan(regular.paddingX);
-      expect(compact.borderRadius).toBeLessThan(regular.borderRadius);
-      expect(compact.magnificationScale).toBe(1.0); // no magnify in compact
-    });
-
-    it('large preset grows icons + magnification', () => {
-      const large = computeDockGeometry({ edge: 'bottom', preset: 'large', visible: true });
-      const regular = computeDockGeometry({ edge: 'bottom', preset: 'regular', visible: true });
-      expect(large.iconSize).toBeGreaterThan(regular.iconSize);
-      expect(large.magnificationScale).toBeGreaterThan(regular.magnificationScale);
-    });
-
-    it('floating preset lifts the dock further from the edge', () => {
-      const floating = computeDockGeometry({ edge: 'bottom', preset: 'floating', visible: true });
-      const regular = computeDockGeometry({ edge: 'bottom', preset: 'regular', visible: true });
-      // Larger margin (lifted off the edge) and bigger pill radius.
-      expect(Number(floating.positionStyle.bottom)).toBeGreaterThan(Number(regular.positionStyle.bottom));
-      expect(floating.borderRadius).toBeGreaterThan(regular.borderRadius);
-    });
-  });
-
   describe('normalizeDockEdge', () => {
     it('accepts valid edges', () => {
       expect(normalizeDockEdge('top')).toBe('top');
@@ -97,20 +40,16 @@ describe('dockGeometry', () => {
     });
   });
 
-  describe('nearestEdge', () => {
-    const W = 1920;
-    const H = 1080;
-    it('returns top when cursor is near top edge', () => {
-      expect(nearestEdge(960, 5, W, H)).toBe('top');
+  describe('normalizeDockAlign', () => {
+    it('accepts valid alignments', () => {
+      expect(normalizeDockAlign('start')).toBe('start');
+      expect(normalizeDockAlign('center')).toBe('center');
+      expect(normalizeDockAlign('end')).toBe('end');
     });
-    it('returns bottom when cursor is near bottom edge', () => {
-      expect(nearestEdge(960, H - 5, W, H)).toBe('bottom');
-    });
-    it('returns left when cursor is near left edge', () => {
-      expect(nearestEdge(5, 540, W, H)).toBe('left');
-    });
-    it('returns right when cursor is near right edge', () => {
-      expect(nearestEdge(W - 5, 540, W, H)).toBe('right');
+    it('falls back to center for unknown values', () => {
+      expect(normalizeDockAlign('middle')).toBe('center');
+      expect(normalizeDockAlign(null)).toBe('center');
+      expect(normalizeDockAlign(undefined)).toBe('center');
     });
   });
 });

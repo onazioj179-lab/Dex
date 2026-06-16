@@ -3541,6 +3541,14 @@ class DexApp {
       return { success: true };
     });
 
+    // Lightweight incremental refresh hook the renderer calls on focus. Electron's
+    // FileSearchIndexer is already incremental + self-maintaining, so here we just
+    // acknowledge the cross-shell call (no heavy rebuild, no rate-limit). The Tauri
+    // shell handles the SAME channel by running its native snapshot-diff index_sync.
+    ipcMain.handle('search:sync', async () => {
+      return { success: true, mode: 'auto' };
+    });
+
     // -------------------------------------------------------------------------
     // Media File Scanner (Real File System Integration)
     // -------------------------------------------------------------------------

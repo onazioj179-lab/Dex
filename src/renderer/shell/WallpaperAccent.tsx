@@ -287,19 +287,3 @@ export const WallpaperLayer: React.FC<{
     </>
   );
 };
-
-// =========================================================================
-// DOCK REFLECTION (mix-blend-mode soft-light)
-// =========================================================================
-
-export function getDockReflectionStyle(): React.CSSProperties {
-  return {
-    background: 'var(--wallpaper-dominant, transparent)',
-    mixBlendMode: 'soft-light',
-    opacity: 0.08,
-    position: 'absolute',
-    inset: 0,
-    borderRadius: 'inherit',
-    pointerEvents: 'none',
-  };
-}

@@ -512,10 +512,16 @@ export const useSystemHealth = () => {
 
 /** Get unacknowledged alerts */
 export const usePerformanceAlerts = () => {
-  return usePerformanceMonitor(state => ({
-    alerts: state.alerts.filter(a => !a.acknowledged),
-    count: state.unacknowledgedCount,
-  }));
+  // Select the raw (ref-stable) inputs, then memoize the derived filter so the
+  // returned object/array reference only changes when alerts or the count
+  // actually change — a plain `state => ({ alerts: ...filter(), count })`
+  // selector would allocate a new array every store tick and re-render on each.
+  const alerts = usePerformanceMonitor(state => state.alerts);
+  const count = usePerformanceMonitor(state => state.unacknowledgedCount);
+  return React.useMemo(
+    () => ({ alerts: alerts.filter(a => !a.acknowledged), count }),
+    [alerts, count],
+  );
 };
 
 // ===========================================================================

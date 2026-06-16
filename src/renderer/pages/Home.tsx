@@ -674,16 +674,20 @@ export const Home: React.FC = () => {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '10px 14px',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.10)',
-                    borderRadius: 12, cursor: 'pointer',
+                    // Unified desktop surface: a recent file is a row on the desktop,
+                    // not a floating card. No fill/border/elevation at rest; a soft
+                    // scrim appears on hover. Inherited text-shadow keeps it legible.
+                    background: 'transparent',
+                    border: '1px solid transparent',
+                    borderRadius: 10, cursor: 'pointer',
                     color: 'var(--color-text-primary)', fontSize: 12,
                     textAlign: 'left',
-                    boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
-                    transition: 'background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease',
+                    textShadow: 'var(--dex-desktop-text-shadow)',
+                    boxShadow: 'none',
+                    transition: 'background 0.18s ease',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = '0 12px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.10)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--dex-desktop-scrim-hover)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', opacity: 0.5 }}><DexIcon name="file-text" size={14} /></span>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
@@ -1133,15 +1137,17 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
   const color = done ? 'var(--color-success)' : 'var(--color-accent)';
 
   return (
-    <div className="dex-hover-card" style={{
+    <div style={{
       display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-      padding: '10px 14px', borderRadius: 12,
-      background: 'rgba(255,255,255,0.06)',
-      border: '1px solid rgba(255,255,255,0.10)',
-      boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
+      padding: '10px 14px', borderRadius: 10,
+      // Unified desktop surface: a soft scrim region, not a bordered glass card.
+      background: 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))',
+      border: '1px solid transparent',
+      boxShadow: 'none',
+      textShadow: 'var(--dex-desktop-text-shadow)',
       opacity: done ? 0.6 : 1,
       cursor: 'default',
-      transition: 'opacity 0.18s ease, transform 0.18s ease, background 0.15s ease, box-shadow 0.15s ease',
+      transition: 'opacity 0.18s ease, transform 0.18s ease, background 0.15s ease',
       animation: done ? 'activityDone 0.5s ease-out' : 'fadeIn 0.2s ease-out',
       transform: done ? 'scale(0.97)' : 'scale(1)',
     }}>

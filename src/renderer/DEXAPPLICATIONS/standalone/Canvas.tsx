@@ -6,6 +6,7 @@
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { useGlobalUndo } from '../../services/undoManager';
+import { useAutoSave, loadAutoSave, clearAutoSave } from '../../utils/useAutoSave';
 
 interface Point {
   x: number;
@@ -51,6 +52,27 @@ const Canvas: React.FC = () => {
     clearHistory();
     return () => clearHistory();
   }, [clearHistory]);
+
+  // --- Crash recovery -----------------------------------------------------
+  // Canvas is the first adopter of the shared recovery layer as well as the
+  // shared undo engine. The drawing is a vector stroke list, so autosave
+  // persists it losslessly (and far more cheaply than a PNG snapshot) and
+  // restores it after a crash or accidental close. getData reads through a ref
+  // so the autosave subscription stays stable across every stroke.
+  const recoveryRef = useRef<{ strokes: Stroke[]; bgColor: string }>({ strokes, bgColor });
+  recoveryRef.current = { strokes, bgColor };
+  const getRecoveryData = useCallback(() => recoveryRef.current, []);
+  useAutoSave('canvas', getRecoveryData, strokes.length > 0, 15_000);
+
+  // Restore the last auto-saved drawing once on mount.
+  useEffect(() => {
+    const saved = loadAutoSave<{ strokes: Stroke[]; bgColor: string }>('canvas');
+    if (saved && Array.isArray(saved.strokes) && saved.strokes.length > 0) {
+      setStrokes(saved.strokes);
+      if (typeof saved.bgColor === 'string') setBgColor(saved.bgColor);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Track the CSS (layout) size separately from the backing-store size so
   // drawing math stays in CSS pixels while the canvas renders at device
@@ -258,6 +280,9 @@ const Canvas: React.FC = () => {
     if (strokes.length === 0) return;
     const before = strokes;
     setStrokes([]);
+    // Drop the recovery snapshot too so a cleared canvas doesn't come back on
+    // next open (undo still restores `before` within the session).
+    clearAutoSave('canvas');
     pushUndo('Clear canvas', () => setStrokes([]), () => setStrokes(before));
   };
 

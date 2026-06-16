@@ -237,23 +237,84 @@ fn system_status() -> Value {
     })
 }
 
-/// `system:getProcesses` — running process list (pid, name, cpu%, memMB).
+/// A process row for ranking. Kept separate from the JSON shape so the ranking
+/// policy is pure + unit-testable without sysinfo / a live machine.
+#[derive(Clone)]
+struct ProcInfo {
+    pid: u32,
+    name: String,
+    cpu: f32,
+    memory_mb: u64,
+}
+
+/// Number of processes returned to the UI. A task list wants the resource hogs,
+/// not an unsorted dump of every PID on the machine.
+const PROCESS_LIMIT: usize = 60;
+
+/// Rank by resource pressure — CPU% descending, memory as the tiebreaker — and
+/// keep the top `limit`. Pure and deterministic.
+fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
+    procs.sort_by(|a, b| {
+        b.cpu
+            .partial_cmp(&a.cpu)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(b.memory_mb.cmp(&a.memory_mb))
+    });
+    procs.truncate(limit);
+    procs
+}
+
+/// `system:getProcesses` — top running processes by resource use (pid, name,
+/// cpu%, memMB). Ranked + capped so the UI gets the hogs, not raw noise.
 fn system_processes() -> Value {
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
-    let procs: Vec<Value> = sys
+    let all: Vec<ProcInfo> = sys
         .processes()
         .iter()
-        .map(|(pid, p)| {
+        .map(|(pid, p)| ProcInfo {
+            pid: pid.as_u32(),
+            name: p.name().to_string(),
+            cpu: p.cpu_usage(),
+            memory_mb: p.memory() / (1024 * 1024),
+        })
+        .collect();
+    let procs: Vec<Value> = rank_processes(all, PROCESS_LIMIT)
+        .iter()
+        .map(|p| {
             json!({
-                "pid": pid.as_u32(),
-                "name": p.name(),
-                "cpu": p.cpu_usage(),
-                "memory": p.memory() / (1024 * 1024),
+                "pid": p.pid,
+                "name": p.name,
+                "cpu": p.cpu,
+                "memory": p.memory_mb,
             })
         })
         .collect();
     json!({ "success": true, "processes": procs })
+}
+
+#[cfg(test)]
+mod process_ranking_tests {
+    use super::{rank_processes, ProcInfo};
+
+    fn p(pid: u32, cpu: f32, memory_mb: u64) -> ProcInfo {
+        ProcInfo { pid, name: format!("proc{pid}"), cpu, memory_mb }
+    }
+
+    #[test]
+    fn ranks_by_cpu_then_memory_and_truncates() {
+        let procs = vec![p(1, 5.0, 100), p(2, 50.0, 10), p(3, 5.0, 900)];
+        let top = rank_processes(procs, 2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].pid, 2, "highest CPU first");
+        assert_eq!(top[1].pid, 3, "CPU tie -> higher memory first");
+    }
+
+    #[test]
+    fn limit_larger_than_len_is_safe() {
+        assert_eq!(rank_processes(vec![p(1, 1.0, 1)], 10).len(), 1);
+        assert!(rank_processes(vec![], 5).is_empty());
+    }
 }
 
 /// `system:killProcess` — terminate by pid.
@@ -660,6 +721,146 @@ fn index_stats(app: &tauri::AppHandle) -> Value {
         .and_then(|g| g.as_ref().map(|i| i.count()))
         .unwrap_or(0);
     json!({ "indexed": count, "shell": "tauri" })
+}
+
+/// Incrementally re-sync the index against the user's folders WITHOUT a full
+/// rebuild: snapshot each folder (size+mtime), diff it against the previous
+/// snapshot held in managed state, then `upsert_file` the added/modified files
+/// and `remove_path` the deleted ones. Cheap to call often (e.g. on focus).
+///
+/// Guard: a first run (empty baseline) or an unusually large diff falls back to a
+/// full clear+rebuild, because `upsert_file` commits per file and thousands of
+/// commits would be pathological — incremental is for the small steady-state diff.
+fn index_sync(app: &tauri::AppHandle) -> Value {
+    // Clone the (Arc-backed) index handle and release the search lock immediately.
+    let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
+    let idx = {
+        let guard = match search_state.lock() {
+            Ok(g) => g,
+            Err(_) => return json!({ "success": false, "error": "index busy" }),
+        };
+        match guard.as_ref() {
+            Some(i) => i.clone(),
+            None => return json!({ "success": false, "error": "index unavailable" }),
+        }
+    };
+
+    let p = app.path();
+    let dirs: Vec<std::path::PathBuf> = [p.document_dir(), p.desktop_dir(), p.download_dir()]
+        .into_iter()
+        .flatten()
+        .collect();
+
+    // Hold the snapshot lock for the whole sync so two syncs can't interleave; it
+    // is a different mutex from the search index, so queries stay responsive.
+    let snap_state = app.state::<std::sync::Mutex<dex_scanner::Snapshot>>();
+    let mut prev = match snap_state.lock() {
+        Ok(g) => g,
+        Err(_) => return json!({ "success": false, "error": "snapshot busy" }),
+    };
+
+    let mut new_snapshot: dex_scanner::Snapshot = dex_scanner::Snapshot::new();
+    for dir in &dirs {
+        new_snapshot.extend(dex_scanner::scan_snapshot(dir, 20000));
+    }
+    let diff = dex_scanner::diff_snapshots(&prev, &new_snapshot);
+
+    const SYNC_UPSERT_LIMIT: usize = 500;
+    let change_count = diff.added.len() + diff.modified.len();
+    if prev.is_empty() || change_count > SYNC_UPSERT_LIMIT {
+        // Initial build or too-large diff: a full rebuild is cheaper than thousands
+        // of single-file commits. Reset the baseline to the freshly-scanned state.
+        let _ = idx.clear();
+        let mut total = 0usize;
+        for dir in &dirs {
+            if let Ok(n) = idx.index_path(dir, 20000) {
+                total += n;
+            }
+        }
+        *prev = new_snapshot;
+        return json!({ "success": true, "mode": "rebuilt", "indexed": total });
+    }
+
+    let mut upserted = 0usize;
+    for path in diff.added.iter().chain(diff.modified.iter()) {
+        if idx.upsert_file(std::path::Path::new(path)).unwrap_or(false) {
+            upserted += 1;
+        }
+    }
+    let mut removed = 0usize;
+    for path in &diff.removed {
+        if idx.remove_path(std::path::Path::new(path)).is_ok() {
+            removed += 1;
+        }
+    }
+    *prev = new_snapshot;
+
+    json!({
+        "success": true,
+        "mode": "incremental",
+        "added": diff.added.len(),
+        "modified": diff.modified.len(),
+        "removed": removed,
+        "upserted": upserted,
+    })
+}
+
+/// Start a live, push-based filesystem watcher over the indexed folders so the
+/// search index refreshes itself as files change — the push complement to the
+/// poll-based `search:sync`. Change bursts are coalesced (~1.5s quiet window) and
+/// then run through `index_sync`, whose snapshot-diff collapses even noisy or
+/// metadata-only events down to the minimal set of upserts/removals. The watcher
+/// is owned by its debounce thread for the app's lifetime; if setup fails it
+/// degrades silently (on-demand `search:sync` / `search:rebuild` still work).
+fn start_index_watcher(app: tauri::AppHandle) {
+    use notify::Watcher;
+    let dirs: Vec<std::path::PathBuf> = {
+        let p = app.path();
+        [p.document_dir(), p.desktop_dir(), p.download_dir()]
+            .into_iter()
+            .flatten()
+            .collect()
+    };
+    if dirs.is_empty() {
+        return;
+    }
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            if matches!(
+                event.kind,
+                notify::EventKind::Create(_)
+                    | notify::EventKind::Modify(_)
+                    | notify::EventKind::Remove(_)
+            ) {
+                let _ = tx.send(());
+            }
+        }
+    }) {
+        Ok(w) => w,
+        Err(_) => return,
+    };
+    for dir in &dirs {
+        let _ = watcher.watch(dir.as_path(), notify::RecursiveMode::Recursive);
+    }
+    std::thread::spawn(move || {
+        let _keep_alive = watcher; // own the watcher so it stays active
+        loop {
+            // Block until the first change in a quiet period.
+            if rx.recv().is_err() {
+                break;
+            }
+            // Coalesce the burst: drain until ~1.5s of quiet, then sync once.
+            loop {
+                match rx.recv_timeout(std::time::Duration::from_millis(1500)) {
+                    Ok(()) => continue,
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
+                }
+            }
+            let _ = index_sync(&app);
+        }
+    });
 }
 
 /// Native Vault dispatch (GOAL-6B) — encrypted password manager + TOTP. State is
@@ -1270,6 +1471,7 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
 
         // --- Native search index (GOAL-6A, Tantivy) ------------------------
         "search:rebuild" | "fileSearch:reindex" => index_rebuild(&app),
+        "search:sync" | "fileSearch:sync" => index_sync(&app),
         "search:getStats" => index_stats(&app),
 
         // --- Native audio analysis (GOAL-6C) -------------------------------
@@ -1540,6 +1742,10 @@ fn main() {
             app.manage(std::sync::Mutex::new(
                 dex_search::SearchIndex::open_or_create(&index_dir).ok(),
             ));
+            // Previous file snapshot for incremental `search:sync` (size+mtime per
+            // path). Starts empty: the first sync does a full build, then each later
+            // sync only diffs + upserts what changed.
+            app.manage(std::sync::Mutex::new(dex_scanner::Snapshot::new()));
             // Notification center — persists under the app data dir, mirroring
             // Electron's userData/notifications.
             let notif_dir = app
@@ -1576,6 +1782,10 @@ fn main() {
             // that the db + watched_folders schema are ready (mirrors startWatching).
             app.manage(cmd_file_watcher::FileWatchState::default());
             cmd_file_watcher::start_all(app.handle().clone());
+            // Live, push-based watcher that keeps the native search index fresh as
+            // files change (debounced -> index_sync). Best-effort; the poll-based
+            // search:sync / search:rebuild remain the fallback.
+            start_index_watcher(app.handle().clone());
             // Security permissions store (session-scoped; SecurityController parity).
             app.manage(std::sync::Mutex::new(security::SecurityState::default()));
             // HTTP file-transfer server slot (started on demand via httpTransfer:start).

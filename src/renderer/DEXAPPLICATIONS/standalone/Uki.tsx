@@ -49,6 +49,7 @@ function buildSystemPrompt(): string {
     c.foregroundAppId ? `The user is currently in the "${c.foregroundAppId}" app.` : '',
     c.openAppIds.length ? `Open apps: ${c.openAppIds.join(', ')}.` : '',
     c.sessionHistory.length ? `Recently used: ${c.sessionHistory.slice(-5).join(', ')}.` : '',
+    c.recentFiles.length ? `Recent files: ${c.recentFiles.join(', ')}.` : '',
     `Network: ${c.online ? 'online' : 'offline'}.`,
   ].filter(Boolean);
   let prompt = `${SYSTEM_PROMPT}\n\n[Live context] ${parts.join(' ')}`;

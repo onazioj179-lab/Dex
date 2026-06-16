@@ -46,6 +46,13 @@ export interface UkiWorkflowRecord extends UkiVersioned {
   triggers?: readonly string[];
   createdTs: number;
   updatedTs: number;
+  /**
+   * Quality signals for scored retention (relevance/frequency/recency). Optional
+   * and backward-compatible: records written before these existed read as 0 /
+   * createdTs via the consumers' nullish fallbacks.
+   */
+  useCount?: number;
+  lastUsedTs?: number;
 }
 
 /** Cached fact retrieved from a free API. */

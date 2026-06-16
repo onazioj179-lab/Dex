@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { sharedTick } from '../services/SharedTick';
 
 // ==================== TYPES ====================
 
@@ -106,20 +107,12 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     };
 
     checkClipboard();
-    let interval: ReturnType<typeof setInterval> | null = setInterval(checkClipboard, 5000);
-    const onVisibility = () => {
-      if (document.hidden) {
-        if (interval !== null) { clearInterval(interval); interval = null; }
-      } else if (interval === null) {
-        checkClipboard();
-        interval = setInterval(checkClipboard, 5000);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      if (interval !== null) clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
+    // SharedTick already pauses while the window is hidden, so it replaces the
+    // raw interval plus the manual visibilitychange pause/resume that used to
+    // live here.
+    const tickId = 'clipboard-monitor';
+    sharedTick.subscribe(tickId, checkClipboard, 5000);
+    return () => sharedTick.unsubscribe(tickId);
   }, [isOpen]);
 
   // Focus input when opened

@@ -684,8 +684,25 @@ function loadCoOccurrence(): CoOccurrence {
   return {};
 }
 
+// The co-occurrence graph is keyed by every unique query string the user types,
+// and new keys are only decay-pruned on load when >2h has elapsed — so within a
+// long session it grows without bound (in memory and on disk). Cap the number of
+// query keys here, dropping the weakest-signal ones. Mutates `graph` in place so
+// the live `_coGraph` stays bounded too.
+const MAX_CO_KEYS = 400;
+
 function saveCoOccurrence(graph: CoOccurrence) {
   try {
+    const keys = Object.keys(graph);
+    if (keys.length > MAX_CO_KEYS) {
+      const weight = (k: string) => {
+        let sum = 0;
+        for (const v of Object.values(graph[k])) sum += v;
+        return sum;
+      };
+      keys.sort((a, b) => weight(b) - weight(a));
+      for (const k of keys.slice(MAX_CO_KEYS)) delete graph[k];
+    }
     localStorage.setItem(CO_OCCURRENCE_KEY, JSON.stringify(graph));
   } catch { /* ignore */ }
 }

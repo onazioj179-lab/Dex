@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import { sharedTick } from './SharedTick';
 
 // ============================================================================
 // Types
@@ -185,27 +186,33 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 // Memory Polling
 // ============================================================================
 
-let pollingInterval: ReturnType<typeof setInterval> | null = null;
+let pollingActive = false;
 const POLLING_INTERVAL = 10_000; // 10 seconds — halved to reduce background CPU
 
+const MEMORY_TICK_ID = 'memory-monitor-poll';
+
 function startMemoryPolling(): void {
-  if (pollingInterval) return;
-  
+  if (pollingActive) return;
+
   const poll = () => {
     const stats = getMemoryStats();
     if (stats) {
       useMemoryStore.getState().updateStats(stats);
     }
   };
-  
+
+  // Ride the shared tick: heap telemetry is pure display/adaptation state, so
+  // it auto-pauses while the window is hidden (nothing to measure) and catches
+  // up on focus -- one shared runtime timer, no dedicated background poller.
   poll(); // Initial poll
-  pollingInterval = setInterval(poll, POLLING_INTERVAL);
+  sharedTick.subscribe(MEMORY_TICK_ID, poll, POLLING_INTERVAL);
+  pollingActive = true;
 }
 
 function stopMemoryPolling(): void {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    pollingInterval = null;
+  if (pollingActive) {
+    sharedTick.unsubscribe(MEMORY_TICK_ID);
+    pollingActive = false;
   }
 }
 

@@ -20,7 +20,7 @@
 // through Zustand actions.
 
 import { create } from 'zustand';
-import { normalizeDockEdge, normalizeDockPreset, type DockEdge, type DockSizePreset } from '../../shared/shell/dockGeometry';
+import { normalizeDockEdge, normalizeDockPreset, normalizeDockAlign, type DockEdge, type DockSizePreset, type DockAlign } from '../../shared/shell/dockGeometry';
 
 export const DEX_SHELL_PREFS_KEY = 'dex-shell-preferences-v1';
 
@@ -29,6 +29,8 @@ export type GlassMode = 'off' | 'reduced' | 'normal' | 'liquid';
 export interface ShellPreferences {
   /** Edge of the screen the dock attaches to. */
   dockEdge: DockEdge;
+  /** Alignment along that edge (start / center / end). */
+  dockAlign: DockAlign;
   /** Size preset for dock + icons. */
   dockPreset: DockSizePreset;
   /** Liquid-Glass background opacity (0.4–1.0). 1.0 = fully opaque. */
@@ -59,6 +61,7 @@ export interface ShellPreferences {
 
 export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockEdge: 'bottom',
+  dockAlign: 'center',
   dockPreset: 'regular',
   glassOpacity: 0.85,
   glassTint: '#0a0a0a',
@@ -76,6 +79,7 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
 
 interface ShellPreferencesActions {
   setDockEdge: (edge: DockEdge) => void;
+  setDockAlign: (align: DockAlign) => void;
   setDockPreset: (preset: DockSizePreset) => void;
   setGlassOpacity: (value: number) => void;
   setGlassTint: (hex: string) => void;
@@ -116,6 +120,7 @@ export function mergePrefs(input: unknown): ShellPreferences {
   if (!input || typeof input !== 'object') return base;
   const o = input as Record<string, unknown>;
   base.dockEdge = normalizeDockEdge(o.dockEdge);
+  base.dockAlign = normalizeDockAlign(o.dockAlign);
   base.dockPreset = normalizeDockPreset(o.dockPreset);
   base.glassOpacity = clamp01(o.glassOpacity, base.glassOpacity, 0.4, 1);
   base.glassTint = typeof o.glassTint === 'string' && /^#[0-9a-f]{6}$/i.test(o.glassTint)
@@ -297,6 +302,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
     ...initial,
 
     setDockEdge: (edge) => update({ dockEdge: normalizeDockEdge(edge) }),
+    setDockAlign: (align) => update({ dockAlign: normalizeDockAlign(align) }),
     setDockPreset: (preset) => update({ dockPreset: normalizeDockPreset(preset) }),
 
     setGlassOpacity: (value) => {

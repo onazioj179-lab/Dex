@@ -329,6 +329,181 @@ export const DotLoader = memo<DotLoaderProps>(({
 DotLoader.displayName = 'DotLoader';
 
 // ======================================================================
+// DEX LOADER — the one canonical DEX loading surface
+// ======================================================================
+//
+// The platform had a generic <Spinner>, a bespoke per-app spinner, a button
+// spinner and several ad-hoc "<div>Loading…</div>" strings — no shared identity,
+// so surfaces kept reinventing (or skipping) the loading state. DexLoader is the
+// single, branded answer: a precision mark + an optional task label + optional
+// determinate progress, in three sizes (inline / panel / screen) for the states
+// the platform actually has (a control, an app/asset load, a startup/recovery
+// screen). It is FLAT (no backdrop blur, per the DEX-Sharp identity) and honors
+// prefers-reduced-motion.
+
+export interface DexLoadingMarkProps {
+  /** Pixel size of the mark. */
+  size?: number;
+  /** Accent color of the active arc. */
+  accent?: string;
+  /** 0-100 makes the mark determinate (a filled arc, no spin). */
+  progress?: number;
+  /** Mark the SVG decorative when a parent element already labels the status. */
+  decorative?: boolean;
+  style?: React.CSSProperties;
+}
+
+/**
+ * The DEX loading mark — a precision instrument cue, not a generic spinner: a
+ * hairline track with four cardinal ticks (a reticle), a bright accent arc and a
+ * center point. Indeterminate, the arc sweeps at a calm, constant rate; given
+ * `progress` it becomes a determinate arc. Motion is GPU-only (transform) and
+ * stops under prefers-reduced-motion.
+ */
+export const DexLoadingMark = memo<DexLoadingMarkProps>(({
+  size = 36,
+  accent = 'var(--color-accent)',
+  progress,
+  decorative = false,
+  style,
+}) => {
+  const determinate = typeof progress === 'number';
+  const C = 2 * Math.PI * 9; // circumference of the r=9 ring
+  const pct = determinate ? Math.min(100, Math.max(0, progress as number)) : 0;
+  const ticks: ReadonlyArray<readonly [number, number]> = [[12, 3], [21, 12], [12, 21], [3, 12]];
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      role={decorative ? 'presentation' : 'status'}
+      aria-label={decorative ? undefined : 'Loading'}
+      aria-busy={decorative ? undefined : 'true'}
+      style={style}
+    >
+      {/* hairline track */}
+      <circle cx="12" cy="12" r="9" fill="none" stroke="var(--color-border-subtle)" strokeWidth="1.5" />
+      {/* reticle ticks */}
+      {ticks.map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="0.85" fill="var(--color-border-strong, var(--color-border))" />
+      ))}
+      {/* active arc */}
+      <circle
+        className={determinate ? undefined : 'dex-mark-arc'}
+        cx="12" cy="12" r="9" fill="none"
+        stroke={accent}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeDasharray={determinate ? `${(pct / 100) * C} ${C}` : `${C * 0.3} ${C * 0.7}`}
+        transform={determinate ? 'rotate(-90 12 12)' : undefined}
+        style={determinate
+          ? { transition: 'stroke-dasharray 300ms cubic-bezier(0.23,1,0.32,1)' }
+          : { transformOrigin: '12px 12px' }}
+      />
+      {/* center point */}
+      <circle cx="12" cy="12" r="1.1" fill={accent} />
+      <style>{`
+        .dex-mark-arc { animation: dex-mark-spin 1.1s linear infinite; transform-origin: 12px 12px; }
+        @keyframes dex-mark-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .dex-mark-arc { animation: none; } }
+      `}</style>
+    </svg>
+  );
+});
+
+DexLoadingMark.displayName = 'DexLoadingMark';
+
+export interface DexLoaderProps {
+  /** `inline` for controls/menus, `panel` to fill a container, `screen` to cover it. */
+  variant?: 'inline' | 'panel' | 'screen';
+  /** Primary task label, e.g. "Opening Notes". */
+  label?: string;
+  /** Secondary detail, e.g. "Preparing workspace…". */
+  sublabel?: string;
+  /** 0-100 → determinate (shows a progress bar + a filled mark). */
+  progress?: number;
+  /** Mark size override. */
+  size?: number;
+  /** Accent color override. */
+  accent?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+/**
+ * The canonical DEX loading surface. Prefer this over a bare spinner or a
+ * "Loading…" string anywhere the user waits for content.
+ */
+export const DexLoader = memo<DexLoaderProps>(({
+  variant = 'panel',
+  label,
+  sublabel,
+  progress,
+  size,
+  accent,
+  className,
+  style,
+}) => {
+  const determinate = typeof progress === 'number';
+
+  if (variant === 'inline') {
+    return (
+      <span
+        role="status"
+        aria-label={label || 'Loading'}
+        aria-busy="true"
+        className={className}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)',
+          color: 'var(--color-text-tertiary)', fontSize: 12, ...style,
+        }}
+      >
+        <DexLoadingMark size={size ?? 16} accent={accent} progress={progress} decorative />
+        {label && <span>{label}</span>}
+      </span>
+    );
+  }
+
+  const isScreen = variant === 'screen';
+  return (
+    <div
+      role="status"
+      aria-label={label || 'Loading'}
+      aria-busy="true"
+      className={className}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 'var(--space-3)',
+        width: '100%', height: '100%', minHeight: isScreen ? '100%' : 120,
+        padding: 'var(--space-6)', textAlign: 'center', boxSizing: 'border-box',
+        ...(isScreen
+          ? { position: 'absolute', inset: 0, background: 'var(--color-bg-base, var(--color-bg-primary))', zIndex: 1 }
+          : null),
+        ...style,
+      }}
+    >
+      <DexLoadingMark size={size ?? 36} accent={accent} progress={progress} decorative />
+      {label && (
+        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.01em', color: 'var(--color-text-secondary)' }}>
+          {label}
+        </div>
+      )}
+      {sublabel && (
+        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', maxWidth: 280, lineHeight: 1.4 }}>
+          {sublabel}
+        </div>
+      )}
+      {determinate && (
+        <ProgressBar value={progress as number} height={4} style={{ width: 180, maxWidth: '70%' }} />
+      )}
+    </div>
+  );
+});
+
+DexLoader.displayName = 'DexLoader';
+
+// ======================================================================
 // LOADING OVERLAY COMPONENT
 // ======================================================================
 
@@ -372,10 +547,9 @@ export const LoadingOverlay = memo<LoadingOverlayProps>(({
         gap: 'var(--space-3)',
         background,
         zIndex,
-        backdropFilter: 'var(--blur-sm)',
       }}
     >
-      {children || <Spinner size={40} />}
+      {children || <DexLoadingMark size={40} decorative />}
       {message && (
         <div style={{ fontSize: 14, color: '#fff', fontWeight: 500 }}>
           {message}

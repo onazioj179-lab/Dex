@@ -282,6 +282,18 @@ export const Browser: React.FC = () => {
         credMsgHandlersRef.current.delete(id);
       }
     }
+    // The same bulk-close paths also bypass closeTab's pruning of the per-tab
+    // side-channel refs, so reconcile them here too — otherwise stale entries
+    // for dead tabs accumulate across a long session of tab churn.
+    for (const id of webviewEventsRef.current) {
+      if (!liveIds.has(id)) webviewEventsRef.current.delete(id);
+    }
+    for (const id of autofillInjectedRef.current) {
+      if (!liveIds.has(id)) autofillInjectedRef.current.delete(id);
+    }
+    for (const id of webviewSrcRef.current.keys()) {
+      if (!liveIds.has(id)) webviewSrcRef.current.delete(id);
+    }
   }, [tabs]);
 
   useEffect(() => {
@@ -750,23 +762,44 @@ export const Browser: React.FC = () => {
     } catch (e) { console.warn('[DEX]', e); }
   }, [savedPasswords, domainFromUrl]);
 
+  // Patch a single tab in place, returning the previous array unchanged when
+  // none of the fields actually differ. did-stop-loading, did-finish-load and
+  // did-navigate all set loading:false in sequence, so without this guard each
+  // redundant event still allocates a fresh array and re-renders the whole tab
+  // strip. Returning `prev` on a no-op skips the render entirely.
+  const patchTab = useCallback((tabId: string, patch: Partial<Tab>) => {
+    setTabs(prev => {
+      const idx = prev.findIndex(t => t.id === tabId);
+      if (idx === -1) return prev;
+      const cur = prev[idx];
+      let changed = false;
+      for (const k in patch) {
+        if ((cur as any)[k] !== (patch as any)[k]) { changed = true; break; }
+      }
+      if (!changed) return prev;
+      const next = prev.slice();
+      next[idx] = { ...cur, ...patch };
+      return next;
+    });
+  }, []);
+
   // Multi-webview event attachment
   const attachWebviewEvents = useCallback((webview: any, tabId: string) => {
     if (!webview || webviewEventsRef.current.has(tabId)) return;
     webviewEventsRef.current.add(tabId);
 
     webview.addEventListener('did-start-loading', () => {
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: true } : t));
+      patchTab(tabId, { loading: true });
     });
     webview.addEventListener('did-stop-loading', () => {
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false } : t));
+      patchTab(tabId, { loading: false });
     });
     webview.addEventListener('did-finish-load', () => {
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false } : t));
+      patchTab(tabId, { loading: false });
     });
     webview.addEventListener('page-title-updated', (e: { title?: string }) => {
       const title = e.title || 'New Tab';
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, title } : t));
+      patchTab(tabId, { title });
       try {
         const url = webview.getURL?.() || '';
         if (url) addToHistory(url, title);
@@ -775,7 +808,7 @@ export const Browser: React.FC = () => {
     webview.addEventListener('did-navigate', (e: { url: string }) => {
       // Only update loading state — do NOT update tab.url here.
       // Updating tab.url would change the webview src attribute and cause a reload loop.
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false } : t));
+      patchTab(tabId, { loading: false });
       if (activeTabRef.current === tabId) setUrlInput(e.url);
     });
     webview.addEventListener('did-navigate-in-page', (e: { url: string }) => {
@@ -784,7 +817,7 @@ export const Browser: React.FC = () => {
     });
     webview.addEventListener('crashed', () => {
       console.error('[Browser] Webview crashed:', tabId);
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false, title: 'Page Crashed' } : t));
+      patchTab(tabId, { loading: false, title: 'Page Crashed' });
       setTabErrors(prev => ({ ...prev, [tabId]: 'Page crashed. Click reload to try again.' }));
       setCrashedTabs(prev => { const next = new Set(prev); next.add(tabId); return next; });
     });
@@ -797,7 +830,7 @@ export const Browser: React.FC = () => {
     webview.addEventListener('did-fail-load', (e: { errorCode: number; errorDescription?: string }) => {
       if (e.errorCode === -3) return;
       console.error('[Browser] Load failed:', tabId, e.errorCode, e.errorDescription);
-      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false } : t));
+      patchTab(tabId, { loading: false });
       setTabErrors(prev => ({ ...prev, [tabId]: e.errorDescription || 'Failed to load page' }));
     });
     webview.addEventListener('console-message', (e: { level: number; message: string }) => {
@@ -864,7 +897,7 @@ export const Browser: React.FC = () => {
     webview.addEventListener('leave-html-full-screen', () => {
       setFullscreenTabId(prev => prev === tabId ? null : prev);
     });
-  }, [addToHistory, injectAutofill, domainFromUrl, setDownloads, setShowDownloads]);
+  }, [addToHistory, injectAutofill, domainFromUrl, setDownloads, setShowDownloads, patchTab]);
 
   // Ref callback factory for webviews
   const getWebviewRef = useCallback((tabId: string) => (el: any) => {

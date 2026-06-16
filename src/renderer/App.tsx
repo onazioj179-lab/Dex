@@ -398,8 +398,12 @@ export const App: React.FC = () => {
   // (reads theme-schedule:getInfo + resolves locally) — no native timer needed.
   useEffect(() => {
     useThemeScheduleStore.getState().loadInfo();
-    const id = setInterval(() => useThemeScheduleStore.getState().applyNow(), 60000);
-    return () => clearInterval(id);
+    // Ride the shared 1s tick instead of a standalone 60s timer: one runtime
+    // timer for the whole shell, auto-paused when the window is hidden, and it
+    // catches up on focus -- so scheduled light<->dark still flips correctly
+    // when you return, with zero idle cost while DEX is in the background.
+    sharedTick.subscribe('theme-schedule', () => useThemeScheduleStore.getState().applyNow(), 60_000);
+    return () => sharedTick.unsubscribe('theme-schedule');
   }, []);
 
   useEffect(() => {

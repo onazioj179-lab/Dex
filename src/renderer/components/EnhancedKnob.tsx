@@ -93,20 +93,29 @@ export const EnhancedKnob: React.FC<EnhancedKnobProps> = ({
     const handleMove = (e: MouseEvent | TouchEvent) => {
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       const deltaY = startY.current - clientY;
-      
+
       // Fine-tune mode with Shift key
       const sensitivity = (e as MouseEvent).shiftKey ? 0.001 : 0.005;
       const newValue = Math.max(0, Math.min(1, startValue.current + deltaY * sensitivity));
-      
+
       // Snap to step
       const range = max - min;
       const stepNormalized = step / range;
       const snappedValue = Math.round(newValue / stepNormalized) * stepNormalized;
-      
-      onChange(snappedValue);
+
+      // Coalesce to one onChange per frame: a drag fires mousemove far faster
+      // than the display refreshes, so per-event onChange just thrashes renders.
+      pending = snappedValue;
+      if (!rafId) rafId = requestAnimationFrame(flush);
     };
 
+    let rafId = 0;
+    let pending = startValue.current;
+    const flush = () => { rafId = 0; onChange(pending); };
+
     const handleUp = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      onChange(pending); // commit the final value
       setIsDragging(false);
       setTimeout(() => setShowValue(false), 400);
     };
@@ -117,6 +126,7 @@ export const EnhancedKnob: React.FC<EnhancedKnobProps> = ({
     document.addEventListener('touchend', handleUp);
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
       document.removeEventListener('touchmove', handleMove);
@@ -356,8 +366,20 @@ export const EnhancedSlider: React.FC<EnhancedSliderProps> = ({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMove = (e: MouseEvent | TouchEvent) => handleInteraction(e);
-    const handleUp = () => setIsDragging(false);
+    // Coalesce drag updates to one per frame; the mousedown click still runs
+    // handleInteraction synchronously for immediate response.
+    let rafId = 0;
+    let lastEvent: MouseEvent | TouchEvent | null = null;
+    const flush = () => { rafId = 0; if (lastEvent) handleInteraction(lastEvent); };
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      lastEvent = e;
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
+    const handleUp = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      if (lastEvent) handleInteraction(lastEvent); // commit final position
+      setIsDragging(false);
+    };
 
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleUp);
@@ -365,6 +387,7 @@ export const EnhancedSlider: React.FC<EnhancedSliderProps> = ({
     document.addEventListener('touchend', handleUp);
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
       document.removeEventListener('touchmove', handleMove);

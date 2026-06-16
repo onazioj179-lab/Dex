@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
+import { DexLoader } from '../components/LoadingStates';
 import { useAppTracking } from '../services/usePatternLearning';
 import { glassSidebar } from '../styles/glassMenu';
 import { useToastHelpers } from '../components/Toast';
@@ -901,8 +902,8 @@ export const Workflows: React.FC = () => {
             {/* Workflow Grid */}
             <div style={styles.workflowGrid}>
               {loading ? (
-                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px var(--space-5)', fontSize: '14px', color: 'var(--color-text-muted)' }}>
-                  Loading workflows...
+                <div style={{ gridColumn: '1 / -1', padding: '60px var(--space-5)' }}>
+                  <DexLoader variant="panel" label="Loading workflows…" style={{ minHeight: 0 }} />
                 </div>
               ) : filteredWorkflows.length === 0 ? (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px var(--space-5)', textAlign: 'center' as const }}>

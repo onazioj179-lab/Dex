@@ -166,6 +166,11 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
   useEffect(() => {
     if (!isResizing || !activeDirection) return;
 
+    let rafId = 0;
+    let pendingW = startSize.current.width;
+    let pendingH = startSize.current.height;
+    const flush = () => { rafId = 0; setSize({ width: pendingW, height: pendingH }); onResize?.(pendingW, pendingH); };
+
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -194,15 +199,21 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       newWidth = clamp(snap(newWidth), minWidth, maxWidth);
       newHeight = clamp(snap(newHeight), minHeight, maxHeight);
 
-      setSize({ width: newWidth, height: newHeight });
-      onResize?.(newWidth, newHeight);
+      // Coalesce to one setSize/onResize per frame instead of per mousemove.
+      pendingW = newWidth;
+      pendingH = newHeight;
+      if (!rafId) rafId = requestAnimationFrame(flush);
     };
 
     const handleMouseUp = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      // Commit the final dragged size directly — reading the `size` state here
+      // would lag a frame behind the last batched update.
+      setSize({ width: pendingW, height: pendingH });
       setIsResizing(false);
       setActiveDirection(null);
-      saveSize(size.width, size.height);
-      onResizeEnd?.(size.width, size.height);
+      saveSize(pendingW, pendingH);
+      onResizeEnd?.(pendingW, pendingH);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -211,12 +222,13 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
     document.addEventListener('touchend', handleMouseUp);
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleMouseMove);
       document.removeEventListener('touchend', handleMouseUp);
     };
-  }, [isResizing, activeDirection, clamp, snap, minWidth, maxWidth, minHeight, maxHeight, onResize, onResizeEnd, saveSize, size.width, size.height]);
+  }, [isResizing, activeDirection, clamp, snap, minWidth, maxWidth, minHeight, maxHeight, onResize, onResizeEnd, saveSize]);
 
   // Double-click to reset
   const handleDoubleClick = useCallback(() => {
