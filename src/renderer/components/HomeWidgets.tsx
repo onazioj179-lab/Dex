@@ -868,9 +868,8 @@ const WidgetContent: React.FC<{ widget: Widget }> = memo(({ widget }) => {
 const FALLBACK_MIN_W = 120;
 const FALLBACK_MIN_H = 80;
 
-// Resting elevation (matches the original card chrome) vs. the lifted
-// elevation used while a widget is being dragged.
-const REST_SHADOW = 'var(--pg-shadow-context), var(--pg-gloss-top)';
+// Lifted elevation used while a widget is being actively dragged. At rest a
+// widget has no shadow -- it sits flat on the unified desktop surface.
 const DRAG_SHADOW = 'var(--elev-4), var(--pg-gloss-top)';
 
 const DraggableWidget: React.FC<{
@@ -1030,14 +1029,15 @@ const DraggableWidget: React.FC<{
         width: widget.width,
         height: widget.height,
         borderRadius: 12,
-        background: 'rgba(24,24,28,0.42)',
-        backdropFilter: 'var(--blur-xl) saturate(180%)',
-        WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-        // A quiet hairline at rest; the hover state lifts it to a brighter
-        // hairline rather than a loud dashed "edit" border (borders guide, not
-        // dominate). Affordances live in the cursor + revealed handles.
-        border: (hovered || interacting) ? '1px solid var(--color-border-strong, rgba(255,255,255,0.22))' : '1px solid rgba(255,255,255,0.10)',
-        boxShadow: REST_SHADOW,
+        // Solid, readable widget chrome. A fully-transparent "content floats on
+        // the desktop" look left widget content unreadable over a photo wallpaper
+        // and made stray content (e.g. a status widget's bars) look like a glitch.
+        // An opaque elevated surface -- not glass, not see-through -- stays legible
+        // on every wallpaper and perf tier. A brighter hairline on hover marks the
+        // draggable bounds.
+        background: 'var(--color-bg-elevated, #1a1a1e)',
+        border: (hovered || interacting) ? '1px solid var(--color-border-strong, rgba(255,255,255,0.22))' : '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+        boxShadow: 'none',
         overflow: 'hidden',
         // Always directly draggable; the active "grabbing" cursor and the lift
         // are applied imperatively during a gesture.
@@ -1240,6 +1240,9 @@ const navigateToApp = (appId: string): void => {
 
 // --- Shared card chrome -------------------------------------------------
 
+// Solid, readable dashboard cards. A fully-transparent "unified surface" left
+// these sections washed-out and unreadable over a photo wallpaper, so they use
+// an opaque elevated surface with a hairline border -- solid chrome, not glass.
 const CARD_BG = 'var(--color-bg-elevated, #1a1a1e)';
 const CARD_BORDER = '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))';
 

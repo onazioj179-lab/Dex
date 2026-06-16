@@ -20,7 +20,10 @@
 //   - Strips most ANSI escape sequences for safe display; preserves color
 //     and bright via 16-color palette.
 // ===========================================================================
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { APP_DEFINITIONS } from '../store/runningApps';
+import { buildDexCommands, matchTerminalCommand, resolveShortcut } from '../../shared/commands/dexCommands';
+import { executeDexCommand } from '../services/dexCommandRunner';
 
 // ---------------------------------------------------------------------------
 // IPC bridge accessor
@@ -297,6 +300,51 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     b.invoke('pty:write', { sessionId, data: text + (isWindows ? '\r\n' : '\n') }).catch(() => { /* */ });
   }, [sessionId, appendOutput]);
 
+  // -------------------------------------------------------------------------
+  // DEX commands -- the in-terminal `dex <cmd>` runner. Reads the ONE canonical
+  // command catalog (shared/commands/dexCommands), so it stays in lock-step
+  // with the palette / keyboard / UKI. App commands launch via the running-apps
+  // store; everything else points the user at its shortcut. Lines starting with
+  // `dex` are handled locally and NOT forwarded to the OS shell.
+  // -------------------------------------------------------------------------
+  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
+  const dexCommands = useMemo(() => buildDexCommands(APP_DEFINITIONS), []);
+
+  const handleDexInput = useCallback((raw: string): boolean => {
+    const value = raw.trim();
+    if (!/^dex(\s|$)/i.test(value)) return false; // not a DEX command -> shell
+    appendOutput(`${value}\r\n`);
+    const rest = value.replace(/^dex\s*/i, '').trim();
+
+    if (rest === '' || rest === 'help' || rest === 'list') {
+      const rows = dexCommands.map((c) => {
+        const sc = resolveShortcut(c, isMac);
+        return `  ${c.terminal.padEnd(14)}${(sc || '').padEnd(18)}${c.label}`;
+      });
+      appendOutput(
+        `DEX commands  ·  run as: dex <name>\r\n` +
+        `  ${'name'.padEnd(14)}${'shortcut'.padEnd(18)}description\r\n` +
+        rows.join('\r\n') + '\r\n',
+      );
+      return true;
+    }
+
+    const m = matchTerminalCommand(dexCommands, `dex ${rest}`);
+    if (!m) {
+      appendOutput(`dex: unknown command '${rest.split(/\s+/)[0]}' — try 'dex list'\r\n`);
+      return true;
+    }
+    const { command, args } = m;
+    try {
+      executeDexCommand(command, args); // app launch OR dispatch the dex-command action bus
+      const verb = command.appId ? `Opening ${command.label.replace(/^Open /, '')}…` : `Ran ${command.label}`;
+      appendOutput(`\x1b[32m${verb}\x1b[0m\r\n`);
+    } catch {
+      appendOutput(`dex: failed to run ${command.id}\r\n`);
+    }
+    return true;
+  }, [dexCommands, isMac, appendOutput]);
+
   const onKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -305,6 +353,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       setHistory(h => (value && h[h.length - 1] !== value ? [...h, value] : h));
       setHistoryIdx(null);
       setInput('');
+      if (handleDexInput(value)) return; // DEX command handled locally
       send(value);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -327,7 +376,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (b && sessionId) b.invoke('pty:write', { sessionId, data: '\x03' }).catch(() => {});
       setInput('');
     }
-  }, [input, history, historyIdx, onClose, send, sessionId]);
+  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput]);
 
   // -------------------------------------------------------------------------
   // Render
