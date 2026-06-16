@@ -13,6 +13,7 @@ import DexIcon from '../../components/DexIcon';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { buildTimeline, sessionDuration } from '../../../shared/rewind/timeline';
 import { groupSessionsByDay, describeSession, formatDuration } from '../../../shared/rewind/timelineView';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // ===========================================================================
 // TYPES
@@ -278,6 +279,24 @@ const Rewind: React.FC = () => {
   const [journalDraft, setJournalDraft] = useState({ title: '', body: '', mood: 'neutral' as JournalEntry['mood'], tags: '' });
   const [journalEditing, setJournalEditing] = useState<string | null>(null);
   const [journalFilter, setJournalFilter] = useState<'all' | 'pinned'>('all');
+  const [journalSearch, setJournalSearch] = useState('');
+
+  // -- uki context: let the assistant know Rewind's active view + recording state
+  // and journal size (UKI Workspace Awareness initiative). Mirrors the
+  // Notes/Tasks/Files/Gallery resolvers; a latest-value ref reads live state.
+  const ukiCtxRef = useRef({ view, isRecording, journalCount: journalEntries.length });
+  useEffect(() => { ukiCtxRef.current = { view, isRecording, journalCount: journalEntries.length }; });
+  useEffect(() => {
+    registerUkiAppContext('rewind', () => {
+      const c = ukiCtxRef.current;
+      return {
+        appId: 'rewind',
+        currentFile: `Rewind: ${c.view}`,
+        custom: { view: c.view, recording: c.isRecording, journalEntries: c.journalCount },
+      };
+    });
+    return () => unregisterUkiAppContext('rewind');
+  }, []);
 
   // Persist journal entries on change (debounced flush)
   const journalFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1903,9 +1922,15 @@ const timer = setInterval(check, 15000);
   }
 
   function renderJournal() {
-    const filtered = journalFilter === 'pinned'
+    const q = journalSearch.trim().toLowerCase();
+    let filtered = journalFilter === 'pinned'
       ? journalEntries.filter(e => e.pinned)
       : journalEntries;
+    if (q) filtered = filtered.filter(e =>
+      (e.title || '').toLowerCase().includes(q) ||
+      (e.body || '').toLowerCase().includes(q) ||
+      (e.tags || []).some(t => t.toLowerCase().includes(q))
+    );
 
     const todayEntries = filtered.filter(e => {
       const d = new Date(e.timestamp);
@@ -1937,6 +1962,25 @@ const timer = setInterval(check, 15000);
             ))}
           </div>
         </div>
+
+        {/* Search across journal entries (title, body, tags) */}
+        <input
+          type="text"
+          placeholder="Search journal..."
+          value={journalSearch}
+          onChange={e => setJournalSearch(e.target.value)}
+          style={{
+            background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
+            borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'inherit', fontSize: 13,
+            outline: 'none', fontFamily: 'inherit',
+          }}
+          aria-label="Search journal entries"
+        />
+        {q && filtered.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted, #71717a)', padding: 'var(--space-2)' }}>
+            No journal entries match "{journalSearch.trim()}".
+          </div>
+        )}
 
         {/* Compose */}
         <div style={{ ...S.insightCard, display: 'flex', flexDirection: 'column', gap: 10 }}>

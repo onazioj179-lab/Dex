@@ -876,6 +876,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [matchCount, setMatchCount] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [showReplace, setShowReplace] = useState(false);
 
   const doFind = useCallback(() => {
@@ -939,14 +940,16 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
 
   const doReplace = useCallback(() => {
     if (!editorRef.current) return;
-    const highlight = editorRef.current.querySelector('.find-highlight');
-    if (highlight) {
-      highlight.textContent = replaceText;
-      highlight.className = '';
-      (highlight as HTMLElement).style.background = '';
-      doFind();
-    }
-  }, [replaceText, editorRef, doFind]);
+    const highlights = editorRef.current.querySelectorAll('.find-highlight');
+    if (highlights.length === 0) return;
+    // Replace the CURRENT (active) match, not blindly the first one.
+    const target = highlights[Math.min(currentIndex, highlights.length - 1)] as HTMLElement;
+    target.textContent = replaceText;
+    target.className = '';
+    target.style.background = '';
+    target.style.outline = '';
+    doFind();
+  }, [replaceText, editorRef, doFind, currentIndex]);
 
   const doReplaceAll = useCallback(() => {
     if (!editorRef.current) return;
@@ -960,8 +963,33 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
   }, [replaceText, editorRef]);
 
   useEffect(() => {
+    setCurrentIndex(0);
     doFind();
   }, [findText, doFind]);
+
+  // Mark the active match (stronger highlight) and scroll it into view. Runs
+  // after doFind rebuilds the highlight spans (matchCount change) and whenever
+  // the user steps to another match (currentIndex change).
+  useEffect(() => {
+    const root = editorRef.current;
+    if (!root) return;
+    const hs = Array.from(root.querySelectorAll('.find-highlight')) as HTMLElement[];
+    if (hs.length === 0) return;
+    const active = Math.min(currentIndex, hs.length - 1);
+    hs.forEach((el, i) => {
+      const isActive = i === active;
+      el.style.background = isActive ? 'rgba(255,159,10,0.55)' : 'rgba(255,214,10,0.3)';
+      el.style.outline = isActive ? '1px solid rgba(255,159,10,0.9)' : 'none';
+    });
+    hs[active]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [matchCount, currentIndex, editorRef]);
+
+  const step = useCallback((delta: number) => {
+    setCurrentIndex(i => {
+      if (matchCount === 0) return 0;
+      return (i + delta + matchCount) % matchCount;
+    });
+  }, [matchCount]);
 
   useEffect(() => {
     if (!visible && editorRef.current) {
@@ -1012,13 +1040,27 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
             outline: 'none',
           }}
           onKeyDown={e => {
-            if (e.key === 'Enter') doFind();
+            if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
             if (e.key === 'Escape') onClose();
           }}
         />
-        <span style={{ fontSize: 11, color: colors.textDim, minWidth: 40, textAlign: 'right' }}>
-          {matchCount > 0 ? `${matchCount} found` : ''}
+        <span style={{ fontSize: 11, color: colors.textDim, minWidth: 46, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+          {matchCount > 0 ? `${Math.min(currentIndex, matchCount - 1) + 1} / ${matchCount}` : findText ? '0 / 0' : ''}
         </span>
+        <button
+          aria-label="Previous match"
+          title="Previous match (Shift+Enter)"
+          onClick={() => step(-1)}
+          disabled={matchCount === 0}
+          style={{ background: 'none', border: 'none', color: matchCount === 0 ? colors.textDim : colors.text, cursor: matchCount === 0 ? 'default' : 'pointer', fontSize: 13, opacity: matchCount === 0 ? 0.4 : 1, padding: '0 2px' }}
+        >&#8593;</button>
+        <button
+          aria-label="Next match"
+          title="Next match (Enter)"
+          onClick={() => step(1)}
+          disabled={matchCount === 0}
+          style={{ background: 'none', border: 'none', color: matchCount === 0 ? colors.textDim : colors.text, cursor: matchCount === 0 ? 'default' : 'pointer', fontSize: 13, opacity: matchCount === 0 ? 0.4 : 1, padding: '0 2px' }}
+        >&#8595;</button>
         <button
           aria-label={showReplace ? 'Hide replace' : 'Show replace'}
           onClick={() => setShowReplace(!showReplace)}

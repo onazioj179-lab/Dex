@@ -817,7 +817,248 @@ error boundaries; Home widgets still directly draggable after the radius sweep.
   UI. So icon sizes are intentionally left as-is; forcing uniformity would be
   completing the letter while breaking the spirit (and the owner's don't-churn rule).
 
-The Precision UI initiative is COMPLETE: alignment, spacing rhythm, density
-calibration (now reaching every app), border reduction, one radius language,
-Widget Freedom, gallery perf, Task Manager progressive detail, and consistency
-all landed and verified. No remaining gap.
+- **Batch 7 -- alignment / visual-rhythm follow-up (honest gap-closure).** A
+  re-audit against the brief (3 parallel read-only agents over shell / pages /
+  creative apps) found the foundation genuinely clean -- radius holds (0 off-scale
+  JSX literals, 1 trivial CSS exception), spacing tokenized, borders already
+  hairline from Sharp 2.0, no double-border bugs in any app. The ONE real residual
+  defect was MODAL ALIGNMENT on Home: the Pin-App modal used hardcoded
+  `18px 22px` / `padding: 14` while the sibling Wallpaper modal used the token
+  rhythm, so its body grid sat 8px inside its own header (a ragged left edge); and
+  the Wallpaper footer was off-grid (`14px ... 18px`) while active wallpaper tiles
+  swapped border width `2px <-> 2.5px` on selection (a 0.5px layout shift on every
+  click, on top of an already-sufficient scale + ring + check-badge active signal).
+  Fixed in pages/Home.tsx: both Home modals onto the canonical modal rhythm
+  (header `--space-5/6/4` = 20/24/16, body `--space-4/6` = 16/24 so the body left
+  edge meets the header, footer `--space-4/6/5` = 16/24/20 mirroring the header);
+  active tile border made constant-width (color-only). Verified: renderer `tsc
+  --noEmit` exit 0, zero console errors, and live computed-style read of the open
+  modal confirms header 20/24/16, body 16/24/16, footer 16/24/20, tile borders a
+  single 2px (no 2.5px). The audit's other flags were verified FALSE POSITIVES and
+  deliberately NOT touched: the AppManager title-bar inset `0 0.5px 0` gloss is a
+  TOP highlight, not a duplicate of the BOTTOM border; the HomeWidgets hover border
+  is already constant-width color-only and the remove-button 2px ring is an
+  intentional contrast cutout.
+- **Shadows / elevation -- deliberate non-churn decision (like icons).** The modern
+  `--elev-*` 0-4 ramp is defined but used 0 times; the purpose-named `--pg-shadow-*`
+  set (card/panel/modal/popover/tooltip/...) backs ~263 sites. These are DIFFERENT
+  MODELS, not redundant duplicates: `--pg-shadow-*` is the set the 6.0 reduced-glass
+  redesign already tuned (-40% intensity), while `--elev-*` bakes a `0 0 0 1px`
+  border ring into every step. Migrating would re-introduce borders, change tuned
+  intensities, and need a per-site semantic->numeric remap -- textbook churn. So
+  `--pg-shadow-*` stays the system; `--elev-*` is left unused (a redundant
+  abstraction, not a gap). Do NOT "adopt" it in a future pass.
+
+The Precision UI initiative is COMPLETE and re-verified: alignment + visual rhythm
+(Home modals now on one modal rhythm; no layout-shift affordances), spacing rhythm,
+density calibration (reaching every app), border reduction (hairline throughout; no
+redundant borders found), one radius language, Widget Freedom, gallery perf, Task
+Manager progressive detail, and consistency all landed and verified. The two
+standing quality decisions -- icons left at intentional size variety, shadows left
+on the tuned `--pg-shadow-*` system -- are deliberate non-churn calls, not gaps.
+
+## Operational Simplicity / Creative Completion / Scale (owner brief, 2026-06-15)
+
+Next DEX 5.5 brief: operational simplicity, safe delete/recovery, widget redesign,
+text reduction, UKI intelligence, creative-suite completion (AXL/Nexus/Rewind/
+Journal), large-scale handling, search infra, consistency. RECON (4 parallel
+agents) finding: this brief is far more FUNCTIONAL than the visual Precision UI
+work, and a large share of the "completion" is gated on native engines / ML and
+therefore HONESTLY BLOCKED, not fakeable:
+- AXL: STEP/IGES import, real FEA, robust parametric constraint solver -> native CAD
+  kernel. Nexus: semantic graph + vector search -> graph DB + embeddings. Rewind:
+  AI search + smart summary -> ML backend. File-content search -> Tantivy native
+  (core/dex-search exists but no renderer binding). These stay BLOCKED; the apps
+  already degrade honestly (stubs, not broken).
+- Widget redesign (remove permanent Add-Widget chrome, right-click to add) was
+  ALREADY satisfied in the tree (the persistent button is gone; empty-state quick-add
+  + Home context-menu "Add Widget" remain). Not re-churned.
+
+Landed + verified (renderer `tsc` clean; operated live -- Gallery + Rewind mount
+clean, Journal search filters with a working no-match state, zero crashes):
+- **UKI Workspace Awareness** -- registered context resolvers for Gallery (active
+  album, view, selection, item count) and Rewind (active view, recording state,
+  journal size), mirroring the existing Notes/Tasks/Files resolvers via
+  `uki/appContextRegistry`. Real signal folded into the assistant prompt through
+  `formatUkiContexts`, not a stub. Files: pages/Gallery.tsx, DEXAPPLICATIONS/rewind/
+  Rewind.tsx. (Remaining resolvers -- Kanban, Browser-tab via IPC, Nexus graph --
+  sequenced; Browser/Nexus are heavier/privacy-gated.)
+- **Journal text search** -- title/body/tags filter + search input + honest no-match
+  state in Rewind's Journal view (was filter-only: all/pinned). Files: Rewind.tsx.
+- **Nexus search cap 8 -> 24** -- the hardcoded result slice starved large knowledge
+  bases. Files: DEXAPPLICATIONS/standalone/Nexus.tsx.
+
+NEXT (real, renderer-safe, sequenced -- NOT blocked): Tasks/Rewind-timeline
+virtualization (System Scale; Tasks has drag-reorder so handle carefully); the
+delete/management-action consistency quick wins (Trash access in Journal/Rewind,
+Notes drag-move between folders, Files Duplicate); conservative text-reduction
+(icon-only + tooltip for genuinely-redundant labels like Prism "Apply Rotation").
+The native/ML items above are the honest hard blockers.
+
+## OS-Level Refinement -- foundations pass (owner brief, 2026-06-15/16)
+
+Owner brief: "Aggressive OS-Level Refinement & Creative Workspace Transformation"
+-- stop polishing edges, fix FOUNDATIONS. Window mgmt completeness, small-screen
+usability, premium shell, creative production-readiness, browser/rewind/uki/audio
+maturity, consistency, navigation, STABILITY (no raw exceptions/broken screens),
+performance, precision density. Explicitly "aggressive refinement, NOT feature
+growth."
+
+RECON (4 read-only Explore agents -- window mgmt / small-screen / stability /
+feature-state map). Honest verdict per foundation:
+
+- **Window management -- VERIFIED FUNCTIONALLY COMPLETE (no work needed).** Central
+  architecture: `shell/FloatingWindow.tsx` + `components/AppManager.tsx` (controls,
+  geometry, z-order) + `shell/snapEngine.ts` (13-zone snap) + `store/runningApps.ts`
+  (lifecycle + `APP_DEFINITIONS` registry, ~50 apps) + `shell/WindowManifest.ts`
+  (persisted bounds/z/minimized). All of minimize / maximize-restore / resize / snap
+  / move / focus-raise / close are wired CENTRALLY, so every windowed app inherits
+  them -- NO app is missing controls. Confirms the owner's standing finding ("most OS
+  features already exist; the problems were layout/dock bugs"). Remaining items are
+  MATURITY POLISH only (genie minimize-to-dock animation, stash-zone routing,
+  center-snap, inter-window edge magnetism, keyboard window-mgmt for split/maximized
+  states) -- deliberately NOT done this pass: they touch AppManager heavily and are
+  decoration, not foundation. Do not rebuild the window system.
+
+- **Stability -- LANDED + verified.** The ErrorBoundary infra is already strong
+  (`services/ErrorBoundary.tsx`: RootErrorBoundary in main.tsx with bounded
+  auto-recovery; per-app `AppErrorBoundary`; lightweight `ViewErrorBoundary`; raw
+  stacks DEV-gated so production never shows them; global window error/rejection
+  handlers). The GAP was coverage: several surfaces in App.tsx mounted with bare
+  `Suspense` / no boundary -- most critically **AppManager itself (the entire shell)
+  was in `Suspense` with NO AppErrorBoundary**, so a shell crash fell through to the
+  fatal root screen with no in-place recovery. Extended the existing proven pattern
+  to 7 surfaces: appmanager (the shell), onboarding, pip, miniplayer, minishell,
+  minipulse, diagnostics. Now any of these crashing shows the recoverable app-crash
+  card, never a raw screen. Files: App.tsx only. Verified: `tsc --noEmit` exit 0;
+  full cold reload mounts the shell clean with zero runtime/render errors (the
+  residual `[hmr] Failed to reload /App.tsx` console lines are the known stale-cache
+  artifact of editing one file 7x rapidly -- a fresh load doesn't use HMR and mounts
+  fine).
+
+- **Small-screen -- mostly OK; one item DEFERRED on purpose.** Modals/dialogs already
+  use the responsive `min(NNNpx, calc(100vw - NN))` pattern (Modal.tsx, Home modals,
+  CommandPalette) and popovers that clamp (ContextMenu, UnifiedDropdown flip+clamp).
+  The two flagged shared dropdowns are narrower than they first looked: `Select.tsx`
+  menu is `left:0; right:0` (= parent width, CANNOT overflow horizontally; only lacks
+  vertical flip-up near the viewport bottom), and `SendToMenu.tsx` is right-anchored
+  (left-overflow only at the extreme screen edge, and it lives in toolbars). Flip/
+  clamp surgery on the app-wide `Select` for a moderate edge-case is churn risk on a
+  load-bearing component, so it is DEFERRED to a focused, separately-verified pass
+  (extract/reuse UnifiedDropdown's flip+clamp into a shared positioning hook, apply
+  to Select + SendToMenu, verify live at a small viewport). Not started this pass.
+
+SEQUENCED feature-area backlog (FEATURE-SCALE -- next phase, NOT this refinement
+pass; several are owner-in-flight or blocked). The owner is currently editing
+Rewind.tsx / Nexus.tsx / Gallery.tsx / HomeWidgets.tsx (the UKI-resolver + journal-
+search + nexus-cap work above), so those files were deliberately left untouched here:
+- UKI cross-app: register Browser + Files context resolvers (highest leverage; the
+  registry + chatActions pipeline already exist); add workflow error-recovery
+  (re-prompt/fallback) -- currently absent.
+- Browser: session save/restore across app restart (tabs lost on close today);
+  send-to integration (Rewind link capture, Note-from-selection, Search indexing).
+- Rewind: tab-snapshot capture wired to Browser navigate/close -> "restore session"
+  in the timeline (recovery today is file-path level, not tab/app state).
+- Audio/Imosion (DAW substantial + in-flight): sample-library picker via Files,
+  preset CRUD, plugin UI surfacing.
+- Creative coherence (axl/nexus alpha): undo/redo + session save + large-project
+  handling; unify the "new content" entry across Notes/Canvas/Rewind-journal.
+- Dropdown viewport-clamp (Select/SendToMenu) -- the deferred small-screen item.
+
+## Developer Platform / DEX Script / Notes Evolution brief (owner, 2026-06-16)
+
+Brief: developer mode, DEX Script automation language, terminal evolution, Notes
+evolution, account/security/IPC/memory. RECON (2 agents) finding: most of this
+brief's BACKBONE ALREADY EXISTS at the controller/engine level -- so the honest
+work is mostly RENDERER UI surfacing existing systems, plus a few native blockers:
+- ScriptingEngine (FULL, sandboxed VM, manual/schedule/event/hotkey triggers),
+  DiagnosticsController (FULL, crash/perf/IPC metrics), AuthController (REAL
+  biometric/PIN/password, OS keychain), PtyService+Terminal, Calculator (ALREADY
+  scientific + memory + history), crash protection (silent ErrorBoundary, no raw
+  stack traces in prod), encryption, IPC kernel, memory-leak instrumentation +
+  the 9 fixes already shipped. Gaps = renderer panels (dev diagnostics panel,
+  script editor UI, account card, memory monitor) -- buildable but each a real
+  panel. NATIVE-BLOCKED: terminal split/char-mode/mouse (needs node-pty),
+  multi-device account sync (needs cloud backend).
+- Notes is ALREADY strong: rich text, headings, lists, checklists, code blocks,
+  callouts, wiki-links, backlinks, templates, images, TOC, find AND replace.
+  Genuine gaps: code-block syntax highlighting (needs a highlighter dep), table
+  INSERT UI, callout INSERT button (round-trips via the `[!NOTE]` blockquote
+  marker -> needs htmlToDoc/docToHTML round-trip care), and Find navigation.
+
+Landed + verified (renderer `tsc` clean; operated live in Notes):
+- **Notes Find navigation upgrade** (NotesComponents.tsx FindReplace) -- the find
+  bar highlighted all matches but had no way to STEP through them (no active match,
+  no position, Replace blindly hit the first). Added: active-match highlight
+  (orange vs yellow) with scroll-into-view, a "X / Y" position counter, Prev/Next
+  buttons (Enter = next, Shift+Enter = prev, wrap-around both ways), and Replace
+  now targets the CURRENT match. Verified live: 1/4 -> 2/4 -> 3/4 -> 4/4 -> wrap
+  to 1/4, Prev wraps to 4/4, active highlight tracks each step.
+
+OBSERVED (not chased -- possible keep-alive/double-mount artifact): two FindReplace
+instances were mounted during testing (one empty/disabled, one live). Worth a
+glance to confirm DexNotes isn't rendering the find bar in two view branches.
+
+NEXT (renderer-safe, sequenced): Notes insert-buttons batch (callout + table
+insert, with round-trip verification) and code-block language picker; then the
+"surface an existing controller" panels (dev diagnostics, script editor, account
+card, memory monitor) -- each a real build, none blocked. Terminal split + account
+cloud sync stay native-blocked.
+
+## Responsive dropdown/popover foundation (OS-level refinement, 2026-06-16)
+
+Closed the small-screen dropdown gap that was deferred in the foundations pass
+above -- this time BUILT, not punted. New shared hook
+`hooks/useDropdownPosition.ts`: measures the trigger + menu against the viewport
+before paint (useLayoutEffect, no flicker), FLIPS the menu up when there is no room
+below, caps `maxHeight` to the available space (a menu always scrolls inside the
+viewport instead of off the bottom of a laptop screen), and CLAMPS horizontally so
+a menu never leaves the screen edge. Options: `matchWidth` (full-width menus keep
+left:0/right:0 + vertical flip only), `align` ('left'|'right'), `gap`, `margin`,
+`minHeight`. Re-measures on window resize while open; degrades to prior behavior if
+refs aren't ready.
+
+Applied to the high-traffic SHARED dropdowns (one fix -> every screen that uses
+them): `Select` + `MultiSelect` (matchWidth) and `RichTextInput`'s suggestions
+dropdown (matchWidth), plus `SendToMenu` (align:right, so the creative-suite "Send
+To" menu clamps instead of overflowing the screen edge). Also hardened the
+`.popover` CSS utility with `max-width: min(320px, calc(100vw - 16px))`.
+
+REAL BUG fixed in passing: `Select`/`MultiSelect` rendered the literal text "check"
+(`<span>check</span>`) next to the selected option instead of a checkmark -- now a
+proper `<DexIcon name="check" />`.
+
+Verified: `tsc --noEmit` exit 0; `npm run build:renderer` exit 0; live cold reload
+mounts clean at 1280x800 and at 1024x600 (small laptop) with no error boundary
+(session-restore prompt shows -- silent recovery working). Files: hooks/
+useDropdownPosition.ts (new), components/Select.tsx, components/SendToMenu.tsx,
+components/RichTextInput.tsx, styles/design-system.css.
+
+## Notes insert-buttons + Developer crash-reports (2026-06-16)
+
+Built the sequenced wins from the Developer-Platform brief (BUILT, not deferred):
+- **Notes: Callout + Table insert buttons** (NotesEditor.tsx). The model already
+  rendered callouts (`[!NOTE/WARNING/TIP]` blockquotes) and tables, and `htmlToDoc`
+  already REVERSES both (reads `data-callout`/`callout-body` -> marker, parses
+  `table/tr/td|th`), but there were NO toolbar buttons -- you had to type the raw
+  marker / paste HTML. Added a toolbar group: Insert Table (3x3, header row) + three
+  Callout buttons (Note/Warning/Tip), each inserting the RENDERED HTML via
+  execCommand insertHTML so it shows styled immediately. Verified live in Notes:
+  callout inserts as `blockquote[data-callout=note]` with body + label, table inserts
+  3 `th` + 6 `td`; and crucially the MODEL ROUND-TRIP is lossless + IDEMPOTENT
+  (htmlToDoc->docToHTML->htmlToDoc->docToHTML identical; callout marker + table cells
+  survive), so both PERSIST across save/reload (confirmed: the edited notes show the
+  `[!NOTE]`/table content in the Recent Notes widget after the fact).
+- **Developer Mode: crash reports** (DiagnosticsPanel.tsx). The live diagnostics
+  overlay (MiniPulse -> expand) showed memory/render/timeline/logs but NOT crash
+  history, which `DiagnosticsController` already exposes. Added a Crash Reports
+  section calling `window.dex.diagnostics.getCrashReports()` (guarded; degrades to
+  "No crashes recorded." without the native bridge). Verified live: section renders
+  in the panel with the empty state. (This SURFACES an existing controller -- the
+  pattern for the remaining dev panels: script editor, account card, memory monitor.)
+
+Verified: renderer `tsc --noEmit` clean; operated live (Notes inserts + round-trip,
+diagnostics panel opened via MiniPulse). NOT a code-block syntax-highlight picker
+(needs a highlighter dep + docToHTML/htmlToDoc language round-trip) -- a separate,
+honestly-scoped follow-up. Files: DEXAPPLICATIONS/notes/NotesEditor.tsx,
+components/DiagnosticsPanel.tsx.

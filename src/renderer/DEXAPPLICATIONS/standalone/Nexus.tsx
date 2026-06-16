@@ -2464,7 +2464,7 @@ const Nexus: React.FC = () => {
     const q = searchQuery.toLowerCase();
     return searchIndexRef.current
       .filter(n => n.nameLower.includes(q))
-      .slice(0, 8)
+      .slice(0, 24)
       .map(n => n.file);
   }, [searchQuery, filesLoaded, nodeCount]);
 

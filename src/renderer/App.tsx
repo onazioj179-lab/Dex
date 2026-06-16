@@ -515,9 +515,11 @@ export const App: React.FC = () => {
       
       {/* First-run onboarding wizard */}
       {needsOnboarding && (
+        <AppErrorBoundary instanceId="onboarding" appId="onboarding" appName="Onboarding" appColor="#0a84ff">
         <Suspense fallback={null}>
           <OnboardingWizard onComplete={markOnboardingComplete} onSkip={markOnboardingComplete} />
         </Suspense>
+        </AppErrorBoundary>
       )}
 
       {/* Lock Screen - blocks all interaction when locked */}
@@ -585,37 +587,47 @@ export const App: React.FC = () => {
 
       {/* Picture-in-Picture Video Player */}
       {pipState && (
+        <AppErrorBoundary instanceId="pip" appId="pip" appName="Picture in Picture" appColor="#0a84ff">
         <PictureInPicture
           src={pipState.src}
           poster={pipState.poster}
           title={pipState.title}
           onClose={closePiP}
         />
+        </AppErrorBoundary>
       )}
 
       {/* Global music remote — persists playback control across the whole app */}
-      <MiniPlayer />
+      <AppErrorBoundary instanceId="miniplayer" appId="miniplayer" appName="Music Remote" appColor="#ff375f">
+        <MiniPlayer />
+      </AppErrorBoundary>
 
       {/* System Diagnostics overlay (Ctrl+Shift+D) */}
       {diagnosticsOpen && (
+        <AppErrorBoundary instanceId="diagnostics" appId="diagnostics" appName="Diagnostics" appColor="#30d158">
         <Suspense fallback={null}>
           <DiagnosticsPanel open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
         </Suspense>
+        </AppErrorBoundary>
       )}
 
       {/* Mini Pulse -- always-on-top system monitor pill (opt-in via shell prefs) */}
       {miniPulseEnabled && (
+        <AppErrorBoundary instanceId="minipulse" appId="minipulse" appName="System Monitor" appColor="#30d158">
         <MiniPulse
           hidden={diagnosticsOpen}
           onExpand={() => setDiagnosticsOpen(true)}
         />
+        </AppErrorBoundary>
       )}
 
       {/* Compact / mini always-on-top mode — overlays the shell while the apps
           keep running underneath, so expanding returns to the exact state. */}
       {compactMode && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 999999 }}>
-          <MiniShell />
+          <AppErrorBoundary instanceId="minishell" appId="minishell" appName="Mini Shell" appColor="var(--color-accent, #0a84ff)">
+            <MiniShell />
+          </AppErrorBoundary>
         </div>
       )}
 
@@ -630,6 +642,7 @@ export const App: React.FC = () => {
       }} />
 
       <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <AppErrorBoundary instanceId="appmanager" appId="appmanager" appName="App Shell" appColor="var(--color-accent, #0a84ff)">
         <Suspense fallback={(
           <div style={{
             flex: 1,
@@ -646,6 +659,7 @@ export const App: React.FC = () => {
         )}>
           <AppManager />
         </Suspense>
+        </AppErrorBoundary>
       </div>
     </div>
     </ModalProvider>

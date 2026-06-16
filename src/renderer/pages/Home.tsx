@@ -307,7 +307,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
         width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(72vh, calc(100vh - 32px))',
         overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '18px 22px var(--space-3)', borderBottom: '1px solid var(--color-bg-hover)' }}>
+        <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)' }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', color: '#fff' }}>Pin App to Home</h2>
           <p style={{ margin: '3px 0 10px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose an app to drop on your desktop. Drag to move, right-click to unpin.</p>
           <input
@@ -324,7 +324,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
             }}
           />
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4) var(--space-6)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 'var(--space-2)' }}>
             {apps.map(([id, def]) => {
               const pinned = isAppPinned(id);
@@ -896,7 +896,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                         background: bg,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        border: isActive ? '2.5px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-border-subtle)',
+                        border: isActive ? '2px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-border-subtle)',
                         cursor: 'pointer', position: 'relative', overflow: 'hidden',
                         transition: 'border-color 0.2s, transform 0.15s',
                         transform: isActive ? 'scale(1.02)' : 'scale(1)',
@@ -955,7 +955,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         </div>
 
         {/* Controls footer */}
-        <div style={{ padding: '14px var(--space-6) 18px', borderTop: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
+        <div style={{ padding: 'var(--space-4) var(--space-6) var(--space-5)', borderTop: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 5 }}>

@@ -2004,7 +2004,9 @@ img, svg {
   border: 1px solid var(--color-border-default);
   box-shadow: var(--shadow-xl), inset 0 0.5px 0 rgba(255,255,255,0.04);
   min-width: 200px;
-  max-width: 320px;
+  /* Stay within the viewport on small/laptop screens (OS-level refinement:
+     no popover may overflow the display edge). */
+  max-width: min(320px, calc(100vw - 16px));
   z-index: var(--z-popover);
   animation: fadeIn var(--duration-fast) var(--ease-out);
 }

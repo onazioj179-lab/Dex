@@ -43,6 +43,7 @@ function percent(v: number): string {
 const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) => {
   const [snapshots, setSnapshots] = useState<MetricSnapshot[]>([]);
   const [timeline, setTimeline] = useState<{ totalMs: number; phases: { name: string; durationMs: number }[] } | null>(null);
+  const [crashes, setCrashes] = useState<any[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,6 +65,20 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
         .then((t: any) => { if (t && Array.isArray(t.phases)) setTimeline(t); })
         .catch(() => { /* main process may not be ready */ });
     }
+  }, [open]);
+
+  // Crash reports from the main-process DiagnosticsController (unhandled
+  // exceptions / rejections / GPU + worker crashes). Surfaces history that the
+  // overlay never showed; degrades to an empty state without the native bridge.
+  useEffect(() => {
+    if (!open) return;
+    const getCrashReports = (window as any).dex?.diagnostics?.getCrashReports;
+    if (typeof getCrashReports !== 'function') return;
+    let cancelled = false;
+    getCrashReports()
+      .then((list: any[]) => { if (!cancelled && Array.isArray(list)) setCrashes(list); })
+      .catch(() => { /* main process may not be ready */ });
+    return () => { cancelled = true; };
   }, [open]);
 
   if (!open) return null;
@@ -164,6 +179,32 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
             </div>
           </section>
         )}
+
+        {/* Crash reports */}
+        <section aria-label="Crash reports">
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pg-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            Crash Reports{crashes.length > 0 ? ` (${crashes.length})` : ''}
+          </div>
+          {crashes.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary)' }}>No crashes recorded.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
+              {crashes.slice(0, 20).map((c, i) => (
+                <div key={c.id || i} style={{ padding: '4px var(--space-2)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: 11 }}>
+                    <span style={{ fontWeight: 600, color: 'var(--status-error, #ef4444)' }}>{String(c.type || c.kind || c.reason || 'crash')}</span>
+                    <span style={{ color: 'var(--pg-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{c.timestamp ? new Date(c.timestamp).toLocaleString() : String(c.time || '')}</span>
+                  </div>
+                  {(c.message || c.error || c.detail) && (
+                    <div style={{ fontSize: 10, color: 'var(--pg-text-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {String(c.message || c.error || c.detail)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Live logs */}
         <section aria-label="Live logs">

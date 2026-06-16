@@ -69,7 +69,15 @@ export interface FloatingWindowProps {
 // Geometry is delegated to src/renderer/shell/snapEngine.ts so this component,
 // StageManager, and a future tiling overlay all share one source of truth.
 
-const SAFE_TOP = 0;
+// The DEX shell renders a fixed 34px top chrome bar (drag region + window
+// controls) above every app surface; NotificationBanners offsets by the same
+// 34px. A maximized / top-snapped / top-dragged floating window MUST sit below
+// it -- otherwise its own title bar (close / minimize / restore) lands
+// underneath the shell bar and becomes unclickable. That is the "window
+// controls inaccessible when maximized" bug. Reserving this safe top zone keeps
+// the controls reachable at any size, resolution, or scaling.
+const SHELL_TOP_CHROME = 34;
+const SAFE_TOP = SHELL_TOP_CHROME;
 const SAFE_GUTTER = 0;
 
 /**
@@ -156,7 +164,9 @@ function clampWindowPosition(x: number, y: number, width: number, height: number
   const r = getReservedInsets();
   const visibleInset = 40;
   const minX = -(Math.max(0, width - visibleInset)) + r.left;
-  const minY = r.top;
+  // Never let a window's title bar (its controls) slide under the shell's top
+  // chrome -- clamp to the same safe top zone used for maximize/snap.
+  const minY = SAFE_TOP + r.top;
   const maxX = Math.max(0, window.innerWidth - visibleInset - r.right);
   const maxY = Math.max(0, window.innerHeight - visibleInset - r.bottom);
   return {
