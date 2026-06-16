@@ -1762,7 +1762,9 @@ const PinnedAppsWidget: React.FC = () => {
       <DashCardHeader title="Pinned Apps" icon="grid" appId="home" count={apps.length || undefined} />
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)',
-        alignContent: 'start', flex: 1, paddingTop: 2,
+        // Scroll within the card so no pinned apps are clipped when the icon grid
+        // is taller than the cell (was hiding ~122px of icons in the 1-row span).
+        alignContent: 'start', flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 2,
       }}>
         {apps.map(({ id, def }) => {
           const tinted = !!def.color && !def.color.startsWith('var');
