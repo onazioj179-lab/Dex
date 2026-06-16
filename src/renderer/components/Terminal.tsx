@@ -24,6 +24,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { buildDexCommands, matchTerminalCommand, resolveShortcut } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
+import { describeCapabilities, type CapabilityStatus } from '../uki/permissions';
 
 // ---------------------------------------------------------------------------
 // IPC bridge accessor
@@ -103,12 +104,26 @@ interface Line { id: number; spans: Span[]; }
 const MAX_SPAWN_RETRIES = 3;
 const FAST_EXIT_MS = 1500;
 
+/** Longest common prefix of a list of strings (for Tab completion). */
+function longestCommonPrefix(items: readonly string[]): string {
+  if (items.length === 0) return '';
+  let prefix = items[0];
+  for (const s of items) {
+    while (!s.startsWith(prefix)) prefix = prefix.slice(0, -1);
+    if (!prefix) break;
+  }
+  return prefix;
+}
+
 export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
+  // Reverse history search (Ctrl+R): `q` is the query, `idx` selects among
+  // matches (newest first); null means search mode is off.
+  const [revSearch, setRevSearch] = useState<{ q: string; idx: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const retriesRef = useRef(0);
@@ -329,6 +344,35 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       return true;
     }
 
+    // `dex perms` -- transparency: what UKI can and cannot access right now.
+    if (rest === 'perms' || rest === 'permissions' || rest === 'access') {
+      void (async () => {
+        try {
+          const caps = await describeCapabilities();
+          const dot = (s: CapabilityStatus) =>
+            s === 'granted' ? '\x1b[32m●\x1b[0m'
+            : s === 'hard-denied' ? '\x1b[31m✕\x1b[0m'
+            : '\x1b[90m○\x1b[0m';
+          const rows = caps.map((c) => {
+            const exp = c.status === 'granted' && c.expiresTs
+              ? ` \x1b[90m(until ${new Date(c.expiresTs).toLocaleTimeString()})\x1b[0m`
+              : '';
+            return `  ${dot(c.status)} ${c.label.padEnd(20)} ${c.status}${exp}\r\n` +
+              `      \x1b[90m${c.rationale}\x1b[0m`;
+          });
+          appendOutput(
+            `UKI access — what UKI can and cannot do right now\r\n` +
+            `  \x1b[32m●\x1b[0m granted   \x1b[90m○\x1b[0m not granted   \x1b[31m✕\x1b[0m blocked by this build\r\n` +
+            rows.join('\r\n') + '\r\n' +
+            `Grant or revoke from UKI settings; session grants lapse automatically.\r\n`,
+          );
+        } catch {
+          appendOutput(`dex: could not read UKI permissions\r\n`);
+        }
+      })();
+      return true;
+    }
+
     const m = matchTerminalCommand(dexCommands, `dex ${rest}`);
     if (!m) {
       appendOutput(`dex: unknown command '${rest.split(/\s+/)[0]}' — try 'dex list'\r\n`);
@@ -345,7 +389,40 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     return true;
   }, [dexCommands, isMac, appendOutput]);
 
+  // Matches for the active reverse search, newest first. Empty when off.
+  const revMatches = useMemo(() => {
+    if (!revSearch || !revSearch.q) return [] as string[];
+    const q = revSearch.q.toLowerCase();
+    return [...history].reverse().filter((h) => h.toLowerCase().includes(q));
+  }, [revSearch, history]);
+  const revMatch = revMatches.length
+    ? revMatches[Math.min(revSearch?.idx ?? 0, revMatches.length - 1)]
+    : null;
+
+  // Completion candidates for `dex <name>`: terminal-only builtins + catalog.
+  const dexCompletionNames = useMemo(
+    () => [...new Set(['help', 'list', 'perms', ...dexCommands.map((c) => c.terminal)])].filter(Boolean),
+    [dexCommands],
+  );
+
   const onKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    // --- Reverse history search mode intercepts navigation/commit keys. Typing
+    // and Backspace fall through to the input's onChange, which edits the query.
+    if (revSearch) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        setInput(revMatch ?? revSearch.q);
+        setRevSearch(null);
+      } else if (e.key === 'Escape' || (e.ctrlKey && (e.key.toLowerCase() === 'g' || e.key.toLowerCase() === 'c'))) {
+        e.preventDefault();
+        setRevSearch(null);
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        setRevSearch((p) => (p ? { ...p, idx: p.idx + 1 } : p)); // cycle to older match
+      }
+      return;
+    }
+
     if (e.key === 'Enter') {
       e.preventDefault();
       const value = input;
@@ -355,6 +432,27 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       setInput('');
       if (handleDexInput(value)) return; // DEX command handled locally
       send(value);
+    } else if (e.key === 'Tab') {
+      // Completion: dex subcommands from the catalog, else complete from history.
+      e.preventDefault();
+      const dexMatch = /^dex\s+(.*)$/i.exec(input);
+      if (dexMatch) {
+        const partial = dexMatch[1];
+        const cands = dexCompletionNames.filter((n) => n.startsWith(partial));
+        if (cands.length === 1) {
+          setInput(`dex ${cands[0]} `);
+        } else if (cands.length > 1) {
+          const common = longestCommonPrefix(cands);
+          if (common.length > partial.length) setInput(`dex ${common}`);
+          appendOutput(`${input}\r\n  ${cands.join('   ')}\r\n`);
+        }
+      } else if (input.trim()) {
+        const m = [...history].reverse().find((h) => h !== input && h.startsWith(input));
+        if (m) setInput(m);
+      }
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'r') {
+      e.preventDefault();
+      setRevSearch({ q: '', idx: 0 });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (history.length === 0) return;
@@ -376,7 +474,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (b && sessionId) b.invoke('pty:write', { sessionId, data: '\x03' }).catch(() => {});
       setInput('');
     }
-  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput]);
+  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -455,6 +553,23 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           </div>
         ))}
       </div>
+      {revSearch && (
+        <div
+          style={{
+            padding: '3px 10px',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            background: '#0a0a0a',
+            color: '#999', fontSize: 11,
+          }}
+        >
+          <span style={{ color: '#c9a227' }}>(reverse-i-search)</span>
+          {` ‘${revSearch.q}’: `}
+          <span style={{ color: '#e0e0e0' }}>{revMatch ?? ''}</span>
+          {revMatches.length > 1 && (
+            <span style={{ color: '#666' }}>{`  (${Math.min(revSearch.idx, revMatches.length - 1) + 1}/${revMatches.length})`}</span>
+          )}
+        </div>
+      )}
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
@@ -463,11 +578,11 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           background: '#0a0a0a',
         }}
       >
-        <span style={{ color: '#3da66a', fontWeight: 600 }}>$</span>
+        <span style={{ color: revSearch ? '#c9a227' : '#3da66a', fontWeight: 600 }}>{revSearch ? '?' : '$'}</span>
         <input
           ref={inputRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
+          value={revSearch ? revSearch.q : input}
+          onChange={e => { if (revSearch) setRevSearch({ q: e.target.value, idx: 0 }); else setInput(e.target.value); }}
           onKeyDown={onKey}
           spellCheck={false}
           autoCapitalize="off"

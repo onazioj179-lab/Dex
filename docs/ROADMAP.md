@@ -49,6 +49,22 @@
 > sandbox) — the audit itself is DONE: real XSS/SSRF/DoS-panic fixes + 9 memory-
 > leak fixes landed and verified (tsc + both cargo checks green). The platform
 > is consistent, verified, and operational as-is.
+>
+> **Loading-experience unification (2026-06-16).** One canonical DEX loading
+> surface now exists: `DexLoader` (+ the `DexLoadingMark` primitive) in
+> `components/LoadingStates.tsx` — a precision reticle mark + task label + optional
+> determinate progress, in inline / panel / screen sizes, FLAT (dropped the
+> `LoadingOverlay` backdrop-blur that contradicted the flat identity) and
+> reduced-motion aware. The app-launch fallback (`AppWrapper.AppLoading`) now
+> routes through it, and the bare `<div>Loading…</div>` / "Loading..." states in
+> Rewind, Journal (UnifiedSystems notifications + JournalView), Select and
+> Workflows were replaced with it — removing those blank/ad-hoc loading flashes
+> the owner brief calls out ("no blank screens"). The two competing
+> `CreativeAppSkeleton` impls are now consolidated (2026-06-16): the rich
+> per-app-type mockup in `components/CreativeAppSkeleton.tsx` is the single source
+> of truth; the thin, unused shadow component in `AppWrapper.tsx` (plus its dead
+> loading-style keys orphaned by the `DexLoader` reroute) was removed. Verified:
+> full tsc clean + component import suite green.
 
 ## Next major phase: uki AI + intelligence everywhere (owner brief, 2026-06-09)
 
@@ -86,6 +102,19 @@ embeddings, appContext, skills, confidence, citations, streaming). Deliverables:
       REMAINING: more cross-app action handlers (create note, etc. — need bridges).
 - [ ] **uki across apps** — the CreativeCommandBar pattern rolled out to Notes,
       Tasks, Files (mentions + slash commands exist in shared/uki).
+- [x] **Intent tolerance + workflow awareness (2026-06-16)** — a shared fuzzy
+      resolver (`shared/commands/resolve.ts`: OSA edit-distance + noise/verb-aware
+      token coverage) now backs the one command catalog, so UKI utterance matching
+      (`findByUtterance`) and terminal `dex` lookup tolerate typos ("noets"),
+      partial words ("calc"), reordering ("notes open") and filler ("can you open
+      notes please") while still returning null for noise. Exposed
+      `suggestDexCommands` / `didYouMean` as the engine for terminal autocomplete
+      (dropdown UI wiring in progress). Also closed the long-standing
+      workflow-awareness gap: `ukiBridge` now pushes the active app to the main
+      NLU engine via `uki.setContext` (preload -> IPC -> UkiEngine.setContext was
+      fully wired, but the renderer never called it, so the engine always saw a
+      null active app). Tested: tests/unit/command-resolve.test.ts +
+      dexCommands.test.ts (52 green).
 - Stretch: visual/object identification (needs a vision model); N/A: AirPods/CarPlay.
 
 **2. Intelligence expansion (per-app AI affordances, all on existing uki plumbing)**
@@ -239,6 +268,103 @@ REMAINING (lower leverage / deferred):
   the old elevated card bg; renderer + main build green. NEXT: the fixed HomeDashboard bento
   is visually unified but not yet free-positionable like pinned files/apps/widgets — a
   larger object-model rework deferred to avoid churn.
+
+- **Core Engine Expansion + UKI/Creative/Memory program (2026-06-16, IN PROGRESS)**:
+  two large owner briefs (Runtime/C++/Rust/Xenon foundation pass; UKI cognition +
+  creative-suite + memory + permissions) captured here because they exceed the
+  /goal 4000-char limit. This is a multi-session program; executed in verified
+  renderer slices, NOT claimed complete.
+  DONE this session (all `tsc --noEmit` green):
+  - Idle-cost consolidation onto SharedTick (one shared 1s tick, auto-pauses when
+    hidden): theme re-check (App.tsx), notification unread poll (UnifiedSystems),
+    heap telemetry (MemoryMonitor), memory:report IPC (PerformanceOptimization),
+    preload-cache cleanup (InstantAppLoader). Left as raw timers by design:
+    autosave (data safety), permission auto-disable / ScreenGuard / IntegrityMonitor
+    (security), Thermal/PowerManager (precision/decay), clipboard (must run hidden),
+    frame/FPS sampling (measurement), LockScreen (tick paused while locked),
+    app-local timers (Timer/Pomodoro/WorldClock — correct as-is).
+  - Reliability: React root cached + reused in main.tsx so HMR / double-eval can't
+    call createRoot() twice on the same node.
+  - UKI Local Memory maturity: uki/memory.ts workflows were appended UNBOUNDED with
+    no dedup; now dedup-by-title (re-save updates in place + keeps usage), capped
+    (MAX_WORKFLOWS=100) with recency-scored eviction (frequency field forward-ready).
+    Feeds the live index_search index + MemoryInspector. (schemas.ts adds optional
+    useCount/lastUsedTs.)
+  - Terminal command experience (Terminal.tsx): Tab completion (dex catalog +
+    history-prefix) and Ctrl+R reverse history search (inline banner + cycle).
+  - Terminal multi-session tabs (NEW components/TerminalTabs.tsx): a compact tab
+    strip over N independent <Terminal> instances (each keeps its own PTY +
+    scrollback while hidden); + adds a session, × closes one, closing the last
+    closes the panel. Base Terminal untouched; swapped into DexCode's terminal
+    panel. Maps to the creative-suite brief's "Terminal Expansion: Sessions/Tabs".
+  - UKI permission transparency (uki/permissions.ts): describeCapabilities() +
+    ALL_CAPABILITIES (status granted/denied/hard-denied + scope/expiry + rationale),
+    surfaced via a new `dex perms` terminal command (wired, not an orphan API).
+  - UKI context assembly (uki/context.ts + Uki.tsx): recentFiles now folds into
+    liveContext() and the system prompt, so UKI sees recent activity.
+  - NATIVE (Rust, all `cargo test`/`cargo check --workspace` green — toolchain IS
+    present: cargo 1.95):
+    * dex-search: incremental index maintenance — upsert_file() (delete-then-add in
+      one commit, opstamp-correct so re-index replaces not duplicates) + remove_path()
+      + shared file_record() helper. Lets a watcher keep the index live without a
+      full rebuild. 6/6 tests.
+    * dex-scanner: change detection — FileStamp/Snapshot, scan_snapshot(), and
+      diff_snapshots() (added/modified/removed, deterministic). `walk` refactored to
+      carry mtime (no duplicate walk). This is the file-monitoring half that feeds
+      dex-search's upsert/remove. 8/8 tests.
+    * src-tauri: `search:sync` command (main.rs index_sync) closes the loop —
+      snapshot indexed folders -> diff vs managed baseline Snapshot -> upsert
+      added/modified + remove deleted; bulk-rebuild fallback on first run / >500-file
+      diff so it never does thousands of per-file commits. `cargo check` green.
+    * src-tauri: `start_index_watcher` — live PUSH-based fs.watch (reuses the
+      existing `notify` dep + the cmd_file_watcher pattern) over the indexed dirs;
+      debounces change bursts (~1.5s quiet window on a bg thread) then runs
+      index_sync, so the OS tells us what changed and we update only the delta.
+      Started best-effort in setup(); poll-based search:sync stays as fallback.
+      So native incremental indexing is end-to-end (poll + push), `cargo check` green.
+      REMAINING: a renderer trigger (call search:sync on focus) — deferred because
+      it needs handlers in BOTH the Electron + Tauri shells (cross-shell migration).
+    * dex-cache (NEW crate, core/dex-cache): the brief's "Cache manager into Rust" —
+      a bounded LRU + per-entry-TTL cache as ONE shared primitive (replaces ad-hoc
+      per-module HashMap caches). Pure std, no deps; deterministic LRU (monotonic
+      access counter, not wall-clock) so it is fully test-stable. 8/8 tests; added to
+      the workspace members. ADOPTED (not left orphan): dex-search now uses it as a
+      query-result hot cache (query -> Vec<FileHit>, LRU 64), invalidated on every
+      write (index_path/upsert/remove/clear) so a cached result can never be stale —
+      it only saves repeat-query Tantivy work between mutations. 7/7 dex-search tests
+      incl. a cache-invalidation test. (The SQLite-backed value caches in src-tauri
+      were correctly left alone — replacing them would drop persistence.)
+    * Cross-shell search:sync trigger: renderer fires a debounced (30s) `search:sync`
+      on window focus + once on mount (AppManager.tsx, fire-and-forget); Electron
+      main got a lightweight `search:sync` ack handler (FileSearchIndexer is already
+      incremental/self-maintaining); Tauri runs the native index_sync. So the live
+      index actually refreshes in use, in BOTH shells. tsc green.
+    * Process manager maturity (NOT a new crate — src-tauri already lists/kills via
+      sysinfo): system:getProcesses dumped ALL pids unsorted; added a pure, tested
+      `rank_processes` (CPU% desc, memory tiebreaker, top-60) so the UI gets the
+      resource hogs, not raw noise. 2/2 ranking tests (cargo test green). A new
+      process-manager crate would have been a duplicate — avoided.
+  HONEST CONSTRAINTS / NEXT:
+  - The brief's "10 GB UKI memory cap" cannot live in uki/cache.ts (localStorage,
+    ~5-10 MB origin quota). A true multi-GB memory store needs IndexedDB or native
+    dex.db — separate track.
+  - Event-listener "passive/leak sweep" is NOT a safe blanket batch: ~66 high-freq
+    listeners lack `passive` but many call preventDefault (gesture/zoom) and would
+    break; the 730/606 add/remove gap is mostly intentional app-lifetime singletons.
+    Needs per-site surgical work, not a sweep.
+  - CORRECTION: the Rust `core/` workspace IS buildable + testable here (cargo 1.95),
+    so native Rust work is in-scope and verified above. Status of the brief's named
+    services: cache = DONE (dex-cache); process = ALREADY EXISTS (sysinfo, matured
+    with ranking); search/file-monitoring = DONE. Genuinely still missing/separate:
+    a URL download manager (network/async — core logic testable, the fetch isn't),
+    C++/SIMD media + napi, Xenon orchestration + dynamic scaling, thread pools, and
+    UKI cognition/visual-reasoning (ML models).
+  - Creative-Suite-Completion brief (owner, 2026-06-16) captured: DAW/video/design/
+    CAD pro tools, Notes (tables/outline/stats), DEX Code (multi-cursor/refactor),
+    gaming + app-store + asset ecosystem, UI density/consistency pass. Multi-session,
+    mostly per-app renderer work; sequenced in DEX-5.5.md. STARTED with Terminal
+    multi-session tabs (above). The big-app tool work (DAW razor/slice, video blade,
+    etc.) is real per-app feature work, not a single sweep.
 
 ## Build / run
 

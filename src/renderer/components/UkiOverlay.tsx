@@ -1583,9 +1583,20 @@ const UkiOverlay: React.FC = () => {
       ])).filter(m => m.content);
       // Stream tokens straight into the live response area as they arrive.
       setIsThinking(false);
+      // Coalesce token updates to one setState per frame: tokens arrive far
+      // faster than the display refreshes, and each setStreamingResponse
+      // re-renders the whole overlay (conversation history, thought steps).
+      // Keep the latest accumulated text and flush it on the animation frame.
+      let pendingAcc: string | null = null;
+      let streamRaf = 0;
+      const flushStream = () => { streamRaf = 0; if (pendingAcc !== null) setStreamingResponse(empathyPrefix + pendingAcc); };
       const llmReply = await streamConfiguredLLM(normalized, groundedPrompt, (_tok, acc) => {
-        setStreamingResponse(empathyPrefix + acc);
+        pendingAcc = acc;
+        if (!streamRaf) streamRaf = requestAnimationFrame(flushStream);
       }, { history });
+      // Ensure the final tokens are shown even if the last frame hadn't fired.
+      if (streamRaf) cancelAnimationFrame(streamRaf);
+      if (pendingAcc !== null) setStreamingResponse(empathyPrefix + pendingAcc);
       if (llmReply) {
         pushStep('LLM stream complete');
         commitTurn(empathyPrefix + llmReply, 'llm', text, [...thoughtStepsRef.current], false);

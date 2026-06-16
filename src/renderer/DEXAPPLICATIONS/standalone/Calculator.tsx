@@ -18,7 +18,7 @@ const Calculator: React.FC = () => {
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
   const [memory, setMemory] = useState(0);
-  const [history, setHistory] = useState<{ expr: string; result: string }[]>([]);
+  const [history, setHistory] = useState<{ id: string; expr: string; result: string }[]>([]);
   const [mode, setMode] = useState<'basic' | 'scientific'>('basic');
   const [showHistory, setShowHistory] = useState(false);
   const [lastOperator, setLastOperator] = useState<string | null>(null);
@@ -28,7 +28,11 @@ const Calculator: React.FC = () => {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('dex-calculator-history');
-      if (saved) setHistory(JSON.parse(saved));
+      if (saved) {
+        // Backfill stable ids for entries persisted before ids existed.
+        const parsed = JSON.parse(saved) as { id?: string; expr: string; result: string }[];
+        setHistory(parsed.map((h, i) => ({ id: h.id ?? `calc-old-${i}`, expr: h.expr, result: h.result })));
+      }
     } catch (e) {
       console.warn('[Calculator] Failed to load history:', e);
     }
@@ -131,7 +135,9 @@ const Calculator: React.FC = () => {
     const expr = `${formatNumber(previousValue)} ${lastOperator} ${formatNumber(value)}`;
     const resultStr = formatNumber(result);
     
-    setHistory(prev => [{ expr, result: resultStr }, ...prev]);
+    // Cap the in-memory array (not just the persisted copy) so a long session
+    // of calculations can't grow history without bound.
+    setHistory(prev => [{ id: `calc-${Date.now()}`, expr, result: resultStr }, ...prev].slice(0, 50));
     setDisplay(resultStr);
     setExpression('');
     setPreviousValue(null);
@@ -333,8 +339,8 @@ const Calculator: React.FC = () => {
             {history.length === 0 ? (
               <div style={styles.emptyHistory}>No calculations yet</div>
             ) : (
-              history.map((item, idx) => (
-                <div key={idx} style={styles.historyItem} onClick={() => { setDisplay(item.result); setWaitingForOperand(true); }}>
+              history.map((item) => (
+                <div key={item.id} style={styles.historyItem} onClick={() => { setDisplay(item.result); setWaitingForOperand(true); }}>
                   <div style={styles.historyExpr}>{item.expr}</div>
                   <div style={styles.historyResult}>= {item.result}</div>
                 </div>

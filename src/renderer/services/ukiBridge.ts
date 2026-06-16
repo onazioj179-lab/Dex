@@ -12,6 +12,7 @@
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiUIState } from '../store/ukiStore';
 import { checkPermissionAccess, usePermissionStore } from '../store/permissionStore';
+import { useRunningApps } from '../store/runningApps';
 
 let initialized = false;
 let recognition: any = null;
@@ -178,6 +179,32 @@ function stopSpeechRecognition(): void {
 }
 
 /**
+ * Keep the main-process UKI engine aware of the active workspace.
+ *
+ * `window.dex.uki.setContext(page, appId)` is plumbed end-to-end (preload -> IPC
+ * -> UkiEngine.setContext) but, until now, nothing in the renderer ever called
+ * it -- so the engine's NLU always saw a null active app and could not reason
+ * about "what am I doing right now". We close that loop here: push the current
+ * app on startup, then on every focus change (deduped). This is what makes UKI
+ * workflow-aware ("close this", "summarize it") resolve against the right app.
+ */
+function syncWorkflowContext(dex: any): void {
+  const set = dex?.uki?.setContext;
+  if (typeof set !== 'function') return;
+  let last: string | null = null;
+  const push = (appId: string | undefined) => {
+    const id = appId || null;
+    if (id === last) return;
+    last = id;
+    try { set(null, id); } catch { /* engine not ready */ }
+  };
+  try {
+    push(useRunningApps.getState().currentAppId);
+    useRunningApps.subscribe((state) => push(state.currentAppId));
+  } catch { /* store unavailable (non-renderer/test) */ }
+}
+
+/**
  * Call once from App.tsx or main.tsx to wire UKI IPC listeners.
  */
 export function initUkiRendererBridge(): void {
@@ -187,6 +214,8 @@ export function initUkiRendererBridge(): void {
   const dex = (window as any).dex;
   const ipc = (window as any).electron?.ipcRenderer || (window as any).ipcRenderer;
   if (!ipc) return;
+
+  syncWorkflowContext(dex);
 
   const store = useUkiStore;
 

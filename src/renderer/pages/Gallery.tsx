@@ -387,6 +387,9 @@ export const Gallery: React.FC = () => {
   const [imgPan, setImgPan] = useState({ x: 0, y: 0 });
   const [imgDragging, setImgDragging] = useState(false);
   const [imgDragStart, setImgDragStart] = useState({ x: 0, y: 0 });
+  // rAF batching for image pan (see handleImagePointerMove).
+  const panRafRef = useRef(0);
+  const panTargetRef = useRef<{ x: number; y: number } | null>(null);
   const [imgRotation, setImgRotation] = useState(0);
   const [showMediaInfo, setShowMediaInfo] = useState(false);
 
@@ -620,10 +623,20 @@ export const Gallery: React.FC = () => {
 
   const handleImagePointerMove = useCallback((e: React.PointerEvent) => {
     if (!imgDragging) return;
-    setImgPan({ x: e.clientX - imgDragStart.x, y: e.clientY - imgDragStart.y });
+    // Coalesce pan updates to one setState per frame: pointermove fires far
+    // faster than the display refreshes, so per-event setImgPan just thrashes
+    // the lightbox render. Keep the latest target and flush it on the frame.
+    panTargetRef.current = { x: e.clientX - imgDragStart.x, y: e.clientY - imgDragStart.y };
+    if (panRafRef.current) return;
+    panRafRef.current = requestAnimationFrame(() => {
+      panRafRef.current = 0;
+      if (panTargetRef.current) setImgPan(panTargetRef.current);
+    });
   }, [imgDragging, imgDragStart]);
 
   const handleImagePointerUp = useCallback(() => {
+    if (panRafRef.current) { cancelAnimationFrame(panRafRef.current); panRafRef.current = 0; }
+    if (panTargetRef.current) { setImgPan(panTargetRef.current); panTargetRef.current = null; }
     setImgDragging(false);
   }, []);
 

@@ -112,17 +112,6 @@ export const glassButtonHover: React.CSSProperties = {
   borderColor: 'var(--color-text-tertiary)',
 };
 
-/** Dock surface. DEX Sharp 2.0: a thin, crisp, dark bar — deliberately darker
- * than the app surfaces so it reads as bespoke chrome that recedes against the
- * wallpaper instead of a washed-out light slab. No blur; depth is a tight,
- * contained shadow + a hairline rim. Not bleachy. */
-export const liquidGlassDock: React.CSSProperties = {
-  background: '#0E0E11',
-  border: '1px solid var(--color-border)',
-  borderRadius: 9999,
-  boxShadow: '0 8px 22px rgba(0,0,0,0.55), inset 0 0.5px 0 rgba(255,255,255,0.05)',
-};
-
 /** Liquid glass for interactive buttons */
 export const liquidGlassButton: React.CSSProperties = {
   background: 'var(--color-border)',
@@ -377,7 +366,6 @@ export default {
   glassSelectStyles,
   glassButton,
   glassButtonHover,
-  liquidGlassDock,
   liquidGlassButton,
   liquidGlassButtonHover,
   liquidGlassInput,

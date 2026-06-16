@@ -12,6 +12,8 @@ import {
   toCommandRegistry,
   matchTerminalCommand,
   findByUtterance,
+  suggestDexCommands,
+  didYouMean,
   CORE_DEX_COMMANDS,
   type AppDefLike,
 } from '../../src/shared/commands/dexCommands';
@@ -122,5 +124,41 @@ describe('findByUtterance (UKI)', () => {
   });
   it('returns null for noise', () => {
     expect(findByUtterance(cmds, 'asdfqwer')).toBeNull();
+  });
+  // Intent tolerance -- the point of the fuzzy resolver.
+  it('tolerates a typo', () => {
+    expect(findByUtterance(cmds, 'noets')?.id).toBe('app.notes');
+  });
+  it('tolerates a partial word', () => {
+    expect(findByUtterance(cmds, 'calc')?.id).toBe('app.calculator');
+  });
+  it('tolerates reordering + filler ("broken sentence")', () => {
+    expect(findByUtterance(cmds, 'can you open notes for me')?.id).toBe('app.notes');
+  });
+});
+
+describe('suggestDexCommands (terminal autocomplete)', () => {
+  const cmds = buildDexCommands(APPS);
+  it('lists the catalog head for an empty query', () => {
+    expect(suggestDexCommands(cmds, '', 5)).toHaveLength(5);
+  });
+  it('ranks the matching command first for a partial alias', () => {
+    expect(suggestDexCommands(cmds, 'calc')[0]?.command.id).toBe('app.calculator');
+  });
+  it('still suggests despite a typo', () => {
+    expect(suggestDexCommands(cmds, 'noets').some((m) => m.command.id === 'app.notes')).toBe(true);
+  });
+  it('suggests nothing for noise', () => {
+    expect(suggestDexCommands(cmds, 'asdfqwer')).toHaveLength(0);
+  });
+});
+
+describe('didYouMean (terminal "dex <typo>")', () => {
+  const cmds = buildDexCommands(APPS);
+  it('recovers a clear typo', () => {
+    expect(didYouMean(cmds, 'noets')?.id).toBe('app.notes');
+  });
+  it('declines a low-confidence guess', () => {
+    expect(didYouMean(cmds, 'asdfqwer')).toBeNull();
   });
 });

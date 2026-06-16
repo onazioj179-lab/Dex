@@ -13,6 +13,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import { getMaxConcurrentApps, getStoredTier } from '../services/TierManager';
@@ -298,7 +299,10 @@ export const useCurrentAppId = () => useRunningApps(s => s.currentAppId);
 export const useRunningAppsList = () => useRunningApps(s => s.runningApps);
 export const useRunningAppCount = () => useRunningApps(s => s.runningApps.length);
 export const useIsAppRunning = (appId: string) => useRunningApps(s => s.runningApps.some(a => a.id === appId));
-export const useRunningAppActions = () => useRunningApps(s => ({
+// useShallow: the selector returns a fresh object/array each call, so without
+// shallow equality every subscriber would re-render on ANY store change — the
+// exact re-render storm these selector hooks exist to prevent.
+export const useRunningAppActions = () => useRunningApps(useShallow(s => ({
   launchApp: s.launchApp,
   closeApp: s.closeApp,
   closeAllApps: s.closeAllApps,
@@ -306,13 +310,13 @@ export const useRunningAppActions = () => useRunningApps(s => ({
   minimizeApp: s.minimizeApp,
   restoreApp: s.restoreApp,
   bringToFront: s.bringToFront,
-}));
+})));
 
 /** Returns app IDs ordered by most-recently-used (excludes apps no longer running) */
-export const useRecentlyUsedApps = () => useRunningApps(s => {
+export const useRecentlyUsedApps = () => useRunningApps(useShallow(s => {
   const running = new Set(s.runningApps.map(a => a.id));
   return s.sessionHistory.filter(id => running.has(id));
-});
+}));
 
 // App definitions with colors and shortcuts for UI
 // Platform release stamped onto every built-in app so dock, Launchpad,

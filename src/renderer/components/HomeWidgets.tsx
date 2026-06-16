@@ -243,8 +243,11 @@ const CalendarWidget: React.FC = () => {
   useEffect(() => {
     const refresh = () => setUpcoming(readUpcomingCalendarEvents(3));
     refresh();
-    const id = setInterval(refresh, 5 * 60 * 1000);
-    return () => clearInterval(id);
+    // SharedTick instead of a raw setInterval: it auto-pauses while the window
+    // is hidden, so the widget stops polling in the background.
+    const tickId = `calendar-widget-${Date.now()}`;
+    sharedTick.subscribe(tickId, refresh, 5 * 60 * 1000);
+    return () => sharedTick.unsubscribe(tickId);
   }, []);
   const today = now.getDate();
   const isCurrentMonth = viewMonth === now.getMonth() && viewYear === now.getFullYear();
@@ -1029,15 +1032,18 @@ const DraggableWidget: React.FC<{
         width: widget.width,
         height: widget.height,
         borderRadius: 12,
-        // Solid, readable widget chrome. A fully-transparent "content floats on
-        // the desktop" look left widget content unreadable over a photo wallpaper
-        // and made stray content (e.g. a status widget's bars) look like a glitch.
-        // An opaque elevated surface -- not glass, not see-through -- stays legible
-        // on every wallpaper and perf tier. A brighter hairline on hover marks the
-        // draggable bounds.
-        background: 'var(--color-bg-elevated, #1a1a1e)',
-        border: (hovered || interacting) ? '1px solid var(--color-border-strong, rgba(255,255,255,0.22))' : '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+        // Unified desktop surface (v5.5 Desktop initiative): the widget is a
+        // desktop object sitting on the wallpaper, not an opaque card. At rest it
+        // has no fill or border. An inherited text-shadow plus an object drop-shadow
+        // keep content legible on any wallpaper -- this is the legibility treatment
+        // the earlier full-transparency attempt was missing (text and data-viz bars
+        // read as deliberate floating objects, not a glitch). On hover/drag a soft
+        // scrim + hairline reveal the draggable bounds.
+        background: (hovered || interacting) ? 'var(--dex-desktop-scrim-hover)' : 'transparent',
+        border: (hovered || interacting) ? '1px solid var(--color-border-strong, rgba(255,255,255,0.22))' : '1px solid transparent',
         boxShadow: 'none',
+        textShadow: 'var(--dex-desktop-text-shadow)',
+        filter: interacting ? undefined : 'var(--dex-desktop-object-shadow)',
         overflow: 'hidden',
         // Always directly draggable; the active "grabbing" cursor and the lift
         // are applied imperatively during a gesture.
@@ -1240,11 +1246,14 @@ const navigateToApp = (appId: string): void => {
 
 // --- Shared card chrome -------------------------------------------------
 
-// Solid, readable dashboard cards. A fully-transparent "unified surface" left
-// these sections washed-out and unreadable over a photo wallpaper, so they use
-// an opaque elevated surface with a hairline border -- solid chrome, not glass.
-const CARD_BG = 'var(--color-bg-elevated, #1a1a1e)';
-const CARD_BORDER = '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))';
+// Unified desktop surface (v5.5 Desktop initiative): dashboard panels are gently
+// dimmed regions of the one Home surface, not opaque bordered cards. A soft scrim
+// (no hard border, no elevation, no washed-out glass) plus an inherited text-shadow
+// keeps dense text readable on any wallpaper -- the legibility the earlier
+// full-transparency attempt lacked -- while the borderless soft fills read as a
+// continuous desktop rather than a stack of separate cards.
+const CARD_BG = 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))';
+const CARD_BORDER = '1px solid transparent';
 
 const dashCardStyle: React.CSSProperties = {
   display: 'flex',
@@ -1258,6 +1267,7 @@ const dashCardStyle: React.CSSProperties = {
   borderRadius: 10,
   padding: 'var(--space-3) 14px',
   fontFamily: 'var(--dex-font-ui)',
+  textShadow: 'var(--dex-desktop-text-shadow)',
   overflow: 'hidden',
 };
 
