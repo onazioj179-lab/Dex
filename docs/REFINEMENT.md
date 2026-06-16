@@ -1062,3 +1062,74 @@ diagnostics panel opened via MiniPulse). NOT a code-block syntax-highlight picke
 (needs a highlighter dep + docToHTML/htmlToDoc language round-trip) -- a separate,
 honestly-scoped follow-up. Files: DEXAPPLICATIONS/notes/NotesEditor.tsx,
 components/DiagnosticsPanel.tsx.
+
+## Unified command catalog: shortcuts -> DEX, terminal + UKI access (2026-06-16)
+
+Owner brief: map shortcut commands to DEX (and most of the 1000 we don't need),
+make them runnable from the terminal, have UKI know them, work under the hood with
+NO duplicates, DEX inner apps only, cross-platform. RECON (1 agent) finding: DEX
+has the command-registry TYPE (`shared/commands/registry.ts`: PaletteCommand,
+searchCommands, parseArgv) but NO populated instance -- commands/shortcuts are
+scattered across CommandPalette.tsx (hardcoded 70+), KeyboardCommandSystem +
+HotkeyController (duplicate keybindings), AppManager keydown, SpotlightEngine, and
+UKI's separate action map. The terminal was a pure OS shell with zero DEX-command
+access.
+
+Built the SINGLE SOURCE OF TRUTH + first surface (tsc clean; 19 unit tests green):
+- **`src/shared/commands/dexCommands.ts`** -- the canonical DexCommand catalog.
+  App-launch commands DERIVE from APP_DEFINITIONS (caller passes it in; the app
+  list is NEVER duplicated); system/window/nav commands authored once in
+  CORE_DEX_COMMANDS. Every command is CROSS-PLATFORM (`crossPlatform()` derives
+  win+mac from one string; Ctrl<->Cmd, Alt<->Option; `resolveShortcut` picks per
+  platform). Helpers: `buildDexCommands`, `toCommandRegistry` (plugs into the
+  EXISTING registry -- no parallel type), `matchTerminalCommand` (`dex notes`),
+  `findByUtterance` (UKI NL match). Pure (no DOM/React/IPC) so main+renderer+tests
+  share it. Maps only to DEX inner apps.
+- **Terminal `dex` command** (`Terminal.tsx`) -- reads the catalog; `dex list`
+  prints the catalog with per-platform shortcuts, `dex <app>` launches via the
+  running-apps store, lines starting with `dex` are handled locally (not sent to
+  the OS shell). The explicit "access via terminal" ask. (Live click-test needs
+  the Electron PTY -- absent in the browser preview -- so the matching/exec logic
+  is UNIT-TESTED instead; tsc clean.)
+- **`tests/unit/dexCommands.test.ts`** (19 tests) -- cross-platform derivation,
+  app derivation w/o dup, unique ids+aliases, terminal matching (+dex prefix+args),
+  shortcut resolution, registry-adapter feeding searchCommands, UKI utterance match.
+- **`docs/SHORTCUTS.md`** + `docs/shortcuts-1000.md` -- the triage: ~40 ergonomic
+  slots assigned (apps Ctrl+1..9 / Alt+letter from APP_DEFINITIONS; system/window/
+  nav core), the other ~960 of the 1000 stay reserved/unbound.
+
+NEXT (all READ the same catalog -- no new lists): wire the palette (mount
+RegistryCommandPalette or feed CommandPalette via toCommandRegistry), feed unified
+search/Spotlight, bridge UKI chatActions through findByUtterance, and have the
+keydown layer look up commands by resolveShortcut instead of hardcoding (retiring
+the duplicate KeyboardCommandSystem/HotkeyController maps).
+
+### Surface wiring -- executor + command bus + UKI (2026-06-16)
+
+Built the GLUE so non-keyboard surfaces can RUN catalog commands, one path each:
+- **`src/renderer/services/dexCommandRunner.ts`** -- the ONE renderer executor.
+  `executeDexCommand(cmd)`: app commands launch via the running-apps store (payload
+  from APP_DEFINITIONS, no dup); ACTION commands dispatch a single `dex-command`
+  window event. Every surface runs commands through this.
+- **AppManager `dex-command` listener** -- a ref-based listener (mirrors the existing
+  keyHandlerRef pattern) routes actions (uki / closeApp / maximize / tileLeft /
+  tileRight / splitScreen / arrangeWindows / overview / navBack / navForward) to the
+  SAME handlers the keyboard already uses. One router, no per-surface action code.
+  VERIFIED LIVE: dispatching `dex-command {action:'uki'}` flipped the uki store's
+  showPanel false->true.
+- **Terminal** refactored to call `executeDexCommand` (dedup -- both app launches AND
+  actions now work from `dex <cmd>`).
+- **UKI (chatActions.ts)** -- new `chat.dexCommand` skill + `dex.command` action map
+  natural-language window/system phrases ("split screen", "tile left", "maximize",
+  "arrange windows", "go back", "toggle assistant") through `findByUtterance` ->
+  `executeDexCommand`. App open/close stays on the existing app.open path; an
+  unresolved-phrase guard lets ordinary conversation fall through. VERIFIED
+  deterministically (buildChatCommand is pure -- no LLM): "split screen"/"tile left"/
+  "maximize" -> understood, `dex.command` step, confirm tier; "open notes" ->
+  app.open; "what is the weather" -> not understood (normal chat).
+
+Net: ONE catalog -> ONE executor -> ONE event bus, consumed by terminal + UKI today,
+keyboard already covers the same shortcuts, palette/Spotlight already derive app
+launches from APP_DEFINITIONS. tsc clean; watermark OK; 19 catalog tests green.
+STILL open (lower value, working surfaces): feed the catalog's ACTION commands into
+the palette/Spotlight lists, and the keydown-from-catalog dedup refactor.

@@ -591,19 +591,7 @@ export const Home: React.FC = () => {
         }
       `}</style>
 
-      {/* Sticky search bar (appears when scrolled past row 2) */}
-      {searchSticky && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
-          padding: '10px var(--space-6)',
-          background: 'rgba(12, 12, 14, 0.34)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', justifyContent: 'center',
-          animation: 'fadeIn 0.15s ease-out',
-        }}>
-          <SpotlightSearch variant="home" onNavigate={handleLaunchApp} />
-        </div>
-      )}
+      {/* Sticky Home search removed -- search now lives on the floating dock. */}
 
       {/* Scrollable content */}
       <div
@@ -630,20 +618,10 @@ export const Home: React.FC = () => {
           WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 18px), transparent 100%)',
         }}
       >
-        {/* ROW 1: Spotlight Search. position+zIndex lift the whole search section
-            (and its absolutely-positioned results dropdown) into the positive-z
-            layer so the dropdown floats cleanly OVER the widget grid below
-            instead of being painted under it (static siblings paint in DOM
-            order, so without this the results bled behind the cards). */}
-        <div style={{
-          marginTop: 36,
-          display: 'flex', justifyContent: 'center',
-          padding: '0 var(--space-6)',
-          position: 'relative', zIndex: 50,
-          animation: 'fadeIn 0.25s ease-out 0.03s both',
-        }}>
-          <SpotlightSearch variant="home" onNavigate={handleLaunchApp} />
-        </div>
+        {/* Main Home search removed -- search now lives on the floating dock
+            (the search icon opens the spotlight / app menu). A small top inset
+            keeps the dashboard off the very top edge. */}
+        <div style={{ height: 28 }} />
 
         {/* Live Activity - inline row */}
         {activities.length > 0 && (

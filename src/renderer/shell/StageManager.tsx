@@ -288,10 +288,12 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
           overflowY: 'auto',
           overflowX: 'hidden',
           scrollbarWidth: 'none',
-          background: expanded ? 'var(--pg-sidebar)' : 'transparent',
-          backdropFilter: expanded ? 'var(--blur-xl) saturate(180%)' : 'none',
-          WebkitBackdropFilter: expanded ? 'var(--blur-xl) saturate(180%)' : 'none',
-          border: expanded ? '1px solid var(--pg-border)' : 'none',
+          // Solid chrome to match the new dock + app menu (no washed-out glass
+          // or backdrop blur -- consistent, readable shell surfaces).
+          background: expanded ? 'var(--color-bg-elevated, #1a1a1e)' : 'transparent',
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
+          border: expanded ? '1px solid var(--color-border, rgba(255,255,255,0.12))' : 'none',
           borderRadius: 12,
           boxShadow: expanded ? 'var(--pg-shadow-overlay)' : 'none',
           opacity: expanded ? 1 : 0,
