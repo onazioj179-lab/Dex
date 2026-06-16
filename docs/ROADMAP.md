@@ -221,6 +221,25 @@ REMAINING (lower leverage / deferred):
   per-app deep passes (vinx timeline tooling, imosion mixer), hover states on remaining
   inline-styled buttons.
 
+- **Desktop & Window System Refinement (2026-06-16, DONE)**: the live floating-window
+  system (AppManager.tsx detached-window block; FloatingWindow.tsx is unused/legacy) now
+  keeps window chrome PERMANENT. Previously the title bar — and thus close/minimize/restore
+  — was gated behind `{!isMaximized && ...}`, so a maximized window had no reachable
+  controls and the already-written drag-from-maximized restore handler was dead code. The
+  gate is removed: the title bar renders in every state, the maximize control shows a
+  Restore glyph + "Restore" label when maximized, and dragging a maximized window restores
+  it and continues the drag in one motion. Resize-edge blue hover glow removed (visual
+  stability: no resize highlight/glow). Verified live in preview: maximized Files window at
+  1440x772 keeps Minimize/Restore/Close on-screen (x 1346-1428 within 1440 viewport,
+  clickable); restore round-trips to 700px and the label flips back to Maximize.
+  Unified Home surface: per-widget glass and per-card backgrounds removed — DraggableWidget
+  (HomeWidgets.tsx) and the dashboard bento cards (CARD_BG/CARD_BORDER -> transparent/none),
+  plus Home.tsx recent-files rows and ActivityCard, now sit flat on the desktop (hover-only
+  hairline, soft text-shadow for legibility on mid/high tiers). Verified: 0 elements retain
+  the old elevated card bg; renderer + main build green. NEXT: the fixed HomeDashboard bento
+  is visually unified but not yet free-positionable like pinned files/apps/widgets — a
+  larger object-model rework deferred to avoid churn.
+
 ## Build / run
 
 - `npm run dev:tauri` — live dev window.

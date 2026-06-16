@@ -20,6 +20,16 @@ import { scopedQuery } from '../services/commandScope';
 import { getRecentCommandIds, recordRecentCommand } from '../services/recentCommands';
 import { listPresets, type WorkspacePreset } from '../shell/WorkspacePresets';
 import { exportDiagnostics, resetSettingsToDefaults } from '../services/ErrorBoundary';
+import { buildDexCommands, resolveShortcut } from '../../shared/commands/dexCommands';
+import { executeDexCommand } from '../services/dexCommandRunner';
+
+// Catalog ACTION commands the palette does NOT already cover (split / arrange /
+// lock / fullscreen exist above). Adding only the gaps keeps the catalog the one
+// source without duplicating commands. Each runs through the single executor.
+const DEX_PALETTE_ACTION_IDS = new Set([
+  'window.tileLeft', 'window.tileRight', 'window.maximize',
+  'system.uki', 'system.compact', 'nav.back', 'nav.forward', 'window.close',
+]);
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 
@@ -251,6 +261,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'open-keyboard', title: 'Keyboard Shortcuts', subtitle: 'View all shortcuts', icon: Icons.calculator, category: 'settings', action: () => { openApp('settings'); }, keywords: ['hotkey', 'keybind', 'shortcut'] },
     { id: 'open-privacy', title: 'Privacy Settings', subtitle: 'Security and privacy options', icon: Icons.password, category: 'settings', action: () => { openApp('settings'); }, keywords: ['security', 'privacy', 'encryption'] },
     { id: 'reset-settings', title: 'Reset Appearance & Settings', subtitle: 'Restore UI preferences to defaults (your data is kept)', icon: Icons.theme, category: 'settings', action: () => { if (window.confirm('Reset appearance and UI settings to defaults?\n\nYour notes, tasks, files, and projects are NOT affected.')) { resetSettingsToDefaults(); window.location.reload(); } }, keywords: ['reset', 'defaults', 'settings', 'recover', 'fix', 'corrupt', 'restore', 'broken'] },
+
+    // DEX catalog action commands not covered above (tile/maximize/uki/compact/nav),
+    // run through the one executor + command bus.
+    ...buildDexCommands(APP_DEFINITIONS)
+      .filter(c => DEX_PALETTE_ACTION_IDS.has(c.id))
+      .map((c): Command => ({
+        id: `dex-${c.id}`,
+        title: c.label,
+        subtitle: 'DEX command',
+        icon: Icons.workflows,
+        category: 'action',
+        action: () => executeDexCommand(c),
+        keywords: c.keywords,
+        shortcut: resolveShortcut(c, platform.isMac) || undefined,
+      })),
   ], [openApp, wsPresets]);
 
   // Filter commands based on query

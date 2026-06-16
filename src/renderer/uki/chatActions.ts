@@ -31,14 +31,24 @@ import {
 import { summarizePlan } from '../../shared/uki/planSummary';
 import { tierForAction, type ConfirmTier } from '../../shared/uki/confirmTier';
 import { askConfiguredLLM } from './providers/connect';
-import { useRunningApps } from '../store/runningApps';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { APP_REGISTRY } from '../store/appSubsystem';
 import { useNotesStore } from '../store/notesStore';
+import { buildDexCommands, findByUtterance } from '../../shared/commands/dexCommands';
+import { executeDexCommand } from '../services/dexCommandRunner';
+
+/** Resolve free text to a DEX catalog ACTION command (window/system/nav), or null. */
+function resolveDexAction(text: string): ReturnType<typeof findByUtterance> {
+  const cmd = findByUtterance(buildDexCommands(APP_DEFINITIONS), text);
+  // app launches are handled by app.open; this path is for action commands only.
+  return cmd && cmd.action ? cmd : null;
+}
 
 /** Whether each action mutates the workspace (drives the confirm tier). */
 const ACTION_MUTATES: Record<string, boolean> = {
   'app.open': true,
   'app.close': true,
+  'dex.command': true,
   'notes.create': true,
   'tasks.create': true,
   'uki.summarize': false,
@@ -65,6 +75,14 @@ const CHAT_SKILLS: Skill[] = [
     label: 'Close an app',
     intent: /^(close|quit|exit)\b/,
     plan: { steps: [{ actionId: 'app.close', params: { target: '{{goal}}' } }] },
+  },
+  {
+    // Window / system / navigation commands from the DEX catalog -- "split screen",
+    // "tile left", "maximize", "arrange windows", "go back", "toggle assistant", ...
+    id: 'chat.dexCommand',
+    label: 'Run a DEX command',
+    intent: /^(split|tile|snap|maximi[sz]e|minimi[sz]e|arrange|go back|go forward|toggle (uki|assistant)|compact|lock)\b/,
+    plan: { steps: [{ actionId: 'dex.command', params: { target: '{{goal}}' } }] },
   },
   {
     id: 'chat.summarise',
@@ -140,6 +158,13 @@ function chatActionRegistry(systemPrompt: string): ActionRegistry {
       if (!store.isAppRunning(app.id)) return `${app.name} is not open.`;
       store.closeApp(app.id);
       return `Closed ${app.name}.`;
+    },
+    // Window/system/nav action from the catalog, run through the one executor.
+    'dex.command': (params) => {
+      const cmd = resolveDexAction(String(params.target ?? ''));
+      if (!cmd) throw new Error('no matching DEX command');
+      executeDexCommand(cmd);
+      return `Ran ${cmd.label}.`;
     },
     'uki.summarize': llm('Summarise the following in 3 sentences. Return only the summary:'),
     'uki.rewriteTone': llm('Rewrite the following to be clear and professional. Return only the rewritten text:'),
@@ -223,6 +248,13 @@ export function buildChatCommand(goal: string): ChatCommand {
       !resolveAppTarget(String(s.params.target ?? '')),
   );
   if (unresolvedNav) plan = { ...plan, steps: [] };
+
+  // Same guard for catalog action commands: if the phrase doesn't resolve to a
+  // real DEX command, don't offer it -- let it fall through to normal chat.
+  const unresolvedDex = plan.steps.some(
+    (s) => s.actionId === 'dex.command' && !resolveDexAction(String(s.params.target ?? '')),
+  );
+  if (unresolvedDex) plan = { ...plan, steps: [] };
 
   let tier: ConfirmTier = 'auto';
   for (const step of plan.steps) {
