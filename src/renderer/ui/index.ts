@@ -35,6 +35,26 @@ export type { AppShellProps, ToolbarProps } from './AppShell';
 export { Modal } from './Modal';
 export type { ModalProps, ModalSize } from './Modal';
 
+// Sharp micro-controls -- precision inputs with full keyboard support.
+export { RangeSlider } from './RangeSlider';
+export type { RangeSliderProps } from './RangeSlider';
+
+export { NumberStepper, clampStepper } from './NumberStepper';
+export type { NumberStepperProps, NumberStepperSize } from './NumberStepper';
+
+export { SegmentedControl } from './SegmentedControl';
+export type { SegmentedControlProps, SegmentedOption, SegmentedSize } from './SegmentedControl';
+
+// Pure, DOM-free value math shared by the micro-controls (also unit-tested).
+export {
+  clamp,
+  snapToStep,
+  valueToPercent,
+  ratioToValue,
+  roundToStepPrecision,
+  stepDecimals,
+} from './controlMath';
+
 // Re-export the existing pre-tokenized controls so consumers have a single
 // import surface. These already use the design tokens internally.
 export { DexToggle as Toggle, DexCheckbox as Checkbox, DexSlider as Slider, DexRadioGroup as RadioGroup, DexTabs as Tabs } from '../shell/UIComponents';

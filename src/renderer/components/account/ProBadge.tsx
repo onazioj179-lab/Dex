@@ -35,7 +35,7 @@ export function ProBadge({ gate, currentPlan, hideWhenUnlocked = true }: ProBadg
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        padding: '2px 8px',
+        padding: '2px var(--space-2)',
         background: 'linear-gradient(135deg, #4A9EFF 0%, #8B5CF6 100%)',
         color: '#fff',
         fontSize: fontSize.xs,

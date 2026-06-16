@@ -28,12 +28,16 @@ const BRUSH_SIZES = [2, 4, 8, 12, 20, 32];
 
 const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Live ref to the in-progress stroke so the real-time draw() can read the
+  // previous point synchronously within the same pointer event, and so a drag
+  // never triggers a per-move React re-render (the ref is the only source of
+  // truth for the live stroke until it is committed to `strokes` on release).
+  const currentStrokeRef = useRef<Point[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<'pen' | 'eraser' | 'highlighter'>('pen');
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(4);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
   const [bgColor, setBgColor] = useState('#FFFFFF');
 
   // Shared, bounded undo/redo (replaces the old unbounded Stroke[][] stack that
@@ -48,39 +52,24 @@ const Canvas: React.FC = () => {
     return () => clearHistory();
   }, [clearHistory]);
 
-  // Initialize canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  // Track the CSS (layout) size separately from the backing-store size so
+  // drawing math stays in CSS pixels while the canvas renders at device
+  // resolution. Without this, getBoundingClientRect-based pointer coords would
+  // not match canvas.width/height on HiDPI screens.
+  const cssSizeRef = useRef({ w: 0, h: 0 });
 
-    // Set canvas size to container
-    const resize = () => {
-      const rect = canvas.parentElement?.getBoundingClientRect();
-      if (rect) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-        redraw();
-      }
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, []);
-
-  // Redraw canvas
+  // Redraw canvas (declared before the resize effect that depends on it).
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear and fill background
+    const { w, h } = cssSizeRef.current;
+
+    // Clear and fill background using CSS-pixel extents (ctx is DPR-scaled).
     ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, w, h);
 
     // Draw all strokes
     strokes.forEach(stroke => {
@@ -118,6 +107,62 @@ const Canvas: React.FC = () => {
     redraw();
   }, [redraw]);
 
+  // Size the canvas to its container at device resolution. Setting width/height
+  // in device pixels and scaling the context by DPR keeps strokes crisp on
+  // HiDPI displays; ResizeObserver also catches layout-driven size changes
+  // (split panes, window chrome) that a plain window 'resize' listener misses.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    const applySize = () => {
+      const rect = parent.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(1, Math.round(rect.width));
+      const h = Math.max(1, Math.round(rect.height));
+      cssSizeRef.current = { w, h };
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      const ctx = canvas.getContext('2d');
+      // Reset any prior transform before applying the new DPR scale so repeated
+      // resizes don't compound the scale factor.
+      ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+      redraw();
+    };
+
+    applySize();
+    const ro = new ResizeObserver(applySize);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [redraw]);
+
+  // Keyboard shortcuts already advertised in the toolbar tooltips (Ctrl+Z /
+  // Ctrl+Shift+Z) plus the conventional Escape-to-cancel and Ctrl+Y redo.
+  // Previously the tooltips promised shortcuts that were never wired up.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (mod && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      } else if (e.key === 'Escape' && isDrawing) {
+        // Abandon the in-progress stroke without committing it to history.
+        e.preventDefault();
+        setIsDrawing(false);
+        currentStrokeRef.current = [];
+        redraw();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo, isDrawing, redraw]);
+
   // Get point from event
   const getPoint = (e: React.MouseEvent | React.TouchEvent): Point => {
     const canvas = canvasRef.current;
@@ -142,55 +187,61 @@ const Canvas: React.FC = () => {
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     setIsDrawing(true);
     const point = getPoint(e);
-    setCurrentStroke([point]);
+    // The ref is the single source of truth for the live stroke; intentionally
+    // not mirrored into React state since nothing renders it and a setState per
+    // pointer-move would re-reconcile the whole tree on every mouse event.
+    currentStrokeRef.current = [point];
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
-    
+
     const point = getPoint(e);
-    setCurrentStroke(prev => [...prev, point]);
+    // Read the previous point from the ref (synchronous) rather than the state
+    // array, which lags one event behind and would draw the live segment from
+    // the wrong origin.
+    const prevPoints = currentStrokeRef.current;
+    const lastPoint = prevPoints[prevPoints.length - 1];
+    currentStrokeRef.current = [...prevPoints, point];
 
     // Draw current stroke in real-time
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx || !lastPoint) return;
 
-    if (currentStroke.length > 0) {
-      ctx.beginPath();
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      if (tool === 'eraser') {
-        ctx.strokeStyle = bgColor;
-        ctx.lineWidth = brushSize * 3;
-        ctx.globalAlpha = 1;
-      } else if (tool === 'highlighter') {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = brushSize * 2;
-        ctx.globalAlpha = 0.3;
-      } else {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = brushSize;
-        ctx.globalAlpha = 1;
-      }
+    ctx.beginPath();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-      const lastPoint = currentStroke[currentStroke.length - 1];
-      ctx.moveTo(lastPoint.x, lastPoint.y);
-      ctx.lineTo(point.x, point.y);
-      ctx.stroke();
+    if (tool === 'eraser') {
+      ctx.strokeStyle = bgColor;
+      ctx.lineWidth = brushSize * 3;
+      ctx.globalAlpha = 1;
+    } else if (tool === 'highlighter') {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = brushSize * 2;
+      ctx.globalAlpha = 0.3;
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = brushSize;
       ctx.globalAlpha = 1;
     }
+
+    ctx.moveTo(lastPoint.x, lastPoint.y);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   };
 
   const stopDrawing = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
-    
-    if (currentStroke.length > 0) {
+
+    const drawn = currentStrokeRef.current;
+    if (drawn.length > 0) {
       const newStroke: Stroke = {
-        points: currentStroke,
+        points: drawn,
         color,
         size: brushSize,
         tool,
@@ -200,7 +251,7 @@ const Canvas: React.FC = () => {
       setStrokes(after);
       pushUndo('Draw stroke', () => setStrokes(after), () => setStrokes(before));
     }
-    setCurrentStroke([]);
+    currentStrokeRef.current = [];
   };
 
   const clear = () => {
@@ -322,8 +373,8 @@ const s: Record<string, React.CSSProperties> = {
   toolbar: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '8px 12px',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) var(--space-3)',
     background: 'var(--color-bg-elevated)',
     borderBottom: '1px solid var(--color-border)',
     flexShrink: 0,

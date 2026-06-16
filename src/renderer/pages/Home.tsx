@@ -122,7 +122,7 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
         flexDirection: 'column',
         alignItems: 'center',
         gap: 6,
-        padding: '8px 6px',
+        padding: 'var(--space-2) 6px',
         border: '1px solid transparent',
         borderRadius: 10,
         background: 'transparent',
@@ -230,7 +230,7 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
         flexDirection: 'column',
         alignItems: 'center',
         gap: 6,
-        padding: '8px 6px',
+        padding: 'var(--space-2) 6px',
         border: '1px solid transparent',
         borderRadius: 10,
         background: 'transparent',
@@ -307,7 +307,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
         width: 'min(520px, calc(100vw - 32px))', maxHeight: 'min(72vh, calc(100vh - 32px))',
         overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '18px 22px 12px', borderBottom: '1px solid var(--color-bg-hover)' }}>
+        <div style={{ padding: '18px 22px var(--space-3)', borderBottom: '1px solid var(--color-bg-hover)' }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', color: '#fff' }}>Pin App to Home</h2>
           <p style={{ margin: '3px 0 10px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose an app to drop on your desktop. Drag to move, right-click to unpin.</p>
           <input
@@ -317,7 +317,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
             placeholder="Search apps"
             aria-label="Filter apps"
             style={{
-              width: '100%', padding: '8px 12px', borderRadius: 8,
+              width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 8,
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
@@ -325,7 +325,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
           />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 'var(--space-2)' }}>
             {apps.map(([id, def]) => {
               const pinned = isAppPinned(id);
               const png = APP_ICON_PNGS[id];
@@ -363,7 +363,7 @@ const PinAppPicker: React.FC<{ position: { x: number; y: number } | null; onClos
               );
             })}
             {apps.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 24, color: 'var(--color-text-tertiary)', fontSize: 12 }}>No apps match.</div>
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-tertiary)', fontSize: 12 }}>No apps match.</div>
             )}
           </div>
         </div>
@@ -595,7 +595,7 @@ export const Home: React.FC = () => {
       {searchSticky && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
-          padding: '10px 24px',
+          padding: '10px var(--space-6)',
           background: 'rgba(12, 12, 14, 0.34)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex', justifyContent: 'center',
@@ -611,18 +611,35 @@ export const Home: React.FC = () => {
         onScroll={handleScroll}
         style={{
           position: 'relative', zIndex: 2,
-          flex: 1, overflowY: 'auto', overflowX: 'hidden',
+          // min-height: 0 is REQUIRED: as a flex child this is the scroll
+          // viewport, and without it the default min-height:auto lets it grow
+          // to its content height instead of constraining to the column and
+          // scrolling -- the tall dashboard then overflows and the root's
+          // overflow:hidden clips the lower widgets off at short heights.
+          flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
           scrollBehavior: 'smooth',
           scrollbarWidth: 'none',
           overscrollBehaviorY: 'contain',
           WebkitOverflowScrolling: 'touch',
+          // Thin edge-softening only: a small fade at the very top and bottom of
+          // the scroll viewport so content doesn't hard-clip into a line. The long
+          // 96px bottom "feather" was reduced to 18px -- it used to melt the last
+          // widgets away over the dock, which (now that the area scrolls) just hid
+          // readable content. Keep the edge clean; content stays legible to the end.
+          maskImage: 'linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 18px), transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 18px), transparent 100%)',
         }}
       >
-        {/* ROW 1: Spotlight Search */}
+        {/* ROW 1: Spotlight Search. position+zIndex lift the whole search section
+            (and its absolutely-positioned results dropdown) into the positive-z
+            layer so the dropdown floats cleanly OVER the widget grid below
+            instead of being painted under it (static siblings paint in DOM
+            order, so without this the results bled behind the cards). */}
         <div style={{
           marginTop: 36,
           display: 'flex', justifyContent: 'center',
-          padding: '0 24px',
+          padding: '0 var(--space-6)',
+          position: 'relative', zIndex: 50,
           animation: 'fadeIn 0.25s ease-out 0.03s both',
         }}>
           <SpotlightSearch variant="home" onNavigate={handleLaunchApp} />
@@ -631,8 +648,8 @@ export const Home: React.FC = () => {
         {/* Live Activity - inline row */}
         {activities.length > 0 && (
           <div style={{
-            marginTop: 12,
-            padding: '0 24px',
+            marginTop: 'var(--space-3)',
+            padding: '0 var(--space-6)',
             animation: 'fadeIn 0.35s ease-out 0.3s both',
           }}>
             <div className="dex-label-caps" style={{ marginBottom: 6 }}>
@@ -653,7 +670,7 @@ export const Home: React.FC = () => {
             AI suggestions, pinned apps). Compact, flat, real data. */}
         <div style={{
           marginTop: 18,
-          padding: '0 24px',
+          padding: '0 var(--space-6)',
           animation: 'fadeIn 0.35s ease-out 0.08s both',
         }}>
           <HomeDashboard />
@@ -663,10 +680,10 @@ export const Home: React.FC = () => {
         {recents.length > 0 && (
           <div style={{
             marginTop: 18,
-            padding: '0 24px',
+            padding: '0 var(--space-6)',
             animation: 'fadeIn 0.35s ease-out 0.1s both',
           }}>
-            <div className="dex-label-caps" style={{ marginBottom: 8 }}>
+            <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>
               Recent Files
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -768,14 +785,13 @@ export const Home: React.FC = () => {
               { label: 'Pin File Here...', icon: <DexIcon name="file-plus" size={14} />, action: () => { void pinFileFromDialog(ctxMenu); } },
               { label: 'Pin App Here...', icon: <DexIcon name="plus" size={14} />, action: () => { setAppPickerPosition(ctxMenu); setShowAppPicker(true); setCtxMenu(null); } },
               null,
-              { label: useWidgetStore.getState().editMode ? 'Done Editing Widgets' : 'Edit Widgets', icon: <DexIcon name="puzzle" size={14} />, action: () => { useWidgetStore.getState().toggleEditMode(); setCtxMenu(null); } },
-              { label: 'Add Widget', icon: <DexIcon name="plus" size={14} />, action: () => { useWidgetStore.getState().setEditMode(true); setCtxMenu(null); } },
+              { label: 'Add Widget', icon: <DexIcon name="plus" size={14} />, action: () => { useWidgetStore.getState().setPickerOpen(true); setCtxMenu(null); } },
               null,
               { label: 'Settings', icon: <DexIcon name="settings" size={14} />, action: () => { handleLaunchApp('settings'); setCtxMenu(null); } },
               { label: 'Refresh', icon: <DexIcon name="refresh" size={14} />, action: () => { refreshData(); setCtxMenu(null); } },
             ].map((item, i) =>
               item === null ? (
-                <div key={`sep-${i}`} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 8px' }} />
+                <div key={`sep-${i}`} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
               ) : (
                 <button
                   key={item.label}
@@ -787,7 +803,7 @@ export const Home: React.FC = () => {
                   onPointerDown={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.16)'; }}
                   onPointerUp={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 8px)', margin: '0 4px', padding: '7px 12px',
+                    display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 8px)', margin: '0 4px', padding: '7px var(--space-3)',
                     background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13,
                     textAlign: 'left', cursor: 'pointer',
@@ -844,8 +860,8 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         display: 'flex', flexDirection: 'column',
       }}>
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
             <div style={{ minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: 0 }}>Wallpaper</h2>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--color-text-tertiary)' }}>Choose a desktop background</p>
@@ -857,14 +873,14 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         </div>
 
         {/* Scrollable preset grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', scrollbarWidth: 'thin' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4) var(--space-6)', scrollbarWidth: 'thin' }}>
           {(() => {
             const imagePresets = WALLPAPER_PRESETS.filter(p => p.mode === 'image');
             const staticPresets = WALLPAPER_PRESETS.filter(p => p.mode !== 'live' && p.mode !== 'image' && !p.id.startsWith('crimson') && !p.id.startsWith('blood') && !p.id.startsWith('obsidian') && !p.id.startsWith('scarlet') && !p.id.startsWith('inferno'));
             const redPresets = WALLPAPER_PRESETS.filter(p => ['crimson-dark', 'blood-moon', 'obsidian-ember', 'scarlet-edge', 'inferno'].includes(p.id));
             const livePresets = WALLPAPER_PRESETS.filter(p => p.mode === 'live');
             const renderGrid = (presets: typeof WALLPAPER_PRESETS) => (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 10, marginBottom: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 10, marginBottom: 'var(--space-5)' }}>
                 {presets.map(p => {
                   const isActive = presetId === p.id;
                   const bg = p.mode === 'solid' ? p.value : (p.thumbnail || p.value);
@@ -888,14 +904,14 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       }}
                     >
                       {isActive && (
-                        <div style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 9, background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--pg-shadow-chip)' }}>
+                        <div style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 8, background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--pg-shadow-chip)' }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                       )}
                       {p.mode === 'live' && (
                         <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
                       )}
-                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 'var(--space-3) 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}
                       </div>
                     </button>
@@ -927,7 +943,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               background: 'var(--color-border-subtle)',
               border: presetId === 'custom' ? '2px solid var(--color-accent, #0a84ff)' : '2px solid var(--color-bg-hover)',
               cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
               color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
               transition: 'background 0.15s, border-color 0.15s',
             }}
@@ -939,7 +955,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         </div>
 
         {/* Controls footer */}
-        <div style={{ padding: '14px 24px 18px', borderTop: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
+        <div style={{ padding: '14px var(--space-6) 18px', borderTop: '1px solid var(--color-bg-hover)', flexShrink: 0 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 5 }}>
@@ -1004,7 +1020,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
   const availableToAdd = ALL_AVAILABLE_APPS.filter(a => !apps.some(p => p.id === a.id));
 
   return (
-    <div style={{ marginTop: 18, padding: '0 24px', animation: 'fadeIn 0.3s ease-out 0.06s both' }}>
+    <div style={{ marginTop: 18, padding: '0 var(--space-6)', animation: 'fadeIn 0.3s ease-out 0.06s both' }}>
       <style>{`
         .home-app-btn {
           display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -1091,7 +1107,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
               <button
                 onClick={() => { removeApp(ctxMenu.appId!); setCtxMenu(null); }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px',
+                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%', padding: 'var(--space-2) 14px',
                   background: 'transparent', border: 'none', color: 'var(--color-error, #FF453A)', fontSize: 13, cursor: 'pointer', textAlign: 'left',
                   borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
                 }}
@@ -1103,7 +1119,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
             )}
             {availableToAdd.length > 0 && (
               <>
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 8px' }} />
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '6px 14px', fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: '0.03em' }}>Add App</div>
                 <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                   {availableToAdd.map(app => (
@@ -1111,7 +1127,7 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
                       key={app.id}
                       onClick={() => { addApp(app.id); setCtxMenu(null); }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8, width: 'calc(100% - 8px)', padding: '8px 14px',
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: 'calc(100% - 8px)', padding: 'var(--space-2) 14px',
                         background: 'transparent', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', textAlign: 'left',
                         borderRadius: 4, margin: '0 4px', transition: 'all 0.1s ease',
                       }}
@@ -1140,7 +1156,7 @@ const ActivityCard: React.FC<{ activity: LiveActivity }> = ({ activity }) => {
 
   return (
     <div className="dex-hover-card" style={{
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
       padding: '10px 14px', borderRadius: 12,
       background: 'rgba(255,255,255,0.06)',
       border: '1px solid rgba(255,255,255,0.10)',

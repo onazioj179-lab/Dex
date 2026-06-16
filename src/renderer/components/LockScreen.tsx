@@ -621,7 +621,7 @@ export const LockScreen: React.FC = () => {
       {!isLocked && idleWarning?.active && idleSeconds > 0 && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0,
-          zIndex: 'var(--z-max)', padding: '10px 20px',
+          zIndex: 'var(--z-max)', padding: '10px var(--space-5)',
           background: 'linear-gradient(135deg, rgba(255,159,10,0.95), rgba(255,69,58,0.9))',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: space[3],
           fontSize: '13px', fontWeight: fontWeight.semibold, color: '#fff',
@@ -716,7 +716,7 @@ const styles: Record<string, React.CSSProperties> = {
   lockoutBanner: {
     display: 'flex',
     alignItems: 'center',
-    padding: '10px 16px',
+    padding: '10px var(--space-4)',
     borderRadius: radius.xl,
     background: 'var(--color-warning-muted, rgba(255,159,10,0.12))',
     border: '1px solid rgba(255,159,10,0.25)',
@@ -800,7 +800,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-border-subtle)',
     color: 'var(--color-text-primary)',
     fontSize: fontSize.lg,
-    padding: '0 44px 0 16px',
+    padding: '0 44px 0 var(--space-4)',
     outline: 'none',
     boxSizing: 'border-box',
     fontFamily: 'inherit',

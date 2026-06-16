@@ -10,6 +10,13 @@
  * index built lazily on first query and refreshed when the underlying memory
  * changes (caller-driven via `invalidate()`).
  *
+ * Role (audit FINDING 9): this is the LEXICAL BACKEND of the single search
+ * facade `./semanticSearch.ts`, not a parallel "find" surface. UI should call
+ * `semanticSearch()`, which delegates to `query()` here for the lexical half of
+ * the hybrid retriever and (once enabled) merges the semantic half from
+ * shared/uki/embeddings + the main-process EmbeddingService. The two indexes
+ * are one hybrid system; see semanticSearch.ts for the contract.
+ *
  * Designed for sub-10ms lookups on a few hundred docs. Larger corpora should
  * move to a proper FTS index (planned: SQLite FTS5 in main).
  */

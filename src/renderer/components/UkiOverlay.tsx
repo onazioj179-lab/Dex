@@ -20,6 +20,7 @@ import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridg
 import { UKIPatternStore } from '../services/UKIPatternStore';
 import { buildSystemPrompt } from '../uki';
 import { streamConfiguredLLM, hasConfiguredProvider } from '../uki/providers/connect';
+import { formatUkiContexts } from '../uki/appContextRegistry';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -1569,6 +1570,11 @@ const UkiOverlay: React.FC = () => {
         online: isOnline,
         localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
+      // Fold in live app context (what the user is looking at across Notes/Tasks/
+      // Files, etc.) so the overlay's answers are grounded in the current state,
+      // same as the uki chat app does.
+      const appCtx = formatUkiContexts();
+      const groundedPrompt = appCtx ? `${sysPrompt}\n\n[What the user is looking at]\n${appCtx}` : sysPrompt;
       // Give the model a little conversational context (last few turns).
       const recent = useUkiStore.getState().conversationHistory.slice(-4);
       const history = recent.flatMap(t => ([
@@ -1577,7 +1583,7 @@ const UkiOverlay: React.FC = () => {
       ])).filter(m => m.content);
       // Stream tokens straight into the live response area as they arrive.
       setIsThinking(false);
-      const llmReply = await streamConfiguredLLM(normalized, sysPrompt, (_tok, acc) => {
+      const llmReply = await streamConfiguredLLM(normalized, groundedPrompt, (_tok, acc) => {
         setStreamingResponse(empathyPrefix + acc);
       }, { history });
       if (llmReply) {
@@ -1700,7 +1706,7 @@ const UkiOverlay: React.FC = () => {
       }}>
         {/* State bar */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
           padding: '10px 14px',
           borderBottom: '1px solid var(--color-bg-hover)',
         }}>
@@ -1797,7 +1803,7 @@ const UkiOverlay: React.FC = () => {
           display: collapsed ? 'none' : 'block',
           maxHeight: 260,
           overflowY: 'auto',
-          padding: '8px 14px',
+          padding: 'var(--space-2) 14px',
           fontFamily: 'var(--dex-font-ui)',
         }}>
           {/* AutoPilot pending-approval cards */}
@@ -1849,7 +1855,7 @@ const UkiOverlay: React.FC = () => {
                 {isOpen && (
                   <div style={{
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
-                    lineHeight: 1.5, padding: '6px 8px', marginBottom: 6,
+                    lineHeight: 1.5, padding: '6px var(--space-2)', marginBottom: 6,
                     background: 'var(--color-bg-hover)', borderLeft: '2px solid var(--color-accent-light)',
                     borderRadius: 3,
                   }}>
@@ -1895,7 +1901,7 @@ const UkiOverlay: React.FC = () => {
           {isThinking && !streamingResponse && (
             <div style={{
               display: 'flex', flexDirection: 'column', gap: 4,
-              padding: '6px 8px', marginBottom: 8,
+              padding: '6px var(--space-2)', marginBottom: 'var(--space-2)',
               background: 'var(--color-accent-soft)',
               borderLeft: '2px solid var(--color-accent)',
               borderRadius: 3,
@@ -1948,7 +1954,7 @@ const UkiOverlay: React.FC = () => {
           {error && (
             <div style={{
               fontSize: 12, color: 'var(--color-error)', lineHeight: 1.4,
-              padding: '6px 8px', background: 'var(--color-error-muted, rgba(255,69,58,0.08))',
+              padding: '6px var(--space-2)', background: 'var(--color-error-muted, rgba(255,69,58,0.08))',
               borderRadius: 6, border: '1px solid var(--color-error-muted, rgba(255,69,58,0.15))',
             }}>
               {error}
@@ -1969,7 +1975,7 @@ const UkiOverlay: React.FC = () => {
         {!collapsed && state === 'listening' && (
           <div style={{
             borderTop: '1px solid var(--color-bg-hover)',
-            padding: '6px 14px 8px',
+            padding: '6px 14px var(--space-2)',
           }}>
             <button
               onClick={() => setShowHelp(h => !h)}
@@ -1992,7 +1998,7 @@ const UkiOverlay: React.FC = () => {
             {showHelp && (
               <div style={{
                 marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr',
-                gap: '3px 12px', fontSize: 11, lineHeight: 1.6,
+                gap: '3px var(--space-3)', fontSize: 11, lineHeight: 1.6,
                 color: 'var(--color-text-tertiary)',
               }}>
                 {[
@@ -2013,7 +2019,7 @@ const UkiOverlay: React.FC = () => {
         {/* Text input bar */}
         <div style={{
           borderTop: '1px solid var(--color-bg-hover)',
-          padding: '8px 10px',
+          padding: 'var(--space-2) 10px',
           display: collapsed ? 'none' : 'flex', alignItems: 'center', gap: 6,
           position: 'relative',
         }}>
@@ -2061,8 +2067,8 @@ const UkiOverlay: React.FC = () => {
                     aria-selected={false}
                     onMouseDown={(e) => { e.preventDefault(); setInputText(m.cmd + ' '); inputRef.current?.focus(); }}
                     style={{
-                      display: 'flex', alignItems: 'baseline', gap: 8,
-                      padding: '4px 8px', borderRadius: 4, cursor: 'pointer',
+                      display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)',
+                      padding: '4px var(--space-2)', borderRadius: 4, cursor: 'pointer',
                     }}
                   >
                     <span style={{ fontFamily: 'monospace', color: 'var(--color-accent)', fontWeight: 600 }}>{m.cmd}</span>
@@ -2100,7 +2106,7 @@ const UkiOverlay: React.FC = () => {
             style={{
               flex: 1, background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
-              borderRadius: 8, padding: '8px 12px',
+              borderRadius: 8, padding: 'var(--space-2) var(--space-3)',
               fontSize: 13, color: 'var(--color-text-primary)',
               outline: 'none',
               resize: 'none',

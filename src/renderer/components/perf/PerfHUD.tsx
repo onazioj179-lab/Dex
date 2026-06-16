@@ -124,7 +124,7 @@ export const PerfHUD: React.FC<PerfHUDProps> = ({
         background: 'rgba(15,15,18,0.82)',
         color: '#e5e7eb',
         font: '11px/1.35 ui-monospace, Menlo, Consolas, monospace',
-        padding: '8px 10px',
+        padding: 'var(--space-2) 10px',
         borderRadius: 6,
         backdropFilter: 'var(--blur-md)',
         minWidth: 180,

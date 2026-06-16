@@ -164,8 +164,8 @@ const PDFViewer: React.FC = () => {
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
       fontFamily: 'var(--font-system)',
     }}>
-      <div style={{ ...premiumGlassToolbar, padding: '8px 12px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ ...premiumGlassToolbar, padding: 'var(--space-2) var(--space-3)', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <DexIcon name="file-text" size={18} color="var(--color-text-primary)" />
           <button onClick={openPdf} style={btnPrimary}>Open PDF</button>
           <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginLeft: 6, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -232,7 +232,7 @@ const PDFViewer: React.FC = () => {
         ) : (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            height: '100%', color: 'var(--color-text-muted)', gap: 12,
+            height: '100%', color: 'var(--color-text-muted)', gap: 'var(--space-3)',
           }}>
             <DexIcon name="file-text" size={56} color="var(--color-text-muted)" />
             <span style={{ fontSize: 13 }}>Open a PDF to begin</span>

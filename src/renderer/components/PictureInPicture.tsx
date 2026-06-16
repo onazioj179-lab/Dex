@@ -419,8 +419,8 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
           transition: 'opacity 0.2s ease',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 12px',
-          gap: 8,
+          padding: '0 var(--space-3)',
+          gap: 'var(--space-2)',
         }}
       >
         <span style={{
@@ -470,7 +470,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
           bottom: 0,
           left: 0,
           right: 0,
-          padding: '8px 10px',
+          padding: 'var(--space-2) 10px',
           background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
           opacity: showControls ? 1 : 0,
           transition: 'opacity 0.2s ease',

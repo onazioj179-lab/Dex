@@ -9,6 +9,7 @@
  * Advanced theme customization with accent colors and presets
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { applyAccentFamily } from '../utils/accentFamily';
 
 // Theme presets
 export interface ThemePreset {
@@ -141,7 +142,12 @@ export const ACCENT_COLORS = [
 export const applyTheme = (preset: ThemePreset) => {
   const root = document.documentElement;
   
-  root.style.setProperty('--color-accent', preset.accentColor);
+  // Expand the preset accent into the full coherent --color-accent-* family
+  // (shared deriver) rather than only the base, so hover/dark/light/soft/muted
+  // track the chosen colour. Falls back to base-only if somehow unparseable.
+  if (!applyAccentFamily(preset.accentColor)) {
+    root.style.setProperty('--color-accent', preset.accentColor);
+  }
   root.style.setProperty('--color-bg-primary', preset.bgPrimary);
   root.style.setProperty('--color-bg-secondary', preset.bgSecondary);
   root.style.setProperty('--color-bg-tertiary', preset.bgTertiary);
@@ -163,21 +169,11 @@ export const applyTheme = (preset: ThemePreset) => {
   localStorage.setItem('dex-accent-color', preset.accentColor);
 };
 
-// Apply just accent color + derived accent-light/soft/muted variants
+// Apply just the accent colour as the full coherent --color-accent-* family.
+// Delegates to the shared deriver (one source of truth for accent expansion).
 export const applyAccentColor = (color: string) => {
-  const root = document.documentElement;
-  root.style.setProperty('--color-accent', color);
-  root.style.setProperty('--accent-color', color);
-  // Parse hex to derive RGBA variants
-  const r = parseInt(color.slice(1, 3), 16);
-  const g = parseInt(color.slice(3, 5), 16);
-  const b = parseInt(color.slice(5, 7), 16);
-  if (!isNaN(r)) {
-    root.style.setProperty('--color-accent-light', `rgba(${r}, ${g}, ${b}, 0.10)`);
-    root.style.setProperty('--color-accent-soft', `rgba(${r}, ${g}, ${b}, 0.06)`);
-    root.style.setProperty('--color-accent-muted', `rgba(${r}, ${g}, ${b}, 0.08)`);
-  }
-  localStorage.setItem('dex-accent-color', color);
+  applyAccentFamily(color);
+  try { localStorage.setItem('dex-accent-color', color); } catch { /* quota */ }
 };
 
 // Get current theme from localStorage
@@ -377,7 +373,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 'var(--dex-space-6, 24px)',
+    padding: 'var(--dex-space-6, var(--space-6))',
   },
   panel: {
     // Responsive width: never overflows a small window.
@@ -395,13 +391,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '14px 16px',
+    padding: '14px var(--space-4)',
     borderBottom: '1px solid var(--color-border, #27272a)',
   },
   headerTitle: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--space-2)',
     fontSize: '14px',
     fontWeight: 600,
     color: 'var(--color-text-primary, #fafafa)',
@@ -416,8 +412,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   quickToggle: {
     display: 'flex',
-    gap: '8px',
-    padding: '12px 16px',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-3) var(--space-4)',
     borderBottom: '1px solid var(--color-border, #27272a)',
   },
   toggleBtn: {
@@ -425,7 +421,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
+    gap: 'var(--space-2)',
     padding: '10px',
     background: 'transparent',
     border: '1px solid var(--color-border, #27272a)',
@@ -438,12 +434,12 @@ const styles: Record<string, React.CSSProperties> = {
   tabs: {
     display: 'flex',
     gap: '4px',
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     borderBottom: '1px solid var(--color-border, #27272a)',
   },
   tab: {
     flex: 1,
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     background: 'transparent',
     border: 'none',
     borderRadius: '4px',
@@ -458,16 +454,16 @@ const styles: Record<string, React.CSSProperties> = {
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '16px',
+    padding: 'var(--space-4)',
   },
   presetGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '12px',
+    gap: 'var(--space-3)',
   },
   presetCard: {
     position: 'relative',
-    padding: '12px',
+    padding: 'var(--space-3)',
     borderRadius: '6px',
     border: '2px solid var(--color-border, #27272a)',
     cursor: 'pointer',
@@ -477,8 +473,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: '60px',
     borderRadius: '4px',
     border: '1px solid',
-    padding: '8px',
-    marginBottom: '8px',
+    padding: 'var(--space-2)',
+    marginBottom: 'var(--space-2)',
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
@@ -508,13 +504,13 @@ const styles: Record<string, React.CSSProperties> = {
   colorGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(5, 1fr)',
-    gap: '16px',
+    gap: 'var(--space-4)',
   },
   colorItem: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--space-2)',
     cursor: 'pointer',
   },
   colorSwatch: {

@@ -5,50 +5,43 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * DiskBackedCache — SSD-Based Temporary Memory Extension for DEX
- * 
- * Uses fast SSD storage as overflow memory for large media projects.
- * When RAM is constrained, large buffers are transparently paged to disk.
- * 
- * Features:
- * - Transparent memory-to-disk paging
- * - Memory-mapped file access for near-RAM speed
- * - Automatic cleanup on app exit
- * - Configurable memory pressure thresholds
- * - Priority-based eviction (keep active project data in RAM)
+ * DiskBackedCache — DEPRECATED delegator (consolidation FINDING 11).
+ *
+ * Historically this provided SSD-based memory-to-disk paging as a second,
+ * parallel disk cache layer. The consolidation audit collapses every persistent
+ * disk cache into ONE tier owned by `CacheCoordinator` (backed by the merged
+ * `DiskCache`, a 2GB LRU). This module is retained only as a thin, deprecated
+ * shim so any remaining `ssd-cache:*` IPC wiring and existing callers keep
+ * working against a stable surface — all real storage now lives in the single
+ * `DiskCache` disk tier. Do not add new behavior here; use
+ * `cacheCoordinator.getDiskTier()` directly.
+ *
+ * Semantics preserved for the public surface:
+ *  - store/retrieve/remove/has round-trip Buffers through the disk tier.
+ *  - LRU + 2GB size budget come from the underlying DiskCache.
+ *  - The `priority` argument is accepted for compatibility but no longer drives
+ *    a separate in-memory page pool (there is only one disk tier now).
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { ipcMain } from 'electron';
 import * as crypto from 'crypto';
-import { app, ipcMain } from 'electron';
+import * as os from 'os';
 import { Logger } from '../utils/Logger';
+import { cacheCoordinator } from './CacheCoordinator';
+import type { DiskCache } from './DiskCache';
 
 const logger = new Logger();
 
-interface PageEntry {
-  id: string;
-  key: string;
-  sizeBytes: number;
-  location: 'memory' | 'disk';
-  priority: number; // Higher = keep in memory longer
-  filePath?: string;
-  data?: Buffer;
-  lastAccessed: number;
-  created: number;
-}
-
 export interface DiskBackedCacheConfig {
-  /** Max RAM to use before paging to disk (MB) */
+  /** Max RAM to use before paging to disk (MB) — retained for API compatibility. */
   maxMemoryMB: number;
-  /** Max disk space to use (MB) */
+  /** Max disk space to use (MB) — retained for API compatibility. */
   maxDiskMB: number;
-  /** Memory usage % that triggers paging */
+  /** Memory usage % that triggers paging — retained for API compatibility. */
   memoryPressureThreshold: number;
-  /** Check memory pressure interval (ms) */
+  /** Check memory pressure interval (ms) — retained for API compatibility. */
   checkIntervalMs: number;
-  /** Disk cache directory */
+  /** Disk cache directory — retained for API compatibility. */
   cacheDir?: string;
 }
 
@@ -59,143 +52,78 @@ const DEFAULT_CONFIG: DiskBackedCacheConfig = {
   checkIntervalMs: 10000,
 };
 
+/** Namespace disk-tier keys so this shim never collides with other disk users. */
+const KEY_PREFIX = 'ssd-swap:';
+
+/**
+ * @deprecated Use `cacheCoordinator.getDiskTier()`. This class delegates to the
+ * single consolidated disk tier and exists only for backward compatibility.
+ */
 export class DiskBackedCache {
   private config: DiskBackedCacheConfig;
-  private pages: Map<string, PageEntry> = new Map();
-  private memoryUsed = 0;
-  private diskUsed = 0;
-  private cacheDir: string;
-  private checkTimer: ReturnType<typeof setInterval> | null = null;
+  // Track keys this shim owns so getStats() can report a meaningful entry count.
+  private keys = new Set<string>();
 
   constructor(config: Partial<DiskBackedCacheConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.cacheDir = this.config.cacheDir || path.join(app.getPath('userData'), 'cache', 'ssd-swap');
+  }
+
+  private async tier(): Promise<DiskCache> {
+    return cacheCoordinator.getDiskTier();
   }
 
   async initialize(): Promise<void> {
-    logger.info(`[DiskBackedCache] Initializing — ${this.config.maxMemoryMB}MB RAM, ${this.config.maxDiskMB}MB disk`);
-
-    await fs.promises.mkdir(this.cacheDir, { recursive: true });
-
-    // Clean up any leftover files from previous sessions
-    await this.cleanupStaleFiles();
-
-    // Start memory pressure monitoring
-    this.startMonitoring();
-
-    // Register IPC
+    // Materialize the shared disk tier; no separate directory or monitor.
+    await this.tier();
     this.registerIPC();
-
-    logger.success('[DiskBackedCache] Ready');
+    logger.success('[DiskBackedCache] Ready (delegating to consolidated disk tier)');
   }
 
   // ─── Core Operations ────────────────────────────────────────
 
   /**
-   * Store data with optional priority (higher = stays in RAM longer).
-   * Data is kept in RAM until memory pressure forces paging to disk.
+   * Store data in the consolidated disk tier. Returns a synthetic id for
+   * backward compatibility (the disk tier is keyed, not id-addressed).
    */
-  async store(key: string, data: Buffer, priority = 5): Promise<string> {
-    // Remove existing entry for this key
-    if (this.pages.has(key)) {
-      await this.remove(key);
-    }
-
-    const id = crypto.randomUUID();
-
-    const entry: PageEntry = {
-      id,
-      key,
-      sizeBytes: data.length,
-      location: 'memory',
-      priority,
-      data,
-      lastAccessed: Date.now(),
-      created: Date.now(),
-    };
-
-    this.pages.set(key, entry);
-    this.memoryUsed += data.length;
-
-    // If over memory limit, page lowest priority items to disk
-    await this.balanceMemory();
-
-    return id;
+  async store(key: string, data: Buffer, _priority = 5): Promise<string> {
+    const tier = await this.tier();
+    await tier.put(KEY_PREFIX + key, data);
+    this.keys.add(key);
+    return crypto.randomUUID();
   }
 
-  /**
-   * Retrieve data — transparently loads from disk if paged out.
-   */
+  /** Retrieve data from the consolidated disk tier. */
   async retrieve(key: string): Promise<Buffer | null> {
-    const entry = this.pages.get(key);
-    if (!entry) return null;
-
-    entry.lastAccessed = Date.now();
-
-    if (entry.location === 'memory' && entry.data) {
-      return entry.data;
-    }
-
-    // Load from disk
-    if (entry.location === 'disk' && entry.filePath) {
-      try {
-        const data = await fs.promises.readFile(entry.filePath);
-
-        // Promote back to memory if there's room
-        const maxMemBytes = this.config.maxMemoryMB * 1024 * 1024;
-        if (this.memoryUsed + data.length < maxMemBytes * 0.9) {
-          entry.data = data;
-          entry.location = 'memory';
-          this.memoryUsed += data.length;
-          this.diskUsed -= data.length;
-          // Clean up disk file
-          await fs.promises.unlink(entry.filePath).catch((e: unknown) => { logger.warn('[DiskBackedCache] unlink failed:', e); });
-          entry.filePath = undefined;
-        }
-
-        return data;
-      } catch (err) {
-        logger.error(`[DiskBackedCache] Failed to read ${key} from disk`, err);
-        this.pages.delete(key);
-        return null;
-      }
-    }
-
-    return null;
+    const tier = await this.tier();
+    return tier.get(KEY_PREFIX + key);
   }
 
   async remove(key: string): Promise<boolean> {
-    const entry = this.pages.get(key);
-    if (!entry) return false;
-
-    if (entry.location === 'memory') {
-      this.memoryUsed -= entry.sizeBytes;
-    } else if (entry.location === 'disk' && entry.filePath) {
-      this.diskUsed -= entry.sizeBytes;
-      await fs.promises.unlink(entry.filePath).catch((e: unknown) => { logger.warn('[DiskBackedCache] remove unlink failed:', e); });
-    }
-
-    entry.data = undefined;
-    this.pages.delete(key);
-    return true;
+    const tier = await this.tier();
+    this.keys.delete(key);
+    return tier.delete(KEY_PREFIX + key);
   }
 
   has(key: string): boolean {
-    return this.pages.has(key);
+    // Synchronous compatibility check against the underlying tier when available.
+    const tier = cacheCoordinator._diskTierForDelegation();
+    return tier.has(KEY_PREFIX + key);
   }
 
   getStats() {
-    const memPages = [...this.pages.values()].filter(p => p.location === 'memory').length;
-    const diskPages = [...this.pages.values()].filter(p => p.location === 'disk').length;
+    const tier = cacheCoordinator._diskTierForDelegation();
+    const diskStats = tier.getStats();
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
 
+    // Shape preserved from the legacy paging cache; all storage is now on disk,
+    // so memory-tier figures report zero.
     return {
-      totalEntries: this.pages.size,
-      memoryEntries: memPages,
-      diskEntries: diskPages,
-      memoryUsedMB: +(this.memoryUsed / 1048576).toFixed(2),
-      diskUsedMB: +(this.diskUsed / 1048576).toFixed(2),
+      totalEntries: this.keys.size,
+      memoryEntries: 0,
+      diskEntries: this.keys.size,
+      memoryUsedMB: 0,
+      diskUsedMB: diskStats.totalSizeMB,
       maxMemoryMB: this.config.maxMemoryMB,
       maxDiskMB: this.config.maxDiskMB,
       systemMemoryUsedPercent: +(((totalMem - freeMem) / totalMem) * 100).toFixed(1),
@@ -203,163 +131,35 @@ export class DiskBackedCache {
     };
   }
 
-  // ─── Memory Balancing ──────────────────────────────────────
-
-  private async balanceMemory(): Promise<void> {
-    const maxMemBytes = this.config.maxMemoryMB * 1024 * 1024;
-    const maxDiskBytes = this.config.maxDiskMB * 1024 * 1024;
-
-    // Page items to disk when over memory limit
-    while (this.memoryUsed > maxMemBytes) {
-      const victim = this.findPageVictim();
-      if (!victim) break;
-
-      const paged = await this.pageToDisk(victim);
-      if (!paged) break;
-    }
-
-    // Evict disk items when over disk limit
-    while (this.diskUsed > maxDiskBytes) {
-      const victim = this.findDiskVictim();
-      if (!victim) break;
-      await this.remove(victim.key);
-    }
-  }
-
-  private findPageVictim(): PageEntry | null {
-    // Find lowest priority, least recently accessed memory item
-    let victim: PageEntry | null = null;
-    for (const entry of this.pages.values()) {
-      if (entry.location !== 'memory') continue;
-      if (!victim) {
-        victim = entry;
-        continue;
-      }
-      // Lower priority first, then older access time
-      if (entry.priority < victim.priority ||
-        (entry.priority === victim.priority && entry.lastAccessed < victim.lastAccessed)) {
-        victim = entry;
-      }
-    }
-    return victim;
-  }
-
-  private findDiskVictim(): PageEntry | null {
-    let victim: PageEntry | null = null;
-    for (const entry of this.pages.values()) {
-      if (entry.location !== 'disk') continue;
-      if (!victim || entry.lastAccessed < victim.lastAccessed) {
-        victim = entry;
-      }
-    }
-    return victim;
-  }
-
-  private async pageToDisk(entry: PageEntry): Promise<boolean> {
-    if (!entry.data) return false;
-
-    try {
-      const filename = `${entry.id}.page`;
-      const filePath = path.join(this.cacheDir, filename);
-
-      // Write to disk
-      const tmpPath = filePath + '.tmp';
-      await fs.promises.writeFile(tmpPath, entry.data);
-      await fs.promises.rename(tmpPath, filePath);
-
-      // Update entry
-      this.memoryUsed -= entry.sizeBytes;
-      this.diskUsed += entry.sizeBytes;
-      entry.location = 'disk';
-      entry.filePath = filePath;
-      entry.data = undefined; // Release memory
-
-      return true;
-    } catch (err) {
-      logger.error(`[DiskBackedCache] Failed to page ${entry.key} to disk`, err);
-      return false;
-    }
-  }
-
-  // ─── Monitoring ─────────────────────────────────────────────
-
-  private startMonitoring(): void {
-    this.checkTimer = setInterval(async () => {
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      const pressure = (totalMem - freeMem) / totalMem;
-
-      // If system memory pressure is high, aggressively page to disk
-      if (pressure > this.config.memoryPressureThreshold) {
-        const memPages = [...this.pages.values()].filter(p => p.location === 'memory');
-        const toPage = Math.ceil(memPages.length * 0.3); // Page 30% of in-memory items
-
-        memPages
-          .sort((a, b) => a.priority - b.priority || a.lastAccessed - b.lastAccessed)
-          .slice(0, toPage)
-          .forEach(async (entry) => {
-            await this.pageToDisk(entry);
-          });
-
-        if (toPage > 0) {
-          logger.info(`[DiskBackedCache] Memory pressure ${(pressure * 100).toFixed(1)}% — paged ${toPage} items to disk`);
-        }
-      }
-    }, this.config.checkIntervalMs);
-  }
-
-  // ─── Cleanup ────────────────────────────────────────────────
-
-  private async cleanupStaleFiles(): Promise<void> {
-    try {
-      const files = await fs.promises.readdir(this.cacheDir);
-      let cleaned = 0;
-      for (const file of files) {
-        if (file.endsWith('.page') || file.endsWith('.tmp')) {
-          await fs.promises.unlink(path.join(this.cacheDir, file));
-          cleaned++;
-        }
-      }
-      if (cleaned > 0) {
-        logger.info(`[DiskBackedCache] Cleaned ${cleaned} stale files`);
-      }
-    } catch {
-      // Directory might not exist yet
-    }
-  }
-
   // ─── IPC ────────────────────────────────────────────────────
 
   private registerIPC(): void {
-    ipcMain.handle('ssd-cache:get-stats', () => this.getStats());
-    ipcMain.handle('ssd-cache:store', async (_e, key: string, data: string, priority?: number) => {
+    // Idempotent registration so repeated initialize() calls never throw.
+    const handle = (channel: string, fn: Parameters<typeof ipcMain.handle>[1]) => {
+      ipcMain.removeHandler(channel);
+      ipcMain.handle(channel, fn);
+    };
+
+    handle('ssd-cache:get-stats', () => this.getStats());
+    handle('ssd-cache:store', async (_e, key: string, data: string, priority?: number) => {
       return this.store(key, Buffer.from(data, 'base64'), priority);
     });
-    ipcMain.handle('ssd-cache:retrieve', async (_e, key: string) => {
+    handle('ssd-cache:retrieve', async (_e, key: string) => {
       const data = await this.retrieve(key);
       return data ? data.toString('base64') : null;
     });
-    ipcMain.handle('ssd-cache:remove', async (_e, key: string) => {
+    handle('ssd-cache:remove', async (_e, key: string) => {
       return this.remove(key);
     });
-    ipcMain.handle('ssd-cache:has', (_e, key: string) => this.has(key));
+    handle('ssd-cache:has', (_e, key: string) => this.has(key));
   }
 
   // ─── Shutdown ───────────────────────────────────────────────
 
   async shutdown(): Promise<void> {
-    if (this.checkTimer) clearInterval(this.checkTimer);
-
-    // Clean up all disk pages
-    for (const entry of this.pages.values()) {
-      if (entry.location === 'disk' && entry.filePath) {
-        await fs.promises.unlink(entry.filePath).catch((e: unknown) => { logger.warn('[DiskBackedCache] shutdown unlink failed:', e); });
-      }
-    }
-    this.pages.clear();
-    this.memoryUsed = 0;
-    this.diskUsed = 0;
-
-    logger.info('[DiskBackedCache] Shut down');
+    // The shared disk tier is owned (and shut down) by CacheCoordinator; this
+    // shim only drops its own bookkeeping. Entries persist as part of the LRU.
+    this.keys.clear();
+    logger.info('[DiskBackedCache] Shut down (disk tier owned by CacheCoordinator)');
   }
 }

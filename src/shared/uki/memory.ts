@@ -7,6 +7,14 @@
 /**
  * UKI memory store. Three tiers — short-term (recent context), working
  * (current session goals), long-term (durable facts). Pure data + Map.
+ *
+ * Role (audit FINDING 8): this is the canonical in-memory MODEL for UKI memory
+ * (used by the Memory inspector UI and tests). Persistence is NOT here — the
+ * single renderer persistence adapter is `src/renderer/uki/memory.ts`, whose
+ * cold tier is `src/renderer/uki/compressedMemory.ts`. The main-process recall
+ * fusion surface `src/main/uki/knowledge/UkiRewindMemory.ts` is a separate,
+ * read-only blender over other sources, not a copy of this store. Keep this
+ * module pure (no I/O) so it stays the shared shape both processes reason about.
  */
 
 // DEX v3.8.9 - UKI brain: memory

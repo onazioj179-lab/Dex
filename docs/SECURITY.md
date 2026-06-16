@@ -1,7 +1,7 @@
 # Security Policy - DEX
 
 > **DEX - Personal Control Hub for Desktop Automation**  
-> Created by Onazi Treasure OJ | Version 3.6.0  
+> Created by Onazi Treasure OJ  
 > Contact: onazi75@gmail.com
 
 ## Security Philosophy

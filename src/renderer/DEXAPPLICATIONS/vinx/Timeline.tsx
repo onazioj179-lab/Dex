@@ -276,20 +276,21 @@ HeaderBtn.displayName = 'HeaderBtn';
 // ---------------------------------------------------------------------------
 
 const ClipVisual: React.FC<{
-  clip: Clip; track: Track; zoom: number; scrollX: number;
+  clip: Clip; track: Track; zoom: number; scrollX: number; viewportWidth: number;
   selected: boolean; activeTool: VinxTool;
   onSelect: (clipId: string, multi: boolean) => void;
   onDragStart: (clipId: string, trackId: string, startFrame: number) => void;
   onTrimStart: (clipId: string, side: 'left' | 'right') => void;
   onSplit: (clipId: string, frame: number) => void;
   onClipContextMenu?: (clipId: string, trackId: string, x: number, y: number) => void;
-}> = memo(({ clip, track, zoom, scrollX, selected, activeTool, onSelect, onDragStart, onTrimStart, onSplit, onClipContextMenu }) => {
+}> = memo(({ clip, track, zoom, scrollX, viewportWidth, selected, activeTool, onSelect, onDragStart, onTrimStart, onSplit, onClipContextMenu }) => {
   const color = getClipColor(track.type);
   const x = frameToPixels(clip.startFrame, zoom) - scrollX;
   const width = frameToPixels(clip.endFrame - clip.startFrame, zoom);
 
-  if (x + width < 0 || x > 5000) return null; // Off-screen culling
-
+  // NOTE: hooks must run unconditionally. The off-screen cull below must come
+  // AFTER this useCallback, otherwise scrolling a clip on/off screen changes the
+  // hook count between renders and React throws "rendered fewer hooks than expected".
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
     if (activeTool === 'razor') {
@@ -304,6 +305,10 @@ const ClipVisual: React.FC<{
       onDragStart(clip.id, clip.trackId, clip.startFrame);
     }
   }, [activeTool, clip.id, clip.trackId, clip.startFrame, zoom, onSelect, onDragStart, onSplit]);
+
+  // Off-screen culling against the real visible lane width (was a hardcoded 5000px,
+  // which over-rendered on narrow panels and under-culled on ultrawide ones).
+  if (x + width < 0 || x > viewportWidth) return null;
 
   const clipStyle: React.CSSProperties = {
     position: 'absolute',
@@ -342,7 +347,7 @@ const ClipVisual: React.FC<{
 
       {/* Clip name */}
       <div style={{
-        fontSize: 10, color: 'var(--color-text-primary)', padding: '2px 8px', whiteSpace: 'nowrap',
+        fontSize: 10, color: 'var(--color-text-primary)', padding: '2px var(--space-2)', whiteSpace: 'nowrap',
         overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 700, flexShrink: 0,
       }}>
         {clip.name}
@@ -384,7 +389,7 @@ const ClipVisual: React.FC<{
                 flex: 1, minWidth: 1.5, maxWidth: 4,
                 height: `${Math.max(8, Math.min(90, h))}%`,
                 background: `${color}70`,
-                borderRadius: 1,
+                borderRadius: 2,
               }} />
             );
           })}
@@ -419,7 +424,7 @@ ClipVisual.displayName = 'ClipVisual';
 // ---------------------------------------------------------------------------
 
 const TrackLane: React.FC<{
-  track: Track; zoom: number; scrollX: number;
+  track: Track; zoom: number; scrollX: number; viewportWidth: number;
   selectedClipIds: string[]; activeTool: VinxTool;
   onSelect: (clipId: string, multi: boolean) => void;
   onDragStart: (clipId: string, trackId: string, startFrame: number) => void;
@@ -427,7 +432,7 @@ const TrackLane: React.FC<{
   onSplit: (clipId: string, frame: number) => void;
   onDropMedia: (trackId: string, frame: number, data: string) => void;
   onClipContextMenu?: (clipId: string, trackId: string, x: number, y: number) => void;
-}> = memo(({ track, zoom, scrollX, selectedClipIds, activeTool, onSelect, onDragStart, onTrimStart, onSplit, onDropMedia, onClipContextMenu }) => {
+}> = memo(({ track, zoom, scrollX, viewportWidth, selectedClipIds, activeTool, onSelect, onDragStart, onTrimStart, onSplit, onDropMedia, onClipContextMenu }) => {
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -468,6 +473,7 @@ const TrackLane: React.FC<{
           track={track}
           zoom={zoom}
           scrollX={scrollX}
+          viewportWidth={viewportWidth}
           selected={selectedClipIds.includes(clip.id)}
           activeTool={activeTool}
           onSelect={onSelect}
@@ -487,9 +493,10 @@ TrackLane.displayName = 'TrackLane';
 // PLAYHEAD
 // ---------------------------------------------------------------------------
 
-const Playhead: React.FC<{ frame: number; zoom: number; scrollX: number; height: number }> = memo(({ frame, zoom, scrollX, height }) => {
+const Playhead: React.FC<{ frame: number; zoom: number; scrollX: number; height: number; viewportWidth: number }> = memo(({ frame, zoom, scrollX, height, viewportWidth }) => {
   const x = frameToPixels(frame, zoom) - scrollX;
-  if (x < 0 || x > 5000) return null;
+  // Cull against the real visible lane width rather than a hardcoded 5000px.
+  if (x < 0 || x > viewportWidth) return null;
 
   return (
     <div style={{
@@ -520,7 +527,7 @@ const MarkerVisual: React.FC<{ marker: Marker; zoom: number; scrollX: number; he
     }}>
       <div style={{
         position: 'absolute', top: -1, left: -3, width: 7, height: 7,
-        background: marker.color, borderRadius: 1,
+        background: marker.color, borderRadius: 2,
       }} />
     </div>
   );
@@ -867,6 +874,12 @@ export const Timeline: React.FC<{
   // -- Keyboard shortcuts --
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore shortcuts while typing in a field, otherwise Delete/Backspace and the
+      // single-letter tool keys (v/c/y/u/h/n) fire while editing text (e.g. the project
+      // name input or any clip text field), silently deleting clips or switching tools.
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const clips = useVinxStore.getState().getSelectedClips();
         for (const clip of clips) {
@@ -901,7 +914,7 @@ export const Timeline: React.FC<{
       {/* Timeline body */}
       <div
         ref={containerRef}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
         onWheel={handleWheel}
       >
         {/* Ruler row */}
@@ -916,7 +929,7 @@ export const Timeline: React.FC<{
 
         {/* Tracks */}
         <div
-          style={{ flex: 1, overflow: 'hidden', position: 'relative' }}
+          style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
           onClick={handleBackgroundClick}
         >
           <div style={{
@@ -931,9 +944,9 @@ export const Timeline: React.FC<{
                   onFocusTrack={setFocusedTrackId}
                   onNavigateTrack={handleTrackKeyboardNavigate}
                 />
-                <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
                   <TrackLane
-                    track={track} zoom={zoom} scrollX={scrollX}
+                    track={track} zoom={zoom} scrollX={scrollX} viewportWidth={laneWidth}
                     selectedClipIds={selectedClipIds} activeTool={activeTool}
                     onSelect={selectClip} onDragStart={handleDragStart}
                     onTrimStart={handleTrimStart} onSplit={handleSplit}
@@ -946,7 +959,7 @@ export const Timeline: React.FC<{
           </div>
 
           {/* Playhead overlay */}
-          <Playhead frame={currentFrame} zoom={zoom} scrollX={scrollX} height={totalHeight} />
+          <Playhead frame={currentFrame} zoom={zoom} scrollX={scrollX} height={totalHeight} viewportWidth={laneWidth} />
 
           {/* Markers */}
           {markers.map(m => (

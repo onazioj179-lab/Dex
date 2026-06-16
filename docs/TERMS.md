@@ -5,32 +5,25 @@
 
 ## Plain-English summary
 
-1. You buy a licence to use DEX. The software stays ours. You may use it
-   on the devices and for the purposes the plan you bought allows.
-2. Your data stays on your device unless you turn on cloud sync. How we use
-   and share data -- including analytics, advertising in ad-supported features,
-   and partner integrations -- is described in our [Privacy Policy](../PRIVACY.md).
+1. DEX is free for everyone. Every feature is available to all users at
+   no cost, with no paid plans, no in-app purchases, and no advertising.
+   You get a licence to use DEX; the software stays ours.
+2. Your data stays on your device unless you turn on cloud sync. How we
+   use and share data -- including analytics and partner integrations --
+   is described in our [Privacy Policy](../PRIVACY.md).
 3. The cloud sync, account, and storage features are **optional**. You
    can use DEX fully without an account.
-4. You may cancel any subscription any time. Refund window: 14 days from
-   purchase, no questions asked.
-5. We do not promise the software is bug-free. We do promise to fix
+4. We do not promise the software is bug-free. We do promise to fix
    security issues quickly and to be honest about what happened.
-6. If you abuse the service (spam accounts, attack our infrastructure,
-   resell DEX without a Studio licence) we may suspend you.
+5. If you abuse the service (spam accounts, attack our infrastructure,
+   redistribute DEX without permission) we may suspend you.
 
 ## 1. Licence
 
-Subject to payment of the applicable fees and these terms, Onazi Treasure OJ
+DEX is free for everyone. Subject to these terms, Onazi Treasure OJ
 ("DEX", "we") grants you a non-exclusive, non-transferable, revocable
-licence to install and use DEX on the number of devices and for the use
-case described by your plan in [PRICING.md](PRICING.md).
-
-- **Personal plan**: non-commercial use only, up to 2 devices.
-- **Family plan**: same household, up to 5 people, non-commercial.
-- **Pro plan**: includes commercial use, up to 3 devices.
-- **Studio plan**: per seat. Includes commercial use, admin console.
-- **Free Viewer**: read-only viewer. No fees, no time limit.
+licence to install and use DEX, including every feature, at no cost.
+There are no paid plans, paid tiers, or in-app purchases.
 
 You may not redistribute, sublicense, or reverse engineer DEX except as
 the [LICENSE](../LICENSE) explicitly permits.
@@ -52,8 +45,8 @@ A DEX account is optional. If you create one:
 
 If you turn on cloud sync:
 
-- Free Viewer accounts get 10 GB. Paid plans get 100 GB (per seat for
-  Studio).
+- Every account gets cloud storage at no cost; fair-use limits may apply
+  to protect the service.
 - All cloud objects are encrypted client-side with AES-GCM 256 before
   upload.
 - You may set a passphrase to enable end-to-end encryption. In that
@@ -75,38 +68,30 @@ it and nominate heirs:
   per heir.
 - You may cancel the entire arrangement at any time.
 
-## 5. Payments and refunds
+## 5. Cost
 
-- Payments are processed by Stripe. We never see your card number.
-- Subscriptions renew automatically until cancelled. Cancel at any time
-  in Settings > Account or by emailing onazi75@gmail.com.
-- **14-day refund window** from the date of purchase or renewal, no
-  questions asked.
-- Lifetime licences cover every update within the current major version
-  (v3.x.y) and one major upgrade transition at no cost.
-- Prices are locked for 12 months from your start date. Renewal prices
-  may change with at least 30 days notice.
+- DEX is free for everyone. There are no fees, subscriptions, paid
+  plans, in-app purchases, or advertising.
+- Every feature and every update is included at no cost.
+- Because there is nothing to buy, there are no charges and no refunds.
 
 ## 6. Acceptable use
 
 You agree not to:
 
-- Create accounts in bulk to abuse free quotas.
+- Create accounts in bulk to abuse free service quotas.
 - Attack our infrastructure (DoS, brute force, scraping behind rate
   limits).
 - Use DEX to commit, plan, or assist a crime.
-- Resell DEX without a Studio licence and a written reseller agreement.
+- Redistribute or resell DEX without written permission.
 
-If you do, we may suspend or terminate your account. We will refund any
-unused prepaid time on a pro-rata basis if we terminate you for a reason
-other than abuse.
+If you do, we may suspend or terminate your account.
 
 ## 7. Warranty and liability
 
-DEX is provided "as is". We do not warrant that it is bug-free. To the
-extent permitted by law, our total liability for any claim arising from
-your use of DEX is capped at the amount you paid us in the 12 months
-before the claim arose.
+DEX is provided "as is". We do not warrant that it is bug-free. DEX is
+free, so to the extent permitted by law our total liability for any claim
+arising from your use of DEX is capped at USD 50.
 
 We do warrant that:
 - We will not knowingly ship malware.
@@ -118,8 +103,8 @@ We do warrant that:
 ## 8. Changes
 
 We may update these terms. We will email account holders at least 30
-days before material changes take effect. If you disagree, you may
-cancel and request a pro-rata refund.
+days before material changes take effect. If you disagree, you may stop
+using DEX and delete your account.
 
 ## 9. Contact
 

@@ -167,7 +167,7 @@ const barStyles: Record<string, React.CSSProperties> = {
     overflow: 'auto',
   },
   item: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 13,
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
@@ -181,7 +181,7 @@ const barStyles: Record<string, React.CSSProperties> = {
   freq: {
     fontSize: 10,
     color: 'var(--color-text-tertiary)',
-    marginLeft: 8,
+    marginLeft: 'var(--space-2)',
   },
 };
 

@@ -18,6 +18,8 @@ import { safeMath, formatResult } from '../utils/safeMath';
 import { platform } from '../utils';
 import { scopedQuery } from '../services/commandScope';
 import { getRecentCommandIds, recordRecentCommand } from '../services/recentCommands';
+import { listPresets, type WorkspacePreset } from '../shell/WorkspacePresets';
+import { exportDiagnostics, resetSettingsToDefaults } from '../services/ErrorBoundary';
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 
@@ -167,6 +169,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     if (def) launchApp({ id: appId, name: def.name, icon: def.icon || appId, color: def.color });
   }, [launchApp]);
 
+  // Saved workspace layouts ("workspace memory") — refreshed when the palette
+  // opens and whenever a layout is saved/removed, so Restore commands stay live.
+  const [wsPresets, setWsPresets] = useState<WorkspacePreset[]>([]);
+  useEffect(() => {
+    const refresh = () => setWsPresets(listPresets());
+    refresh();
+    window.addEventListener('dex-workspace-presets-changed', refresh);
+    return () => window.removeEventListener('dex-workspace-presets-changed', refresh);
+  }, [isOpen]);
+
   // Build command list
   const commands: Command[] = useMemo(() => [
     // Apps — System
@@ -223,14 +235,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'lock-screen', title: 'Lock Screen', subtitle: 'Lock DEX immediately', icon: Icons.power, category: 'action', action: () => { window.dispatchEvent(new CustomEvent('dex-lock')); }, keywords: ['secure', 'lock', 'bye'], shortcut: `${_M}+L` },
     { id: 'take-screenshot', title: 'Take Screenshot', subtitle: 'Capture screen', icon: Icons.gallery, category: 'action', action: () => { openApp('rewind'); }, keywords: ['capture', 'snap', 'screen'] },
     { id: 'clear-clipboard', title: 'Clear Clipboard', subtitle: 'Wipe clipboard history', icon: Icons.trash, category: 'action', action: () => { localStorage.removeItem('dex-clipboard-history'); }, keywords: ['clean', 'privacy'] },
+    { id: 'save-diagnostics', title: 'Save Diagnostics Report', subtitle: 'Download crash + environment info', icon: Icons.files, category: 'action', action: () => { exportDiagnostics(); }, keywords: ['diagnostics', 'crash', 'report', 'debug', 'support', 'recovery', 'logs'] },
     { id: 'fullscreen', title: 'Toggle Fullscreen', subtitle: 'Enter or exit fullscreen', icon: Icons.gallery, category: 'action', action: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }, keywords: ['maximize', 'f11'], shortcut: 'F11' },
-    
+    { id: 'arrange-windows', title: 'Arrange Windows', subtitle: 'Tile open windows into a grid', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), keywords: ['tile', 'grid', 'arrange', 'organize', 'windows', 'layout', 'cascade'] },
+    { id: 'split-5050', title: 'Split 50 / 50', subtitle: 'Two windows, equal columns', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-split-layout', { detail: { ratios: [1, 1] } })), keywords: ['split', 'half', '50', 'two', 'columns', 'side by side', 'layout'] },
+    { id: 'split-7030', title: 'Split 70 / 30', subtitle: 'Wide primary + narrow side panel', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-split-layout', { detail: { ratios: [0.7, 0.3] } })), keywords: ['split', '70', '30', 'two', 'columns', 'primary', 'side', 'layout'] },
+    { id: 'split-602020', title: 'Split 60 / 20 / 20', subtitle: 'Primary + two side columns', icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-split-layout', { detail: { ratios: [0.6, 0.2, 0.2] } })), keywords: ['split', '60', '20', 'three', 'columns', 'thirds', 'layout'] },
+    { id: 'save-workspace', title: 'Save Workspace Layout', subtitle: 'Remember the current window arrangement', icon: Icons.workflows, category: 'action', action: () => { const name = window.prompt('Name this workspace layout:'); if (name && name.trim()) window.dispatchEvent(new CustomEvent('dex-workspace-save', { detail: { name: name.trim() } })); }, keywords: ['workspace', 'layout', 'save', 'arrangement', 'session', 'memory'] },
+    ...(wsPresets.length > 0 ? [{ id: 'manage-workspaces', title: 'Manage Workspace Layouts', subtitle: 'Rename or delete saved layouts', icon: Icons.workflows, category: 'action' as const, action: () => window.dispatchEvent(new CustomEvent('dex-workspace-manage')), keywords: ['workspace', 'layout', 'manage', 'rename', 'delete', 'edit'] }] : []),
+    ...wsPresets.map((p): Command => ({ id: 'restore-ws-' + p.id, title: `Restore Workspace: ${p.name}`, subtitle: `${p.windows.length} window${p.windows.length === 1 ? '' : 's'}`, icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-workspace-restore', { detail: { id: p.id } })), keywords: ['workspace', 'layout', 'restore', 'open', p.name.toLowerCase()] })),
+
     // Settings
     { id: 'toggle-theme', title: 'Toggle Dark/Light Theme', subtitle: 'Switch appearance', icon: Icons.theme, category: 'settings', action: () => { toggleTheme(); }, keywords: ['dark', 'light', 'appearance'] },
     { id: 'open-appearance', title: 'Appearance Settings', subtitle: 'Colors, fonts, accent', icon: Icons.colorpicker, category: 'settings', action: () => { openApp('settings'); }, keywords: ['theme', 'color', 'font', 'accent'] },
     { id: 'open-keyboard', title: 'Keyboard Shortcuts', subtitle: 'View all shortcuts', icon: Icons.calculator, category: 'settings', action: () => { openApp('settings'); }, keywords: ['hotkey', 'keybind', 'shortcut'] },
     { id: 'open-privacy', title: 'Privacy Settings', subtitle: 'Security and privacy options', icon: Icons.password, category: 'settings', action: () => { openApp('settings'); }, keywords: ['security', 'privacy', 'encryption'] },
-  ], [openApp]);
+    { id: 'reset-settings', title: 'Reset Appearance & Settings', subtitle: 'Restore UI preferences to defaults (your data is kept)', icon: Icons.theme, category: 'settings', action: () => { if (window.confirm('Reset appearance and UI settings to defaults?\n\nYour notes, tasks, files, and projects are NOT affected.')) { resetSettingsToDefaults(); window.location.reload(); } }, keywords: ['reset', 'defaults', 'settings', 'recover', 'fix', 'corrupt', 'restore', 'broken'] },
+  ], [openApp, wsPresets]);
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
@@ -361,8 +382,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     inputWrapper: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      padding: '16px',
+      gap: 'var(--space-3)',
+      padding: 'var(--space-4)',
       borderBottom: '1px solid var(--color-border)',
     },
     searchIcon: {
@@ -379,7 +400,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       fontFamily: 'inherit',
     },
     shortcut: {
-      padding: '4px 8px',
+      padding: '4px var(--space-2)',
       background: 'var(--color-bg-glass)',
       borderRadius: '3px',
       fontSize: '11px',
@@ -389,16 +410,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     list: {
       maxHeight: '400px',
       overflow: 'auto',
-      padding: '8px',
+      padding: 'var(--space-2)',
     },
     category: {
-      padding: '8px 12px 4px',
+      padding: 'var(--space-2) var(--space-3) 4px',
     },
     item: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      padding: '10px 12px',
+      gap: 'var(--space-3)',
+      padding: '10px var(--space-3)',
       borderRadius: '6px',
       cursor: 'pointer',
       transition: 'background 0.1s',
@@ -438,7 +459,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       borderRadius: '3px',
     },
     empty: {
-      padding: '32px',
+      padding: 'var(--space-8)',
       textAlign: 'center',
       color: 'var(--color-text-muted)',
     },

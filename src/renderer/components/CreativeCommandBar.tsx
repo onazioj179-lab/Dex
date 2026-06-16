@@ -113,11 +113,11 @@ export default function CreativeCommandBar({
       aria-label={`${appId} AI command bar`}
       style={{
         background: C.surface, border: C.border, borderRadius: C.radius,
-        padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
+        padding: 10, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
         color: C.text, font: '13px/1.45 var(--dex-font-ui, system-ui, sans-serif)',
       }}
     >
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
         <label htmlFor={inputId} style={{ color: C.textDim, fontSize: 12, flex: '0 0 auto' }}>
           Ask {appId}
         </label>
@@ -168,7 +168,7 @@ export default function CreativeCommandBar({
 
       {/* Plan preview (#003) */}
       {phase === 'preview' && command && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {!command.understood ? (
             <p style={{ margin: 0, color: C.textDim }}>
               I didn’t catch a creative action in that. Try naming the operation
@@ -178,7 +178,7 @@ export default function CreativeCommandBar({
             <>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {command.ops.map((op, i) => (
-                  <li key={`${op.op}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <li key={`${op.op}-${i}`} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
                     <Dot color={op.mutates ? C.warn : C.ok} />
                     <span>
                       <strong style={{ fontWeight: 600 }}>{op.op}</strong>
@@ -201,7 +201,7 @@ export default function CreativeCommandBar({
                 </p>
               )}
 
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button
                   type="button"
                   onClick={() => void apply()}
@@ -236,8 +236,8 @@ export default function CreativeCommandBar({
 
       {/* Run report (#049) */}
       {phase === 'done' && report && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             <Dot color={report.ok ? C.ok : C.bad} />
             <strong>
               {report.ok ? 'Done' : 'Completed with errors'} — {report.applied} applied
@@ -247,7 +247,7 @@ export default function CreativeCommandBar({
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {report.results.map((r, i) => (
-              <li key={`${r.op.op}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <li key={`${r.op.op}-${i}`} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
                 <Dot color={r.outcome === 'applied' ? C.ok : r.outcome === 'failed' ? C.bad : C.warn} />
                 <span>
                   <strong style={{ fontWeight: 600 }}>{r.op.op}</strong>
@@ -261,7 +261,7 @@ export default function CreativeCommandBar({
             onClick={() => { reset(); setInput(''); }}
             style={{
               alignSelf: 'flex-start', background: 'transparent', color: C.accent,
-              border: C.border, borderRadius: 4, padding: '6px 12px', cursor: 'pointer',
+              border: C.border, borderRadius: 4, padding: '6px var(--space-3)', cursor: 'pointer',
             }}
           >
             New command

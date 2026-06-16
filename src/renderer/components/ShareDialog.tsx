@@ -33,7 +33,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 'var(--space-6)',
   },
   sectionTitle: {
     fontSize: 11,
@@ -41,11 +41,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary)',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    marginBottom: 12,
+    marginBottom: 'var(--space-3)',
   },
   inputRow: {
     display: 'flex',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   input: {
     flex: 1,
@@ -70,7 +70,7 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 120,
   },
   inviteBtn: {
-    padding: '10px 20px',
+    padding: '10px var(--space-5)',
     fontSize: 14,
     fontWeight: 500,
     background: 'var(--color-accent)',
@@ -84,13 +84,13 @@ const styles: Record<string, React.CSSProperties> = {
   collaboratorList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   collaborator: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '10px 12px',
+    gap: 'var(--space-3)',
+    padding: '10px var(--space-3)',
     background: 'var(--color-bg-base)',
     borderRadius: radius.xl,
   },
@@ -150,8 +150,8 @@ const styles: Record<string, React.CSSProperties> = {
   linkRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '12px 14px',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-3) 14px',
     background: 'var(--color-bg-base)',
     borderRadius: radius.xl,
   },
@@ -187,7 +187,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
   },
   copyBtn: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 12,
     fontWeight: 500,
     background: 'var(--color-bg-elevated)',
@@ -223,19 +223,19 @@ const styles: Record<string, React.CSSProperties> = {
   accessRequestCard: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '12px 14px',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-3) 14px',
     background: 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))',
     border: '1px solid rgba(255,159,10,0.2)',
     borderRadius: radius.xl,
-    marginBottom: 8,
+    marginBottom: 'var(--space-2)',
   },
   accessRequestActions: {
     display: 'flex',
     gap: 6,
   },
   approveBtn: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 12,
     fontWeight: 500,
     background: '#30d158',
@@ -245,7 +245,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   denyBtn: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 12,
     fontWeight: 500,
     background: 'transparent',
@@ -356,7 +356,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
       size="md"
       testIdPrefix="share-dialog"
       title={
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
           <span>Share "{projectName}"</span>
           <button
             style={styles.closeBtn}
@@ -376,7 +376,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
       {error && (
         <div style={{
           padding: '10px 14px',
-          marginBottom: 16,
+          marginBottom: 'var(--space-4)',
           background: 'var(--color-error-muted)',
           border: '1px solid var(--color-error-muted)',
           borderRadius: radius.xl,

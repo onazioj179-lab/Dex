@@ -23,6 +23,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { useWallpaperStore } from './store/wallpaperStore';
 import { AppErrorBoundary } from './services/ErrorBoundary';
 import ToastProvider from './components/Toast';
+import { ModalProvider } from './shell/ModalHost';
 import {
   BatchActionBar,
   FeedbackPanel,
@@ -35,16 +36,19 @@ import { initializeTier } from './services/TierManager';
 import { startAdaptivePerfMonitor } from './services/AdaptivePerfMonitor';
 import { startIdlePauseCoordinator } from './utils/idlePause';
 import { initComfort } from './improvements500/comfortPrefs';
+import { applyAccentFamily } from './utils/accentFamily';
 import { startPermissionAutoDisable, stopPermissionAutoDisable } from './store/permissionStore';
 import { 
   initAppSubsystemIPC 
 } from './store/appSubsystem';
 import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
+import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
 import { OnboardingWizard, useOnboardingCheck } from './components/Onboarding';
 import { SystemFeatures } from './components/SystemFeatures';
 import { UpdateNotificationDropdown } from './components/UpdateNotificationDropdown';
 import { PictureInPicture, usePiPState, closePiP } from './components/PictureInPicture';
+import { MiniPlayer } from './components/MiniPlayer';
 import MiniPulse from './components/MiniPulse';
 import { MiniShell, useCompactMode, useCompactModeShortcut } from './shell/MiniShell';
 import { useShellPreferences } from './store/shellPreferencesStore';
@@ -55,7 +59,7 @@ const AppManager = lazy(() => import('./components/AppManager').then(m => ({ def
 const DiagnosticsPanel = lazy(() => import('./components/DiagnosticsPanel'));
 const LockScreen = lazy(() => import('./components/LockScreen').then(m => ({ default: m.LockScreen })));
 const KeyboardShortcuts = lazy(() => import('./components/KeyboardShortcuts'));
-const WhatsNewModal = lazy(() => import('./components/WhatsNewModal'));
+const WorkspacePresetsPanel = lazy(() => import('./components/WorkspacePresetsPanel'));
 
 // Services - OS-Grade System Layer
 import {
@@ -106,8 +110,7 @@ const initializeTheme = () => {
       // resolves to empty app-wide, so every var(--color-accent) fell back to
       // its hardcoded dark-blue and accent never themed to light mode.
       if (settings.accentColor && /^#([0-9a-f]{3}|[0-9a-f]{6})$|^rgb/i.test(String(settings.accentColor).trim())) {
-        document.documentElement.style.setProperty('--color-accent', settings.accentColor);
-        document.documentElement.style.setProperty('--accent-color', settings.accentColor);
+        applyAccentFamily(String(settings.accentColor).trim());
       }
     }
   } catch (_) {
@@ -126,8 +129,7 @@ const initializeTheme = () => {
     const api = (window as any).electronAPI;
     const osColor = await api?.theme?.getSystemAccentColor?.();
     if (osColor && /^#[0-9a-f]{6}$/i.test(osColor)) {
-      document.documentElement.style.setProperty('--color-accent', osColor);
-      document.documentElement.style.setProperty('--accent-color', osColor);
+      applyAccentFamily(osColor);
     }
   } catch {
     // OS accent detection unavailable
@@ -391,6 +393,15 @@ export const App: React.FC = () => {
     obs.observe(document.documentElement, { attributes: true });
     return () => { obs.disconnect(); if (debounceTimer) clearTimeout(debounceTimer); };
   }, []);
+  // Apply the saved auto-theme schedule on boot, then re-check every minute so
+  // scheduled/solar modes flip light<->dark at their configured times. Pull-based
+  // (reads theme-schedule:getInfo + resolves locally) — no native timer needed.
+  useEffect(() => {
+    useThemeScheduleStore.getState().loadInfo();
+    const id = setInterval(() => useThemeScheduleStore.getState().applyNow(), 60000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     // Re-apply theme on mount (in case it wasn't applied)
     initializeTheme();
@@ -490,6 +501,7 @@ export const App: React.FC = () => {
     <AppErrorBoundary instanceId="root" appId="dex-root" appName="DEX" appColor="var(--color-accent, #0a84ff)">
     <ToastProvider>
     <UnifiedSystemsProvider>
+    <ModalProvider>
     <div style={rootStyles.container}>
       <style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
       
@@ -536,6 +548,7 @@ export const App: React.FC = () => {
         <TaskQueueStrip />
         <BatchActionBar />
         <KeyboardShortcuts />
+        <WorkspacePresetsPanel />
       </Suspense>
       </AppErrorBoundary>
       
@@ -580,6 +593,9 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Global music remote — persists playback control across the whole app */}
+      <MiniPlayer />
+
       {/* System Diagnostics overlay (Ctrl+Shift+D) */}
       {diagnosticsOpen && (
         <Suspense fallback={null}>
@@ -603,11 +619,6 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* What's New modal (shown once per version) */}
-      <Suspense fallback={null}>
-        <WhatsNewModal />
-      </Suspense>
-      
       {/* Global wallpaper layer -- sits behind everything, reacts to wallpaper store */}
       <div aria-hidden="true" style={{
         position: 'fixed', inset: 0, zIndex: -2,
@@ -637,6 +648,7 @@ export const App: React.FC = () => {
         </Suspense>
       </div>
     </div>
+    </ModalProvider>
     </UnifiedSystemsProvider>
     </ToastProvider>
     </AppErrorBoundary>

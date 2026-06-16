@@ -114,7 +114,7 @@ export const AppLoadingState: React.FC<LoadingProps> = ({
   <div
     data-testid={testId ?? 'app-loading-state'}
     className={className}
-    style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 20, ...style }}
+    style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 'var(--space-5)', ...style }}
     role="status"
     aria-busy="true"
     aria-label={label}

@@ -244,8 +244,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     header: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      padding: '16px',
+      gap: 'var(--space-3)',
+      padding: 'var(--space-4)',
       borderBottom: '1px solid var(--color-border)',
     },
     headerIcon: {
@@ -258,7 +258,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
       color: 'var(--color-text-primary)',
     },
     clearBtn: {
-      padding: '4px 8px',
+      padding: '4px var(--space-2)',
       background: 'var(--color-bg-glass)',
       border: 'none',
       borderRadius: '3px',
@@ -269,8 +269,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     searchWrapper: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      padding: '12px 16px',
+      gap: 'var(--space-2)',
+      padding: 'var(--space-3) var(--space-4)',
       borderBottom: '1px solid var(--color-border)',
     },
     searchIcon: {
@@ -291,8 +291,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     item: {
       display: 'flex',
       alignItems: 'flex-start',
-      gap: '12px',
-      padding: '12px 16px',
+      gap: 'var(--space-3)',
+      padding: 'var(--space-3) var(--space-4)',
       cursor: 'pointer',
       borderBottom: '1px solid var(--color-border-subtle)',
       transition: 'background 0.1s',
@@ -325,7 +325,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     itemMeta: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
+      gap: 'var(--space-2)',
       marginTop: '4px',
     },
     itemTime: {
@@ -355,12 +355,12 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
       justifyContent: 'center',
     },
     empty: {
-      padding: '48px 24px',
+      padding: '48px var(--space-6)',
       textAlign: 'center',
       color: 'var(--color-text-muted)',
     },
     emptyIcon: {
-      marginBottom: '12px',
+      marginBottom: 'var(--space-3)',
       opacity: 0.5,
     },
   };

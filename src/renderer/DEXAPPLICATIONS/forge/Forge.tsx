@@ -11,7 +11,6 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave } from '../../utils/useAutoSave';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useToastHelpers } from '../../components/Toast';
-import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import { useAppTracking } from '../../services/usePatternLearning';
 import {
@@ -282,13 +281,6 @@ const Forge: React.FC = () => {
   // ===== RUNNING APPS =====
   const { setCurrentApp } = useRunningApps();
 
-  // ===== BEGINNER MODE =====
-  const { 
-    isBeginnerMode: beginnerMode, 
-    showShortcutsPanel, 
-    setShowShortcutsPanel,
-  } = useBeginnerMode('forge');
-
   // ===== STATE =====
   const [jobs, setJobs] = useState<Job[]>(() => {
     try { const saved = localStorage.getItem('forge-jobs'); if (saved) { const parsed = JSON.parse(saved); if (Array.isArray(parsed) && parsed.length > 0) return parsed; } } catch { /* ignore */ }
@@ -395,6 +387,9 @@ const Forge: React.FC = () => {
   // Refs for encoding engine
   const fileMapRef = useRef<Map<string, File>>(new Map());
   const activeEncodings = useRef<Set<string>>(new Set());
+  // Track watch-folder IPC listeners so they can be detached on unmount.
+  // Without this each added watch folder leaks a 'watch:fileAdded' handler.
+  const watchHandlersRef = useRef<Array<(event: any, data: any) => void>>([]);
 
   // Cleanup blob URLs on unmount to prevent memory leaks
   const jobsRef = useRef(jobs);
@@ -404,6 +399,11 @@ const Forge: React.FC = () => {
       jobsRef.current.forEach(j => {
         if (j.outputBlobUrl) try { URL.revokeObjectURL(j.outputBlobUrl); } catch { /* already revoked */ }
       });
+      // Detach any watch-folder IPC listeners registered during this session
+      watchHandlersRef.current.forEach(h => {
+        try { window.electron?.ipcRenderer?.off?.('watch:fileAdded', h); } catch { /* already detached */ }
+      });
+      watchHandlersRef.current = [];
     };
   }, []);
 
@@ -529,37 +529,6 @@ const Forge: React.FC = () => {
       }).catch((e: unknown) => { console.warn('[DEX]', e); });
     }
   }, []);
-
-  // ===== EMPTY STATE =====
-  const renderWelcome = () => (
-    <div style={{ 
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
-      height: '100%', gap: '16px', textAlign: 'center',
-    }}>
-      <div style={{ color: 'var(--color-accent)', opacity: 0.5 }}>
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-      </div>
-      <div>
-        <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>FORGE</div>
-        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Drop media files or click Add Files to start encoding</span>
-      </div>
-      <button onClick={addFiles} aria-label="Add files" style={{  
-        border: 'none', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 600, background: 'var(--color-accent)',
-        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 24px',
-      }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="12" y1="5" x2="12" y2="19"/>
-          <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        Add Files
-      </button>
-      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', opacity: 0.5, marginTop: 4 }}>Supports MP4, MOV, AVI, MKV, WebM, MP3, WAV, FLAC and more</div>
-    </div>
-  );
 
   // ===== REAL ENCODING ENGINE =====
   // Re-encodes video via HTMLVideoElement + canvas.captureStream() + MediaRecorder
@@ -1054,6 +1023,8 @@ const Forge: React.FC = () => {
               }
             };
             window.electron?.ipcRenderer?.on?.('watch:fileAdded', handler);
+            // Remember the handler so the unmount effect can detach it
+            watchHandlersRef.current.push(handler);
           } catch {
             // Watch IPC not available - folder saved but monitoring won't auto-detect
             console.warn('[Forge] File watching IPC not available');
@@ -1200,32 +1171,39 @@ const Forge: React.FC = () => {
     }
   }, []);
 
-  const selectedJob = jobs.find(j => j.id === selectedJobId);
-  const queuedJobs = jobs.filter(j => j.status === 'queued').length;
-  const processingJobs = jobs.filter(j => j.status === 'processing').length;
-  const completedJobs = jobs.filter(j => j.status === 'completed').length;
+  const selectedJob = useMemo(() => jobs.find(j => j.id === selectedJobId), [jobs, selectedJobId]);
+  // Single pass for the header counts instead of three separate filters per render
+  const { queuedJobs, processingJobs, completedJobs } = useMemo(() => {
+    let queued = 0, processing = 0, completed = 0;
+    for (const j of jobs) {
+      if (j.status === 'queued') queued++;
+      else if (j.status === 'processing') processing++;
+      else if (j.status === 'completed') completed++;
+    }
+    return { queuedJobs: queued, processingJobs: processing, completedJobs: completed };
+  }, [jobs]);
 
   // ===== STYLES - MINIMAL =====
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, contain: 'layout style' } as React.CSSProperties,
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 800, color: 'var(--color-accent)', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
-    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
+    btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
     btnPrimary: { background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: '#5ac8fa', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '6px' },
     btnDanger: { background: '#3a1818', color: '#ff6961', border: '1px solid #4a2020', borderRadius: '6px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     sidebar: { width: '220px', flexShrink: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
-    tab: { flex: 1, padding: '8px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
+    tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
     tabActive: { color: 'var(--color-accent)', borderBottom: '2px solid var(--color-accent)' },
     sidebarContent: { flex: 1, overflow: 'auto', padding: '10px' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-inset)' },
-    queueHeader: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--color-bg-surface)', borderBottom: '1px solid var(--color-border-subtle)' },
-    queueStats: { display: 'flex', gap: '12px', marginLeft: 'auto' },
+    queueHeader: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px var(--space-3)', background: 'var(--color-bg-surface)', borderBottom: '1px solid var(--color-border-subtle)' },
+    queueStats: { display: 'flex', gap: 'var(--space-3)', marginLeft: 'auto' },
     stat: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' },
     queueList: { flex: 1, overflow: 'auto', padding: '10px' },
-    jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--color-border-subtle)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
+    jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: 'var(--space-2) 10px', background: 'var(--color-border-subtle)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
     jobItemSelected: { borderColor: 'var(--color-accent)', background: '#0d1a2e' },
     jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '6px', color: 'var(--color-accent)' },
     jobInfo: { flex: 1 },
@@ -1237,27 +1215,27 @@ const Forge: React.FC = () => {
     jobStatus: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 },
     jobActions: { display: 'flex', gap: '2px' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px' },
-    inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, background: 'var(--color-bg-inset)', borderLeft: '1px solid var(--color-border-subtle)', padding: '12px', overflow: 'auto' },
-    inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: '12px', color: 'var(--color-text-primary)' },
-    inspectorSection: { marginBottom: '12px' },
-    sectionTitle: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px', fontWeight: 600 },
+    inspectorPanel: { width: '240px', minWidth: '180px', maxWidth: '280px', flexShrink: 0, background: 'var(--color-bg-inset)', borderLeft: '1px solid var(--color-border-subtle)', padding: 'var(--space-3)', overflow: 'auto' },
+    inspectorTitle: { fontSize: '12px', fontWeight: 600, marginBottom: 'var(--space-3)', color: 'var(--color-text-primary)' },
+    inspectorSection: { marginBottom: 'var(--space-3)' },
+    sectionTitle: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', marginBottom: 'var(--space-2)', letterSpacing: '0.5px', fontWeight: 600 },
     infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: '11px' },
     infoLabel: { color: 'var(--color-text-muted)' },
     infoValue: { color: 'var(--color-text-primary)', fontWeight: 600 },
-    presetItem: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
+    presetItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
     presetItemSelected: { borderColor: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
     presetInfo: { flex: 1 },
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
     presetDesc: { fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' },
-    categoryHeader: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', padding: '12px 0 8px', marginTop: '8px', letterSpacing: '0.8px', fontWeight: 700, borderTop: '1px solid var(--color-border-subtle)' },
-    statusBar: { display: 'flex', alignItems: 'center', gap: '12px', padding: '0 12px', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
-    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
-    checkbox: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', cursor: 'pointer', fontSize: '11px', fontWeight: 600 },
-    sliderRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
+    categoryHeader: { fontSize: '11px', color: 'var(--color-accent)', textTransform: 'uppercase', padding: 'var(--space-3) 0 var(--space-2)', marginTop: 'var(--space-2)', letterSpacing: '0.8px', fontWeight: 700, borderTop: '1px solid var(--color-border-subtle)' },
+    statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
+    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
+    checkbox: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 0', cursor: 'pointer', fontSize: '11px', fontWeight: 600 },
+    sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },
     sliderLabel: { width: '90px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
     slider: { flex: 1, accentColor: 'var(--color-accent)' },
     sliderValue: { width: '36px', fontSize: '11px', textAlign: 'right', color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontWeight: 600 },
-    select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px 8px', fontSize: '11px', cursor: 'pointer', width: '100%', fontWeight: 600, transition: 'all 0.12s ease' },
+    select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px var(--space-2)', fontSize: '11px', cursor: 'pointer', width: '100%', fontWeight: 600, transition: 'all 0.12s ease' },
   }), []);
 
   // Keyboard shortcuts
@@ -1370,7 +1348,7 @@ const Forge: React.FC = () => {
       `}</style>
       {/* Header */}
       <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           <img src={new URL('../../../../appicons/forge.png', import.meta.url).href} alt="Forge" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
           <div style={styles.logo}>FORGE</div>
         </div>
@@ -1397,10 +1375,10 @@ const Forge: React.FC = () => {
           )}
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
+            <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-accent)' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showToolsMenu && (
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '10px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>PROCESSING</div>
+                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PROCESSING</div>
                 {[
                   { label: 'Trim / Split', active: showTrimSplit, fn: () => setShowTrimSplit(v => !v) },
                   { label: 'Crop & Pad', active: showCropPad, fn: () => setShowCropPad(v => !v) },
@@ -1409,31 +1387,31 @@ const Forge: React.FC = () => {
                   { label: 'Normalize Audio', active: audioNormalize, fn: () => setAudioNormalize(v => !v) },
                   { label: 'Concatenate', active: showConcat, fn: () => { setShowConcat(v => !v); setConcatOrder(jobs.map(j => j.id)); } },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>PREVIEW</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PREVIEW</div>
                 {[
                   { label: 'Preview', active: showPreview, fn: () => { if (selectedJob) setShowPreview(v => !v); } },
                   { label: 'A/B Compare', active: showABCompare, fn: () => { if (selectedJob?.outputBlobUrl) setShowABCompare(v => !v); } },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>EXPORT</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>EXPORT</div>
                 {[
                   { label: 'Image Sequence', active: showImageSequence, fn: () => setShowImageSequence(v => !v) },
                   { label: 'Audio Extract', active: showAudioExtract, fn: () => setShowAudioExtract(v => !v) },
                   { label: 'Batch Rename', active: showBatchRename, fn: () => setShowBatchRename(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '4px 12px 2px' }}>AUTOMATION</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>AUTOMATION</div>
                 {[
                   { label: 'Auto Rules', active: showConditionalRules, fn: () => setShowConditionalRules(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
+                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
                 ))}
               </div>
             )}
@@ -1450,22 +1428,18 @@ const Forge: React.FC = () => {
             <button style={{ ...styles.tab, ...(activeTab === 'presets' ? styles.tabActive : {}) }} onClick={() => setActiveTab('presets')} aria-label="Presets tab">
               Presets
             </button>
-            {!beginnerMode && (
-              <>
-                <button style={{ ...styles.tab, ...(activeTab === 'watch' ? styles.tabActive : {}) }} onClick={() => setActiveTab('watch')} aria-label="Watch folders tab">
-                  Watch
-                </button>
-                <button style={{ ...styles.tab, ...(activeTab === 'settings' ? styles.tabActive : {}) }} onClick={() => setActiveTab('settings')} aria-label="Settings tab">
-                  Settings
-                </button>
-              </>
-            )}
+            <button style={{ ...styles.tab, ...(activeTab === 'watch' ? styles.tabActive : {}) }} onClick={() => setActiveTab('watch')} aria-label="Watch folders tab">
+              Watch
+            </button>
+            <button style={{ ...styles.tab, ...(activeTab === 'settings' ? styles.tabActive : {}) }} onClick={() => setActiveTab('settings')} aria-label="Settings tab">
+              Settings
+            </button>
           </div>
 
           <div data-testid="forge-presets" style={styles.sidebarContent}>
             {activeTab === 'presets' && (
               <div>
-                <select style={{ ...styles.select, marginBottom: '12px' }} value={presetCategory} onChange={(e) => setPresetCategory(e.target.value)}>
+                <select style={{ ...styles.select, marginBottom: 'var(--space-3)' }} value={presetCategory} onChange={(e) => setPresetCategory(e.target.value)}>
                   <option value="all">All Presets</option>
                   <option value="Professional">Professional</option>
                   <option value="Modern Codecs">Modern Codecs</option>
@@ -1478,13 +1452,13 @@ const Forge: React.FC = () => {
                   <option value="Custom">Custom</option>
                 </select>
                 {showPresetInput ? (
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 12, width: '100%' }}>
-                    <input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPresetName.trim()) { const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); } else if (e.key === 'Escape') { setShowPresetInput(false); setNewPresetName(''); } }} autoFocus placeholder="Preset name..." style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid #2a5e3a', borderRadius: 3, padding: '4px 8px', color: '#fff', fontSize: 11, outline: 'none' }} />
-                    <button onClick={() => { if (!newPresetName.trim()) return; const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px 8px', background: '#1e3a28', color: 'var(--color-success)', border: '1px solid #2a5e3a' }}>Save</button>
-                    <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px 8px' }}>Cancel</button>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-3)', width: '100%' }}>
+                    <input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPresetName.trim()) { const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); } else if (e.key === 'Escape') { setShowPresetInput(false); setNewPresetName(''); } }} autoFocus placeholder="Preset name..." style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid #2a5e3a', borderRadius: 3, padding: '4px var(--space-2)', color: '#fff', fontSize: 11, outline: 'none' }} />
+                    <button onClick={() => { if (!newPresetName.trim()) return; const base = presets.find(p => p.id === selectedPreset) || presets[0]; const custom: Preset = { ...base, id: `custom-${Date.now()}`, name: newPresetName.trim(), category: 'Custom', description: `Based on ${base.name}` }; setPresets(prev => [...prev, custom]); const customOnly = [...presets.filter(p => p.category === 'Custom'), custom]; localStorage.setItem('forge-custom-presets', JSON.stringify(customOnly)); setSelectedPreset(custom.id); setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)', background: '#1e3a28', color: 'var(--color-success)', border: '1px solid #2a5e3a' }}>Save</button>
+                    <button onClick={() => { setShowPresetInput(false); setNewPresetName(''); }} style={{ ...styles.btn, padding: '4px var(--space-2)' }}>Cancel</button>
                   </div>
                 ) : (
-                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: '12px', background: 'var(--color-success-muted, rgba(48,209,88,0.1))', border: '1px solid var(--color-success-muted, rgba(48,209,88,0.3))', color: 'var(--color-success)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
+                  <button onClick={() => setShowPresetInput(true)} style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: 'var(--space-3)', background: 'var(--color-success-muted, rgba(48,209,88,0.1))', border: '1px solid var(--color-success-muted, rgba(48,209,88,0.3))', color: 'var(--color-success)' }} aria-label="Save as Preset">{Icons.check} Save as Preset</button>
                 )}
                 
                 {['Professional', 'Modern Codecs', 'Standard', 'Web', 'Social Media', 'Broadcast', 'Audio', 'Other']
@@ -1517,16 +1491,15 @@ const Forge: React.FC = () => {
 
             {activeTab === 'watch' && (
               <div>
-                <button style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: '12px' }} onClick={addWatchFolder} aria-label="Add watch folder">{Icons.folderPlus} Add Watch Folder</button>
+                <button style={{ ...styles.btn, width: '100%', justifyContent: 'center', marginBottom: 'var(--space-3)' }} onClick={addWatchFolder} aria-label="Add watch folder">{Icons.folderPlus} Add Watch Folder</button>
                 {watchFolders.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px 0' }}>
-                    <div style={{ marginBottom: '8px' }}>{Icons.folder}</div>
+                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 'var(--space-10) 0' }}>
+                    <div style={{ marginBottom: 'var(--space-2)' }}>{Icons.folder}</div>
                     <div>No watch folders configured</div>
-                    <div style={{ fontSize: '11px', marginTop: '4px' }}>Add folders to automatically encode dropped files</div>
                   </div>
                 ) : (
                   watchFolders.map(wf => (
-                    <div key={wf.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '3px', marginBottom: '4px', border: '1px solid var(--color-border-subtle)' }}>
+                    <div key={wf.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '3px', marginBottom: '4px', border: '1px solid var(--color-border-subtle)' }}>
                       <span style={{ color: wf.active ? 'var(--color-success)' : '#6b7280' }}>{Icons.folderWatch}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '11px', fontWeight: 600 }}>{wf.path}</div>
@@ -1556,7 +1529,7 @@ const Forge: React.FC = () => {
                   <span>Use Hardware Acceleration</span>
                 </div>
                 
-                <div style={{ ...styles.sectionTitle, marginTop: '16px' }}>Completion</div>
+                <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Completion</div>
                 <div style={styles.checkbox} onClick={() => setNotifyOnComplete(!notifyOnComplete)}>
                   <div style={{ width: '14px', height: '14px', background: notifyOnComplete ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {notifyOnComplete && Icons.check}
@@ -1570,7 +1543,7 @@ const Forge: React.FC = () => {
                   <span>Shutdown After Queue Complete</span>
                 </div>
 
-                <div style={{ ...styles.sectionTitle, marginTop: '16px' }}>Audio</div>
+                <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Audio</div>
                 <div style={styles.checkbox} onClick={() => setAudioNormalize(!audioNormalize)}>
                   <div style={{ width: '14px', height: '14px', background: audioNormalize ? '#bf5af2' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {audioNormalize && Icons.check}
@@ -1585,11 +1558,11 @@ const Forge: React.FC = () => {
                   </div>
                 )}
 
-                <div style={{ ...styles.sectionTitle, marginTop: '16px' }}>Output</div>
+                <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Output</div>
                 <div style={{ marginBottom: '10px' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '4px', display: 'block' }}>Output Directory</span>
                   <input value={customOutputDir} onChange={e => setCustomOutputDir(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '11px' }} />
+                    style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: '11px' }} />
                 </div>
               </div>
             )}
@@ -1749,19 +1722,19 @@ const Forge: React.FC = () => {
               )}
             </div>
 
-            {!beginnerMode && selectedJob.status === 'queued' && (
-              <div style={{ marginTop: '16px' }}>
+            {selectedJob.status === 'queued' && (
+              <div style={{ marginTop: 'var(--space-4)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Encoding Preset</div>
-                <select value={selectedJob.preset} onChange={e => { const preset = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, preset } : j)); }} style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer', marginBottom: '8px' }}>
+                <select value={selectedJob.preset} onChange={e => { const preset = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, preset } : j)); }} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer', marginBottom: 'var(--space-2)' }}>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginBottom: '6px' }}>Output Format</div>
-                <select value={selectedJob.format} onChange={e => { const format = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, format } : j)); }} style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
+                <select value={selectedJob.format} onChange={e => { const format = e.target.value; setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, format } : j)); }} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
                   {['mp4', 'webm', 'mkv', 'mov', 'avi', 'gif', 'mp3', 'wav', 'flac', 'aac'].map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
                 </select>
 
                 {/* Per-Job Video Overrides */}
-                <div style={{ marginTop: 10, padding: '8px', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ marginTop: 10, padding: 'var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
                   <div className="dex-label-caps" style={{ marginBottom: 6 }}>VIDEO</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <div style={{ flex: 1 }}>
@@ -1797,7 +1770,7 @@ const Forge: React.FC = () => {
                     <input type="range" min="500" max="100000" step="500" value={(selectedJob as any).overrideBitrate || (presets.find(p => p.id === selectedJob.preset)?.bitrate || 8000)} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideBitrate: Number(e.target.value) } as any : j))} style={{ flex: 1, accentColor: 'var(--color-success)' }} />
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{((selectedJob as any).overrideBitrate || (presets.find(p => p.id === selectedJob.preset)?.bitrate || 8000))} k</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 6 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>
                       <input type="checkbox" checked={(selectedJob as any).overrideTwoPass || false} onChange={e => setJobs(prev => prev.map(j => j.id === selectedJobId ? { ...j, overrideTwoPass: e.target.checked } as any : j))} style={{ accentColor: 'var(--color-success)' }} />Two-Pass
                     </label>
@@ -1808,7 +1781,7 @@ const Forge: React.FC = () => {
                 </div>
 
                 {/* Per-Job Audio Overrides */}
-                <div style={{ marginTop: 6, padding: '8px', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
+                <div style={{ marginTop: 6, padding: 'var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: 4, border: '1px solid var(--color-border-subtle)' }}>
                   <div className="dex-label-caps" style={{ marginBottom: 6 }}>AUDIO</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <div style={{ flex: 1 }}>
@@ -1851,14 +1824,14 @@ const Forge: React.FC = () => {
               <a
                 href={selectedJob.outputBlobUrl}
                 download={selectedJob.name.replace(/\.[^.]+$/, '') + '.webm'}
-                style={{ ...styles.btn, ...styles.btnPrimary, width: '100%', justifyContent: 'center', marginTop: '16px', textDecoration: 'none', textAlign: 'center', display: 'inline-flex' } as React.CSSProperties}
+                style={{ ...styles.btn, ...styles.btnPrimary, width: '100%', justifyContent: 'center', marginTop: 'var(--space-4)', textDecoration: 'none', textAlign: 'center', display: 'inline-flex' } as React.CSSProperties}
               >
                 {Icons.download} Download Encoded File
               </a>
             )}
 
             {selectedJob.status === 'failed' && selectedJob.error && (
-              <div style={{ marginTop: '12px', padding: '8px', background: 'var(--color-error-muted, rgba(255,69,58,0.1))', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2)', background: 'var(--color-error-muted, rgba(255,69,58,0.1))', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {Icons.alert} {selectedJob.error}
               </div>
             )}
@@ -1879,9 +1852,9 @@ const Forge: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Frame Format</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 'var(--space-3)' }}>
               {(['tiff', 'png', 'exr', 'dpx'] as const).map(f => (
-                <button key={f} aria-label={`Select ${f} format`} aria-pressed={imgSeqFormat === f} onClick={() => setImgSeqFormat(f)} style={{ padding: '8px 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: imgSeqFormat === f ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: imgSeqFormat === f ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
+                <button key={f} aria-label={`Select ${f} format`} aria-pressed={imgSeqFormat === f} onClick={() => setImgSeqFormat(f)} style={{ padding: 'var(--space-2) 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: imgSeqFormat === f ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: imgSeqFormat === f ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
               ))}
             </div>
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
@@ -1889,7 +1862,7 @@ const Forge: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>frame_[####].{imgSeqFormat}</div>
             </div>
             {imgSeqFormat === 'exr' && (
-              <div style={{ padding: 8, background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.15))', marginBottom: 10 }}>
+              <div style={{ padding: 'var(--space-2)', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.15))', marginBottom: 10 }}>
                 <div style={{ fontSize: 11, color: 'var(--color-warning)' }}>32-bit float HDR — ideal for VFX compositing</div>
               </div>
             )}
@@ -1922,7 +1895,7 @@ const Forge: React.FC = () => {
                 const a = document.createElement('a'); a.href = URL.createObjectURL(frameBlobs[i]); a.download = `frame_${String(i).padStart(6, '0')}.${imgSeqFormat}`; a.click(); URL.revokeObjectURL(a.href);
               }
               URL.revokeObjectURL(objUrl); toast.success(`Exported ${totalFrames} frames`); setShowImageSequence(false);
-            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Export Sequence</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Export Sequence</button>
           </div>
         </div>
       )}
@@ -1936,9 +1909,9 @@ const Forge: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Output Format</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 'var(--space-3)' }}>
               {(['wav', 'mp3', 'flac', 'aac'] as const).map(f => (
-                <button key={f} aria-label={`Select ${f} audio format`} aria-pressed={audioExtractFormat === f} onClick={() => setAudioExtractFormat(f)} style={{ padding: '8px 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: audioExtractFormat === f ? 'rgba(191,90,242,0.15)' : 'var(--color-border-subtle)', color: audioExtractFormat === f ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
+                <button key={f} aria-label={`Select ${f} audio format`} aria-pressed={audioExtractFormat === f} onClick={() => setAudioExtractFormat(f)} style={{ padding: 'var(--space-2) 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: audioExtractFormat === f ? 'rgba(191,90,242,0.15)' : 'var(--color-border-subtle)', color: audioExtractFormat === f ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
               ))}
             </div>
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
@@ -1975,7 +1948,7 @@ const Forge: React.FC = () => {
                 recorder.start(100); source.start(0);
                 source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
               } catch (err: any) { toast.error('Audio extraction failed: ' + (err?.message || 'Unknown error')); }
-            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Extract Audio</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Extract Audio</button>
           </div>
         </div>
       )}
@@ -1987,17 +1960,17 @@ const Forge: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Watermark Overlay</span>
             <button aria-label="Close Watermark Overlay" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowWatermark(false)}><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['text', 'image'] as const).map(t => (
                 <button key={t} aria-label={`Select ${t} watermark type`} aria-pressed={watermarkType === t} onClick={() => setWatermarkType(t)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: watermarkType === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
               ))}
             </div>
             {watermarkType === 'text' && (
-              <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 8 }} />
+              <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 'var(--space-2)' }} />
             )}
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Position</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 'var(--space-2)' }}>
               {(['top-left', 'top-center', 'top-right', 'bottom-left', 'center', 'bottom-right'] as const).map((p) => (
                 <button key={p} aria-label={`Set watermark position ${p}`} onClick={() => setWatermarkPosition(p)} style={{ padding: 4, borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: watermarkPosition === p ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkPosition === p ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p === 'center' ? '●' : p.split('-').map(w => w[0].toUpperCase()).join('')}</button>
               ))}
@@ -2021,7 +1994,7 @@ const Forge: React.FC = () => {
             <button aria-label="Close Trim and Split" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTrimSplit(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ height: 40, background: 'var(--color-border-subtle)', borderRadius: 4, position: 'relative', marginBottom: 8, overflow: 'hidden' }}>
+            <div style={{ height: 40, background: 'var(--color-border-subtle)', borderRadius: 4, position: 'relative', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: `${trimIn}%`, right: `${100 - trimOut}%`, top: 0, bottom: 0, background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)', borderLeft: '2px solid var(--color-accent)', borderRight: '2px solid var(--color-accent)' }} />
               <svg width="100%" height="40" viewBox="0 0 380 40" preserveAspectRatio="none" style={{ position: 'absolute', top: 0 }}>
                 {/* Waveform unavailable in renderer — audio not decoded yet */}
@@ -2029,7 +2002,7 @@ const Forge: React.FC = () => {
                 {[...Array(24)].map((_, i) => <rect key={i} x={i * 16 + 2} y={17} width="3" height="6" fill="#303040" rx="1"/>)}
               </svg>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 10 }}>
               <div style={{ flex: 1 }}><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>In Point</div><input type="range" min="0" max="99" value={trimIn} onChange={e => setTrimIn(Math.min(Number(e.target.value), trimOut - 1))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{trimIn}%</div></div>
               <div style={{ flex: 1 }}><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Out Point</div><input type="range" min="1" max="100" value={trimOut} onChange={e => setTrimOut(Math.max(Number(e.target.value), trimIn + 1))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{trimOut}%</div></div>
             </div>
@@ -2062,11 +2035,11 @@ const Forge: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crop & Pad</span>
             <button aria-label="Close Crop and Pad panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropPad(false)}><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '9:16'] as const).map(a => (
-                <button key={a} onClick={() => setCropAspect(a)} style={{ padding: '4px 8px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: cropAspect === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropAspect === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
+                <button key={a} onClick={() => setCropAspect(a)} style={{ padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: cropAspect === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropAspect === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
               ))}
             </div>
             <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2098,7 +2071,7 @@ const Forge: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Subtitle File</div>
-              <label style={{ padding: '6px 12px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'inline-block' }}>Load SRT / ASS<input type="file" accept=".srt,.ass,.ssa,.vtt" style={{ display: 'none' }} onChange={(e) => {
+              <label style={{ padding: '6px var(--space-3)', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'inline-block' }}>Load SRT / ASS<input type="file" accept=".srt,.ass,.ssa,.vtt" style={{ display: 'none' }} onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
                   const reader = new FileReader();
@@ -2127,11 +2100,11 @@ const Forge: React.FC = () => {
               }} /></label>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Font Family</div>
-            <select value={subBurnFont} onChange={e => setSubBurnFont(e.target.value)} style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 8 }}>
+            <select value={subBurnFont} onChange={e => setSubBurnFont(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 'var(--space-2)' }}>
               {['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Impact'].map(f => <option key={f} value={f}>{f}</option>)}
             </select>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Font Size</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{subBurnSize}px</span></div>
-            <input type="range" min="12" max="64" value={subBurnSize} onChange={e => setSubBurnSize(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 8 }} />
+            <input type="range" min="12" max="64" value={subBurnSize} onChange={e => setSubBurnSize(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Position</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Bottom</option><option>Top</option><option>Center</option></select></div>
               <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Style</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Outline</option><option>Shadow</option><option>Box</option></select></div>
@@ -2153,9 +2126,9 @@ const Forge: React.FC = () => {
             <button aria-label="Close Conditional Rules" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConditionalRules(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>When input matches a condition, automatically apply the action</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>When input matches a condition, automatically apply the action</div>
             {conditionalRules.map((rule, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                 <input type="checkbox" checked={rule.enabled} onChange={() => setConditionalRules(rules => rules.map((r, j) => j === i ? { ...r, enabled: !r.enabled } : r))} style={{ accentColor: 'var(--color-success)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: rule.enabled ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)' }}>IF {rule.condition}</div>
@@ -2180,8 +2153,8 @@ const Forge: React.FC = () => {
             {fileMapRef.current.has(selectedJob.id) ? (
               <div style={{ borderRadius: 6, overflow: 'hidden', background: '#000' }}>
                 {selectedJob.isAudio ? (
-                  <div style={{ padding: 20, textAlign: 'center' }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>{Icons.audioWave}</div>
+                  <div style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 40, marginBottom: 'var(--space-3)' }}>{Icons.audioWave}</div>
                     <audio ref={previewVideoRef as any} controls style={{ width: '100%' }}
                       src={previewSourceUrl || undefined} />
                   </div>
@@ -2191,7 +2164,7 @@ const Forge: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Source file not available for preview</div>
+              <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Source file not available for preview</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               <span>Output: WebM (VP9) {selectedJob.format !== 'WebM' ? `— styled as ${selectedJob.format}` : ''}</span>
@@ -2246,16 +2219,16 @@ const Forge: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
             <input value={batchRenamePattern} onChange={e => setBatchRenamePattern(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, fontFamily: 'var(--font-mono)', marginBottom: 8 }} />
+              style={{ width: '100%', padding: 'var(--space-2) 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
               {['{name}', '{preset}', '{format}', '{date}', '{index}', '{resolution}'].map(token => (
                 <button key={token} onClick={() => setBatchRenamePattern(prev => prev + token)} style={{
-                  padding: '3px 8px', borderRadius: 3, border: '1px solid var(--color-bg-hover)',
+                  padding: '3px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-bg-hover)',
                   background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)',
                 }}>{token}</button>
               ))}
             </div>
-            <div style={{ padding: 8, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
+            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Preview</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
                 {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', new Date().toISOString().split('T')[0]).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
@@ -2274,7 +2247,7 @@ const Forge: React.FC = () => {
                   + '.' + (presets.find(p => p.id === j.preset)?.container || 'mp4'),
               })));
               setShowBatchRename(false);
-            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to All Jobs</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to All Jobs</button>
           </div>
         </div>
       )}
@@ -2287,16 +2260,16 @@ const Forge: React.FC = () => {
             <button aria-label="Close Concat" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowConcat(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Drag to reorder. Files will be concatenated in this order.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Drag to reorder. Files will be concatenated in this order.</div>
             {jobs.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Add files to queue first</div>
+              <div style={{ padding: 'var(--space-5)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Add files to queue first</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 10 }}>
                 {concatOrder.map((id, idx) => {
                   const job = jobs.find(j => j.id === id);
                   if (!job) return null;
                   return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)' }}>
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 16 }}>{idx + 1}.</span>
                       <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', flex: 1 }}>{job.name}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -2425,16 +2398,21 @@ const Forge: React.FC = () => {
           null,
           { label: 'Remove Job', fn: () => removeJob(ctxJob.id), danger: true },
         ];
+        // Clamp to the viewport so right-clicks near the right/bottom edge
+        // don't push the menu off-screen (every other popup here clamps too).
+        const MENU_W = 160;
+        const MENU_H = 7 * 28 + 8; // 5 items + 2 dividers, ~28px each
+        const clampedX = Math.max(8, Math.min(ctxMenu.x, window.innerWidth - MENU_W - 8));
+        const clampedY = Math.max(8, Math.min(ctxMenu.y, window.innerHeight - MENU_H - 8));
         return (
-          <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', left: clampedX, top: clampedY, zIndex: 'var(--z-max)', minWidth: MENU_W, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
-              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px 8px' }} />
+              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px var(--space-2)' }} />
               : <div key={i} className="forge-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );
       })()}
-      {showShortcutsPanel && <KeyboardShortcutsPanel appId="forge" onClose={() => setShowShortcutsPanel(false)} />}
     </div>
   );
 };

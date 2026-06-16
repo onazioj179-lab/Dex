@@ -22,6 +22,8 @@
  * Handlers are then ported one subsystem at a time on the Rust side.
  */
 
+import { canHandleLocally, handleLocally, NATIVE_PENDING } from './rendererShims';
+
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 type UnlistenFn = () => void;
 type TauriListen = (event: string, handler: (e: { payload: unknown }) => void) => Promise<UnlistenFn>;
@@ -90,15 +92,58 @@ function recordChannel(channel: string, degraded: boolean): void {
   degradeLog.set(channel, e);
 }
 
-/** Snapshot of channel usage, most-degraded first. Feeds the migration priority. */
-export function dexDegradeReport(): Array<{ channel: string; calls: number; nulls: number }> {
+/** Known native-pending gaps, keyed by channel, for honest report annotation. */
+const NATIVE_PENDING_BY_CHANNEL = new Map(NATIVE_PENDING.map((e) => [e.channel, e.needs]));
+
+/**
+ * Snapshot of channel usage, most-degraded first. Feeds the migration priority.
+ * Each degraded channel is tagged: `pending` (with the native capability it
+ * needs) when it's a known, catalogued gap in `rendererShims.NATIVE_PENDING`, or
+ * `unaccounted` when something degraded that we did NOT expect — that tag is the
+ * signal that the catalogue (or a shim) is missing and the report is no longer
+ * honest. Slice 5 drives this toward empty: a channel leaves the degraded set
+ * either by gaining a renderer shim (rendererShims.ts) or a native handler.
+ */
+export function dexDegradeReport(): Array<{
+  channel: string;
+  calls: number;
+  nulls: number;
+  status?: 'pending' | 'unaccounted';
+  needs?: string;
+}> {
   return [...degradeLog.entries()]
-    .map(([channel, v]) => ({ channel, ...v }))
+    .map(([channel, v]) => {
+      const out: { channel: string; calls: number; nulls: number; status?: 'pending' | 'unaccounted'; needs?: string } = {
+        channel,
+        ...v,
+      };
+      if (v.nulls > 0) {
+        const needs = NATIVE_PENDING_BY_CHANNEL.get(channel);
+        if (needs) {
+          out.status = 'pending';
+          out.needs = needs;
+        } else {
+          out.status = 'unaccounted';
+        }
+      }
+      return out;
+    })
     .sort((a, b) => b.nulls - a.nulls || b.calls - a.calls);
 }
 
 /** Route one IPC channel call to the native `dex_ipc` dispatcher. */
 function dexIpc(channel: string, args: unknown[]): Promise<unknown> {
+  // Some channels never needed the backend — they compute values the renderer
+  // already owns (display config, reduced-motion, WebAuthn) or are pure
+  // telemetry sinks. Serve those locally so they answer truthfully AND stay out
+  // of the degrade report instead of hitting the null-returning native arm.
+  // (See rendererShims.ts; NATIVE_PENDING there catalogues what stays degraded.)
+  if (canHandleLocally(channel)) {
+    return handleLocally(channel, args).then((res) => {
+      recordChannel(channel, res === null || res === undefined);
+      return res;
+    });
+  }
   const invoke = tauriInvoke();
   if (!invoke) return Promise.resolve(null);
   return invoke('dex_ipc', { channel, args })

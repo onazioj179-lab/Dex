@@ -177,12 +177,12 @@ const ScreenRecorder: React.FC = () => {
       fontFamily: 'var(--font-system)',
     }}>
       {/* Header / toolbar */}
-      <div style={{ ...premiumGlassToolbar, padding: '10px 16px', justifyContent: 'space-between' }}>
+      <div style={{ ...premiumGlassToolbar, padding: '10px var(--space-4)', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <DexIcon name="video" size={18} color="var(--color-text-primary)" />
           <span style={{ fontSize: 14, fontWeight: 600 }}>Screen Recorder</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <span style={{
             fontSize: 13, fontVariantNumeric: 'tabular-nums',
             color: 'var(--color-text-secondary)', minWidth: 56, textAlign: 'right',
@@ -205,7 +205,7 @@ const ScreenRecorder: React.FC = () => {
       </div>
 
       {/* Preview area */}
-      <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+      <div style={{ flex: 1, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', overflow: 'hidden' }}>
         <div style={{
           ...premiumGlassPanel, flex: 1, position: 'relative', overflow: 'hidden',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -241,7 +241,7 @@ const ScreenRecorder: React.FC = () => {
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', justifyContent: 'center' }}>
           <button
             onClick={handleStart}
             disabled={startDisabled}
@@ -262,7 +262,7 @@ const ScreenRecorder: React.FC = () => {
               href={downloadUrl}
               download={downloadName}
               style={{
-                marginLeft: 8, padding: '8px 14px', borderRadius: 6,
+                marginLeft: 'var(--space-2)', padding: 'var(--space-2) 14px', borderRadius: 6,
                 background: 'var(--color-accent)', color: '#fff', textDecoration: 'none',
                 fontSize: 13, fontWeight: 500,
               }}
@@ -273,13 +273,13 @@ const ScreenRecorder: React.FC = () => {
 
       {/* Status bar */}
       <div style={{
-        padding: '8px 16px', borderTop: '1px solid var(--color-border-subtle)',
-        background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', gap: 8,
+        padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-border-subtle)',
+        background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
         fontSize: 11, color: 'var(--color-text-muted)',
       }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor }} />
         <span style={{ color: statusColor, fontWeight: 500 }}>{statusLabel}</span>
-        {errorMsg && <span style={{ color: 'var(--color-error)', marginLeft: 8 }}>{errorMsg}</span>}
+        {errorMsg && <span style={{ color: 'var(--color-error)', marginLeft: 'var(--space-2)' }}>{errorMsg}</span>}
       </div>
     </div>
   );
@@ -287,7 +287,7 @@ const ScreenRecorder: React.FC = () => {
 
 function controlButtonStyle(disabled: boolean, accent: string): React.CSSProperties {
   return {
-    padding: '8px 18px', borderRadius: 6, fontSize: 13, fontWeight: 500,
+    padding: 'var(--space-2) 18px', borderRadius: 6, fontSize: 13, fontWeight: 500,
     background: disabled ? 'var(--color-bg-hover)' : accent,
     color: disabled ? 'var(--color-text-muted)' : '#fff',
     border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',

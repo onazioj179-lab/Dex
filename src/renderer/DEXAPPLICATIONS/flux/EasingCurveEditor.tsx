@@ -165,7 +165,7 @@ const EasingCurveEditor: React.FC<EasingCurveEditorProps> = ({ value, onChange, 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <canvas
         ref={canvasRef}
         width={SIZE}
@@ -196,7 +196,7 @@ const EasingCurveEditor: React.FC<EasingCurveEditorProps> = ({ value, onChange, 
               if (onPickPreset) onPickPreset(p.name);
             }}
             style={{
-              padding: '4px 8px',
+              padding: '4px var(--space-2)',
               fontSize: '11px',
               background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
               border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.1))',

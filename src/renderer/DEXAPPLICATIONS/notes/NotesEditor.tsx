@@ -156,7 +156,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 2,
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     borderBottom: '1px solid var(--color-bg-hover)',
     background: 'var(--color-bg-inset, rgba(0,0,0,0.15))',
     flexWrap: 'wrap',
@@ -207,7 +207,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   editable: {
     minHeight: '100%',
-    padding: '24px 32px',
+    padding: 'var(--space-4) var(--space-8)',
     outline: 'none',
     color: 'var(--color-text-primary, #e0e0e0)',
     fontSize: 15,
@@ -220,7 +220,7 @@ const styles: Record<string, React.CSSProperties> = {
   preview: {
     flex: 1,
     overflow: 'auto',
-    padding: '24px 32px',
+    padding: 'var(--space-4) var(--space-8)',
     color: 'var(--color-text-primary, #e0e0e0)',
     fontSize: 15,
     lineHeight: 1.7,
@@ -235,7 +235,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '4px 12px',
+    padding: '4px var(--space-3)',
     borderTop: '1px solid var(--color-bg-hover)',
     background: 'var(--color-bg-inset, rgba(0,0,0,0.1))',
     fontSize: 11,
@@ -244,7 +244,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   placeholder: {
     position: 'absolute' as const,
-    top: 24,
+    top: 16,
     left: 32,
     color: 'var(--color-text-tertiary)',
     fontSize: 15,
@@ -254,7 +254,7 @@ const styles: Record<string, React.CSSProperties> = {
   focusModeEditable: {
     maxWidth: 720,
     margin: '0 auto',
-    padding: '48px 32px',
+    padding: '48px var(--space-8)',
   },
   aiBtn: {
     height: 28,
@@ -293,14 +293,6 @@ const styles: Record<string, React.CSSProperties> = {
     pointerEvents: 'none',
     zIndex: 5,
   },
-  dropOverlayInner: {
-    padding: '8px 16px',
-    borderRadius: 'var(--radius-sm, 6px)',
-    background: 'rgba(0,0,0,0.55)',
-    color: '#64d2ff',
-    fontSize: 13,
-    fontWeight: 600,
-  },
   // [[wiki-link]] popup -- mirrors the WordSuggestions SuggestionBar styling.
   wikiPopup: {
     position: 'fixed',
@@ -318,7 +310,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'auto',
   },
   wikiItem: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 13,
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
@@ -354,6 +346,9 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   const lastContent = useRef(content);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComposing = useRef(false);
+  // Set by the Ctrl/Cmd+Shift+V shortcut so the next paste lands as plain text,
+  // stripping all formatting (the normal paste keeps rich HTML when available).
+  const forcePlainRef = useRef(false);
   const [isEmpty, setIsEmpty] = useState(true);
   const [charCount, setCharCount] = useState(0);
   const [wdCount, setWdCount] = useState(0);
@@ -432,20 +427,26 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
   const emitChange = useCallback(() => {
     if (!editorRef.current || isComposing.current) return;
-    const html = editorRef.current.innerHTML;
-    const doc = htmlToDoc(html);
-    const serialized = serializeDoc(doc);
-    const plainText = docToPlainText(doc);
-    const words = countWords(plainText);
 
-    lastContent.current = serialized;
-    setIsEmpty(!plainText.trim());
-    setCharCount(plainText.length);
-    setWdCount(words);
+    // Live, cheap counts straight off the DOM text -- runs every keystroke.
+    // The expensive doc parse/serialize is deferred into the debounce below so
+    // typing never pays for a full DOMParser + JSON.stringify of the document.
+    const liveText = editorRef.current.textContent || '';
+    setIsEmpty(!liveText.trim());
+    setCharCount(liveText.length);
+    setWdCount(countWords(liveText));
 
-    // Debounce saves
+    // Debounce the heavy work: parse HTML -> doc, serialize, extract plain text,
+    // then notify the parent (which itself persists). onChange timing is
+    // unchanged (it already only fired after this 300ms debounce).
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
+      if (!editorRef.current) return;
+      const doc = htmlToDoc(editorRef.current.innerHTML);
+      const serialized = serializeDoc(doc);
+      const plainText = docToPlainText(doc);
+      const words = countWords(plainText);
+      lastContent.current = serialized;
       onChange(serialized, plainText, words);
     }, 300);
   }, [onChange]);
@@ -508,8 +509,22 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     setWikiQuery(m[1]);
     setWikiActive(0);
     setWikiOpen(true);
+    // Anchor at the caret, but clamp into the viewport so the popup never
+    // spills off the right or bottom edge (flips above the caret if needed).
     const rect = range.getBoundingClientRect();
-    setWikiPos({ top: rect.bottom + 4, left: rect.left });
+    const POPUP_W = 320;
+    const POPUP_H = 240;
+    const margin = 8;
+    let left = rect.left;
+    if (left + POPUP_W + margin > window.innerWidth) {
+      left = Math.max(margin, window.innerWidth - POPUP_W - margin);
+    }
+    let top = rect.bottom + 4;
+    if (top + POPUP_H + margin > window.innerHeight) {
+      // Not enough room below -- place it above the caret instead.
+      top = Math.max(margin, rect.top - POPUP_H - 4);
+    }
+    setWikiPos({ top, left });
   }, [closeWiki]);
 
   // Replace the open "[[query" before the caret with a finished "[[Title]]".
@@ -534,6 +549,16 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     closeWiki();
     emitChange();
   }, [closeWiki, pushUndo, emitChange]);
+
+  // The popup is position:fixed at the caret, so any scroll would leave it
+  // floating at a stale spot -- close it on scroll (capture catches the inner
+  // scroll container too) while it is open. Listener only attached when open.
+  useEffect(() => {
+    if (!wikiOpen) return;
+    const onScroll = () => closeWiki();
+    window.addEventListener('scroll', onScroll, true);
+    return () => window.removeEventListener('scroll', onScroll, true);
+  }, [wikiOpen, closeWiki]);
 
   // -- uki AI writing actions --------------------------------------------
 
@@ -561,7 +586,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       return;
     }
     if (!hasConfiguredProvider()) {
-      setAiStatus('Add an AI provider key in Settings to use AI actions.');
+      setAiStatus('No AI provider configured.');
       return;
     }
     // Preserve the selection across the await so a 'replace' lands in the right spot.
@@ -618,10 +643,9 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         li.setAttribute('data-checked', 'false');
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.addEventListener('change', () => {
-          li.setAttribute('data-checked', checkbox.checked ? 'true' : 'false');
-          emitChange();
-        });
+        // Toggling is handled by the delegated onClick (handleClick), which also
+        // syncs data-checked and emits a change -- so no per-checkbox listener
+        // here (those leak across innerHTML rebuilds and double-fire on click).
         li.appendChild(checkbox);
         li.appendChild(document.createTextNode(' '));
         const ul = document.createElement('ul');
@@ -727,6 +751,14 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
     const ctrl = e.ctrlKey || e.metaKey;
 
+    // Paste as plain text (Ctrl/Cmd+Shift+V): flag the upcoming paste so it
+    // strips formatting. Do NOT preventDefault -- the browser still fires the
+    // paste event, which handlePaste consumes and clears the flag.
+    if (ctrl && e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+      forcePlainRef.current = true;
+      return;
+    }
+
     // Save
     if (ctrl && e.key === 's') {
       e.preventDefault();
@@ -813,10 +845,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             li.setAttribute('data-checked', 'false');
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.addEventListener('change', () => {
-              li.setAttribute('data-checked', checkbox.checked ? 'true' : 'false');
-              emitChange();
-            });
+            // Toggling handled by delegated onClick (handleClick); no per-node listener.
             li.appendChild(checkbox);
             li.appendChild(document.createTextNode(' '));
             node.parentNode?.insertBefore(li, node.nextSibling);
@@ -859,10 +888,14 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
 
+    // Paste-as-plain (Ctrl/Cmd+Shift+V): drop all HTML formatting this once.
+    const plainOnly = forcePlainRef.current;
+    forcePlainRef.current = false;
+
     // If it has HTML, use it (supports paste from other rich editors). Sanitize
     // first: external clipboard HTML is untrusted and can carry scripts / inline
     // event handlers (onerror, onload, ...) that would execute on insertion.
-    if (html) {
+    if (html && !plainOnly) {
       e.preventDefault();
       pushUndo();
       document.execCommand('insertHTML', false, DOMPurify.sanitize(html));
@@ -998,7 +1031,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         onDrop={handleDrop}
       >
         {showEditor && (
-          <div style={styles.editorArea}>
+          <div className="dex-scroll-fade-y" style={styles.editorArea}>
             <div style={{ position: 'relative' }}>
               {isEmpty && !readOnly && (
                 <div style={styles.placeholder}>{placeholder}</div>
@@ -1016,6 +1049,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onClick={handleClick}
+                onBlur={closeWiki}
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 spellCheck
@@ -1028,7 +1062,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
         {showPreview && (
           <div
-            className="dexnotes-preview"
+            className="dexnotes-preview dex-scroll-fade-y"
             style={styles.preview}
             onClick={handleClick}
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderPreview(content)) }}
@@ -1037,9 +1071,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
         {/* Drop-target highlight for dragged attachments */}
         {isDragOver && (
-          <div style={styles.dropOverlay}>
-            <div style={styles.dropOverlayInner}>Drop file to attach</div>
-          </div>
+          <div style={styles.dropOverlay} />
         )}
 
         {/* [[wiki-link]] autocomplete popup */}
@@ -1109,6 +1141,74 @@ div[contenteditable] blockquote {
   color: var(--color-text-secondary);
   font-style: italic;
 }
+/* === Callout blocks: > [!NOTE] / [!WARNING] / [!TIP] === */
+/* Rendered from a blockquote carrying a [!TYPE] marker. Colours map to theme
+   tokens: NOTE -> accent, WARNING -> warning, TIP -> success. Applies in both
+   the contenteditable and the read-only preview. */
+.dexnotes-editable blockquote.callout,
+.dexnotes-preview blockquote.callout {
+  border: 1px solid var(--callout-color, var(--color-accent));
+  border-left-width: 3px;
+  background: var(--callout-bg, rgba(10,132,255,0.08));
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px 14px;
+  margin: 12px 0;
+  color: var(--color-text-primary);
+  font-style: normal;
+}
+.dexnotes-editable blockquote.callout-note,
+.dexnotes-preview blockquote.callout-note {
+  --callout-color: var(--color-accent);
+  --callout-bg: var(--color-accent-light, rgba(10,132,255,0.08));
+}
+.dexnotes-editable blockquote.callout-warning,
+.dexnotes-preview blockquote.callout-warning {
+  --callout-color: var(--color-warning);
+  --callout-bg: rgba(255,159,10,0.10);
+}
+.dexnotes-editable blockquote.callout-tip,
+.dexnotes-preview blockquote.callout-tip {
+  --callout-color: var(--color-success);
+  --callout-bg: rgba(48,209,88,0.10);
+}
+.dexnotes-editable blockquote.callout .callout-title,
+.dexnotes-preview blockquote.callout .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  color: var(--callout-color, var(--color-accent));
+  margin-bottom: 4px;
+  user-select: none;
+}
+.dexnotes-editable blockquote.callout .callout-icon,
+.dexnotes-preview blockquote.callout .callout-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--callout-color, var(--color-accent));
+  -webkit-mask: var(--callout-icon-mask) center / contain no-repeat;
+  mask: var(--callout-icon-mask) center / contain no-repeat;
+}
+.dexnotes-editable blockquote.callout-note .callout-icon,
+.dexnotes-preview blockquote.callout-note .callout-icon {
+  --callout-icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Crect x='11' y='10' width='2' height='7' fill='black'/%3E%3Crect x='11' y='6.5' width='2' height='2' fill='black'/%3E%3C/svg%3E");
+}
+.dexnotes-editable blockquote.callout-warning .callout-icon,
+.dexnotes-preview blockquote.callout-warning .callout-icon {
+  --callout-icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 L22 21 H2 Z'/%3E%3Crect x='11' y='9' width='2' height='6' fill='black'/%3E%3Crect x='11' y='16.5' width='2' height='2' fill='black'/%3E%3C/svg%3E");
+}
+.dexnotes-editable blockquote.callout-tip .callout-icon,
+.dexnotes-preview blockquote.callout-tip .callout-icon {
+  --callout-icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 21h6v-1H9zM12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z'/%3E%3C/svg%3E");
+}
+.dexnotes-editable blockquote.callout .callout-body > *:first-child,
+.dexnotes-preview blockquote.callout .callout-body > *:first-child { margin-top: 0; }
+.dexnotes-editable blockquote.callout .callout-body > *:last-child,
+.dexnotes-preview blockquote.callout .callout-body > *:last-child { margin-bottom: 0; }
 div[contenteditable] pre {
   background: rgba(0,0,0,0.3);
   border-radius: 4px;

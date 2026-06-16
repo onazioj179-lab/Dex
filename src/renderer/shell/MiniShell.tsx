@@ -169,7 +169,7 @@ const styles: Record<string, React.CSSProperties> = {
     inset: 0,
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 'var(--space-3)',
     padding: '0 14px',
     background: 'var(--color-bg-surface, #161618)',
     borderRadius: 'var(--radius-xl, 8px)',

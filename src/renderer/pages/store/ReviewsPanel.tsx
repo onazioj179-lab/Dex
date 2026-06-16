@@ -96,11 +96,11 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
   const histMax = summary ? Math.max(1, ...RATINGS.map(r => summary.histogram[r])) : 1;
 
   return (
-    <section style={{ marginTop: 8 }}>
+    <section style={{ marginTop: 'var(--space-2)' }}>
       <SectionTitle icon="star" title="Ratings & Reviews" />
 
       {/* Summary */}
-      <div style={{ ...premiumGlassCard, padding: 16, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ ...premiumGlassCard, padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ textAlign: 'center', minWidth: 110 }}>
           <div style={{ fontSize: 44, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{avg.toFixed(1)}</div>
           <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}><StarRating value={avg} size={15} /></div>
@@ -113,7 +113,7 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
             const c = summary?.histogram[r] ?? 0;
             const pct = Math.round((c / histMax) * 100);
             return (
-              <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <span style={{ width: 12, textAlign: 'right', fontSize: 11, color: 'var(--color-text-tertiary)' }}>{r}</span>
                 <DexIcon name="star" size={11} color={STAR_GOLD} />
                 <span style={{ flex: 1, height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
@@ -133,7 +133,7 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
       </div>
 
       {/* Write a review */}
-      <div style={{ ...premiumGlassCard, padding: 16, marginTop: 12 }}>
+      <div style={{ ...premiumGlassCard, padding: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
         <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 10 }}>Write a review</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
           <StarRating value={rating} size={22} onChange={setRating} ariaLabel="Your star rating" />
@@ -154,9 +154,9 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
           placeholder="Share what you think (optional)"
           maxLength={4000}
           rows={3}
-          style={{ ...inputStyle, marginTop: 8, resize: 'vertical', minHeight: 64, lineHeight: 1.5 }}
+          style={{ ...inputStyle, marginTop: 'var(--space-2)', resize: 'vertical', minHeight: 64, lineHeight: 1.5 }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', marginTop: 10, flexWrap: 'wrap' }}>
           {notice ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: noticeColor(notice.tone) }}>
               <DexIcon name={notice.tone === 'ok' ? 'check-circle' : notice.tone === 'warn' ? 'shield' : 'alert-triangle'} size={13} />
@@ -174,9 +174,16 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
         {loading ? (
           <div style={mutedRow}>Loading reviews...</div>
         ) : loadError ? (
-          <div style={{ ...mutedRow, color: '#ff8a82' }}><DexIcon name="alert-triangle" size={13} /> Could not load reviews: {loadError}</div>
+          <div style={{ ...premiumGlassCard, padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: '#ff8a82', fontSize: 12.5 }}>
+              <DexIcon name="alert-triangle" size={14} /> Could not load reviews: {loadError}
+            </div>
+            <button type="button" style={storeButton('accent')} onClick={() => { void load(); }}>
+              <DexIcon name="refresh" size={14} /> Try again
+            </button>
+          </div>
         ) : reviews.length === 0 ? (
-          <div style={{ ...premiumGlassCard, padding: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+          <div style={{ ...premiumGlassCard, padding: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
             <DexIcon name="star" size={24} />
             <span style={{ fontSize: 12.5 }}>No reviews yet. Be the first to review this app.</span>
           </div>
@@ -185,14 +192,14 @@ export default function ReviewsPanel({ packageId }: { packageId: string }): Reac
             {reviews.map(r => (
               <article key={r.id} style={{ ...premiumGlassCard, padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
                     <StarRating value={r.rating} size={13} />
                     {r.title && <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>}
                   </div>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{formatRelativeTime(r.createdAt)}</span>
                 </div>
-                {r.body && <p style={{ margin: '8px 0 0', fontSize: 12.5, lineHeight: 1.55, color: 'var(--color-text-secondary)', overflowWrap: 'anywhere' }}>{r.body}</p>}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                {r.body && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 12.5, lineHeight: 1.55, color: 'var(--color-text-secondary)', overflowWrap: 'anywhere' }}>{r.body}</p>}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
                   <button
                     type="button"
                     onClick={() => flag(r.id)}
@@ -221,7 +228,7 @@ const inputStyle: React.CSSProperties = {
   padding: '9px 11px',
   background: 'var(--color-bg-surface)',
   border: '1px solid var(--pg-border-strong)',
-  borderRadius: 7,
+  borderRadius: 6,
   color: 'var(--color-text-primary)',
   outline: 'none',
   fontSize: 13,
@@ -231,8 +238,8 @@ const inputStyle: React.CSSProperties = {
 const mutedRow: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
-  padding: '12px 4px',
+  gap: 'var(--space-2)',
+  padding: 'var(--space-3) 4px',
   fontSize: 12.5,
   color: 'var(--color-text-secondary)',
 };

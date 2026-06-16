@@ -6,14 +6,14 @@
 // =============================================================================
 /**
  * DEX Platform - Onboarding & Beginner Mode
- * 6-screen first-launch experience + in-app tips system
+ * Minimal first-launch experience: welcome -> required policy acceptance.
+ * Users learn the product by using it; no feature tours or explanation screens.
  * Minimal, professional design matching DEX true-black aesthetic
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, type PolicySlug } from '../../shared/policies';
+import { POLICY_CONTACT_EMAIL, POLICY_METADATA, type PolicySlug } from '../../shared/policies';
 import { acceptCurrentPolicies, hasAcceptedCurrentPolicies, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
-import { AccountAuthFlow } from './account/AccountAuthFlow';
 import { platform } from '../utils';
 import { Z_HELP_OVERLAY_BASE } from '../../shared/zIndex';
 import { Button, IconButton } from '../ui';
@@ -33,7 +33,7 @@ interface OnboardingPreferences {
   autoUpdatesEnabled: boolean;
 }
 
-type OnboardingScreen = 'welcome' | 'hardware' | 'privacy' | 'tour' | 'sampleData' | 'terms' | 'account' | 'ready';
+type OnboardingScreen = 'welcome' | 'terms';
 
 // ==================== APP TIPS (minimal) ====================
 export const APP_TIPS: Record<string, AppTip[]> = {
@@ -104,19 +104,12 @@ export const KEYBOARD_SHORTCUTS: Record<string, { key: string; action: string }[
 };
 
 // ==================== SHARED STYLES ====================
-const CARD_STYLE: React.CSSProperties = {
-  background: 'var(--color-bg-elevated)',
-  border: '1px solid var(--color-border-subtle)',
-  borderRadius: 6,
-  padding: '16px 20px',
-};
-
 // Primary CTAs get a touch more horizontal presence than the Button default.
 const CTA_PADDING: React.CSSProperties = { padding: '0 28px' };
 
 // ==================== STEP INDICATOR ====================
 const StepIndicator: React.FC<{ current: number; total: number }> = ({ current, total }) => (
-  <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 32 }}>
+  <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 'var(--space-8)' }}>
     {Array.from({ length: total }, (_, i) => (
       <div
         key={i}
@@ -145,163 +138,18 @@ const WelcomeScreen: React.FC<{ onNext: () => void; onSkip: () => void }> = ({ o
     }}>
       <span style={{ fontSize: 36, fontWeight: 700, color: 'var(--color-accent-text, #fff)', fontFamily: 'var(--dex-font-ui)', letterSpacing: '-0.02em' }}>D</span>
     </div>
-    <h1 style={{ fontSize: 28, fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+    <h1 style={{ fontSize: 28, fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 var(--space-2)', letterSpacing: '-0.02em' }}>
       Welcome to DEX
     </h1>
-    <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: '0 0 40px', lineHeight: 1.6 }}>
-      Your personal control hub for desktop automation.<br />
-      Let us set things up for the best experience.
+    <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', margin: '0 0 var(--space-10)', lineHeight: 1.6 }}>
+      Your personal control hub for desktop automation.
     </p>
-    <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
       <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext} aria-label="Get started with setup">Get Started</Button>
       <Button variant="ghost" size="lg" onClick={onSkip} aria-label="Skip setup wizard and review required policies">Skip Setup</Button>
     </div>
   </div>
 );
-
-// ==================== SCREEN: HARDWARE DETECTION ====================
-const HardwareScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const [hwInfo, setHwInfo] = useState<{
-    cores: number; memory: string; gpu: string; display: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const cores = navigator.hardwareConcurrency || 4;
-    const memoryGB = (navigator as any).deviceMemory || 'Unknown';
-    const dpr = window.devicePixelRatio || 1;
-    const display = `${window.screen.width}x${window.screen.height} @${dpr}x`;
-
-    setHwInfo({
-      cores,
-      memory: typeof memoryGB === 'number' ? `${memoryGB} GB` : `${memoryGB}`,
-      gpu: 'Detected',
-      display,
-    });
-  }, []);
-
-  const profileLabel = useMemo(() => {
-    if (!hwInfo) return 'Balanced';
-    if (hwInfo.cores >= 8) return 'High Performance';
-    if (hwInfo.cores >= 4) return 'Balanced';
-    return 'Efficiency';
-  }, [hwInfo]);
-
-  return (
-    <div style={{ padding: '32px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px', textAlign: 'center' }}>
-        System Check
-      </h2>
-      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
-        DEX adapts to your hardware automatically.
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
-        {[
-          { label: 'CPU Cores', value: hwInfo ? `${hwInfo.cores} cores` : '...' },
-          { label: 'Memory', value: hwInfo?.memory || '...' },
-          { label: 'Display', value: hwInfo?.display || '...' },
-          { label: 'GPU', value: hwInfo?.gpu || '...' },
-        ].map(item => (
-          <div key={item.label} style={CARD_STYLE}>
-            <div className="dex-label-caps" style={{ marginBottom: 4 }}>
-              {item.label}
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ ...CARD_STYLE, textAlign: 'center', marginBottom: 28 }}>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Selected Profile</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-accent, #4A9EFF)' }}>{profileLabel}</div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>You can change this in Settings &gt; Performance</div>
-      </div>
-
-      <div style={{ textAlign: 'center' }}>
-        <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext}>Continue</Button>
-      </div>
-    </div>
-  );
-};
-
-// ==================== SCREEN: PRIVACY ====================
-const PrivacyScreen: React.FC<{
-  prefs: OnboardingPreferences;
-  onUpdate: (prefs: OnboardingPreferences) => void;
-  onNext: () => void;
-}> = ({ prefs, onUpdate, onNext }) => {
-  const Toggle: React.FC<{ label: string; desc: string; value: boolean; onToggle: () => void }> = ({ label, desc, value, onToggle }) => (
-    <div style={{ ...CARD_STYLE, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{desc}</div>
-      </div>
-      <button
-        onClick={onToggle}
-        style={{
-          width: 42, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-          background: value ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border)',
-          position: 'relative', transition: 'background 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-          flexShrink: 0,
-        }}
-      >
-        <div style={{
-          width: 18, height: 18, borderRadius: 9,
-          background: 'var(--color-accent-text, #fff)',
-          position: 'absolute', top: 3,
-          left: value ? 21 : 3,
-          transition: 'left 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }} />
-      </button>
-    </div>
-  );
-
-  return (
-    <div style={{ padding: '32px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px', textAlign: 'center' }}>
-        Privacy
-      </h2>
-      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
-        Required diagnostics keep DEX reliable and secure. Optional analytics stay off unless you turn them on.
-      </p>
-
-      <Toggle
-        label="Optional Product Analytics"
-        desc="Feature usage and performance signals to improve DEX"
-        value={prefs.analyticsEnabled}
-        onToggle={() => onUpdate({ ...prefs, analyticsEnabled: !prefs.analyticsEnabled })}
-      />
-      <Toggle
-        label="Enhanced Crash Details"
-        desc="Keep richer local crash details for troubleshooting"
-        value={prefs.crashReportsEnabled}
-        onToggle={() => onUpdate({ ...prefs, crashReportsEnabled: !prefs.crashReportsEnabled })}
-      />
-      <Toggle
-        label="Auto Updates"
-        desc="Check for updates in the background"
-        value={prefs.autoUpdatesEnabled}
-        onToggle={() => onUpdate({ ...prefs, autoUpdatesEnabled: !prefs.autoUpdatesEnabled })}
-      />
-
-      <div style={{
-        background: 'var(--color-accent-soft, rgba(74, 158, 255, 0.06))',
-        border: '1px solid var(--color-accent-subtle, rgba(74, 158, 255, 0.12))',
-        borderRadius: 6, padding: '12px 16px', marginTop: 16, marginBottom: 28,
-      }}>
-        <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, marginBottom: 4 }}>Clear data categories</div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-          DEX may use required diagnostics to keep the app secure, compatible, and updated.
-          Sensitive content is never collected or shared by default.
-        </div>
-      </div>
-
-      <div style={{ textAlign: 'center' }}>
-        <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext}>Continue</Button>
-      </div>
-    </div>
-  );
-};
 
 // ==================== SCREEN: REQUIRED POLICIES ====================
 const PolicyAcceptanceScreen: React.FC<{
@@ -313,15 +161,15 @@ const PolicyAcceptanceScreen: React.FC<{
   const optionalPolicies = useMemo(() => POLICY_METADATA.filter(p => !p.requiredForUse), []);
 
   return (
-    <div style={{ padding: '20px 0' }}>
+    <div style={{ padding: 'var(--space-5) 0' }}>
       <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 6px', textAlign: 'center' }}>
         Terms & Privacy
       </h2>
-      <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 20px', textAlign: 'center', lineHeight: 1.55 }}>
+      <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 var(--space-5)', textAlign: 'center', lineHeight: 1.55 }}>
         Review and accept the required policies to continue.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
         {requiredPolicies.map(policy => (
           <div
             key={policy.slug}
@@ -329,14 +177,14 @@ const PolicyAcceptanceScreen: React.FC<{
               background: 'var(--color-bg-secondary, #0A0A0A)',
               border: '1px solid var(--color-bg-hover)',
               borderRadius: 6,
-              padding: '12px 14px',
+              padding: 'var(--space-3) 14px',
               display: 'flex',
-              gap: 12,
+              gap: 'var(--space-3)',
               alignItems: 'flex-start',
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
                   {policy.title}
                 </span>
@@ -347,7 +195,6 @@ const PolicyAcceptanceScreen: React.FC<{
                 }}>
                   Required
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>v{policy.version}</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
                 {policy.summary}
@@ -370,7 +217,7 @@ const PolicyAcceptanceScreen: React.FC<{
           display: 'flex',
           flexWrap: 'wrap',
           gap: 6,
-          marginBottom: 16,
+          marginBottom: 'var(--space-4)',
           padding: '0 2px',
         }}>
           <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', alignSelf: 'center', marginRight: 4 }}>
@@ -390,8 +237,8 @@ const PolicyAcceptanceScreen: React.FC<{
       )}
 
       <label style={{
-        display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16,
-        padding: '12px 14px', borderRadius: 6,
+        display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 'var(--space-4)',
+        padding: 'var(--space-3) 14px', borderRadius: 6,
         background: accepted ? 'var(--color-accent-soft, rgba(74,158,255,0.06))' : 'rgba(255,255,255,0.02)',
         border: `1px solid ${accepted ? 'rgba(74,158,255,0.25)' : 'var(--color-bg-hover)'}`,
         cursor: 'pointer',
@@ -404,11 +251,11 @@ const PolicyAcceptanceScreen: React.FC<{
           style={{ marginTop: 2, accentColor: 'var(--color-accent, #4A9EFF)' }}
         />
         <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>, including required diagnostics, optional analytics, advertising in ad-supported features (paid plans are ad-free), and the partner data sharing described in those policies.
+          I have read and accept the <strong style={{ color: 'var(--color-text-primary)' }}>Terms of Use</strong> and <strong style={{ color: 'var(--color-text-primary)' }}>Privacy Policy</strong>, including required diagnostics, optional analytics, and the data use for product improvement and model and system training described in those policies. DEX is free for everyone — no ads, no paid tiers, and your private files and secrets are never collected.
         </span>
       </label>
 
-      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
         <Button
           variant="primary"
           size="lg"
@@ -421,7 +268,7 @@ const PolicyAcceptanceScreen: React.FC<{
       </div>
 
       <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', lineHeight: 1.5 }}>
-        Data policy v{DATA_POLICY_VERSION} &middot; Contact {POLICY_CONTACT_EMAIL}
+        Contact {POLICY_CONTACT_EMAIL}
       </div>
 
       {viewerSlug && (
@@ -433,173 +280,22 @@ const PolicyAcceptanceScreen: React.FC<{
   );
 };
 
-// ==================== SCREEN: FEATURE TOUR ====================
-const TourScreen: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const features = [
-    { title: 'Home', desc: 'System overview, clock, and quick actions', icon: 'H' },
-    { title: 'Files', desc: 'Browse, search, and organize your files', icon: 'F' },
-    { title: 'Workflows', desc: 'Automate repetitive tasks across apps', icon: 'W' },
-    { title: 'Transfers', desc: 'Send files between devices on your network', icon: 'T' },
-    { title: 'Apps', desc: 'Vinx, Imosion, Prism, Flux, Forge, and more', icon: 'A' },
-    { title: 'Settings', desc: 'Customize everything to your preference', icon: 'S' },
-  ];
-
-  return (
-    <div style={{ padding: '32px 0' }}>
-      <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px', textAlign: 'center' }}>
-        What DEX Can Do
-      </h2>
-      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', textAlign: 'center' }}>
-        A quick look at your new control hub.
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
-        {features.map(f => (
-          <div key={f.title} style={{ ...CARD_STYLE, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-              background: 'var(--color-accent-muted, rgba(74, 158, 255, 0.1))',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, fontWeight: 700, color: 'var(--color-accent, #4A9EFF)',
-            }}>
-              {f.icon}
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{f.title}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>{f.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ textAlign: 'center' }}>
-        <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onNext}>Continue</Button>
-      </div>
-    </div>
-  );
-};
-
-// ==================== SCREEN: SAMPLE DATA ====================
-const SampleDataScreen: React.FC<{
-  onNext: (loadSample: boolean) => void;
-}> = ({ onNext }) => (
-  <div style={{ padding: '32px 0', textAlign: 'center' }}>
-    <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px' }}>
-      Sample Content
-    </h2>
-    <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 28px', lineHeight: 1.6 }}>
-      Load sample workflows and notes to explore<br />
-      how DEX works, or start fresh.
-    </p>
-
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28, textAlign: 'left' }}>
-      <button
-        onClick={() => onNext(true)}
-        style={{
-          ...CARD_STYLE, border: '1px solid rgba(74, 158, 255, 0.25)',
-          cursor: 'pointer', textAlign: 'left',
-          transition: 'border-color 180ms cubic-bezier(0.4, 0, 0.2, 1), background 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      >
-        <div style={{
-          width: 28, height: 28, borderRadius: 6, marginBottom: 10,
-          background: 'var(--color-accent-subtle, rgba(74,158,255,0.12))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--color-accent, #4A9EFF)',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Load Samples</div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
-          Pre-built workflows, sample notes, and demo automations to explore.
-        </div>
-      </button>
-      <button
-        onClick={() => onNext(false)}
-        style={{
-          ...CARD_STYLE, cursor: 'pointer', textAlign: 'left',
-          transition: 'border-color 180ms cubic-bezier(0.4, 0, 0.2, 1), background 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      >
-        <div style={{
-          width: 28, height: 28, borderRadius: 6, marginBottom: 10,
-          background: 'rgba(255,255,255,0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--color-text-secondary)',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="4" width="16" height="16" rx="3" />
-          </svg>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Start Empty</div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
-          Clean slate. Build your workspace from scratch.
-        </div>
-      </button>
-    </div>
-  </div>
-);
-
-// ==================== SCREEN: READY ====================
-const ReadyScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
-  <div style={{ textAlign: 'center', padding: '48px 0' }}>
-    <div style={{
-      width: 64, height: 64, borderRadius: 32, margin: '0 auto 24px',
-      background: 'var(--color-success-muted, rgba(61, 166, 106, 0.12))',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #3DA66A)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-    </div>
-    <h2 style={{ fontSize: 24, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 8px' }}>
-      All Set
-    </h2>
-    <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', margin: '0 0 12px', lineHeight: 1.6 }}>
-      DEX is ready. Press <kbd style={{
-        background: 'var(--color-border)', padding: '2px 6px', borderRadius: 3,
-        fontSize: 11, fontFamily: 'inherit',
-      }}>?</kbd> anytime for keyboard shortcuts.
-    </p>
-    <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 36px' }}>
-      Tip: Use {platform.isMac ? '⌘' : 'Ctrl'}+K to open the Command Palette.
-    </p>
-    <Button variant="primary" size="lg" style={CTA_PADDING} onClick={onComplete}>Launch DEX</Button>
-  </div>
-);
-
-// ==================== SCREEN: ACCOUNT (optional) ====================
-const AccountStepScreen: React.FC<{ onDone: () => void }> = ({ onDone }) => (
-  <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-    <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 4px' }}>
-      Sign in or skip
-    </h2>
-    <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: '0 0 16px', textAlign: 'center', maxWidth: 460, lineHeight: 1.5 }}>
-      An account is optional. DEX runs fully on your machine without one. Sign in or
-      create an account if you want cloud backup, sync, or to publish plugins.
-    </p>
-    <AccountAuthFlow showWelcome={false} onComplete={onDone} />
-  </div>
-);
-
-
-// ==================== FULL ONBOARDING WIZARD (6 SCREENS) ====================
+// ==================== ONBOARDING WIZARD (2 SCREENS) ====================
 export const OnboardingWizard: React.FC<{
   onComplete: () => void;
   onSkip?: () => void;
 }> = ({ onComplete }) => {
-  const screens: OnboardingScreen[] = ['welcome', 'hardware', 'privacy', 'tour', 'sampleData', 'terms', 'account', 'ready'];
+  const screens: OnboardingScreen[] = ['welcome', 'terms'];
   const [screenIndex, setScreenIndex] = useState(0);
   const [exiting, setExiting] = useState(false);
-  const [loadSample, setLoadSample] = useState(false);
-  const [policyAccepted, setPolicyAccepted] = useState(() => hasAcceptedCurrentPolicies());
-  const [prefs, setPrefs] = useState<OnboardingPreferences>({
+  // Sensible defaults are applied silently. The dedicated privacy/preferences
+  // screen was removed to keep onboarding minimal; these can be changed later
+  // in Settings. Optional analytics stays off until the user opts in.
+  const prefs: OnboardingPreferences = {
     analyticsEnabled: false,
     crashReportsEnabled: true,
     autoUpdatesEnabled: true,
-  });
+  };
 
   const current = screens[screenIndex];
   const [slideDir, setSlideDir] = useState<'next' | 'back'>('next');
@@ -618,27 +314,11 @@ export const OnboardingWizard: React.FC<{
     }
   }, [screenIndex]);
 
-  const jumpToPolicy = useCallback(() => {
-    const policyIndex = screens.indexOf('terms');
-    setSlideDir('next');
-    setScreenIndex(policyIndex);
-  }, [screens]);
-
-  const handleAcceptPolicies = useCallback(() => {
-    acceptCurrentPolicies();
-    setOptionalAnalyticsEnabled(prefs.analyticsEnabled);
-    setPolicyAccepted(true);
-    goNext();
-  }, [goNext, prefs.analyticsEnabled]);
-
-  const handleComplete = useCallback(() => {
-    if (!policyAccepted && !hasAcceptedCurrentPolicies()) {
-      jumpToPolicy();
-      return;
-    }
-    // Save preferences + sample data choice
+  // Persist default preferences and close the wizard. Onboarding completes the
+  // moment required policies are accepted -- users learn the product by using it.
+  const finishOnboarding = useCallback(() => {
     try {
-      localStorage.setItem('dex-onboarding-prefs', JSON.stringify({ ...prefs, loadSample }));
+      localStorage.setItem('dex-onboarding-prefs', JSON.stringify({ ...prefs, loadSample: false }));
       setOptionalAnalyticsEnabled(prefs.analyticsEnabled);
     } catch {
       // storage unavailable
@@ -651,11 +331,18 @@ export const OnboardingWizard: React.FC<{
     } catch { /* IPC may not be available in renderer-only mode */ }
     setExiting(true);
     setTimeout(onComplete, 300);
-  }, [jumpToPolicy, loadSample, onComplete, policyAccepted, prefs]);
+  }, [onComplete, prefs.analyticsEnabled, prefs.autoUpdatesEnabled, prefs.crashReportsEnabled]);
 
+  const handleAcceptPolicies = useCallback(() => {
+    acceptCurrentPolicies();
+    finishOnboarding();
+  }, [finishOnboarding]);
+
+  // Required policies cannot be skipped; "Skip Setup" jumps straight to them.
   const handleSkip = useCallback(() => {
-    jumpToPolicy();
-  }, [jumpToPolicy]);
+    setSlideDir('next');
+    setScreenIndex(screens.indexOf('terms'));
+  }, [screens]);
 
   const handleQuit = useCallback(() => {
     try {
@@ -669,12 +356,12 @@ export const OnboardingWizard: React.FC<{
     }
   }, []);
 
-  // Item 198: Keyboard navigation for onboarding
+  // Keyboard navigation for onboarding. The policy screen has its own gated
+  // accept button, so Enter/ArrowRight only advance from the welcome screen.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && current !== 'ready' && current !== 'terms') { handleSkip(); }
-      else if ((e.key === 'Enter' || e.key === 'ArrowRight') && current !== 'ready') { goNext(); }
-      else if (e.key === 'Enter' && current === 'ready') { handleComplete(); }
+      if (e.key === 'Escape' && current !== 'terms') { handleSkip(); }
+      else if ((e.key === 'Enter' || e.key === 'ArrowRight') && current !== 'terms') { goNext(); }
       else if (e.key === 'ArrowLeft') { goBack(); }
     };
     window.addEventListener('keydown', handler);
@@ -704,7 +391,7 @@ export const OnboardingWizard: React.FC<{
         }
       `}</style>
       <div style={{
-        width: '100%', maxWidth: 'min(600px, calc(100vw - 48px))', padding: '0 32px',
+        width: '100%', maxWidth: 'min(600px, calc(100vw - 48px))', padding: '0 var(--space-8)',
         animation: 'onboardFadeIn 200ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         <StepIndicator current={screenIndex} total={screens.length} />
@@ -713,8 +400,8 @@ export const OnboardingWizard: React.FC<{
           animation: `${slideDir === 'next' ? 'onboardSlideNext' : 'onboardSlideBack'} 200ms cubic-bezier(0.4, 0, 0.2, 1)`,
         }}>
 
-        {screenIndex > 0 && current !== 'ready' && (
-          <div style={{ marginBottom: 8 }}>
+        {screenIndex > 0 && (
+          <div style={{ marginBottom: 'var(--space-2)' }}>
             <Button variant="ghost" size="sm" onClick={goBack}>
               Back
             </Button>
@@ -722,18 +409,12 @@ export const OnboardingWizard: React.FC<{
         )}
 
         {current === 'welcome' && <WelcomeScreen onNext={goNext} onSkip={handleSkip} />}
-        {current === 'hardware' && <HardwareScreen onNext={goNext} />}
-        {current === 'privacy' && <PrivacyScreen prefs={prefs} onUpdate={setPrefs} onNext={goNext} />}
-        {current === 'tour' && <TourScreen onNext={goNext} />}
-        {current === 'sampleData' && <SampleDataScreen onNext={(wantSamples) => { setLoadSample(wantSamples); goNext(); }} />}
         {current === 'terms' && <PolicyAcceptanceScreen onAccept={handleAcceptPolicies} />}
-        {current === 'account' && <AccountStepScreen onDone={goNext} />}
-        {current === 'ready' && <ReadyScreen onComplete={handleComplete} />}
         </div>
 
         {/* Persistent quit footer -- always visible during setup */}
         <div style={{
-          marginTop: 28, paddingTop: 16,
+          marginTop: 28, paddingTop: 'var(--space-4)',
           borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           fontSize: 11, color: 'var(--color-text-tertiary, #888)',
@@ -750,7 +431,7 @@ export const OnboardingWizard: React.FC<{
               border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
               borderRadius: 4,
               height: 'var(--dex-control-h-sm, 28px)',
-              padding: '0 12px',
+              padding: '0 var(--space-3)',
               fontSize: 11, fontWeight: 600,
               cursor: 'pointer',
               transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -828,7 +509,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           />
         </div>
         <div style={{ padding: '10px 18px 18px', maxHeight: 400, overflow: 'auto' }}>
-          <div className="dex-label-caps" style={{ marginBottom: 8 }}>
+          <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>
             General
           </div>
           {global.map(s => (
@@ -839,7 +520,7 @@ export const KeyboardShortcutsPanel: React.FC<{
           ))}
           {appShortcuts.length > 0 && (
             <>
-              <div className="dex-label-caps" style={{ marginTop: 14, marginBottom: 8 }}>
+              <div className="dex-label-caps" style={{ marginTop: 14, marginBottom: 'var(--space-2)' }}>
                 {appId.charAt(0).toUpperCase() + appId.slice(1)}
               </div>
               {appShortcuts.map(s => (
@@ -865,11 +546,11 @@ export const BeginnerTip: React.FC<{
     background: 'var(--color-bg-elevated, #111111)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: 6,
-    padding: '10px 12px',
+    padding: '10px var(--space-3)',
     maxWidth: 200,
     boxShadow: 'var(--pg-shadow-tooltip)',
   }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
       <div>
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{tip.title}</div>
         <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>{tip.content}</div>
@@ -889,10 +570,10 @@ export const EmptyState: React.FC<{
   action?: React.ReactNode;
 }> = ({ icon, title, description, action }) => (
   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48, textAlign: 'center' }}>
-    {icon && <div style={{ marginBottom: 16, opacity: 0.3, color: 'var(--color-text-tertiary)' }}>{icon}</div>}
+    {icon && <div style={{ marginBottom: 'var(--space-4)', opacity: 0.3, color: 'var(--color-text-tertiary)' }}>{icon}</div>}
     {title && <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{title}</div>}
     {description && <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', maxWidth: 240 }}>{description}</div>}
-    {action && <div style={{ marginTop: 16 }}>{action}</div>}
+    {action && <div style={{ marginTop: 'var(--space-4)' }}>{action}</div>}
   </div>
 );
 

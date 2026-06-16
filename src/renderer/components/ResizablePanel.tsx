@@ -345,7 +345,7 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
               left: direction.includes('w') ? 2 : 'auto',
               width: HANDLE_SIZE,
               height: HANDLE_SIZE,
-              borderRadius: 1,
+              borderRadius: 2,
               background: colors.text.tertiary,
               opacity: isResizing && activeDirection === direction ? 1 : 0.5,
               transition: 'opacity 0.1s ease',

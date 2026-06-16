@@ -244,9 +244,9 @@ export const PremiumButton = memo(function PremiumButton({
   const { focusProps, focusStyle } = useFocusRing();
 
   const sizeStyles: Record<string, React.CSSProperties> = {
-    sm: { padding: '6px 12px', fontSize: 12, minHeight: 28, gap: 4 },
-    md: { padding: '8px 16px', fontSize: 13, minHeight: 32, gap: 6 },
-    lg: { padding: '10px 20px', fontSize: 14, minHeight: 40, gap: 8 },
+    sm: { padding: '6px var(--space-3)', fontSize: 12, minHeight: 28, gap: 4 },
+    md: { padding: 'var(--space-2) var(--space-4)', fontSize: 13, minHeight: 32, gap: 6 },
+    lg: { padding: '10px var(--space-5)', fontSize: 14, minHeight: 40, gap: 'var(--space-2)' },
   };
 
   const variantStyles: Record<string, React.CSSProperties> = {
@@ -466,7 +466,7 @@ export const GlowPulseBadge = memo(function GlowPulseBadge({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2px 8px',
+        padding: '2px var(--space-2)',
         borderRadius: 9999,
         background: color,
         color: '#FFFFFF',
@@ -610,7 +610,7 @@ export const PremiumInput = memo(function PremiumInput({
       className={className}
       style={{
         width: '100%',
-        padding: '8px 12px',
+        padding: 'var(--space-2) var(--space-3)',
         borderRadius: 6,
         border: `1px solid ${error ? 'var(--color-error)' : success ? 'var(--color-success)' : 'rgba(255, 255, 255, 0.14)'}`,
         background: 'rgba(0, 0, 0, 0.25)',

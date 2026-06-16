@@ -17,10 +17,10 @@ import { resolvePlan, limitsFor, planLabel } from '../../../shared/plan';
 
 // ---------- Shared design tokens (kept inline to avoid prop drilling) ----------
 const PANEL: React.CSSProperties = {
-  padding: '20px 24px',
+  padding: 'var(--space-5) var(--space-6)',
   display: 'flex',
   flexDirection: 'column',
-  gap: 16,
+  gap: 'var(--space-4)',
   color: 'var(--color-text-primary)',
   overflowY: 'auto',
 };
@@ -30,11 +30,11 @@ const ROW: React.CSSProperties = {
   justifyContent: 'space-between',
   padding: '10px 0',
   borderBottom: '1px solid var(--color-border-subtle)',
-  gap: 12,
+  gap: 'var(--space-3)',
 };
 const LABEL: React.CSSProperties = { fontSize: 13, fontWeight: 500 };
 const DESC: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
-const TITLE: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginTop: 12, marginBottom: 4 };
+const TITLE: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginTop: 'var(--space-3)', marginBottom: 4 };
 const SECTION: React.CSSProperties = {
   background: 'var(--color-bg-elevated)',
   border: '1px solid var(--color-border-subtle)',
@@ -42,7 +42,7 @@ const SECTION: React.CSSProperties = {
   padding: '4px 14px',
 };
 const BTN: React.CSSProperties = {
-  padding: '6px 12px',
+  padding: '6px var(--space-3)',
   fontSize: 12,
   borderRadius: 4,
   border: '1px solid var(--color-border-subtle)',
@@ -53,12 +53,12 @@ const BTN: React.CSSProperties = {
 const BTN_DANGER: React.CSSProperties = {
   ...BTN,
   borderColor: 'rgba(255,69,58,0.4)',
-  color: '#ff453a',
+  color: 'var(--color-error)',
 };
 const BTN_PRIMARY: React.CSSProperties = {
   ...BTN,
   background: 'var(--color-accent)',
-  color: '#fff',
+  color: 'var(--color-accent-text)',
   border: 'none',
 };
 const TEXTAREA: React.CSSProperties = {
@@ -66,7 +66,7 @@ const TEXTAREA: React.CSSProperties = {
   minHeight: 70,
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
-  padding: 8,
+  padding: 'var(--space-2)',
   borderRadius: 4,
   border: '1px solid var(--color-border-subtle)',
   background: 'var(--color-bg-base)',
@@ -169,7 +169,7 @@ export const PermissionsPanel: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button style={BTN} onClick={refresh} disabled={loading}>
           {loading ? 'Refreshing...' : 'Refresh'}
         </button>
@@ -179,7 +179,7 @@ export const PermissionsPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div style={{ color: '#ff453a', fontSize: 12 }}>Error: {error}</div>
+        <div style={{ color: 'var(--color-error)', fontSize: 12 }}>Error: {error}</div>
       )}
 
       <h3 style={TITLE}>Allowed ({allowed.length})</h3>
@@ -329,7 +329,7 @@ export const SnapLayoutsPanel: React.FC = () => {
             <kbd style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
-              padding: '3px 8px',
+              padding: '3px var(--space-2)',
               borderRadius: 3,
               background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border-subtle)',
@@ -451,8 +451,8 @@ export const CreatorAccessPanel: React.FC = () => {
           </div>
           <span style={{
             fontSize: 11, padding: '3px 10px', borderRadius: 999,
-            background: keyState?.configured ? 'rgba(48,209,88,0.15)' : 'rgba(255,159,10,0.15)',
-            color: keyState?.configured ? '#30d158' : '#ff9f0a',
+            background: keyState?.configured ? 'var(--color-success-muted, rgba(48,209,88,0.15))' : 'var(--color-warning-muted, rgba(255,159,10,0.15))',
+            color: keyState?.configured ? 'var(--color-success)' : 'var(--color-warning)',
           }}>{keyState?.configured ? 'Ready' : 'Not provisioned'}</span>
         </div>
 
@@ -482,8 +482,8 @@ export const CreatorAccessPanel: React.FC = () => {
           </div>
           <span style={{
             fontSize: 11, padding: '3px 10px', borderRadius: 999,
-            background: planTier === 'power' ? 'rgba(94,160,255,0.18)' : 'rgba(150,150,150,0.15)',
-            color: planTier === 'power' ? '#5ea0ff' : 'var(--color-text-secondary)',
+            background: planTier === 'power' ? 'var(--color-accent-light)' : 'var(--color-bg-hover)',
+            color: planTier === 'power' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
           }}>{planTier === 'power' ? 'Power' : 'Free'}</span>
         </div>
       </div>
@@ -504,7 +504,7 @@ export const CreatorAccessPanel: React.FC = () => {
               </button>
             </div>
             {challenge && (
-              <div style={{ padding: '8px 0' }}>
+              <div style={{ padding: 'var(--space-2) 0' }}>
                 <textarea readOnly value={challenge} style={TEXTAREA} aria-label="Challenge" />
                 {challengeIssued && (
                   <div style={DESC}>
@@ -517,7 +517,7 @@ export const CreatorAccessPanel: React.FC = () => {
 
           <h3 style={TITLE}>Step 2 — Paste signature</h3>
           <div style={SECTION}>
-            <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: 'var(--space-2) 0' }}>
               <textarea
                 value={signature}
                 onChange={e => setSignature(e.target.value)}
@@ -525,7 +525,7 @@ export const CreatorAccessPanel: React.FC = () => {
                 style={TEXTAREA}
                 aria-label="Signature"
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <button style={BTN_PRIMARY} onClick={submitSignature} disabled={busy || !challenge || !signature.trim()}>
                   Verify & unlock
                 </button>
@@ -538,8 +538,8 @@ export const CreatorAccessPanel: React.FC = () => {
       {verifyMsg && (
         <div style={{
           padding: 10, borderRadius: 4, fontSize: 12,
-          background: verifyMsg.startsWith('Unlocked') ? 'rgba(48,209,88,0.1)' : 'rgba(255,69,58,0.1)',
-          color: verifyMsg.startsWith('Unlocked') ? '#30d158' : '#ff453a',
+          background: verifyMsg.startsWith('Unlocked') ? 'var(--color-success-muted, rgba(48,209,88,0.1))' : 'var(--color-error-muted, rgba(255,69,58,0.1))',
+          color: verifyMsg.startsWith('Unlocked') ? 'var(--color-success)' : 'var(--color-error)',
         }}>{verifyMsg}</div>
       )}
     </div>

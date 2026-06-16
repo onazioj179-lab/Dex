@@ -9,6 +9,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { glassPanel, glassButton } from '../styles/glassMenu';
+import DexIcon from '../components/DexIcon';
+import EmptyState from '../components/EmptyState';
 import type { DiscoveredGame, LaunchPlan, PlaytimeRecord } from '../../shared/games/launcher';
 import type { ScanResult } from '../../shared/games/scanner';
 
@@ -23,7 +25,7 @@ const rowStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   ...rowStyle,
   minWidth: 220,
-  padding: '8px 10px',
+  padding: 'var(--space-2) 10px',
   color: 'var(--color-text-primary)',
   outline: 'none',
 };
@@ -136,9 +138,19 @@ export default function Games(): React.ReactElement {
       {last && <div className="mb-3 text-sm opacity-80 break-words" role="status" aria-live="polite">{last}</div>}
 
       {games.length === 0 ? (
-        <div className="opacity-70">No games found yet. Hit Scan to look in default storefront paths.</div>
+        <EmptyState
+          icon={<DexIcon name="gamepad-2" size={48} />}
+          title="No games found yet"
+          description="Scan your default storefront paths (Steam, Epic, GOG, Xbox...) to discover installed games."
+          actions={[{ label: scanning ? 'Scanning...' : 'Scan for games', onClick: onScan }]}
+        />
       ) : visibleGames.length === 0 ? (
-        <div className="opacity-70">No games match the current search.</div>
+        <EmptyState
+          icon={<DexIcon name="search" size={48} />}
+          title="No games match your search"
+          description={`Nothing matches "${query.trim()}". Try a different term or clear the search.`}
+          actions={[{ label: 'Clear search', onClick: () => setQuery(''), variant: 'secondary' }]}
+        />
       ) : (
         <ul className="space-y-2">
           {visibleGames.map(g => {

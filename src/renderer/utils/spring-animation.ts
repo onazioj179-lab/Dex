@@ -9,6 +9,20 @@
 // Phase G: Visual Feedback (Items 376-395)
 // Physics-based spring animations like iOS/macOS
 // =============================================================================
+//
+// CONSOLIDATION NOTE (DEX Consolidation Audit, finding 4):
+// This file is one of the renderer's spring engines. The survivor,
+// services/UnifiedMotionSystem.ts, is a preset-name -> CSS-transition engine
+// and intentionally has NO spring physics, no `createSpring`, and no
+// `SPRING_PRESETS` of this shape, so there is no behaviour-preserving target to
+// delegate to. These presets (mass/stiffness/damping ~100-400) and the
+// `SpringConfig` shape here are distinct from MotionController's and are
+// consumed verbatim through the `snappy.ts` barrel (createSpring, springTransform,
+// useSpring, etc.). Folding this into UnifiedMotionSystem would change physics
+// (reduce-motion handling, rest thresholds, preset values), violating the
+// zero-behaviour-change rule, so the spring core stays here as the single
+// implementation behind these import paths.
+// =============================================================================
 
 // ---------------------------------------------------------------------------
 // 376-380. Spring Core

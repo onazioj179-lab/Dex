@@ -39,27 +39,27 @@ const dialogStyle: React.CSSProperties = {
 };
 
 const headerStyle: React.CSSProperties = {
-  padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   borderBottom: '1px solid var(--color-bg-hover)', flexShrink: 0,
 };
 
 const sectionHeaderStyle: React.CSSProperties = {
-  padding: '8px 16px 4px', fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)',
+  padding: 'var(--space-2) var(--space-4) 4px', fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '0.05em',
 };
 
 const presetGridStyle: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6, padding: '0 16px 8px',
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6, padding: '0 var(--space-4) var(--space-2)',
 };
 
 const presetCardStyle = (selected: boolean): React.CSSProperties => ({
-  padding: '8px', borderRadius: 3, cursor: 'pointer',
+  padding: 'var(--space-2)', borderRadius: 3, cursor: 'pointer',
   border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-bg-hover)'}`,
   background: selected ? 'rgba(74,158,255,0.08)' : 'var(--color-border-subtle)',
 });
 
 const rowStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8, padding: '4px 16px', minHeight: 28,
+  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '4px var(--space-4)', minHeight: 28,
 };
 
 const labelStyle: React.CSSProperties = {
@@ -76,22 +76,22 @@ const selectStyle: React.CSSProperties = {
   ...inputStyle, appearance: 'none', cursor: 'pointer',
   backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'8\' height=\'5\' viewBox=\'0 0 8 5\'%3E%3Cpath fill=\'%235A5A5A\' d=\'M0 0l4 5 4-5z\'/%3E%3C/svg%3E")',
   backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center',
-  paddingRight: 20,
+  paddingRight: 'var(--space-5)',
 };
 
 const btnPrimaryStyle: React.CSSProperties = {
-  padding: '6px 20px', fontSize: 11, fontWeight: 600, border: 'none',
+  padding: '6px var(--space-5)', fontSize: 11, fontWeight: 600, border: 'none',
   borderRadius: 3, background: 'var(--color-accent)', color: '#000000', cursor: 'pointer',
 };
 
 const btnSecondaryStyle: React.CSSProperties = {
-  padding: '6px 16px', fontSize: 11, fontWeight: 600, borderRadius: 3,
+  padding: '6px var(--space-4)', fontSize: 11, fontWeight: 600, borderRadius: 3,
   border: '1px solid var(--color-border)', background: 'transparent',
   color: 'var(--color-text-secondary)', cursor: 'pointer',
 };
 
 const jobRowStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px',
+  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px var(--space-4)',
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 
@@ -352,7 +352,7 @@ export const ExportDialog: React.FC = memo(() => {
           </button>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {/* Presets */}
           <div style={sectionHeaderStyle}>Presets</div>
           <div style={presetGridStyle}>
@@ -372,7 +372,7 @@ export const ExportDialog: React.FC = memo(() => {
           </div>
 
           {/* Custom toggle */}
-          <div style={{ padding: '4px 16px' }}>
+          <div style={{ padding: '4px var(--space-4)' }}>
             <button
               aria-label={customMode ? 'Disable custom settings' : 'Enable custom settings'}
               style={{
@@ -466,10 +466,10 @@ export const ExportDialog: React.FC = memo(() => {
               Export markers as .vtt {projectMarkers.length === 0 && <span style={{ color: 'var(--color-text-tertiary)' }}>(no markers)</span>}
             </label>
           </div>
-          <div style={{ padding: '0 16px', fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ padding: '0 var(--space-4)', fontSize: 10, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
             Duration: {formatTimecode(duration, frameRate)} / {duration} frames
             {diskFreeGB != null && (
-              <span style={{ marginLeft: 12, color: diskFreeGB < 2 ? 'var(--color-error)' : 'var(--color-text-tertiary)' }}>
+              <span style={{ marginLeft: 'var(--space-3)', color: diskFreeGB < 2 ? 'var(--color-error)' : 'var(--color-text-tertiary)' }}>
                 &middot; Free disk: {diskFreeGB.toFixed(1)} GB
               </span>
             )}
@@ -522,7 +522,7 @@ export const ExportDialog: React.FC = memo(() => {
 
         {/* Footer */}
         <div style={{
-          padding: '12px 16px', display: 'flex', justifyContent: 'flex-end', gap: 8,
+          padding: 'var(--space-3) var(--space-4)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)',
           borderTop: '1px solid var(--color-bg-hover)', flexShrink: 0,
         }}>
           <button aria-label="Cancel export" style={btnSecondaryStyle} onClick={() => setShowExportDialog(false)}>Cancel</button>
