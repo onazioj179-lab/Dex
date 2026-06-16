@@ -653,7 +653,7 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({ compact = fa
 
 const panelStyles: Record<string, React.CSSProperties> = {
   container: {
-    padding: 12,
+    padding: 'var(--space-3)',
     background: 'var(--color-bg-surface)',
     borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
@@ -661,16 +661,16 @@ const panelStyles: Record<string, React.CSSProperties> = {
   compact: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '4px 8px',
+    gap: 'var(--space-2)',
+    padding: '4px var(--space-2)',
     borderRadius: 3,
     background: 'var(--color-bg-inset)',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 'var(--space-2)',
+    marginBottom: 'var(--space-3)',
   },
   healthDot: {
     width: 8,
@@ -685,7 +685,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
   metrics: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 12,
+    gap: 'var(--space-3)',
   },
   metric: {
     display: 'flex',
@@ -716,7 +716,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
     borderRadius: 8,
   },
   alerts: {
-    marginTop: 12,
+    marginTop: 'var(--space-3)',
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
@@ -724,7 +724,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
   alert: {
     fontSize: 11,
     color: 'var(--color-text-secondary)',
-    padding: '6px 8px',
+    padding: '6px var(--space-2)',
     borderRadius: 3,
     background: 'var(--color-bg-inset)',
     borderLeft: '2px solid',

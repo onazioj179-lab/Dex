@@ -72,24 +72,24 @@ const rootStyle: React.CSSProperties = {
   overflow: 'hidden',
 };
 const headerStyle: React.CSSProperties = {
-  padding: '20px 24px 14px', flexShrink: 0,
+  padding: 'var(--space-5) var(--space-6) 14px', flexShrink: 0,
   background: 'var(--color-bg-surface-solid, #1C1C1E)',
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 const searchInput: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', borderRadius: 6,
+  width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6,
   border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
   color: 'var(--color-text-primary, #e5e5ea)', fontSize: 13, outline: 'none',
 };
 const listArea: React.CSSProperties = {
-  flex: 1, overflowY: 'auto', padding: '12px 20px 20px',
+  flex: 1, overflowY: 'auto', padding: 'var(--space-3) var(--space-5) var(--space-5)',
 };
 const groupHeader: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
   color: 'var(--color-text-tertiary)', padding: '14px 0 6px',
 };
 const rowStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+  display: 'flex', alignItems: 'center', gap: 10, padding: 'var(--space-2) 10px',
   borderRadius: 6, cursor: 'default', transition: 'background 0.15s',
 };
 const btnSmall: React.CSSProperties = {
@@ -98,7 +98,7 @@ const btnSmall: React.CSSProperties = {
 };
 const emptyState: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-  flex: 1, gap: 12, opacity: 0.5,
+  flex: 1, gap: 'var(--space-3)', opacity: 0.5,
 };
 
 // ── Row component ──────────────────────────────────────────────
@@ -227,7 +227,7 @@ const RecycleBin: React.FC = () => {
     <div style={rootStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>Trash</div>
             <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>

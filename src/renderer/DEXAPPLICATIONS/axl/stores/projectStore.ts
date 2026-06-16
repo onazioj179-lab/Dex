@@ -18,6 +18,19 @@ import type {
 } from '../types';
 import { MATERIAL_DB } from '../constants';
 import { genId, vec3, defaultTransform, calcVolume, calcWeight, formatWeight } from '../utils/math';
+import { ConstraintSolver } from '../engine/ConstraintSolver';
+
+// The iterative solver understands a core set of geometric constraint types.
+// The UI offers a few CAD-friendly aliases (mate/align/offset) that map onto
+// those primitives so the engine can actually resolve them.
+const SOLVER_TYPE_ALIAS: Record<string, ConstraintType> = {
+  mate: 'coincident',
+  align: 'parallel',
+  offset: 'distance',
+};
+
+// Shared solver instance — stateless between solves, safe to reuse.
+const constraintSolver = new ConstraintSolver();
 
 function createDefaultProject(): AXLProject {
   const boxId = genId();
@@ -105,6 +118,7 @@ interface ProjectStore {
   // Constraints
   addConstraint: (type: ConstraintType, partAId: string, partBId: string, value?: number) => void;
   removeConstraint: (constraintId: string) => void;
+  solveConstraints: () => { converged: boolean; moved: number; unsatisfied: number };
 
   // Assembly
   toggleExplodedView: () => void;
@@ -401,6 +415,9 @@ export const useProjectStore = create<ProjectStore>()(
             assembly: { ...state.project.assembly, constraints: [...state.project.assembly.constraints, c] },
           },
         }));
+        // Resolve geometry immediately so the new constraint actually snaps parts
+        // together and its satisfied indicator reflects reality (smart placement).
+        get().solveConstraints();
       },
 
       removeConstraint: (constraintId: string) => {
@@ -415,6 +432,41 @@ export const useProjectStore = create<ProjectStore>()(
             },
           },
         }));
+        // Re-solve the remaining set so satisfied flags stay accurate after removal.
+        get().solveConstraints();
+      },
+
+      solveConstraints: () => {
+        const { parts, constraints } = get().project.assembly;
+        if (constraints.length === 0) return { converged: true, moved: 0, unsatisfied: 0 };
+        // Map UI aliases (mate/align/offset) onto the solver's primitive types.
+        const solverConstraints: Constraint[] = constraints.map((c: Constraint) =>
+          SOLVER_TYPE_ALIAS[c.type] ? { ...c, type: SOLVER_TYPE_ALIAS[c.type] } : c
+        );
+        const result = constraintSolver.solve(parts, solverConstraints);
+        let moved = 0;
+        let unsatisfied = 0;
+        set((state: ProjectStore) => ({
+          project: {
+            ...state.project,
+            modifiedAt: Date.now(),
+            assembly: {
+              ...state.project.assembly,
+              parts: state.project.assembly.parts.map((p: Part) => {
+                const upd = result.partUpdates.get(p.id);
+                if (!upd) return p;
+                moved++;
+                return { ...p, transform: { ...p.transform, ...upd } };
+              }),
+              constraints: state.project.assembly.constraints.map((c: Constraint) => {
+                const ok = result.constraintStatus.get(c.id) ?? c.satisfied;
+                if (!ok) unsatisfied++;
+                return ok === c.satisfied ? c : { ...c, satisfied: ok };
+              }),
+            },
+          },
+        }));
+        return { converged: result.converged, moved, unsatisfied };
       },
 
       toggleExplodedView: () => {

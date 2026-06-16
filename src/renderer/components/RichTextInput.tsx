@@ -26,6 +26,7 @@ import React, {
 } from 'react';
 import { colors, radius } from '../styles/tokens';
 import { TRANSITION } from '../styles/animationTokens';
+import { useDropdownPosition } from '../hooks/useDropdownPosition';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -185,8 +186,11 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
 }, ref) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historyRef = useRef(new UndoRedoManager());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const suggestRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<Selection>({ start: 0, end: 0 });
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestStyle = useDropdownPosition(showSuggestions, containerRef, suggestRef, { matchWidth: true, minHeight: 100 });
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   const [stats, setStats] = useState<TextStats>(() => calculateStats(value));
@@ -369,6 +373,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
 
   return (
     <div
+      ref={containerRef}
       className={className}
       style={{
         position: 'relative',
@@ -388,7 +393,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
         spellCheck={spellCheck}
         style={{
           width: '100%',
-          padding: '10px 12px',
+          padding: '10px var(--space-3)',
           background: colors.bg.inset,
           border: `1px solid ${colors.border.subtle}`,
           borderRadius: radius.md,
@@ -405,19 +410,15 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
       {/* Suggestions dropdown */}
       {showSuggestions && filteredSuggestions.length > 0 && (
         <div
+          ref={suggestRef}
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: 4,
             background: colors.bg.elevated,
             border: `1px solid ${colors.border.default}`,
             borderRadius: radius.md,
             boxShadow: 'var(--pg-shadow-tooltip)',
-            maxHeight: 200,
             overflowY: 'auto',
             zIndex: 1000,
+            ...suggestStyle,
           }}
         >
           {filteredSuggestions.map((suggestion, i) => (
@@ -428,7 +429,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
                 selectSuggestion(suggestion);
               }}
               style={{
-                padding: '8px 12px',
+                padding: 'var(--space-2) var(--space-3)',
                 cursor: 'pointer',
                 background: i === suggestionIndex ? colors.bg.hover : 'transparent',
                 color: colors.text.primary,
@@ -446,7 +447,7 @@ export const RichTextInput = forwardRef<RichTextInputRef, RichTextInputProps>(({
         <div
           style={{
             display: 'flex',
-            gap: 12,
+            gap: 'var(--space-3)',
             marginTop: 6,
             fontSize: 11,
             color: colors.text.tertiary,

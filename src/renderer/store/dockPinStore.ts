@@ -90,29 +90,54 @@ interface DockSettings {
   magnification: boolean;
   magnificationScale: number;
   iconSize: number;
+  /** Settings schema version -- drives one-time migrations. */
+  version?: number;
 }
 
+// v6.0 OS-grade arrangement: the dock now reserves its own space at the screen
+// edge (taskbar behavior) instead of floating over and clipping app content.
+// Pinned/visible is the default; auto-hide remains an explicit opt-in.
+const SETTINGS_VERSION = 6;
+
 const DEFAULT_SETTINGS: DockSettings = {
-  mode: 'auto-hide',
-  magnification: true,
+  mode: 'always-visible',
+  // Owner direction: the dock stays still — no hover magnification by default.
+  // (AppManager also hard-disables the effect regardless of saved value.)
+  magnification: false,
   magnificationScale: 1.15,
-  iconSize: 48,
+  iconSize: 40,
+  version: SETTINGS_VERSION,
 };
+
+// One-time upgrade of legacy installs: flip the old auto-hide default (which
+// overlaid and clipped app toolbars/status bars) to the space-reserving pinned
+// dock. An explicit auto-hide choice made AFTER this migration is preserved,
+// because saveSettings stamps the current version so this guard no longer matches.
+function migrateSettings(s: DockSettings): DockSettings {
+  if ((s.version ?? 0) < SETTINGS_VERSION) {
+    if (s.mode === 'auto-hide') s.mode = 'always-visible';
+    s.version = SETTINGS_VERSION;
+  }
+  return s;
+}
 
 function loadSettings(): DockSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      // Migrate the RAW stored object first (so a missing version reads as 0),
+      // then layer defaults underneath for any absent fields. Merging defaults
+      // in before migration would mask the missing version as the current one.
+      return { ...DEFAULT_SETTINGS, ...migrateSettings(parsed) };
     }
   } catch { /* ignore */ }
-  return DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS };
 }
 
 function saveSettings(s: DockSettings): void {
   try {
-    const json = JSON.stringify(s);
+    const json = JSON.stringify({ ...s, version: SETTINGS_VERSION });
     localStorage.setItem(SETTINGS_KEY, json);
     (window as any).electron?.invoke?.('capability:storage:set', SETTINGS_KEY, json).catch((e: unknown) => { console.warn('[DEX]', e); });
   } catch { /* ignore */ }
@@ -140,7 +165,7 @@ async function loadPinsAsync(): Promise<DockPin[] | null> {
 async function loadSettingsAsync(): Promise<DockSettings | null> {
   try {
     const raw = await (window as any).electron?.invoke?.('capability:storage:get', SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) return { ...DEFAULT_SETTINGS, ...migrateSettings(JSON.parse(raw)) };
   } catch { /* fallback */ }
   return null;
 }

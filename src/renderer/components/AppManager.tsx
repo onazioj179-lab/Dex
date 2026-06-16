@@ -46,12 +46,15 @@ import { getDockReflectionStyle } from '../shell/WallpaperAccent';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
 import StageManager, { STAGE_STRIP_WIDTH } from '../shell/StageManager';
 import AppSwitcher from '../shell/AppSwitcher';
-import { loadEngagement, saveEngagement, incrementStat, checkAchievements } from '../services/engagement';
+import { loadEngagement, saveEngagement, incrementStat, checkAchievements, recordSessionStart, recordAppUsage, type Achievement, type EngagementState } from '../services/engagement';
+import { notify } from '../services/notify';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
 import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
+import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
+import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
 import { CalmFocusEngine } from '../../shared/phase15/calmFocus';
 import { WorkspaceSnapshotStore } from '../../shared/phase15/workspaceSnapshot';
@@ -500,7 +503,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
 // -- Extracted styles (module constants — never re-created) ----------------
 const errorBoundaryContainer: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-  height: '100%', background: 'var(--color-bg-base)', gap: 16,
+  height: '100%', background: 'var(--color-bg-base)', gap: 'var(--space-4)',
   animation: 'fadeIn 0.25s var(--ease-out)',
 };
 const errorBoundaryIcon: React.CSSProperties = {
@@ -511,7 +514,7 @@ const errorBoundaryIcon: React.CSSProperties = {
 const errorBoundaryTitle: React.CSSProperties = { fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' };
 const errorBoundaryMsg: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 320, textAlign: 'center', lineHeight: 1.5 };
 const errorBoundaryBtn: React.CSSProperties = {
-  padding: '8px 22px', background: 'var(--color-accent)', color: '#fff',
+  padding: 'var(--space-2) 22px', background: 'var(--color-accent)', color: '#fff',
   border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500,
   cursor: 'pointer', marginTop: 4, letterSpacing: '-0.01em',
   transition: 'opacity 0.15s ease, transform 0.12s ease',
@@ -542,7 +545,7 @@ const loadingSkel = (w: number, delay = '0s'): React.CSSProperties => ({
   animation: 'pulse 1.5s ease-in-out infinite',
   animationDelay: delay,
 });
-const loadingContentRow: React.CSSProperties = { flex: 1, display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center' };
+const loadingContentRow: React.CSSProperties = { flex: 1, display: 'flex', gap: 'var(--space-3)', alignItems: 'center', justifyContent: 'center' };
 const loadingContentSkel = (w: number | string, delay: string): React.CSSProperties => ({
   width: w,
   borderRadius: 999,
@@ -607,7 +610,7 @@ const Loading: React.FC<{ appId?: string }> = ({ appId }) => {
         <div style={loadingSkel(28, '0.3s')} />
       </div>
       <div style={loadingContentRow}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', alignItems: 'center' }}>
           <div style={{ ...loadingContentSkel(180, '0.1s'), height: 10 }} aria-hidden="true" />
           <div style={{ ...loadingContentSkel(120, '0.2s'), height: 10 }} aria-hidden="true" />
           <div 
@@ -653,7 +656,13 @@ export const AppManager: React.FC = () => {
   const sendAssetToApp = useCreativeSuite(s => s.sendToApp);
 
   // Dock pinning store
-  const { pins: dockPins, pinApp, unpinApp, reorder: reorderDockPins, isPinned: isDockPinned, mode: dockMode, magnification: dockMagnification, magnificationScale, iconSize: dockIconSize } = useDockPins();
+  const { pins: dockPins, pinApp, unpinApp, reorder: reorderDockPins, isPinned: isDockPinned, mode: dockMode, magnificationScale, iconSize: dockIconSize } = useDockPins();
+  // Dock magnification (the gaussian hover swell/lift) is HARD-DISABLED per owner
+  // direction: the dock must stay perfectly still — never grow, shift, or "move
+  // out of place" under the cursor. Forced off here (not read from the store) so
+  // every consumer below (mousemove handler, willChange) sees it off regardless
+  // of any previously-saved setting.
+  const dockMagnification = false;
 
   // Shell preferences (movable + compact taskbar) — read reactively so edge /
   // preset changes from Settings re-render the dock immediately.
@@ -667,6 +676,11 @@ export const AppManager: React.FC = () => {
   const [appMenuSearch, setAppMenuSearch] = useState('');
   const appMenuSearchRef = useRef<HTMLInputElement>(null);
   const [taskbarVisible, setTaskbarVisible] = useState(true);
+  // Immersive focus: hide the top bar (the dock already auto-hides) so an open
+  // app gets the full DEX frame with zero chrome — "clear the screen to
+  // concentrate". Toggled with Ctrl+Shift+F, exited with Escape or the pill.
+  // Only meaningful inside an app; navigating Home always shows chrome.
+  const [immersive, setImmersive] = useState(false);
   const [navHistory, setNavHistory] = useState<AppId[]>(['home']);
   const [navIndex, setNavIndex] = useState(0);
   const navHistoryRef = useRef<AppId[]>(['home']);
@@ -679,16 +693,8 @@ export const AppManager: React.FC = () => {
   const [systemVolume, setSystemVolume] = useState(() => { try { return Number(localStorage.getItem('dex-system-volume') ?? '80'); } catch { return 80; } });
   const [spatialAudioOn, setSpatialAudioOn] = useState(() => isSoundEnabled());
 
-  // -- Publish dock-reserved insets as CSS variables so floating windows can
-  //    size maximize/snap bounds without ever clipping under the dock. --
-  useEffect(() => {
-    const insets = getDockReservedInsets(dockEdgePref, dockPresetPref, taskbarVisible);
-    const root = document.documentElement;
-    root.style.setProperty('--dex-reserved-top', `${insets.top}px`);
-    root.style.setProperty('--dex-reserved-right', `${insets.right}px`);
-    root.style.setProperty('--dex-reserved-bottom', `${insets.bottom}px`);
-    root.style.setProperty('--dex-reserved-left', `${insets.left}px`);
-  }, [dockEdgePref, dockPresetPref, taskbarVisible]);
+  // Dock-reserved inset CSS variables are published in an effect lower down,
+  // after `anyWindowMaximized` is declared (it is one of the dependencies).
 
   // -- Suspend/Resume & Crash Recovery toasts --
   useEffect(() => {
@@ -861,14 +867,21 @@ export const AppManager: React.FC = () => {
     restoreOfferShownRef.current = true;
     try {
       const last = readLastSession();
-      if (!last || last.clean || last.apps.length === 0) return;
+      if (!last || last.apps.length === 0) return;
       if (Date.now() - last.timestamp > 24 * 60 * 60 * 1000) { clearLastSession(); return; }
       const apps = last.apps;
+      const appsLabel = apps.length === 1 ? apps[0].name : `${apps.length} apps`;
       notifyPush({
-        title: 'Restore your workspace?',
-        body: `Your last session ended unexpectedly with ${apps.length === 1 ? apps[0].name : `${apps.length} apps`} open.`,
-        icon: 'warning',
-        priority: 'high',
+        // Offer session restore on BOTH a clean restart (owner brief P2: "reopen
+        // workspace, everything returns") and an unclean exit (crash recovery).
+        // One-click + dismissible -- a clean restart never force-reopens apps on
+        // its own, so there are still no surprise "ghost apps".
+        title: last.clean ? 'Restore your last workspace?' : 'Restore your workspace?',
+        body: last.clean
+          ? `Pick up where you left off — ${appsLabel} were open.`
+          : `Your last session ended unexpectedly with ${appsLabel} open.`,
+        icon: last.clean ? 'info' : 'warning',
+        priority: last.clean ? 'normal' : 'high',
         duration: 15000,
         source: 'recovery',
         actions: [{
@@ -876,6 +889,30 @@ export const AppManager: React.FC = () => {
           onClick: () => {
             const launch = useRunningApps.getState().launchApp;
             for (const a of apps) launch(a);
+            // Also restore each window's last geometry/z/minimized from the
+            // manifest (crash-recovery ONLY -- a clean restart still starts fresh,
+            // by design). Bounds are clamped to the CURRENT work area in case the
+            // viewport changed since the crash.
+            try {
+              const manifest = loadWindowManifest();
+              if (manifest && manifest.windows.length) {
+                const ws = getShellWorkspace(0);
+                const mins: string[] = [];
+                requestAnimationFrame(() => {
+                  setDetachedApps(prev => {
+                    const next = new Map(prev);
+                    for (const w of manifest.windows) {
+                      if (!apps.some(a => a.id === w.appId)) continue;
+                      const c = clampWindowToWorkspace({ x: w.x, y: w.y, w: w.width, h: w.height }, ws);
+                      next.set(w.appId, { ...c, z: w.z });
+                      if (w.minimized) mins.push(w.appId);
+                    }
+                    return next;
+                  });
+                  if (mins.length) setMinimizedApps(prev => { const n = new Set(prev); mins.forEach(id => n.add(id)); return n; });
+                });
+              }
+            } catch { /* restore is best-effort; the apps still launched */ }
           },
         }],
       });
@@ -984,7 +1021,6 @@ export const AppManager: React.FC = () => {
 
   // -- Dock hover preview state -----------------------------------------------
   const [dockPreview, setDockPreview] = useState<{ id: string; x: number; y: number } | null>(null);
-  const dockPreviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dockPreviewPinnedId, setDockPreviewPinnedId] = useState<string | null>(null);
   const [dockPeekAnnouncement, setDockPeekAnnouncement] = useState('');
 
@@ -1022,24 +1058,39 @@ export const AppManager: React.FC = () => {
   // Stage Manager left offset for floating windows
   const stageOffset = stageManagerOn && runningApps.filter(a => a.id !== 'home').length > 0 ? STAGE_STRIP_WIDTH : 0;
 
-  const getShellWorkspace = useCallback((padding = 0) => getWorkspaceBounds(
-    { width: window.innerWidth, height: window.innerHeight },
-    {
-      topReserve: 0,
-      dockReserve: 0,
-      leftReserve: stageOffset,
-      padding,
-      minWidth: 320,
-      minHeight: 260,
-    },
-  ), [stageOffset, showAppTabBar, runningApps.length]);
+  const getShellWorkspace = useCallback((padding = 0) => {
+    // OS-grade work area. Detached windows are positioned RELATIVE to the content
+    // surface (it is their containing block via `contain: layout`), and that
+    // surface already sits below the chrome (title bar + tab bar) and above a
+    // pinned dock -- its flexed height and reserved edge margin do exactly that.
+    // So the work area is simply the content surface's own box, read via
+    // clientWidth/clientHeight which -- unlike getBoundingClientRect -- are immune
+    // to the app-transition transform that previously baked a stale offset into
+    // stored window bounds. Only the Stage Manager strip needs an explicit reserve.
+    const el = contentRef.current;
+    const w = el ? el.clientWidth : window.innerWidth;
+    const h = el ? el.clientHeight : window.innerHeight;
+    return getWorkspaceBounds(
+      { width: w, height: h },
+      {
+        topReserve: 0,
+        dockReserve: 0,
+        leftReserve: stageOffset,
+        padding,
+        minWidth: 320,
+        minHeight: 260,
+      },
+    );
+  }, [stageOffset, showAppTabBar, runningApps.length, dockMode, dockEdgePref, dockPresetPref]);
 
-  const getMaximizedWindowBounds = useCallback(() => ({
-    x: 0,
-    y: 0,
-    w: Math.max(320, window.innerWidth),
-    h: Math.max(260, window.innerHeight),
-  }), []);
+  // Maximizing means "fill the work area" -- below the chrome, above the pinned
+  // dock -- not "cover the whole viewport". This is what stops a maximized
+  // creative app (Prism/Flux/Forge/Imosion/Axl) from spilling its bottom toolbar
+  // under the dock and off the screen edge.
+  const getMaximizedWindowBounds = useCallback(() => {
+    const ws = getShellWorkspace(0);
+    return { x: ws.x, y: ws.y, w: ws.w, h: ws.h };
+  }, [getShellWorkspace]);
 
   // Migrate legacy detached-window top offsets from older shell reserve logic.
   useEffect(() => {
@@ -1065,18 +1116,69 @@ export const AppManager: React.FC = () => {
     });
   }, [detachedApps.size, getMaximizedWindowBounds, getShellWorkspace]);
 
-  // -- Global stat-bump handler (sourced from all creative apps) -----------
+  // -- Engagement / achievements: one central apply -> check -> REWARD path -
+  // Every stat change (the dex-stat-bump bus, session start, app usage) runs
+  // through applyEngagement. The previous handler dropped
+  // checkAchievements().newUnlocks, so achievements unlocked silently with no
+  // reward -- and the reward moment is the entire point. Newly satisfied
+  // achievements now always surface on the unified notification path (banner +
+  // Notification Center), with a one-tap "View" into the Trophies app.
+  const rewardUnlocks = useCallback((unlocked: Achievement[]) => {
+    if (!unlocked.length) return;
+    const headline = unlocked.reduce((best, a) => (a.points > best.points ? a : best), unlocked[0]);
+    const totalPts = unlocked.reduce((sum, a) => sum + a.points, 0);
+    const single = unlocked.length === 1;
+    const openTrophies = () => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'achievements' } }));
+    void notify({
+      title: single ? `Achievement unlocked: ${headline.title}` : `${unlocked.length} achievements unlocked!`,
+      body: single
+        ? `${headline.description}  ·  +${headline.points} pts`
+        : `Including "${headline.title}"  ·  +${totalPts} pts total`,
+      icon: 'success',
+      priority: 'normal',
+      source: 'Achievements',
+      action: { target: 'achievements', label: 'View' },
+      actions: [{ label: 'View', onClick: openTrophies }],
+    });
+  }, []);
+
+  const applyEngagement = useCallback((mutate: (s: EngagementState) => EngagementState) => {
+    try {
+      const { state, newUnlocks } = checkAchievements(mutate(loadEngagement()));
+      saveEngagement(state);
+      if (newUnlocks.length) rewardUnlocks(newUnlocks);
+    } catch (err) { console.warn('[DEX] engagement apply error', err); }
+  }, [rewardUnlocks]);
+
+  // Global stat-bump bus -- sourced from every app's real user actions.
   useEffect(() => {
     const handler = (e: CustomEvent<{ key: string; amount?: number }>) => {
-      try {
-        const eng = loadEngagement();
-        const { state } = checkAchievements(incrementStat(eng, e.detail.key as Parameters<typeof incrementStat>[1], e.detail.amount ?? 1));
-        saveEngagement(state);
-      } catch (err) { console.warn('[DEX] stat-bump error', err); }
+      applyEngagement(s => incrementStat(s, e.detail.key as Parameters<typeof incrementStat>[1], e.detail.amount ?? 1));
     };
     window.addEventListener('dex-stat-bump', handler as EventListener);
     return () => window.removeEventListener('dex-stat-bump', handler as EventListener);
-  }, []);
+  }, [applyEngagement]);
+
+  // Session start: record ONCE per renderer session. recordSessionStart had no
+  // caller, so streaks, session counts and time-of-day stats never advanced and
+  // that whole achievement category was unreachable. This revives it.
+  const sessionRecordedRef = useRef(false);
+  useEffect(() => {
+    if (sessionRecordedRef.current) return;
+    sessionRecordedRef.current = true;
+    applyEngagement(recordSessionStart);
+  }, [applyEngagement]);
+
+  // App usage: record centrally when a non-home app comes to the foreground, so
+  // breadth ("used N apps") + per-app depth advance for EVERY app -- not just the
+  // handful that self-recorded. The creative apps (videoeditor/prism/flux/axl)
+  // still call recordAppUsage on their own mount today; skip them here to avoid
+  // double counting until that per-app call is folded into this central path.
+  useEffect(() => {
+    if (!currentAppId || currentAppId === 'home') return;
+    if (['videoeditor', 'prism', 'flux', 'axl'].includes(currentAppId)) return;
+    applyEngagement(s => recordAppUsage(s, currentAppId));
+  }, [currentAppId, applyEngagement]);
 
   // -- App Switcher HUD (Ctrl+Tab visual overlay) --------------------------
   const [switcherVisible, setSwitcherVisible] = useState(false);
@@ -1191,6 +1293,51 @@ export const AppManager: React.FC = () => {
     return false;
   }, [detachedApps]);
 
+  // True while a FULLSCREEN app is in front -- the creative apps that open
+  // maximized (def.maximized). On the desktop and over windowed apps the dock is
+  // pinned and reserves space; in a fullscreen app it hides so the app fills
+  // everything (reveal it at the bottom edge / Show Dock handle). "Lock the dock
+  // once the app opens, lift it up when needed."
+  const inFullscreenApp = useMemo(
+    () => currentAppId !== 'home' && !!APP_WINDOW_SIZES[currentAppId as string]?.maximized,
+    [currentAppId],
+  );
+
+  // -- Publish dock-reserved insets as CSS variables so the inline app surface
+  //    and floating windows size their bounds without ever clipping under the
+  //    dock. Reserve only when the dock is pinned -- on the desktop / over
+  //    windowed apps, never in a fullscreen app (it hides there). Keyed to
+  //    dockMode + inFullscreenApp (stable), NOT taskbarVisible (which flickers
+  //    with hover and collapsed the insets to 0 mid-session). --
+  useEffect(() => {
+    const dockPinned = dockMode === 'always-visible' && !inFullscreenApp;
+    const insets = getDockReservedInsets(dockEdgePref, dockPresetPref, dockPinned);
+    const root = document.documentElement;
+    root.style.setProperty('--dex-reserved-top', `${insets.top}px`);
+    root.style.setProperty('--dex-reserved-right', `${insets.right}px`);
+    root.style.setProperty('--dex-reserved-bottom', `${insets.bottom}px`);
+    root.style.setProperty('--dex-reserved-left', `${insets.left}px`);
+  }, [dockEdgePref, dockPresetPref, dockMode, inFullscreenApp]);
+
+  // When the dock hides for a fullscreen app (or returns on the desktop), the
+  // work area changes -- re-fit maximized creative windows to the CURRENT work
+  // area so they fill the freed space instead of leaving the old reserved gap.
+  useEffect(() => {
+    const maxB = getMaximizedWindowBounds();
+    setDetachedApps(prev => {
+      let changed = false;
+      const next = new Map(prev);
+      next.forEach((bounds, appId) => {
+        if (CREATIVE_APPS.has(appId) && !isSameWindowBounds(bounds, maxB, 1)) {
+          next.set(appId, { ...maxB, z: bounds.z });
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inFullscreenApp]);
+
   // Helper: check if any dropdown/menu is currently open (used by dock auto-hide)
   const isAnyMenuOpen = useCallback((): boolean => {
     return !!document.querySelector('[role="menu"], [role="listbox"], .dropdown:not([hidden]), .context-menu:not([hidden]), [data-state="open"]');
@@ -1199,10 +1346,11 @@ export const AppManager: React.FC = () => {
   // Auto-hide dock: show on bottom hover, hide after leaving
   // When any window is maximized, dock hides immediately
   const showDock = useCallback(() => {
-    if (anyWindowMaximized && !showAppMenuRef.current && !dockCtxRef.current) return;
+    // Always able to reveal -- the dock hides in fullscreen apps, so a deliberate
+    // edge-dwell / Show Dock handle must be able to bring it back.
     if (dockHideTimerRef.current) { clearTimeout(dockHideTimerRef.current); dockHideTimerRef.current = null; }
     setTaskbarVisible(true);
-  }, [anyWindowMaximized]);
+  }, []);
 
   // Hover-intent gate for bottom trigger zone. Requires cursor to dwell ~280ms
   // with average velocity below 0.35 px/ms before revealing the dock. The longer,
@@ -1246,7 +1394,8 @@ export const AppManager: React.FC = () => {
     }
   }, [showDock]);
   const scheduleDockHide = useCallback(() => {
-    if (dockMode === 'always-visible' && !anyWindowMaximized) return;
+    // Pinned on the desktop / over windowed apps; allowed to hide in a fullscreen app.
+    if (dockMode === 'always-visible' && !inFullscreenApp) return;
     if (dockHideTimerRef.current) clearTimeout(dockHideTimerRef.current);
     // Delay before hiding allows user to return and see smooth transition
     dockHideTimerRef.current = setTimeout(() => {
@@ -1260,18 +1409,19 @@ export const AppManager: React.FC = () => {
       if (Date.now() - lastMenuCloseRef.current < 200) return;
       setTaskbarVisible(false);
     }, 450); // 450ms — gentle delay so a brief overshoot does not hide the dock
-  }, [dockMode, anyWindowMaximized, isAnyMenuOpen]);
+  }, [dockMode, inFullscreenApp, isAnyMenuOpen]);
 
-  // Keep dock visible when mode is always-visible and no maximized window
+  // Dock visibility policy: pinned (shown) on the Home desktop and over windowed
+  // apps; the moment a FULLSCREEN app comes to the front it tucks away so the app
+  // owns the whole screen (reveal at the bottom edge / Show Dock handle). Other
+  // dock modes still hide on maximize.
   useEffect(() => {
-    if (dockMode === 'always-visible' && !anyWindowMaximized) {
+    if (dockMode === 'always-visible' && !inFullscreenApp) {
       setTaskbarVisible(true);
-    }
-    // When a window becomes maximized, hide dock
-    if (anyWindowMaximized && dockMode !== 'always-visible') {
+    } else if (inFullscreenApp || anyWindowMaximized) {
       setTaskbarVisible(false);
     }
-  }, [dockMode, anyWindowMaximized]);
+  }, [dockMode, anyWindowMaximized, inFullscreenApp]);
 
   // Keep dock visible whenever any overlay menu is open (prevents auto-hide race condition)
   useEffect(() => {
@@ -1370,7 +1520,7 @@ export const AppManager: React.FC = () => {
   // Global mouse position tracking for dock hide fallback
   // Ensures dock hides when mouse moves away from bottom edge region
   useEffect(() => {
-    if (dockMode === 'always-visible' && !anyWindowMaximized) return;
+    if (dockMode === 'always-visible' && !inFullscreenApp) return;
     let rafId: number | null = null;
     
     // Helper: check if any dropdown/menu is currently open
@@ -1431,7 +1581,7 @@ export const AppManager: React.FC = () => {
       document.removeEventListener('mousemove', throttledMove);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [taskbarVisible, dockMode, anyWindowMaximized, scheduleDockHide]);
+  }, [taskbarVisible, dockMode, anyWindowMaximized, inFullscreenApp, scheduleDockHide]);
 
   // Clock + Battery for status row
   useEffect(() => {
@@ -1916,6 +2066,116 @@ export const AppManager: React.FC = () => {
     setCurrentApp(appId);
   }, [setCurrentApp]);
 
+  // Persist the live floating-window layout (geometry + z-order + minimized) to
+  // the window manifest. The infra existed but scheduleWrite was NEVER called, so
+  // the manifest stayed empty and crash-recovery / "restore previous session" had
+  // no geometry to work from. Debounced inside scheduleWrite; App.tsx flushes it
+  // synchronously on beforeunload.
+  useEffect(() => {
+    const snaps: WindowSnapshot[] = [];
+    detachedApps.forEach((b, appId) => {
+      snaps.push({
+        appId,
+        x: Math.round(b.x), y: Math.round(b.y),
+        width: Math.round(b.w), height: Math.round(b.h),
+        z: b.z,
+        minimized: minimizedApps.has(appId),
+        focused: focusedFloatingAppId === appId,
+      });
+    });
+    // Don't persist an EMPTY layout: on a fresh boot detachedApps starts empty, and
+    // an empty write would wipe the previous session's geometry BEFORE the restore
+    // offer can read it. The journal gates what actually restores, so keeping the
+    // last non-empty manifest is safe.
+    if (snaps.length === 0) return;
+    scheduleWindowManifest(snaps, stageManagerOn ? 'stage' : undefined);
+  }, [detachedApps, minimizedApps, focusedFloatingAppId, stageManagerOn]);
+
+  // -- Workspace presets ("workspace memory") --------------------------------
+  // Save the current floating-window layout under a name, and restore a saved
+  // one instantly. Reuses the manifest geometry snapshot and the same
+  // launch+clamp restore path as crash recovery. Driven by CustomEvents so any
+  // UI (menu / command palette / overview) can trigger it without prop-drilling.
+  useEffect(() => {
+    const onSave = (e: Event) => {
+      const name = (e as CustomEvent).detail?.name as string | undefined;
+      if (!name) return;
+      const snaps: WindowSnapshot[] = [];
+      detachedApps.forEach((b, appId) => {
+        snaps.push({
+          appId, x: Math.round(b.x), y: Math.round(b.y),
+          width: Math.round(b.w), height: Math.round(b.h), z: b.z,
+          minimized: minimizedApps.has(appId), focused: focusedFloatingAppId === appId,
+        });
+      });
+      const preset = saveWorkspacePreset(name, snaps, stageManagerOn ? 'stage' : undefined);
+      window.dispatchEvent(new CustomEvent('dex-workspace-presets-changed'));
+      void notify({
+        title: 'Workspace saved',
+        body: `"${preset.name}" — ${snaps.length} window${snaps.length === 1 ? '' : 's'}`,
+        source: 'workspace',
+      });
+    };
+    const onRestore = (e: Event) => {
+      const id = (e as CustomEvent).detail?.id as string | undefined;
+      if (!id) return;
+      const preset = getWorkspacePreset(id);
+      if (!preset || !preset.windows.length) return;
+      const launch = useRunningApps.getState().launchApp;
+      for (const w of preset.windows) {
+        const def = APP_DEFINITIONS[w.appId as AppId];
+        if (def) launch({ id: w.appId, name: def.name, icon: def.icon || w.appId, color: def.color });
+      }
+      const ws = getShellWorkspace(0);
+      const mins: string[] = [];
+      requestAnimationFrame(() => {
+        setDetachedApps(prev => {
+          const next = new Map(prev);
+          for (const w of preset.windows) {
+            const c = clampWindowToWorkspace({ x: w.x, y: w.y, w: w.width, h: w.height }, ws);
+            next.set(w.appId, { ...c, z: w.z });
+            if (w.minimized) mins.push(w.appId);
+          }
+          return next;
+        });
+        if (mins.length) setMinimizedApps(prev => { const n = new Set(prev); mins.forEach(id => n.add(id)); return n; });
+      });
+      void notify({ title: 'Workspace restored', body: `"${preset.name}"`, source: 'workspace' });
+    };
+    // Apply a built-in starter workspace: open each app as a floating window via
+    // the proven `dex-open-in-window` path (launch + detach), then let the
+    // min-size-aware auto-arrange tile them — no saved geometry, so the layout
+    // fits whatever display it lands on.
+    const onApplyTemplate = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      const apps = (detail.apps as string[] | undefined) || [];
+      const wantUki = !!detail.uki;
+      if (!apps.length && !wantUki) return;
+      let opened = 0;
+      for (const appId of apps) {
+        if (!APP_DEFINITIONS[appId as AppId]) continue;
+        window.dispatchEvent(new CustomEvent('dex-open-in-window', { detail: { appId } }));
+        opened++;
+      }
+      // UKI is a global overlay assistant, not a tiled window — summon it (only
+      // if not already open, so we never toggle it shut).
+      if (wantUki) {
+        try { if (!useUkiStore.getState().showPanel) useUkiStore.getState().togglePanel(); } catch { /* store not ready */ }
+      }
+      // Each open detaches on the next frame; give them a beat, then tile.
+      setTimeout(() => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), 200);
+      void notify({ title: 'Workspace opened', body: `${opened} app${opened === 1 ? '' : 's'} arranged${wantUki ? ' · UKI' : ''}`, source: 'workspace' });
+    };
+    window.addEventListener('dex-workspace-save', onSave);
+    window.addEventListener('dex-workspace-restore', onRestore);
+    window.addEventListener('dex-workspace-apply-template', onApplyTemplate);
+    return () => {
+      window.removeEventListener('dex-workspace-save', onSave);
+      window.removeEventListener('dex-workspace-restore', onRestore);
+      window.removeEventListener('dex-workspace-apply-template', onApplyTemplate);
+    };
+  }, [detachedApps, minimizedApps, focusedFloatingAppId, stageManagerOn, getShellWorkspace]);
+
   // Event bridge: open apps as floating windows from spotlight/search
   useEffect(() => {
     const handler = (e: Event) => {
@@ -2038,6 +2298,32 @@ export const AppManager: React.FC = () => {
         'right-third':  { x: LEFT + PAD * 3 + thirdW * 2, y: TOP + PAD, w: thirdW, h: usableH - PAD * 2 },
       };
 
+      // Min-size-aware columns: never use more columns than the work area can
+      // hold at a usable width (560px) — otherwise windows that refuse to shrink
+      // below their min-width overlap. When the predefined layout needs more
+      // columns than fit, fall back to a capped grid (down to a vertical stack).
+      const MIN_TILE_W = 560;
+      const maxCols = Math.max(1, Math.floor((W - PAD) / (MIN_TILE_W + PAD)));
+      const wantCols = count === 1 ? 1 : count <= 5 ? 2 : 3;
+      if (count >= 2 && maxCols < wantCols) {
+        const cols = Math.min(maxCols, count);
+        const rows = Math.ceil(count / cols);
+        const cellW = Math.floor((W - PAD * (cols + 1)) / cols);
+        const cellH = Math.floor((usableH - PAD * (rows + 1)) / rows);
+        ids.slice(0, count).forEach((id, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const z = nextDetachZ();
+          const b = next.get(id);
+          if (b) next.set(id, {
+            x: LEFT + PAD * (col + 1) + cellW * col,
+            y: TOP + PAD * (row + 1) + cellH * row,
+            w: cellW, h: cellH, z,
+          });
+        });
+        return next;
+      }
+
       // For 6 windows: use a 3x2 grid
       if (count >= 6) {
         const usedIds = ids.slice(0, 6);
@@ -2071,6 +2357,58 @@ export const AppManager: React.FC = () => {
     });
   }, [detachedApps, getShellWorkspace]);
 
+  // Dynamic multi-split layouts (DEX 5.5 maturity initiative): arrange the open
+  // floating windows into full-height columns whose widths follow the given
+  // ratios — 50/50 = [1,1], 70/30 = [0.7,0.3], 60/20/20 = [0.6,0.2,0.2]. Uses as
+  // many columns as there are windows (capped to the ratio count); extra windows
+  // are left untouched. The user is choosing the ratio, so we honor it (a column
+  // is floored at 220px so a tiny screen never produces a zero-width pane).
+  const applySplitRatio = useCallback((ratios: number[]) => {
+    const ids = Array.from(detachedApps.keys());
+    if (ids.length === 0 || ratios.length === 0) return;
+    const workspace = getShellWorkspace(0);
+    const PAD = 6;
+    const n = Math.min(ids.length, ratios.length);
+    const used = ratios.slice(0, n);
+    const sum = used.reduce((a, b) => a + b, 0) || 1;
+    const avail = workspace.w - PAD * (n + 1);
+    // Respect each window's real min-width (browser = 720, etc.) so a narrow
+    // ratio column never clips/overlaps. If the windows can't even sit side by
+    // side at their mins, a column split is impossible — fall back to the
+    // min-size-aware tiler and say so.
+    const mins = ids.slice(0, n).map(id => (APP_WINDOW_MIN_SIZES[id]?.w ?? 360));
+    if (mins.reduce((a, b) => a + b, 0) > avail) {
+      autoTileAll();
+      void notify({ title: 'Tiled instead', body: 'Not enough width for that split', source: 'workspace' });
+      return;
+    }
+    // Ratio width per column, floored at its min; trim any overflow from the
+    // columns that still have slack above their min (so totals fit exactly).
+    const widths = used.map((r, i) => Math.max(mins[i], Math.floor(avail * (r / sum))));
+    let overflow = widths.reduce((a, b) => a + b, 0) - avail;
+    while (overflow > 0) {
+      const slack = widths.map((w, i) => (w > mins[i] ? i : -1)).filter(i => i >= 0);
+      if (!slack.length) break;
+      const per = Math.ceil(overflow / slack.length);
+      for (const i of slack) {
+        const take = Math.min(per, widths[i] - mins[i], overflow);
+        widths[i] -= take; overflow -= take;
+        if (overflow <= 0) break;
+      }
+    }
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      let x = workspace.x + PAD;
+      for (let i = 0; i < n; i++) {
+        const id = ids[i];
+        const b = next.get(id);
+        if (b) next.set(id, { x, y: workspace.y + PAD, w: widths[i], h: workspace.h - PAD * 2, z: nextDetachZ() });
+        x += widths[i] + PAD;
+      }
+      return next;
+    });
+  }, [detachedApps, getShellWorkspace, autoTileAll]);
+
   useEffect(() => {
     const onResize = () => {
       const workspace = getShellWorkspace(0);
@@ -2092,6 +2430,23 @@ export const AppManager: React.FC = () => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [getMaximizedWindowBounds, getShellWorkspace]);
+
+  // Surface the existing Auto-Tile-All (dock context menu) to any UI — the
+  // Command Palette "Arrange Windows" command dispatches this event. Reuses the
+  // proven predefined-layout tiler rather than a separate grid implementation.
+  useEffect(() => {
+    const onArrange = () => autoTileAll();
+    const onSplit = (e: Event) => {
+      const ratios = (e as CustomEvent).detail?.ratios as number[] | undefined;
+      if (Array.isArray(ratios) && ratios.length) applySplitRatio(ratios);
+    };
+    window.addEventListener('dex-arrange-windows', onArrange);
+    window.addEventListener('dex-split-layout', onSplit);
+    return () => {
+      window.removeEventListener('dex-arrange-windows', onArrange);
+      window.removeEventListener('dex-split-layout', onSplit);
+    };
+  }, [autoTileAll, applySplitRatio]);
 
   // Keyboard shortcuts -- use ref-based handler to avoid re-registering on every state change
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -2157,6 +2512,15 @@ export const AppManager: React.FC = () => {
       }
       // Ctrl+W -- close current app (go home)
       if ((e.ctrlKey || e.metaKey) && e.key === 'w') { e.preventDefault(); if (currentAppId !== 'home') { handleCloseApp(currentAppId); setCurrentApp('home'); } return; }
+      // Escape leaves immersive focus first, before any app-level Escape handling.
+      if (e.key === 'Escape' && immersive) { e.preventDefault(); setImmersive(false); return; }
+      // Ctrl+\ -- toggle immersive focus (hide chrome) while inside an app.
+      // (Ctrl+Shift+F is taken by the global search overlay; \ avoids that clash.)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === '\\') {
+        e.preventDefault();
+        if (currentAppId !== 'home') setImmersive(v => !v); else setImmersive(false);
+        return;
+      }
       // Ctrl+Shift+W -- close all apps
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'W') { e.preventDefault(); handleCloseAllApps(); return; }
       // Ctrl+Shift+E -- detach/reattach current app as floating window
@@ -2604,8 +2968,8 @@ export const AppManager: React.FC = () => {
             {!isMaximized && (
             <div
               style={{
-                height: 38, display: 'flex', alignItems: 'center', gap: 8,
-                padding: '0 14px', cursor: 'grab', userSelect: 'none',
+                height: 36, display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
                 background: useGlass ? 'rgba(28,28,32,0.55)' : 'var(--color-bg-elevated, #1C1C20)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
                 justifyContent: 'center',
@@ -2808,7 +3172,7 @@ export const AppManager: React.FC = () => {
                         position: 'absolute', top: 28, right: -16, zIndex: 'var(--z-overlay)' as unknown as number,
                         background: 'var(--color-bg-elevated)',
                         border: '1px solid var(--color-border)', borderRadius: 10,
-                        padding: '10px 10px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5,
+                        padding: '10px 10px var(--space-2)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5,
                         boxShadow: 'var(--pg-shadow-context), inset 0 0.5px 0 var(--color-border-subtle)',
                         width: 'min(240px, calc(100vw - 48px))',
                         animation: 'fadeIn 0.18s ease',
@@ -2832,7 +3196,7 @@ export const AppManager: React.FC = () => {
                             aria-label={`Snap window ${label}`}
                             style={{
                               width: 50, height: 38, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                              background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 5,
+                              background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4,
                               color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0,
                               transition: 'all 0.15s ease',
                             }}
@@ -2889,13 +3253,39 @@ export const AppManager: React.FC = () => {
                     const startW = detBounds.w;
                     const el = e.currentTarget.parentElement as HTMLElement;
                     if (el) el.setAttribute('data-dragging', 'true');
+                    // Neighbor rebalance: a window flush to this one's right edge
+                    // becomes the other half of a divider — its right stays fixed
+                    // while its left follows ours (floored at its min-width).
+                    const GAP = 6;
+                    let neighborId: string | null = null;
+                    let neighborStart: { x: number; y: number; w: number; h: number } | null = null;
+                    detachedApps.forEach((nb, id) => {
+                      if (id === appId || minimizedApps.has(id)) return;
+                      const gap = nb.x - (detBounds.x + detBounds.w);
+                      const vOverlap = Math.min(detBounds.y + detBounds.h, nb.y + nb.h) - Math.max(detBounds.y, nb.y);
+                      if (gap >= -4 && gap <= 18 && vOverlap > 40) { neighborId = id; neighborStart = { x: nb.x, y: nb.y, w: nb.w, h: nb.h }; }
+                    });
+                    const neighborEl = neighborId ? (document.querySelector(`[data-floating-window="${neighborId}"]`) as HTMLElement | null) : null;
+                    const neighborMinW = neighborId ? (APP_WINDOW_MIN_SIZES[neighborId]?.w ?? 360) : 360;
+                    const computeW = (ev: PointerEvent, workspace: { x: number; w: number }) => {
+                      const ns = neighborStart;
+                      const maxW = ns
+                        ? (ns.x + ns.w) - GAP - detBounds.x - neighborMinW
+                        : workspace.x + workspace.w - detBounds.x;
+                      return Math.min(Math.max(360, startW + ev.clientX - startX), maxW);
+                    };
                     let rafId = 0;
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(0);
-                        const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
+                        const nw = computeW(ev, getShellWorkspace(0));
                         if (el) el.style.width = nw + 'px';
+                        const ns = neighborStart;
+                        if (neighborEl && ns) {
+                          const nbX = detBounds.x + nw + GAP;
+                          neighborEl.style.left = nbX + 'px';
+                          neighborEl.style.width = ((ns.x + ns.w) - nbX) + 'px';
+                        }
                       });
                     };
                     const onUp = (ev: PointerEvent) => {
@@ -2904,13 +3294,20 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
                       const workspace = getShellWorkspace(0);
-                      const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
+                      const nw = computeW(ev, workspace);
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
                         if (!b) return prev;
                         const next = new Map(prev);
                         const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: nw, h: b.h }, workspace);
                         next.set(appId, { ...b, ...clamped });
+                        const ns = neighborStart;
+                        if (neighborId && ns) {
+                          const nbX = b.x + nw + GAP;
+                          const nbW = Math.max(neighborMinW, (ns.x + ns.w) - nbX);
+                          const nbPrev = prev.get(neighborId);
+                          if (nbPrev) next.set(neighborId, { ...nbPrev, ...clampWindowToWorkspace({ x: nbX, y: ns.y, w: nbW, h: ns.h }, workspace) });
+                        }
                         return next;
                       });
                     };
@@ -2972,20 +3369,38 @@ export const AppManager: React.FC = () => {
                     const startLeft = detBounds.x;
                     const el = e.currentTarget.parentElement as HTMLElement;
                     if (el) el.setAttribute('data-dragging', 'true');
+                    // Neighbor rebalance: a window flush to our LEFT is the other
+                    // half of a divider — its left stays fixed while its right
+                    // follows our left edge (floored at its min-width).
+                    const GAP = 6;
+                    let neighborId: string | null = null;
+                    let neighborStart: { x: number; y: number; w: number; h: number } | null = null;
+                    detachedApps.forEach((nb, id) => {
+                      if (id === appId || minimizedApps.has(id)) return;
+                      const gap = detBounds.x - (nb.x + nb.w);
+                      const vOverlap = Math.min(detBounds.y + detBounds.h, nb.y + nb.h) - Math.max(detBounds.y, nb.y);
+                      if (gap >= -4 && gap <= 18 && vOverlap > 40) { neighborId = id; neighborStart = { x: nb.x, y: nb.y, w: nb.w, h: nb.h }; }
+                    });
+                    const neighborEl = neighborId ? (document.querySelector(`[data-floating-window="${neighborId}"]`) as HTMLElement | null) : null;
+                    const neighborMinW = neighborId ? (APP_WINDOW_MIN_SIZES[neighborId]?.w ?? 360) : 360;
+                    const computeLeft = (ev: PointerEvent, workspace: { x: number }) => {
+                      const ns = neighborStart;
+                      const deltaX = ev.clientX - startX;
+                      const desiredW = Math.max(360, startW - deltaX);
+                      const desiredLeft = startLeft + (startW - desiredW);
+                      const minLeft = ns ? Math.max(workspace.x, ns.x + neighborMinW + GAP) : workspace.x;
+                      return Math.max(minLeft, desiredLeft);
+                    };
                     let rafId = 0;
                     const onMove = (ev: PointerEvent) => {
                       cancelAnimationFrame(rafId);
                       rafId = requestAnimationFrame(() => {
                         const workspace = getShellWorkspace(0);
-                        const deltaX = ev.clientX - startX;
-                        const desiredW = Math.max(360, startW - deltaX);
-                        const desiredLeft = startLeft + (startW - desiredW);
-                        const nl = Math.max(workspace.x, desiredLeft);
+                        const nl = computeLeft(ev, workspace);
                         const nw = startLeft + startW - nl;
-                        if (el) {
-                          el.style.width = nw + 'px';
-                          el.style.left = nl + 'px';
-                        }
+                        if (el) { el.style.width = nw + 'px'; el.style.left = nl + 'px'; }
+                        const ns = neighborStart;
+                        if (neighborEl && ns) neighborEl.style.width = ((nl - GAP) - ns.x) + 'px';
                       });
                     };
                     const onUp = (ev: PointerEvent) => {
@@ -2994,10 +3409,7 @@ export const AppManager: React.FC = () => {
                       document.removeEventListener('pointerup', onUp);
                       if (el) el.removeAttribute('data-dragging');
                       const workspace = getShellWorkspace(0);
-                      const deltaX = ev.clientX - startX;
-                      const desiredW = Math.max(360, startW - deltaX);
-                      const desiredLeft = startLeft + (startW - desiredW);
-                      const nl = Math.max(workspace.x, desiredLeft);
+                      const nl = computeLeft(ev, workspace);
                       const nw = startLeft + startW - nl;
                       setDetachedApps(prev => {
                         const b = prev.get(appId);
@@ -3005,6 +3417,12 @@ export const AppManager: React.FC = () => {
                         const next = new Map(prev);
                         const clamped = clampWindowToWorkspace({ x: nl, y: b.y, w: nw, h: b.h }, workspace);
                         next.set(appId, { ...b, ...clamped });
+                        const ns = neighborStart;
+                        if (neighborId && ns) {
+                          const nbW = Math.max(neighborMinW, (nl - GAP) - ns.x);
+                          const nbPrev = prev.get(neighborId);
+                          if (nbPrev) next.set(neighborId, { ...nbPrev, ...clampWindowToWorkspace({ x: ns.x, y: ns.y, w: nbW, h: ns.h }, workspace) });
+                        }
                         return next;
                       });
                     };
@@ -3318,7 +3736,7 @@ export const AppManager: React.FC = () => {
           }}
           className={`dex-app-container ${showInline ? 'dex-app-opening' : ''}`}
         >
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
             <AppErrorBoundary appId={appId}>
               <Suspense fallback={<Loading appId={appId} />}>
                 <Comp />
@@ -3367,10 +3785,14 @@ export const AppManager: React.FC = () => {
         if (!dockRef.current) return;
         const items = dockRef.current.querySelectorAll<HTMLElement>('[data-dock-item]');
         const dockRect = dockRef.current.getBoundingClientRect();
-        const sigma = 40;
-        const influence = 80;
-        // Use layout offsets instead of transformed DOMRects. Reading transformed
-        // rects feeds the previous scale back into the next frame and makes icons jitter.
+        // Gentler magnification (owner direction): a broad, soft lift that GLIDES
+        // with the cursor instead of a sharp pop bleeding left-to-center. A wider
+        // sigma spreads the swell across neighbours; the short transition smooths
+        // frame-to-frame motion. Safe to transition now because centres come from
+        // layout offsets (offsetLeft), NOT transformed rects, so there is no
+        // scale-feedback loop to cause jitter.
+        const sigma = 60;
+        const influence = 120;
         const centers: number[] = [];
         for (let i = 0; i < items.length; i++) {
           centers[i] = dockRect.left + items[i].offsetLeft + items[i].offsetWidth / 2;
@@ -3379,12 +3801,12 @@ export const AppManager: React.FC = () => {
         for (let i = 0; i < items.length; i++) {
           const dist = Math.abs(mx - centers[i]);
           const scale = dist <= influence
-            ? 1 + (magnificationScale - 1) * 0.25 * Math.exp(-(dist * dist) / (2 * sigma * sigma))
+            ? 1 + (magnificationScale - 1) * 0.22 * Math.exp(-(dist * dist) / (2 * sigma * sigma))
             : 1;
           const roundedScale = Math.round(scale * 1000) / 1000;
           if (items[i].dataset.dockScale === String(roundedScale)) continue;
           items[i].dataset.dockScale = String(roundedScale);
-          items[i].style.transition = 'none';
+          items[i].style.transition = 'transform 0.18s cubic-bezier(0.22,1,0.36,1)';
           items[i].style.transform = `scale(${roundedScale})`;
         }
       });
@@ -3510,44 +3932,32 @@ export const AppManager: React.FC = () => {
           transformOrigin: 'bottom center',
           willChange: dockMagnification ? 'transform' : 'auto',
         }}
-          onMouseEnter={(e) => {
-            if (dockPreviewTimer.current) clearTimeout(dockPreviewTimer.current);
-            const el = e.currentTarget;
-            const rect = el.getBoundingClientRect();
-            dockPreviewTimer.current = setTimeout(() => {
-              setDockPreview({ id: item.id, x: rect.left + rect.width / 2, y: rect.top });
-              setDockPeekAnnouncement(`Dock peek opened for ${item.label}`);
-            }, 400);
-          }}
-          onMouseLeave={() => {
-            if (dockPreviewTimer.current) clearTimeout(dockPreviewTimer.current);
-            dockPreviewTimer.current = null;
-            if (dockPreviewPinnedId !== item.id) setDockPreview(null);
-          }}
         >
 
           <button
             type="button"
             onPointerDown={(e) => {
+              // Non-primary mouse button (right/middle) -> let onContextMenu handle it.
+              if (e.pointerType === 'mouse' && e.button !== 0) return;
               if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
-              dockLongPressTimerRef.current = setTimeout(() => {
-                setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
-              }, 420);
+              // Long-press opens the context menu on touch only; mouse uses right-click.
               if (e.pointerType === 'touch') {
-                dockTouchReorderRef.current = {
-                  appId: item.id,
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  dragging: false,
-                  lastToIndex: items.findIndex((d) => d.id === item.id),
-                };
-                e.currentTarget.setPointerCapture?.(e.pointerId);
-                return;
+                dockLongPressTimerRef.current = setTimeout(() => {
+                  setDockCtx({ appId: item.id, x: e.clientX, y: e.clientY });
+                }, 420);
               }
-              openDockApp(item.id, e.currentTarget);
+              // Drag-to-reorder for BOTH mouse and touch. Launch is deferred to
+              // pointer-up when no drag happened, so a plain click still opens the app.
+              dockTouchReorderRef.current = {
+                appId: item.id,
+                startX: e.clientX,
+                startY: e.clientY,
+                dragging: false,
+                lastToIndex: items.findIndex((d) => d.id === item.id),
+              };
+              e.currentTarget.setPointerCapture?.(e.pointerId);
             }}
             onPointerMove={(e) => {
-              if (e.pointerType !== 'touch') return;
               const gesture = dockTouchReorderRef.current;
               if (!gesture || gesture.appId !== item.id) return;
 
@@ -3589,18 +3999,16 @@ export const AppManager: React.FC = () => {
             onPointerUp={(e) => {
               if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
               dockLongPressTimerRef.current = null;
-              if (e.pointerType === 'touch') {
-                const gesture = dockTouchReorderRef.current;
-                if (gesture && gesture.appId === item.id && !gesture.dragging) {
-                  openDockApp(item.id, e.currentTarget);
-                }
-                dockTouchReorderRef.current = null;
+              const gesture = dockTouchReorderRef.current;
+              if (gesture && gesture.appId === item.id && !gesture.dragging) {
+                openDockApp(item.id, e.currentTarget);
               }
+              dockTouchReorderRef.current = null;
             }}
-            onPointerCancel={(e) => {
+            onPointerCancel={() => {
               if (dockLongPressTimerRef.current) clearTimeout(dockLongPressTimerRef.current);
               dockLongPressTimerRef.current = null;
-              if (e.pointerType === 'touch') dockTouchReorderRef.current = null;
+              dockTouchReorderRef.current = null;
             }}
             onClick={(e) => {
               if (e.detail !== 0) return;
@@ -3625,20 +4033,18 @@ export const AppManager: React.FC = () => {
             style={{
               width: size, height: size,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              // Focused app reads as a clear accent-tinted square -- the one,
-              // unambiguous "this app is in front" affordance. Background apps
-              // are transparent (their running state is the dot below). A
-              // rounded square (not a full circle) is the bespoke DEX shape.
-              background: isActive ? 'var(--color-accent-soft)' : 'transparent',
+              // No background highlight on the dock -- hard-coded transparent for
+              // every state (active AND hover). The owner does not want the accent
+              // square or a hover square. The icon glyph, the magnification lift,
+              // and the running/active dot below are the only affordances.
+              background: 'transparent',
               border: 'none', borderRadius: 12, cursor: 'pointer',
               position: 'relative', padding: 0,
               touchAction: 'manipulation',
               color: item.color,
               opacity: isMinimized ? 0.5 : 1,
-              transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), background 0.15s ease, opacity 0.25s ease',
+              transition: 'color 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
             }}
-            onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isActive ? 'var(--color-accent-soft)' : 'transparent'; }}
           >
             {AppIconPngs[item.id] ? (
               <AppIconImg appId={item.id} size={size - 8} />
@@ -3698,7 +4104,7 @@ export const AppManager: React.FC = () => {
     });
 
   const dockSeparator = (key: string) => (
-    <div key={key} style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 6px', flexShrink: 0, alignSelf: 'center', borderRadius: 1 }} />
+    <div key={key} style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 6px', flexShrink: 0, alignSelf: 'center', borderRadius: 2 }} />
   );
 
   // APP_MENU_CATEGORIES is computed once at module scope — no useMemo needed
@@ -3846,11 +4252,15 @@ export const AppManager: React.FC = () => {
         ref={tabContainerRef}
         style={{
           height: 32, display: 'flex', alignItems: 'center',
-          padding: '0 8px', gap: 2,
-          background: 'var(--color-bg-glass, rgba(22,22,24,0.72))',
-          backdropFilter: 'var(--blur-lg) saturate(170%)',
-          WebkitBackdropFilter: 'var(--blur-lg) saturate(170%)',
-          borderBottom: '1px solid var(--color-border-subtle)',
+          padding: '0 var(--space-2)', gap: 2,
+          // Tier 2 of the top chrome: solid, matching the menu bar tone (#0E0E11)
+          // so the two read as one continuous two-tier bar divided by a single
+          // hairline, not two unrelated strips. (No blur in full-flat mode.)
+          background: '#0E0E11',
+          backdropFilter: 'var(--blur-xl) saturate(180%)',
+          WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.04)',
           flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
           scrollbarWidth: 'none',
         }}
@@ -3883,7 +4293,7 @@ export const AppManager: React.FC = () => {
               title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 10px 0 8px', height: 26, borderRadius: 4,
+                padding: '0 10px 0 var(--space-2)', height: 26, borderRadius: 4,
                 background: isActive ? 'rgba(74,158,255,0.16)' : isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
                 border: isDragging ? '1px dashed var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
@@ -3945,7 +4355,7 @@ export const AppManager: React.FC = () => {
             transform: 'translate(10px, -50%) scale(1.06)',
             pointerEvents: 'none', zIndex: 9999,
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '0 10px 0 8px', height: 26, borderRadius: 4,
+            padding: '0 10px 0 var(--space-2)', height: 26, borderRadius: 4,
             background: 'var(--color-bg-glass-strong, rgba(20,20,22,0.92))',
             backdropFilter: 'var(--blur-lg) saturate(180%)', WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
             border: '1px solid var(--color-border-subtle)',
@@ -3974,11 +4384,12 @@ export const AppManager: React.FC = () => {
     <div data-tauri-drag-region style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      background: 'rgba(14,14,17,0.46)',
-      backdropFilter: 'var(--blur-xl) saturate(180%)',
-      WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
+      // DEX Sharp: solid, placed chrome — matches the dock tone (#0E0E11) so the
+      // top bar reads as crisp bespoke chrome, not a washed-out translucent slab.
+      // (Blur was already a no-op platform-wide; dropping it removes dead cost.)
+      background: '#0E0E11',
       borderBottom: '1px solid rgba(255,255,255,0.06)',
-      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.08), 0 1px 10px rgba(0,0,0,0.22)',
+      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.06), 0 1px 8px rgba(0,0,0,0.28)',
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -3986,7 +4397,7 @@ export const AppManager: React.FC = () => {
         {windowControls === 'traffic' && (
           <div
             className="traffic-light-group"
-            style={{ display: 'flex', gap: 8, marginRight: 8, alignItems: 'center' }}
+            style={{ display: 'flex', gap: 'var(--space-2)', marginRight: 'var(--space-2)', alignItems: 'center' }}
           >
             <button onClick={handleClose} data-tip="Close" aria-label="Close window" style={trafficBtn('#ff5f57')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
@@ -4014,14 +4425,16 @@ export const AppManager: React.FC = () => {
       </div>
       <span style={{
         fontSize: 13, fontWeight: 500, color: 'var(--color-text-tertiary)',
-        position: 'absolute', left: 280,
+        // Truly CENTERED in the bar -- was pinned at a hardcoded left:280, which
+        // read as off-balance / not engineered. Centre via 50% + translateX,
+        // clamped so it never collides with the left nav cluster or the right
+        // status cluster (ellipsises instead).
+        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
         letterSpacing: '-0.01em',
         display: currentApp === 'home' ? 'none' : 'flex', alignItems: 'center', gap: 6,
         WebkitAppRegion: 'no-drag',
         cursor: 'pointer',
-        // Clamp at 0 so the strip never gets a negative width on narrow windows
-        // (calc(50% - 320px) goes negative below ~640px and clipped the title).
-        maxWidth: 'max(0px, calc(50% - 320px))',
+        maxWidth: 'min(46vw, 460px)',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -4038,8 +4451,8 @@ export const AppManager: React.FC = () => {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4,
               background: 'rgba(255,255,255,0.07)',
-              backdropFilter: 'var(--blur-lg) saturate(160%)',
-              WebkitBackdropFilter: 'var(--blur-lg) saturate(160%)',
+              // Full-flat: no backdrop-filter (this was a straggler against the
+              // platform-wide flat-glass rule). Flat tint + hairline only.
               border: '1px solid rgba(255,255,255,0.09)',
               borderRadius: 14, padding: '2px 10px 2px 6px',
               height: 24, overflow: 'hidden',
@@ -4118,8 +4531,8 @@ export const AppManager: React.FC = () => {
                             onClick={() => { restoreFloatingApp(id); setCurrentApp(id as AppId); setShowMinimizedList(false); }}
                             title={`Restore ${def?.name || id}`}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              width: '100%', padding: '6px 12px',
+                              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                              width: '100%', padding: '6px var(--space-3)',
                               background: 'none', border: 'none', cursor: 'pointer',
                               fontSize: 12, color: 'var(--color-text-primary, #f5f5f7)',
                               textAlign: 'left', transition: 'background 0.1s',
@@ -4194,12 +4607,11 @@ export const AppManager: React.FC = () => {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 22, height: 18, borderRadius: 4,
-              background: titlebarMenuOpen ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.10)',
-              cursor: 'pointer', padding: 0, transition: 'background 0.15s ease',
+              background: titlebarMenuOpen ? 'var(--color-border)' : 'transparent',
+              border: 'none', cursor: 'pointer', padding: 0, transition: 'background 0.15s ease',
             }}
-            onMouseEnter={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.14)'; }}
-            onMouseLeave={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+            onMouseEnter={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+            onMouseLeave={e => { if (!titlebarMenuOpen) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round">
               <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
@@ -4215,7 +4627,7 @@ export const AppManager: React.FC = () => {
                 style={{
                   position: 'absolute', top: 24, right: 0, zIndex: 'var(--z-max)',
                   minWidth: 220, padding: '6px 0',
-                  background: 'rgba(24,24,28,0.70)',
+                  background: 'var(--color-bg-glass)',
                   backdropFilter: 'var(--blur-xl) saturate(180%)',
                   WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
                   borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)',
@@ -4230,7 +4642,7 @@ export const AppManager: React.FC = () => {
                   onClick={() => { setCurrentApp('settings' as AppId); setTitlebarMenuOpen(false); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: '8px 14px', background: 'transparent', border: 'none',
+                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
                     textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
                   }}
@@ -4245,7 +4657,7 @@ export const AppManager: React.FC = () => {
                 {/* Network Status */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 14px', fontSize: 13, color: 'var(--color-text-primary)',
+                  padding: 'var(--space-2) 14px', fontSize: 13, color: 'var(--color-text-primary)',
                 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={navigator.onLine ? 'var(--color-success)' : 'var(--color-error)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={navigator.onLine ? 'var(--color-success)' : 'var(--color-error)'}/>
@@ -4253,7 +4665,7 @@ export const AppManager: React.FC = () => {
                   {navigator.onLine ? 'Wi-Fi: Connected' : 'Wi-Fi: Offline'}
                 </div>
                 {/* Volume */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 14px' }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>{systemVolume > 0 && <path d="M15.54 8.46a5 5 0 010 7.07"/>}{systemVolume > 40 && <path d="M19.07 4.93a10 10 0 010 14.14"/>}
                   </svg>
@@ -4329,7 +4741,7 @@ export const AppManager: React.FC = () => {
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: '8px 14px', background: 'transparent', border: 'none',
+                    padding: 'var(--space-2) 14px', background: 'transparent', border: 'none',
                     color: 'var(--color-text-primary)', fontSize: 13, cursor: 'pointer',
                     textAlign: 'left', borderRadius: 0, transition: 'background 0.08s',
                   }}
@@ -4351,7 +4763,7 @@ export const AppManager: React.FC = () => {
                 {/* Battery detail */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 14px', fontSize: 13, color: 'var(--color-text-primary)',
+                  padding: 'var(--space-2) 14px', fontSize: 13, color: 'var(--color-text-primary)',
                 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="2" y="7" width="18" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/>
@@ -4381,13 +4793,53 @@ export const AppManager: React.FC = () => {
   // RENDER
   // ======================================================================
 
+  // OS-grade dock space reservation: when the dock is pinned (always-visible)
+  // and shown, the inline app surface reserves the dock's footprint on its edge
+  // so app content (toolbars, status bars, panels) is never clipped under the
+  // floating dock. Auto-hide keeps overlay behavior (the dock slides away on leave).
+  const dockReservesSpace = dockMode === 'always-visible' && !inFullscreenApp;
+  const dockReserveStyle: React.CSSProperties = {
+    marginTop: dockReservesSpace && dockEdgePref === 'top' ? 'var(--dex-reserved-top)' : undefined,
+    marginBottom: dockReservesSpace && dockEdgePref === 'bottom' ? 'var(--dex-reserved-bottom)' : undefined,
+    marginLeft: dockReservesSpace && dockEdgePref === 'left' ? 'var(--dex-reserved-left)' : undefined,
+    marginRight: dockReservesSpace && dockEdgePref === 'right' ? 'var(--dex-reserved-right)' : undefined,
+    // No margin transition: animating the work-area margin made getShellWorkspace
+    // read a MOVING TARGET for ~320ms, so a window opened/maximized right after a
+    // dock pin or fullscreen toggle got sized to a transient box and could land
+    // out of bounds. Instant resize keeps the work area always-settled.
+  };
+
   return (
     <div role="application" aria-label="DEX Desktop" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', fontFamily: 'var(--font-family)', overflow: 'hidden', minWidth: 360 }}>
       <a href="#dex-main-content" className="dex-skip-nav">Skip to content</a>
       <div aria-live="polite" aria-atomic="true" className="dex-sr-only" id="dex-live-region" />
 
-      {renderTitleBar()}
-      {renderAppTabBar()}
+      {immersive && currentAppId !== 'home' ? (
+        // Immersive focus: chrome hidden, only a quiet exit pill remains.
+        <button
+          onClick={() => setImmersive(false)}
+          aria-label="Exit focus mode"
+          title="Exit focus (Esc)"
+          style={{
+            position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 9000, display: 'flex', alignItems: 'center', gap: 6,
+            height: 24, padding: '0 var(--space-3)', borderRadius: 9999,
+            background: 'rgba(14,14,17,0.92)', border: '1px solid var(--color-border)',
+            color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500,
+            cursor: 'pointer', opacity: 0.5, transition: 'opacity 0.2s ease',
+            WebkitAppRegion: 'no-drag',
+          } as React.CSSProperties}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.5'; }}
+        >
+          Focus mode · Esc to exit
+        </button>
+      ) : (
+        <>
+          {renderTitleBar()}
+          {renderAppTabBar()}
+        </>
+      )}
 
       {/* Stage Manager -- macOS Tahoe left strip */}
       {stageManagerOn && (
@@ -4446,19 +4898,25 @@ export const AppManager: React.FC = () => {
 
       {/* Content area -- supports split-screen tiling */}
       {splitMode === 'off' ? (
-        <div ref={contentRef} id="dex-main-content" role="main" aria-label="App content" style={{
-          flex: 1, position: 'relative', overflow: 'hidden',
+        <div ref={contentRef} role="main" aria-label="App content" style={{
+          flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden',
           background: 'transparent',
-          margin: 0, borderRadius: 0,
+          borderRadius: 0,
           contain: 'layout style',
+          ...dockReserveStyle,
         }}>
           {keepAliveElements}
         </div>
       ) : (
         <div ref={splitContainerRef} style={{
-          flex: 1, display: 'flex',
+          flex: 1, minWidth: 0, minHeight: 0, display: 'flex',
           flexDirection: splitMode === 'horizontal' ? 'row' : 'column',
           overflow: 'hidden', position: 'relative',
+          // Same containment as the non-split surface: make THIS box the containing
+          // block for position:fixed floating windows so they anchor to the split
+          // area and can't escape to the viewport / out of bounds.
+          contain: 'layout style',
+          ...dockReserveStyle,
         }}>
           {/* Primary pane */}
           <div style={{
@@ -4517,20 +4975,25 @@ export const AppManager: React.FC = () => {
 
       {/* Snap Zone Preview Indicator (visible during window drag) */}
       {snapPreviewZone && (() => {
-        const W = window.innerWidth;
-        const H = window.innerHeight;
-        const PAD = 8;
-        const TOP = 36;
-        const halfW = (W - PAD * 3) / 2;
-        const halfH = (H - TOP - PAD * 3) / 2;
+        // Mirror tileWindow's work-area math (PAD=6, same formulas) so the drag
+        // preview lands exactly where the window will snap. The window renders
+        // INSIDE the content surface (its containing block), so translate the
+        // work-area rect to screen coords by the surface's on-screen origin.
+        const ws = getShellWorkspace(0);
+        const origin = contentRef.current?.getBoundingClientRect();
+        const originX = origin ? origin.left : 0;
+        const originY = origin ? origin.top : 0;
+        const W = ws.w, H = ws.h, LEFT = ws.x, TOP = ws.y, PAD = 6;
+        const halfW = Math.floor((W - PAD * 3) / 2);
+        const halfH = Math.floor((H - PAD * 3) / 2);
         const zones: Record<string, { x: number; y: number; w: number; h: number }> = {
-          left:         { x: PAD, y: TOP + PAD, w: halfW, h: H - TOP - PAD * 2 },
-          right:        { x: PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: H - TOP - PAD * 2 },
-          'top-left':   { x: PAD, y: TOP + PAD, w: halfW, h: halfH },
-          'top-right':  { x: PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
-          'bottom-left':  { x: PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
-          'bottom-right': { x: PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
-          maximize:     { x: PAD, y: TOP + PAD, w: W - PAD * 2, h: H - TOP - PAD * 2 },
+          left:         { x: LEFT + PAD, y: TOP + PAD, w: halfW, h: H - PAD * 2 },
+          right:        { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: H - PAD * 2 },
+          'top-left':   { x: LEFT + PAD, y: TOP + PAD, w: halfW, h: halfH },
+          'top-right':  { x: LEFT + PAD * 2 + halfW, y: TOP + PAD, w: halfW, h: halfH },
+          'bottom-left':  { x: LEFT + PAD, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+          'bottom-right': { x: LEFT + PAD * 2 + halfW, y: TOP + PAD * 2 + halfH, w: halfW, h: halfH },
+          maximize:     { x: LEFT, y: TOP, w: W, h: H },
         };
         const z = zones[snapPreviewZone];
         if (!z) return null;
@@ -4539,7 +5002,7 @@ export const AppManager: React.FC = () => {
             key="snap-preview"
             aria-hidden="true"
             style={{
-              position: 'fixed', left: z.x, top: z.y, width: z.w, height: z.h,
+              position: 'fixed', left: originX + z.x, top: originY + z.y, width: z.w, height: z.h,
               background: 'rgba(59,130,246,0.08)',
               border: '2.5px solid rgba(59,130,246,0.35)',
               borderRadius: 10,
@@ -4581,7 +5044,7 @@ export const AppManager: React.FC = () => {
             padding: '7px 14px',
             pointerEvents: 'auto',
             boxShadow: 'var(--pg-shadow-panel), var(--pg-gloss-top)',
-            display: 'flex', alignItems: 'center', gap: 8,
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
             animation: isReduceMotion() ? 'none' : 'dex-menu-pop 0.15s cubic-bezier(0.23,1,0.32,1)',
           } as React.CSSProperties}>
             <div style={{ width: 24, height: 24, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: previewApp.color, background: `${previewApp.color}18`, flexShrink: 0 }}>
@@ -4675,6 +5138,9 @@ export const AppManager: React.FC = () => {
       <div aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>
         {dockPeekAnnouncement}
       </div>
+      {/* No bottom shelf/scrim: it read as a dark band + contrast line between the
+          app edge and the dock. The dock carries its own shadow for grounding, so
+          the bottom stays clean -- app, a small clear gap, then the dock. */}
       <div
         onMouseEnter={showDock}
         onMouseMove={handleDockMouseMove}
@@ -4688,11 +5154,14 @@ export const AppManager: React.FC = () => {
             transform: taskbarVisible ? geom.visibleTransform : geom.hiddenTransform,
             display: 'flex', justifyContent: 'center',
             opacity: taskbarVisible ? 1 : 0,
-            // Reveal/hide via the DEX motion contract (dock category): quick
-            // decelerate in on reveal, a snappier accelerate out on hide.
+            // Reveal/hide by fading OPACITY ONLY -- never transition `transform`.
+            // Centering is `translateX(-50%)`, so animating transform makes the
+            // whole dock slide sideways (and read as off-centre / "moving out")
+            // every time its width changes (app open/close, reveal, magnification).
+            // Fading is drift-proof: the dock stays locked to centre at all times.
             transition: taskbarVisible
-              ? 'opacity var(--motion-dock-reveal), transform var(--motion-dock-reveal)'
-              : 'opacity var(--motion-dock-hide), transform var(--motion-dock-hide)',
+              ? 'opacity var(--motion-dock-reveal)'
+              : 'opacity var(--motion-dock-hide)',
             pointerEvents: taskbarVisible ? 'auto' : 'none',
           } as React.CSSProperties;
         })()}
@@ -4710,11 +5179,11 @@ export const AppManager: React.FC = () => {
               ...liquidGlassDock,
               display: 'flex',
               flexDirection: geom.flexDirection,
-              alignItems: 'center', gap: 8,
-              padding: `${geom.paddingY + 4}px ${geom.paddingX + 8}px`,
+              alignItems: 'center', gap: 4,
+              padding: `${geom.paddingY}px ${geom.paddingX + 4}px`,
               // Deliberate rounded-rect, not a full pill -- reads as bespoke
-              // DEX chrome rather than a generic OS dock.
-              borderRadius: 20,
+              // DEX chrome rather than a generic OS dock. Thinner in 6.0.
+              borderRadius: 15,
               overflow: 'visible',
               maxWidth: geom.flexDirection === 'row' ? '96vw' : undefined,
               maxHeight: geom.flexDirection === 'column' ? '96vh' : undefined,
@@ -4737,7 +5206,7 @@ export const AppManager: React.FC = () => {
               aria-label="Open App Menu"
               data-dex-launchpad
               style={{
-                width: 40, height: 40,
+                width: 34, height: 34,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: showAppMenu ? 'var(--color-accent-soft)' : 'transparent',
                 border: 'none', borderRadius: 12, cursor: 'pointer',
@@ -4771,10 +5240,10 @@ export const AppManager: React.FC = () => {
                   aria-label={isUkiActive ? 'Close UKI' : 'Open UKI'}
                   title="UKI Voice Assistant"
                   style={{
-                    width: 36, height: 36,
+                    width: 32, height: 32,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isUkiActive ? 'var(--color-accent-soft)' : 'transparent',
-                    border: 'none', borderRadius: 12, cursor: 'pointer',
+                    border: 'none', borderRadius: 10, cursor: 'pointer',
                     transition: 'background 0.2s cubic-bezier(0.4,0,0.2,1)',
                     padding: 0, touchAction: 'manipulation',
                     outline: 'none',
@@ -4847,7 +5316,11 @@ export const AppManager: React.FC = () => {
           position: 'fixed', bottom: 0, left: 0, right: 0,
           height: 8,
           zIndex: 5001, cursor: 'default', background: 'transparent',
-          pointerEvents: anyWindowMaximized ? 'none' : 'auto',
+          // Active whenever the dock is hidden so a deliberate move-to-edge dwell
+          // (gated by hover-intent below, so it won't flicker while you work along
+          // an app's bottom) brings it back; passthrough when the dock is already
+          // shown. The explicit "Show Dock" handle + keyboard also reveal it.
+          pointerEvents: taskbarVisible ? 'none' : 'auto',
         }}
       >
         {/* Visible touch/pen affordance pill — larger grab handle centered for touch users */}
@@ -4909,8 +5382,8 @@ export const AppManager: React.FC = () => {
               backdropFilter: 'none',
               WebkitBackdropFilter: 'none',
               border: '1px solid rgba(255, 255, 255, 0.14)',
-              borderRadius: 16,
-              padding: '20px 20px 16px',
+              borderRadius: 10,
+              padding: 'var(--space-5) var(--space-5) var(--space-4)',
               boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
               animation: 'appMenuSlideUp 0.22s cubic-bezier(0.23,1,0.32,1)',
             } as React.CSSProperties}
@@ -4922,7 +5395,7 @@ export const AppManager: React.FC = () => {
               }
             `}</style>
             {/* Search bar — pill style matching Home search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 46, padding: '0 18px', borderRadius: 28, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', height: 46, padding: '0 18px', borderRadius: 28, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', marginBottom: 'var(--space-3)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ opacity: 0.4, flexShrink: 0 }}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
               <input
                 ref={appMenuSearchRef}
@@ -4955,7 +5428,7 @@ export const AppManager: React.FC = () => {
                 return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} aria-label="Search results">
               {searchResults.length === 0 && (
-                <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No apps or settings found</div>
+                <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>No apps or settings found</div>
               )}
               {searchResults.map(result => {
                 const resultIcon = result.icon ? (Icons as Record<string, JSX.Element>)[result.icon] : null;
@@ -4968,8 +5441,8 @@ export const AppManager: React.FC = () => {
                     onClick={() => { result.action(); setShowAppMenu(false); setAppMenuSearch(''); }}
                     className="dex-hover-lift"
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                      width: '100%', padding: '10px var(--space-3)', borderRadius: 10,
                       background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
                       cursor: 'pointer', textAlign: 'left',
                     }}
@@ -5018,7 +5491,7 @@ export const AppManager: React.FC = () => {
               }}
             >
               {filtered.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No apps found</div>
+                <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>No apps found</div>
               )}
               {filtered.map(app => {
                 const icon = Icons[app.id] || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={24} color={app.color} />;
@@ -5232,7 +5705,7 @@ export const AppManager: React.FC = () => {
               });
               return items.map((item, i) => (
                 <React.Fragment key={i}>
-                  {item.separator && <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '3px 8px' }} />}
+                  {item.separator && <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '3px var(--space-2)' }} />}
                   <button
                     role="menuitem"
                     onClick={item.action}
@@ -5309,7 +5782,7 @@ export const AppManager: React.FC = () => {
               <path d="M8 7l4 5-4 5M13 17h4" stroke="url(#sg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', marginBottom: 24 }}>DEX</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', marginBottom: 'var(--space-6)' }}>DEX</div>
           <div style={{ width: 200, height: 3, borderRadius: 2, background: 'var(--color-border-subtle)', overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 2, background: 'linear-gradient(90deg, #4a9eff, #a855f7)', width: `${splashProgress}%`, transition: 'width 0.3s ease' }} />
           </div>

@@ -9,6 +9,7 @@
  * Appears in each app's toolbar, shows compatible target apps.
  */
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useDropdownPosition } from '../hooks/useDropdownPosition';
 import {
   type CreativeAppId,
   type AssetKind,
@@ -74,6 +75,8 @@ interface SendToMenuProps {
 const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset, style }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useDropdownPosition(open, ref, menuRef, { align: 'right', minHeight: 100 });
   const sendToApp = useCreativeSuite(s => s.sendToApp);
 
   const targets = getTargetApps(assetKind).filter(a => a !== sourceApp);
@@ -159,12 +162,10 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
 
       {open && (
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            marginTop: '4px',
             minWidth: '180px',
+            overflowY: 'auto',
             background: 'rgba(40,40,42,0.98)',
             border: '1px solid var(--color-border)',
             borderRadius: '8px',
@@ -172,6 +173,7 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
             zIndex: 'var(--z-max)',
             padding: '4px',
             animation: 'dex-snap-in 0.15s ease-out',
+            ...menuStyle,
           }}
         >
           <div style={{ padding: '6px 10px 4px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>SEND TO APP</div>
@@ -192,7 +194,7 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--space-2)',
                   transition: 'background 0.12s',
                 }}
                 className="dex-send-to-item"

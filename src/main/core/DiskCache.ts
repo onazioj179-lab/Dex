@@ -350,22 +350,30 @@ export class DiskCache {
   // ─── IPC ────────────────────────────────────────────────────
 
   private registerIPC(): void {
-    ipcMain.handle('cache:get-stats', () => this.getStats());
-    ipcMain.handle('cache:clear', async () => {
+    // Idempotent registration: DiskCache is now the single disk tier owned by
+    // CacheCoordinator and may be (re)materialized across a shutdown cycle.
+    // Remove any prior handler first so re-init never throws "second handler".
+    const handle = (channel: string, fn: Parameters<typeof ipcMain.handle>[1]) => {
+      ipcMain.removeHandler(channel);
+      ipcMain.handle(channel, fn);
+    };
+
+    handle('cache:get-stats', () => this.getStats());
+    handle('cache:clear', async () => {
       await this.clear();
       return true;
     });
-    ipcMain.handle('cache:get', async (_e, key: string) => {
+    handle('cache:get', async (_e, key: string) => {
       const data = await this.getString(key);
       return data;
     });
-    ipcMain.handle('cache:put', async (_e, key: string, value: string) => {
+    handle('cache:put', async (_e, key: string, value: string) => {
       return this.put(key, value);
     });
-    ipcMain.handle('cache:delete', async (_e, key: string) => {
+    handle('cache:delete', async (_e, key: string) => {
       return this.delete(key);
     });
-    ipcMain.handle('cache:has', (_e, key: string) => this.has(key));
+    handle('cache:has', (_e, key: string) => this.has(key));
   }
 
   // ─── Shutdown ───────────────────────────────────────────────

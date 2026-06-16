@@ -142,7 +142,10 @@ describe('PiiGuardDialog', () => {
   it('clicking backdrop cancels', () => {
     const props = { ...baseProps, onCancel: vi.fn() };
     render(<PiiGuardDialog open {...props} />);
-    fireEvent.click(screen.getByTestId('pii-guard-dialog'));
+    // Backdrop-to-cancel now routes through the canonical ui/Modal surface,
+    // whose backdrop carries the `${testIdPrefix}-backdrop` hook. A true
+    // backdrop click (target === currentTarget) maps to onClose -> onCancel.
+    fireEvent.click(screen.getByTestId('pii-guard-backdrop'));
     expect(props.onCancel).toHaveBeenCalled();
   });
 });

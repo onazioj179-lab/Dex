@@ -129,7 +129,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    padding: '8px 12px',
+    padding: 'var(--space-2) var(--space-3)',
     fontSize: 13,
     fontWeight: 500,
     color: colors.text.primary,
@@ -180,7 +180,7 @@ const styles = {
   divider: {
     height: 1,
     background: colors.border.subtle,
-    margin: '4px 8px',
+    margin: '4px var(--space-2)',
   },
 };
 
@@ -579,7 +579,7 @@ export const DropdownButton: React.FC<DropdownButtonProps> = ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 13,
     fontWeight: 500,
     color: colors.text.primary,

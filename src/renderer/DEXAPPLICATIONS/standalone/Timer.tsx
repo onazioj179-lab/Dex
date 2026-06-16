@@ -265,15 +265,15 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     background: 'var(--color-bg-base)',
-    padding: 20,
+    padding: 'var(--space-5)',
     overflow: 'auto',
   },
   timerSection: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 24,
-    paddingBottom: 20,
+    gap: 'var(--space-6)',
+    paddingBottom: 'var(--space-5)',
   },
   circleContainer: {
     position: 'relative',
@@ -304,14 +304,14 @@ const s: Record<string, React.CSSProperties> = {
   },
   controls: {
     display: 'flex',
-    gap: 12,
+    gap: 'var(--space-3)',
     alignItems: 'center',
   },
   primaryBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '12px 32px',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-3) var(--space-8)',
     background: 'var(--color-accent)',
     color: 'var(--color-text-inverse, #fff)',
     border: 'none',
@@ -325,7 +325,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '10px 20px',
+    padding: '10px var(--space-5)',
     background: 'var(--color-bg-elevated)',
     color: 'var(--color-text-secondary)',
     border: '1px solid var(--color-border)',
@@ -336,16 +336,16 @@ const s: Record<string, React.CSSProperties> = {
   },
   presetsSection: {
     borderTop: '1px solid var(--color-border)',
-    paddingTop: 20,
+    paddingTop: 'var(--space-5)',
   },
   presetsHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 'var(--space-3)',
   },
   customToggle: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     border: '1px solid var(--color-border)',
     borderRadius: 4,
     fontSize: 12,
@@ -356,10 +356,10 @@ const s: Record<string, React.CSSProperties> = {
   presetsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   presetBtn: {
-    padding: '12px 16px',
+    padding: 'var(--space-3) var(--space-4)',
     border: '1px solid var(--color-border)',
     borderRadius: 8,
     fontSize: 14,
@@ -371,7 +371,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   inputGroup: {
     display: 'flex',
@@ -380,7 +380,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   numInput: {
     width: 60,
-    padding: '10px 8px',
+    padding: '10px var(--space-2)',
     fontSize: 24,
     fontWeight: 600,
     textAlign: 'center',
@@ -401,7 +401,7 @@ const s: Record<string, React.CSSProperties> = {
     marginBottom: 18,
   },
   setBtn: {
-    padding: '10px 20px',
+    padding: '10px var(--space-5)',
     background: 'var(--color-accent)',
     color: 'var(--color-text-inverse, #fff)',
     border: 'none',
@@ -409,7 +409,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',
-    marginLeft: 8,
+    marginLeft: 'var(--space-2)',
   },
 };
 

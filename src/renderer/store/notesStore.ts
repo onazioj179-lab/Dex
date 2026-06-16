@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import { create } from 'zustand';
+import { DEFAULT_NOTE_TEMPLATES, findBuiltinTemplate } from './noteTemplates';
 
 // ---------------------------------------------------------------------------
 // IPC Helper (with localStorage fallback when window.dex is unavailable —
@@ -46,8 +47,19 @@ function fbToList(n: any): any {
     word_count: n.word_count || 0, created_at: n.created_at, updated_at: n.updated_at,
     pinned: n.pinned ? 1 : 0, pin_order: n.pin_order || 0, locked: n.locked ? 1 : 0,
     color_label: n.color_label || null, folder_id: n.folder_id || null,
-    is_daily_note: 0, is_template: 0, tags: n.tags || [],
+    is_daily_note: n.is_daily_note ? 1 : 0, is_template: 0, tags: n.tags || [],
+    favorite: n.favorite ? 1 : 0,
   };
+}
+
+// Today's date as a stable "YYYY-MM-DD" title, in local time. Used as both the
+// daily-note title and the key for finding an existing one. Local time (not
+// toISOString) so the note matches the user's calendar day, not UTC.
+function dailyNoteTitle(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function fallbackInvoke(channel: string, ...args: any[]): any {
@@ -75,6 +87,7 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
         id, title: data.title || '', content: data.content || '', plain_text: data.plain_text || '',
         folder_id: data.folder_id || null, created_at: now, updated_at: now,
         pinned: 0, pin_order: 0, locked: 0, color_label: null, tags: [],
+        favorite: 0, is_daily_note: data.is_daily_note ? 1 : 0,
       };
       fbSave(s);
       return { id };
@@ -109,6 +122,27 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
       const pinned = !!args[1];
       if (s.notes[id]) { s.notes[id].pinned = pinned ? 1 : 0; fbSave(s); }
       return true;
+    }
+    case 'dexnotes:favorite': {
+      const id = args[0] as string;
+      const favorite = !!args[1];
+      if (s.notes[id]) { s.notes[id].favorite = favorite ? 1 : 0; fbSave(s); }
+      return true;
+    }
+    case 'dexnotes:getDailyNote': {
+      // Find (or create) a note titled with today's date, e.g. "2026-06-14".
+      const title = dailyNoteTitle();
+      const existing = Object.values(s.notes).find((n: any) => (n.title || '') === title);
+      if (existing) return { id: (existing as any).id };
+      const id = fbId('note');
+      s.notes[id] = {
+        id, title, content: '{"type":"doc","content":[{"type":"paragraph","content":[]}]}',
+        plain_text: '', folder_id: null, created_at: now, updated_at: now,
+        pinned: 0, pin_order: 0, locked: 0, color_label: null, tags: [],
+        favorite: 0, is_daily_note: 1,
+      };
+      fbSave(s);
+      return { id };
     }
     case 'dexnotes:listFolders': return Object.values(s.folders);
     case 'dexnotes:createFolder': {
@@ -167,6 +201,44 @@ function fallbackInvoke(channel: string, ...args: any[]): any {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Favorites overlay
+// ---------------------------------------------------------------------------
+// Favorites are persisted in a small localStorage set keyed by note id, layered
+// on top of whatever the backend returns. This keeps the star working and
+// durable whether notes come from the native SQLite backend (which may not have
+// a favorite column) or the localStorage fallback -- a single source of truth
+// the UI reads, mirroring how pane sizes persist outside the note row.
+
+const FAVORITES_KEY = 'dex-notes-favorites-v1';
+
+function favLoad(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr as string[]);
+    }
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+function favSave(set: Set<string>): void {
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(Array.from(set))); } catch { /* ignore */ }
+}
+
+function favSet(id: string, on: boolean): Set<string> {
+  const s = favLoad();
+  if (on) s.add(id); else s.delete(id);
+  favSave(s);
+  return s;
+}
+
+/** Stamp the persisted favorite flag onto a note list item (or full note). */
+function applyFavorite<T extends { id: string; favorite?: number }>(note: T, favs: Set<string>): T {
+  return { ...note, favorite: favs.has(note.id) ? 1 : 0 };
+}
+
 async function ipc(channel: string, ...args: any[]): Promise<any> {
   try {
     if ((window as any).dex?.invoke) {
@@ -205,6 +277,7 @@ export interface NoteListItem {
   folder_id: string | null;
   is_daily_note: number;
   is_template: number;
+  favorite: number;
   tags: string[];
 }
 
@@ -330,6 +403,7 @@ export interface NotesStoreState {
   permanentlyDeleteNote: (id: string) => Promise<void>;
   duplicateNote: (id: string) => Promise<string | null>;
   togglePin: (id: string) => Promise<void>;
+  toggleFavorite: (id: string) => Promise<void>;
 
   // Actions -- Folders
   createFolder: (name: string, parentId?: string | null) => Promise<string | null>;
@@ -450,14 +524,15 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
       offset: 0,
     });
     if (result) {
-      set({ notes: result });
+      const favs = favLoad();
+      set({ notes: (result as NoteListItem[]).map(n => applyFavorite(n, favs)) });
     }
   },
 
   loadNote: async (id: string) => {
     const result = await ipc('dexnotes:get', id);
     if (result) {
-      set({ activeNote: result, selectedNoteId: id });
+      set({ activeNote: applyFavorite(result as NoteFull, favLoad()), selectedNoteId: id });
     }
   },
 
@@ -558,6 +633,22 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
     });
     if (activeNote && activeNote.id === id) {
       set({ activeNote: { ...activeNote, pinned: newPinned ? 1 : 0 } });
+    }
+  },
+
+  toggleFavorite: async (id: string) => {
+    const { notes, activeNote } = get();
+    const note = notes.find(n => n.id === id);
+    const newFavorite = note ? !note.favorite : true;
+    // Persist to the favorites overlay (durable across backends); best-effort
+    // notify the backend too in case a native favorite column exists.
+    favSet(id, newFavorite);
+    void ipc('dexnotes:favorite', id, newFavorite);
+    set({
+      notes: notes.map(n => n.id === id ? { ...n, favorite: newFavorite ? 1 : 0 } : n),
+    });
+    if (activeNote && activeNote.id === id) {
+      set({ activeNote: { ...activeNote, favorite: newFavorite ? 1 : 0 } });
     }
   },
 
@@ -708,9 +799,13 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
 
   loadTemplates: async () => {
     const result = await ipc('dexnotes:listTemplates');
-    if (result) {
-      set({ templates: result });
-    }
+    const backend: NoteTemplate[] = Array.isArray(result) ? result : [];
+    // Built-in starter templates are always available; any backend-provided
+    // custom templates merge in (backend wins on id collision).
+    const byId = new Map<string, NoteTemplate>();
+    for (const t of DEFAULT_NOTE_TEMPLATES) byId.set(t.id, t);
+    for (const t of backend) if (t && t.id) byId.set(t.id, t);
+    set({ templates: Array.from(byId.values()) });
   },
 
   loadStats: async () => {
@@ -730,6 +825,23 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
 
   createFromTemplate: async (templateId: string, folderId?: string | null) => {
     const folder = folderId !== undefined ? folderId : get().selectedFolderId;
+    // Built-in templates are materialized via the standard create path so they
+    // work under the native backend and the browser fallback alike.
+    const builtin = findBuiltinTemplate(templateId);
+    if (builtin) {
+      const created = await ipc('dexnotes:create', {
+        title: builtin.title,
+        content: builtin.content,
+        plain_text: builtin.plain_text,
+        folder_id: folder || null,
+      });
+      if (created?.id) {
+        await get().loadNotes();
+        await get().loadNote(created.id);
+        return created.id;
+      }
+      return null;
+    }
     const result = await ipc('dexnotes:createFromTemplate', templateId);
     if (result?.id) {
       await get().loadNotes();

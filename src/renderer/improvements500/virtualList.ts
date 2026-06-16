@@ -53,11 +53,11 @@ export interface UseVirtualListOptions {
 }
 
 export function useVirtualList(opts: UseVirtualListOptions): {
-  ref: React.RefObject<HTMLDivElement | null>;
+  ref: React.RefObject<HTMLDivElement>;
   slice: VirtualSlice;
   onScroll: () => void;
 } {
-  const ref = useRef<HTMLDivElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
 

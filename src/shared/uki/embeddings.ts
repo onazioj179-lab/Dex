@@ -8,6 +8,13 @@
  * Pure cosine-similarity embedding index. In-memory, paged. The actual
  * embedding model lives elsewhere; this module only stores + searches
  * vectors that were already computed.
+ *
+ * Role (audit FINDING 9): this is the VECTOR STORE PRIMITIVE that backs the
+ * semantic half of the single search facade `src/renderer/uki/semanticSearch.ts`.
+ * Vectors come from `src/main/services/EmbeddingService.ts` (hash-128 / onnx).
+ * It is not a competing "find" surface — `semanticSearch` owns the public API
+ * and merges these cosine hits with the lexical `index_search` results into one
+ * hybrid retriever. See semanticSearch.ts for the contract.
  */
 
 // DEX v3.8.9 - UKI brain: embeddings

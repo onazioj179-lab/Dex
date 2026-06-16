@@ -131,7 +131,7 @@ const QRCodeGenerator: React.FC = () => {
             />
           )}
           {mode === 'wifi' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <input value={wifiSSID} onChange={e => setWifiSSID(e.target.value)} placeholder="Network name (SSID)" style={s.input} />
               <input value={wifiPass} onChange={e => setWifiPass(e.target.value)} placeholder="Password" type="password" style={s.input} />
               <select value={wifiType} onChange={e => setWifiType(e.target.value as any)} style={s.select}>
@@ -142,7 +142,7 @@ const QRCodeGenerator: React.FC = () => {
             </div>
           )}
           {mode === 'contact' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" style={s.input} />
               <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone number" style={s.input} />
               <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" style={s.input} />
@@ -357,12 +357,12 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)', overflow: 'hidden',
   },
   tabs: {
-    display: 'flex', gap: 4, padding: '12px 16px', flexShrink: 0,
+    display: 'flex', gap: 4, padding: 'var(--space-3) var(--space-4)', flexShrink: 0,
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px 12px', borderRadius: 6, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 6, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -371,30 +371,30 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent-light)', color: 'var(--color-accent)',
   },
   body: {
-    flex: 1, overflow: 'auto', padding: '16px 20px',
-    display: 'flex', flexDirection: 'column', gap: 16,
+    flex: 1, overflow: 'auto', padding: 'var(--space-4) var(--space-5)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
   },
   inputArea: {},
   textarea: {
-    width: '100%', minHeight: 80, padding: '10px 12px', borderRadius: 8,
+    width: '100%', minHeight: 80, padding: '10px var(--space-3)', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 14, resize: 'vertical',
     outline: 'none', fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   input: {
-    width: '100%', padding: '10px 12px', borderRadius: 8,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 14, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   select: {
-    width: '100%', padding: '10px 12px', borderRadius: 8,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)', fontSize: 14, cursor: 'pointer',
     outline: 'none', fontFamily: 'var(--font-family)',
   },
   preview: {
-    display: 'flex', justifyContent: 'center', padding: 16,
+    display: 'flex', justifyContent: 'center', padding: 'var(--space-4)',
   },
   canvas: {
     width: 240, height: 240, borderRadius: 10,
@@ -405,20 +405,20 @@ const s: Record<string, React.CSSProperties> = {
     border: '2px dashed var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center',
-    padding: 20,
+    padding: 'var(--space-5)',
   },
   actions: {
-    display: 'flex', justifyContent: 'center', gap: 12,
+    display: 'flex', justifyContent: 'center', gap: 'var(--space-3)',
   },
   actionBtn: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '8px 16px', borderRadius: 6, border: 'none',
+    padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none',
     background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)',
     fontSize: 13, fontWeight: 500, cursor: 'pointer',
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   colorRow: {
-    display: 'flex', justifyContent: 'center', gap: 16,
+    display: 'flex', justifyContent: 'center', gap: 'var(--space-4)',
   },
   colorLabel: {
     display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',

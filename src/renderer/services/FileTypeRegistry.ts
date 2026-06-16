@@ -144,7 +144,30 @@ export function getAppsForFile(filename: string): string[] {
   return [result.appId, ...result.alternates];
 }
 
+// Filename-pattern inference: catch common naming conventions (screenshots,
+// invoices, recordings, screencasts) so a file lands in the right collection even
+// when the bare extension is ambiguous -- an invoice_*.pdf is clearly a document,
+// a screenshot_*.png an image. Pure regex over the name; no extension lookup / IO.
+const FILENAME_PATTERNS: { pattern: RegExp; category: FileTypeMapping['category'] }[] = [
+  { pattern: /^(invoice|receipt|bill|statement|contract|resume|cv|report)[_\- ]/i, category: 'document' },
+  { pattern: /^(screenshot|screen[ _-]?shot|capture)[_\- ]?|^img[_-]\d{4}|^photo[_-]/i, category: 'image' },
+  { pattern: /^(recording|voice[_-]?note|voice[_-]?memo|audio[_-]?note)/i, category: 'audio' },
+  { pattern: /^(screencast|screen[_-]?record|tutorial|demo|webinar)/i, category: 'video' },
+];
+
+/** Infer a category from filename conventions alone (no extension / IO). */
+export function inferCategoryFromFilename(filename: string): FileTypeMapping['category'] | null {
+  const base = filename.toLowerCase();
+  for (const { pattern, category } of FILENAME_PATTERNS) {
+    if (pattern.test(base)) return category;
+  }
+  return null;
+}
+
 export function getCategoryForFile(filename: string): FileTypeMapping['category'] | null {
+  // Name conventions win over the bare extension (a higher-confidence signal).
+  const nameHint = inferCategoryFromFilename(filename);
+  if (nameHint) return nameHint;
   const ext = getExtension(filename);
   if (!ext) return null;
   return extMap.get(ext)?.category ?? null;

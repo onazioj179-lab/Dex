@@ -180,15 +180,15 @@ export const SkeletonCard: React.FC<SkeletonCardProps> = ({
           animate={animate}
         />
       )}
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: 'var(--space-4)' }}>
         {showAvatar && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
             <SkeletonAvatar size={36} animate={animate} />
             <SkeletonBase width={120} height={12} animate={animate} />
           </div>
         )}
         <SkeletonText lines={titleLines} lineHeight={18} gap={4} animate={animate} />
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <SkeletonText lines={descriptionLines} lineHeight={12} gap={6} animate={animate} />
         </div>
       </div>
@@ -221,8 +221,8 @@ export const SkeletonListItem: React.FC<SkeletonListItemProps> = ({
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 12,
-      padding: '12px 16px',
+      gap: 'var(--space-3)',
+      padding: 'var(--space-3) var(--space-4)',
     }}>
       {showAvatar && <SkeletonAvatar size={avatarSize} animate={animate} />}
       <div style={{ flex: 1 }}>
@@ -311,8 +311,8 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
         <div style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${columns}, 1fr)`,
-          gap: 12,
-          padding: '12px 16px',
+          gap: 'var(--space-3)',
+          padding: 'var(--space-3) var(--space-4)',
           background: 'var(--color-bg-secondary, #1a1a1a)',
           borderRadius: '6px 6px 0 0',
         }}>
@@ -327,8 +327,8 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${columns}, 1fr)`,
-            gap: 12,
-            padding: '12px 16px',
+            gap: 'var(--space-3)',
+            padding: 'var(--space-3) var(--space-4)',
             background: 'var(--color-bg-primary, #0a0a0a)',
           }}
         >
@@ -355,11 +355,11 @@ export const SkeletonPage: React.FC<{ variant?: 'list' | 'grid' | 'detail'; anim
   animate = true,
 }) => {
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 'var(--space-6)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <SkeletonBase width={200} height={28} animate={animate} />
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 'var(--space-2)' }}>
           <SkeletonBase width={300} height={14} animate={animate} />
         </div>
       </div>
@@ -368,11 +368,11 @@ export const SkeletonPage: React.FC<{ variant?: 'list' | 'grid' | 'detail'; anim
       {variant === 'list' && <SkeletonList count={8} animate={animate} />}
       {variant === 'grid' && <SkeletonGrid columns={4} count={8} animate={animate} />}
       {variant === 'detail' && (
-        <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ display: 'flex', gap: 'var(--space-6)' }}>
           <SkeletonImage width={300} height={300} animate={animate} />
           <div style={{ flex: 1 }}>
             <SkeletonBase width="60%" height={32} animate={animate} />
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 'var(--space-4)' }}>
               <SkeletonText lines={5} animate={animate} />
             </div>
           </div>
@@ -387,11 +387,11 @@ export const SkeletonFilesGrid: React.FC<{ count?: number }> = ({ count = 12 }) 
   <div style={{
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-    gap: 16,
-    padding: 16,
+    gap: 'var(--space-4)',
+    padding: 'var(--space-4)',
   }}>
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)' }}>
         <SkeletonBase width={64} height={64} borderRadius={8} />
         <SkeletonBase width={80} height={12} />
       </div>
@@ -401,7 +401,7 @@ export const SkeletonFilesGrid: React.FC<{ count?: number }> = ({ count = 12 }) 
 
 // Browser tab skeleton
 export const SkeletonBrowserTab: React.FC = () => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)' }}>
     <SkeletonIcon size={16} />
     <SkeletonBase width={100} height={12} />
   </div>
@@ -409,8 +409,8 @@ export const SkeletonBrowserTab: React.FC = () => (
 
 // Notes skeleton
 export const SkeletonNote: React.FC = () => (
-  <div style={{ padding: 24 }}>
-    <SkeletonBase width="40%" height={24} style={{ marginBottom: 16 }} />
+  <div style={{ padding: 'var(--space-6)' }}>
+    <SkeletonBase width="40%" height={24} style={{ marginBottom: 'var(--space-4)' }} />
     <SkeletonText lines={8} lineHeight={16} gap={12} />
   </div>
 );

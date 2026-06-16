@@ -1,13 +1,14 @@
 # DEX -- Privacy Policy
 
-**Effective date:** 2026-06-06  
-**Version:** 2.1.0  
+**Effective date:** 2026-06-13  
 **Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
 > This document is a working draft and is not a substitute for professional legal advice. It should be reviewed and finalized by qualified counsel before public commercial release.
 
-DEX is designed to feel powerful without being sneaky. The default model is local-first, with required minimal diagnostics for reliability/security and optional product analytics for richer product improvement. Some features may be ad-supported or connect third-party partners, as described below.
+DEX is free for everyone: every feature is available to all users at no cost, with no paid plans, no paid tiers, no in-app purchases, and no advertising. In exchange, DEX may use limited data to operate and improve the product.
+
+DEX is designed to feel powerful without being sneaky. The default model is local-first, with required minimal diagnostics for reliability/security and optional product analytics for richer product improvement. Be aware that some minimal diagnostics do leave your device, and DEX uses permitted data to improve the system; DEX does not claim that nothing ever leaves your machine. Some features may connect third-party service providers or integration partners, as described below.
 
 This policy explains what DEX may process, why, and what controls users should have.
 
@@ -25,8 +26,7 @@ This policy explains what DEX may process, why, and what controls users should h
 | Sensitive content | Never by default | Protect secrets and private material | Warning before diagnostic capture when risk exists |
 | Plugin data | Feature-controlled | Plugin operation | Review/revoke plugin permissions |
 | Cloud/sync data | Off by default | Sync, backup, cloud features | Enable/disable and delete where supported |
-| Advertising data | Free tier / select features | Deliver and measure ads in ad-supported features (paid plans are ad-free) | Opt out of personalized ads; upgrade to a paid plan |
-| Partner/service-provider sharing | As needed | Operate hosting, analytics, payments, integrations, ads | Disable connected integrations; California opt-out of sale/sharing |
+| Partner/service-provider sharing | As needed | Operate hosting, analytics, crash reporting, support, integrations | Disable connected integrations; California opt-out of sale/sharing |
 
 ## 2. Required Diagnostics
 
@@ -82,16 +82,13 @@ DEX may use permitted data to:
 - Personalize the experience.
 - Train, evaluate, tune, test, and improve models and automation systems.
 - Detect abuse, protect users, enforce policies, and investigate security incidents.
-- Respond to requests and operate the product/business.
-- Deliver, personalize, and measure advertising in ad-supported features.
+- Respond to requests and operate the product.
 
-### Advertising and supported features
-
-Some parts of DEX -- for example, the free tier, in-app games, or other clearly marked features -- may show advertising or sponsored content. **Paid plans are ad-free.** Advertising partners may receive only the limited information needed to deliver and measure ads (such as a device or advertising identifier, coarse region, and non-content interaction signals). DEX does not share your private files, notes, vault contents, or message contents with advertisers.
+DEX is free for everyone and does not collect or share data to deliver advertising.
 
 ### Sharing with service providers and partners
 
-DEX may share data with service providers who process it on our behalf (hosting, analytics, crash reporting, payments, customer support), with integration partners you choose to connect, with advertising partners for ad-supported features, and where required for legal, safety, or business-transfer reasons. Providers and partners may use the data only for the purposes DEX authorizes.
+DEX may share data with service providers who process it on our behalf (hosting, analytics, crash reporting, customer support), with integration partners you choose to connect, and where required for legal, safety, or business-transfer reasons. Providers and partners may use the data only for the purposes DEX authorizes.
 
 ## 9. Data Storage and Retention
 
@@ -103,7 +100,6 @@ DEX should provide controls to:
 
 - View data categories.
 - Toggle optional analytics.
-- Opt out of personalized advertising.
 - Disable cloud/sync.
 - Export local data.
 - Delete local data.
@@ -120,7 +116,7 @@ DEX is not directed to children under 13 or the minimum age required in your jur
 
 ## 12. Changes
 
-Material changes may require re-acceptance. The current policy version is shown in Settings and in the bundled policy viewer.
+Material changes may require re-acceptance. The latest policies are always available in Settings and in the bundled policy viewer.
 
 ## 13. Contact
 

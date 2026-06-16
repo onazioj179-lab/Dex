@@ -11,6 +11,8 @@
 
 import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
+import { applyAccentFamily } from '../utils/accentFamily';
+import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
 import { Select } from '../components/Select';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
@@ -40,7 +42,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
-import { DATA_CATEGORIES, DATA_POLICY_VERSION, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
+import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { clearPolicyAcceptance, hasAcceptedCurrentPolicies, isOptionalAnalyticsEnabled, readPolicyAcceptance, setOptionalAnalyticsEnabled } from '../utils/policyConsent';
 
 // ===========================================================================
@@ -390,7 +392,7 @@ const SystemMonitorPanel: React.FC = () => {
   };
 
   const headerCellStyle: React.CSSProperties = {
-    textAlign: 'left', padding: '8px 10px', fontSize: 11, fontWeight: 600,
+    textAlign: 'left', padding: 'var(--space-2) 10px', fontSize: 11, fontWeight: 600,
     color: 'var(--color-text-secondary)', cursor: 'pointer', userSelect: 'none',
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-elevated, #1a1a1e)',
@@ -403,7 +405,7 @@ const SystemMonitorPanel: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', maxWidth: 980 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5) var(--space-6)', maxWidth: 980 }}>
       <div>
         <h3 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>System Monitor</h3>
         <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
@@ -413,23 +415,23 @@ const SystemMonitorPanel: React.FC = () => {
 
       {/* Live stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>CPU</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: totalCpu > 80 ? '#FF453A' : totalCpu > 50 ? '#FF9F0A' : '#30D158', fontVariantNumeric: 'tabular-nums' }}>{totalCpu}%</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: totalCpu > 80 ? 'var(--color-error)' : totalCpu > 50 ? 'var(--color-warning)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>{totalCpu}%</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.cpu?.cores || '?'} cores</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Memory</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: totalMem > 80 ? '#FF453A' : totalMem > 50 ? '#FF9F0A' : '#30D158', fontVariantNumeric: 'tabular-nums' }}>{totalMem}%</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: totalMem > 80 ? 'var(--color-error)' : totalMem > 50 ? 'var(--color-warning)' : 'var(--color-success)', fontVariantNumeric: 'tabular-nums' }}>{totalMem}%</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{memUsedGB} / {memTotalGB} GB</div>
         </div>
-        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Processes</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{processes.length}</div>
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{filtered.length} shown</div>
         </div>
         {status.battery && (
-          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '12px 14px' }}>
+          <div style={{ background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: 'var(--space-3) 14px' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Battery</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{status.battery.percent}%</div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{status.battery.charging ? 'Charging' : 'On battery'}</div>
@@ -438,14 +440,14 @@ const SystemMonitorPanel: React.FC = () => {
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Filter by name or PID..."
           value={filter}
           onChange={e => setFilter(e.target.value)}
           style={{
-            flex: 1, height: 32, padding: '0 12px', borderRadius: 6,
+            flex: 1, height: 32, padding: '0 var(--space-3)', borderRadius: 6,
             background: 'var(--color-bg-elevated, #1a1a1e)', border: '1px solid var(--color-border-subtle)',
             color: 'var(--color-text-primary)', fontSize: 12, fontFamily: 'inherit', outline: 'none',
           }}
@@ -461,7 +463,7 @@ const SystemMonitorPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div style={{ padding: '10px 14px', background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 6, color: '#FF6961', fontSize: 12 }}>
+        <div style={{ padding: '10px 14px', background: 'var(--color-error-muted, rgba(255,69,58,0.12))', border: '1px solid rgba(255,69,58,0.3)', borderRadius: 6, color: 'var(--color-error)', fontSize: 12 }}>
           {error}
         </div>
       )}
@@ -492,10 +494,10 @@ const SystemMonitorPanel: React.FC = () => {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 24, color: 'var(--color-text-secondary)' }}>Loading processes...</td></tr>
+                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>Loading processes...</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 24, color: 'var(--color-text-secondary)' }}>
+                <tr><td colSpan={5} style={{ ...cellStyle, textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
                   {filter ? 'No processes match filter.' : 'No process data available.'}
                 </td></tr>
               )}
@@ -507,8 +509,8 @@ const SystemMonitorPanel: React.FC = () => {
                     {p.name}
                   </td>
                   <td style={{ ...cellStyle, textAlign: 'right', color: 'var(--color-text-secondary)' }}>{p.pid}</td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.cpu || 0) > 50 ? '#FF9F0A' : 'var(--color-text-primary)' }}>{(p.cpu || 0).toFixed(1)}%</td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.memory || 0) > 10 ? '#FF9F0A' : 'var(--color-text-primary)' }}>{(p.memory || 0).toFixed(1)}%</td>
+                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.cpu || 0) > 50 ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>{(p.cpu || 0).toFixed(1)}%</td>
+                  <td style={{ ...cellStyle, textAlign: 'right', color: (p.memory || 0) > 10 ? 'var(--color-warning)' : 'var(--color-text-primary)' }}>{(p.memory || 0).toFixed(1)}%</td>
                   <td style={{ ...cellStyle, textAlign: 'center' }}>
                     <button
                       onClick={() => handleEndProcess(p.pid, p.name)}
@@ -516,8 +518,8 @@ const SystemMonitorPanel: React.FC = () => {
                       aria-label={busyPid === p.pid ? `Ending ${p.name}` : `End process ${p.name} (PID ${p.pid})`}
                       style={{
                         padding: '3px 10px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.4)',
-                        background: busyPid === p.pid ? 'rgba(255,69,58,0.1)' : 'transparent',
-                        color: '#FF6961', fontSize: 11, fontWeight: 600,
+                        background: busyPid === p.pid ? 'var(--color-error-muted, rgba(255,69,58,0.1))' : 'transparent',
+                        color: 'var(--color-error)', fontSize: 11, fontWeight: 600,
                         cursor: busyPid === p.pid ? 'wait' : 'pointer',
                       }}
                     >{busyPid === p.pid ? '...' : 'End'}</button>
@@ -675,16 +677,16 @@ const UpdateManagerSection: React.FC = () => {
     try { await dexUpdates?.rollback?.(backupId); } catch { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: 'Rollback failed', type: 'error' } })); }
   };
 
-  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle)' };
+  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border-subtle)' };
   const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' };
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
-  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: '16px 0 8px', textTransform: 'uppercase' as const };
+  const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'uppercase' as const };
   const pill = (on: boolean): React.CSSProperties => ({
     width: 44, height: 26, borderRadius: 13, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
     background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
     position: 'relative', flexShrink: 0,
   });
-  const btnBase: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
+  const btnBase: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
 
   const Toggle: React.FC<{ on: boolean; onToggle: () => void; ariaLabel: string }> = ({ on, onToggle, ariaLabel }) => (
     <button style={pill(on)} onClick={onToggle} aria-checked={on} role="switch" aria-label={ariaLabel}>
@@ -698,13 +700,13 @@ const UpdateManagerSection: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' as const, height: '100%', overflow: 'hidden' }}>
-    <div style={{ flex: 1, padding: '0 24px 24px', overflowY: 'auto' as const }}>
+    <div style={{ flex: 1, padding: '0 var(--space-6) var(--space-6)', overflowY: 'auto' as const }}>
       {/* Status Banner */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 10,
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderRadius: 10,
         background: info.updateAvailable ? 'var(--color-accent-soft, rgba(10,132,255,0.08))' : 'var(--color-success-muted, rgba(48,209,88,0.08))',
         border: `1px solid ${info.updateAvailable ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'var(--color-success-muted, rgba(48,209,88,0.2))'}`,
-        marginBottom: 20,
+        marginBottom: 'var(--space-5)',
       }}>
         <div style={{ width: 40, height: 40, borderRadius: 8, background: info.updateAvailable ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'var(--color-success-muted, rgba(48,209,88,0.15))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {info.updateAvailable ? (
@@ -725,7 +727,7 @@ const UpdateManagerSection: React.FC = () => {
             Current version: {info.currentVersion}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
           {info.status === 'idle' && !info.updateAvailable && (
             <button onClick={checkForUpdates} aria-label="Check for updates" style={{ ...btnBase, background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)' }}>Check Now</button>
           )}
@@ -743,7 +745,7 @@ const UpdateManagerSection: React.FC = () => {
 
       {/* Download Progress */}
       {info.status === 'downloading' && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 'var(--space-5)' }}>
           <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-hover)', overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent)', width: `${Math.max(0, info.downloadProgress)}%` }} />
           </div>
@@ -752,7 +754,7 @@ const UpdateManagerSection: React.FC = () => {
 
       {/* Error */}
       {info.error && (
-        <div style={{ fontSize: 12, color: 'var(--color-error)', padding: '8px 0 12px' }}>{info.error}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-error)', padding: 'var(--space-2) 0 var(--space-3)' }}>{info.error}</div>
       )}
 
       {/* Release Notes */}
@@ -762,7 +764,7 @@ const UpdateManagerSection: React.FC = () => {
           <div style={{
             padding: 14, borderRadius: 8, background: 'var(--color-bg-surface)',
             border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
-            lineHeight: 1.6, maxHeight: 120, overflowY: 'auto' as const, marginBottom: 12, whiteSpace: 'pre-wrap' as const,
+            lineHeight: 1.6, maxHeight: 120, overflowY: 'auto' as const, marginBottom: 'var(--space-3)', whiteSpace: 'pre-wrap' as const,
           }}>
             {info.releaseNotes}
           </div>
@@ -816,7 +818,7 @@ const UpdateManagerSection: React.FC = () => {
       <button
         onClick={() => setShowChangelog(!showChangelog)}
         aria-label={showChangelog ? 'Hide changelog' : 'View changelog'}
-        style={{ ...btnBase, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}
+        style={{ ...btnBase, background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 6 }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
         {showChangelog ? 'Hide Changelog' : 'View Changelog'}
@@ -825,7 +827,7 @@ const UpdateManagerSection: React.FC = () => {
         <div style={{
           padding: 14, borderRadius: 8, background: 'var(--color-bg-surface)',
           border: '1px solid var(--color-border-subtle)', fontSize: 12, color: 'var(--color-text-secondary)',
-          lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' as const, marginBottom: 12, whiteSpace: 'pre-wrap' as const,
+          lineHeight: 1.6, maxHeight: 200, overflowY: 'auto' as const, marginBottom: 'var(--space-3)', whiteSpace: 'pre-wrap' as const,
         }}>
           {changelog}
         </div>
@@ -835,10 +837,10 @@ const UpdateManagerSection: React.FC = () => {
       {history.length > 0 && (
         <>
           <div style={heading}>Update History</div>
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 'var(--space-3)' }}>
             {history.slice(0, 10).map((h, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: h.success ? 'var(--color-success)' : 'var(--color-error)' }} />
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>v{h.version}</span>
                 </div>
@@ -853,15 +855,15 @@ const UpdateManagerSection: React.FC = () => {
       {backups.length > 0 && (
         <>
           <div style={heading}>Rollback</div>
-          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>Restore a previous version if the current one has issues.</p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-2)' }}>Restore a previous version if the current one has issues.</p>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
             {backups.map((b: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
                 <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{b.version || b.id}</span>
                 <button
                   onClick={() => rollback(b.id)}
                   aria-label={`Rollback to version ${b.version || b.id}`}
-                  style={{ ...btnBase, background: 'transparent', color: 'var(--color-error)', border: '1px solid rgba(255,69,58,0.3)', padding: '4px 12px', fontSize: 11 }}
+                  style={{ ...btnBase, background: 'transparent', color: 'var(--color-error)', border: '1px solid rgba(255,69,58,0.3)', padding: '4px var(--space-3)', fontSize: 11 }}
                 >
                   Rollback
                 </button>
@@ -1035,14 +1037,18 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.dir = isRtl ? 'rtl' : 'ltr';
     } catch { /* ignore */ }
     
-    // Apply accent color
-    const accentColor = String(settings.accentColor || 'var(--color-accent)');
-    root.style.setProperty('--accent-color', accentColor);
-    root.style.setProperty('--color-accent', accentColor);
-    
-    // Calculate hover variant (always lighter for dark mode)
-    root.style.setProperty('--color-accent-hover', lightenColor(accentColor, 20));
-    
+    // Apply accent color as one coherent family (base/hover/dark/light/soft) via
+    // the shared deriver, so accent tints and pressed states track the chosen
+    // colour. A non-literal sentinel like 'var(--color-accent)' means "system
+    // default": clear inline overrides so the stylesheet baseline shows through
+    // (the old path set --color-accent to a self-referential var, which broke it).
+    const accentColor = String(settings.accentColor || '').trim();
+    if (!applyAccentFamily(accentColor)) {
+      for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft']) {
+        root.style.removeProperty(prop);
+      }
+    }
+
     // Apply font size (scale-based)
     const scale = typeof settings.fontScale === 'number' ? settings.fontScale : 100;
     root.style.setProperty('--font-size-base', `${Math.round(14 * scale / 100)}px`);
@@ -1365,19 +1371,18 @@ const TextDensityControls: React.FC<{
       return Number.isFinite(v) && v >= 0.8 && v <= 1.4 ? v : 1;
     } catch { return 1; }
   });
-  const [compact, setCompact] = useState<boolean>(() => {
-    try { return localStorage.getItem('dex-density-compact') === 'true'; } catch { return false; }
-  });
+  const [density, setDensity] = useState<DensityPref>(() => loadComfort().density);
 
   const applyFontScale = (v: number) => {
     setFontScale(v);
     document.documentElement.style.setProperty('--font-scale', String(v));
     try { localStorage.setItem('dex-font-scale', String(v)); } catch {}
   };
-  const applyCompact = (v: boolean) => {
-    setCompact(v);
-    document.documentElement.style.setProperty('--density-scale', v ? '0.85' : '1');
-    try { localStorage.setItem('dex-density-compact', String(v)); } catch {}
+  const applyDensity = (v: DensityPref) => {
+    setDensity(v);
+    // Canonical density path: comfortPrefs writes data-density on <html>, which
+    // the consolidated density tokens in design-system.css pick up app-wide.
+    setComfort({ density: v });
   };
 
   return (
@@ -1388,7 +1393,7 @@ const TextDensityControls: React.FC<{
           <span style={settingLabel}>Text size</span>
           <span style={settingDesc}>Scale all UI text ({Math.round(fontScale * 100)}%)</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 200 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 200 }}>
           <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>A</span>
           <input
             type="range"
@@ -1408,20 +1413,62 @@ const TextDensityControls: React.FC<{
       </div>
       <div style={settingRow}>
         <div style={settingInfo}>
-          <span style={settingLabel}>Compact density</span>
-          <span style={settingDesc}>Tighter spacing for density-aware components</span>
+          <span style={settingLabel}>Density</span>
+          <span style={settingDesc}>Spacing across the whole UI — compact, default, or comfortable</span>
         </div>
-        <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={compact}
-            onChange={e => applyCompact(e.target.checked)}
-            aria-label="Compact density"
-            style={{ accentColor: 'var(--color-accent)', width: 18, height: 18, cursor: 'pointer' }}
-          />
-        </label>
+        <div style={{ display: 'flex', gap: 6 }} role="group" aria-label="UI density">
+          {DENSITY_OPTIONS.map(opt => {
+            const active = density === opt.id;
+            return (
+              <button
+                key={opt.id}
+                aria-label={`${opt.label} density`}
+                aria-pressed={active}
+                onClick={() => applyDensity(opt.id)}
+                style={{
+                  padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+                  background: active ? 'var(--color-accent-light)' : 'transparent',
+                  color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </>
+  );
+};
+
+// Dark-room: near-black surfaces + dimmed text for low-light work. Self-contained
+// so it owns its own state; persists + applies through the canonical comfortPrefs
+// path (writes data-darkroom on <html>, read by design-system.css).
+const DarkRoomToggle: React.FC<{
+  settingRow: React.CSSProperties;
+  settingInfo: React.CSSProperties;
+  settingLabel: React.CSSProperties;
+  settingDesc: React.CSSProperties;
+}> = ({ settingRow, settingInfo, settingLabel, settingDesc }) => {
+  const [on, setOn] = useState<boolean>(() => loadComfort().darkroom);
+  const toggle = (v: boolean) => { setOn(v); setComfort({ darkroom: v }); };
+  return (
+    <div style={settingRow}>
+      <div style={settingInfo}>
+        <span style={settingLabel}>Pure black (OLED)</span>
+        <span style={settingDesc}>True-black surfaces — eases the eyes in low light and saves power on OLED screens</span>
+      </div>
+      <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={e => toggle(e.target.checked)}
+          aria-label="Dark room mode"
+          style={{ accentColor: 'var(--color-accent)', width: 18, height: 18, cursor: 'pointer' }}
+        />
+      </label>
+    </div>
   );
 };
 
@@ -1739,8 +1786,8 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
   const lastRun = status && status.lastRunTs > 0 ? new Date(status.lastRunTs).toLocaleString() : 'never';
 
   return (
-    <div style={{ padding: '6px 0 12px', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+    <div style={{ padding: '6px 0 var(--space-3)', fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
         <span>
           {status
             ? `Knowledge feed: ${status.archives} archives, ${fmt(status.bytesUsed)} of ${fmt(status.budgetBytes)} (${utilPct}%) -- ${status.totalIngested} facts ingested -- last run ${lastRun}`
@@ -2330,7 +2377,7 @@ export const Settings: React.FC = () => {
                 style={{
                   ...styles.button,
                   background: prefs.dockEdge === edge ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: prefs.dockEdge === edge ? '#fff' : 'var(--color-text-primary)',
+                  color: prefs.dockEdge === edge ? 'var(--color-accent-text)' : 'var(--color-text-primary)',
                   textTransform: 'capitalize',
                 }}
                 onClick={() => prefs.setDockEdge(edge)}
@@ -2354,7 +2401,7 @@ export const Settings: React.FC = () => {
                 style={{
                   ...styles.button,
                   background: prefs.dockPreset === preset ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: prefs.dockPreset === preset ? '#fff' : 'var(--color-text-primary)',
+                  color: prefs.dockPreset === preset ? 'var(--color-accent-text)' : 'var(--color-text-primary)',
                   textTransform: 'capitalize',
                 }}
                 onClick={() => prefs.setDockPreset(preset)}
@@ -2383,7 +2430,7 @@ export const Settings: React.FC = () => {
                 style={{
                   ...styles.button,
                   background: prefs.glassMode === mode.id ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: prefs.glassMode === mode.id ? '#fff' : 'var(--color-text-primary)',
+                  color: prefs.glassMode === mode.id ? 'var(--color-accent-text)' : 'var(--color-text-primary)',
                 }}
                 onClick={() => prefs.setGlassMode(mode.id)}
               >{mode.label}</button>
@@ -2603,7 +2650,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <h3 style={styles.sectionTitle}>Accent Color</h3>
-      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
         {['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff375f', '#64d2ff', '#ff9f0a'].map(color => (
           <button
             key={color}
@@ -2624,7 +2671,7 @@ export const Settings: React.FC = () => {
           <span style={styles.settingLabel}>Font Scale</span>
           <span style={styles.settingDesc}>Adjust text size across the app ({settings.fontScale ?? 100}%)</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 160 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 160 }}>
           <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>A</span>
           <input type="range" min="80" max="130" step="5" value={settings.fontScale ?? 100}
             onChange={e => {
@@ -2646,6 +2693,12 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Visual Effects</h3>
       {renderToggle('reduceMotion', 'Reduce Motion', 'Minimize animated effects')}
+      <DarkRoomToggle
+        settingRow={styles.settingRow}
+        settingInfo={styles.settingInfo}
+        settingLabel={styles.settingLabel}
+        settingDesc={styles.settingDesc}
+      />
 
       {/* Glass mode segmented control -- single source of truth, mirrored
           into the legacy `transparency` boolean for back-compat with older
@@ -2678,7 +2731,7 @@ export const Settings: React.FC = () => {
                   }));
                 }}
                 style={{
-                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                   background: active ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
                   color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -2693,11 +2746,11 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper</h3>
       <div style={{
-        padding: 16, borderRadius: 10,
+        padding: 'var(--space-4)', borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
           {WALLPAPER_PRESETS.filter(p => p.mode !== 'live').map(preset => (
             <button
               key={preset.id}
@@ -2740,7 +2793,7 @@ export const Settings: React.FC = () => {
             input.click();
           }}
           style={{
-            width: '100%', padding: '8px 0', borderRadius: 6, cursor: 'pointer',
+            width: '100%', padding: 'var(--space-2) 0', borderRadius: 6, cursor: 'pointer',
             border: '1px dashed var(--color-border-subtle)',
             background: 'transparent', color: 'var(--color-text-secondary)',
             fontSize: 11, fontWeight: 500,
@@ -2750,7 +2803,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Wallpaper Tinting</h3>
       <div style={{
-        padding: 16, borderRadius: 10,
+        padding: 'var(--space-4)', borderRadius: 10,
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
@@ -2766,7 +2819,7 @@ export const Settings: React.FC = () => {
                 aria-label={`Select ${mat} material`}
                 onClick={() => setSettings(prev => ({ ...prev, windowMaterial: mat }))}
                 style={{
-                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   border: settings.windowMaterial === mat ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
                   background: settings.windowMaterial === mat ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
                   color: settings.windowMaterial === mat ? 'var(--color-accent)' : 'var(--color-text-secondary)',
@@ -2777,12 +2830,12 @@ export const Settings: React.FC = () => {
             ))}
           </div>
         </div>
-        <div style={{ ...styles.settingRow, marginTop: 12 }}>
+        <div style={{ ...styles.settingRow, marginTop: 'var(--space-3)' }}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Blur Intensity</span>
             <span style={styles.settingDesc}>Blur amount behind glass surfaces</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 140 }}>
             <input type="range" min="0" max="30" step="1" value={settings.blurIntensity ?? 12}
               onChange={e => {
                 const v = Number(e.target.value);
@@ -2793,12 +2846,12 @@ export const Settings: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{settings.blurIntensity ?? 12}px</span>
           </div>
         </div>
-        <div style={{ ...styles.settingRow, marginTop: 8 }}>
+        <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)' }}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Glass Opacity</span>
             <span style={styles.settingDesc}>Transparency of glass surfaces</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 140 }}>
             <input type="range" min="0" max="100" step="5" value={Math.round((settings.glassOpacity ?? 0.85) * 100)}
               onChange={e => {
                 const v = Number(e.target.value) / 100;
@@ -2936,8 +2989,8 @@ export const Settings: React.FC = () => {
       </div>
       
       {showPinSetup && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
-          <div style={{ marginBottom: '12px' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Enter PIN (4-8 digits)</label>
             <input
               type="password"
@@ -2950,7 +3003,7 @@ export const Settings: React.FC = () => {
               placeholder="****"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm PIN</label>
             <input
               type="password"
@@ -2963,8 +3016,8 @@ export const Settings: React.FC = () => {
               placeholder="****"
             />
           </div>
-          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: 'var(--space-3)' }}>{authError}</div>}
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button style={styles.manageBtn} aria-label="Save PIN" onClick={handleSetupPin}>Save PIN</button>
             <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel PIN setup" onClick={() => { setShowPinSetup(false); setPinInput(''); setConfirmPinInput(''); setAuthError(''); }}>Cancel</button>
           </div>
@@ -2972,8 +3025,8 @@ export const Settings: React.FC = () => {
       )}
       
       {showPinChange && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
-          <div style={{ marginBottom: '12px' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Current PIN</label>
             <input
               type="password"
@@ -2986,7 +3039,7 @@ export const Settings: React.FC = () => {
               placeholder="****"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>New PIN (4-8 digits)</label>
             <input
               type="password"
@@ -2999,7 +3052,7 @@ export const Settings: React.FC = () => {
               placeholder="****"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm New PIN</label>
             <input
               type="password"
@@ -3012,8 +3065,8 @@ export const Settings: React.FC = () => {
               placeholder="****"
             />
           </div>
-          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: 'var(--space-3)' }}>{authError}</div>}
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button style={styles.manageBtn} aria-label="Save new PIN" onClick={handleChangePin}>Change PIN</button>
             <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel PIN change" onClick={() => { setShowPinChange(false); setCurrentPinInput(''); setPinInput(''); setConfirmPinInput(''); setAuthError(''); }}>Cancel</button>
           </div>
@@ -3037,8 +3090,8 @@ export const Settings: React.FC = () => {
       </div>
       
       {showPasswordSetup && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
-          <div style={{ marginBottom: '12px' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Enter Password (min 8 characters)</label>
             <input
               type="password"
@@ -3048,7 +3101,7 @@ export const Settings: React.FC = () => {
               placeholder="Enter password"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm Password</label>
             <input
               type="password"
@@ -3058,8 +3111,8 @@ export const Settings: React.FC = () => {
               placeholder="Confirm password"
             />
           </div>
-          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: 'var(--space-3)' }}>{authError}</div>}
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button style={styles.manageBtn} aria-label="Save password" onClick={handleSetupPassword}>Save Password</button>
             <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel password setup" onClick={() => { setShowPasswordSetup(false); setPasswordInput(''); setConfirmPasswordInput(''); setAuthError(''); }}>Cancel</button>
           </div>
@@ -3067,8 +3120,8 @@ export const Settings: React.FC = () => {
       )}
       
       {showPasswordChange && (
-        <div style={{ padding: '16px', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: '16px' }}>
-          <div style={{ marginBottom: '12px' }}>
+        <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-surface)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Current Password</label>
             <input
               type="password"
@@ -3078,7 +3131,7 @@ export const Settings: React.FC = () => {
               placeholder="Current password"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>New Password (min 8 characters)</label>
             <input
               type="password"
@@ -3088,7 +3141,7 @@ export const Settings: React.FC = () => {
               placeholder="New password"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm New Password</label>
             <input
               type="password"
@@ -3098,8 +3151,8 @@ export const Settings: React.FC = () => {
               placeholder="Confirm new password"
             />
           </div>
-          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: '12px' }}>{authError}</div>}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {authError && <div style={{ color: 'var(--color-error)', fontSize: '12px', marginBottom: 'var(--space-3)' }}>{authError}</div>}
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button style={styles.manageBtn} aria-label="Save new password" onClick={handleChangePassword}>Change Password</button>
             <button style={{ ...styles.manageBtn, background: 'transparent' }} aria-label="Cancel password change" onClick={() => { setShowPasswordChange(false); setCurrentPasswordInput(''); setPasswordInput(''); setConfirmPasswordInput(''); setAuthError(''); }}>Cancel</button>
           </div>
@@ -3124,8 +3177,8 @@ export const Settings: React.FC = () => {
       
       {/* Current Auth Status */}
       {(settings.pinEnabled || settings.passwordEnabled || settings.biometricEnabled) && (
-        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success)', fontSize: '13px', fontWeight: 500 }}>
+        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-success)', fontSize: '13px', fontWeight: 500 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9,12 11,14 15,10"/></svg>
             Protected with: {[
               settings.biometricEnabled && 'Fingerprint',
@@ -3138,7 +3191,7 @@ export const Settings: React.FC = () => {
       
       {/* Recovery Codes */}
       {(settings.pinEnabled || settings.passwordEnabled) && (
-        <div style={{ marginTop: '12px' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <div style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>Recovery Codes</span>
@@ -3147,14 +3200,14 @@ export const Settings: React.FC = () => {
             <button style={styles.manageBtn} aria-label="Generate recovery codes" onClick={handleGenerateRecoveryCodes}>Generate</button>
           </div>
           {showRecoveryCodes && recoveryCodes.length > 0 && (
-            <div style={{ padding: '16px', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: '16px' }}>
+            <div style={{ padding: 'var(--space-4)', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.2)', borderRadius: '6px', marginBottom: 'var(--space-4)' }}>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '10px' }}>Save these codes somewhere safe!</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--color-text-primary)' }}>
                 {recoveryCodes.map((code, i) => (
                   <div key={i} style={{ padding: '6px 10px', background: 'var(--color-bg-inset, rgba(0,0,0,0.2))', borderRadius: '4px', textAlign: 'center' }}>{code}</div>
                 ))}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>Each code can only be used once. Store them securely.</div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: 'var(--space-2)' }}>Each code can only be used once. Store them securely.</div>
               <button style={{ ...styles.manageBtn, marginTop: '10px' }} aria-label="Close recovery codes" onClick={() => setShowRecoveryCodes(false)}>Done</button>
             </div>
           )}
@@ -3217,7 +3270,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <h3 style={styles.sectionTitle}>Permission Controls</h3>
-      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
         All permissions are OFF by default. Unused permissions auto-disable after the configured timeout.
       </div>
       {(() => {
@@ -3235,7 +3288,7 @@ export const Settings: React.FC = () => {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 {entry.enabled && (
                   <select
                     value={entry.autoDisableMinutes}
@@ -3281,7 +3334,7 @@ export const Settings: React.FC = () => {
         });
       })()}
       <button
-        style={{ ...styles.dangerBtnSmall, marginTop: 8, marginBottom: 16 }}
+        style={{ ...styles.dangerBtnSmall, marginTop: 'var(--space-2)', marginBottom: 'var(--space-4)' }}
         onClick={() => usePermissionStore.getState().revokeAll()}
         aria-label="Revoke all permissions"
       >
@@ -3305,7 +3358,7 @@ export const Settings: React.FC = () => {
 
   const renderAboutSettings = () => (
     <div style={styles.settingsContent}>
-      <div style={{ ...styles.aboutHeader, marginTop: 12 }}>
+      <div style={{ ...styles.aboutHeader, marginTop: 'var(--space-3)' }}>
         <div style={styles.appIcon}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5">
             <rect x="3" y="3" width="18" height="18" rx="4" />
@@ -3314,13 +3367,12 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.appInfo}>
           <span style={styles.appName}>DEX</span>
-          <span style={styles.appVersion}>Version {appVersion}</span>
         </div>
       </div>
       
       {/* Creator Watermark */}
       <div style={{
-        padding: '20px', borderRadius: '10px', marginBottom: '20px',
+        padding: 'var(--space-5)', borderRadius: '10px', marginBottom: 'var(--space-5)',
         background: 'linear-gradient(135deg, rgba(74,158,255,0.08) 0%, rgba(99,102,241,0.06) 100%)',
         border: '1px solid var(--color-accent-light, rgba(74,158,255,0.15))',
         position: 'relative', overflow: 'hidden',
@@ -3329,10 +3381,10 @@ export const Settings: React.FC = () => {
         <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-accent)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
           Created by Onazi Treasure OJ
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)', lineHeight: 1.5 }}>
           Personal Control Hub for Desktop Automation
         </div>
-        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
           <span>&copy; 2026 Onazi Treasure OJ</span>
           <span>MIT License</span>
           <span>All Rights Reserved</span>
@@ -3359,7 +3411,7 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* What you get -- user-facing capability snapshot */}
-      <div style={{ marginTop: 8, marginBottom: 18 }}>
+      <div style={{ marginTop: 'var(--space-2)', marginBottom: 18 }}>
         <h3 style={styles.sectionTitle}>What DEX does for you</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
           {[
@@ -3371,7 +3423,7 @@ export const Settings: React.FC = () => {
             { title: 'Always improving', body: 'Free updates roll in automatically. New features show up here, with the changelog one click away.' },
           ].map(card => (
             <div key={card.title} style={{
-              padding: '12px 14px', borderRadius: 8,
+              padding: 'var(--space-3) 14px', borderRadius: 8,
               border: '1px solid var(--color-border-subtle)',
               background: 'var(--color-bg-hover, rgba(255,255,255,0.03))',
             }}>
@@ -3389,18 +3441,14 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Legal & Privacy */}
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 'var(--space-6)' }}>
         <h3 style={styles.sectionTitle}>Legal & Privacy</h3>
         <div style={styles.aboutDetails}>
           <div style={styles.aboutRow}>
             <span style={styles.aboutLabel}>Policy State</span>
-            <span style={{ ...styles.aboutValue, color: hasAcceptedCurrentPolicies(policyAcceptance) ? 'var(--color-success, #30d158)' : 'var(--status-error, #ef4444)' }}>
+            <span style={{ ...styles.aboutValue, color: hasAcceptedCurrentPolicies(policyAcceptance) ? 'var(--color-success, #30d158)' : 'var(--color-error, #ff453a)' }}>
               {hasAcceptedCurrentPolicies(policyAcceptance) ? 'Accepted current policies' : 'Needs review'}
             </span>
-          </div>
-          <div style={styles.aboutRow}>
-            <span style={styles.aboutLabel}>Data Policy</span>
-            <span style={styles.aboutValue}>v{DATA_POLICY_VERSION}</span>
           </div>
           <div style={styles.aboutRow}>
             <span style={styles.aboutLabel}>Accepted</span>
@@ -3412,7 +3460,7 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 14 }}>
           {POLICY_METADATA.map(policy => (
             <button key={policy.slug} style={styles.linkBtn} onClick={() => openPolicyViewer(policy.slug)} aria-label={`Open ${policy.title}`}>
               {policy.title}
@@ -3439,9 +3487,9 @@ export const Settings: React.FC = () => {
           </label>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 'var(--space-2)', marginBottom: 14 }}>
           {DATA_CATEGORIES.map(category => (
-            <div key={category.id} style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
+            <div key={category.id} style={{ padding: '10px var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover, rgba(255,255,255,0.035))' }}>
               <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>{category.label}</div>
               <div style={{ fontSize: 10, color: 'var(--color-accent)', margin: '3px 0 5px' }}>{category.defaultState}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 }}>{category.purpose}</div>
@@ -3455,9 +3503,9 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Diagnostic Share */}
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 'var(--space-6)' }}>
         <h3 style={styles.sectionTitle}>Diagnostics</h3>
-        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 12, lineHeight: '1.5' }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)', lineHeight: '1.5' }}>
           Share diagnostic information with DEX for troubleshooting and product improvement.
           This includes your DEX version, OS, selected app usage stats, and error logs.
           Review before sending; personal files, passwords, and vault items are not collected by default.
@@ -3466,15 +3514,15 @@ export const Settings: React.FC = () => {
           aria-label="Share diagnostics via email"
           style={{
             ...styles.linkBtn,
-            background: 'linear-gradient(135deg, rgba(59,130,246,.15), rgba(99,102,241,.1))',
-            border: '1px solid rgba(99,102,241,.25)',
-            color: '#818cf8',
-            padding: '10px 20px',
+            background: 'var(--color-accent-light)',
+            border: '1px solid var(--color-accent-muted)',
+            color: 'var(--color-accent)',
+            padding: '10px var(--space-5)',
             fontWeight: 600,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 'var(--space-2)',
           }}
           onClick={() => {
             const diag: string[] = [];
@@ -3579,7 +3627,7 @@ export const Settings: React.FC = () => {
         onChange={e => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
         aria-label={label}
         style={{
-          padding: '6px 12px', borderRadius: 6, fontSize: 12,
+          padding: '6px var(--space-3)', borderRadius: 6, fontSize: 12,
           border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
           color: 'var(--color-text-primary)', outline: 'none', cursor: 'pointer',
         }}
@@ -3690,12 +3738,12 @@ export const Settings: React.FC = () => {
         const autoOpt = isAutoOptimizeEnabled();
         return (
           <>
-            <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+            <div style={{ marginBottom: 'var(--space-3)', fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
               {hw.cores} cores &middot; {hw.memoryGB.toFixed(1)} GB RAM &middot; {hw.gpuRenderer.slice(0, 48)}
               {hw.weakGPU ? ' (weak GPU)' : ''}
             </div>
             {/* 5-segment tier selector */}
-            <div style={{ display: 'flex', gap: 2, marginBottom: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ display: 'flex', gap: 2, marginBottom: 'var(--space-2)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--color-border-subtle)' }}>
               {ALL_TIERS.map((tier) => {
                 const active = tier === currentTier;
                 return (
@@ -3707,9 +3755,9 @@ export const Settings: React.FC = () => {
                       window.location.reload();
                     }}
                     style={{
-                      flex: 1, padding: '8px 4px', border: 'none', cursor: 'pointer',
+                      flex: 1, padding: 'var(--space-2) 4px', border: 'none', cursor: 'pointer',
                       background: active ? 'var(--color-accent, #007AFF)' : 'var(--color-bg-secondary)',
-                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      color: active ? 'var(--color-accent-text)' : 'var(--color-text-secondary)',
                       fontSize: 11, fontWeight: active ? 700 : 500, transition: 'all 0.2s ease',
                     }}
                     title={getTierDescription(tier)}
@@ -3720,7 +3768,7 @@ export const Settings: React.FC = () => {
                 );
               })}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
               {getTierDescription(currentTier)}
               {manual ? ' (manual override)' : ' (auto-detected)'}
             </div>
@@ -3735,7 +3783,7 @@ export const Settings: React.FC = () => {
                 style={{
                   background: 'none', border: '1px solid var(--color-border-subtle)',
                   color: 'var(--color-text-secondary)', borderRadius: 6, padding: '6px 14px',
-                  cursor: 'pointer', fontSize: 12, marginBottom: 12,
+                  cursor: 'pointer', fontSize: 12, marginBottom: 'var(--space-3)',
                 }}
               >
                 Reset to Auto-Detect
@@ -3844,7 +3892,7 @@ export const Settings: React.FC = () => {
     return (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Network Mode</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
         {(['full', 'local-only', 'disabled'] as NetworkMode[]).map(m => {
           const selected = m === networkMode;
           return (
@@ -3853,10 +3901,10 @@ export const Settings: React.FC = () => {
               type="button"
               onClick={() => setNetworkMode(m)}
               style={{
-                display: 'flex', alignItems: 'flex-start', gap: 12,
+                display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)',
                 background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.10))' : 'transparent',
                 border: `1px solid ${selected ? 'var(--color-accent-light, rgba(74,158,255,0.40))' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
-                borderRadius: 6, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+                borderRadius: 6, padding: 'var(--space-3) 14px', cursor: 'pointer', textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.12s, border-color 0.12s',
               }}
@@ -4043,7 +4091,7 @@ export const Settings: React.FC = () => {
               <span style={styles.settingDesc}>{sc.desc}</span>
             </div>
             <div style={{
-              padding: '4px 12px', borderRadius: 4,
+              padding: '4px var(--space-3)', borderRadius: 4,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
               fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
               fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
@@ -4052,7 +4100,7 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         ))}
-        <div style={{ ...styles.settingDesc, marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
+        <div style={{ ...styles.settingDesc, marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, background: 'var(--color-bg-surface)' }}>
           Keyboard shortcut customization is available in the Command Palette ({_M}+Shift+P → "Keyboard Shortcuts").
         </div>
       </div>
@@ -4144,7 +4192,7 @@ export const Settings: React.FC = () => {
           <span style={styles.settingDesc}>The phrase to activate UKI hands-free</span>
         </div>
         <div style={{
-          padding: '4px 12px', borderRadius: 4,
+          padding: '4px var(--space-3)', borderRadius: 4,
           background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
           fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
           fontFamily: 'var(--font-mono)',
@@ -4167,7 +4215,7 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitle}>Memory Management</h3>
       <UkiArchiveStats styles={styles} />
       <UkiKnowledgeFeed styles={styles} />
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         <button
           style={{ ...styles.secondaryBtn, flex: 1 }}
           onClick={async () => {
@@ -4235,12 +4283,12 @@ export const Settings: React.FC = () => {
     return (
       <div style={styles.settingsContent}>
         <h3 style={styles.sectionTitleFirst}>DEX Creative Suite</h3>
-        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
           Manage individual creative applications. Each app has its own version, settings profile, and performance controls.
         </p>
 
         {/* App Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-5)' }}>
           {CREATIVE_APP_IDS.map(id => {
             const app = APP_DEFINITIONS[id];
             if (!app) return null;
@@ -4251,7 +4299,7 @@ export const Settings: React.FC = () => {
                 onClick={() => setSelectedCreativeApp(isSelected ? null : id)}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  padding: '14px 8px', borderRadius: 10, cursor: 'pointer',
+                  padding: '14px var(--space-2)', borderRadius: 10, cursor: 'pointer',
                   background: isSelected ? `${app.color}22` : 'var(--color-bg-surface)',
                   border: isSelected ? `1.5px solid ${app.color}` : '1.5px solid var(--color-border-subtle)',
                   transition: 'all 0.15s ease',
@@ -4280,10 +4328,10 @@ export const Settings: React.FC = () => {
         {detail && selectedCreativeApp && (
           <div style={{
             background: 'var(--color-bg-surface)', borderRadius: 10,
-            border: `1px solid ${detail.color}33`, padding: 20,
+            border: `1px solid ${detail.color}33`, padding: 'var(--space-4)',
           }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{
                 width: 48, height: 48, borderRadius: 10,
                 background: `linear-gradient(135deg, ${detail.color}55, ${detail.color}22)`,
@@ -4304,7 +4352,7 @@ export const Settings: React.FC = () => {
 
             {/* Version Info */}
             <h3 style={styles.sectionTitle}>App Info</h3>
-            <div style={styles.aboutDetails}>
+            <div style={{ ...styles.aboutDetails, background: 'transparent', border: 'none', borderRadius: 0, padding: '0 0 4px' }}>
               <div style={styles.aboutRow}>
                 <span style={styles.aboutLabel}>Version</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: detail.color }}>{detail.version || '—'}</span>
@@ -4316,7 +4364,7 @@ export const Settings: React.FC = () => {
               <div style={styles.aboutRow}>
                 <span style={styles.aboutLabel}>Shortcut</span>
                 <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px var(--space-2)', borderRadius: 4,
                   background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
                 }}>{detail.shortcut || '—'}</span>
               </div>
@@ -4408,7 +4456,7 @@ export const Settings: React.FC = () => {
                 <option value="8">8 GB</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <button
                 style={{ ...styles.secondaryBtn, flex: 1 }}
                 onClick={() => {
@@ -4446,7 +4494,7 @@ export const Settings: React.FC = () => {
                 <span style={{ color: 'var(--color-success, #30d158)' }}>Included with DEX</span>
               </div>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', lineHeight: 1.5 }}>
               Select an app above to view its version, configure performance, and manage per-app settings.
               Each creative app can be independently updated in future releases.
             </p>
@@ -4526,13 +4574,13 @@ export const Settings: React.FC = () => {
           <span style={styles.sidebarTitle}>Settings</span>
         </div>
 
-        <div style={{ padding: '0 12px 8px' }}>
+        <div style={{ padding: '0 var(--space-3) var(--space-2)' }}>
           <div
             style={{
               position: 'relative', display: 'flex', alignItems: 'center',
               background: 'var(--color-bg-hover)',
               border: `1px solid ${settingsSearch ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
-              borderRadius: 5, transition: 'border-color 0.12s ease',
+              borderRadius: 4, transition: 'border-color 0.12s ease',
             }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2"
@@ -4588,7 +4636,7 @@ export const Settings: React.FC = () => {
             role="listbox"
             aria-label="Settings search results"
             style={{
-              margin: '0 12px 8px', borderRadius: 6, overflow: 'hidden',
+              margin: '0 var(--space-3) var(--space-2)', borderRadius: 6, overflow: 'hidden',
               border: '1px solid var(--color-border-subtle)',
               background: 'var(--color-bg-surface)',
               maxHeight: 320, overflowY: 'auto',
@@ -4606,7 +4654,7 @@ export const Settings: React.FC = () => {
                 : 'No matches'}
             </div>
             {searchResults.length === 0 ? (
-              <div style={{ padding: '16px 12px', textAlign: 'center' as const }}>
+              <div style={{ padding: 'var(--space-4) var(--space-3)', textAlign: 'center' as const }}>
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
                   No settings match &ldquo;{settingsSearch.trim()}&rdquo;
                 </div>
@@ -4627,7 +4675,7 @@ export const Settings: React.FC = () => {
                     onClick={() => activateSearchResult(i)}
                     style={{
                       display: 'flex', width: '100%', alignItems: 'flex-start',
-                      gap: 8, padding: '8px 10px', textAlign: 'left' as const,
+                      gap: 'var(--space-2)', padding: 'var(--space-2) 10px', textAlign: 'left' as const,
                       border: 'none', cursor: 'pointer',
                       borderBottom: '1px solid var(--color-border-subtle)',
                       background: active ? 'var(--pg-row-active, var(--color-bg-hover))' : 'transparent',
@@ -4672,12 +4720,12 @@ export const Settings: React.FC = () => {
         )}
 
         {/* Import/Export buttons */}
-        <div style={{ padding: '0 12px 8px', display: 'flex', gap: 6 }}>
+        <div style={{ padding: '0 var(--space-3) var(--space-2)', display: 'flex', gap: 6 }}>
           <button
             onClick={() => importSettings(setSettings)}
             aria-label="Import settings from file"
             style={{
-              flex: 1, padding: '5px 8px', borderRadius: 4, fontSize: 10, fontWeight: 500,
+              flex: 1, padding: '5px var(--space-2)', borderRadius: 4, fontSize: 10, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -4694,7 +4742,7 @@ export const Settings: React.FC = () => {
             onClick={() => exportSettings(settings)}
             aria-label="Export settings to file"
             style={{
-              flex: 1, padding: '5px 8px', borderRadius: 4, fontSize: 10, fontWeight: 500,
+              flex: 1, padding: '5px var(--space-2)', borderRadius: 4, fontSize: 10, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -4712,7 +4760,7 @@ export const Settings: React.FC = () => {
         {/* Changed settings count */}
         {countChangedSettings(settings) > 0 && (
           <div style={{ 
-            padding: '6px 12px', margin: '0 12px 8px', borderRadius: 4,
+            padding: '6px var(--space-3)', margin: '0 var(--space-3) var(--space-2)', borderRadius: 4,
             background: 'var(--color-accent-soft, rgba(10,132,255,0.1))', border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))',
             fontSize: 10, color: 'var(--color-accent)',
             display: 'flex', alignItems: 'center', gap: 6,
@@ -4722,7 +4770,7 @@ export const Settings: React.FC = () => {
           </div>
         )}
         
-        <div style={styles.sectionList}>
+        <div className="dex-scroll-fade-y" style={styles.sectionList}>
           {(() => {
             const q = settingsSearch.trim().toLowerCase();
             if (q) {
@@ -4737,14 +4785,14 @@ export const Settings: React.FC = () => {
               );
               if (filtered.length === 0) {
                 return (
-                  <div style={{ padding: '12px 14px', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  <div style={{ padding: 'var(--space-3) 14px', fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                     No matching sections.
                   </div>
                 );
               }
               return (
                 <React.Fragment>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: '12px 14px 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}>
                     Sections ({filtered.length})
                   </div>
                   {filtered.map(section => (
@@ -4775,7 +4823,7 @@ export const Settings: React.FC = () => {
               if (items.length === 0) return null;
               return (
                 <React.Fragment key={cat.label}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: '12px 14px 4px' }}>{cat.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}>{cat.label}</div>
                   {items.map(section => (
                     <button
                       key={section.id}
@@ -4866,7 +4914,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '-0.01em',
   },
   sectionList: {
-    padding: '8px',
+    padding: 'var(--space-2)',
     display: 'flex',
     flexDirection: 'column',
     gap: '1px',
@@ -4877,7 +4925,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '7px 12px',
+    padding: '7px var(--space-3)',
     height: 'var(--pg-row-height)',
     borderRadius: 'var(--pg-row-radius)',
     border: 'none',
@@ -4893,7 +4941,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
   },
-  
+
+  // Generic small button (segmented controls, inline actions)
+  button: {
+    padding: '6px 14px',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-bg-hover)',
+    color: 'var(--color-text-primary)',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+
   // Main
   main: {
     flex: 1,
@@ -4919,7 +4980,7 @@ const styles: Record<string, React.CSSProperties> = {
   settingsContent: {
     flex: 1,
     overflow: 'auto',
-    padding: '4px 24px 24px',
+    padding: '4px var(--space-6) var(--space-6)',
     scrollBehavior: 'smooth',
   },
   sectionTitle: {
@@ -4937,7 +4998,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary)',
     textTransform: 'uppercase',
     letterSpacing: 'var(--dex-tracking-label, 0.08em)',
-    marginTop: '12px',
+    marginTop: 'var(--space-3)',
     marginBottom: '10px',
   },
   
@@ -4947,7 +5008,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 'var(--space-2)',
     padding: '13px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
@@ -4995,7 +5056,7 @@ const styles: Record<string, React.CSSProperties> = {
   
 
   secondaryBtn: {
-    marginTop: '12px',
+    marginTop: 'var(--space-3)',
     padding: '10px 18px',
     borderRadius: '6px',
     border: '1px solid var(--color-border)',
@@ -5008,7 +5069,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   dangerBtn: {
-    marginTop: '12px',
+    marginTop: 'var(--space-3)',
     padding: '10px 18px',
     borderRadius: '6px',
     border: 'none',
@@ -5020,7 +5081,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   dangerBtnSmall: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     borderRadius: '4px',
     border: 'none',
     background: 'rgba(255,67,58,0.15)',
@@ -5033,8 +5094,8 @@ const styles: Record<string, React.CSSProperties> = {
   aboutHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    marginBottom: '24px',
+    gap: 'var(--space-4)',
+    marginBottom: 'var(--space-6)',
   },
   appIcon: {
     width: '72px',
@@ -5064,8 +5125,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--color-border-subtle)',
     borderRadius: '10px',
-    padding: '4px 16px',
-    marginBottom: '24px',
+    padding: '4px var(--space-4)',
+    marginBottom: 'var(--space-6)',
   },
   aboutRow: {
     display: 'flex',
@@ -5084,10 +5145,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   aboutLinks: {
     display: 'flex',
-    gap: '12px',
+    gap: 'var(--space-3)',
   },
   linkBtn: {
-    padding: '9px 16px',
+    padding: '9px var(--space-4)',
     borderRadius: '6px',
     border: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface)',
@@ -5100,7 +5161,7 @@ const styles: Record<string, React.CSSProperties> = {
   
   // Manage button
   manageBtn: {
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     borderRadius: '4px',
     border: 'none',
     background: 'var(--color-bg-glass)',

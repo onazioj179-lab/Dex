@@ -236,7 +236,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
               right: -4,
               minWidth: 14,
               height: 14,
-              borderRadius: 7,
+              borderRadius: 6,
               background: COLOR_PRO,
               color: '#000',
               fontSize: 9,
@@ -257,13 +257,13 @@ export const UpdateNotificationDropdown: React.FC = () => {
           role="dialog"
           aria-label="Update options"
           style={{
-            marginTop: 8,
+            marginTop: 'var(--space-2)',
             width: 'min(320px, calc(100vw - 48px))',
             background: COLOR_BG,
             border: `1px solid ${COLOR_BORDER}`,
             borderRadius: 10,
             boxShadow: 'var(--pg-shadow-popover)',
-            padding: 16,
+            padding: 'var(--space-4)',
             backdropFilter: 'var(--blur-lg)',
           }}
         >
@@ -281,7 +281,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
                   style={{
                     fontSize: 11,
                     color: COLOR_MUTED,
-                    marginBottom: 12,
+                    marginBottom: 'var(--space-3)',
                     maxHeight: 80,
                     overflowY: 'auto',
                     whiteSpace: 'pre-wrap',
@@ -308,7 +308,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
                   </div>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={handleUpdate}
@@ -345,7 +345,7 @@ export const UpdateNotificationDropdown: React.FC = () => {
               >
                 {downgrade.eligible ? `Pro Downgrade \u00B7 ${downgrade.daysRemaining}d left` : 'Downgrade'}
               </div>
-              <div style={{ fontSize: 12, color: COLOR_TEXT, marginBottom: 8, lineHeight: 1.4 }}>
+              <div style={{ fontSize: 12, color: COLOR_TEXT, marginBottom: 'var(--space-2)', lineHeight: 1.4 }}>
                 {downgrade.reason}
               </div>
               {downgrade.eligible && (downgrade.targetVersions?.length || downgrade.targetVersion) && (
@@ -388,7 +388,7 @@ function primaryBtn(disabled: boolean): React.CSSProperties {
   return {
     flex: '1 1 auto',
     minWidth: 110,
-    padding: '7px 12px',
+    padding: '7px var(--space-3)',
     background: COLOR_ACCENT,
     color: '#fff',
     border: 'none',
@@ -402,7 +402,7 @@ function primaryBtn(disabled: boolean): React.CSSProperties {
 
 function ghostBtn(disabled: boolean): React.CSSProperties {
   return {
-    padding: '7px 12px',
+    padding: '7px var(--space-3)',
     background: 'transparent',
     color: COLOR_TEXT,
     border: `1px solid ${COLOR_BORDER}`,

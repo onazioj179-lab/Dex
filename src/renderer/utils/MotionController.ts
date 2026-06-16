@@ -8,6 +8,18 @@
  * DEX Motion Controller
  * Spring physics engine, momentum scroller, and reduce-motion compliance.
  * Single source of animation truth for the entire DEX UI.
+ *
+ * CONSOLIDATION NOTE (DEX Consolidation Audit, finding 4):
+ * This module is the real spring/scroller core for the renderer. The survivor,
+ * services/UnifiedMotionSystem.ts, is a preset-name -> CSS-transition engine
+ * with no spring physics, scrollers, or `SPRING_PRESETS`, so there is nothing
+ * here that can delegate into it without inventing new behaviour. In fact
+ * utils/motionHooks.ts -- the survivor's documented React surface -- is bound
+ * to this file's `SpringAnimator`, `MomentumScroller`, `ElasticScroller`,
+ * `SPRING_PRESETS`, `isReduceMotion`, `applyWillChange`/`removeWillChange`, and
+ * `perfAudit`. This file therefore remains the single implementation behind its
+ * import paths; consolidating it away would break the survivor's own hooks and
+ * change behaviour, which the zero-behaviour-change rule forbids.
  */
 
 // ---------------------------------------------------------------------------

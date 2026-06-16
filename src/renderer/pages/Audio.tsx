@@ -19,6 +19,7 @@ import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { getAudioPlaybackService } from '../services/media/AudioPlaybackService';
+import { useNowPlaying } from '../services/nowPlaying';
 
 // ===========================================================================
 // TYPES
@@ -694,6 +695,35 @@ export const Audio: React.FC = () => {
     playTrack(filteredTracks[prevIdx]);
   }, [currentTrack, filteredTracks, playTrack]);
 
+  // --- Global MiniPlayer bridge ---------------------------------------------
+  // Register this engine's transport so the floating remote can drive it, and
+  // re-register when the callbacks' identity changes so it always calls fresh.
+  useEffect(() => {
+    useNowPlaying.getState().registerEngine({
+      toggle: togglePlayPause,
+      next: skipToNext,
+      prev: skipToPrev,
+      seekPct: seekTo,
+    });
+    return () => { useNowPlaying.getState().unregisterEngine(); };
+  }, [togglePlayPause, skipToNext, skipToPrev, seekTo]);
+
+  // Publish transport state for the MiniPlayer to render.
+  useEffect(() => {
+    useNowPlaying.getState().publish({
+      track: currentTrack
+        ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist, album: currentTrack.album, artwork: currentTrack.artwork }
+        : null,
+      isPlaying,
+      currentTime,
+      duration,
+    });
+  }, [currentTrack, isPlaying, currentTime, duration]);
+
+  // When the Audio app is actually closed (this component unmounts), playback
+  // tears down — clear the MiniPlayer so it doesn't show a dead track.
+  useEffect(() => () => { useNowPlaying.getState().publish({ track: null, isPlaying: false }); }, []);
+
   // Keyboard shortcuts for playback control
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -808,7 +838,7 @@ export const Audio: React.FC = () => {
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5">
               <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
             </svg>
-            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', marginTop: 12 }}>Drop audio files here</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', marginTop: 'var(--space-3)' }}>Drop audio files here</div>
             <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>MP3, WAV, FLAC, OGG, AAC, M4A</div>
           </div>
         </div>
@@ -819,8 +849,8 @@ export const Audio: React.FC = () => {
           <span style={styles.sidebarTitle}>Music</span>
         </div>
         
-        <div style={styles.playlistList}>
-          <div className="dex-label-caps" style={{ padding: '12px 10px 4px' }}>Library</div>
+        <div className="dex-scroll-fade-y" style={styles.playlistList}>
+          <div className="dex-label-caps" style={{ padding: 'var(--space-3) 10px 4px' }}>Library</div>
           {playlists.slice(0, 3).map(playlist => (
             <button
               key={playlist.id}
@@ -838,7 +868,7 @@ export const Audio: React.FC = () => {
             </button>
           ))}
 
-          <div className="dex-label-caps" style={{ padding: '12px 10px 4px' }}>Browse</div>
+          <div className="dex-label-caps" style={{ padding: 'var(--space-3) 10px 4px' }}>Browse</div>
           {([
             { key: 'artists' as const, icon: 'user', label: 'Artists' },
             { key: 'albums' as const, icon: 'disc', label: 'Albums' },
@@ -860,7 +890,7 @@ export const Audio: React.FC = () => {
             </button>
           ))}
           
-          <div className="dex-label-caps" style={{ padding: '12px 10px 4px' }}>Playlists</div>
+          <div className="dex-label-caps" style={{ padding: 'var(--space-3) 10px 4px' }}>Playlists</div>
           {playlists.slice(3).map(playlist => (
             <button
               key={playlist.id}
@@ -933,8 +963,8 @@ export const Audio: React.FC = () => {
                 });
                 return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([group, groupTracks]) => (
                   <div key={group}>
-                    <div style={{ padding: '12px 16px 6px', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-bg-hover)' }}>{group}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '2px 16px 8px' }}>{groupTracks.length} {groupTracks.length === 1 ? 'song' : 'songs'}</div>
+                    <div style={{ padding: 'var(--space-3) var(--space-4) 6px', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-bg-hover)' }}>{group}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '2px var(--space-4) var(--space-2)' }}>{groupTracks.length} {groupTracks.length === 1 ? 'song' : 'songs'}</div>
                     {groupTracks.map((track, i) => (
                       <div key={track.id} style={{ ...styles.trackItem, background: currentTrack?.id === track.id ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent' }} onClick={() => playTrack(track)}>
                         <span style={styles.trackNumber}>{i + 1}</span>
@@ -965,9 +995,9 @@ export const Audio: React.FC = () => {
           
           <div style={styles.tracks}>
             {isLoading ? (
-              <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {Array.from({ length: 10 }).map((_, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.06}s` }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 'var(--space-2) var(--space-3)', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.06}s` }}>
                     <div style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
                     <div style={{ width: 32, height: 32, borderRadius: 4, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
@@ -994,7 +1024,7 @@ export const Audio: React.FC = () => {
                     ? 'Heart songs to add them to favorites'
                     : 'or click to browse — MP3, WAV, FLAC, OGG, AAC, M4A'}
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); handleBrowseFiles(); }} aria-label="Browse for audio files" style={{ marginTop: 12, padding: '8px 20px', borderRadius: 6, background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Browse Files</button>
+                <button onClick={(e) => { e.stopPropagation(); handleBrowseFiles(); }} aria-label="Browse for audio files" style={{ marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-5)', borderRadius: 6, background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Browse Files</button>
                 <div style={styles.dropZoneBorder} />
               </div>
             ) : filteredTracks.map((track, index) => (
@@ -1057,7 +1087,7 @@ export const Audio: React.FC = () => {
         )}
 
         {/* Pro Features Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px 12px', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface-solid)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px var(--space-3)', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface-solid)', flexWrap: 'wrap' }}>
           {[
             { label: 'Equalizer', fn: () => setShowEqualizer(v => !v), active: showEqualizer },
             { label: 'Queue', fn: () => setShowQueue(v => !v), active: showQueue },
@@ -1065,14 +1095,14 @@ export const Audio: React.FC = () => {
             { label: 'Visualizer', fn: () => setShowVisualizer(v => !v), active: showVisualizer },
             { label: 'Crossfade', fn: () => setShowCrossfadeSettings(v => !v), active: showCrossfadeSettings },
           ].map(b => (
-            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
+            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
           ))}
           {/* Sleep Timer */}
           <select
             value={sleepTimer}
             onChange={e => startSleepTimer(Number(e.target.value))}
             aria-label="Sleep timer"
-            style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid ' + (sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: sleepTimer > 0 ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: sleepTimer > 0 ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
           >
             <option value={0}>{sleepRemaining > 0 ? `${Math.ceil(sleepRemaining / 60)}m left` : 'Sleep Timer'}</option>
             <option value={15}>15 min</option>
@@ -1095,7 +1125,7 @@ export const Audio: React.FC = () => {
             <div style={{ padding: 14 }}>
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
                 {[{ name: 'Flat', vals: [0,0,0,0,0,0,0,0,0,0] }, { name: 'Bass Boost', vals: [6,5,4,2,0,0,0,0,0,0] }, { name: 'Treble', vals: [0,0,0,0,0,1,3,4,5,6] }, { name: 'Rock', vals: [4,3,0,-2,0,2,4,5,5,4] }, { name: 'Pop', vals: [-1,0,2,4,5,4,2,0,-1,-2] }, { name: 'Jazz', vals: [3,2,0,1,2,2,3,4,4,3] }].map(p => (
-                  <button key={p.name} onClick={() => { setEqBands(p.vals); setEqPreset(p.name.toLowerCase()); }} aria-label={`Select ${p.name} preset`} aria-pressed={eqPreset === p.name.toLowerCase()} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: eqPreset === p.name.toLowerCase() ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === p.name.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p.name}</button>
+                  <button key={p.name} onClick={() => { setEqBands(p.vals); setEqPreset(p.name.toLowerCase()); }} aria-label={`Select ${p.name} preset`} aria-pressed={eqPreset === p.name.toLowerCase()} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: eqPreset === p.name.toLowerCase() ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === p.name.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p.name}</button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120, padding: '0 4px' }}>
@@ -1121,14 +1151,14 @@ export const Audio: React.FC = () => {
                 <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowQueue(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
               </div>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-2)' }}>
               {queue.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center' }}>
+                <div style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Queue is empty</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Songs will appear here</div>
                 </div>
               ) : queue.map((t, i) => (
-                <div key={t.id + i} draggable onDragStart={() => setQueueDragIdx(i)} onDragOver={(e) => { e.preventDefault(); setQueueOverIdx(i); }} onDragEnd={() => { if (queueDragIdx !== null && queueOverIdx !== null && queueDragIdx !== queueOverIdx) { setQueue(prev => { const next = [...prev]; const [moved] = next.splice(queueDragIdx, 1); next.splice(queueOverIdx, 0, moved); return next; }); } setQueueDragIdx(null); setQueueOverIdx(null); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 4, marginBottom: 1, cursor: 'grab', background: queueOverIdx === i ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent', opacity: queueDragIdx === i ? 0.4 : 1, transition: 'background 0.15s, opacity 0.15s' }}>
+                <div key={t.id + i} draggable onDragStart={() => setQueueDragIdx(i)} onDragOver={(e) => { e.preventDefault(); setQueueOverIdx(i); }} onDragEnd={() => { if (queueDragIdx !== null && queueOverIdx !== null && queueDragIdx !== queueOverIdx) { setQueue(prev => { const next = [...prev]; const [moved] = next.splice(queueDragIdx, 1); next.splice(queueOverIdx, 0, moved); return next; }); } setQueueDragIdx(null); setQueueOverIdx(null); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 6px', borderRadius: 4, marginBottom: 1, cursor: 'grab', background: queueOverIdx === i ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent', opacity: queueDragIdx === i ? 0.4 : 1, transition: 'background 0.15s, opacity 0.15s' }}>
                   <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 14, textAlign: 'center' }}>{i + 1}</span>
                   <div style={{ width: 24, height: 24, borderRadius: 4, background: 'var(--color-bg-hover)' }} />
                   <div style={{ flex: 1 }}>
@@ -1145,7 +1175,7 @@ export const Audio: React.FC = () => {
         {/* Mini Player */}
         {showMiniPlayer && currentTrack && (
           <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", right: 20, bottom: 80, width: 260, background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
-            <div style={{ padding: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ padding: 'var(--space-3)', display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{ width: 44, height: 44, borderRadius: 6, background: 'var(--color-bg-hover)', flexShrink: 0 }} />
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentTrack.title}</div>
@@ -1153,12 +1183,12 @@ export const Audio: React.FC = () => {
               </div>
               <button onClick={() => setShowMiniPlayer(false)} aria-label="Close mini player" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button>
             </div>
-            <div style={{ padding: '0 12px 6px', display: 'flex', gap: 4, alignItems: 'center' }}>
+            <div style={{ padding: '0 var(--space-3) 6px', display: 'flex', gap: 4, alignItems: 'center' }}>
               <div style={{ flex: 1, height: 3, background: 'var(--color-bg-hover)', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${progress}%`, background: 'var(--color-accent)', borderRadius: 2 }} />
               </div>
             </div>
-            <div style={{ padding: '0 12px 10px', display: 'flex', justifyContent: 'center', gap: 12 }}>
+            <div style={{ padding: '0 var(--space-3) 10px', display: 'flex', justifyContent: 'center', gap: 'var(--space-3)' }}>
               <button onClick={skipToPrev} aria-label="Previous track" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icons.skipBack}</button>
               <button onClick={togglePlayPause} aria-label={isPlaying ? 'Pause' : 'Play'} style={{ background: 'none', border: 'none', color: 'var(--color-text-primary)', cursor: 'pointer' }}>{isPlaying ? Icons.pause : Icons.play}</button>
               <button onClick={skipToNext} aria-label="Next track" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}>{Icons.skipForward}</button>
@@ -1173,12 +1203,12 @@ export const Audio: React.FC = () => {
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Visualizer</span>
                 {(['bars', 'wave', 'spectrum'] as const).map(m => (
-                  <button key={m} onClick={() => setVizMode(m)} aria-label={`Visualizer mode: ${m}`} aria-pressed={vizMode === m} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: vizMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: vizMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
+                  <button key={m} onClick={() => setVizMode(m)} aria-label={`Visualizer mode: ${m}`} aria-pressed={vizMode === m} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: vizMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: vizMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
                 ))}
               </div>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowVisualizer(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
             </div>
-            <div style={{ height: 160, padding: 12, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: vizMode === 'bars' ? 2 : 0 }}>
+            <div style={{ height: 160, padding: 'var(--space-3)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: vizMode === 'bars' ? 2 : 0 }}>
               <canvas ref={vizCanvasRef} width={356} height={140} style={{ width: '100%', height: 140, borderRadius: 4 }} />
             </div>
           </div>
@@ -1192,7 +1222,7 @@ export const Audio: React.FC = () => {
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCrossfadeSettings(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
             </div>
             <div style={{ padding: 14 }}>
-              <div style={{ height: 60, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, padding: 8, position: 'relative' }}>
+              <div style={{ height: 60, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, padding: 'var(--space-2)', position: 'relative' }}>
                 <svg width="100%" height="44" viewBox="0 0 252 44">
                   <path d={`M0 4 L${126 - crossfadeDuration * 10} 4 Q126 4 ${126 + crossfadeDuration * 10} 40`} fill="none" stroke="var(--color-accent)" strokeWidth="2" opacity="0.7"/>
                   <path d={`M${126 - crossfadeDuration * 10} 40 Q126 40 ${126 + crossfadeDuration * 10} 4 L252 4`} fill="none" stroke="var(--color-success)" strokeWidth="2" opacity="0.7"/>
@@ -1238,12 +1268,12 @@ export const Audio: React.FC = () => {
         {editingTrack && (
           <div style={{ position: 'fixed', inset: 0, background: 'var(--color-bg-inset, rgba(0,0,0,0.5))', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={() => setEditingTrack(null)}>
             <div style={{ width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border)', boxShadow: 'var(--pg-shadow-modal)', animation: 'dex-panel-in 200ms ease-out' }} onMouseDown={e => e.stopPropagation()}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Edit Track Info</span>
                 <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setEditingTrack(null)} aria-label="Close"><DexIcon name="close" size={14} /></button>
               </div>
-              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ width: 80, height: 80, borderRadius: 6, background: editingTrack.artwork ? 'transparent' : getArtworkColor(editingTrack.id), margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ width: 80, height: 80, borderRadius: 6, background: editingTrack.artwork ? 'transparent' : getArtworkColor(editingTrack.id), margin: '0 auto var(--space-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   {editingTrack.artwork ? (
                     <img src={editingTrack.artwork} alt="Album art" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
@@ -1261,7 +1291,7 @@ export const Audio: React.FC = () => {
                     />
                   </div>
                 ))}
-                <button onClick={saveMetadata} style={{ marginTop: 4, padding: '8px 0', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
+                <button onClick={saveMetadata} style={{ marginTop: 4, padding: 'var(--space-2) 0', borderRadius: 6, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save Changes</button>
               </div>
             </div>
           </div>
@@ -1408,13 +1438,13 @@ const styles: Record<string, React.CSSProperties> = {
   playlistList: {
     flex: 1,
     overflow: 'auto',
-    padding: '8px',
+    padding: 'var(--space-2)',
   },
   playlistItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     borderRadius: '4px',
     border: 'none',
     cursor: 'pointer',
@@ -1431,7 +1461,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     borderRadius: '4px',
     border: 'none',
     background: 'transparent',
@@ -1439,7 +1469,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '13px',
     width: '100%',
-    marginTop: '8px',
+    marginTop: 'var(--space-2)',
     transition: 'all 0.15s ease',
   },
   
@@ -1459,7 +1489,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
   },
   trackListHeader: {
-    padding: '20px 24px',
+    padding: 'var(--space-5) var(--space-6)',
     borderBottom: '1px solid var(--color-border)',
   },
   playlistTitle: {
@@ -1480,19 +1510,19 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '60px 20px',
+    padding: '60px var(--space-5)',
     textAlign: 'center',
   },
   emptyIcon: {
     fontSize: '48px',
     color: 'var(--color-text-muted)',
-    marginBottom: '16px',
+    marginBottom: 'var(--space-4)',
   },
   emptyTitle: {
     fontSize: '18px',
     fontWeight: 600,
     color: 'var(--color-text-primary)',
-    marginBottom: '8px',
+    marginBottom: 'var(--space-2)',
   },
   emptySubtitle: {
     fontSize: '14px',
@@ -1527,7 +1557,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     flex: 1,
     minHeight: '360px',
-    margin: '24px',
+    margin: 'var(--space-6)',
     borderRadius: '12px',
     border: '2px dashed var(--color-border)',
     background: 'var(--color-bg-secondary)',
@@ -1539,14 +1569,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dropZoneIcon: {
     color: 'var(--color-text-muted)',
-    marginBottom: '16px',
+    marginBottom: 'var(--space-4)',
     opacity: 0.6,
   },
   dropZoneTitle: {
     fontSize: '20px',
     fontWeight: 600,
     color: 'var(--color-text-primary)',
-    marginBottom: '8px',
+    marginBottom: 'var(--space-2)',
   },
   dropZoneSubtitle: {
     fontSize: '14px',
@@ -1562,8 +1592,8 @@ const styles: Record<string, React.CSSProperties> = {
   trackItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    padding: '10px 24px',
+    gap: 'var(--space-4)',
+    padding: '10px var(--space-6)',
     cursor: 'pointer',
     borderBottom: '1px solid var(--color-border-subtle)',
     transition: 'all 0.15s ease',
@@ -1633,15 +1663,15 @@ const styles: Record<string, React.CSSProperties> = {
     height: '90px',
     display: 'flex',
     alignItems: 'center',
-    padding: '0 20px',
-    gap: '20px',
+    padding: '0 var(--space-5)',
+    gap: 'var(--space-5)',
     background: 'var(--color-bg-surface-solid)',
     borderTop: '1px solid var(--color-border-subtle)',
   },
   nowPlayingLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: 'var(--space-3)',
     width: '250px',
   },
   nowPlayingArtwork: {
@@ -1669,12 +1699,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--space-2)',
   },
   controls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: 'var(--space-4)',
   },
   controlBtn: {
     display: 'flex',

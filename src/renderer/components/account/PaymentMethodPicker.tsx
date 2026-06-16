@@ -194,7 +194,7 @@ const monoText: React.CSSProperties = {
   fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
   fontSize: fontSize.xs,
   background: 'var(--color-bg, #0A0A0B)',
-  padding: '4px 8px',
+  padding: '4px var(--space-2)',
   borderRadius: radius.sm,
   wordBreak: 'break-all',
   flex: 1,

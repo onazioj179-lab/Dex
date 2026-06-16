@@ -206,12 +206,12 @@ const Weather: React.FC = () => {
 
       {/* Loading / Error states */}
       {loading && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)' }}>
           <AppLoadingState rows={3} label="Loading weather" />
         </div>
       )}
       {error && !loading && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)' }}>
           <AppErrorState
             title="Weather unavailable"
             description={error}
@@ -301,14 +301,14 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)', overflow: 'auto',
   },
   header: {
-    padding: '16px 20px 8px', flexShrink: 0,
+    padding: 'var(--space-4) var(--space-5) var(--space-2)', flexShrink: 0,
   },
   locationRow: {
-    display: 'flex', alignItems: 'center', gap: 8,
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
   },
   locationSelect: {
     flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border, var(--color-border))',
-    borderRadius: 6, padding: '8px 12px', color: 'var(--color-text-primary)',
+    borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'var(--color-text-primary)',
     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-family)', outline: 'none', cursor: 'pointer',
   },
   iconBtn: {
@@ -322,25 +322,25 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   addRow: {
-    display: 'flex', gap: 8, marginTop: 8,
+    display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)',
   },
   addInput: {
     flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border, var(--color-border))',
-    borderRadius: 6, padding: '8px 12px', color: 'var(--color-text-primary)',
+    borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'var(--color-text-primary)',
     fontSize: 13, outline: 'none', fontFamily: 'var(--font-family)',
   },
   addBtn: {
-    padding: '8px 16px', borderRadius: 6, border: 'none',
+    padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none',
     background: 'var(--color-accent)', color: 'var(--color-text-inverse, #fff)', fontSize: 13, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   currentCard: {
-    padding: '20px', margin: '8px 20px 12px', borderRadius: 12,
+    padding: 'var(--space-5)', margin: 'var(--space-2) var(--space-5) var(--space-3)', borderRadius: 12,
     background: 'linear-gradient(135deg, rgba(10,132,255,0.15), rgba(94,92,230,0.1))',
     border: '1px solid var(--color-bg-hover)',
   },
   currentMain: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)',
   },
   currentIcon: { fontSize: 48 },
   currentTemp: { fontSize: 56, fontWeight: 200, letterSpacing: '-0.02em' },
@@ -353,26 +353,26 @@ const s: Record<string, React.CSSProperties> = {
   },
   detailGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-    gap: 8, marginTop: 16,
+    gap: 'var(--space-2)', marginTop: 'var(--space-4)',
   },
   detailItem: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: '8px', borderRadius: 6, background: 'var(--color-border-subtle)',
+    padding: 'var(--space-2)', borderRadius: 6, background: 'var(--color-border-subtle)',
   },
   detailLabel: { fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 2 },
   detailValue: { fontSize: 15, fontWeight: 600 },
   section: {
-    padding: '0 20px 12px',
+    padding: '0 var(--space-5) var(--space-3)',
   },
   sectionTitle: {
-    marginBottom: 8,
+    marginBottom: 'var(--space-2)',
   },
   hourlyScroll: {
     display: 'flex', gap: 2, overflowX: 'auto' as const, paddingBottom: 4,
   },
   hourlyItem: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4,
-    padding: '8px 10px', borderRadius: 8, background: 'var(--color-border-subtle)',
+    padding: 'var(--space-2) 10px', borderRadius: 8, background: 'var(--color-border-subtle)',
     minWidth: 54, flexShrink: 0,
   },
   hourlyTime: { fontSize: 11, color: 'var(--color-text-secondary)' },
@@ -381,18 +381,18 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column' as const, gap: 2,
   },
   forecastRow: {
-    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px var(--space-3)',
     borderRadius: 8, border: 'none', cursor: 'pointer', width: '100%',
     fontFamily: 'var(--font-family)', color: 'var(--color-text-primary)',
     transition: 'background 0.15s',
   },
   forecastDay: { width: 50, fontSize: 13, fontWeight: 500 },
   precip: { fontSize: 11, color: 'var(--color-accent)', marginLeft: -4 },
-  forecastTemps: { marginLeft: 'auto', display: 'flex', gap: 8 },
+  forecastTemps: { marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' },
   forecastHigh: { fontSize: 14, fontWeight: 600 },
   forecastLow: { fontSize: 14, color: 'var(--color-text-secondary)' },
   dayDetail: {
-    padding: '12px 20px 20px',
+    padding: 'var(--space-3) var(--space-5) var(--space-5)',
   },
 };
 

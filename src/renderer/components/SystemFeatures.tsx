@@ -268,13 +268,13 @@ const launcherStyles: Record<string, React.CSSProperties> = {
     maxHeight: 340, overflowY: 'auto' as const, padding: '4px 0',
   },
   resultItem: {
-    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-    padding: '10px 16px', background: 'transparent', border: 'none',
+    width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+    padding: '10px var(--space-4)', background: 'transparent', border: 'none',
     color: 'var(--color-text-primary, var(--color-text-primary))',
     cursor: 'pointer', fontSize: 14, textAlign: 'left' as const,
   },
   appIcon: {
-    width: 28, height: 28, borderRadius: 5,
+    width: 28, height: 28, borderRadius: 4,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 13, fontWeight: 600, color: '#fff', flexShrink: 0,
   },

@@ -218,7 +218,7 @@ const NoiseGenerator: React.FC = () => {
     <div style={st.container}>
       {/* Main Display */}
       <div style={st.display}>
-        <div style={{ fontSize: 64, marginBottom: 8 }}>
+        <div style={{ fontSize: 64, marginBottom: 'var(--space-2)' }}>
           {mixMode ? 'MX' : currentPreset.icon}
         </div>
         <div style={st.presetName}>{mixMode ? 'Mix Mode' : currentPreset.label}</div>
@@ -327,15 +327,15 @@ const st: Record<string, React.CSSProperties> = {
   },
   display: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '32px 20px 16px', flexShrink: 0,
+    padding: 'var(--space-8) var(--space-5) var(--space-4)', flexShrink: 0,
   },
   presetName: { fontSize: 18, fontWeight: 600 },
   timerDisplay: {
-    fontSize: 14, color: 'var(--color-accent)', marginTop: 8,
+    fontSize: 14, color: 'var(--color-accent)', marginTop: 'var(--space-2)',
     fontVariantNumeric: 'tabular-nums',
   },
   transport: {
-    display: 'flex', justifyContent: 'center', padding: '0 20px 20px',
+    display: 'flex', justifyContent: 'center', padding: '0 var(--space-5) var(--space-5)',
   },
   playBtn: {
     width: 56, height: 56, borderRadius: '50%', border: 'none',
@@ -345,7 +345,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   volumeRow: {
     display: 'flex', alignItems: 'center', gap: 10,
-    padding: '0 32px 16px', width: '100%', maxWidth: 400,
+    padding: '0 var(--space-8) var(--space-4)', width: '100%', maxWidth: 400,
   },
   volumeIcon: { fontSize: 14 },
   slider: {
@@ -354,34 +354,34 @@ const st: Record<string, React.CSSProperties> = {
     cursor: 'pointer', accentColor: 'var(--color-accent)',
   },
   timerRow: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '0 20px 16px', width: '100%', maxWidth: 400,
+    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+    padding: '0 var(--space-5) var(--space-4)', width: '100%', maxWidth: 400,
   },
   timerLabel: { fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' },
   timerOptions: { display: 'flex', gap: 4 },
   timerBtn: {
-    padding: '4px 8px', borderRadius: 4, border: 'none',
+    padding: '4px var(--space-2)', borderRadius: 4, border: 'none',
     fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   mixToggle: {
     display: 'flex', borderRadius: 6, overflow: 'hidden',
     border: '1px solid var(--color-border, var(--color-border))',
-    marginBottom: 16,
+    marginBottom: 'var(--space-4)',
   },
   mixBtn: {
-    padding: '6px 20px', border: 'none', fontSize: 12, fontWeight: 600,
+    padding: '6px var(--space-5)', border: 'none', fontSize: 12, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-    gap: 8, padding: '0 20px 20px', width: '100%', maxWidth: 500,
+    gap: 'var(--space-2)', padding: '0 var(--space-5) var(--space-5)', width: '100%', maxWidth: 500,
   },
   presetCard: {
     display: 'flex', flexDirection: 'column',
   },
   presetBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-    padding: '14px 8px', borderRadius: 10, cursor: 'pointer',
+    padding: '14px var(--space-2)', borderRadius: 10, cursor: 'pointer',
     border: '1px solid', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s',
   },

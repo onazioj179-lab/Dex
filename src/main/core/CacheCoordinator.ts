@@ -18,6 +18,7 @@
 
 import * as log from 'electron-log';
 import { memoryManager, BoundedCache } from './MemoryManager';
+import { DiskCache } from './DiskCache';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +61,14 @@ class CacheCoordinator {
 
   private initialized = false;
   private idleRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Consolidation (FINDING 11): CacheCoordinator is the single main-process
+  // owner of the ONE persistent disk tier. The merged DiskCache (2GB LRU) is
+  // the canonical disk implementation; DiskBackedCache delegates here. Created
+  // lazily so no main.ts wiring change is required -- the first caller that
+  // needs disk-backed storage materializes and initializes it.
+  private diskTier: DiskCache | null = null;
+  private diskTierReady: Promise<void> | null = null;
 
   // Rule 24: Write-through invalidation tags
   // Maps a domain tag to a set of cache keys that should be invalidated
@@ -244,6 +253,33 @@ class CacheCoordinator {
   }
 
   // ---------------------------------------------------------------------------
+  // Persistent disk tier (single owner -- merged DiskCache, 2GB LRU)
+  // ---------------------------------------------------------------------------
+  //
+  // The disk tier is the one persistent cache layer for the main process.
+  // Returns an initialized DiskCache singleton; constructed and initialized on
+  // first use so callers never need explicit wiring. Subsequent calls reuse the
+  // same instance and await the same initialization promise.
+
+  async getDiskTier(): Promise<DiskCache> {
+    if (!this.diskTier) {
+      this.diskTier = new DiskCache();
+      this.diskTierReady = this.diskTier.initialize();
+    }
+    if (this.diskTierReady) await this.diskTierReady;
+    return this.diskTier;
+  }
+
+  /** Synchronous handle to the disk tier, materializing it without awaiting init. */
+  private ensureDiskTier(): DiskCache {
+    if (!this.diskTier) {
+      this.diskTier = new DiskCache();
+      this.diskTierReady = this.diskTier.initialize();
+    }
+    return this.diskTier;
+  }
+
+  // ---------------------------------------------------------------------------
   // Pressure response (Rule 28: budgets enforced by ResourceGovernor)
   // ---------------------------------------------------------------------------
 
@@ -290,8 +326,19 @@ class CacheCoordinator {
       this.idleRefreshInterval = null;
     }
     this.clearAllCaches();
+    // Flush and release the persistent disk tier if it was materialized.
+    if (this.diskTier) {
+      void this.diskTier.shutdown();
+      this.diskTier = null;
+      this.diskTierReady = null;
+    }
     this.initialized = false;
     log.info('[CacheCoordinator] Shutdown');
+  }
+
+  /** Expose the shared disk tier to the deprecated DiskBackedCache delegator. */
+  _diskTierForDelegation(): DiskCache {
+    return this.ensureDiskTier();
   }
 }
 

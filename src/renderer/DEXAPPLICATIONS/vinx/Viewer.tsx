@@ -272,7 +272,7 @@ const viewerTabBarStyle: React.CSSProperties = {
 };
 
 const viewerTabStyle = (active: boolean): React.CSSProperties => ({
-  padding: '0 12px', display: 'flex', alignItems: 'center', fontSize: 10, fontWeight: 600,
+  padding: '0 var(--space-3)', display: 'flex', alignItems: 'center', fontSize: 10, fontWeight: 600,
   letterSpacing: '0.02em', textTransform: 'uppercase',
   color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', cursor: 'pointer', userSelect: 'none',
   borderBottom: active ? '1px solid var(--color-accent, #4A9EFF)' : '1px solid transparent',
@@ -280,12 +280,12 @@ const viewerTabStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const canvasContainerStyle: React.CSSProperties = {
-  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
   overflow: 'hidden', position: 'relative', background: 'var(--color-bg-base)',
 };
 
 const controlsBarStyle: React.CSSProperties = {
-  height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 8px',
+  height: 32, display: 'flex', alignItems: 'center', gap: 2, padding: '0 var(--space-2)',
   flexShrink: 0, background: 'var(--color-bg-base)', borderTop: '1px solid var(--color-bg-hover)',
   minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin',
 };
@@ -297,7 +297,7 @@ const timecodeStyle: React.CSSProperties = {
 };
 
 const scrubberContainerStyle: React.CSSProperties = {
-  height: 20, display: 'flex', alignItems: 'center', padding: '0 8px',
+  height: 20, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)',
   flexShrink: 0, background: 'var(--color-bg-base)',
 };
 
@@ -534,10 +534,10 @@ const ViewerPanel: React.FC<{
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, overflow: 'hidden' }}>
       {/* Label bar */}
       <div style={{
-        height: 20, display: 'flex', alignItems: 'center', padding: '0 8px',
+        height: 20, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)',
         fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.04em',
         textTransform: 'uppercase', flexShrink: 0, background: 'var(--color-bg-base)',
-        justifyContent: 'space-between', gap: 8, minWidth: 0,
+        justifyContent: 'space-between', gap: 'var(--space-2)', minWidth: 0,
       }}>
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin', flexShrink: 0 }}>

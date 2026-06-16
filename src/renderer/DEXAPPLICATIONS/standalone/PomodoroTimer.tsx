@@ -181,7 +181,7 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)', overflow: 'hidden',
   },
   phaseTabs: {
-    display: 'flex', gap: 4, padding: '16px 20px', flexShrink: 0,
+    display: 'flex', gap: 4, padding: 'var(--space-4) var(--space-5)', flexShrink: 0,
   },
   phaseTab: {
     padding: '6px 14px', borderRadius: 6, border: 'none',
@@ -191,7 +191,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   timerArea: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '0 20px',
+    padding: '0 var(--space-5)',
   },
   circleWrap: { position: 'relative', width: 240, height: 240 },
   timerText: {
@@ -199,8 +199,8 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
   },
   controls: {
-    display: 'flex', alignItems: 'center', gap: 16,
-    padding: '0 20px 20px', flexShrink: 0,
+    display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
+    padding: '0 var(--space-5) var(--space-5)', flexShrink: 0,
   },
   primaryBtn: {
     width: 120, height: 48, borderRadius: 24, border: 'none',
@@ -214,10 +214,10 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   sessionInfo: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-    padding: '0 20px 24px', flexShrink: 0,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)',
+    padding: '0 var(--space-5) var(--space-6)', flexShrink: 0,
   },
-  sessionDots: { display: 'flex', gap: 8 },
+  sessionDots: { display: 'flex', gap: 'var(--space-2)' },
 };
 
 PomodoroTimer.displayName = 'PomodoroTimer';

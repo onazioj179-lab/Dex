@@ -9,6 +9,23 @@
 //   1. UkiKnowledgeGraph   (semantic / structural)
 //   2. Rust native UKI memory archive (durable summaries)
 //   3. RewindEngine timeline (clipboard / files / browser / app activity)
+//
+// Consolidation contract (audit FINDING 8): this is NOT a fourth independent
+// memory store. It owns no records — it is a read-only *fusion / recall*
+// surface that queries three already-existing main-process sources through the
+// provider interfaces below and blends them by similarity + recency. It is the
+// main-process peer of the renderer memory stack:
+//   - MODEL  (in-memory tiers):      src/shared/uki/memory.ts
+//   - ADAPTER (renderer hot tier):   src/renderer/uki/memory.ts
+//   - COLD   (renderer archive):     src/renderer/uki/compressedMemory.ts
+// The renderer's persisted conversational turns are NOT duplicated here; the
+// `native` provider reaches the durable Rust archive instead. Unifying the
+// renderer localStorage store and this process's sources into one physical
+// store would require new cross-process IPC wiring (in main.ts /
+// UkiController), which is deliberately left out of scope: the structural
+// reconciliation is to keep this a registration/fusion surface over existing
+// sources rather than a parallel store. To add a source, register a new
+// provider via `configureUkiRewindMemory` — do not persist turns here.
 // ===========================================================================
 
 export interface RecallSource {

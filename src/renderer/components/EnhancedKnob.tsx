@@ -226,7 +226,7 @@ export const EnhancedKnob: React.FC<EnhancedKnobProps> = ({
               width: 2,
               height: size * 0.15,
               background: color,
-              borderRadius: 1,
+              borderRadius: 2,
               transform: 'translateX(-50%)',
             }}
           />
@@ -240,7 +240,7 @@ export const EnhancedKnob: React.FC<EnhancedKnobProps> = ({
               top: -28,
               left: '50%',
               transform: 'translateX(-50%)',
-              padding: '4px 8px',
+              padding: '4px var(--space-2)',
               background: colors.bg.elevated,
               border: `1px solid ${colors.border.subtle}`,
               borderRadius: radius.sm,
@@ -384,7 +384,7 @@ export const EnhancedSlider: React.FC<EnhancedSliderProps> = ({
         display: 'flex',
         flexDirection: vertical ? 'column' : 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 'var(--space-2)',
         opacity: disabled ? 0.4 : 1,
       }}
     >

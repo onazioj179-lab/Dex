@@ -58,7 +58,7 @@ export default function AppDetail({
       <section style={styles.hero}>
         <AppIcon iconUrl={entry.iconUrl || undefined} name={name} size={96} radius={22} />
         <div style={{ minWidth: 0, flex: '1 1 320px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{name}</h1>
             <RecognitionPill publisher={publisher} />
             {installed && <StateBadge kind="installed" />}
@@ -142,14 +142,14 @@ export default function AppDetail({
       <section style={{ marginTop: 22 }}>
         <SectionTitle icon="shield" title="What this app can do" />
         {caps.length === 0 ? (
-          <div style={{ ...premiumGlassCard, padding: 16, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--color-text-secondary)', fontSize: 12.5 }}>
+          <div style={{ ...premiumGlassCard, padding: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--color-text-secondary)', fontSize: 12.5 }}>
             <DexIcon name="check-circle" size={16} color="var(--color-success)" />
             <span>Runs fully sandboxed. This app requests no special access to your device.</span>
           </div>
         ) : (
           <div style={styles.capGrid}>
             {caps.map(cap => (
-              <div key={cap.capability} style={{ ...premiumGlassCard, padding: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div key={cap.capability} style={{ ...premiumGlassCard, padding: 'var(--space-3)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <span style={{ color: cap.sensitive ? STAR_AMBER : 'var(--color-accent)', flexShrink: 0, marginTop: 1 }}>
                   <DexIcon name={cap.sensitive ? 'shield' : 'check-circle'} size={16} />
                 </span>
@@ -168,7 +168,7 @@ export default function AppDetail({
             ))}
           </div>
         )}
-        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ marginTop: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <DexIcon name="info" size={12} />
           <span>You approve sensitive access at install time. DEX can revoke any capability later in Settings.</span>
         </div>
@@ -177,7 +177,7 @@ export default function AppDetail({
       {/* Categories */}
       <section style={{ marginTop: 22 }}>
         <SectionTitle icon="tag" title="Category" />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           {m.categories.map(c => (
             <span key={c} style={styles.categoryPill}>{categoryLabel(c)}</span>
           ))}
@@ -202,7 +202,7 @@ function PublisherCard({ publisher, fallbackId }: { publisher?: PublisherProfile
   const badge = recognitionBadge(publisher);
   if (!publisher) {
     return (
-      <div style={{ ...premiumGlassCard, padding: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ ...premiumGlassCard, padding: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <span style={{ color: 'var(--color-text-tertiary)', display: 'inline-flex' }}><DexIcon name="user" size={22} /></span>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>Unverified publisher</div>
@@ -214,12 +214,12 @@ function PublisherCard({ publisher, fallbackId }: { publisher?: PublisherProfile
     );
   }
   return (
-    <div style={{ ...premiumGlassCard, padding: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+    <div style={{ ...premiumGlassCard, padding: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
       <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', background: 'rgba(10,132,255,0.12)', border: '1px solid rgba(10,132,255,0.26)' }}>
         <DexIcon name={badge?.level === 'first-party' ? 'shield' : 'award'} size={22} />
       </span>
       <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{publisher.name}</span>
           <RecognitionPill publisher={publisher} />
         </div>
@@ -252,7 +252,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: 16,
+    padding: 'var(--space-4)',
   },
   hero: {
     ...premiumGlassCard,
@@ -266,8 +266,8 @@ const styles: Record<string, React.CSSProperties> = {
   metaRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '4px 16px',
-    marginTop: 12,
+    gap: '4px var(--space-4)',
+    marginTop: 'var(--space-3)',
     fontSize: 12,
     color: 'var(--color-text-tertiary)',
     alignItems: 'center',
@@ -275,10 +275,10 @@ const styles: Record<string, React.CSSProperties> = {
   planNote: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-    padding: '8px 11px',
-    borderRadius: 7,
+    gap: 'var(--space-2)',
+    marginTop: 'var(--space-3)',
+    padding: 'var(--space-2) 11px',
+    borderRadius: 6,
     border: '1px solid var(--pg-border)',
     background: 'rgba(255,255,255,0.04)',
     color: 'var(--color-text-secondary)',
@@ -287,7 +287,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   shotRail: {
     display: 'flex',
-    gap: 12,
+    gap: 'var(--space-3)',
     overflowX: 'auto',
     overflowY: 'hidden',
     paddingBottom: 6,

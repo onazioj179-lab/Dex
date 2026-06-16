@@ -16,12 +16,17 @@ export type DockSizePreset = 'compact' | 'regular' | 'large' | 'floating';
 /** Visible/hidden offset in pixels when the dock auto-hides off-screen. */
 const HIDE_OFFSET_PX = 12;
 
-/** Margin from the edge in regular mode. Compact tucks closer; floating lifts off. */
+/**
+ * Margin from the edge. Kept small so the dock sits CLOSE to the screen edge --
+ * grounded/attached, not floating in from the middle (owner direction, DEX 5.5
+ * spatial brief). The `floating` preset still deliberately lifts off the edge.
+ * This margin also drives the reserved inset, so trimming it reclaims workspace.
+ */
 const EDGE_MARGIN_BY_PRESET: Record<DockSizePreset, number> = {
-  compact: 4,
-  regular: 10,
-  large: 14,
-  floating: 22,
+  compact: 2,
+  regular: 4,
+  large: 6,
+  floating: 18,
 };
 
 /** Icon pixel size by preset. Compact halves visual footprint. */
@@ -199,8 +204,11 @@ export function getDockReservedInsets(
   const magnification = MAGNIFICATION_BY_PRESET[preset];
   // Pill thickness perpendicular to the dock edge, with magnification headroom.
   const pillThickness = Math.ceil(iconSize * magnification + inner.y * 2);
-  // Total inset = margin from edge + pill thickness + a small breathing pad.
-  const breathingPad = 8;
+  // Total inset = margin from edge + pill thickness + a thin breathing pad. The
+  // pad is deliberately small so the app surface sits close to the dock (no wide
+  // empty strip reading as a gap/line); pillThickness already carries the full
+  // magnification headroom, so a thin pad cannot let a hovered icon touch content.
+  const breathingPad = 4;
   const reserved = margin + pillThickness + breathingPad;
   switch (edge) {
     case 'top':    return { ...empty, top: reserved };

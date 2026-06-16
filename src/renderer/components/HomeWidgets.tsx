@@ -111,7 +111,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
   
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'default', padding: '10px 12px', textAlign: 'center', position: 'relative' }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', cursor: 'default', padding: '10px var(--space-3)', textAlign: 'center', position: 'relative' }}
     >
       <button
         type="button"
@@ -265,7 +265,7 @@ const CalendarWidget: React.FC = () => {
   const goToday = () => { setViewMonth(now.getMonth()); setViewYear(now.getFullYear()); };
   
   return (
-    <div style={{ padding: 8 }}>
+    <div style={{ padding: 'var(--space-2)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <button onClick={prevMonth} style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 14 }} aria-label="Previous month">‹</button>
         <button onClick={goToday} style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
@@ -289,7 +289,7 @@ const CalendarWidget: React.FC = () => {
           );
         })}
       </div>
-      <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--color-border-subtle, var(--color-border))' }}>
+      <div style={{ marginTop: 'var(--space-2)', paddingTop: 6, borderTop: '1px solid var(--color-border-subtle, var(--color-border))' }}>
         {upcoming.length === 0 ? (
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>No upcoming events</div>
         ) : upcoming.map(ev => (
@@ -315,7 +315,7 @@ const CalendarWidget: React.FC = () => {
 const RecentFilesWidget: React.FC = () => {
   const recents = useRecentFiles(s => s.recentFiles).slice(0, 6);
   return (
-    <div style={{ padding: 8, overflow: 'hidden' }}>
+    <div style={{ padding: 'var(--space-2)', overflow: 'hidden' }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Recent Files</div>
       {recents.length === 0 && <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No recent files</div>}
       {recents.map((f: { name: string }, i: number) => (
@@ -348,7 +348,7 @@ const QuickActionsWidget: React.FC = () => {
   };
   
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, padding: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, padding: 'var(--space-2)' }}>
       {actions.map((a: { appId: string; label: string; color: string; icon?: string }) => (
         <button 
           key={a.appId} 
@@ -467,7 +467,7 @@ const SystemStatusWidget: React.FC = () => {
   
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>System</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: network.online ? 'var(--color-success)' : 'var(--color-error)' }} />
@@ -494,7 +494,7 @@ const NotesScratchpadWidget: React.FC<{ widgetId: string }> = ({ widgetId }) => 
     }, 500);
   }, [widgetId]);
   return (
-    <div style={{ padding: 8, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: 'var(--space-2)', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
       <textarea
         value={text}
@@ -638,8 +638,8 @@ const BatteryWidget: React.FC = () => {
   }, []);
   const color = battery.level > 20 ? 'var(--color-success)' : 'var(--color-error)';
   return (
-    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5">
           <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/>
           <line x1="23" y1="13" x2="23" y2="11"/>
@@ -697,9 +697,9 @@ const StorageWidget: React.FC = () => {
   const usedPercent = storage.total > 0 ? Math.round((storage.used / storage.total) * 100) : 0;
   const color = usedPercent > 90 ? 'var(--color-error)' : usedPercent > 70 ? 'var(--color-warning)' : 'var(--color-accent)';
   return (
-    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>Storage</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
+    <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Storage</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 'var(--space-2)' }}>
         <span style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatBytes(storage.free)}</span>
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>free of {formatBytes(storage.total)}</span>
       </div>
@@ -735,14 +735,14 @@ const MusicControlsWidget: React.FC = () => {
   };
   
   return (
-    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+    <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {track.title}
       </div>
       {track.artist && (
         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>{track.artist}</div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
         <button onClick={() => sendControl('prev')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }} aria-label="Previous">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
         </button>
@@ -862,60 +862,167 @@ const WidgetContent: React.FC<{ widget: Widget }> = memo(({ widget }) => {
 // DRAGGABLE WIDGET WRAPPER
 // ======================================================================
 
+// Minimum widget fallbacks when a template is missing (kept in sync with
+// widgetStore.resizeWidget so the live preview never disagrees with the
+// committed size).
+const FALLBACK_MIN_W = 120;
+const FALLBACK_MIN_H = 80;
+
+// Resting elevation (matches the original card chrome) vs. the lifted
+// elevation used while a widget is being dragged.
+const REST_SHADOW = 'var(--pg-shadow-context), var(--pg-gloss-top)';
+const DRAG_SHADOW = 'var(--elev-4), var(--pg-gloss-top)';
+
 const DraggableWidget: React.FC<{
   widget: Widget;
-  editMode: boolean;
   onRemove: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (w: number, h: number) => void;
-}> = memo(({ widget, editMode, onRemove, onMove, onResize }) => {
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const resizeRef = useRef<{ startX: number; startY: number; origW: number; origH: number } | null>(null);
+}> = memo(({ widget, onRemove, onMove, onResize }) => {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  // Live drag/resize bookkeeping. All per-frame work mutates the DOM node
+  // directly via rAF; the store is written exactly once, on pointer up — so
+  // dragging stays at 60fps with no React re-render per mouse move.
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; origX: number; origY: number; dx: number; dy: number } | null>(null);
+  const resizeRef = useRef<{ pointerId: number; startX: number; startY: number; origW: number; origH: number; w: number; h: number } | null>(null);
+  const rafRef = useRef<number>(0);
 
-  // Use pointer events for touch + mouse support (item 79)
+  // One re-render at gesture start and one at end (never per move). Drives the
+  // resting styles only: swaps cursor/elevation while a gesture is live so the
+  // imperative transform isn't fought by CSS.
+  const [interacting, setInteracting] = useState(false);
+  // Hover reveals the resize handle + remove button (direct manipulation: no
+  // global edit mode -- you touch the widget directly to reposition/resize it).
+  const [hovered, setHovered] = useState(false);
+
+  const minSize = useCallback(() => {
+    const t = WIDGET_TEMPLATES.find(t => t.type === widget.type);
+    return { minW: t?.minWidth ?? FALLBACK_MIN_W, minH: t?.minHeight ?? FALLBACK_MIN_H };
+  }, [widget.type]);
+
+  // --- Live drag (transform-based) --------------------------------------
   const handleDragStart = useCallback((e: React.PointerEvent) => {
-    if (!editMode) return;
+    // Primary button / touch / pen only.
+    if (e.button !== 0) return;
+    // Interactive-content passthrough: a press that lands on a control inside
+    // the widget (button, field, link, the resize handle/remove button) is a
+    // click, not a reposition -- let it through so widgets stay usable.
+    if ((e.target as HTMLElement).closest(
+      'button, input, textarea, select, a, [role="button"], [role="slider"], [contenteditable="true"]',
+    )) return;
     e.preventDefault();
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: widget.x, origY: widget.y };
-  }, [editMode, widget.x, widget.y]);
+    const node = nodeRef.current;
+    if (!node) return;
+    node.setPointerCapture(e.pointerId);
+    dragRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origX: widget.x, origY: widget.y, dx: 0, dy: 0 };
+    // Lift: scale + elevation + grab cursor, applied imperatively so it lands
+    // on the same frame as the gesture without waiting for a React commit.
+    node.style.transition = 'none';
+    node.style.animation = 'none';
+    node.style.transform = 'translate3d(0,0,0) scale(1.02)';
+    node.style.boxShadow = DRAG_SHADOW;
+    node.style.cursor = 'grabbing';
+    node.style.zIndex = '40';
+    setInteracting(true);
+  }, [widget.x, widget.y]);
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    onMove(dragRef.current.origX + dx, dragRef.current.origY + dy);
-  }, [onMove]);
-
-  const handleDragEnd = useCallback((e: React.PointerEvent) => {
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    dragRef.current = null;
+    const d = dragRef.current;
+    if (!d) return;
+    d.dx = e.clientX - d.startX;
+    d.dy = e.clientY - d.startY;
+    if (rafRef.current) return; // coalesce: at most one transform write per frame
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const node = nodeRef.current;
+      const cur = dragRef.current;
+      if (!node || !cur) return;
+      node.style.transform = `translate3d(${cur.dx}px, ${cur.dy}px, 0) scale(1.02)`;
+    });
   }, []);
 
+  const endDrag = useCallback((e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    dragRef.current = null;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+    const node = nodeRef.current;
+    if (node) {
+      try { node.releasePointerCapture(d.pointerId); } catch { /* pointer already released */ }
+      // Clear the live transform; the committed left/top below and the
+      // declarative lift styles (restored by setInteracting(false) below) land
+      // in the same paint, so the widget settles without a one-frame jump.
+      node.style.transform = '';
+    }
+    setInteracting(false);
+    // Commit the new grid position to the store exactly once.
+    onMove(d.origX + d.dx, d.origY + d.dy);
+  }, [onMove]);
+
+  // --- Live resize (width/height applied to the node, committed on up) ---
   const handleResizeStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    resizeRef.current = { startX: e.clientX, startY: e.clientY, origW: widget.width, origH: widget.height };
+    const node = nodeRef.current;
+    if (!node) return;
+    node.setPointerCapture(e.pointerId);
+    resizeRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origW: widget.width, origH: widget.height, w: widget.width, h: widget.height };
+    node.style.transition = 'none';
+    node.style.animation = 'none';
+    node.style.boxShadow = DRAG_SHADOW;
+    node.style.zIndex = '40';
+    setInteracting(true);
   }, [widget.width, widget.height]);
 
   const handleResizeMove = useCallback((e: React.PointerEvent) => {
-    if (!resizeRef.current) return;
-    const dw = e.clientX - resizeRef.current.startX;
-    const dh = e.clientY - resizeRef.current.startY;
-    onResize(resizeRef.current.origW + dw, resizeRef.current.origH + dh);
+    const r = resizeRef.current;
+    if (!r) return;
+    const { minW, minH } = minSize();
+    r.w = Math.max(minW, r.origW + (e.clientX - r.startX));
+    r.h = Math.max(minH, r.origH + (e.clientY - r.startY));
+    if (rafRef.current) return; // coalesce to one layout write per frame
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const node = nodeRef.current;
+      const cur = resizeRef.current;
+      if (!node || !cur) return;
+      node.style.width = `${cur.w}px`;
+      node.style.height = `${cur.h}px`;
+    });
+  }, [minSize]);
+
+  const endResize = useCallback((e: React.PointerEvent) => {
+    const r = resizeRef.current;
+    if (!r) return;
+    resizeRef.current = null;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+    const node = nodeRef.current;
+    if (node) {
+      try { node.releasePointerCapture(r.pointerId); } catch { /* pointer already released */ }
+    }
+    // The committed width/height (via onResize) and the declarative lift styles
+    // are both restored by the re-render setInteracting(false) triggers, so the
+    // live inline width/height set during the gesture are reconciled away with
+    // no flash. Nothing imperative needs clearing here.
+    setInteracting(false);
+    // Commit the final size once; the store clamps to the template minimums.
+    onResize(r.w, r.h);
   }, [onResize]);
 
-  const handleResizeEnd = useCallback((e: React.PointerEvent) => {
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    resizeRef.current = null;
+  // Cancel any in-flight rAF if the widget unmounts mid-gesture (e.g. removed
+  // while being dragged) so we never write to a detached node.
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
   return (
     <div
+      ref={nodeRef}
       role="article"
-      aria-label={`${widget.title} widget${editMode ? ', drag to reposition' : ''}`}
+      aria-label={`${widget.title} widget, drag to reposition`}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
       style={{
         position: 'absolute',
         left: widget.x,
@@ -926,26 +1033,34 @@ const DraggableWidget: React.FC<{
         background: 'rgba(24,24,28,0.42)',
         backdropFilter: 'var(--blur-xl) saturate(180%)',
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-        border: editMode ? '1.5px dashed rgba(10,132,255,0.5)' : '1px solid rgba(255,255,255,0.10)',
-        boxShadow: 'var(--pg-shadow-context), var(--pg-gloss-top)',
+        // A quiet hairline at rest; the hover state lifts it to a brighter
+        // hairline rather than a loud dashed "edit" border (borders guide, not
+        // dominate). Affordances live in the cursor + revealed handles.
+        border: (hovered || interacting) ? '1px solid var(--color-border-strong, rgba(255,255,255,0.22))' : '1px solid rgba(255,255,255,0.10)',
+        boxShadow: REST_SHADOW,
         overflow: 'hidden',
-        cursor: editMode ? 'move' : 'default',
-        transition: editMode ? 'none' : 'box-shadow 0.2s',
-        animation: editMode ? 'widgetWiggle 0.3s ease infinite alternate' : undefined,
+        // Always directly draggable; the active "grabbing" cursor and the lift
+        // are applied imperatively during a gesture.
+        cursor: 'grab',
+        // No transition while interacting so the live transform tracks the
+        // pointer 1:1; otherwise a gentle settle on the lift styles.
+        transition: interacting ? 'none' : 'box-shadow 0.2s, transform 0.15s, border-color 0.15s',
+        willChange: interacting ? 'transform' : undefined,
         zIndex: 10,
-        touchAction: editMode ? 'none' : 'auto',
+        touchAction: 'none',
       }}
       onPointerDown={handleDragStart}
       onPointerMove={handleDragMove}
-      onPointerUp={handleDragEnd}
-      onPointerCancel={handleDragEnd}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
     >
       <WidgetContent widget={widget} />
 
-      {/* Remove button (edit mode) */}
-      {editMode && (
+      {/* Remove button (revealed on hover) */}
+      {(hovered || interacting) && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          onPointerDown={(e) => e.stopPropagation()}
           aria-label={`Remove ${widget.title}`}
           style={{
             position: 'absolute', top: -6, right: -6,
@@ -960,19 +1075,19 @@ const DraggableWidget: React.FC<{
         </button>
       )}
 
-      {/* Resize handle (edit mode) */}
-      {editMode && (
+      {/* Resize handle (revealed on hover) */}
+      {(hovered || interacting) && (
         <div
           role="slider"
           aria-label={`Resize ${widget.title} widget`}
           onPointerDown={handleResizeStart}
           onPointerMove={handleResizeMove}
-          onPointerUp={handleResizeEnd}
-          onPointerCancel={handleResizeEnd}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
           style={{
             position: 'absolute', bottom: 2, right: 2,
             width: 16, height: 16, cursor: 'nwse-resize',
-            background: 'rgba(10,132,255,0.4)', borderRadius: 3,
+            background: 'var(--color-accent, rgba(10,132,255,0.6))', opacity: 0.55, borderRadius: 3,
             touchAction: 'none',
           }}
         />
@@ -1006,7 +1121,7 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
         borderRadius: 12, border: '1px solid var(--color-border, rgba(255,255,255,0.10))',
         boxShadow: 'var(--pg-shadow-popover)',
-        padding: 20, overflow: 'auto',
+        padding: 'var(--space-5)', overflow: 'auto',
       }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 14 }}>Add Widget</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
@@ -1049,28 +1164,19 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 export const HomeWidgets: React.FC = () => {
   const widgets = useWidgetStore(s => s.widgets);
   const addWidget = useWidgetStore(s => s.addWidget);
-  const editMode = useWidgetStore(s => s.editMode);
-  const toggleEditMode = useWidgetStore(s => s.toggleEditMode);
   const removeWidget = useWidgetStore(s => s.removeWidget);
   const moveWidget = useWidgetStore(s => s.moveWidget);
   const resizeWidget = useWidgetStore(s => s.resizeWidget);
-  const [showPicker, setShowPicker] = useState(false);
+  const pickerOpen = useWidgetStore(s => s.pickerOpen);
+  const setPickerOpen = useWidgetStore(s => s.setPickerOpen);
 
   return (
     <>
-      <style>{`
-        @keyframes widgetWiggle {
-          0% { transform: rotate(-0.3deg); }
-          100% { transform: rotate(0.3deg); }
-        }
-      `}</style>
-
       {/* Widget layer */}
       {widgets.filter(w => w.visible).map(w => (
         <DraggableWidget
           key={w.id}
           widget={w}
-          editMode={editMode}
           onRemove={() => removeWidget(w.id)}
           onMove={(x, y) => moveWidget(w.id, x, y)}
           onResize={(width, height) => resizeWidget(w.id, width, height)}
@@ -1078,12 +1184,12 @@ export const HomeWidgets: React.FC = () => {
       ))}
 
       {/* Empty state: let user add clock/date widget themselves quickly */}
-      {widgets.filter(w => w.visible).length === 0 && !editMode && (
+      {widgets.filter(w => w.visible).length === 0 && (
         <div style={{ position: 'absolute', top: 88, right: 20, zIndex: 20 }}>
           <button
             onClick={() => { addWidget('clock'); }}
             style={{
-              padding: '8px 12px',
+              padding: 'var(--space-2) var(--space-3)',
               borderRadius: 10,
               border: '1px solid rgba(255,255,255,0.16)',
               background: 'rgba(24,24,28,0.58)',
@@ -1100,37 +1206,12 @@ export const HomeWidgets: React.FC = () => {
         </div>
       )}
 
-      {/* Edit mode toolbar (bottom-right) */}
-      {editMode && (
-        <div style={{
-          position: 'absolute', bottom: 80, right: 20, zIndex: 20,
-          display: 'flex', gap: 8,
-        }}>
-          <button
-            onClick={() => setShowPicker(true)}
-            style={{
-              padding: '8px 16px', borderRadius: 14, border: 'none',
-              background: 'rgba(10,132,255,0.9)', color: '#fff',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(10,132,255,0.3)',
-            }}
-          >
-            + Add Widget
-          </button>
-          <button
-            onClick={toggleEditMode}
-            style={{
-              padding: '8px 16px', borderRadius: 14, border: 'none',
-              background: 'var(--color-border)', color: '#fff',
-              fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            }}
-          >
-            Done
-          </button>
-        </div>
-      )}
-
-      {showPicker && <WidgetPicker onClose={() => setShowPicker(false)} />}
+      {/* No persistent "Add widget" button (Widget Freedom initiative): the
+          workspace is the editor. Repositioning/resizing/removing are direct
+          (touch the widget), and adding is the OS-like right-click on the
+          desktop -> "Add Widget" (Home desktop context menu), which opens the
+          picker below. No permanent arrange/add chrome. */}
+      {pickerOpen && <WidgetPicker onClose={() => setPickerOpen(false)} />}
     </>
   );
 };
@@ -1166,11 +1247,13 @@ const dashCardStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   minWidth: 0,
-  minHeight: 150,
+  minHeight: 0,
+  width: '100%',
+  height: '100%',
   background: CARD_BG,
   border: CARD_BORDER,
   borderRadius: 10,
-  padding: '12px 14px',
+  padding: 'var(--space-3) 14px',
   fontFamily: 'var(--dex-font-ui)',
   overflow: 'hidden',
 };
@@ -1187,8 +1270,8 @@ const DashCardHeader: React.FC<{
     className="dex-hover-bg"
     aria-label={`Open ${title}`}
     style={{
-      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-      background: 'transparent', border: 'none', padding: '0 0 8px', margin: 0,
+      display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
+      background: 'transparent', border: 'none', padding: '0 0 var(--space-2)', margin: 0,
       cursor: 'pointer', textAlign: 'left', color: 'var(--color-text-secondary)',
     }}
   >
@@ -1204,7 +1287,7 @@ const DashCardHeader: React.FC<{
 const DashEmpty: React.FC<{ icon: string; label: string; hint?: string }> = ({ icon, label, hint }) => (
   <div style={{
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', gap: 6, padding: '8px 4px', textAlign: 'center',
+    justifyContent: 'center', gap: 6, padding: 'var(--space-2) 4px', textAlign: 'center',
   }}>
     <DexIcon name={icon} size={20} color="var(--color-text-muted, #6b6b70)" />
     <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{label}</span>
@@ -1336,7 +1419,7 @@ const RecentNotesWidget: React.FC = () => {
       {recent.length === 0 ? (
         <DashEmpty icon="notes" label="No notes yet" hint="Create a note and it shows up here." />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {recent.map(n => {
             const preview = (n.plain_text || '').replace(/\s+/g, ' ').trim();
             return (
@@ -1575,7 +1658,7 @@ const RewindSummaryWidget: React.FC = () => {
                 const max = summary.topApps[0]?.count || 1;
                 const pct = Math.max(8, Math.round((a.count / max) * 100));
                 return (
-                  <div key={a.name + i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div key={a.name + i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <span style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
                     <span style={{ width: 56, height: 4, borderRadius: 2, background: 'var(--color-bg-hover, rgba(255,255,255,0.08))', overflow: 'hidden', flexShrink: 0 }}>
                       <span style={{ display: 'block', width: `${pct}%`, height: '100%', background: 'var(--color-accent)', borderRadius: 2 }} />
@@ -1660,55 +1743,114 @@ const AiSuggestionsWidget: React.FC = () => {
 
 const PinnedAppsWidget: React.FC = () => {
   const pins = useDockPins(s => s.pins);
+  const pinApp = useDockPins(s => s.pinApp);
+  const [picking, setPicking] = useState(false);
   const apps = useMemo(() => {
     return [...pins]
       .sort((a, b) => a.position - b.position)
       .map(p => ({ id: p.id, def: APP_DEFINITIONS[p.id] }))
       .filter((x): x is { id: string; def: NonNullable<typeof x.def> } => !!x.def && x.id !== 'home')
-      .slice(0, 8);
+      .slice(0, 11);
   }, [pins]);
+  const pinnedIds = useMemo(() => new Set(pins.map(p => p.id)), [pins]);
+  const addable = useMemo(() => Object.entries(APP_DEFINITIONS)
+    .filter(([id, def]) => id !== 'home' && !!def && !pinnedIds.has(id))
+    .map(([id, def]) => ({ id, def: def! })), [pinnedIds]);
 
   return (
-    <div style={dashCardStyle}>
+    <div style={{ ...dashCardStyle, position: 'relative' }}>
       <DashCardHeader title="Pinned Apps" icon="grid" appId="home" count={apps.length || undefined} />
-      {apps.length === 0 ? (
-        <DashEmpty icon="grid" label="No pinned apps" hint="Pin apps to the dock to see them here." />
-      ) : (
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
-          alignContent: 'start', flex: 1, paddingTop: 2,
-        }}>
-          {apps.map(({ id, def }) => {
-            const tinted = !!def.color && !def.color.startsWith('var');
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => navigateToApp(id)}
-                className="dex-hover-bg"
-                aria-label={`Open ${def.name}`}
-                title={def.name}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                  padding: '8px 2px', border: 'none', borderRadius: 8,
-                  background: 'transparent', cursor: 'pointer',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                <span style={{
-                  width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: tinted ? `${def.color}22` : 'var(--color-bg-hover, rgba(255,255,255,0.08))',
-                  color: tinted ? def.color : 'var(--color-accent)',
-                }}>
-                  <DexIcon name={def.icon as any} size={18} color="currentColor" />
-                </span>
-                <span style={{ fontSize: 10, lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-tertiary)' }}>
-                  {def.name}
-                </span>
-              </button>
-            );
-          })}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)',
+        // Scroll within the card so no pinned apps are clipped when the icon grid
+        // is taller than the cell (was hiding ~122px of icons in the 1-row span).
+        alignContent: 'start', flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 2,
+      }}>
+        {apps.map(({ id, def }) => {
+          const tinted = !!def.color && !def.color.startsWith('var');
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => navigateToApp(id)}
+              className="dex-hover-bg"
+              aria-label={`Open ${def.name}`}
+              title={def.name}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                padding: 'var(--space-2) 2px', border: 'none', borderRadius: 8,
+                background: 'transparent', cursor: 'pointer',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              <span style={{
+                width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: tinted ? `${def.color}22` : 'var(--color-bg-hover, rgba(255,255,255,0.08))',
+                color: tinted ? def.color : 'var(--color-accent)',
+              }}>
+                <DexIcon name={def.icon as any} size={18} color="currentColor" />
+              </span>
+              <span style={{ fontSize: 10, lineHeight: 1.15, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-tertiary)' }}>
+                {def.name}
+              </span>
+            </button>
+          );
+        })}
+        {/* Add-to-Home affordance: pin any app straight from the widget. */}
+        <button
+          type="button"
+          onClick={() => setPicking(p => !p)}
+          className="dex-hover-bg"
+          aria-label="Add app to Home"
+          aria-expanded={picking}
+          title="Add app to Home"
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+            padding: 'var(--space-2) 2px', border: 'none', borderRadius: 8,
+            background: 'transparent', cursor: 'pointer', color: 'var(--color-text-tertiary)',
+          }}
+        >
+          <span style={{
+            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--color-bg-inset)', border: '1px dashed var(--color-border)',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Add</span>
+        </button>
+      </div>
+
+      {picking && (
+        <div
+          role="menu"
+          aria-label="Add app to Home"
+          style={{
+            position: 'absolute', left: 8, right: 8, top: 38, maxHeight: 210, overflowY: 'auto',
+            zIndex: 20, background: '#0E0E11', border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', padding: 6,
+          }}
+        >
+          {addable.length === 0 ? (
+            <div style={{ padding: 10, fontSize: 12, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>Every app is already pinned.</div>
+          ) : addable.map(({ id, def }) => (
+            <button
+              key={id}
+              type="button"
+              role="menuitem"
+              className="dex-hover-bg"
+              onClick={() => { pinApp(id); setPicking(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
+                padding: '7px var(--space-2)', border: 'none', borderRadius: 6,
+                background: 'transparent', cursor: 'pointer', color: 'var(--color-text-primary)', textAlign: 'left',
+              }}
+            >
+              <DexIcon name={def.icon as any} size={16} color="var(--color-text-secondary)" />
+              <span style={{ fontSize: 12 }}>{def.name}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -1718,11 +1860,17 @@ const PinnedAppsWidget: React.FC = () => {
 // --- Dashboard grid -----------------------------------------------------
 
 /**
- * The DEX 5.5 Home dashboard: a responsive, flat grid of the seven brief
- * widgets. Rendered inside the Home scroll area. Auto-fills columns so it
- * stays compact on narrow windows and spreads on wide ones, with no
- * clutter and no fixed magic widths.
+ * Bento sizing: each dashboard card claims a different footprint in the grid
+ * so the dashboard reads as a macOS-style bento wall rather than a uniform
+ * grid. Sizes map to column/row spans over the base bento cell.
  */
+const BENTO_SPAN: Record<string, React.CSSProperties> = {
+  small: {},
+  wide:  { gridColumn: 'span 2' },
+  tall:  { gridRow: 'span 2' },
+  large: { gridColumn: 'span 2', gridRow: 'span 2' },
+};
+
 export const HomeDashboard: React.FC = () => {
   return (
     <div
@@ -1730,19 +1878,26 @@ export const HomeDashboard: React.FC = () => {
       aria-label="Home dashboard"
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))',
-        gap: 12,
+        gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+        // 168px rows; the oversized/empty look came from SPANS, not row height —
+        // Current Tasks (2 items) was a 2-row `tall` card and Rewind a 2x2 `large`
+        // card, leaving huge empty space. Cards are now sized to their content and
+        // their list bodies scroll, so the bento stays compact + aligned.
+        gridAutoRows: '168px',
+        gridAutoFlow: 'dense',
+        gridAutoColumns: '1fr',
+        gap: 'var(--space-3)',
         width: '100%',
         fontFamily: 'var(--dex-font-ui)',
       }}
     >
-      <RecentProjectsWidget />
-      <RecentNotesWidget />
-      <CurrentTasksWidget />
-      <ActiveWorkflowsWidget />
-      <RewindSummaryWidget />
-      <AiSuggestionsWidget />
-      <PinnedAppsWidget />
+      <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><RecentProjectsWidget /></div>
+      <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><RecentNotesWidget /></div>
+      <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><CurrentTasksWidget /></div>
+      <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><ActiveWorkflowsWidget /></div>
+      <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><RewindSummaryWidget /></div>
+      <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><AiSuggestionsWidget /></div>
+      <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><PinnedAppsWidget /></div>
     </div>
   );
 };

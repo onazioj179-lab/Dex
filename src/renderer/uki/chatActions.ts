@@ -33,11 +33,14 @@ import { tierForAction, type ConfirmTier } from '../../shared/uki/confirmTier';
 import { askConfiguredLLM } from './providers/connect';
 import { useRunningApps } from '../store/runningApps';
 import { APP_REGISTRY } from '../store/appSubsystem';
+import { useNotesStore } from '../store/notesStore';
 
 /** Whether each action mutates the workspace (drives the confirm tier). */
 const ACTION_MUTATES: Record<string, boolean> = {
   'app.open': true,
   'app.close': true,
+  'notes.create': true,
+  'tasks.create': true,
   'uki.summarize': false,
   'uki.rewriteTone': false,
   'uki.bulletize': false,
@@ -80,6 +83,18 @@ const CHAT_SKILLS: Skill[] = [
     label: 'Bullet points',
     intent: /^bullet/,
     plan: { steps: [{ actionId: 'uki.bulletize', params: { text: '{{goal}}' } }] },
+  },
+  {
+    id: 'chat.createNote',
+    label: 'Create a note',
+    intent: /^(new note|create (a )?note|take a note|note that|note\s*:)/,
+    plan: { steps: [{ actionId: 'notes.create', params: { text: '{{goal}}' } }] },
+  },
+  {
+    id: 'chat.createTask',
+    label: 'Create a task',
+    intent: /^(add (a )?task|create (a )?task|new task|remind me to|add to-?do|to-?do\s*:)/,
+    plan: { steps: [{ actionId: 'tasks.create', params: { text: '{{goal}}' } }] },
   },
 ];
 
@@ -129,6 +144,47 @@ function chatActionRegistry(systemPrompt: string): ActionRegistry {
     'uki.summarize': llm('Summarise the following in 3 sentences. Return only the summary:'),
     'uki.rewriteTone': llm('Rewrite the following to be clear and professional. Return only the rewritten text:'),
     'uki.bulletize': llm('Convert the following into 5 concise bullet points. Return only the bullets:'),
+    // Create a real note in DEX Notes from the message. The notes store owns
+    // persistence (native backend or localStorage fallback) and the open Notes
+    // app subscribes to it, so the note appears live or on next open.
+    'notes.create': async (params) => {
+      const raw = String(params.text ?? '').trim();
+      const body = raw.replace(/^(new note|create (a )?note|take a note|note that|note)\s*[:,\-]?\s*/i, '').trim();
+      if (!body) throw new Error('there was nothing to put in the note');
+      const store = useNotesStore.getState();
+      const id = await store.createNote();
+      if (!id) throw new Error('could not create the note');
+      const title = body.split('\n')[0].slice(0, 80) || 'Untitled';
+      const content = JSON.stringify({
+        type: 'doc',
+        content: body.split('\n').map((line) => ({
+          type: 'paragraph',
+          content: line ? [{ type: 'text', text: line }] : [],
+        })),
+      });
+      await store.updateNote(id, { title, plain_text: body, content });
+      const a = resolveAppTarget('notes');
+      if (a) useRunningApps.getState().launchApp({ id: a.id, name: a.name, icon: a.icon, color: a.color });
+      return `Created note "${title}".`;
+    },
+    // Create a real task in DEX Tasks. Tasks keeps its own local state + storage
+    // (no shared store), so queue the task durably and signal the app to drain it
+    // -- it adds + persists whether it is already open or opened fresh by us.
+    'tasks.create': (params) => {
+      const raw = String(params.text ?? '').trim();
+      const title = raw.replace(/^(add (a )?task|create (a )?task|new task|remind me to|add to-?do|to-?do)\s*[:,\-]?\s*/i, '').trim();
+      if (!title) throw new Error('no task text was given');
+      try {
+        const q = JSON.parse(localStorage.getItem('dex-uki-pending-tasks') || '[]');
+        const arr = Array.isArray(q) ? q : [];
+        arr.push({ title });
+        localStorage.setItem('dex-uki-pending-tasks', JSON.stringify(arr));
+      } catch { /* non-fatal: the app drains what it can */ }
+      const a = resolveAppTarget('tasks');
+      if (a) useRunningApps.getState().launchApp({ id: a.id, name: a.name, icon: a.icon, color: a.color });
+      window.dispatchEvent(new CustomEvent('uki:tasks-pending'));
+      return `Added task "${title}".`;
+    },
   });
 }
 

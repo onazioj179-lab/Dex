@@ -37,14 +37,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '16px 24px',
+    padding: 'var(--space-4) var(--space-6)',
     borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
     background: 'var(--color-bg-hover, rgba(255,255,255,0.02))',
   },
   headerLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 'var(--space-3)',
   },
   logo: {
     width: 36,
@@ -72,10 +72,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   headerActions: {
     display: 'flex',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   actionBtn: {
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     fontSize: 13,
     fontWeight: 500,
     background: 'var(--color-bg-hover, rgba(255,255,255,0.08))',
@@ -96,11 +96,11 @@ const styles: Record<string, React.CSSProperties> = {
   tabs: {
     display: 'flex',
     gap: 4,
-    padding: '12px 24px',
+    padding: 'var(--space-3) var(--space-6)',
     borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.04))',
   },
   tab: {
-    padding: '10px 20px',
+    padding: '10px var(--space-5)',
     fontSize: 13,
     fontWeight: 500,
     background: 'transparent',
@@ -130,18 +130,18 @@ const styles: Record<string, React.CSSProperties> = {
   content: {
     flex: 1,
     overflowY: 'auto',
-    padding: 24,
+    padding: 'var(--space-6)',
   },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: 16,
+    gap: 'var(--space-4)',
   },
   card: {
     background: 'var(--color-bg-elevated, linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%))',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
     borderRadius: 12,
-    padding: 20,
+    padding: 'var(--space-5)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
@@ -149,7 +149,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 'var(--space-3)',
   },
   cardIcon: {
     width: 44,
@@ -185,8 +185,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-tertiary, #8e8e93)',
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    gap: 'var(--space-3)',
+    marginBottom: 'var(--space-4)',
   },
   cardCollaborators: {
     display: 'flex',
@@ -214,7 +214,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 12,
+    paddingTop: 'var(--space-3)',
     borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
   },
   cardAppBadge: {
@@ -258,31 +258,24 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 'var(--space-5)',
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: 600,
     color: 'var(--color-text-primary, #fff)',
-    marginBottom: 8,
-  },
-  emptyDesc: {
-    fontSize: 14,
-    color: 'var(--color-text-tertiary, #8e8e93)',
-    maxWidth: 320,
-    lineHeight: 1.5,
-    marginBottom: 24,
+    marginBottom: 'var(--space-2)',
   },
   checkpointList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 'var(--space-2)',
   },
   checkpointItem: {
     display: 'flex',
     alignItems: 'center',
     gap: 14,
-    padding: '14px 16px',
+    padding: '14px var(--space-4)',
     background: 'var(--color-bg-hover, rgba(255,255,255,0.04))',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.06))',
     borderRadius: 10,
@@ -319,10 +312,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    padding: '10px 16px',
+    padding: '10px var(--space-4)',
     background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
     borderRadius: 10,
-    marginBottom: 20,
+    marginBottom: 'var(--space-5)',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
   },
   searchInput: {
@@ -335,8 +328,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   filterChips: {
     display: 'flex',
-    gap: 8,
-    marginBottom: 20,
+    gap: 'var(--space-2)',
+    marginBottom: 'var(--space-5)',
   },
   filterChip: {
     padding: '6px 14px',
@@ -358,8 +351,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    padding: '12px 20px',
-    margin: '0 24px 16px',
+    padding: 'var(--space-3) var(--space-5)',
+    margin: '0 var(--space-6) var(--space-4)',
     background: 'linear-gradient(135deg, rgba(255,69,58,0.15), rgba(255,69,58,0.08))',
     border: '1px solid var(--color-error-muted, rgba(255,69,58,0.3))',
     borderRadius: 10,
@@ -745,11 +738,8 @@ const CollabHub: React.FC = () => {
                 </svg>
               </div>
               <div style={styles.emptyTitle}>No projects yet</div>
-              <div style={styles.emptyDesc}>
-                Create a new collaborative project or ask someone to share one with you
-              </div>
               <button
-                style={{ ...styles.actionBtn, ...styles.actionBtnPrimary }}
+                style={{ ...styles.actionBtn, ...styles.actionBtnPrimary, marginTop: 'var(--space-6)' }}
                 onClick={handleCreateProject}
               >
                 Create Project
@@ -871,9 +861,6 @@ const CollabHub: React.FC = () => {
                 </svg>
               </div>
               <div style={styles.emptyTitle}>No checkpoints yet</div>
-              <div style={styles.emptyDesc}>
-                Checkpoints are saved automatically as you work on projects
-              </div>
             </div>
           ) : (
             <div style={styles.checkpointList}>
@@ -893,7 +880,7 @@ const CollabHub: React.FC = () => {
                     <div style={styles.checkpointName}>{cp.name}</div>
                     <div style={styles.checkpointMeta}>
                       {cp.projectName} • {formatTime(cp.timestamp)} • by {cp.creatorName}
-                      {cp.autoSave && <span style={{ marginLeft: 8, opacity: 0.6 }}>Auto-saved</span>}
+                      {cp.autoSave && <span style={{ marginLeft: 'var(--space-2)', opacity: 0.6 }}>Auto-saved</span>}
                     </div>
                   </div>
                   <div style={styles.checkpointActions}>
@@ -924,12 +911,9 @@ const CollabHub: React.FC = () => {
                 </svg>
               </div>
               <div style={styles.emptyTitle}>No activity yet</div>
-              <div style={styles.emptyDesc}>
-                Activity will appear here as you collaborate on projects
-              </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {activityFeed.map(item => (
                 <div
                   key={item.id}
@@ -937,7 +921,7 @@ const CollabHub: React.FC = () => {
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: 14,
-                    padding: '14px 16px',
+                    padding: '14px var(--space-4)',
                     background: item.actionable
                       ? 'linear-gradient(135deg, rgba(255,159,10,0.1), rgba(255,159,10,0.05))'
                       : 'var(--color-bg-hover, rgba(255,255,255,0.04))',
@@ -979,7 +963,7 @@ const CollabHub: React.FC = () => {
                       marginBottom: 2,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
+                      gap: 'var(--space-2)',
                     }}>
                       {item.title}
                       {item.status && item.status !== 'pending' && (
@@ -1005,7 +989,7 @@ const CollabHub: React.FC = () => {
                       {item.description}
                     </div>
                     {item.actionable && item.requestId && (
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                         <button
                           style={{
                             padding: '6px 14px',

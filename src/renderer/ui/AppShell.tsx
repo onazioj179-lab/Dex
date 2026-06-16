@@ -38,8 +38,9 @@ export interface AppShellProps {
 
 /**
  * AppShell — opt-in chrome wrapper. Apps that adopt it inherit:
- *   - 36px title strip with icon + title + subtitle + headerRight
- *   - Optional toolbar row (44px) below title strip
+ *   - 34px title strip with icon + title + subtitle + headerRight (matches the
+ *     shell top bar so stacked chrome shares one height rhythm)
+ *   - Optional toolbar row (40px, the canonical large-control rung) below it
  *   - Flex column layout, children take remaining space
  *   - Optional status bar at the bottom
  */
@@ -79,7 +80,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           alignItems: 'center',
           gap: space[2],
           padding: `0 ${space[3]}px`,
-          height: 36,
+          height: 34,
           flexShrink: 0,
           minWidth: 0,
           background: 'var(--color-bg-titlebar, rgba(255,255,255,0.02))',
@@ -158,7 +159,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             alignItems: 'center',
             gap: space[2],
             padding: `0 ${space[3]}px`,
-            height: 44,
+            height: 40,
             flexShrink: 0,
             minWidth: 0,
             overflowX: 'auto',

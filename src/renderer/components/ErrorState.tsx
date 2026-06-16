@@ -36,8 +36,8 @@ const baseStyle: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 12,
-  padding: '32px 24px',
+  gap: 'var(--space-3)',
+  padding: 'var(--space-8) var(--space-6)',
   textAlign: 'center',
   color: 'var(--color-text-secondary)',
   minHeight: 160,
@@ -45,8 +45,8 @@ const baseStyle: React.CSSProperties = {
 
 const compactStyle: React.CSSProperties = {
   ...baseStyle,
-  padding: '16px 12px',
-  gap: 8,
+  padding: 'var(--space-4) var(--space-3)',
+  gap: 'var(--space-2)',
   minHeight: 96,
 };
 
@@ -75,7 +75,7 @@ const messageStyle: React.CSSProperties = {
 
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
-  gap: 8,
+  gap: 'var(--space-2)',
   flexWrap: 'wrap',
   justifyContent: 'center',
   marginTop: 4,

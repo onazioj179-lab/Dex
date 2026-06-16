@@ -233,7 +233,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   toolbar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '12px 20px', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
+    padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
     flexShrink: 0,
   },
   title: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em' },
@@ -249,13 +249,13 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   addPanel: {
-    padding: '12px 20px', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
+    padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border, var(--color-border-subtle))',
   },
   addGrid: {
     display: 'flex', flexWrap: 'wrap' as const, gap: 6,
   },
   zoneOption: {
-    padding: '6px 12px', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))',
+    padding: '6px var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)',
     cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-family)',
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 2,
@@ -264,11 +264,11 @@ const s: Record<string, React.CSSProperties> = {
   zoneOptOffset: { fontSize: 10, color: 'var(--color-text-secondary)' },
   clockGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: 12, padding: 20, flex: 1,
+    gap: 'var(--space-3)', padding: 'var(--space-5)', flex: 1,
   },
   clockCard: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: '20px 16px', borderRadius: 12,
+    padding: 'var(--space-5) var(--space-4)', borderRadius: 12,
     border: '1px solid var(--color-border, var(--color-bg-hover))',
     position: 'relative' as const, gap: 4,
   },

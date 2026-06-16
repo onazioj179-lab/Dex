@@ -188,12 +188,12 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)', overflow: 'hidden',
   },
   tabs: {
-    display: 'flex', gap: 4, padding: '12px 16px', flexShrink: 0,
+    display: 'flex', gap: 4, padding: 'var(--space-3) var(--space-4)', flexShrink: 0,
     overflowX: 'auto', borderBottom: '1px solid var(--color-border-subtle)',
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px 12px', borderRadius: 6, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 6, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', whiteSpace: 'nowrap',
@@ -205,26 +205,26 @@ const s: Record<string, React.CSSProperties> = {
   tabLabel: { fontSize: 12 },
   converterArea: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    gap: 12, padding: '24px 20px',
+    gap: 'var(--space-3)', padding: 'var(--space-6) var(--space-5)',
   },
   unitBlock: {
-    width: '100%', display: 'flex', flexDirection: 'column', gap: 8,
+    width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
   },
   select: {
-    width: '100%', padding: '10px 12px', borderRadius: 8,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 8,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
     color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500,
     cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-family)',
   },
   input: {
-    width: '100%', padding: '14px 16px', borderRadius: 10,
+    width: '100%', padding: '14px var(--space-4)', borderRadius: 10,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 300,
     outline: 'none', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   resultDisplay: {
-    width: '100%', padding: '14px 16px', borderRadius: 10,
+    width: '100%', padding: '14px var(--space-4)', borderRadius: 10,
     background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-light)',
     color: 'var(--color-accent)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
@@ -240,18 +240,18 @@ const s: Record<string, React.CSSProperties> = {
   },
   formula: {
     textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)',
-    padding: '0 20px 16px', fontVariantNumeric: 'tabular-nums',
+    padding: '0 var(--space-5) var(--space-4)', fontVariantNumeric: 'tabular-nums',
   },
   refGrid: {
     flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
     borderTop: '1px solid var(--color-border-subtle)',
   },
   refHeader: {
-    padding: '12px 20px 8px',
+    padding: 'var(--space-3) var(--space-5) var(--space-2)',
   },
-  refTable: { flex: 1, overflow: 'auto', padding: '0 20px 16px' },
+  refTable: { flex: 1, overflow: 'auto', padding: '0 var(--space-5) var(--space-4)' },
   refRow: {
-    display: 'flex', alignItems: 'center', gap: 8,
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
     padding: '6px 0', fontSize: 14, fontVariantNumeric: 'tabular-nums',
   },
   refFrom: { flex: 1, color: 'var(--color-text-secondary)' },

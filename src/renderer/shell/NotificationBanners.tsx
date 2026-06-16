@@ -258,7 +258,7 @@ const Banner: React.FC<{
         touchAction: 'pan-y',
       }}
     >
-      <div style={{ padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+      <div style={{ padding: 'var(--space-3) 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <div style={{
           width: 28, height: 28, borderRadius: 6, flexShrink: 0,
           background: `color-mix(in srgb, ${iconColor} 8%, transparent)`,
@@ -291,7 +291,7 @@ const Banner: React.FC<{
           )}
           {/* Actions on hover (including undo) */}
           {hovered && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 6, marginTop: 'var(--space-2)' }}>
               {/* Undo button if available */}
               {notification.undoAction && (
                 <button
@@ -402,12 +402,16 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
   return (
     <div style={{
       position: 'fixed',
-      top: 12,
-      right: 12,
+      // Wall-aligned: sit just below the 34px top-bar chrome and flush to the
+      // right edge, clearing a top/right-edge dock via the reserve vars (0 when
+      // the dock is elsewhere). Was top:12/right:12, which floated the stack OVER
+      // the top bar -- reading as unanchored chrome rather than placed UI.
+      top: 'calc(34px + var(--dex-reserved-top, 0px) + 10px)',
+      right: 'calc(var(--dex-reserved-right, 0px) + 12px)',
       zIndex: 'var(--z-notification)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 8,
+      gap: 'var(--space-2)',
       pointerEvents: 'auto',
     }}>
       {visible.map((n, i) => (
@@ -622,10 +626,10 @@ export const NotificationCenter: React.FC<{
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 16px 12px',
+          padding: '14px var(--space-4) var(--space-3)',
           borderBottom: '1px solid var(--color-border-subtle)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
               Notifications
             </span>
@@ -648,7 +652,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('timeline')}
                 style={{
-                  padding: '3px 8px', borderRadius: 3, border: 'none',
+                  padding: '3px var(--space-2)', borderRadius: 3, border: 'none',
                   background: viewMode === 'timeline' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'timeline' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
@@ -660,7 +664,7 @@ export const NotificationCenter: React.FC<{
               <button
                 onClick={() => setViewMode('grouped')}
                 style={{
-                  padding: '3px 8px', borderRadius: 3, border: 'none',
+                  padding: '3px var(--space-2)', borderRadius: 3, border: 'none',
                   background: viewMode === 'grouped' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'grouped' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   fontSize: 10, fontWeight: 500, cursor: 'pointer',
@@ -703,11 +707,11 @@ export const NotificationCenter: React.FC<{
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-2) var(--space-3)' }}>
           {notifications.length === 0 ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'center', padding: '48px 24px', gap: 8,
+              justifyContent: 'center', padding: '48px var(--space-6)', gap: 'var(--space-2)',
               color: 'var(--color-text-tertiary)', textAlign: 'center',
             }}>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
@@ -719,7 +723,7 @@ export const NotificationCenter: React.FC<{
           ) : viewMode === 'grouped' ? (
             /* Grouped View */
             groups.map(group => (
-              <div key={group.source} style={{ marginBottom: 12 }}>
+              <div key={group.source} style={{ marginBottom: 'var(--space-3)' }}>
                 {/* Group header */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -747,7 +751,7 @@ export const NotificationCenter: React.FC<{
                       key={n.id} 
                       onClick={() => onMarkAsRead?.(n.id)}
                       style={{
-                        padding: '10px 12px', borderRadius: 8, marginBottom: 4,
+                        padding: '10px var(--space-3)', borderRadius: 8, marginBottom: 4,
                         background: n.read ? 'var(--color-bg-surface)' : 'var(--color-bg-hover)',
                         border: `1px solid ${n.read ? 'var(--color-border-subtle)' : 'color-mix(in srgb, var(--color-accent) 19%, transparent)'}`,
                         cursor: 'pointer',
@@ -762,7 +766,7 @@ export const NotificationCenter: React.FC<{
                           }} />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                             <span style={{ fontSize: 12, fontWeight: n.read ? 500 : 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
                               {n.title}
                             </span>
@@ -787,7 +791,7 @@ export const NotificationCenter: React.FC<{
               const relativeTime = n.timestamp ? formatRelativeTime(n.timestamp) : '';
               return (
                 <div key={n.id} style={{
-                  padding: '10px 12px', borderRadius: 8, marginBottom: 6,
+                  padding: '10px var(--space-3)', borderRadius: 8, marginBottom: 6,
                   background: 'var(--color-bg-surface)',
                   border: '1px solid var(--color-border-subtle)',
                 }}>
@@ -797,7 +801,7 @@ export const NotificationCenter: React.FC<{
                       background: color, flexShrink: 0, marginTop: 4,
                     }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
                           {n.title}
                         </span>

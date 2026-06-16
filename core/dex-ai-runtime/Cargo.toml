@@ -1,6 +1,6 @@
 [package]
 name = "dex-ai-runtime"
-description = "DEX 6.0 native AI runtime (provider transport + streaming) — scaffold (GOAL-6A/6B)"
+description = "DEX 6.0 native AI runtime — request build + streaming parser + blocking HTTP transport + router re-export (GOAL-6A/6B)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,3 +8,6 @@ authors.workspace = true
 
 [dependencies]
 dex-smart-router = { path = "../dex-smart-router" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", features = ["tls"] }  # tiny blocking HTTP client — the provider transport (POST chat/completions, read SSE/JSON body)

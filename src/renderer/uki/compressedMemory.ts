@@ -5,9 +5,19 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * UKI Compressed Memory -- consolidates older conversational turns into a
- * compact, optionally-encrypted archive so warm/cold memory does not grow
- * unbounded in localStorage.
+ * UKI Compressed Memory -- the COLD tier of `./memory` (renderer persistence
+ * adapter). This is NOT a parallel store: it owns no turns of its own. It
+ * reads the hot rolling window from `./memory` (via `readTurns`), consolidates
+ * the oldest turns into a compact, optionally-encrypted archive, and writes the
+ * trimmed window back through the same `uki:mem:turns` key. The archive lives
+ * under `uki:mem:archive` alongside that hot key in the shared UKI cache layer.
+ *
+ * Tier contract (single store, two physical keys):
+ *   - hot  (`uki:mem:turns`):   owned by `./memory`, last MAX_TURNS exchanges.
+ *   - cold (`uki:mem:archive`): owned here, gzip summaries of evicted turns.
+ * Eviction is one-directional hot -> cold; cold is reachable for read-only
+ * retrieval via `searchArchives` / `expandArchive` and is surfaced into the
+ * lexical index by `./index_search` (which imports `listArchives` from here).
  *
  * Strategy:
  *   1. When raw turns exceed COMPRESS_THRESHOLD, take the oldest
@@ -20,7 +30,8 @@
  *
  * Local-first: archives never leave the device unless the user explicitly
  * exports them via Settings. No background timers; consolidation runs
- * lazily when callers invoke maybeConsolidate().
+ * lazily when callers invoke maybeConsolidate() (driven by `./memory`'s
+ * `recordTurn`).
  */
 
 import * as cache from './cache';

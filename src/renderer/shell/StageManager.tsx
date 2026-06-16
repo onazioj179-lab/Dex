@@ -101,14 +101,14 @@ const StageTile = memo<TileProps>(({ app, isActive, isHovered, icon, isWeak, red
             ? `linear-gradient(145deg, ${color}30 0%, rgba(40,40,48,0.85) 100%)`
             : isHovered
               ? 'rgba(50,50,58,0.8)'
-              : 'rgba(38,38,44,0.7)',
+              : 'var(--color-bg-elevated)',
           cursor: 'pointer',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 5,
-          padding: '8px 4px 6px',
+          padding: 'var(--space-2) 4px 6px',
           transition: reducedMotion ? 'none' : `transform ${dur} ${spring}, border-color ${dur}, background ${dur}, box-shadow ${dur}`,
           transform: isHovered && !isWeak ? 'scale(1.02)' : 'scale(1)',
           boxShadow: isWeak ? 'none' : isActive
@@ -260,7 +260,7 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
         >
           <div style={{
             position: 'absolute', left: 1, top: '15%', bottom: '15%', width: 2,
-            borderRadius: 1,
+            borderRadius: 2,
             background: 'var(--color-border-subtle)',
           }} />
         </div>
@@ -283,7 +283,7 @@ const StageManager: React.FC<StageManagerProps> = memo(({ apps, focusedAppId, on
           flexDirection: 'column',
           alignItems: 'center',
           gap: 6,
-          padding: '12px 8px',
+          padding: 'var(--space-3) var(--space-2)',
           zIndex: 'var(--z-stage-manager)',
           overflowY: 'auto',
           overflowX: 'hidden',

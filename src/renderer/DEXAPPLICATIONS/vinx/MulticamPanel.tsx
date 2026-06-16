@@ -18,7 +18,7 @@ interface Props {
 }
 
 const wrapStyle: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 8, padding: 12, height: '100%',
+  display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', height: '100%',
   background: 'var(--color-bg-elevated)', overflow: 'auto',
 };
 
@@ -28,12 +28,12 @@ const headerStyle: React.CSSProperties = {
 };
 
 const gridStyle: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
+  display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)',
 };
 
 const emptyStyle: React.CSSProperties = {
   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  color: 'var(--color-text-tertiary)', fontSize: 11, textAlign: 'center', padding: 20,
+  color: 'var(--color-text-tertiary)', fontSize: 11, textAlign: 'center', padding: 'var(--space-5)',
 };
 
 function placeholderColor(seed: string): string {
