@@ -9,6 +9,31 @@ import DexIcon from '../components/DexIcon';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useVirtualList } from '../improvements500/virtualList';
+
+// Progressive detail (information priority): show what matters first, reveal
+// diagnostics and advanced data only on request -- never everything at once.
+//   1 Essential   - key metric cards only (CPU / Memory / Apps / Battery)
+//   2 Diagnostics - full metrics + workspaces / workflows / open apps
+//   3 Advanced    - adds the full, virtualized system-process table
+type DetailLevel = 1 | 2 | 3;
+const DETAIL_LEVELS: { level: DetailLevel; label: string; title: string }[] = [
+  { level: 1, label: 'Essential', title: 'Essential — key metrics only' },
+  { level: 2, label: 'Diagnostics', title: 'Diagnostics — full metrics, workspaces, workflows, open apps' },
+  { level: 3, label: 'Advanced', title: 'Advanced — adds the full system process table' },
+];
+const DETAIL_LEVEL_KEY = 'dex-taskmanager-detail';
+const loadDetailLevel = (): DetailLevel => {
+  try {
+    const v = Number(localStorage.getItem(DETAIL_LEVEL_KEY));
+    if (v === 1 || v === 2 || v === 3) return v;
+  } catch { /* ignore */ }
+  return 2;
+};
+
+// Fixed process-row height drives the windowed list (only visible rows mount,
+// so the table stays smooth at thousands of processes).
+const PROCESS_ROW_H = 30;
 
 // Pulse v2: per-app process governance class. The renderer treats this as a hint;
 // downstream RenderGovernor / native scheduler can act on it as backends mature.
@@ -82,7 +107,7 @@ interface SparklineProps {
   ariaLabel: string;
 }
 
-const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 46, max = 100, ariaLabel }) => {
+const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 36, max = 100, ariaLabel }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -200,7 +225,7 @@ const TaskManager: React.FC = () => {
   const [batteryHistory, setBatteryHistory] = useState<number[]>([]);
   const [netRxHistory, setNetRxHistory] = useState<number[]>([]);
   const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
-  const [compactMode, setCompactMode] = useState(false);
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>(loadDetailLevel);
   const [killing, setKilling] = useState<number | null>(null);
   const [killConfirm, setKillConfirm] = useState<{ pid: number; name: string; force: boolean } | null>(null);
 
@@ -208,6 +233,7 @@ const TaskManager: React.FC = () => {
   const stages = useStageStore(s => s.stages);
   const activeStageId = useStageStore(s => s.activeStageId);
   const [governance, setGovernance] = useState<Record<string, GovernanceClass>>({});
+  const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; steps: number; lastRun: number | null }>>([]);
 
   const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
     setter(prev => {
@@ -286,14 +312,54 @@ const TaskManager: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [pushSample, runningApps]);
 
+  // Workflows section: read the saved automations (same source as the Workflows
+  // app — native `workflows:getAll` with the localStorage fallback). Read-only
+  // summary; status lives in the ephemeral engine, so we show steps + last run.
+  const refreshWorkflows = useCallback(async () => {
+    let list: any[] = [];
+    try {
+      const dexApi = (window as any).dex;
+      if (dexApi?.workflows?.getAll) {
+        const remote = await dexApi.workflows.getAll().catch(() => null);
+        if (Array.isArray(remote)) list = remote;
+      }
+      if (list.length === 0) {
+        const saved = localStorage.getItem('dex-workflows');
+        if (saved) { const parsed = JSON.parse(saved); if (Array.isArray(parsed)) list = parsed; }
+      }
+    } catch { /* ignore */ }
+    setWorkflows(list.map((w: any) => ({
+      id: String(w?.id ?? ''),
+      name: String(w?.name ?? 'Untitled workflow'),
+      steps: typeof w?.steps === 'number' ? w.steps : Array.isArray(w?.nodes) ? w.nodes.length : 0,
+      lastRun: w?.lastRun ? (typeof w.lastRun === 'number' ? w.lastRun : Date.parse(w.lastRun) || null) : null,
+    })));
+  }, []);
+
+  useEffect(() => {
+    refreshWorkflows();
+    const timer = window.setInterval(refreshWorkflows, 5000);
+    return () => window.clearInterval(timer);
+  }, [refreshWorkflows]);
+
+  // Persist the chosen detail level so the monitor opens where the user left it.
+  useEffect(() => {
+    try { localStorage.setItem(DETAIL_LEVEL_KEY, String(detailLevel)); } catch { /* ignore */ }
+  }, [detailLevel]);
+
   const visibleProcesses = useMemo(() => {
     const query = filter.trim().toLowerCase();
     const sortedProcesses = [...processes].sort((first, second) => (second.cpu || 0) - (first.cpu || 0));
-    if (!query) return sortedProcesses.slice(0, 80);
-    return sortedProcesses
-      .filter(process => process.name.toLowerCase().includes(query) || String(process.pid).includes(query))
-      .slice(0, 80);
+    // No hard cap: the list is windowed (useVirtualList), so only on-screen rows
+    // ever mount even with thousands of processes.
+    if (!query) return sortedProcesses;
+    return sortedProcesses.filter(
+      process => process.name.toLowerCase().includes(query) || String(process.pid).includes(query),
+    );
   }, [filter, processes]);
+
+  // Windowed process table: drives padTop/visible-rows/padBottom from scrollTop.
+  const procVirtual = useVirtualList({ itemCount: visibleProcesses.length, rowHeight: PROCESS_ROW_H, bufferRows: 6 });
 
   const shellApps = runningApps.filter(app => app.id !== 'home');
   const cpuUsage = status.cpu?.usage ?? 0;
@@ -325,6 +391,37 @@ const TaskManager: React.FC = () => {
   const diskDetail = status.disk
     ? `${(status.disk.used / 1024 ** 3).toFixed(0)} / ${(status.disk.total / 1024 ** 3).toFixed(0)} GB`
     : 'No disk data';
+
+  // -- Health monitoring (Task Manager 2.0) --------------------------------
+  // Detect resource spikes, frozen apps, and runaway processes, and surface a
+  // recovery action (end the worst offender). Thresholds mirror the metric tones.
+  const topProcess = useMemo(() => {
+    let top: SystemProcess | null = null;
+    for (const p of processes) if ((p.cpu || 0) > (top?.cpu ?? -1)) top = p;
+    return top;
+  }, [processes]);
+  const frozenCount = useMemo(
+    () => Object.values(governance).filter(g => g === 'frozen').length,
+    [governance],
+  );
+  const health = useMemo(() => {
+    const issues: string[] = [];
+    let critical = false;
+    let elevated = false;
+    if (cpuUsage > 85) { issues.push(`CPU critical at ${cpuUsage}%`); critical = true; }
+    else if (cpuUsage > 70) { issues.push(`CPU elevated at ${cpuUsage}%`); elevated = true; }
+    if (memoryPercent > 90) { issues.push(`Memory critical at ${memoryPercent}%`); critical = true; }
+    else if (memoryPercent > 80) { issues.push(`Memory high at ${memoryPercent}%`); elevated = true; }
+    if (frozenCount > 0) { issues.push(`${frozenCount} app${frozenCount === 1 ? '' : 's'} frozen`); elevated = true; }
+    if (topProcess && (topProcess.cpu || 0) > 80) {
+      issues.push(`${topProcess.name} using ${Math.round(topProcess.cpu || 0)}% CPU`);
+      elevated = true;
+    }
+    const level: 'healthy' | 'elevated' | 'critical' = critical ? 'critical' : elevated ? 'elevated' : 'healthy';
+    return { level, issues };
+  }, [cpuUsage, memoryPercent, frozenCount, topProcess]);
+  const healthTone = health.level === 'critical' ? '#FF453A' : health.level === 'elevated' ? '#FF9F0A' : '#30D158';
+  const healthLabel = health.level === 'critical' ? 'Critical' : health.level === 'elevated' ? 'Elevated' : 'Healthy';
 
   const handleManualRefresh = () => {
     refreshStatus();
@@ -378,19 +475,56 @@ const TaskManager: React.FC = () => {
             <h2 style={styles.title}>Task Manager</h2>
             <div style={styles.subtitle}>Live performance, running apps, and process activity</div>
           </div>
+          <span
+            data-health-pill
+            title={health.issues.join(' · ') || 'All systems nominal'}
+            style={{ ...styles.healthPill, color: healthTone, borderColor: healthTone + '66', background: healthTone + '14' }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: 999, background: healthTone, display: 'inline-block' }} />
+            {healthLabel}
+          </span>
         </div>
-        <button style={styles.refreshButton} onClick={handleManualRefresh} aria-label="Refresh Task Manager">
-          <DexIcon name="refresh" size={14} /> Refresh
-        </button>
-        <button
-          style={{ ...styles.refreshButton, marginLeft: 8 }}
-          onClick={() => setCompactMode(value => !value)}
-          aria-label={compactMode ? 'Exit compact mode' : 'Enter compact mode'}
-          title={compactMode ? 'Exit compact mode' : 'Compact monitor mode'}
-        >
-          <DexIcon name={compactMode ? 'maximize' : 'minimize'} size={14} /> {compactMode ? 'Expand' : 'Compact'}
-        </button>
+        <div style={styles.headerControls}>
+          <div style={styles.segGroup} role="group" aria-label="Detail level">
+            {DETAIL_LEVELS.map(({ level, label, title }) => (
+              <button
+                key={level}
+                onClick={() => setDetailLevel(level)}
+                aria-pressed={detailLevel === level}
+                title={title}
+                style={{ ...styles.segButton, ...(detailLevel === level ? styles.segButtonActive : null) }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button style={styles.refreshButton} onClick={handleManualRefresh} aria-label="Refresh Task Manager">
+            <DexIcon name="refresh" size={14} /> Refresh
+          </button>
+        </div>
       </div>
+
+      {health.level !== 'healthy' && (
+        <div
+          data-health-banner
+          role="status"
+          style={{ ...styles.healthBanner, borderColor: healthTone + '55', background: healthTone + '12' }}
+        >
+          <DexIcon name="activity" size={15} color={healthTone} strokeWidth={2.3} />
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--color-text-primary)' }}>
+            <strong style={{ color: healthTone }}>{healthLabel}:</strong> {health.issues.join(' · ')}
+          </span>
+          {topProcess && (topProcess.cpu || 0) > 80 && (
+            <button
+              style={styles.endButton}
+              onClick={() => handleEndProcess(topProcess.pid, topProcess.name)}
+              aria-label={`End ${topProcess.name}`}
+            >
+              End {topProcess.name}
+            </button>
+          )}
+        </div>
+      )}
 
       <div style={styles.statsGrid}>
         <MetricCard
@@ -415,14 +549,6 @@ const TaskManager: React.FC = () => {
           history={memoryHistory}
           tone={toneFor(memoryPercent)}
         />
-        <MetricCard
-          label="Processes"
-          value={bridgeAvailable ? String(processCount) : 'Local'}
-          detail={bridgeAvailable ? `${visibleProcesses.length} shown - sampled every 3s` : 'DEX apps only'}
-          history={processHistory}
-          tone="#5E5CE6"
-          max={Math.max(50, ...processHistory)}
-        />
         {hasBattery && (
           <MetricCard
             label="Battery"
@@ -432,46 +558,59 @@ const TaskManager: React.FC = () => {
             tone={batteryTone(batteryPercent, !!battery?.charging)}
           />
         )}
-        <div style={styles.statCard}>
-          <div style={styles.statLabel}>Uptime</div>
-          <div style={{ ...styles.statValue, color: 'var(--color-accent, #0A84FF)', fontSize: 22 }}>{formatUptime(uptimeSeconds)}</div>
-          <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
-          <div style={styles.sparkWrap} />
-        </div>
-        <MetricCard
-          label="Network Rx"
-          value={formatBps(rxBps)}
-          detail={networkConnected ? 'Receiving' : 'Offline'}
-          history={netRxHistory}
-          tone="#5AC8FA"
-          max={Math.max(1024, ...netRxHistory)}
-        />
-        <MetricCard
-          label="Network Tx"
-          value={formatBps(txBps)}
-          detail={networkConnected ? 'Sending' : 'Offline'}
-          history={netTxHistory}
-          tone="#FF9F0A"
-          max={Math.max(1024, ...netTxHistory)}
-        />
-        {status.disk && (
-          <div style={styles.statCard}>
-            <div style={styles.statLabel}>Disk</div>
-            <div style={{ ...styles.statValue, color: toneFor(diskPercent), fontSize: 22 }}>{diskPercent}%</div>
-            <div style={styles.statDetail}>{diskDetail}</div>
-            <div style={styles.sparkWrap} />
-          </div>
+        {detailLevel >= 2 && (
+          <>
+            <MetricCard
+              label="Processes"
+              value={bridgeAvailable ? String(processCount) : 'Local'}
+              detail={bridgeAvailable ? `${visibleProcesses.length} listed - sampled every 3s` : 'DEX apps only'}
+              history={processHistory}
+              tone="#5E5CE6"
+              max={Math.max(50, ...processHistory)}
+            />
+            <div style={styles.statCard}>
+              <div style={styles.statLabel}>Uptime</div>
+              <div style={{ ...styles.statValue, color: 'var(--color-accent, #0A84FF)', fontSize: 20 }}>{formatUptime(uptimeSeconds)}</div>
+              <div style={styles.statDetail}>{networkConnected ? 'Network connected' : 'Offline'}</div>
+              <div style={styles.sparkWrap} />
+            </div>
+            <MetricCard
+              label="Network Rx"
+              value={formatBps(rxBps)}
+              detail={networkConnected ? 'Receiving' : 'Offline'}
+              history={netRxHistory}
+              tone="#5AC8FA"
+              max={Math.max(1024, ...netRxHistory)}
+            />
+            <MetricCard
+              label="Network Tx"
+              value={formatBps(txBps)}
+              detail={networkConnected ? 'Sending' : 'Offline'}
+              history={netTxHistory}
+              tone="#FF9F0A"
+              max={Math.max(1024, ...netTxHistory)}
+            />
+            {status.disk && (
+              <div style={styles.statCard}>
+                <div style={styles.statLabel}>Disk</div>
+                <div style={{ ...styles.statValue, color: toneFor(diskPercent), fontSize: 20 }}>{diskPercent}%</div>
+                <div style={styles.statDetail}>{diskDetail}</div>
+                <div style={styles.sparkWrap} />
+              </div>
+            )}
+          </>
         )}
       </div>
 
+      {detailLevel >= 2 && (
       <div style={styles.contentGrid}>
-        {!compactMode && stages.length > 0 && (
+        {stages.length > 0 && (
         <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
           <div style={styles.panelHeader}>
             <span>Workspaces</span>
             <span style={styles.countPill}>{stages.length}</span>
           </div>
-          <div style={{ ...styles.list, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ ...styles.list, flexDirection: 'row', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
             {stages.map(stage => {
               const stageApps = stage.windows.map(w => w.appId);
               const isActive = stage.id === activeStageId;
@@ -514,8 +653,29 @@ const TaskManager: React.FC = () => {
         </section>
         )}
 
-        {!compactMode && (
-        <section style={styles.panel}>
+        <section style={{ ...styles.panel, gridColumn: '1 / -1' }}>
+          <div style={styles.panelHeader}>
+            <span>Workflows</span>
+            <span style={styles.countPill}>{workflows.length}</span>
+          </div>
+          <div style={{ ...styles.list, flexDirection: 'row', flexWrap: 'wrap', gap: 'var(--space-2)', maxHeight: 150 }}>
+            {workflows.length === 0 ? (
+              <div style={styles.empty}>No workflows yet. Build one in the Workflows app.</div>
+            ) : workflows.map(wf => (
+              <div
+                key={wf.id || wf.name}
+                style={{ flex: '1 1 220px', minWidth: 220, padding: 10, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'rgba(255,255,255,0.03)' }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wf.name}</div>
+                <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  {wf.steps} step{wf.steps === 1 ? '' : 's'} · {wf.lastRun ? `last run ${formatAge(wf.lastRun)} ago` : 'never run'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section style={{ ...styles.panel, ...(detailLevel < 3 ? { gridColumn: '1 / -1' } : null) }}>
           <div style={styles.panelHeader}>
             <span>Open Apps</span>
             <span style={styles.countPill}>{shellApps.length}</span>
@@ -539,7 +699,7 @@ const TaskManager: React.FC = () => {
                     onChange={(e) => setGovernance(prev => ({ ...prev, [app.id]: e.target.value as GovernanceClass }))}
                     aria-label={`Set governance for ${definition?.name || app.name}`}
                     title="Process governance class"
-                    style={{ height: 28, borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', fontSize: 11, padding: '0 6px' }}
+                    style={{ height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-secondary)', fontSize: 11, padding: '0 6px' }}
                   >
                     {(Object.keys(GOVERNANCE_LABEL) as GovernanceClass[]).map(g => (
                       <option key={g} value={g}>{GOVERNANCE_LABEL[g]}</option>
@@ -551,9 +711,8 @@ const TaskManager: React.FC = () => {
             })}
           </div>
         </section>
-        )}
 
-        {!compactMode && (
+        {detailLevel >= 3 && (
         <section style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>System Processes</span>
@@ -572,75 +731,88 @@ const TaskManager: React.FC = () => {
             <span style={{ textAlign: 'right' }}>Memory</span>
             <span style={{ textAlign: 'right' }}>Action</span>
           </div>
-          <div style={styles.processTable}>
+          <div ref={procVirtual.ref as React.RefObject<HTMLDivElement>} onScroll={procVirtual.onScroll} style={styles.processTable}>
             {!bridgeAvailable ? (
               <div style={styles.empty}>Native process bridge is unavailable in this build. DEX app management remains active.</div>
             ) : visibleProcesses.length === 0 ? (
               <div style={styles.empty}>No processes to show yet.</div>
-            ) : visibleProcesses.map(process => {
-              const cpuValue = process.cpu || 0;
-              const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
-              const isKilling = killing === process.pid;
-              return (
-                <div key={`${process.pid}-${process.name}`} style={styles.processRow}>
-                  <span style={styles.processName} title={process.name}>{process.name}</span>
-                  <span style={styles.processPid}>{process.pid}</span>
-                  <span style={{ ...styles.processMetric, color: cpuColor }}>{cpuValue.toFixed(1)}%</span>
-                  <span style={styles.processMetric}>{Math.round(process.memory || 0)} MB</span>
-                  <button
-                    style={{ ...styles.endButton, height: 22, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
-                    onClick={() => handleEndProcess(process.pid, process.name)}
-                    disabled={isKilling}
-                    aria-label={`End process ${process.name}`}
-                    title={`End ${process.name}`}
-                  >
-                    {isKilling ? '...' : 'End'}
-                  </button>
-                </div>
-              );
-            })}
+            ) : (
+              <>
+                <div style={{ height: procVirtual.slice.padTop }} aria-hidden="true" />
+                {visibleProcesses.slice(procVirtual.slice.start, procVirtual.slice.end).map(process => {
+                  const cpuValue = process.cpu || 0;
+                  const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
+                  const isKilling = killing === process.pid;
+                  return (
+                    <div key={`${process.pid}-${process.name}`} style={styles.processRow}>
+                      <span style={styles.processName} title={process.name}>{process.name}</span>
+                      <span style={styles.processPid}>{process.pid}</span>
+                      <span style={{ ...styles.processMetric, color: cpuColor }}>{cpuValue.toFixed(1)}%</span>
+                      <span style={styles.processMetric}>{Math.round(process.memory || 0)} MB</span>
+                      <button
+                        style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
+                        onClick={() => handleEndProcess(process.pid, process.name)}
+                        disabled={isKilling}
+                        aria-label={`End process ${process.name}`}
+                        title={`End ${process.name}`}
+                      >
+                        {isKilling ? '...' : 'End'}
+                      </button>
+                    </div>
+                  );
+                })}
+                <div style={{ height: procVirtual.slice.padBottom }} aria-hidden="true" />
+              </>
+            )}
           </div>
         </section>
         )}
       </div>
+      )}
     </div>
   );
 };
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 14,
-    padding: 18, color: 'var(--color-text-primary)', background: 'var(--pg-surface)',
+    width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+    padding: 'var(--space-4)', color: 'var(--color-text-primary)', background: 'var(--pg-surface)',
     overflow: 'hidden',
   },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' },
   titleWrap: { display: 'flex', alignItems: 'center', gap: 10 },
-  titleIcon: { width: 34, height: 34, borderRadius: 7, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', boxShadow: '0 8px 22px rgba(10,132,255,0.28)' },
+  titleIcon: { width: 34, height: 34, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.20)', color: '#fff', boxShadow: '0 8px 22px rgba(10,132,255,0.28)' },
   title: { margin: 0, fontSize: 18, fontWeight: 750, letterSpacing: 0 },
   subtitle: { fontSize: 12, color: 'var(--color-text-secondary)' },
+  headerControls: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
+  segGroup: { display: 'inline-flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 8, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
+  segButton: { height: 26, padding: '0 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em' },
+  segButtonActive: { background: 'var(--color-accent)', color: '#fff' },
   refreshButton: { display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 11px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-glass)', color: 'var(--color-text-primary)', cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  statCard: { padding: 14, borderRadius: 10, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 4 },
+  healthPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, border: '1px solid', fontSize: 11, fontWeight: 650, letterSpacing: '0.02em', marginLeft: 4 },
+  healthBanner: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px var(--space-3)', borderRadius: 8, border: '1px solid' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-2)' },
+  statCard: { padding: 11, borderRadius: 10, background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.10), 0 1px 2px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 3 },
   statLabel: { fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  statValue: { fontSize: 24, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
+  statValue: { fontSize: 20, fontWeight: 760, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 },
   statDetail: { fontSize: 11, color: 'var(--color-text-tertiary)' },
-  sparkWrap: { marginTop: 6, height: 46 },
-  contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 12 },
+  sparkWrap: { marginTop: 5, height: 36 },
+  contentGrid: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(300px, 0.9fr) minmax(340px, 1.1fr)', gap: 'var(--space-3)' },
   panel: { minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg-glass)', border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-chip), var(--pg-gloss-top)' },
-  panelHeader: { height: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 12px', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em' },
+  panelHeader: { height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 12, fontWeight: 600, letterSpacing: '-0.01em' },
   countPill: { padding: '2px 7px', borderRadius: 999, background: 'rgba(74,158,255,0.16)', color: 'var(--color-accent)', fontSize: 11 },
-  list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 },
+  list: { flex: 1, minHeight: 0, overflow: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' },
   appRow: { display: 'flex', alignItems: 'center', gap: 9, padding: 9, borderRadius: 8, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border-subtle)' },
   appGlyph: { width: 32, height: 32, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--color-accent)', color: '#fff', flexShrink: 0, boxShadow: '0 6px 18px rgba(10,132,255,0.24)' },
   appMeta: { flex: 1, minWidth: 0 },
   appName: { fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   appDetail: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
-  ghostButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
-  endButton: { height: 28, padding: '0 9px', borderRadius: 5, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer' },
-  filterInput: { width: 150, height: 28, borderRadius: 5, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
-  processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  ghostButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
+  endButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer' },
+  filterInput: { width: 150, height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
+  processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },
-  processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12 },
+  processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 'var(--space-2)', height: PROCESS_ROW_H, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12, boxSizing: 'border-box' },
   processName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   processPid: { color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
   processMetric: { color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },

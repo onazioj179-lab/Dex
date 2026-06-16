@@ -20,7 +20,7 @@ interface Props {
   onChange: (patch: Partial<AdjustmentParams>) => void;
 }
 
-const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 };
+const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' };
 const labelStyle: React.CSSProperties = { width: 64, fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600 };
 const valStyle: React.CSSProperties = { width: 38, fontSize: 11, textAlign: 'right', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' };
 const sliderStyle: React.CSSProperties = { flex: 1, accentColor: 'var(--color-accent, #4a9eff)', height: 4 };
@@ -114,7 +114,7 @@ function CurvesEditor({ onChange }: { onChange: (patch: Partial<AdjustmentParams
   const linePath = lut.map((o, i) => `${(i / 255) * SIZE},${SIZE - (o / 255) * SIZE}`).join(' ');
 
   return (
-    <div style={{ marginBottom: 8 }}>
+    <div style={{ marginBottom: 'var(--space-2)' }}>
       <svg
         ref={svgRef}
         width="100%"
@@ -156,7 +156,7 @@ function CurvesEditor({ onChange }: { onChange: (patch: Partial<AdjustmentParams
         <button
           type="button"
           onClick={reset}
-          style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+          style={{ fontSize: 10, fontWeight: 600, padding: '3px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
         >Reset</button>
       </div>
     </div>

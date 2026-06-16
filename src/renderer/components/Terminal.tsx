@@ -393,7 +393,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         ref={scrollRef}
         style={{
           flex: 1, overflowY: 'auto', overflowX: 'hidden',
-          padding: '8px 10px',
+          padding: 'var(--space-2) 10px',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all',
         }}
       >

@@ -39,12 +39,12 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const sectionHeaderStyle: React.CSSProperties = {
-  padding: '8px 8px 4px', fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)',
+  padding: 'var(--space-2) var(--space-2) 4px', fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)',
   textTransform: 'uppercase', letterSpacing: '0.05em',
 };
 
 const propertyRowStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', minHeight: 24, minWidth: 0,
+  display: 'flex', alignItems: 'center', gap: 4, padding: '2px var(--space-2)', minHeight: 24, minWidth: 0,
 };
 
 const propertyLabelStyle: React.CSSProperties = {
@@ -71,7 +71,7 @@ const keyframeDiamondStyle = (active: boolean): React.CSSProperties => ({
 
 const emptyStateStyle: React.CSSProperties = {
   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  color: 'var(--color-text-tertiary)', fontSize: 11, textAlign: 'center', padding: 16,
+  color: 'var(--color-text-tertiary)', fontSize: 11, textAlign: 'center', padding: 'var(--space-4)',
 };
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ const VideoTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
   }, [clip.id, clip.startFrame, currentFrame, _addKeyframe]);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }}>
+    <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
       <div style={sectionHeaderStyle}>Position</div>
       <PropertyRow label="X" value={transform.positionX} min={-1920} max={3840} step={1}
         onChange={v => updateTransform({ positionX: v })}
@@ -252,7 +252,7 @@ const AudioTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
   const _updateClip = useVinxStore(s => s._updateClip);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }}>
+    <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
       <div style={sectionHeaderStyle}>Volume</div>
       <PropertyRow label="Level" value={clip.volume * 100} min={0} max={200} step={1}
         onChange={v => _updateClip(clip.id, { volume: v / 100 })} />
@@ -267,7 +267,7 @@ const AudioTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
         <button
           aria-label={clip.muted ? 'Unmute clip' : 'Mute clip'}
           style={{
-            padding: '2px 8px', fontSize: 10, border: '1px solid var(--color-border)',
+            padding: '2px var(--space-2)', fontSize: 10, border: '1px solid var(--color-border)',
             borderRadius: 2, background: clip.muted ? 'rgba(255,80,80,0.2)' : 'var(--color-border-subtle)',
             color: clip.muted ? '#FF6B6B' : 'var(--color-text-secondary)', cursor: 'pointer',
           }}
@@ -291,7 +291,7 @@ const EffectsTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
   const _updateEffectParam = useVinxStore(s => s._updateEffectParam);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }}>
+    <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
       {clip.effects.length === 0 && (
         <div style={emptyStateStyle}>
           Drag effects from the Media Browser
@@ -325,7 +325,7 @@ const EffectSection: React.FC<{
   return (
     <div style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
       <div style={{
-        display: 'flex', alignItems: 'center', padding: '6px 8px', gap: 6,
+        display: 'flex', alignItems: 'center', padding: '6px var(--space-2)', gap: 6,
       }}>
         <div style={{
           width: 10, height: 10, borderRadius: 2,
@@ -363,7 +363,7 @@ const EffectSection: React.FC<{
               <button
                 aria-label={`Toggle ${param.name} ${val ? 'off' : 'on'}`}
                 style={{
-                  padding: '2px 8px', fontSize: 10, border: '1px solid var(--color-border)',
+                  padding: '2px var(--space-2)', fontSize: 10, border: '1px solid var(--color-border)',
                   borderRadius: 2, background: val ? 'rgba(74,158,255,0.2)' : 'var(--color-border-subtle)',
                   color: val ? 'var(--color-accent)' : 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0,
                 }}
@@ -503,10 +503,10 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
   }, []);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }}>
+    <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
       {/* Three-way color wheels (per-clip primary correction) */}
       <div style={sectionHeaderStyle}>Primary (Lift / Gamma / Gain)</div>
-      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start', padding: '4px 4px 8px', gap: 4, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start', padding: '4px 4px var(--space-2)', gap: 4, flexWrap: 'wrap' }}>
         <PrimaryColorWheel label="Lift" value={wheels.lift} onChange={v => updateWheel('lift', v)} size={100} />
         <PrimaryColorWheel label="Gamma" value={wheels.gamma} onChange={v => updateWheel('gamma', v)} size={100} />
         <PrimaryColorWheel label="Gain" value={wheels.gain} onChange={v => updateWheel('gain', v)} size={100} />
@@ -514,7 +514,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
 
       {/* Live scopes panel sampling preview video */}
       <div style={sectionHeaderStyle}>Live Scopes</div>
-      <div style={{ padding: '0 8px 8px' }}>
+      <div style={{ padding: '0 var(--space-2) var(--space-2)' }}>
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
           {(['waveform', 'vectorscope', 'histogram'] as ScopeMode[]).map(m => (
             <button
@@ -522,7 +522,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
               onClick={() => setLiveScopeMode(m)}
               aria-label={`Live ${m} scope`}
               style={{
-                padding: '2px 8px', fontSize: 9, border: '1px solid var(--color-border)',
+                padding: '2px var(--space-2)', fontSize: 9, border: '1px solid var(--color-border)',
                 borderRadius: 2, background: liveScopeMode === m ? 'rgba(74,158,255,0.15)' : 'transparent',
                 color: liveScopeMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                 cursor: 'pointer', textTransform: 'capitalize',
@@ -537,7 +537,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
 
       {/* Legacy global wheels (sequence-wide grade) */}
       <div style={sectionHeaderStyle}>Global Wheels</div>
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '4px 4px 8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '4px 4px var(--space-2)' }}>
         <ColorWheel label="Lift" r={colorGrade.liftR} g={colorGrade.liftG} b={colorGrade.liftB}
           onChange={(r, g, b) => setColorGrade({ liftR: r, liftG: g, liftB: b })} />
         <ColorWheel label="Gamma" r={colorGrade.gammaR} g={colorGrade.gammaG} b={colorGrade.gammaB}
@@ -585,7 +585,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
         </button>
       </div>
       {showScopes && (
-        <div style={{ padding: '4px 8px' }}>
+        <div style={{ padding: '4px var(--space-2)' }}>
           <div style={{ display: 'flex', gap: 4, marginBottom: 4, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
             {(['waveform', 'vectorscope', 'histogram', 'parade'] as ScopeType[]).map(type => (
               <button
@@ -608,7 +608,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
       )}
 
       {/* Reset */}
-      <div style={{ padding: '8px' }}>
+      <div style={{ padding: 'var(--space-2)' }}>
         <button
           aria-label="Reset color grade"
           style={{
@@ -761,7 +761,7 @@ const CurvesEditor: React.FC<{
           Reset
         </button>
       </div>
-      <div style={{ padding: '2px 8px 4px' }}>
+      <div style={{ padding: '2px var(--space-2) 4px' }}>
         <div style={{ display: 'flex', gap: 3, marginBottom: 4, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
           {CURVE_CHANNELS.map(ch => (
             <button
@@ -769,7 +769,7 @@ const CurvesEditor: React.FC<{
               aria-label={`Curve channel: ${ch.label}`}
               aria-pressed={activeChannel === ch.key}
               style={{
-                padding: '2px 8px', fontSize: 9, fontWeight: 600,
+                padding: '2px var(--space-2)', fontSize: 9, fontWeight: 600,
                 border: '1px solid var(--color-border)', borderRadius: 2,
                 background: activeChannel === ch.key ? `${ch.color}20` : 'transparent',
                 color: activeChannel === ch.key ? ch.color : 'var(--color-text-tertiary)',
@@ -1031,7 +1031,7 @@ export const Inspector: React.FC = memo(() => {
           <>
             {/* Clip name header */}
             <div style={{
-              padding: '6px 8px', fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)',
+              padding: '6px var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)',
               borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>

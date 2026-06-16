@@ -54,6 +54,14 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
     };
 
     const tick = () => {
+      // Skip all sampling/drawing while the window is hidden (minimized or background
+      // tab). drawImage + getImageData on a video every other frame is expensive, and
+      // the scopes are not visible anyway. requestAnimationFrame already throttles when
+      // hidden, but this avoids the per-tick readback entirely.
+      if (document.hidden) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
       frameToggle.current = (frameToggle.current + 1) % 2;
       // 15fps ~ render every other rAF (~30fps source)
       if (frameToggle.current === 0) {

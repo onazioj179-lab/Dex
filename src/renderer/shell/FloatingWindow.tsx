@@ -69,7 +69,15 @@ export interface FloatingWindowProps {
 // Geometry is delegated to src/renderer/shell/snapEngine.ts so this component,
 // StageManager, and a future tiling overlay all share one source of truth.
 
-const SAFE_TOP = 0;
+// The DEX shell renders a fixed 34px top chrome bar (drag region + window
+// controls) above every app surface; NotificationBanners offsets by the same
+// 34px. A maximized / top-snapped / top-dragged floating window MUST sit below
+// it -- otherwise its own title bar (close / minimize / restore) lands
+// underneath the shell bar and becomes unclickable. That is the "window
+// controls inaccessible when maximized" bug. Reserving this safe top zone keeps
+// the controls reachable at any size, resolution, or scaling.
+const SHELL_TOP_CHROME = 34;
+const SAFE_TOP = SHELL_TOP_CHROME;
 const SAFE_GUTTER = 0;
 
 /**
@@ -156,7 +164,9 @@ function clampWindowPosition(x: number, y: number, width: number, height: number
   const r = getReservedInsets();
   const visibleInset = 40;
   const minX = -(Math.max(0, width - visibleInset)) + r.left;
-  const minY = r.top;
+  // Never let a window's title bar (its controls) slide under the shell's top
+  // chrome -- clamp to the same safe top zone used for maximize/snap.
+  const minY = SAFE_TOP + r.top;
   const maxX = Math.max(0, window.innerWidth - visibleInset - r.right);
   const maxY = Math.max(0, window.innerHeight - visibleInset - r.bottom);
   return {
@@ -218,7 +228,6 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const [maximized, setMaximized] = useState(initialState?.maximized ?? false);
   const [snapZone, setSnapZone] = useState<SnapZone | null>(initialState?.snapZone ?? null);
   const [previewZone, setPreviewZone] = useState<SnapZone | null>(null);
-  const [edgeGlow, setEdgeGlow] = useState<string | null>(null);
   const [sizeTooltip, setSizeTooltip] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -556,11 +565,6 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     onMaximize(id);
   }, [id, maximized, onMaximize]);
 
-  // Edge hover glow
-  const handleEdgeHover = useCallback((edge: string | null) => {
-    setEdgeGlow(edge);
-  }, []);
-
   // -----------------------------------------------------------------------
   // RENDER
   // -----------------------------------------------------------------------
@@ -635,27 +639,16 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           // webkit-app-region handled by CSS on [data-floating-window]
         }}
       >
-        {/* Resize handles */}
+        {/* Resize handles -- bare hit zones + cursor affordance only. DEX 5.5:
+            no edge glow/highlight overlay. The resize experience is invisible;
+            users already understand resizing and don't need it re-explained. */}
         {!maximized && edges.map(dir => (
           <div
             key={dir}
             style={edgeStyle(dir)}
             onPointerDown={(e) => handleResizePointerDown(dir, e)}
-            onPointerEnter={() => handleEdgeHover(dir)}
-            onPointerLeave={() => handleEdgeHover(null)}
           />
         ))}
-
-        {/* Edge glow */}
-        {edgeGlow && !maximized && (
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: 10, pointerEvents: 'none',
-            border: '1px solid var(--color-accent)',
-            opacity: 0.4,
-            zIndex: 2,
-            transition: 'opacity 0.1s ease',
-          }} />
-        )}
 
         {/* Title bar -- DEX Sharp: a solid "placed" toolbar (like a native OS
             title bar), not floating glass. Opaque surface + hairline base; no
@@ -731,7 +724,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           position: 'fixed',
           left: sizeTooltip.x,
           top: sizeTooltip.y,
-          padding: '4px 8px',
+          padding: '4px var(--space-2)',
           borderRadius: 4,
           background: 'rgba(0,0,0,0.80)',
           color: 'var(--color-text-primary)',

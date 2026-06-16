@@ -122,7 +122,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   displayArea: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '40px 20px 24px', flexShrink: 0,
+    padding: 'var(--space-10) var(--space-5) var(--space-6)', flexShrink: 0,
   },
   time: {
     fontSize: 56, fontWeight: 200, letterSpacing: '-0.02em',
@@ -130,8 +130,8 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)',
   },
   controls: {
-    display: 'flex', justifyContent: 'center', gap: 16,
-    padding: '0 20px 24px', flexShrink: 0,
+    display: 'flex', justifyContent: 'center', gap: 'var(--space-4)',
+    padding: '0 var(--space-5) var(--space-6)', flexShrink: 0,
   },
   btn: {
     width: 80, height: 80, borderRadius: '50%', border: 'none',
@@ -160,7 +160,7 @@ const s: Record<string, React.CSSProperties> = {
     overflow: 'hidden', borderTop: '1px solid var(--color-border-subtle)',
   },
   lapHeader: {
-    display: 'flex', padding: '10px 20px', gap: 8,
+    display: 'flex', padding: '10px var(--space-5)', gap: 'var(--space-2)',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   lapHeaderText: {
@@ -168,7 +168,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   lapList: { flex: 1, overflow: 'auto', padding: '4px 0' },
   lapRow: {
-    display: 'flex', padding: '8px 20px', gap: 8, fontSize: 14,
+    display: 'flex', padding: 'var(--space-2) var(--space-5)', gap: 'var(--space-2)', fontSize: 14,
     fontVariantNumeric: 'tabular-nums',
   },
   lapNum: { flex: 1 },

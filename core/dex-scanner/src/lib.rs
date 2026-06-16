@@ -19,6 +19,15 @@ pub struct DupGroup {
     pub paths: Vec<String>,
 }
 
+/// Directory names never traversed: build output + vendored dependencies. A
+/// `target/` or `node_modules/` would flood dedup/grouping with irrelevant files
+/// and waste the hashing budget. Dot-dirs (.git, ...) are skipped separately.
+/// (Kept in sync with dex-search's SKIP_DIRS so the two native walks agree.)
+const SKIP_DIRS: &[&str] = &[
+    "node_modules", "$recycle.bin", "target", "dist", "build", "out",
+    "coverage", "vendor", "__pycache__",
+];
+
 /// Bounded depth-first walk returning (path, size) for files.
 fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64)> {
     let mut out = Vec::new();
@@ -41,7 +50,7 @@ fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64)> {
             };
             if meta.is_dir() {
                 let name = entry.file_name().to_string_lossy().to_lowercase();
-                if name.starts_with('.') || name == "node_modules" || name == "$recycle.bin" {
+                if name.starts_with('.') || SKIP_DIRS.contains(&name.as_str()) {
                     continue;
                 }
                 stack.push(entry.path());
@@ -210,5 +219,20 @@ mod tests {
     fn no_files_returns_empty() {
         let dir = tempfile::tempdir().unwrap();
         assert!(find_duplicates(dir.path(), 1000).is_empty());
+    }
+
+    #[test]
+    fn skips_build_and_dependency_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("keep.png"), b"x").unwrap();
+        // Two identical files inside target/ would be a duplicate group IF scanned.
+        let tgt = dir.path().join("target");
+        std::fs::create_dir_all(&tgt).unwrap();
+        std::fs::write(tgt.join("artifact.png"), b"x").unwrap();
+        std::fs::write(tgt.join("artifact2.png"), b"x").unwrap();
+
+        let total: usize = group_by_type(dir.path(), 1000).iter().map(|g| g.count).sum();
+        assert_eq!(total, 1, "only keep.png should be scanned");
+        assert!(find_duplicates(dir.path(), 1000).is_empty(), "target/ dupes must not be scanned");
     }
 }

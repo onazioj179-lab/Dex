@@ -48,12 +48,12 @@ const FeatureTree: React.FC = () => {
   }, 0), [parts]);
 
   return (
-    <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
-      <div style={{ padding: '8px 10px', fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '1px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderRight: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
+      <div style={{ padding: 'var(--space-2) 10px', fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: '1px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: 6 }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         OUTLINER
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 6px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 6px' }}>
         {/* Assembly root */}
         <div style={{ ...sidebarItemStyle(false), fontWeight: 600, fontSize: 11, color: 'var(--color-text-primary)', padding: '6px 10px' }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
@@ -146,7 +146,7 @@ const FeatureTree: React.FC = () => {
       </div>
 
       {/* Assembly info */}
-      <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border-subtle)', fontSize: 9, color: 'var(--color-text-tertiary)' }}>
+      <div style={{ padding: 'var(--space-2) 10px', borderTop: '1px solid var(--color-border-subtle)', fontSize: 9, color: 'var(--color-text-tertiary)' }}>
         Parts: {parts.length} | Weight: {formatWeight(totalWeight)} | {project.assembly.constraints.length} constraints
       </div>
     </div>

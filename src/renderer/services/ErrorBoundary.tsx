@@ -98,6 +98,66 @@ export const clearCrashReports = () => {
   crashReports.length = 0;
 };
 
+/**
+ * Recovery capability: download a diagnostics report (crash history +
+ * environment) as JSON so a user can save it or hand it to support. Read-only —
+ * touches no user data. Available from the crash screen and the Command Palette.
+ */
+export const exportDiagnostics = (): void => {
+  const reports = getCrashReports();
+  const diagnostics = {
+    generatedAt: new Date().toISOString(),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    url: typeof location !== 'undefined' ? location.href : '',
+    memoryUsage: (performance as { memory?: { usedJSHeapSize?: number } })?.memory?.usedJSHeapSize ?? null,
+    crashCount: reports.length,
+    crashReports: reports,
+  };
+  try {
+    const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dex-diagnostics-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    /* download unavailable — never throw from a recovery path */
+  }
+};
+
+/**
+ * Recovery capability: reset appearance / UI preferences to defaults to escape a
+ * corrupt-settings crash loop. SAFETY: an explicit ALLOWLIST of known
+ * settings/preference keys only — never touches user content (notes, tasks,
+ * calendar, kanban, clipboard, creative-app projects, achievements, etc.). Keys
+ * not on the list are preserved, so a missed key fails safe (incomplete reset,
+ * never data loss). Returns the keys actually cleared.
+ */
+const SAFE_SETTINGS_KEYS: readonly string[] = [
+  'dex-settings', 'dex-theme', 'dex-theme-preset', 'dex-accent-color',
+  'dex-reduce-motion', 'dex-window-controls', 'dex-stage-manager',
+  'dex-system-volume', 'dex-clock-show-seconds', 'dex-clock-24h',
+  'dex-focus', 'dex-recent-actions', 'dex-tab-order',
+];
+
+export const resetSettingsToDefaults = (): { cleared: string[] } => {
+  const cleared: string[] = [];
+  for (const key of SAFE_SETTINGS_KEYS) {
+    try {
+      if (localStorage.getItem(key) !== null) {
+        localStorage.removeItem(key);
+        cleared.push(key);
+      }
+    } catch {
+      /* storage unavailable — ignore */
+    }
+  }
+  return { cleared };
+};
+
 // ===========================================================================
 // APP ERROR BOUNDARY
 // ===========================================================================
@@ -316,20 +376,28 @@ const CrashScreen: React.FC<CrashScreenProps> = ({
                 {isRecovering ? 'Recovering…' : 'Try to continue'}
               </button>
             )}
+            <button style={styles.button} onClick={exportDiagnostics}>
+              Save diagnostics
+            </button>
           </div>
-          <details style={styles.details}>
-            <summary style={styles.summary}>Technical Details</summary>
-            <pre style={styles.pre}>
-              <strong>Error:</strong> {error?.name || 'Unknown'}{'\n'}
-              <strong>Message:</strong> {error?.message || 'No message'}{'\n'}
-              {error?.stack && (
-                <>
-                  <strong>Stack:</strong>{'\n'}
-                  {error.stack.split('\n').slice(0, 6).join('\n')}
-                </>
-              )}
-            </pre>
-          </details>
+          {/* DEX 5.5: stack / raw-exception details are DEV-ONLY. Production
+              users never see source, stack traces, or raw exceptions -- the
+              crash is still logged internally for diagnostics. */}
+          {import.meta.env.DEV && (
+            <details style={styles.details}>
+              <summary style={styles.summary}>Technical Details</summary>
+              <pre style={styles.pre}>
+                <strong>Error:</strong> {error?.name || 'Unknown'}{'\n'}
+                <strong>Message:</strong> {error?.message || 'No message'}{'\n'}
+                {error?.stack && (
+                  <>
+                    <strong>Stack:</strong>{'\n'}
+                    {error.stack.split('\n').slice(0, 6).join('\n')}
+                  </>
+                )}
+              </pre>
+            </details>
+          )}
         </div>
       </div>
     );
@@ -408,7 +476,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    padding: 'var(--space-6, 24px)',
+    padding: 'var(--space-6, var(--space-6))',
     background: 'var(--bg-primary, #f5f5f7)',
   },
   content: {
@@ -425,39 +493,39 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 'var(--space-4, 16px)',
+    marginBottom: 'var(--space-4, var(--space-4))',
   },
   title: {
     fontSize: 'var(--font-size-lg, 18px)',
     fontWeight: 600,
     color: 'var(--text-primary, #1d1d1f)',
-    margin: '0 0 var(--space-2, 8px) 0',
+    margin: '0 0 var(--space-2, var(--space-2)) 0',
   },
   message: {
     fontSize: 'var(--font-size-sm, 14px)',
     color: 'var(--text-secondary, #424245)',
-    margin: '0 0 var(--space-2, 8px) 0',
+    margin: '0 0 var(--space-2, var(--space-2)) 0',
     lineHeight: 'var(--line-height-relaxed, 1.5)',
   },
   crashCount: {
     fontSize: 'var(--font-size-xs, 12px)',
     color: 'var(--accent-red, #ff3b30)',
-    margin: '0 0 var(--space-4, 16px) 0',
+    margin: '0 0 var(--space-4, var(--space-4)) 0',
   },
   cantRecover: {
     fontSize: 'var(--font-size-sm, 13px)',
     color: 'var(--accent-red, #ff3b30)',
-    margin: '0 0 var(--space-3, 12px) 0',
+    margin: '0 0 var(--space-3, var(--space-3)) 0',
   },
   actions: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 'var(--space-2, 8px)',
+    gap: 'var(--space-2, var(--space-2))',
     width: '100%',
-    marginTop: 'var(--space-2, 8px)',
+    marginTop: 'var(--space-2, var(--space-2))',
   },
   button: {
-    padding: 'var(--space-2, 10px) var(--space-5, 20px)',
+    padding: 'var(--space-2, 10px) var(--space-5, var(--space-5))',
     borderRadius: 'var(--radius-md, 6px)',
     border: '1px solid var(--color-border-default)',
     background: 'var(--color-bg-secondary)',
@@ -473,7 +541,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-accent, #0a84ff)',
   },
   details: {
-    marginTop: 'var(--space-6, 24px)',
+    marginTop: 'var(--space-6, var(--space-6))',
     width: '100%',
     textAlign: 'left',
   },
@@ -483,8 +551,8 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   pre: {
-    marginTop: 'var(--space-2, 8px)',
-    padding: 'var(--space-3, 12px)',
+    marginTop: 'var(--space-2, var(--space-2))',
+    padding: 'var(--space-3, var(--space-3))',
     borderRadius: 'var(--radius-md, 6px)',
     background: 'var(--bg-tertiary, rgba(0,0,0,0.04))',
     fontSize: 'var(--font-size-2xs, 10px)',
@@ -596,7 +664,7 @@ const loadingStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    gap: 'var(--space-3, 12px)',
+    gap: 'var(--space-3, var(--space-3))',
   },
   spinner: {
     width: 24,
@@ -669,7 +737,7 @@ const stateStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    padding: 'var(--space-6, 24px)',
+    padding: 'var(--space-6, var(--space-6))',
     textAlign: 'center',
   },
   icon: {
@@ -679,13 +747,13 @@ const stateStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 'var(--space-4, 16px)',
+    marginBottom: 'var(--space-4, var(--space-4))',
   },
   title: {
     fontSize: 'var(--font-size-lg, 18px)',
     fontWeight: 600,
     color: 'var(--text-primary, #1d1d1f)',
-    margin: '0 0 var(--space-2, 8px) 0',
+    margin: '0 0 var(--space-2, var(--space-2)) 0',
   },
   message: {
     fontSize: 'var(--font-size-sm, 14px)',
@@ -751,17 +819,17 @@ export class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErr
     }
 
     return (
-      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ border: '1px solid rgba(255,59,48,0.25)', background: 'rgba(255,59,48,0.08)', borderRadius: 8, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <div style={{ fontSize: 14, fontWeight: 700 }}>View error in {this.props.viewName}</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>Something went wrong in this view. The issue was logged.</div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <button onClick={this.reloadView} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 6, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>Reload view</button>
           <button onClick={() => this.setState(prev => ({ ...prev, showDetails: !prev.showDetails }))} style={{ border: '1px solid var(--color-text-tertiary)', borderRadius: 6, padding: '6px 10px', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
             {this.state.showDetails ? 'Hide error details' : 'View error details'}
           </button>
         </div>
         {this.state.showDetails && (
-          <pre style={{ margin: 0, padding: 8, borderRadius: 4, background: 'rgba(0,0,0,0.2)', fontSize: 11, overflowX: 'auto' }}>{this.state.errorMessage}</pre>
+          <pre style={{ margin: 0, padding: 'var(--space-2)', borderRadius: 4, background: 'rgba(0,0,0,0.2)', fontSize: 11, overflowX: 'auto' }}>{this.state.errorMessage}</pre>
         )}
       </div>
     );

@@ -341,11 +341,11 @@ export function CreativeAppSkeleton({ type }: SkeletonProps): JSX.Element {
       );
     case 'canvas':
       return (
-        <div style={{ ...skeletonStyle, flex: 1, margin: '8px' }} />
+        <div style={{ ...skeletonStyle, flex: 1, margin: 'var(--space-2)' }} />
       );
     case 'mixer':
       return (
-        <div style={{ display: 'flex', gap: '4px', padding: '8px' }}>
+        <div style={{ display: 'flex', gap: '4px', padding: 'var(--space-2)' }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} style={{ ...skeletonStyle, width: '60px', height: '200px' }} />
           ))}
@@ -431,31 +431,31 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     maxWidth: '400px',
-    padding: '32px',
+    padding: 'var(--space-8)',
     textAlign: 'center',
   },
   errorIcon: {
     color: 'var(--color-error, #ff453a)',
-    marginBottom: '16px',
+    marginBottom: 'var(--space-4)',
   },
   errorTitle: {
-    margin: '0 0 8px',
+    margin: '0 0 var(--space-2)',
     fontSize: '18px',
     fontWeight: 600,
   },
   errorMessage: {
-    margin: '0 0 24px',
+    margin: '0 0 var(--space-6)',
     fontSize: '14px',
     color: 'var(--color-text-muted, #707070)',
     lineHeight: 1.5,
   },
   errorActions: {
     display: 'flex',
-    gap: '12px',
-    marginBottom: '24px',
+    gap: 'var(--space-3)',
+    marginBottom: 'var(--space-6)',
   },
   retryButton: {
-    padding: '8px 20px',
+    padding: 'var(--space-2) var(--space-5)',
     fontSize: '14px',
     fontWeight: 500,
     color: '#ffffff',
@@ -465,7 +465,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   closeButton: {
-    padding: '8px 20px',
+    padding: 'var(--space-2) var(--space-5)',
     fontSize: '14px',
     fontWeight: 500,
     color: 'var(--color-text-primary, #ffffff)',
@@ -482,14 +482,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: 'var(--color-text-muted, #707070)',
     cursor: 'pointer',
-    marginBottom: '8px',
+    marginBottom: 'var(--space-2)',
   },
   stackTrace: {
     fontSize: '11px',
     fontFamily: 'monospace',
     color: 'var(--color-text-muted, #888)',
     background: 'var(--color-bg-inset, rgba(0,0,0,0.3))',
-    padding: '12px',
+    padding: 'var(--space-3)',
     borderRadius: '4px',
     overflow: 'auto',
     maxHeight: '150px',
@@ -508,7 +508,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '16px',
+    gap: 'var(--space-4)',
   },
   spinner: {
     animation: 'spin 0.8s linear infinite',

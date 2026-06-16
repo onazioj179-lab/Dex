@@ -36,13 +36,25 @@ function toolBtnStyle(active: boolean): React.CSSProperties {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 3,
+    borderRadius: 4,
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.12s',
     color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
     background: active ? 'var(--color-accent-light)' : 'transparent',
     boxShadow: active ? 'inset 0 -1px 0 var(--color-accent)' : 'none',
+  };
+}
+
+// Bare-button hover: subtle background only when not active/selected.
+function hoverHandlers(active: boolean) {
+  return {
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!active) e.currentTarget.style.background = 'var(--color-bg-hover)';
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!active) e.currentTarget.style.background = 'transparent';
+    },
   };
 }
 
@@ -64,7 +76,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
-      height: 32, gap: 4, padding: '0 8px',
+      height: 32, gap: 4, padding: '0 var(--space-2)',
       background: 'var(--color-bg-elevated)',
       borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
       position: 'relative', zIndex: 100,
@@ -83,10 +95,10 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
       <div style={{ width: 1, height: 14, background: 'var(--color-border-subtle)', margin: '0 2px' }} />
 
       {/* Undo/Redo */}
-      <button onClick={handleUndo} disabled={undoStack.length === 0} title="Undo (Ctrl+Z)" aria-label="Undo" style={{ ...toolBtnStyle(false), opacity: undoStack.length > 0 ? 1 : 0.4, cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease' }}>
+      <button onClick={handleUndo} disabled={undoStack.length === 0} title="Undo (Ctrl+Z)" aria-label="Undo" {...hoverHandlers(false)} style={{ ...toolBtnStyle(false), opacity: undoStack.length > 0 ? 1 : 0.4, cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease' }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
       </button>
-      <button onClick={handleRedo} disabled={redoStack.length === 0} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" style={{ ...toolBtnStyle(false), opacity: redoStack.length > 0 ? 1 : 0.4, cursor: redoStack.length > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease' }}>
+      <button onClick={handleRedo} disabled={redoStack.length === 0} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" {...hoverHandlers(false)} style={{ ...toolBtnStyle(false), opacity: redoStack.length > 0 ? 1 : 0.4, cursor: redoStack.length > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease' }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
       </button>
 
@@ -94,7 +106,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {/* Tool modes */}
       {TOOLS.map(t => (
-        <button key={t.mode} onClick={() => setTool(t.mode)} title={`${t.label} (${t.shortcut})`} aria-label={t.label} aria-pressed={tool === t.mode} style={toolBtnStyle(tool === t.mode)}>
+        <button key={t.mode} onClick={() => setTool(t.mode)} title={`${t.label} (${t.shortcut})`} aria-label={t.label} aria-pressed={tool === t.mode} {...hoverHandlers(tool === t.mode)} style={toolBtnStyle(tool === t.mode)}>
           {t.icon}
         </button>
       ))}
@@ -111,7 +123,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
         { type: 'tube' as const, label: 'Tube', icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><ellipse cx="12" cy="5" rx="4" ry="1.5"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/></svg> },
         { type: 'wedge' as const, label: 'Wedge', icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h20L22 8H2v12z"/><path d="M2 8l10-6 10 6"/></svg> },
       ].map(prim => (
-        <button key={prim.type} onClick={() => addPrimitive(prim.type)} title={`Add ${prim.label}`} aria-label={`Add ${prim.label}`} style={toolBtnStyle(false)}>
+        <button key={prim.type} onClick={() => addPrimitive(prim.type)} title={`Add ${prim.label}`} aria-label={`Add ${prim.label}`} {...hoverHandlers(false)} style={toolBtnStyle(false)}>
           {prim.icon}
         </button>
       ))}
@@ -119,10 +131,10 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
 
       {/* Actions */}
-      <button onClick={ui.togglePartsLibrary} title="Parts Library" aria-label="Parts Library" aria-pressed={ui.showPartsLibrary} style={toolBtnStyle(ui.showPartsLibrary)}>
+      <button onClick={ui.togglePartsLibrary} title="Parts Library" aria-label="Parts Library" aria-pressed={ui.showPartsLibrary} {...hoverHandlers(ui.showPartsLibrary)} style={toolBtnStyle(ui.showPartsLibrary)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"/></svg>
       </button>
-      <button onClick={() => { generateBOM(); ui.toggleBOM(); }} title="Generate BOM" aria-label="Generate Bill of Materials" aria-pressed={ui.showBOM} style={toolBtnStyle(ui.showBOM)}>
+      <button onClick={() => { generateBOM(); ui.toggleBOM(); }} title="Generate BOM" aria-label="Generate Bill of Materials" aria-pressed={ui.showBOM} {...hoverHandlers(ui.showBOM)} style={toolBtnStyle(ui.showBOM)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
       </button>
       <button onClick={() => {
@@ -131,10 +143,10 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
           return;
         }
         onRunSimulation();
-      }} title="Simulation" aria-label="Run Simulation" aria-pressed={ui.showSimulation} style={toolBtnStyle(ui.showSimulation)}>
+      }} title="Simulation" aria-label="Run Simulation" aria-pressed={ui.showSimulation} {...hoverHandlers(ui.showSimulation)} style={toolBtnStyle(ui.showSimulation)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       </button>
-      <button onClick={toggleExplodedView} title="Exploded View (X)" aria-label="Exploded View" aria-pressed={project.assembly.exploded} style={toolBtnStyle(project.assembly.exploded)}>
+      <button onClick={toggleExplodedView} title="Exploded View (X)" aria-label="Exploded View" aria-pressed={project.assembly.exploded} {...hoverHandlers(project.assembly.exploded)} style={toolBtnStyle(project.assembly.exploded)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 3l5 5-5 5"/><path d="M8 3L3 8l5 5"/><path d="M12 14v7"/><path d="M12 3v4"/></svg>
       </button>
 
@@ -142,7 +154,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
 
       {/* Export dropdown */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <button onClick={(e) => { e.stopPropagation(); ui.toggleExport(); }} title="Export" aria-label="Export" aria-expanded={ui.showExport} aria-haspopup="menu"
+        <button onClick={(e) => { e.stopPropagation(); ui.toggleExport(); }} title="Export" aria-label="Export" aria-expanded={ui.showExport} aria-haspopup="menu" {...hoverHandlers(ui.showExport)}
           style={{ ...toolBtnStyle(ui.showExport), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Export</span>
@@ -154,7 +166,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
                 className="dex-hover-bg"
                 role="menuitem"
                 aria-label={`Export as ${fmt.toUpperCase()}`}
-                style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, textAlign: 'left', padding: '7px 10px', fontSize: 11, color: 'var(--color-text-primary)', background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 'var(--space-2)', textAlign: 'left', padding: '7px 10px', fontSize: 11, color: 'var(--color-text-primary)', background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
                 <span style={{ flex: 1 }}>{fmt.toUpperCase()}</span>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{fmt === 'stl' ? '3D Print' : fmt === 'gltf' ? 'PBR/Web3D' : fmt === 'dxf' ? 'CNC/CAD' : fmt === 'pdf' ? 'Drawing' : fmt === 'json' ? 'Project' : 'Image'}</span>
@@ -176,28 +188,28 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
           return;
         }
         onAddFeature();
-      }} title="Add Feature" aria-label="Add Feature" aria-expanded={ui.showFeatureCreate}
+      }} title="Add Feature" aria-label="Add Feature" aria-expanded={ui.showFeatureCreate} {...hoverHandlers(ui.showFeatureCreate)}
         style={{ ...toolBtnStyle(ui.showFeatureCreate), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
         <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Feature</span>
       </button>
 
       {/* GD&T */}
-      <button onClick={ui.toggleGDTCreate} title="GD&T Annotation" aria-label="GD&T Annotation" aria-pressed={ui.showGDTCreate}
+      <button onClick={ui.toggleGDTCreate} title="GD&T Annotation" aria-label="GD&T Annotation" aria-pressed={ui.showGDTCreate} {...hoverHandlers(ui.showGDTCreate)}
         style={{ ...toolBtnStyle(ui.showGDTCreate), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
         <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>GD&T</span>
       </button>
 
       {/* Constraints */}
-      <button onClick={ui.toggleConstraintPanel} title="Assembly Constraints" aria-label="Assembly Constraints" aria-pressed={ui.showConstraintPanel}
+      <button onClick={ui.toggleConstraintPanel} title="Assembly Constraints" aria-label="Assembly Constraints" aria-pressed={ui.showConstraintPanel} {...hoverHandlers(ui.showConstraintPanel)}
         style={{ ...toolBtnStyle(ui.showConstraintPanel), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
         <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Constrain</span>
       </button>
 
       {/* AI */}
-      <button onClick={ui.toggleAI} title="AI Design Copilot" aria-label="AI Design Copilot" aria-pressed={ui.showAI}
+      <button onClick={ui.toggleAI} title="AI Design Copilot" aria-label="AI Design Copilot" aria-pressed={ui.showAI} {...hoverHandlers(ui.showAI)}
         style={{ ...toolBtnStyle(ui.showAI), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
         <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>AI</span>

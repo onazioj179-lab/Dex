@@ -64,6 +64,9 @@ export class PlaybackEngine {
   private disposed: boolean = false;
   private isSeeking: boolean = false;
   private seekTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  // Detaches the 'seeked' listeners + timeout of the in-flight seek. Used so a
+  // superseding seek (rapid scrubbing) cannot leak listeners on the video elements.
+  private pendingSeekCleanup: (() => void) | null = null;
 
   constructor(callbacks: PlaybackCallbacks) {
     this.callbacks = callbacks;
@@ -186,6 +189,14 @@ export class PlaybackEngine {
 
   seekToFrame(frame: number): void {
     const clamped = Math.max(0, Math.min(frame, this.sequenceDuration));
+    // Tear down any in-flight seek first. Previously only the safety timeout was
+    // cleared here; the 'seeked' listeners attached by the prior call stayed bound
+    // to the video elements until they happened to fire, leaking a listener per
+    // scrub move during rapid scrubbing.
+    if (this.pendingSeekCleanup) {
+      this.pendingSeekCleanup();
+      this.pendingSeekCleanup = null;
+    }
     if (this.seekTimeoutId) {
       clearTimeout(this.seekTimeoutId);
       this.seekTimeoutId = null;
@@ -210,11 +221,8 @@ export class PlaybackEngine {
       const onReady = () => {
         settled++;
         if (settled >= pending.length) {
-          if (this.seekTimeoutId) {
-            clearTimeout(this.seekTimeoutId);
-            this.seekTimeoutId = null;
-          }
-          pending.forEach(v => v.removeEventListener('seeked', onReady));
+          this.pendingSeekCleanup?.();
+          this.pendingSeekCleanup = null;
           this.isSeeking = false;
           this.renderFrame(clamped);
         }
@@ -223,10 +231,19 @@ export class PlaybackEngine {
       // Safety timeout: render after 150ms even if seeked never fires
       this.seekTimeoutId = setTimeout(() => {
         this.seekTimeoutId = null;
-        pending.forEach(v => v.removeEventListener('seeked', onReady));
+        this.pendingSeekCleanup?.();
+        this.pendingSeekCleanup = null;
         this.isSeeking = false;
         this.renderFrame(clamped);
       }, 150);
+      // Single source of truth for detaching this seek's listeners + timeout.
+      this.pendingSeekCleanup = () => {
+        pending.forEach(v => v.removeEventListener('seeked', onReady));
+        if (this.seekTimeoutId) {
+          clearTimeout(this.seekTimeoutId);
+          this.seekTimeoutId = null;
+        }
+      };
     }
   }
 
@@ -507,6 +524,11 @@ export class PlaybackEngine {
   dispose(): void {
     this.disposed = true;
     this.pause();
+    // Detach any in-flight seek listeners/timeout before tearing down.
+    if (this.pendingSeekCleanup) {
+      this.pendingSeekCleanup();
+      this.pendingSeekCleanup = null;
+    }
     if (this.seekTimeoutId) {
       clearTimeout(this.seekTimeoutId);
       this.seekTimeoutId = null;

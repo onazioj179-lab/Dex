@@ -148,7 +148,7 @@ const ResultItem: React.FC<{
     >
       {/* Icon */}
       <div style={{
-        width: 26, height: 26, borderRadius: 5,
+        width: 26, height: 26, borderRadius: 4,
         background: isSelected ? 'var(--color-border)' : (result.color ? `${result.color}18` : 'var(--color-bg-hover)'),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
@@ -561,12 +561,12 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
       <div data-dex-spotlight style={{ width: '100%', maxWidth: 560, position: 'relative' }}>
         {/* Search Bar — macOS Tahoe glass pill, soft focus, embedded mic */}
         <div className="dex-home-search-pill" style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          height: 50, padding: '0 20px',
-          background: 'rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'var(--blur-xl) saturate(180%)',
-          WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.12)',
+          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+          height: 50, padding: '0 var(--space-5)',
+          // DEX Sharp 2.0: a dark, fully-opaque pill (no blur in full-flat mode, so
+          // translucency would just muddy the wallpaper). Crisp, not bleachy.
+          background: 'var(--color-bg-glass)',
+          border: '1px solid var(--color-border)',
           borderRadius: 9999,
           transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
           boxShadow: showResults
@@ -612,7 +612,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
               aria-label="Clear search"
               style={{
-                width: 18, height: 18, borderRadius: 9,
+                width: 18, height: 18, borderRadius: 8,
                 background: 'rgba(120,120,128,0.32)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -642,13 +642,13 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               position: 'absolute', top: 58, left: 0, right: 0,
               maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
-              // Near-opaque so Home wallpaper/widgets never bleed through and
-              // make results unreadable (kept a hint of glass + the blur).
-              background: 'rgba(18,18,22,0.97)',
+              // Fully opaque so Home wallpaper/widgets never bleed through and
+              // make results unreadable (full-flat: no blur to lean on).
+              background: 'var(--color-bg-glass)',
               backdropFilter: 'var(--blur-xl) saturate(180%)',
               WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
               border: '1px solid rgba(255,255,255,0.10)',
-              borderRadius: 14,
+              borderRadius: 10,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: '4px',
               animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
@@ -658,7 +658,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               <div key={group.category}>
                 <div className="dex-label-caps" style={{
                   display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '6px 12px 3px',
+                  padding: '6px var(--space-3) 3px',
                   fontSize: 10,
                 }}>
                   <CategoryIcon category={group.category} />
@@ -718,14 +718,14 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           display: 'flex', flexDirection: 'column',
           background: 'var(--color-bg-surface-solid, #141416)',
           border: '1px solid var(--color-border)',
-          borderRadius: 16,
+          borderRadius: 10,
           boxShadow: 'var(--pg-shadow-modal), 0 0 0 1px var(--color-bg-hover), var(--pg-gloss-top)',
           overflow: 'hidden',
         }}
       >
         {/* Input row */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
+          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
           height: 52, padding: '0 18px',
           borderBottom: '1px solid var(--color-bg-hover)',
           flexShrink: 0,
@@ -762,7 +762,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
               aria-label="Clear search"
               style={{
-                width: 22, height: 22, borderRadius: 11,
+                width: 22, height: 22, borderRadius: 10,
                 background: 'var(--color-border)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -802,7 +802,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               <div key={group.category}>
                 <div className="dex-label-caps" style={{
                   display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '6px 12px 3px',
+                  padding: '6px var(--space-3) 3px',
                   fontSize: 10,
                 }}>
                   <CategoryIcon category={group.category} />
@@ -829,7 +829,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         {/* Empty state */}
         {query && flatResults.length === 0 && (
           <div style={{
-            padding: '32px 20px', textAlign: 'center',
+            padding: 'var(--space-8) var(--space-5)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No results for "{query}"</div>
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)', opacity: 0.5, marginTop: 4 }}>Xenon is searching deeper — try a different term or check the web</div>
@@ -839,7 +839,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         {/* Footer hints */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '6px 16px',
+          padding: '6px var(--space-4)',
           borderTop: '1px solid var(--color-bg-hover)',
           flexShrink: 0,
         }}>

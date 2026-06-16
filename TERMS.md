@@ -1,11 +1,10 @@
 # DEX -- Terms of Use
 
-**Effective date:** 2026-06-06  
-**Version:** 2.1.0  
+**Effective date:** 2026-06-13  
 **Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
-These Terms are intentionally strict. DEX is a powerful desktop automation, diagnostics, creative, plugin, and system-control environment. By installing, launching, accessing, or using DEX, you agree to these Terms and the DEX Privacy Policy. If you do not agree, do not use DEX.
+These Terms are intentionally strict. DEX is a powerful desktop automation, diagnostics, creative, plugin, and system-control environment. DEX is free for everyone: every feature is available to all users at no cost, with no paid plans, no paid tiers, no in-app purchases, and no advertising. In exchange, DEX may use limited data to operate and improve the product, as described in the Privacy Policy. By installing, launching, accessing, or using DEX, you agree to these Terms and the DEX Privacy Policy. If you do not agree, do not use DEX.
 
 This document is not a substitute for professional legal advice before commercial release.
 
@@ -79,7 +78,7 @@ Plugins are independent software. You are responsible for plugins you install, p
 
 DEX may review, reject, block, quarantine, disable, delist, remove, rate-limit, or restrict plugins, integrations, accounts, features, workflows, or developers that create risk, violate policy, infringe rights, harm users, threaten infrastructure, or undermine DEX.
 
-DEX may include advertising, sponsored content, in-app purchases, or paid features in some tiers or components (for example, the free tier or games); paid plans are ad-free. As described in the Privacy Policy, DEX may share limited data with service providers, integration partners, and advertising partners to operate, measure, and support these features, and may add, change, or remove commercial features over time.
+DEX is free for everyone and does not include advertising, sponsored content, in-app purchases, or paid features. As described in the Privacy Policy, DEX may share limited data with service providers (such as hosting, analytics, crash reporting, and support) and with integration partners you choose to connect, in order to operate, secure, and improve the product.
 
 ## 11. Updates, Changes, and Feature Control
 

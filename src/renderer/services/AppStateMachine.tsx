@@ -591,9 +591,9 @@ const uiStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    padding: 24,
+    padding: 'var(--space-6)',
     textAlign: 'center',
-    gap: 12,
+    gap: 'var(--space-3)',
   },
   spinner: {
     width: 32,
@@ -628,13 +628,13 @@ const uiStyles: Record<string, React.CSSProperties> = {
     transition: 'width 0.3s ease',
   },
   button: {
-    padding: '8px 16px',
+    padding: 'var(--space-2) var(--space-4)',
     borderRadius: 4,
     border: 'none',
     fontSize: 13,
     fontWeight: 500,
     color: 'var(--color-text-inverse)',
     cursor: 'pointer',
-    marginTop: 8,
+    marginTop: 'var(--space-2)',
   },
 };

@@ -102,7 +102,7 @@ export const GlassSidebar: React.FC<GlassSidebarProps> = ({
           flex: 1,
           overflowY: 'auto',
           overflowX: 'hidden',
-          padding: 8,
+          padding: 'var(--space-2)',
           display: 'flex',
           flexDirection: 'column',
           gap: 2,
@@ -113,7 +113,7 @@ export const GlassSidebar: React.FC<GlassSidebarProps> = ({
       {footer && (
         <div
           style={{
-            padding: '10px 12px',
+            padding: '10px var(--space-3)',
             borderTop: '1px solid var(--pg-border)',
           }}
         >
@@ -296,7 +296,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 10px 4px',
+        padding: 'var(--space-3) 10px 4px',
         fontSize: 10.5,
         fontWeight: 600,
         textTransform: 'uppercase',

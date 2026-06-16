@@ -88,12 +88,12 @@ const AiProviderSettings: React.FC = () => {
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
         AI Providers
       </h2>
-      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 16px', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 var(--space-4)', lineHeight: 1.5 }}>
         Connect a provider to power UKI. Keys are stored locally on this device (obfuscated; the
         packaged app uses the OS keychain). Ollama runs locally and needs no key.
       </p>
 
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-8px 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', margin: '-var(--space-2) 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)', flexShrink: 0 }} />
         Running on {shellLabel()}
       </div>
@@ -101,8 +101,8 @@ const AiProviderSettings: React.FC = () => {
       <div
         data-testid="active-model-banner"
         style={{
-          padding: '10px 14px', marginBottom: 12, borderRadius: 8, fontSize: 13,
-          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 14px', marginBottom: 'var(--space-3)', borderRadius: 8, fontSize: 13,
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
           background: routedTop ? 'color-mix(in srgb, var(--color-success) 12%, transparent)' : 'var(--pg-surface)',
           border: `1px solid ${routedTop ? 'var(--color-success)' : 'var(--pg-border)'}`,
           color: 'var(--color-text-primary)',
@@ -129,7 +129,7 @@ const AiProviderSettings: React.FC = () => {
 
       <div
         style={{
-          padding: '10px 14px', marginBottom: 16, borderRadius: 8,
+          padding: '10px 14px', marginBottom: 'var(--space-4)', borderRadius: 8,
           background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         }}
@@ -143,7 +143,7 @@ const AiProviderSettings: React.FC = () => {
           onChange={(e) => chooseGoal(e.target.value as RoutingGoal)}
           aria-label="Smart Router goal"
           style={{
-            height: 28, padding: '0 8px', borderRadius: 6, fontSize: 12,
+            height: 28, padding: '0 var(--space-2)', borderRadius: 6, fontSize: 12,
             background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
             border: '1px solid var(--color-border)',
           }}
@@ -163,7 +163,7 @@ const AiProviderSettings: React.FC = () => {
             background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.label}</span>
             {connected(p.id) && (
               <span style={{ fontSize: 11, color: 'var(--color-success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -176,7 +176,7 @@ const AiProviderSettings: React.FC = () => {
           </div>
 
           {p.requiresKey && (
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-2)' }}>
               <input
                 type="password"
                 value={keys[p.id] ?? ''}
@@ -202,7 +202,7 @@ const AiProviderSettings: React.FC = () => {
                 <button
                   onClick={() => clear(p.id)}
                   style={{
-                    height: 32, padding: '0 12px', borderRadius: 6, fontSize: 13,
+                    height: 32, padding: '0 var(--space-3)', borderRadius: 6, fontSize: 13,
                     background: 'transparent', color: 'var(--color-error)',
                     border: '1px solid var(--color-border)', cursor: 'pointer',
                   }}
@@ -213,7 +213,7 @@ const AiProviderSettings: React.FC = () => {
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }} htmlFor={`model-${p.id}`}>
               Model
             </label>
@@ -223,7 +223,7 @@ const AiProviderSettings: React.FC = () => {
               onChange={(e) => chooseModel(p.id, e.target.value)}
               aria-label={`${p.label} model`}
               style={{
-                height: 28, padding: '0 8px', borderRadius: 6, fontSize: 12,
+                height: 28, padding: '0 var(--space-2)', borderRadius: 6, fontSize: 12,
                 background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
                 border: '1px solid var(--color-border)',
               }}

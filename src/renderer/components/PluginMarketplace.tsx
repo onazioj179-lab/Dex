@@ -109,7 +109,7 @@ export const PluginMarketplace: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: 0, fontSize: 13, color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
+    <div style={{ padding: 0, fontSize: 13, color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', height: '100%' }}>
       <GlassToolbar
         title="Plugin Marketplace"
         trailing={
@@ -125,10 +125,10 @@ export const PluginMarketplace: React.FC = () => {
         }
       />
 
-      <div style={{ padding: '0 16px 16px', overflowY: 'auto' }}>
+      <div style={{ padding: '0 var(--space-4) var(--space-4)', overflowY: 'auto' }}>
         <GlassSurface
           variant="card"
-          style={{ padding: 12, marginBottom: 12, border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))' }}
+          style={{ padding: 'var(--space-3)', marginBottom: 'var(--space-3)', border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))' }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>
             Plugin Policy
@@ -142,7 +142,7 @@ export const PluginMarketplace: React.FC = () => {
         {status && (
           <GlassSurface
             variant="card"
-            style={{ padding: 10, marginBottom: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}
+            style={{ padding: 10, marginBottom: 'var(--space-3)', fontSize: 12, color: 'var(--color-text-secondary)' }}
           >
             {status}
           </GlassSurface>
@@ -234,12 +234,12 @@ const tabBtnStyle = (active: boolean): React.CSSProperties => ({
 
 const rowSurfaceStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10,
-  padding: 12, marginBottom: 8,
+  padding: 'var(--space-3)', marginBottom: 'var(--space-2)',
   minWidth: 0, flexWrap: 'wrap',
 };
 
 const titleLineStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8,
+  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
   fontSize: 13, color: 'var(--color-text-primary)',
   minWidth: 0,
 };
@@ -258,11 +258,11 @@ const metaStyle: React.CSSProperties = {
 };
 
 const emptyStyle: React.CSSProperties = {
-  padding: '12px 4px', color: 'var(--color-text-tertiary)', fontSize: 12,
+  padding: 'var(--space-3) 4px', color: 'var(--color-text-tertiary)', fontSize: 12,
 };
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 10px', borderRadius: 6,
+  width: '100%', padding: 'var(--space-2) 10px', borderRadius: 6,
   border: '1px solid var(--pg-border-strong)',
   background: 'var(--color-bg-inset, rgba(0,0,0,0.35))',
   color: 'var(--color-text-primary)',
@@ -273,7 +273,7 @@ const inputStyle: React.CSSProperties = {
 
 const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties => {
   const base: React.CSSProperties = {
-    padding: '6px 12px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+    padding: '6px var(--space-3)', borderRadius: 4, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
     whiteSpace: 'nowrap', flexShrink: 0,

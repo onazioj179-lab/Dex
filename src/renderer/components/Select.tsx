@@ -11,6 +11,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import DexIcon from './DexIcon';
+import { useDropdownPosition } from '../hooks/useDropdownPosition';
 
 // ==================== TYPES ====================
 
@@ -93,6 +94,8 @@ export const Select: React.FC<SelectProps> = ({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useDropdownPosition(isOpen, containerRef, menuRef, { matchWidth: true });
 
   const currentValue = controlledValue !== undefined ? controlledValue : value;
   const selectedOption = options.find(o => o.value === currentValue);
@@ -182,8 +185,8 @@ export const Select: React.FC<SelectProps> = ({
 
   const sizes = {
     sm: { height: 32, fontSize: 12, padding: '0 10px' },
-    md: { height: 40, fontSize: 14, padding: '0 12px' },
-    lg: { height: 48, fontSize: 16, padding: '0 16px' },
+    md: { height: 40, fontSize: 14, padding: '0 var(--space-3)' },
+    lg: { height: 48, fontSize: 16, padding: '0 var(--space-4)' },
   };
 
   const s = sizes[size];
@@ -196,7 +199,7 @@ export const Select: React.FC<SelectProps> = ({
     control: {
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
+      gap: 'var(--space-2)',
       height: s.height,
       padding: s.padding,
       background: 'var(--color-bg-surface)',
@@ -255,13 +258,13 @@ export const Select: React.FC<SelectProps> = ({
       zIndex: 2400,
     },
     group: {
-      padding: '8px 12px 4px',
+      padding: 'var(--space-2) var(--space-3) 4px',
     },
     option: {
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '10px 12px',
+      padding: '10px var(--space-3)',
       fontSize: s.fontSize,
       color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
@@ -299,11 +302,11 @@ export const Select: React.FC<SelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 20,
+      padding: 'var(--space-5)',
       color: 'var(--color-text-muted)',
     },
     empty: {
-      padding: 20,
+      padding: 'var(--space-5)',
       textAlign: 'center',
       color: 'var(--color-text-muted)',
       fontSize: 13,
@@ -353,7 +356,7 @@ export const Select: React.FC<SelectProps> = ({
       </div>
 
       {isOpen && (
-        <div style={styles.menu}>
+        <div ref={menuRef} style={{ ...styles.menu, ...menuStyle }}>
           {loading ? (
             <div style={styles.loading}>Loading...</div>
           ) : filteredOptions.length === 0 ? (
@@ -383,7 +386,7 @@ export const Select: React.FC<SelectProps> = ({
                           <div style={styles.optionDescription}>{option.description}</div>
                         )}
                       </div>
-                      {option.value === currentValue && <span>check</span>}
+                      {option.value === currentValue && <DexIcon name="check" size={14} />}
                     </div>
                   );
                 })}
@@ -409,7 +412,7 @@ export const Select: React.FC<SelectProps> = ({
                     <div style={styles.optionDescription}>{option.description}</div>
                   )}
                 </div>
-                {option.value === currentValue && <span>check</span>}
+                {option.value === currentValue && <DexIcon name="check" size={14} />}
               </div>
             ))
           )}
@@ -439,6 +442,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useDropdownPosition(isOpen, containerRef, menuRef, { matchWidth: true });
 
   const currentValues = controlledValue !== undefined ? controlledValue : values;
   const selectedOptions = options.filter(o => currentValues.includes(o.value));
@@ -503,7 +508,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       flexWrap: 'wrap',
       gap: 6,
       minHeight: s.minHeight,
-      padding: '6px 12px',
+      padding: '6px var(--space-3)',
       background: 'var(--color-bg-surface)',
       border: `1px solid ${isOpen ? 'var(--color-accent)' : 'var(--color-border)'}`,
       borderRadius: 6,
@@ -515,7 +520,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: 4,
-      padding: '2px 8px',
+      padding: '2px var(--space-2)',
       background: 'var(--color-border-subtle)',
       borderRadius: 3,
       fontSize: s.fontSize - 2,
@@ -561,7 +566,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       display: 'flex',
       alignItems: 'center',
       gap: 10,
-      padding: '10px 12px',
+      padding: '10px var(--space-3)',
       fontSize: s.fontSize,
       color: 'var(--color-text-primary, #f5f5f7)',
       cursor: 'pointer',
@@ -623,7 +628,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       </div>
 
       {isOpen && (
-        <div style={styles.menu}>
+        <div ref={menuRef} style={{ ...styles.menu, ...menuStyle }}>
           {filteredOptions.map(option => {
             const isSelected = currentValues.includes(option.value);
             const isDisabled = option.disabled ||

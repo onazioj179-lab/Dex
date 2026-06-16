@@ -189,18 +189,18 @@ function FeaturedHero({
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
         <AppIcon iconUrl={entry.iconUrl || undefined} name={name} size={84} radius={20} />
         <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1.1 }}>{name}</h1>
             <RecognitionPill publisher={publisher} />
             {installed && <StateBadge kind="installed" />}
             {!installed && entry.comingSoon && <StateBadge kind="soon" />}
           </div>
           {m.description && (
-            <p style={{ margin: '8px 0 0', fontSize: 13.5, lineHeight: 1.5, color: 'var(--color-text-secondary)', maxWidth: 640, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 13.5, lineHeight: 1.5, color: 'var(--color-text-secondary)', maxWidth: 640, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {m.description}
             </p>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
             {ratingCount > 0 && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <StarRating value={rating} size={14} />
@@ -219,7 +219,7 @@ function FeaturedHero({
 
 function EmptyNote({ icon, text }: { icon: string; text: string }): React.ReactElement {
   return (
-    <div style={{ ...premiumGlassCard, padding: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+    <div style={{ ...premiumGlassCard, padding: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
       <DexIcon name={icon} size={28} />
       <span style={{ fontSize: 13, maxWidth: 420, lineHeight: 1.5 }}>{text}</span>
     </div>
@@ -232,16 +232,16 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: 16,
+    padding: 'var(--space-4)',
   },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: 12,
+    gap: 'var(--space-3)',
   },
   rail: {
     display: 'flex',
-    gap: 12,
+    gap: 'var(--space-3)',
     overflowX: 'auto',
     overflowY: 'hidden',
     paddingBottom: 6,

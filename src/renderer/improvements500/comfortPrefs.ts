@@ -24,18 +24,35 @@ import { a11yPrefs } from './a11yPrefs';
 export type MotionPref = 'auto' | 'on' | 'off';
 /** 'auto' follows the OS; 'normal'/'high' force the contrast level. */
 export type ContrastPref = 'auto' | 'normal' | 'high';
+/** UI density. 'default' is the no-op baseline; compact/comfortable rescale spacing. */
+export type DensityPref = 'compact' | 'default' | 'comfortable';
+
+/** Selectable density modes (for Settings UI). */
+export const DENSITY_OPTIONS: ReadonlyArray<{ id: DensityPref; label: string }> = [
+  { id: 'compact', label: 'Compact' },
+  { id: 'default', label: 'Default' },
+  { id: 'comfortable', label: 'Comfortable' },
+];
+
+const DENSITY_IDS = new Set<DensityPref>(['compact', 'default', 'comfortable']);
 
 export interface ComfortPrefs {
   reduceMotion: MotionPref;
   contrast: ContrastPref;
   /** Root text scale multiplier, clamped to [0.85, 1.4]. 1 = default. */
   textScale: number;
+  /** UI density. 'default' = no change. */
+  density: DensityPref;
+  /** Dark-room mode: near-black surfaces + dimmed text for low-light work. */
+  darkroom: boolean;
 }
 
 export interface EffectiveComfort {
   reduceMotion: boolean;
   highContrast: boolean;
   textScale: number;
+  density: DensityPref;
+  darkroom: boolean;
 }
 
 export interface OsComfortSignals {
@@ -47,6 +64,8 @@ export const DEFAULT_COMFORT: ComfortPrefs = {
   reduceMotion: 'auto',
   contrast: 'auto',
   textScale: 1,
+  density: 'default',
+  darkroom: false,
 };
 
 export const TEXT_SCALE_MIN = 0.85;
@@ -67,10 +86,13 @@ export function resolveComfort(prefs: ComfortPrefs, os: OsComfortSignals): Effec
   const highContrast = prefs.contrast === 'high' ? true
     : prefs.contrast === 'normal' ? false
     : os.highContrast;
+  const density = DENSITY_IDS.has(prefs.density as DensityPref) ? prefs.density : 'default';
   return {
     reduceMotion,
     highContrast,
     textScale: clamp(prefs.textScale, TEXT_SCALE_MIN, TEXT_SCALE_MAX),
+    density,
+    darkroom: prefs.darkroom === true,
   };
 }
 
@@ -88,6 +110,19 @@ export function applyComfort(eff: EffectiveComfort): void {
   } else {
     root.style.removeProperty('font-size');
   }
+  // Appearance modes: default values are no-ops, so the attribute is removed
+  // rather than written. Each maps to an html[data-*] block in design-system.css.
+  const density = eff.density ?? 'default';
+  if (density !== 'default') {
+    root.setAttribute('data-density', density);
+  } else {
+    root.removeAttribute('data-density');
+  }
+  if (eff.darkroom === true) {
+    root.setAttribute('data-darkroom', 'on');
+  } else {
+    root.removeAttribute('data-darkroom');
+  }
 }
 
 /** Load saved prefs (merged over defaults). */
@@ -101,6 +136,8 @@ export function loadComfort(): ComfortPrefs {
       reduceMotion: parsed.reduceMotion ?? DEFAULT_COMFORT.reduceMotion,
       contrast: parsed.contrast ?? DEFAULT_COMFORT.contrast,
       textScale: clamp(parsed.textScale ?? 1, TEXT_SCALE_MIN, TEXT_SCALE_MAX),
+      density: DENSITY_IDS.has(parsed.density as DensityPref) ? (parsed.density as DensityPref) : 'default',
+      darkroom: parsed.darkroom === true,
     };
   } catch {
     return { ...DEFAULT_COMFORT };

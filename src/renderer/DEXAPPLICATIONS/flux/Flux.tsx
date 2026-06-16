@@ -4,19 +4,19 @@
  * Professional motion graphics and visual effects
  */
 import React, { useState, useRef, useCallback, useMemo, useEffect, memo } from 'react';
-import CreativeCommandBar from '../../components/CreativeCommandBar';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { useRunningApps } from '../../store/runningApps';
-import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCollaborationFeatures';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
+import { ResizablePanel } from '../../components/ResizablePanel';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { loadEngagement, saveEngagement, recordAppUsage, incrementStat, checkAchievements } from '../../services/engagement';
+import { useCanvasZoomPan } from '../../hooks/useCanvasZoomPan';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS, getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
@@ -24,15 +24,11 @@ import {
   EASING_PRESETS,
   COMPOSITION_PRESETS,
   EXPRESSION_TEMPLATES,
-  EFFECT_DEFAULTS,
-  getEasingFunction,
   interpolate as fluxInterpolate,
-  cubicBezier,
   morphPaths,
   MORPH_SHAPES,
   getPointOnPath,
 } from './FluxFeatures';
-import type { EasingPreset, CompositionSettings } from './FluxFeatures';
 import EasingCurveEditor, { type EasingValue } from './EasingCurveEditor';
 
 // ===========================================================================
@@ -449,8 +445,6 @@ const Flux: React.FC = () => {
     window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Imported "${asset.name}" from ${asset.sourceApp}` } }));
   }, []));
 
-  // ===== BEGINNER MODE =====
-  const { isBeginnerMode: beginnerMode, showShortcutsPanel, setShowShortcutsPanel } = useBeginnerMode('flux');
   const [activeTool, setActiveTool] = useState<string>('pointer');
   // Start with empty canvas — user adds layers as needed
   const [layers, setLayers] = useState<Layer[]>(() => []);
@@ -478,7 +472,9 @@ const Flux: React.FC = () => {
   
   // Canvas state
   const [canvasSize, setCanvasSize] = useState({ width: 1920, height: 1080 });
-  const [viewScale, setViewScale] = useState(50);
+  // Shared creative engine: canvas zoom aliased to Flux's `viewScale` (10-200%,
+  // no pan). Same zoom math as before, now de-duplicated via useCanvasZoomPan.
+  const { zoom: viewScale, setZoom: setViewScale, zoomAtCursor: zoomCanvas } = useCanvasZoomPan({ min: 10, max: 200, initial: 50 });
   const [is3DMode, setIs3DMode] = useState(false);
   const [hardwareTier, setHardwareTier] = useState<'low' | 'mid' | 'high'>('mid');
   
@@ -494,6 +490,45 @@ const Flux: React.FC = () => {
   // Panels
   const [activeTab, setActiveTab] = useState<'library' | 'behaviors' | 'filters' | 'inspector' | 'presets' | 'history'>('library');
   const [showTimeline, setShowTimeline] = useState(true);
+  const [timelineHeight, setTimelineHeight] = useState<number>(() => {
+    try { const s = localStorage.getItem('dex-resize-flux-timeline'); if (s) { const v = JSON.parse(s); if (typeof v?.height === 'number') return v.height; } } catch {}
+    return 200;
+  });
+  const [isTimelineResizing, setIsTimelineResizing] = useState(false);
+  const timelineResizeRef = useRef<{ startY: number; startH: number } | null>(null);
+  const timelineHeightRef = useRef(timelineHeight);
+  useEffect(() => { timelineHeightRef.current = timelineHeight; }, [timelineHeight]);
+  const startTimelineResize = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    timelineResizeRef.current = { startY: e.clientY, startH: timelineHeight };
+    setIsTimelineResizing(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const resetTimelineHeight = () => {
+    setTimelineHeight(200);
+    try { localStorage.setItem('dex-resize-flux-timeline', JSON.stringify({ height: 200 })); } catch {}
+  };
+  useEffect(() => {
+    if (!isTimelineResizing) return;
+    const onMove = (e: PointerEvent) => {
+      const start = timelineResizeRef.current;
+      if (!start) return;
+      const d = start.startY - e.clientY;
+      const next = Math.max(120, Math.min(520, start.startH + d));
+      setTimelineHeight(next);
+    };
+    const onUp = () => {
+      setIsTimelineResizing(false);
+      timelineResizeRef.current = null;
+      try { localStorage.setItem('dex-resize-flux-timeline', JSON.stringify({ height: timelineHeightRef.current })); } catch {}
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [isTimelineResizing]);
   const [loopEnabled, setLoopEnabled] = useState(false);
   const [presetCategory, setPresetCategory] = useState<'animations' | 'effects' | 'particles' | 'easings'>('animations');
 
@@ -801,6 +836,13 @@ const Flux: React.FC = () => {
         e.preventDefault();
         setSelectedLayerId(layers.length > 0 ? layers[0].id : null);
       }
+      // Zoom shortcuts — parity with Prism (both 2D-canvas apps share
+      // useCanvasZoomPan). Ctrl/Cmd +/- zoom, Ctrl/Cmd 0 resets to the default.
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') { e.preventDefault(); setViewScale(z => Math.min(200, Math.round(z * 1.15))); }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); setViewScale(z => Math.max(10, Math.round(z / 1.15))); }
+        if (e.key === '0') { e.preventDefault(); setViewScale(50); }
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedLayerId && !(document.activeElement instanceof HTMLInputElement) && !(document.activeElement instanceof HTMLTextAreaElement)) {
           setLayers(prev => prev.filter(l => l.id !== selectedLayerId));
@@ -811,48 +853,6 @@ const Flux: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedLayerId, layers]);
-
-  // ===== EMPTY STATE =====
-  const renderWelcome = () => (
-    <div style={{ 
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
-      height: '100%', gap: '16px', textAlign: 'center',
-    }}>
-      <div style={{ color: '#bf5af2', opacity: 0.5 }}>
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-          <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-          <polyline points="2 17 12 22 22 17"/>
-          <polyline points="2 12 12 17 22 12"/>
-        </svg>
-      </div>
-      <div>
-        <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', marginBottom: 4 }}>FLUX</div>
-        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Add a layer to start creating motion graphics</span>
-      </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button onClick={() => addLayer('shape')} aria-label="Add shape layer" style={{ 
-          padding: '6px 14px', 
-          background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', 
-          border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '4px', color: 'var(--color-accent)', fontSize: '11px', fontWeight: 600, 
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          </svg>
-          Shape
-        </button>
-        <button onClick={() => addLayer('text')} aria-label="Add text layer" style={{ 
-          padding: '6px 14px', 
-          background: 'var(--color-border-subtle)', 
-          border: '1px solid var(--color-border-subtle)', borderRadius: '4px', 
-          color: 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, 
-          cursor: 'pointer',
-        }}>
-          Text
-        </button>
-      </div>
-    </div>
-  );
 
   // ===== ANIMATION PLAYBACK =====
   useEffect(() => {
@@ -1379,24 +1379,10 @@ const Flux: React.FC = () => {
           e.preventDefault();
           setIsPlaying(p => !p);
           break;
-        case 'Delete':
-        case 'Backspace':
-          if (selectedLayerId) {
-            e.preventDefault();
-            setLayers(prev => prev.filter(l => l.id !== selectedLayerId));
-            setSelectedLayerId('');
-          }
-          break;
-        case 'KeyZ':
-          if (mod && history.length > 1) {
-            e.preventDefault();
-            isRestoringRef.current = true;
-            const prevSnapshot = history[history.length - 2];
-            setLayers(prevSnapshot.layers);
-            setHistory(h => h.slice(0, -1));
-            requestAnimationFrame(() => { isRestoringRef.current = false; });
-          }
-          break;
+        // Delete/Backspace and Ctrl+Z/Ctrl+Shift+Z (undo/redo) are owned by the
+        // dedicated undo/redo effect above, which maintains the redo stack and
+        // guards text inputs. Handling them here too caused a double-fire (one
+        // Ctrl+Z popping two history entries) and corrupted the redo stack.
         case 'KeyD':
           if (mod && selectedLayerId) {
             e.preventDefault();
@@ -1429,7 +1415,9 @@ const Flux: React.FC = () => {
           break;
         case 'ArrowRight':
           e.preventDefault();
-          setCurrentTime(t => t + 1);
+          // Clamp to the composition end so the playhead never scrubs past
+          // duration (which would push the playhead bar beyond 100%).
+          setCurrentTime(t => Math.min(duration, t + 1));
           break;
         case 'Escape':
           if (showTextAnimator) setShowTextAnimator(false);
@@ -1451,7 +1439,7 @@ const Flux: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedLayerId, layers, history, currentTime]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedLayerId, layers, currentTime, duration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ===== MASTER CLEANUP — Release all heavyweight resources on unmount =====
   useEffect(() => {
@@ -1960,10 +1948,13 @@ const Flux: React.FC = () => {
       const k0 = anim.keyframes[i], k1 = anim.keyframes[i + 1];
       if (time >= k0.time && time <= k1.time) {
         const progress = (time - k0.time) / (k1.time - k0.time);
-        const easedProgress = layer.easing
-          ? applyEasing(progress, layer.easing)
-          : progress;
-        return fluxInterpolate(k0.value, k1.value, easedProgress, k1.easing);
+        // A layer-level easing curve (set via the Easing editor) is the explicit
+        // override for the whole layer, so apply it once and interpolate linearly.
+        // Otherwise honor the per-keyframe easing preset inside fluxInterpolate.
+        // (Previously both were applied, double-easing the layer-level curve.)
+        return layer.easing
+          ? fluxInterpolate(k0.value, k1.value, applyEasing(progress, layer.easing), 'linear')
+          : fluxInterpolate(k0.value, k1.value, progress, k1.easing);
       }
     }
     return undefined;
@@ -2206,65 +2197,55 @@ const Flux: React.FC = () => {
   // ===== STYLES - MINIMAL =====
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
+    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 700, color: '#bf5af2', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
-    btn: { padding: '4px 8px', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
+    btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
     btnPrimary: { background: '#bf5af2', color: '#fff', border: '1px solid #bf5af2', borderRadius: '6px' },
-    workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
-    toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: '8px 4px', gap: '4px' },
+    workspace: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
+    toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px' },
     toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '6px', color: 'var(--color-text-muted)', cursor: 'pointer' },
     toolBtnActive: { background: '#bf5af2', color: '#fff', boxShadow: '0 0 0 2px rgba(191,90,242,0.35)' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-    canvasArea: { flex: 1, display: 'flex', overflow: 'hidden' },
-    canvasContainer: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-inset)', position: 'relative' },
+    canvasArea: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
+    canvasContainer: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-inset)', position: 'relative' },
     canvas: { background: '#000', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', borderRadius: '2px' },
-    sidebar: { width: '220px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    sidebar: { width: '100%', height: '100%', background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
-    tab: { flex: 1, padding: '8px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
+    tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
     tabActive: { color: '#bf5af2', borderBottom: '2px solid #bf5af2' },
-    panelContent: { flex: 1, padding: '10px', overflow: 'auto', scrollbarWidth: 'thin' } as any,
-    timeline: { height: showTimeline ? '200px' : '32px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', transition: 'height 0.2s ease' },
-    timelineHeader: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)' },
+    panelContent: { flex: 1, minHeight: 0, padding: '10px', overflow: 'auto', scrollbarWidth: 'thin' } as any,
+    timeline: { position: 'relative', height: showTimeline ? timelineHeight : 32, flexShrink: 0, background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', transition: isTimelineResizing ? 'none' : 'height 0.2s ease' },
+    timelineHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)' },
     transportControls: { display: 'flex', alignItems: 'center', gap: '4px' },
     transportBtn: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-primary)', cursor: 'pointer' },
-    timeDisplay: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px 8px', background: 'var(--color-bg-inset)', borderRadius: '6px', color: '#bf5af2', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
-    timelineTracks: { flex: 1, display: 'flex', overflow: 'hidden' },
-    layerList: { width: '170px', background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin' } as any,
-    layerItem: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' },
+    timeDisplay: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: '6px', color: '#bf5af2', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
+    timelineTracks: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
+    layerList: { width: '170px', flexShrink: 0, minHeight: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin' } as any,
+    layerItem: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px var(--space-2)', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' },
     layerItemSelected: { background: 'rgba(191,90,242,0.1)', borderLeft: '2px solid #bf5af2' },
     layerIcon: { width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' },
     layerName: { flex: 1, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 },
-    trackArea: { flex: 1, overflow: 'hidden', position: 'relative', background: 'var(--color-bg-inset)' },
+    trackArea: { flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative', background: 'var(--color-bg-inset)' },
     track: { height: '28px', position: 'relative', borderBottom: '1px solid var(--color-border-subtle)' },
-    trackClip: { position: 'absolute', top: '3px', height: '22px', background: '#bf5af2', borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: '#fff' },
+    trackClip: { position: 'absolute', top: '3px', height: '22px', background: '#bf5af2', borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: '#fff' },
     playhead: { position: 'absolute', top: 0, width: '1px', background: 'var(--color-error)', zIndex: 50 },
     ruler: { height: '20px', background: 'var(--color-bg-inset)', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end' },
-    behaviorItem: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
+    behaviorItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px' },
-    statusBar: { display: 'flex', alignItems: 'center', gap: '12px', padding: '0 12px', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
-    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'var(--color-bg-hover)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
+    statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
+    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
     libraryGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' },
     libraryItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', background: 'var(--color-bg-hover)', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
-    sliderRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
+    sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },
     sliderLabel: { width: '70px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
     slider: { flex: 1, accentColor: '#bf5af2' },
     sliderValue: { width: '36px', fontSize: '11px', textAlign: 'right', color: '#bf5af2', fontFamily: 'var(--font-mono)', fontWeight: 600 },
-  }), [showTimeline]);
+  }), [showTimeline, timelineHeight, isTimelineResizing]);
 
   return (
     <div style={styles.container} {...dropProps} onClick={() => setCtxMenu(p => ({ ...p, visible: false }))}>
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
-      {/* ROADMAP-600 #095 — natural-language command bar */}
-      <div style={{ padding: 8, flex: '0 0 auto' }}>
-        <CreativeCommandBar
-          appId="flux"
-          facts={{ layerId: selectedLayerId ?? undefined }}
-          onApplyOp={handleFluxOp}
-          examples={['animate this layer', 'apply a motion preset', 'add physics', 'rig this character']}
-          placeholder="Tell Flux what to animate…"
-        />
-      </div>
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
         button { font-family: inherit; transition: all 0.12s ease; }
@@ -2294,7 +2275,7 @@ const Flux: React.FC = () => {
       `}</style>
       {/* Header */}
       <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           <div style={styles.logo}>FLUX</div>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <button style={styles.btn} onClick={importMedia} aria-label="Import media">{Icons.upload} Import</button>
@@ -2304,7 +2285,7 @@ const Flux: React.FC = () => {
         </div>
         <div style={styles.headerCenter}>
           <select
-            style={{ fontSize: '11px', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', outline: 'none' }}
+            style={{ fontSize: '11px', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', padding: '4px var(--space-2)', cursor: 'pointer', outline: 'none' }}
             value=""
             onChange={(e) => {
               const preset = COMPOSITION_PRESETS.find(p => p.name === e.target.value);
@@ -2318,7 +2299,7 @@ const Flux: React.FC = () => {
           </select>
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fps} fps</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={exportVideo} aria-label="Export project">{Icons.download} Export</button>
           <SendToMenu sourceApp="flux" assetKind="video" getAsset={() => {
             const canvas = canvasRef.current;
@@ -2336,10 +2317,10 @@ const Flux: React.FC = () => {
           )}
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFeaturesMenu(false)}>
-            <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ background: showFeaturesMenu ? 'rgba(191,90,242,0.1)' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#bf5af2' : '#86868b', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
+            <button aria-label="Features menu" onClick={(e) => { e.stopPropagation(); setShowFeaturesMenu(v => !v); }} style={{ background: showFeaturesMenu ? 'rgba(191,90,242,0.1)' : 'transparent', border: 'none', fontSize: '11px', color: showFeaturesMenu ? '#bf5af2' : '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Features <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
             {showFeaturesMenu && (
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: '10px', boxShadow: '0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px var(--color-bg-hover)', zIndex: 'var(--z-modal)', padding: '6px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="dex-label-caps" style={{ padding: '6px 12px 4px' }}>ANIMATION</div>
+                <div className="dex-label-caps" style={{ padding: '6px var(--space-3) 4px' }}>ANIMATION</div>
                 {[
                   { label: 'Text Animator', active: showTextAnimator, fn: () => setShowTextAnimator(v => !v) },
                   { label: 'Graph Editor', active: showGraphEditor, fn: () => setShowGraphEditor(v => !v) },
@@ -2350,10 +2331,10 @@ const Flux: React.FC = () => {
                   { label: 'Stagger', active: showStagger, fn: () => setShowStagger(v => !v) },
                   { label: 'Motion Path', active: showMotionPath, fn: () => setShowMotionPath(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
+                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>COMPOSITION</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>COMPOSITION</div>
                 {[
                   { label: 'Null Objects', active: showNullObjects, fn: () => setShowNullObjects(v => !v) },
                   { label: 'Precompose', active: showPrecompose, fn: () => setShowPrecompose(v => !v) },
@@ -2362,10 +2343,10 @@ const Flux: React.FC = () => {
                   { label: 'Masks', active: showMaskSystem, fn: () => setShowMaskSystem(v => !v) },
                   { label: 'Trim Paths', active: showTrimPaths, fn: () => setShowTrimPaths(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
+                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>RENDERING</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>RENDERING</div>
                 {[
                   { label: 'Particles+', active: showAdvancedParticles, fn: () => setShowAdvancedParticles(v => !v) },
                   { label: 'Camera Rig', active: showCameraRig, fn: () => setShowCameraRig(v => !v) },
@@ -2377,28 +2358,28 @@ const Flux: React.FC = () => {
                   { label: 'Color Correction', active: showColorCorrection, fn: () => setShowColorCorrection(v => !v) },
                   { label: 'Stroke Effects', active: showStrokeEffects, fn: () => setShowStrokeEffects(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
+                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>EFFECTS</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>EFFECTS</div>
                 {[
                   { label: 'Audio Reactive', active: showAudioReactive, fn: () => setShowAudioReactive(v => !v) },
                   { label: 'Repeater', active: showRepeater, fn: () => setShowRepeater(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
+                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>LAYOUT</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>LAYOUT</div>
                 {[
                   { label: 'Alignment', active: showAlignment, fn: () => setShowAlignment(v => !v) },
                   { label: 'Guides', active: showGuideLayer, fn: () => setShowGuideLayer(v => !v) },
                   { label: 'Markers', active: showMarkers, fn: () => setShowMarkers(v => !v) },
                   { label: 'Snapshot', active: showSnapshot, fn: () => setShowSnapshot(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
+                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px 8px' }} />
-                <div className="dex-label-caps" style={{ padding: '8px 12px 4px' }}>EXPORT</div>
+                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
+                <div className="dex-label-caps" style={{ padding: 'var(--space-2) var(--space-3) 4px' }}>EXPORT</div>
                 {[
                   { label: 'GIF Export', active: showGifExport, fn: () => setShowGifExport(v => !v) },
                   { label: 'Lottie Export', active: showLottieExport, fn: () => setShowLottieExport(v => !v) },
@@ -2406,7 +2387,7 @@ const Flux: React.FC = () => {
                   { label: 'Render Queue', active: showRenderQueue, fn: () => setShowRenderQueue(v => !v) },
                   { label: 'Export Presets', active: showExportPresets, fn: () => setShowExportPresets(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px 12px', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
+                  <div key={item.label} className="flux-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#bf5af2' }}>ON</span>}</div>
                 ))}
               </div>
             )}
@@ -2496,8 +2477,8 @@ const Flux: React.FC = () => {
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '6px 8px',
+                            gap: 'var(--space-2)',
+                            padding: '6px var(--space-2)',
                             background: activeTool === toolId ? 'rgba(255,55,95,0.15)' : 'transparent',
                             border: 'none',
                             borderRadius: 4,
@@ -2542,16 +2523,15 @@ const Flux: React.FC = () => {
               // Allow zoom with Ctrl/Cmd OR with zoom tool active
               if (e.ctrlKey || e.metaKey || activeTool === 'zoom') {
                 e.preventDefault();
-                // Normalized delta for trackpad vs mouse wheel
-                const delta = Math.abs(e.deltaY) > 50 ? Math.sign(e.deltaY) * 50 : e.deltaY;
-                const factor = 1 + Math.abs(delta) * 0.003;
-                setViewScale(s => delta < 0 ? Math.min(200, s * factor) : Math.max(10, s / factor));
+                // Shared zoom engine; el=null keeps Flux's no-pan canvas behaviour
+                // (identical zoom math, now de-duplicated).
+                zoomCanvas(e, null);
               }
             }}
           >
             <div style={styles.canvasContainer}>
               {initError && (
-                <div style={{ position: 'absolute', top: 8, left: 8, right: 8, zIndex: 60, background: 'rgba(255,159,10,0.15)', border: '1px solid rgba(255,159,10,0.35)', borderRadius: 6, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ position: 'absolute', top: 8, left: 8, right: 8, zIndex: 60, background: 'rgba(255,159,10,0.15)', border: '1px solid rgba(255,159,10,0.35)', borderRadius: 6, padding: 'var(--space-2) var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                   <span style={{ fontSize: 12, color: 'var(--color-warning)' }}>{initError}</span>
                   <button onClick={() => setInitError(null)} aria-label="Dismiss error" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-warning)', fontSize: 16, lineHeight: 1 }}><DexIcon name="close" size={14} /></button>
                 </div>
@@ -2571,14 +2551,14 @@ const Flux: React.FC = () => {
                 style={{ ...styles.canvas, transform: `scale(${viewScale / 100})`, cursor: activeTool === 'move' ? 'grab' : activeTool === 'rotate' ? 'crosshair' : 'default', touchAction: 'none' }}
               />
               {canvasError && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', gap: 12 }}>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', gap: 'var(--space-3)' }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', maxWidth: 260 }}>Canvas unavailable. Try restarting DEX or updating your graphics driver.</span>
                 </div>
               )}
               {/* Overlay UI - Canvas Zoom Controls */}
-              <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '8px', padding: '6px 12px' }}>
-                <button style={{ ...styles.btn, padding: '4px 8px' }} onClick={() => setViewScale(Math.max(10, viewScale - 10))} title="Zoom Out" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+              <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '8px', padding: '6px var(--space-3)' }}>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.max(10, viewScale - 10))} title="Zoom Out" aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <input 
                   type="range" 
                   min="10" 
@@ -2588,13 +2568,22 @@ const Flux: React.FC = () => {
                   style={{ width: '100px', accentColor: '#bf5af2', cursor: 'pointer' }} 
                   title={`Canvas scale: ${Math.round(viewScale)}%`}
                 />
-                <button style={{ ...styles.btn, padding: '4px 8px' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} title="Zoom In" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
-                <span style={{ padding: '4px 8px', background: 'var(--color-border-subtle)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
-                <button style={{ ...styles.btn, padding: '4px 8px' }} onClick={() => setViewScale(50)} title="Reset to 50%" aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} title="Zoom In" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+                <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(50)} title="Reset to 50%" aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
               </div>
             </div>
 
             {/* Sidebar */}
+            <ResizablePanel
+              resizeDirections={['w']}
+              initialWidth={220}
+              defaultWidth={220}
+              minWidth={180}
+              maxWidth={520}
+              storageKey="flux-right"
+              style={{ height: '100%', flexShrink: 0 }}
+            >
             <div style={styles.sidebar}>
               <div style={styles.tabs}>
                 <button style={{ ...styles.tab, ...(activeTab === 'library' ? styles.tabActive : {}) }} onClick={() => setActiveTab('library')} aria-label="Library tab">
@@ -2603,9 +2592,9 @@ const Flux: React.FC = () => {
                 <button style={{ ...styles.tab, ...(activeTab === 'presets' ? styles.tabActive : {}) }} onClick={() => setActiveTab('presets')} aria-label="Presets tab">
                   Presets
                 </button>
-{!beginnerMode && <button style={{ ...styles.tab, ...(activeTab === 'behaviors' ? styles.tabActive : {}) }} onClick={() => setActiveTab('behaviors')} aria-label="Behaviors tab">
+<button style={{ ...styles.tab, ...(activeTab === 'behaviors' ? styles.tabActive : {}) }} onClick={() => setActiveTab('behaviors')} aria-label="Behaviors tab">
                   Behaviors
-                </button>}
+                </button>
                 <button style={{ ...styles.tab, ...(activeTab === 'inspector' ? styles.tabActive : {}) }} onClick={() => setActiveTab('inspector')} aria-label="Inspector tab">
                   Inspector
                 </button>
@@ -2618,33 +2607,33 @@ const Flux: React.FC = () => {
                 {/* Presets Panel */}
                 {activeTab === 'presets' && (
                   <div>
-                    <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-3)' }}>
                       {(['animations', 'effects', 'particles', 'easings'] as const).map(cat => (
-                        <button key={cat} onClick={() => setPresetCategory(cat)} aria-label={`${cat} presets`} style={{ flex: 1, padding: '6px 8px', borderRadius: '4px', border: 'none', background: presetCategory === cat ? 'var(--color-accent)' : 'var(--color-bg-tertiary)', color: presetCategory === cat ? 'white' : 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
+                        <button key={cat} onClick={() => setPresetCategory(cat)} aria-label={`${cat} presets`} style={{ flex: 1, padding: '6px var(--space-2)', borderRadius: '4px', border: 'none', background: presetCategory === cat ? 'var(--color-accent)' : 'var(--color-bg-tertiary)', color: presetCategory === cat ? 'white' : 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
                       ))}
                     </div>
                     
                     {presetCategory === 'animations' && (
                       <>
-                        <div style={{ marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Intro</div>
+                        <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Intro</div>
                         {ANIMATION_PRESETS.filter(p => p.category === 'intro').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.behaviors.forEach(b => addBehavior(selectedLayerId, b.type))}>
                             {Icons.zap}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Outro</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Outro</div>
                         {ANIMATION_PRESETS.filter(p => p.category === 'outro').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.behaviors.forEach(b => addBehavior(selectedLayerId, b.type))}>
                             {Icons.zap}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Emphasis</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Emphasis</div>
                         {ANIMATION_PRESETS.filter(p => p.category === 'emphasis').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.behaviors.forEach(b => addBehavior(selectedLayerId, b.type))}>
                             {Icons.zap}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Loop</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Loop</div>
                         {ANIMATION_PRESETS.filter(p => p.category === 'loop').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.behaviors.forEach(b => addBehavior(selectedLayerId, b.type))}>
                             {Icons.loop}<span style={{ fontSize: '11px' }}>{preset.name}</span>
@@ -2655,25 +2644,25 @@ const Flux: React.FC = () => {
                     
                     {presetCategory === 'effects' && (
                       <>
-                        <div style={{ marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Glow</div>
+                        <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Glow</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'glow').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
                             {Icons.sparkle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Blur</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Blur</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'blur').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
                             {Icons.filter}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Color</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Color</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'color').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
                             {Icons.sliders}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Other</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Other</div>
                         {EFFECT_PRESETS.filter(p => p.category === 'distort' || p.category === 'stylize').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => selectedLayerId && preset.filters.forEach(f => addFilter(selectedLayerId, f.type))}>
                             {Icons.wand}<span style={{ fontSize: '11px' }}>{preset.name}</span>
@@ -2684,25 +2673,25 @@ const Flux: React.FC = () => {
                     
                     {presetCategory === 'particles' && (
                       <>
-                        <div style={{ marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Nature</div>
+                        <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Nature</div>
                         {PARTICLE_PRESETS.filter(p => p.category === 'nature').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => { const l = addLayer('particle'); setLayers(prev => prev.map(ly => ly.id === l ? { ...ly, particleEmitter: { ...preset.emitter } } : ly)); }}>
                             {Icons.particle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Energy</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Energy</div>
                         {PARTICLE_PRESETS.filter(p => p.category === 'energy').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => { const l = addLayer('particle'); setLayers(prev => prev.map(ly => ly.id === l ? { ...ly, particleEmitter: { ...preset.emitter } } : ly)); }}>
                             {Icons.particle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Celebration</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Celebration</div>
                         {PARTICLE_PRESETS.filter(p => p.category === 'celebration').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => { const l = addLayer('particle'); setLayers(prev => prev.map(ly => ly.id === l ? { ...ly, particleEmitter: { ...preset.emitter } } : ly)); }}>
                             {Icons.particle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
                           </div>
                         ))}
-                        <div style={{ marginTop: '12px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Abstract</div>
+                        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Abstract</div>
                         {PARTICLE_PRESETS.filter(p => p.category === 'abstract').map(preset => (
                           <div key={preset.id} style={styles.behaviorItem} onClick={() => { const l = addLayer('particle'); setLayers(prev => prev.map(ly => ly.id === l ? { ...ly, particleEmitter: { ...preset.emitter } } : ly)); }}>
                             {Icons.particle}<span style={{ fontSize: '11px' }}>{preset.name}</span>
@@ -2713,18 +2702,53 @@ const Flux: React.FC = () => {
 
                     {presetCategory === 'easings' && (
                       <>
+                        {/* Honest hint: these presets write the selected layer's easing curve. */}
+                        <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                          {selectedLayerId ? 'Click a preset to set this layer’s easing curve.' : 'Select a layer to apply an easing preset.'}
+                        </div>
                         {(['basic', 'power', 'elastic', 'bounce', 'back', 'custom'] as const).map(cat => {
                           const items = EASING_PRESETS.filter(p => p.category === cat);
                           if (!items.length) return null;
                           return (
                             <React.Fragment key={cat}>
-                              <div style={{ marginTop: cat !== 'basic' ? '12px' : '0', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{cat}</div>
-                              {items.map(preset => (
-                                <div key={preset.id} style={{ ...styles.behaviorItem, flexDirection: 'column' as const, alignItems: 'flex-start', gap: '4px' }}>
-                                  <span style={{ fontSize: '11px' }}>{preset.name}</span>
-                                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>cubic-bezier({preset.bezier.join(', ')})</span>
-                                </div>
-                              ))}
+                              <div style={{ marginTop: cat !== 'basic' ? '12px' : '0', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{cat}</div>
+                              {items.map(preset => {
+                                // Highlight the preset whose bezier matches the layer's current easing.
+                                const e = selectedLayer?.easing;
+                                const isActive = !!e && e.p1x === preset.bezier[0] && e.p1y === preset.bezier[1] && e.p2x === preset.bezier[2] && e.p2y === preset.bezier[3];
+                                return (
+                                  <div
+                                    key={preset.id}
+                                    role="button"
+                                    tabIndex={selectedLayerId ? 0 : -1}
+                                    aria-label={`Apply ${preset.name} easing to selected layer`}
+                                    aria-disabled={!selectedLayerId}
+                                    title={preset.description}
+                                    onClick={() => {
+                                      if (!selectedLayerId) return;
+                                      const [p1x, p1y, p2x, p2y] = preset.bezier;
+                                      updateLayerEasing({ p1x, p1y, p2x, p2y });
+                                      setIsDirty(true);
+                                      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Easing set to ${preset.name}` } }));
+                                    }}
+                                    style={{
+                                      ...styles.behaviorItem,
+                                      flexDirection: 'column' as const,
+                                      alignItems: 'flex-start',
+                                      gap: '4px',
+                                      cursor: selectedLayerId ? 'pointer' : 'not-allowed',
+                                      opacity: selectedLayerId ? 1 : 0.5,
+                                      ...(isActive ? { borderColor: '#bf5af2', background: 'rgba(191,90,242,0.1)' } : {}),
+                                    }}
+                                  >
+                                    <span style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      {preset.name}
+                                      {isActive && <span style={{ fontSize: '11px', color: '#bf5af2', fontWeight: 700 }}>ON</span>}
+                                    </span>
+                                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>cubic-bezier({preset.bezier.join(', ')})</span>
+                                  </div>
+                                );
+                              })}
                             </React.Fragment>
                           );
                         })}
@@ -2774,7 +2798,7 @@ const Flux: React.FC = () => {
                 {/* Behaviors Panel */}
                 {activeTab === 'behaviors' && (
                   <div>
-                    <div style={{ marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Basic Behaviors</div>
+                    <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Basic Behaviors</div>
                     {BEHAVIOR_TYPES.filter(b => b.category === 'basic').map(behavior => (
                       <div
                         key={behavior.id}
@@ -2786,7 +2810,7 @@ const Flux: React.FC = () => {
                       </div>
                     ))}
                     
-                    <div style={{ marginTop: '16px', marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Motion</div>
+                    <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Motion</div>
                     {BEHAVIOR_TYPES.filter(b => b.category === 'motion').map(behavior => (
                       <div
                         key={behavior.id}
@@ -2798,7 +2822,7 @@ const Flux: React.FC = () => {
                       </div>
                     ))}
                     
-                    <div style={{ marginTop: '16px', marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Simulation</div>
+                    <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Simulation</div>
                     {BEHAVIOR_TYPES.filter(b => b.category === 'simulation').map(behavior => (
                       <div
                         key={behavior.id}
@@ -2815,7 +2839,7 @@ const Flux: React.FC = () => {
                 {/* Inspector Panel */}
                 {activeTab === 'inspector' && selectedLayer && (
                   <div>
-                    <div style={{ marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Transform</div>
+                    <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Transform</div>
                     <div style={styles.sliderRow}>
                       <span style={styles.sliderLabel}>Position X</span>
                       <input type="range" min="0" max={canvasSize.width} value={selectedLayer.transform.x} style={styles.slider} onChange={(e) => updateLayerTransform({ x: Number(e.target.value) })} />
@@ -2843,7 +2867,7 @@ const Flux: React.FC = () => {
                     </div>
                     
                     {/* Easing curve editor */}
-                    <div style={{ marginTop: '16px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
+                    <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
                     <button
                       type="button"
                       style={{ ...styles.behaviorItem, justifyContent: 'space-between', width: '100%' }}
@@ -2859,7 +2883,7 @@ const Flux: React.FC = () => {
                       <span style={{ color: 'var(--color-text-muted)' }}>{showEasingPopover ? Icons.chevronUp : Icons.chevronDown}</span>
                     </button>
                     {showEasingPopover && (
-                      <div style={{ padding: '10px', background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)', borderRadius: '8px', marginBottom: '8px' }}>
+                      <div style={{ padding: '10px', background: 'var(--color-bg-inset)', border: '1px solid var(--color-border-subtle)', borderRadius: '8px', marginBottom: 'var(--space-2)' }}>
                         <EasingCurveEditor
                           value={selectedLayer.easing || { p1x: 0.25, p1y: 0.1, p2x: 0.25, p2y: 1 }}
                           onChange={updateLayerEasing}
@@ -2867,7 +2891,7 @@ const Flux: React.FC = () => {
                         {selectedLayer.easing && (
                           <button
                             type="button"
-                            style={{ ...styles.btn, marginTop: '8px', color: 'var(--color-text-muted)' }}
+                            style={{ ...styles.btn, marginTop: 'var(--space-2)', color: 'var(--color-text-muted)' }}
                             onClick={() => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, easing: undefined } : l))}
                           >
                             Reset to per-keyframe easing
@@ -2879,7 +2903,7 @@ const Flux: React.FC = () => {
                     {/* Shape morph target */}
                     {selectedLayer.type === 'shape' && (
                       <>
-                        <div style={{ marginTop: '16px', marginBottom: '8px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Shape Morph</div>
+                        <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Shape Morph</div>
                         <button
                           type="button"
                           style={{ ...styles.behaviorItem, justifyContent: 'space-between', width: '100%' }}
@@ -2904,7 +2928,7 @@ const Flux: React.FC = () => {
                     )}
                     {selectedLayer.behaviors.length > 0 && (
                       <>
-                        <div style={{ marginTop: '16px', marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Applied Behaviors</div>
+                        <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Applied Behaviors</div>
                         {selectedLayer.behaviors.map(b => (
                           <div key={b.id} style={{ ...styles.behaviorItem, background: 'color-mix(in srgb, var(--color-accent) 20%, transparent)' }}>
                             {Icons.wand}
@@ -2920,9 +2944,9 @@ const Flux: React.FC = () => {
                 {/* History Panel */}
                 {activeTab === 'history' && (
                   <div>
-                    <div style={{ marginBottom: '12px', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>History ({history.length})</div>
+                    <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>History ({history.length})</div>
                     {history.length === 0 ? (
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '20px 0' }}>No history yet</div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-5) 0' }}>No history yet</div>
                     ) : (
                       history.map((entry, index) => (
                         <div
@@ -2941,10 +2965,19 @@ const Flux: React.FC = () => {
                 )}
               </div>
             </div>
+            </ResizablePanel>
           </div>
 
           {/* Timeline */}
           <div data-testid="flux-timeline" style={styles.timeline}>
+            {showTimeline && (
+              <div
+                onPointerDown={startTimelineResize}
+                onDoubleClick={resetTimelineHeight}
+                title="Drag to resize timeline (double-click to reset)"
+                style={{ position: 'absolute', top: -3, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 20 }}
+              />
+            )}
             <div style={styles.timelineHeader}>
               <button style={styles.iconBtn} onClick={() => setShowTimeline(!showTimeline)} aria-label="Toggle timeline">
                 {showTimeline ? Icons.chevronDown : Icons.chevronRight}
@@ -3038,7 +3071,7 @@ const Flux: React.FC = () => {
                             width: 7, height: 7,
                             background: currentTime === kf.time ? 'var(--color-warning)' : 'var(--color-accent)',
                             border: '1px solid var(--color-text-tertiary)',
-                            borderRadius: 1, cursor: 'pointer', zIndex: 2,
+                            borderRadius: 2, cursor: 'pointer', zIndex: 2,
                           }} title={`Keyframe at frame ${kf.time}`} />
                         ))}
                       </div>
@@ -3065,7 +3098,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Text Animator</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTextAnimator(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Animate By</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['character', 'word', 'line'] as const).map(m => (
@@ -3073,7 +3106,7 @@ const Flux: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Cascade Delay</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{textAnimCascade}ms</span></div>
-            <input type="range" min="0" max="200" value={textAnimCascade} onChange={e => setTextAnimCascade(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 8 }} />
+            <input type="range" min="0" max="200" value={textAnimCascade} onChange={e => setTextAnimCascade(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Presets</div>
             {['Typewriter', 'Fade Up', 'Scale Pop', 'Rotate In', 'Slide Left', 'Blur Reveal'].map(p => (
               <button key={p} aria-label={`Apply ${p} text animation preset`} onClick={() => {
@@ -3094,7 +3127,7 @@ const Flux: React.FC = () => {
                   behaviors: [...l.behaviors, { id: `beh-${Date.now()}`, type: 'textAnim' as any, enabled: true, settings: { preset: p, mode: textAnimMode, cascade: textAnimCascade } }],
                 } as any : l));
                 setShowTextAnimator(false);
-              }} style={{ display: 'block', width: '100%', padding: '5px 8px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>{p}</button>
+              }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>{p}</button>
             ))}
           </div>
         </div>
@@ -3158,7 +3191,7 @@ const Flux: React.FC = () => {
         return (
         <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: 60, bottom: 0, right: 0, height: 200, background: 'var(--color-bg-elevated)', borderTop: '1px solid var(--color-border-subtle)', boxShadow: '0 -8px 32px rgba(0,0,0,0.5)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Graph Editor</span>
               <select value={graphProperty} onChange={e => setGraphProperty(e.target.value)} aria-label="Graph property" style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
                 {props.map(p => <option key={p} value={p}>{p}</option>)}
@@ -3191,7 +3224,7 @@ const Flux: React.FC = () => {
             </div>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowGraphEditor(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ height: 'calc(100% - 32px)', position: 'relative', padding: '8px 40px' }}>
+          <div style={{ height: 'calc(100% - 32px)', position: 'relative', padding: 'var(--space-2) var(--space-10)' }}>
             {/* Y-axis labels */}
             <div style={{ position: 'absolute', left: 4, top: 8, bottom: 0, width: 34, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{Math.round(hi * 10) / 10}</span>
@@ -3224,14 +3257,14 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Expression Engine</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => { setShowExpressionEditor(false); setExpressionError(null); }} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+          <div style={{ padding: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-2)', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Target</span>
               <select value={expressionTarget} onChange={e => setExpressionTarget(e.target.value)} aria-label="Expression target property" style={{ flex: 1, padding: '3px 6px', borderRadius: 3, border: '1px solid var(--color-border)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: '#bf5af2', fontSize: 11, fontWeight: 600 }}>
                 {['opacity', 'x', 'y', 'scaleX', 'scaleY', 'rotationZ', 'z', 'scaleZ', 'rotationX', 'rotationY'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
-            <textarea value={expressionCode} onChange={e => { setExpressionCode(e.target.value); setExpressionError(null); }} placeholder="// Write expressions here&#10;// time, value, index available&#10;Math.sin(time * 2) * 100" style={{ width: '100%', height: 100, padding: 8, borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical' }} />
+            <textarea value={expressionCode} onChange={e => { setExpressionCode(e.target.value); setExpressionError(null); }} placeholder="// Write expressions here&#10;// time, value, index available&#10;Math.sin(time * 2) * 100" style={{ width: '100%', height: 100, padding: 'var(--space-2)', borderRadius: 4, border: `1px solid ${expressionError ? 'rgba(255,55,95,0.4)' : 'var(--color-border-subtle)'}`, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-success)', fontSize: 11, fontFamily: 'var(--font-mono)', resize: 'vertical' }} />
             {expressionError && <div style={{ fontSize: 11, color: '#ff375f', marginTop: 4, fontFamily: 'var(--font-mono)' }}>{expressionError}</div>}
             <button onClick={() => {
               if (!selectedLayerId || !expressionCode.trim()) return;
@@ -3294,10 +3327,10 @@ const Flux: React.FC = () => {
               } catch (err: any) {
                 setExpressionError(err.message || 'Invalid expression');
               }
-            }} style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 4, border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.12)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to {expressionTarget}</button>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8, marginBottom: 4 }}>Templates</div>
+            }} style={{ width: '100%', marginTop: 'var(--space-2)', padding: '6px 0', borderRadius: 4, border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.12)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to {expressionTarget}</button>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
-              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px 8px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
+              <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
                 <span style={{ color: '#bf5af2', fontWeight: 600 }}>{t.name}</span> — <span style={{ color: 'var(--color-text-tertiary)' }}>{t.code}</span>
               </button>
             ))}
@@ -3312,7 +3345,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Repeater / Replicator</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowRepeater(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['grid', 'radial', 'spiral'] as const).map(t => (
                 <button key={t} onClick={() => setRepeaterType(t)} aria-label={`${t} repeater type`} aria-pressed={repeaterType === t} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: repeaterType === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: repeaterType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
@@ -3334,7 +3367,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>3D Text</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShow3DText(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: '#404050', textShadow: '2px 2px 0px #202030, -1px -1px 0px #606070' }}>Aa</span>
             </div>
@@ -3364,15 +3397,15 @@ const Flux: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {['WebM VP9', 'WebM VP8'].map(f => (
-                <button key={f} aria-label={`${f} export format`} style={{ flex: 1, padding: '8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: f === 'WebM VP9' ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: f === 'WebM VP9' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
+                <button key={f} aria-label={`${f} export format`} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: f === 'WebM VP9' ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: f === 'WebM VP9' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Palette Colors</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{gifPalette}</span></div>
-            <input type="range" min="2" max="256" value={gifPalette} onChange={e => setGifPalette(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 8 }} />
+            <input type="range" min="2" max="256" value={gifPalette} onChange={e => setGifPalette(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer', marginBottom: 10 }}>
               <input type="checkbox" checked={gifDither} onChange={e => setGifDither(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} /> Floyd-Steinberg Dithering
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginBottom: 10 }}>
               <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>FPS</div><select style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>10</option><option>15</option><option>24</option><option>30</option></select></div>
               <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Loop</div><select style={{ width: '100%', padding: '4px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Forever</option><option>Once</option><option>3x</option></select></div>
             </div>
@@ -3425,7 +3458,7 @@ const Flux: React.FC = () => {
                 }
               };
               renderNextFrame();
-            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
           </div>
         </div>
       )}
@@ -3438,13 +3471,13 @@ const Flux: React.FC = () => {
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowLottieExport(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <div style={{ padding: 16, borderRadius: 6, background: 'rgba(255,149,10,0.08)', border: '1px solid rgba(255,149,10,0.2)', textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ padding: 'var(--space-4)', borderRadius: 6, background: 'rgba(255,149,10,0.08)', border: '1px solid rgba(255,149,10,0.2)', textAlign: 'center', marginBottom: 'var(--space-3)' }}>
               <div style={{ fontSize: 24, marginBottom: 4 }}>{ }</div>
               <div style={{ fontSize: 11, color: 'var(--color-warning)', fontWeight: 600 }}>Lottie JSON</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Web-optimized vector animation</div>
             </div>
             {[{ label: 'Optimize', desc: 'Remove unused properties' }, { label: 'Flatten', desc: 'Merge nested transforms' }, { label: 'Minify', desc: 'Compress JSON output' }].map(opt => (
-              <label key={opt.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' }}>
+              <label key={opt.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' }}>
                 <input type="checkbox" defaultChecked style={{ accentColor: 'var(--color-warning)' }} />
                 <div><div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{opt.label}</div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{opt.desc}</div></div>
               </label>
@@ -3508,7 +3541,7 @@ const Flux: React.FC = () => {
               a.href = url; a.download = `flux-lottie-${Date.now()}.json`;
               a.click(); URL.revokeObjectURL(url);
               setShowLottieExport(false);
-            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-warning)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Export Lottie JSON</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-warning)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Export Lottie JSON</button>
           </div>
         </div>
       )}
@@ -3516,23 +3549,23 @@ const Flux: React.FC = () => {
       {/* Composition Templates */}
       {showCompTemplates && (
         <div style={{ position: 'fixed', animation: "dex-panel-in 200ms ease-out", left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'min(500px, calc(100vw - 32px))', height: 'min(440px, calc(100vh - 64px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', zIndex: 'var(--z-modal)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>Composition Templates</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowCompTemplates(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            <div style={{ width: 130, borderRight: '1px solid var(--color-bg-hover)', padding: 8 }}>
+            <div style={{ width: 130, borderRight: '1px solid var(--color-bg-hover)', padding: 'var(--space-2)' }}>
               {(['lower-thirds', 'intros', 'social', 'titles'] as const).map(cat => (
-                <button key={cat} onClick={() => setCompTemplateCategory(cat)} aria-label={`${cat.replace('-', ' ')} templates`} aria-pressed={compTemplateCategory === cat} style={{ display: 'block', width: '100%', padding: '6px 8px', borderRadius: 4, border: 'none', background: compTemplateCategory === cat ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent', color: compTemplateCategory === cat ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat.replace('-', ' ')}</button>
+                <button key={cat} onClick={() => setCompTemplateCategory(cat)} aria-label={`${cat.replace('-', ' ')} templates`} aria-pressed={compTemplateCategory === cat} style={{ display: 'block', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: 'none', background: compTemplateCategory === cat ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent', color: compTemplateCategory === cat ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat.replace('-', ' ')}</button>
               ))}
             </div>
-            <div style={{ flex: 1, padding: 12, overflowY: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            <div style={{ flex: 1, padding: 'var(--space-3)', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
                 {(compTemplateCategory === 'lower-thirds' ? ['Clean Bar', 'Glass Panel', 'Slide In', 'Minimal Line', 'Badge', 'Split'] :
                   compTemplateCategory === 'intros' ? ['Logo Reveal', 'Particle Burst', 'Glitch', 'Cinematic', 'Geometric', 'Gradient Flow'] :
                   compTemplateCategory === 'social' ? ['Instagram Post', 'Story 9:16', 'YouTube End Card', 'TikTok', 'Twitter Banner', 'Facebook Cover'] :
                   ['Title Card', 'Chapter', 'Credit Roll', 'Subtitle', 'Quote', 'Name Plate']).map(t => (
-                  <button key={t} aria-label={`Apply ${t} template`} onClick={() => { const templateLayers = [{ id: `layer_${Date.now()}`, name: t, type: 'shape' as const, visible: true, locked: false, solo: false, startTime: 0, duration: compTemplateCategory === 'intros' ? 150 : 90, inPoint: 0, outPoint: compTemplateCategory === 'intros' ? 150 : 90, transform: { x: canvasSize.width / 2 - 200, y: canvasSize.height / 2 - 50, z: 0, scaleX: 1, scaleY: 1, scaleZ: 1, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0.5, anchorY: 0.5, opacity: 100 }, behaviors: [], filters: [], animations: [{ property: 'opacity', keyframes: [{ time: 0, value: 0, easing: 'easeOut' as const }, { time: 15, value: 100, easing: 'easeOut' as const }] }] }]; setLayers(prev => [...templateLayers, ...prev]); setSelectedLayerId(templateLayers[0].id); setShowCompTemplates(false); }} style={{ padding: 12, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
+                  <button key={t} aria-label={`Apply ${t} template`} onClick={() => { const templateLayers = [{ id: `layer_${Date.now()}`, name: t, type: 'shape' as const, visible: true, locked: false, solo: false, startTime: 0, duration: compTemplateCategory === 'intros' ? 150 : 90, inPoint: 0, outPoint: compTemplateCategory === 'intros' ? 150 : 90, transform: { x: canvasSize.width / 2 - 200, y: canvasSize.height / 2 - 50, z: 0, scaleX: 1, scaleY: 1, scaleZ: 1, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0.5, anchorY: 0.5, opacity: 100 }, behaviors: [], filters: [], animations: [{ property: 'opacity', keyframes: [{ time: 0, value: 0, easing: 'easeOut' as const }, { time: 15, value: 100, easing: 'easeOut' as const }] }] }]; setLayers(prev => [...templateLayers, ...prev]); setSelectedLayerId(templateLayers[0].id); setShowCompTemplates(false); }} style={{ padding: 'var(--space-3)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
                     <div style={{ height: 50, borderRadius: 3, background: 'var(--color-border-subtle)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: 18 }}>*</span>
                     </div>
@@ -3556,10 +3589,10 @@ const Flux: React.FC = () => {
             <button aria-label="Create null object" onClick={() => {
               const id = addLayer('shape');
               setLayers(prev => prev.map(l => l.id === id ? { ...l, name: `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`, type: 'null' as any, transform: { ...l.transform, opacity: 0 } } : l));
-            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}>+ Create Null Object</button>
-            <div style={{ marginBottom: 8 }}>
+            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
+            <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Parent Layer</span>
-              <select style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+              <select style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                 <option>None</option>
                 {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
@@ -3571,7 +3604,7 @@ const Flux: React.FC = () => {
                 <input type="number" defaultValue={prop === 'Scale' ? 100 : 0} style={{ width: 60, padding: '2px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, textAlign: 'right' }} />
               </div>
             ))}
-            <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8, marginTop: 8 }}>
+            <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Null Objects</div>
               <div style={{ padding: 14, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No null objects created yet</div>
             </div>
@@ -3603,7 +3636,7 @@ const Flux: React.FC = () => {
                 <line x1="260" y1="100" x2="180" y2="40" stroke="#bf5af2" strokeWidth="0.5" strokeDasharray="2,2" />
               </svg>
             </div>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Ease Curve</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['Linear', 'Ease In', 'Ease Out', 'Ease Both'].map(e => (
@@ -3621,7 +3654,7 @@ const Flux: React.FC = () => {
                 Closed Path
               </label>
             </div>
-            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: false }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: 'easeInOut' }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: 'easeInOut' }); } setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>Apply Motion Path</button>
+            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: false }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: 'easeInOut' }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: 'easeInOut' }); } setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
           </div>
         </div>
       )}
@@ -3665,7 +3698,7 @@ const Flux: React.FC = () => {
               </div>
               <input type="range" min="0" max="100" value={maskOpacity} onChange={e => setMaskOpacity(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
             </div>
-            <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8, marginTop: 4 }}>
+            <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 4 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Mask List</div>
               {(() => { const sel = layers.find(l => l.id === selectedLayerId); const masks = sel?.masks || []; return masks.length === 0 ? <div style={{ padding: 14, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No masks — select a shape above</div> : masks.map(m => (<div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{m.shape} ({m.mode})</span><button onClick={() => setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, masks: (l.masks || []).filter(mm => mm.id !== m.id) } : l))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button></div>)); })()}
             </div>
@@ -3689,7 +3722,7 @@ const Flux: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginBottom: 10 }}>
               {[{ label: 'Birth Rate', val: '60/s' }, { label: 'Lifetime', val: '2.0s' }, { label: 'Speed', val: '150' }, { label: 'Spread', val: '45°' }].map(p => (
                 <div key={p.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
@@ -3733,12 +3766,12 @@ const Flux: React.FC = () => {
             <button aria-label="Close Audio Reactive panel" onClick={() => setShowAudioReactive(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ height: 60, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', borderRadius: 4, border: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end', gap: 2, padding: '4px 8px', marginBottom: 10 }}>
+            <div style={{ height: 60, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', borderRadius: 4, border: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end', gap: 2, padding: '4px var(--space-2)', marginBottom: 10 }}>
               {audioFreqSnapshot.map((v, i) => (
                 <div key={i} style={{ flex: 1, background: `hsl(${260 + i * 3}, 80%, ${40 + v * 30}%)`, borderRadius: '2px 2px 0 0', height: `${Math.max(4, v * 100)}%`, minHeight: 2, transition: 'height 60ms ease-out' }} />
               ))}
             </div>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Frequency Band</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {([['sub', 'Sub Bass'], ['bass', 'Bass'], ['mids', 'Mids'], ['hiMids', 'Hi-Mids'], ['treble', 'Treble']] as const).map(([k, label]) => (
@@ -3746,9 +3779,9 @@ const Flux: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Bind to Property</span>
-              <select value={audioReactiveProperty} onChange={e => setAudioReactiveProperty(e.target.value as typeof audioReactiveProperty)} style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
+              <select value={audioReactiveProperty} onChange={e => setAudioReactiveProperty(e.target.value as typeof audioReactiveProperty)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
                 <option value="scale">Scale</option>
                 <option value="opacity">Opacity</option>
                 <option value="positionY">Position Y</option>
@@ -3776,7 +3809,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Shader Effects</span>
             <button aria-label="Close Shader Effects panel" onClick={() => setShowShaderEffects(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14, padding: 2 }}><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, overflow: 'auto' }}>
+          <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)', overflow: 'auto' }}>
             {/* GLSL Editor */}
             <div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>GLSL Fragment Shader</div>
@@ -3796,10 +3829,10 @@ const Flux: React.FC = () => {
                   )}
                 </div>
               ))}
-              <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8, marginTop: 8 }}>
+              <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Presets</div>
                 {[{ n: 'Chromatic Aberration', f: 'hue-rotate(5deg) saturate(1.5) contrast(1.1)' }, { n: 'Noise Grain', f: 'contrast(1.3) brightness(0.95)' }, { n: 'Barrel Distortion', f: 'contrast(1.2) brightness(1.05)' }, { n: 'RGB Split', f: 'saturate(2) hue-rotate(10deg) contrast(1.15)' }, { n: 'CRT Scanlines', f: 'contrast(1.4) brightness(0.9) saturate(0.8)' }].map(p => (
-                  <button key={p.n} aria-label={`Apply ${p.n} shader preset`} onClick={() => { if (!selectedLayerId) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { customFilter: p.f } }] } : l)); setShowShaderEffects(false); }} style={{ display: 'block', width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 3 }}>{p.n}</button>
+                  <button key={p.n} aria-label={`Apply ${p.n} shader preset`} onClick={() => { if (!selectedLayerId) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, filters: [...l.filters.filter(f => f.type !== 'stylize'), { id: `shader-${Date.now()}`, type: 'stylize' as any, enabled: true, settings: { customFilter: p.f } }] } : l)); setShowShaderEffects(false); }} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 3 }}>{p.n}</button>
                 ))}
               </div>
             </div>
@@ -3824,7 +3857,7 @@ const Flux: React.FC = () => {
               ))}
             </div>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Matte Layer</span>
-            <select value={matteLayerSelect} onChange={e => setMatteLayerSelect(e.target.value)} style={{ width: '100%', padding: '5px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 8 }}>
+            <select value={matteLayerSelect} onChange={e => setMatteLayerSelect(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 'var(--space-2)' }}>
               <option value="">None</option>
               {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
@@ -3842,7 +3875,7 @@ const Flux: React.FC = () => {
           </div>
           <div style={{ padding: 10 }}>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Composition Name</span>
-            <input type="text" value={precompName} onChange={e => setPrecompName(e.target.value)} style={{ width: '100%', padding: '6px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#ccc', fontSize: 11, marginBottom: 10, boxSizing: 'border-box' }} />
+            <input type="text" value={precompName} onChange={e => setPrecompName(e.target.value)} style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#ccc', fontSize: 11, marginBottom: 10, boxSizing: 'border-box' }} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>
               <input type="checkbox" defaultChecked style={{ accentColor: '#bf5af2' }} />
               Move all attributes into new composition
@@ -3870,7 +3903,7 @@ const Flux: React.FC = () => {
               setLayers(prev => [groupLayer, ...prev.filter(l => l.id !== selectedLayerId)]);
               setSelectedLayerId(groupLayer.id);
               setShowPrecompose(false);
-            }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
           </div>
         </div>
       )}
@@ -3883,15 +3916,15 @@ const Flux: React.FC = () => {
             <button aria-label="Close Time Remap panel" onClick={() => setShowTimeRemap(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 40 }}>Speed</span>
               <input type="range" min="10" max="400" value={timeRemapSpeed} onChange={e => setTimeRemapSpeed(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{timeRemapSpeed}%</span>
             </div>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {[25, 50, 100, 200, 400].map(s => <button key={s} onClick={() => setTimeRemapSpeed(s)} aria-label={`${s}% speed`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (timeRemapSpeed === s ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: timeRemapSpeed === s ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: timeRemapSpeed === s ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{s}%</button>)}
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
               <input type="checkbox" checked={timeRemapReverse} onChange={e => setTimeRemapReverse(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
               Reverse playback
             </label>
@@ -3912,17 +3945,17 @@ const Flux: React.FC = () => {
           </div>
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ flex: 1, padding: 16, borderRadius: 6, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', textAlign: 'center' }}>
+              <div style={{ flex: 1, padding: 'var(--space-4)', borderRadius: 6, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', textAlign: 'center' }}>
                 <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#bf5af2" strokeWidth="2" /></svg>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Source Shape</div>
               </div>
               <span style={{ color: 'var(--color-text-tertiary)' }}><DexIcon name="arrow-right" size={16} /></span>
-              <div style={{ flex: 1, padding: 16, borderRadius: 6, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', textAlign: 'center' }}>
+              <div style={{ flex: 1, padding: 'var(--space-4)', borderRadius: 6, background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', textAlign: 'center' }}>
                 <svg width="40" height="40" viewBox="0 0 40 40"><rect x="6" y="6" width="28" height="28" fill="none" stroke="#bf5af2" strokeWidth="2" rx="2" /></svg>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Target Shape</div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Progress</span>
               <input type="range" min="0" max="100" value={morphProgress} onChange={e => setMorphProgress(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{morphProgress}%</span>
@@ -3966,7 +3999,7 @@ const Flux: React.FC = () => {
           </div>
           <div style={{ padding: 10 }}>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Property</span>
-            <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
               {(['position', 'rotation', 'scale', 'opacity'] as const).map(p => (
                 <button key={p} onClick={() => setWiggleProperty(p)} aria-label={`Wiggle ${p}`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (wiggleProperty === p ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: wiggleProperty === p ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: wiggleProperty === p ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{p}</button>
               ))}
@@ -3976,7 +4009,7 @@ const Flux: React.FC = () => {
               <input type="range" min="1" max="30" value={wiggleFreq} onChange={e => setWiggleFreq(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 20, textAlign: 'right' }}>{wiggleFreq}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 55 }}>Amplitude</span>
               <input type="range" min="1" max="200" value={wiggleAmp} onChange={e => setWiggleAmp(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{wiggleAmp}</span>
@@ -4006,18 +4039,18 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             {selectedLayerId ? (
               <>
-                <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 8 }}>
-                  {(layers.find(l => l.id === selectedLayerId)?.filters || []).length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 12 }}>No effects applied</div>}
+                <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 'var(--space-2)' }}>
+                  {(layers.find(l => l.id === selectedLayerId)?.filters || []).length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No effects applied</div>}
                   {(layers.find(l => l.id === selectedLayerId)?.filters || []).map((f, i) => (
                     <div key={f.id} style={{ marginBottom: 3, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px var(--space-2)' }}>
                         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 12 }}>{i + 1}</span>
                         <span onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { const fl = layer.filters.find(ff => ff.id === f.id); if (fl) { (fl as any)._expanded = !(fl as any)._expanded; setLayers(nl); } } }} style={{ fontSize: 11, color: f.enabled ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)', flex: 1, textTransform: 'capitalize', cursor: 'pointer' }}>{f.type}</span>
                         <button aria-label={`Toggle ${f.type} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, enabled: !ff.enabled } : ff); setLayers(nl); } }} style={{ background: 'none', border: 'none', color: f.enabled ? '#bf5af2' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center' }}>{f.enabled ? <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6"/></svg> : <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="5"/></svg>}</button>
                         <button aria-label={`Remove ${f.type} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.filter(ff => ff.id !== f.id); setLayers(nl); } }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11 }}><DexIcon name="close" size={11} /></button>
                       </div>
                       {(f as any)._expanded && (
-                        <div style={{ padding: '4px 8px 8px', borderTop: '1px solid var(--color-bg-hover)' }}>
+                        <div style={{ padding: '4px var(--space-2) var(--space-2)', borderTop: '1px solid var(--color-bg-hover)' }}>
                           {f.type === 'blur' && (
                             <><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}><span>Radius</span><span>{(f.settings as any).radius ?? 10}px</span></div>
                             <input type="range" min="0" max="100" value={(f.settings as any).radius ?? 10} onChange={e => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = layer.filters.map(ff => ff.id === f.id ? { ...ff, settings: { ...ff.settings, radius: Number(e.target.value) } } : ff); setLayers(nl); } }} style={{ width: '100%', accentColor: '#bf5af2' }} /></>
@@ -4062,7 +4095,7 @@ const Flux: React.FC = () => {
                   ))}
                 </div>
               </>
-            ) : <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 16 }}>Select a layer to manage effects</div>}
+            ) : <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>Select a layer to manage effects</div>}
           </div>
         </div>
       )}
@@ -4086,7 +4119,7 @@ const Flux: React.FC = () => {
               <input type="range" min="10" max="120" value={cameraFov} onChange={e => setCameraFov(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{cameraFov}°</span>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
               <input type="checkbox" checked={cameraDof} onChange={e => setCameraDof(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
               Depth of Field
             </label>
@@ -4125,13 +4158,13 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
               {[{ id: 'studio', name: 'Studio', desc: 'Soft diffused lighting' }, { id: 'outdoor', name: 'Outdoor HDR', desc: 'Daylight environment' }, { id: 'sunset', name: 'Golden Hour', desc: 'Warm directional light' }, { id: 'night', name: 'Night City', desc: 'Urban neon reflections' }, { id: 'gradient', name: 'Gradient Sky', desc: 'Smooth color backdrop' }, { id: 'abstract', name: 'Abstract', desc: 'Colorful patterns' }].map(e => (
-                <button key={e.id} onClick={() => setEnvMapPreset(e.id)} aria-label={`Select ${e.name} environment`} style={{ padding: '8px', borderRadius: 4, border: '1px solid ' + (envMapPreset === e.id ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: envMapPreset === e.id ? 'rgba(191,90,242,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
+                <button key={e.id} onClick={() => setEnvMapPreset(e.id)} aria-label={`Select ${e.name} environment`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (envMapPreset === e.id ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: envMapPreset === e.id ? 'rgba(191,90,242,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ fontSize: 11, color: envMapPreset === e.id ? '#bf5af2' : 'var(--color-text-secondary)', fontWeight: 600 }}>{e.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{e.desc}</div>
                 </button>
               ))}
             </div>
-            <div style={{ padding: 8, borderRadius: 4, border: '2px dashed var(--color-border-subtle)', textAlign: 'center', cursor: 'pointer' }}>
+            <div style={{ padding: 'var(--space-2)', borderRadius: 4, border: '2px dashed var(--color-border-subtle)', textAlign: 'center', cursor: 'pointer' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Load custom HDRI / EXR file</span>
             </div>
           </div>
@@ -4146,11 +4179,11 @@ const Flux: React.FC = () => {
             <button aria-label="Close Render Queue panel" onClick={() => setShowRenderQueue(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'MP4 H.264', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}>+ Add to Queue</button>
+            <button aria-label="Add current composition to render queue" onClick={() => setRenderQueue(prev => [...prev, { id: `rq-${Date.now()}`, name: `Comp - ${new Date().toLocaleTimeString()}`, format: 'MP4 H.264', status: 'queued', progress: 0 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add to Queue</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-              {renderQueue.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 16 }}>Queue is empty</div>}
+              {renderQueue.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-4)' }}>Queue is empty</div>}
               {renderQueue.map(job => (
-                <div key={job.id} style={{ padding: '8px', marginBottom: 4, borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)' }}>
+                <div key={job.id} style={{ padding: 'var(--space-2)', marginBottom: 4, borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{job.name}</span>
                     <span style={{ fontSize: 11, color: job.status === 'done' ? 'var(--color-success)' : job.status === 'rendering' ? '#bf5af2' : job.status === 'error' ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{job.status}</span>
@@ -4163,7 +4196,7 @@ const Flux: React.FC = () => {
               ))}
             </div>
             {renderQueue.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 4, marginTop: 'var(--space-2)' }}>
                 <button aria-label="Start rendering" onClick={() => {
                   const queuedJobs = renderQueue.filter(j => j.status === 'queued');
                   if (queuedJobs.length === 0) return;
@@ -4182,7 +4215,7 @@ const Flux: React.FC = () => {
                     }
                   }, 500);
                 }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Render All</button>
-                <button aria-label="Clear render queue" onClick={() => setRenderQueue([])} style={{ padding: '7px 12px', borderRadius: 4, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
+                <button aria-label="Clear render queue" onClick={() => setRenderQueue([])} style={{ padding: '7px var(--space-3)', borderRadius: 4, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
               </div>
             )}
           </div>
@@ -4197,9 +4230,9 @@ const Flux: React.FC = () => {
             <button aria-label="Close Markers panel" onClick={() => setShowMarkers(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add marker at current time" onClick={() => setMarkers(prev => [...prev, { id: `m-${Date.now()}`, time: currentTime, label: `Marker ${prev.length + 1}`, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2', '#FF375F'][prev.length % 6] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}>+ Add Marker at Frame {currentTime}</button>
+            <button aria-label="Add marker at current time" onClick={() => setMarkers(prev => [...prev, { id: `m-${Date.now()}`, time: currentTime, label: `Marker ${prev.length + 1}`, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2', '#FF375F'][prev.length % 6] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Marker at Frame {currentTime}</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-              {markers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 12 }}>No markers</div>}
+              {markers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No markers</div>}
               {markers.map(m => (
                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                   <div style={{ width: 10, height: 10, borderRadius: 2, background: m.color }} />
@@ -4259,7 +4292,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Guide Layers panel" onClick={() => setShowGuideLayer(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 8 }}>Guide layers are visible in editor but not rendered in final output.</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>Guide layers are visible in editor but not rendered in final output.</div>
             {layers.map(l => (
               <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--color-border-subtle)', fontSize: 11, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={guideLayers.has(l.id)} onChange={() => setGuideLayers(prev => { const n = new Set(prev); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })} style={{ accentColor: '#bf5af2' }} />
@@ -4267,7 +4300,7 @@ const Flux: React.FC = () => {
                 {guideLayers.has(l.id) && <span style={{ fontSize: 11, color: '#bf5af2', marginLeft: 'auto' }}>GUIDE</span>}
               </label>
             ))}
-            {layers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 12 }}>No layers</div>}
+            {layers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No layers</div>}
           </div>
         </div>
       )}
@@ -4280,9 +4313,9 @@ const Flux: React.FC = () => {
             <button aria-label="Close Snapshots panel" onClick={() => setShowSnapshot(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString() }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
+            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString() }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-              {snapshots.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 12 }}>No snapshots taken</div>}
+              {snapshots.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No snapshots taken</div>}
               {snapshots.map(s => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', flex: 1 }}>{s.name}</span>
@@ -4309,7 +4342,7 @@ const Flux: React.FC = () => {
               <input type="range" min="2" max="16" value={frameBlendSamples} onChange={e => setFrameBlendSamples(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 16, textAlign: 'right' }}>{frameBlendSamples}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Shutter</span>
               <input type="range" min="0" max="360" value={frameBlendShutter} onChange={e => setFrameBlendShutter(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{frameBlendShutter}°</span>
@@ -4365,7 +4398,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Stagger panel" onClick={() => setShowStagger(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 40 }}>Offset</span>
               <input type="range" min="1" max="60" value={staggerOffset} onChange={e => setStaggerOffset(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 35, textAlign: 'right' }}>{staggerOffset} fr</span>
@@ -4408,7 +4441,7 @@ const Flux: React.FC = () => {
               </div>
             ))}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4, marginTop: 4 }}>Line Cap</span>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {(['butt', 'round', 'square'] as const).map(c => (
                 <button key={c} onClick={() => setStrokeCap(c)} aria-label={`${c} line cap`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (strokeCap === c ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: strokeCap === c ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: strokeCap === c ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{c}</button>
               ))}
@@ -4435,12 +4468,12 @@ const Flux: React.FC = () => {
               <input type="range" min="2" max="32" value={motionBlurSamples} onChange={e => setMotionBlurSamples(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 18, textAlign: 'right' }}>{motionBlurSamples}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 50 }}>Shutter°</span>
               <input type="range" min="0" max="720" value={motionBlurShutter} onChange={e => setMotionBlurShutter(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{motionBlurShutter}°</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px 8px', borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>Higher samples = better quality, slower render. Shutter angle controls blur intensity (180° = standard film).</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>Higher samples = better quality, slower render. Shutter angle controls blur intensity (180° = standard film).</div>
           </div>
         </div>
       )}
@@ -4455,18 +4488,18 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
               {[{ f: 'mp4', c: 'h264', q: 'YouTube / Web' }, { f: 'mp4', c: 'h265', q: 'High Quality HEVC' }, { f: 'webm', c: 'vp9', q: 'Web Optimized' }, { f: 'mov', c: 'prores', q: 'ProRes Master' }, { f: 'png', c: 'png', q: 'PNG Sequence' }, { f: 'gif', c: 'gif', q: 'Animated GIF' }].map(p => (
-                <button key={p.q} onClick={() => { setExportFormat(p.f); setExportCodec(p.c); }} aria-label={`Export as ${p.q}`} style={{ padding: '8px', borderRadius: 4, border: '1px solid ' + (exportFormat === p.f && exportCodec === p.c ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: exportFormat === p.f && exportCodec === p.c ? 'rgba(191,90,242,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
+                <button key={p.q} onClick={() => { setExportFormat(p.f); setExportCodec(p.c); }} aria-label={`Export as ${p.q}`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (exportFormat === p.f && exportCodec === p.c ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: exportFormat === p.f && exportCodec === p.c ? 'rgba(191,90,242,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ fontSize: 11, color: exportFormat === p.f && exportCodec === p.c ? '#bf5af2' : 'var(--color-text-secondary)', fontWeight: 600 }}>{p.f.toUpperCase()} / {p.c.toUpperCase()}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.q}</div>
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 40 }}>Quality</span>
               <input type="range" min="10" max="100" value={exportQuality} onChange={e => setExportQuality(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 26, textAlign: 'right' }}>{exportQuality}%</span>
             </div>
-            <button aria-label="Export with selected preset" onClick={() => { setShowExportPresets(false); }} style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'linear-gradient(135deg, #bf5af2, #9b59b6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
+            <button aria-label="Export with selected preset" onClick={() => { setShowExportPresets(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'linear-gradient(135deg, #bf5af2, #9b59b6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
           </div>
         </div>
       )}
@@ -4496,13 +4529,12 @@ const Flux: React.FC = () => {
         return (
           <div style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 'var(--z-max)', minWidth: 160, background: 'var(--color-bg-elevated)', border: '1px solid #333', borderRadius: 6, padding: '4px 0', boxShadow: 'var(--pg-shadow-context)', animation: 'contextMenuIn 0.12s ease' }} onClick={e => e.stopPropagation()}>
             {menuItems.map((item, i) => item === null
-              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px 8px' }} />
+              ? <div key={i} style={{ height: 1, background: '#333', margin: '4px var(--space-2)' }} />
               : <div key={i} className="flux-ctx-item" onClick={() => { if (!item.disabled) { item.fn(); setCtxMenu(p => ({ ...p, visible: false })); } }} style={{ padding: '6px 14px', fontSize: 11, color: item.disabled ? '#555' : item.danger ? 'var(--color-error)' : '#e0e0e0', cursor: item.disabled ? 'default' : 'pointer', borderRadius: 3, margin: '0 4px' }}>{item.label}</div>
             )}
           </div>
         );
       })()}
-      {showShortcutsPanel && <KeyboardShortcutsPanel appId="flux" onClose={() => setShowShortcutsPanel(false)} />}
 
       {/* Morph target modal */}
       {showMorphModal && (
@@ -4515,7 +4547,7 @@ const Flux: React.FC = () => {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: 420, padding: 16, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: 10 }}
+            style={{ width: 420, padding: 'var(--space-4)', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)', borderRadius: 10, boxShadow: 'var(--pg-shadow-popover)', display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <strong style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>Morph to target SVG path</strong>
@@ -4526,21 +4558,21 @@ const Flux: React.FC = () => {
               value={morphPathInput}
               onChange={e => setMorphPathInput(e.target.value)}
               placeholder="M 0 0 L 100 0 L 50 87 Z"
-              style={{ width: '100%', minHeight: 80, padding: 8, fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderRadius: 6, resize: 'vertical' }}
+              style={{ width: '100%', minHeight: 80, padding: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderRadius: 6, resize: 'vertical' }}
               aria-label="Target SVG path"
             />
             <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
               Adds a path keyframe at the current playhead time. The shape interpolates from the previous keyframe (or its starting square) to this target.
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
               <button
                 type="button"
-                style={{ ...styles.btn, padding: '6px 12px', background: 'var(--color-bg-hover)' }}
+                style={{ ...styles.btn, padding: '6px var(--space-3)', background: 'var(--color-bg-hover)' }}
                 onClick={() => setShowMorphModal(false)}
               >Cancel</button>
               <button
                 type="button"
-                style={{ ...styles.btn, ...styles.btnPrimary, padding: '6px 12px' }}
+                style={{ ...styles.btn, ...styles.btnPrimary, padding: '6px var(--space-3)' }}
                 disabled={morphPathInput.trim().length === 0}
                 onClick={() => {
                   const trimmed = morphPathInput.trim();

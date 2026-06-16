@@ -7,6 +7,14 @@
 /**
  * UKI Memory — capped, append-only conversational + workflow memory.
  *
+ * This is the SINGLE renderer persistence adapter for UKI memory. It owns the
+ * hot rolling window (`uki:mem:turns`) and delegates its COLD tier to
+ * `./compressedMemory`, which reads back from here, archives evicted turns, and
+ * writes the trimmed window through the same key. The two modules are one store
+ * across two physical cache keys — see `./compressedMemory` for the tier
+ * contract. `./index_search` reads both tiers (live turns + archive summaries)
+ * to build its lexical index; do not introduce a second turn store.
+ *
  * Local-first: everything is stored in localStorage via the UKI cache layer.
  * Encryption is opt-in per record (cache.setAsync({ encrypted: true })).
  *
@@ -14,8 +22,16 @@
  *   - turns:       last N user/UKI exchanges (rolling window, default 200)
  *   - facts:       cached results from free APIs (TTL-driven, see freeApis)
  *   - workflows:   user-named recipes (manual or learned)
+ *   - archive:     cold gzip summaries of evicted turns (see ./compressedMemory)
  *
  * No background timers. All retention happens lazily on write.
+ *
+ * Note: `src/shared/uki/memory.ts` is the pure in-memory tiered MODEL used by
+ * the Memory inspector UI and tests; THIS module is its persistence adapter.
+ * `src/main/uki/knowledge/UkiRewindMemory.ts` is a separate, main-process
+ * recall *fusion* surface (native Rust archive + rewind timeline + knowledge
+ * graph) and is intentionally not unified into this localStorage store — its
+ * data lives in a different process and shape. See that file's header.
  */
 
 import * as cache from './cache';
@@ -41,8 +57,9 @@ export async function recordTurn(
   const turn = freshTurn(user, ukiResponse, extras);
   const list = (await readTurns()).concat(turn).slice(-MAX_TURNS);
   await cache.setAsync(TURNS_KEY, list, { encrypted: true });
-  // Lazy compression: consolidate older warm turns into compressed archives
-  // once the rolling window is full enough. Failures are non-fatal.
+  // Lazy cold-tier handoff: let ./compressedMemory evict older warm turns into
+  // gzip archives once the rolling window is full enough. This is the single
+  // path that moves data hot -> cold; failures are non-fatal (raw window kept).
   try {
     const mod = await import('./compressedMemory');
     await mod.maybeConsolidate();

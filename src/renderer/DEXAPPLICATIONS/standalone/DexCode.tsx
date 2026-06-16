@@ -8,7 +8,6 @@
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
-import { useBeginnerMode, KeyboardShortcutsPanel } from '../../components/Onboarding';
 import { Terminal } from '../../components/Terminal';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
@@ -27,7 +26,6 @@ import {
 export { transpileDexScript, executeDexScript, highlightDexScript };
 
 const DexCode: React.FC = () => {
-  const { showShortcutsPanel, setShowShortcutsPanel } = useBeginnerMode('dexcode');
   const [code, setCode] = useState(() => {
     try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_CODE; } catch { return DEFAULT_CODE; }
   });
@@ -417,6 +415,8 @@ const DexCode: React.FC = () => {
           aria-label="Find in file"
           style={S.activityBtn}
           onClick={() => setShowFind(s => !s)}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           <DexIcon name="search" size={16} />
         </button>
@@ -426,6 +426,8 @@ const DexCode: React.FC = () => {
           style={S.activityBtn}
           onClick={runCode}
           disabled={isRunning}
+          onMouseEnter={e => { if (!isRunning) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           <DexIcon name="play" size={16} />
         </button>
@@ -434,18 +436,12 @@ const DexCode: React.FC = () => {
           aria-label="Toggle terminal"
           style={S.activityBtn}
           onClick={() => setTerminalOpen(o => !o)}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           <DexIcon name="terminal" size={16} />
         </button>
         <div style={{ flex: 1 }} />
-        <button
-          title="Shortcuts"
-          aria-label="Keyboard shortcuts"
-          style={S.activityBtn}
-          onClick={() => setShowShortcutsPanel(true)}
-        >
-          <DexIcon name="command" size={16} />
-        </button>
       </nav>
 
       {/* Sidebar */}
@@ -518,7 +514,7 @@ const DexCode: React.FC = () => {
               <button
                 key={t.id}
                 onClick={() => { setFileName(t.fileName); setCode(t.code); }}
-                style={{...S.templateBtn, padding: '6px 8px'}}
+                style={{...S.templateBtn, padding: '6px var(--space-2)'}}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-inset, var(--color-border-subtle, rgba(255,255,255,0.04)))')}
               >
@@ -542,7 +538,7 @@ const DexCode: React.FC = () => {
       <section style={S.workspace}>
         {/* Top bar */}
         <div style={S.topBar}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <input
               value={fileName + (isModified ? ' •' : '')}
               onChange={e => setFileName(e.target.value.replace(' •', ''))}
@@ -737,7 +733,7 @@ const DexCode: React.FC = () => {
               color: terminalOpen ? '#fff' : 'var(--color-text-secondary)',
               border: '1px solid var(--color-border)',
               borderRadius: 3,
-              padding: '2px 8px',
+              padding: '2px var(--space-2)',
               fontSize: 10,
               fontWeight: 600,
               cursor: 'pointer',
@@ -745,16 +741,15 @@ const DexCode: React.FC = () => {
           >
             Terminal
           </button>
-          <span>? shortcuts · Ctrl+F find · Ctrl+H replace · Ctrl+S export · Ctrl+` terminal</span>
+          <span>Ctrl+F find · Ctrl+H replace · Ctrl+S export · Ctrl+` terminal</span>
         </div>
 
         {terminalOpen && (
-          <div style={{ height: 240, padding: '0 12px 12px', flexShrink: 0 }}>
+          <div style={{ height: 240, padding: '0 var(--space-3) var(--space-3)', flexShrink: 0 }}>
             <Terminal onClose={() => setTerminalOpen(false)} />
           </div>
         )}
       </section>
-      {showShortcutsPanel && <KeyboardShortcutsPanel appId="dexcode" onClose={() => setShowShortcutsPanel(false)} />}
     </div>
   );
 };
@@ -842,7 +837,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.04))',
   },
   eyebrow: {
@@ -875,7 +870,7 @@ const S: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     alignItems: 'flex-start',
     gap: 2,
-    padding: '8px 10px',
+    padding: 'var(--space-2) 10px',
     borderRadius: 6,
     border: '1px solid var(--color-border)',
     background: 'var(--color-bg-inset, rgba(255,255,255,0.04))',
@@ -887,7 +882,7 @@ const S: Record<string, React.CSSProperties> = {
   fileActionBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 'var(--space-2)',
     padding: '7px 10px',
     borderRadius: 4,
     border: 'none',
@@ -904,7 +899,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '5px 8px',
+    padding: '5px var(--space-2)',
     borderRadius: 3,
     border: 'none',
     background: 'transparent',
@@ -928,7 +923,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: 4,
-    padding: 8,
+    padding: 'var(--space-2)',
     borderRadius: 6,
     background: 'var(--color-bg-hover)',
     border: '1px solid var(--color-border)',
@@ -948,7 +943,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     height: 40,
     minHeight: 40,
-    padding: '0 12px',
+    padding: '0 var(--space-3)',
     borderBottom: '1px solid var(--color-border)',
     background: 'var(--color-bg-elevated)',
     flexShrink: 0,
@@ -1008,7 +1003,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '6px 12px',
+    padding: '6px var(--space-3)',
     fontSize: 11,
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
@@ -1027,7 +1022,7 @@ const S: Record<string, React.CSSProperties> = {
   lineNumbers: {
     display: 'flex',
     flexDirection: 'column' as const,
-    padding: '12px 0',
+    padding: 'var(--space-3) 0',
     background: 'var(--color-bg-base, #0C0C0E)',
     borderRight: '1px solid var(--color-border)',
     minWidth: 40,
@@ -1040,7 +1035,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 11,
     lineHeight: '20px',
     color: 'var(--color-text-tertiary)',
-    paddingRight: 8,
+    paddingRight: 'var(--space-2)',
     fontFamily: 'var(--font-mono)',
   },
   highlightOverlay: {
@@ -1050,7 +1045,7 @@ const S: Record<string, React.CSSProperties> = {
     right: 0,
     bottom: 0,
     margin: 0,
-    padding: 12,
+    padding: 'var(--space-3)',
     fontSize: 13,
     lineHeight: '20px',
     fontFamily: 'var(--font-mono)',
@@ -1068,7 +1063,7 @@ const S: Record<string, React.CSSProperties> = {
     left: 40,
     right: 0,
     bottom: 0,
-    padding: 12,
+    padding: 'var(--space-3)',
     fontSize: 13,
     lineHeight: '20px',
     fontFamily: 'var(--font-mono)',
@@ -1092,7 +1087,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   outputContent: {
     flex: 1,
-    padding: '16px',
+    padding: 'var(--space-4)',
     overflow: 'auto',
     fontFamily: 'var(--font-mono)',
     fontSize: 12,
@@ -1114,16 +1109,16 @@ const S: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     background: 'var(--color-bg-hover)',
     borderLeft: '2px solid var(--color-text-primary)',
-    padding: '8px 12px',
-    marginTop: 8,
+    padding: 'var(--space-2) var(--space-3)',
+    marginTop: 'var(--space-2)',
     fontSize: 12,
     whiteSpace: 'pre-wrap' as const,
   },
   statusBar: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '0 12px',
+    gap: 'var(--space-3)',
+    padding: '0 var(--space-3)',
     height: 24,
     fontSize: 10,
     color: 'var(--color-text-tertiary)',
@@ -1159,7 +1154,7 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-base, #0C0C0E)',
     border: '1px solid var(--color-border)',
     borderRadius: 3,
-    padding: '3px 8px',
+    padding: '3px var(--space-2)',
     color: 'var(--color-text-primary)',
     fontSize: 12,
     fontFamily: 'var(--font-mono)',

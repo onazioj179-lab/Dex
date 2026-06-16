@@ -7,13 +7,16 @@
 
 - DEX runs on your machine. Your files, notes, and commands do not
   leave your device unless you explicitly turn on cloud sync.
-- How we use and share data -- including optional analytics, advertising in
-  ad-supported features (the free tier and games; paid plans are ad-free), and
-  partner integrations -- is described in our [Privacy Policy](../PRIVACY.md),
+- DEX is free for everyone: every feature is available to all users at
+  no cost, with no paid plans, no in-app purchases, and no advertising.
+  In exchange, DEX may use limited data to operate and improve the
+  product.
+- How we use and share data -- including optional analytics and partner
+  integrations -- is described in our [Privacy Policy](../PRIVACY.md),
   which also explains your choices and opt-outs.
 - The only personal data we hold for an account is: your email, your
-  display name, your billing record (held by Stripe), and -- if you
-  opted in -- the encrypted blobs you chose to back up.
+  display name, and -- if you opted in -- the encrypted blobs you chose
+  to back up.
 - You can delete your account and your cloud data at any time from
   Settings > Account > Delete account. We honour the request within 30
   days.
@@ -24,7 +27,6 @@
 |---|---|---|
 | Account                  | Email, display name, hashed password / TOTP secret      | Only if you create an account    |
 | Cloud sync               | Encrypted blobs you ticked in backup settings           | Only with sync turned on         |
-| Stripe checkout          | Billing details (held by Stripe, not us)                | Only when you buy a paid plan    |
 | Usage analytics          | Anonymous app-open count, version, OS                   | Only if you opt in (off by default) |
 | Crash reports            | Stack trace, OS, app version (no file content)          | Only if you opt in (off by default) |
 | Support email            | Whatever you write to us                                | When you email support           |
@@ -105,10 +107,8 @@ For any of the above, email onazi75@gmail.com.
 - Account record: until you delete the account, then 30 days for
   reversal.
 - Encrypted backup blobs: while your sync is enabled, plus 30 days
-  after disable / cancel for reversal, then permanent deletion.
-- Billing records (held by Stripe): per Stripe's policy and applicable
-  tax law (often 7 years).
-- Audit logs (sign-in, checkout, sync activity): 90 days.
+  after disable for reversal, then permanent deletion.
+- Audit logs (sign-in, sync activity): 90 days.
 
 ## Children
 

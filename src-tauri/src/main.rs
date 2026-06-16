@@ -32,8 +32,14 @@ mod cmd_link_preview;
 mod cmd_scratchpad;
 mod cmd_window_monitor;
 mod notifications;
+mod ai_runtime;
+mod http_transfer;
 mod read_later;
 mod recycle_bin;
+mod rewind;
+mod terminal;
+mod workflows;
+mod security;
 mod relationship_graph;
 mod reminder;
 mod scratchpad;
@@ -772,6 +778,17 @@ fn vault_audit(vault: &dex_vault::VaultManager) -> Value {
     json!({ "total": arr.len(), "weak": weak, "reused": reused })
 }
 
+/// Security permissions store dispatch — locks the session-scoped managed state
+/// (the portable core of the Electron SecurityController).
+fn security_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+    let state = app.state::<std::sync::Mutex<security::SecurityState>>();
+    let mut guard = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return Value::Null,
+    };
+    security::dispatch(&mut guard, channel, args)
+}
+
 /// Shared-database dispatch — routes the SQLite-backed subsystems (which all
 /// share `dex.db`) to their handlers. Locks the one connection; degrades to
 /// `null` when SQLite is unavailable (no persistence), mirroring Electron.
@@ -819,6 +836,9 @@ fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     }
     if channel.starts_with("recycle-bin:") {
         return recycle_bin::dispatch(conn, channel, args);
+    }
+    if channel.starts_with("workflows:") {
+        return workflows::dispatch(conn, channel, args);
     }
     if channel.starts_with("time-tracking:") {
         return time_tracking::dispatch(conn, channel, args);
@@ -1078,6 +1098,10 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
         // --- Shell ----------------------------------------------------------
         "shell:openExternal" | "shell:openPath" => shell_open(&arg_str(0).unwrap_or_default()),
 
+        // --- OS theme accent ------------------------------------------------
+        // Read the live OS accent color (#RRGGBB) so the UI can match the system.
+        "theme:getSystemAccentColor" => native_ops::system_accent_color(),
+
         // --- Native dialogs (Tauri dialog plugin) --------------------------
         // Electron dialog.showOpenDialog parity: { canceled, filePaths }.
         "dialog:showOpenDialog" | "files:openDialog" => native_ops::show_open_dialog(&app, &args),
@@ -1097,7 +1121,7 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
         ch @ ("scratchpad:updateContent" | "scratchpad:saveNow") => {
             cmd_scratchpad::dispatch(&app, ch, &args)
         }
-        ch @ ("file-watcher:addFolder" | "file-watcher:importFile") => {
+        ch @ ("file-watcher:addFolder" | "file-watcher:importFile" | "file-watcher:removeFolder") => {
             cmd_file_watcher::dispatch(&app, ch, &args)
         }
         ch @ ("multimonitor:get-displays"
@@ -1213,10 +1237,6 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
                 json!({ "success": true })
             }
         }
-        // OS accent-color read is deferred; null makes the UI keep its configured
-        // accent (the same path Electron takes on unsupported platforms).
-        "theme:getSystemAccentColor" => Value::Null,
-
         // --- Batch 3: Reveal in explorer / open file -----------------------
         "fileIntel:revealInExplorer" | "shell:showItemInFolder" => {
             reveal_in_explorer(&arg_str(0).unwrap_or_default())
@@ -1334,6 +1354,7 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
             || ch.starts_with("licensing:")
             || ch.starts_with("read-later:")
             || ch.starts_with("recycle-bin:")
+            || ch.starts_with("workflows:")
             || ch.starts_with("time-tracking:")
             || ch.starts_with("word-count:")
             || ch.starts_with("content-expiry:")
@@ -1384,11 +1405,35 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
             db_dispatch(&app, ch, &args)
         }
 
+        // --- Pure native engines (no DB / SQLite gate) ---------------------
+        // Rewind reconstruction (core/dex-rewind) and the AI runtime
+        // (core/dex-ai-runtime: request build, response/stream parse, and the
+        // blocking HTTP transport). Routed at the top level — NOT through
+        // db_dispatch, which short-circuits to null when SQLite is unavailable.
+        ch if ch.starts_with("rewind:") => rewind::dispatch(ch, &args),
+        ch if ch.starts_with("ai-runtime:") => ai_runtime::dispatch(ch, &args),
+
+        // --- Terminal / PTY (core/PtyService parity) -----------------------
+        // Piped-stdio shell sessions; output streams back as pty:data/pty:exit
+        // events. Needs the AppHandle (for emit + managed session state).
+        ch if ch.starts_with("pty:") => terminal::dispatch(&app, ch, &args),
+
+        // --- HTTP file transfer (LAN QR/link share) ------------------------
+        // Self-contained HTTP server for download/upload over the LAN (the DTP
+        // device-to-device protocol is separate). transfer:selectFiles is the
+        // shared native multi-file picker.
+        ch if ch.starts_with("httpTransfer:") || ch == "transfer:selectFiles" => {
+            http_transfer::dispatch(&app, ch, &args)
+        }
+
         // --- Notification Center (GOAL-6A): all notifications:* channels ---
         ch if ch.starts_with("notifications:") => notifications_dispatch(&app, ch, &args),
 
         // --- Vault (GOAL-6B): all vault:* channels except copyToClipboard --
         ch if ch.starts_with("vault:") => vault_dispatch(&app, ch, &args),
+
+        // --- Security permissions (SecurityController portable core) -------
+        ch if ch.starts_with("security:") => security_dispatch(&app, ch, &args),
 
         // More subsystem handlers land here as the migration proceeds
         // (universal search index, audio, automation, transfer, ...).
@@ -1470,6 +1515,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
     multi_window::ensure_schema(c);
     unified_notification_hub::ensure_schema(c);
     uki_chat::ensure_schema(c);
+    workflows::ensure_schema(c);
 }
 
 fn main() {
@@ -1524,6 +1570,16 @@ fn main() {
             app.manage(db_state);
             // File-swap gate for backup:restore vs out-of-band dex.db connections.
             app.manage(db::DbGate::new(()));
+            // Terminal/PTY session table (in-app shell; piped-stdio sessions).
+            app.manage(terminal::TerminalState::default());
+            // Live file-watcher table; start watchers for persisted folders now
+            // that the db + watched_folders schema are ready (mirrors startWatching).
+            app.manage(cmd_file_watcher::FileWatchState::default());
+            cmd_file_watcher::start_all(app.handle().clone());
+            // Security permissions store (session-scoped; SecurityController parity).
+            app.manage(std::sync::Mutex::new(security::SecurityState::default()));
+            // HTTP file-transfer server slot (started on demand via httpTransfer:start).
+            app.manage::<http_transfer::HttpTransferState>(std::sync::Mutex::new(None));
             // Background reminder scheduler — polls due reminders every 30s and
             // fires OS notifications (mirrors ReminderManager's interval).
             native_ops::start_reminder_scheduler(app.handle().clone());

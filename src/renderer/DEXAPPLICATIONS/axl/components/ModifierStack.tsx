@@ -35,19 +35,19 @@ interface ModifierStackProps {
 
 const styles = {
   container: {
-    display: 'flex', flexDirection: 'column' as const, gap: 8,
-    padding: 12, background: 'var(--color-bg-elevated)', borderRadius: 6,
+    display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)',
+    padding: 'var(--space-3)', background: 'var(--color-bg-elevated)', borderRadius: 6,
     border: '1px solid var(--color-border-subtle)',
   },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 'var(--space-2)',
   },
   title: {
     fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
   },
   addBtn: {
-    padding: '4px 12px', background: 'var(--color-accent)',
+    padding: '4px var(--space-3)', background: 'var(--color-accent)',
     border: 'none', borderRadius: 4, color: 'var(--color-text-inverse, #fff)', fontSize: 12,
     cursor: 'pointer', fontWeight: 500,
   },
@@ -57,7 +57,7 @@ const styles = {
     overflow: 'hidden',
   },
   modHeader: {
-    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)',
     borderBottom: '1px solid var(--color-border-subtle)',
     cursor: 'pointer', userSelect: 'none' as const,
   },
@@ -77,21 +77,21 @@ const styles = {
     fontSize: 12, transition: 'all 0.15s',
   },
   modBody: {
-    padding: 12, display: 'flex', flexDirection: 'column' as const, gap: 10,
+    padding: 'var(--space-3)', display: 'flex', flexDirection: 'column' as const, gap: 10,
   },
   row: {
-    display: 'flex', alignItems: 'center', gap: 8,
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
   },
   label: {
     fontSize: 11, color: 'var(--color-text-secondary)', minWidth: 70,
   },
   input: {
-    flex: 1, padding: '4px 8px', background: 'var(--color-bg-elevated)',
+    flex: 1, padding: '4px var(--space-2)', background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border-subtle)', borderRadius: 3,
     color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
   },
   select: {
-    flex: 1, padding: '4px 8px', background: 'var(--color-bg-elevated)',
+    flex: 1, padding: '4px var(--space-2)', background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border-subtle)', borderRadius: 3,
     color: 'var(--color-text-primary)', fontSize: 12, outline: 'none',
   },
@@ -114,18 +114,18 @@ const styles = {
     zIndex: 100, maxHeight: 280, overflowY: 'auto' as const,
   },
   dropdownCategory: {
-    padding: '6px 12px', fontSize: 10, fontWeight: 600,
+    padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600,
     color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const,
     letterSpacing: 0.5, background: 'var(--color-bg-base)',
   },
   dropdownItem: {
-    padding: '8px 12px', fontSize: 12, cursor: 'pointer',
-    display: 'flex', alignItems: 'center', gap: 8,
+    padding: 'var(--space-2) var(--space-3)', fontSize: 12, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
     color: 'var(--color-text-primary)',
     transition: 'background 0.12s',
   },
   empty: {
-    padding: 20, textAlign: 'center' as const, color: 'var(--color-text-tertiary)',
+    padding: 'var(--space-5)', textAlign: 'center' as const, color: 'var(--color-text-tertiary)',
     fontSize: 12,
   },
 };

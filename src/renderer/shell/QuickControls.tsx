@@ -211,10 +211,10 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>
         Network Mode
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 'var(--space-2)' }}>
         {(['full', 'local-only', 'disabled'] as NetworkMode[]).map(m => {
           const selected = m === mode;
           return (
@@ -223,10 +223,10 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
               type="button"
               onClick={() => setMode(m)}
               style={{
-                display: 'flex', alignItems: 'flex-start', gap: 8,
+                display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
                 background: selected ? 'var(--color-accent-muted, rgba(74,158,255,0.10))' : 'transparent',
                 border: `1px solid ${selected ? 'color-mix(in srgb, var(--color-accent, #4A9EFF) 30%, transparent)' : 'transparent'}`,
-                borderRadius: 4, padding: '6px 8px', cursor: 'pointer', textAlign: 'left',
+                borderRadius: 4, padding: '6px var(--space-2)', cursor: 'pointer', textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.12s, border-color 0.12s',
               }}
@@ -250,7 +250,7 @@ const NetworkPopover: React.FC<{ onSettings: () => void }> = ({ onSettings }) =>
           );
         })}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)' }}>
         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
           {blocked} blocked
         </span>
@@ -327,12 +327,12 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
         disabled={busy}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', padding: '8px 10px',
+          width: '100%', padding: 'var(--space-2) 10px',
           background: enabled ? 'var(--color-success-muted, rgba(61,166,106,0.10))' : 'var(--color-bg-hover, rgba(255,255,255,0.03))',
           border: `1px solid ${enabled ? 'color-mix(in srgb, var(--color-success, #3DA66A) 30%, transparent)' : 'var(--color-border)'}`,
           borderRadius: 4, cursor: busy ? 'wait' : 'pointer',
           color: 'var(--color-text-primary)',
-          marginBottom: 8,
+          marginBottom: 'var(--space-2)',
           transition: 'background 0.12s, border-color 0.12s',
         }}
       >
@@ -354,11 +354,11 @@ const PermissionPopover: React.FC<{ id: PermissionId; onSettings: () => void }> 
         </span>
       </button>
       {notice && (
-        <div style={{ fontSize: 10, color: enabled ? 'var(--color-success)' : 'var(--color-warning)', lineHeight: 1.35, margin: '0 0 8px' }}>
+        <div style={{ fontSize: 10, color: enabled ? 'var(--color-success)' : 'var(--color-warning)', lineHeight: 1.35, margin: '0 0 var(--space-2)' }}>
           {notice}
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)' }}>
         <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
           {grantedAt ? `Granted ${new Date(grantedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Off by default'}
         </span>

@@ -127,6 +127,52 @@ pub fn emit_event(app: &tauri::AppHandle, channel: &str, payload: &Value) {
     let _ = app.emit(channel, payload);
 }
 
+// --- OS accent color (theme:getSystemAccentColor parity) -------------------
+
+/// Read the OS accent color as `#RRGGBB`, mirroring Electron's
+/// `theme:getSystemAccentColor`. On Windows the DWM accent is a REG_DWORD in
+/// ABGR order (0xAABBGGRR) at `HKCU\SOFTWARE\Microsoft\Windows\DWM\AccentColor`;
+/// read it with `reg query` (always-present tool, no new dependency) and swizzle
+/// to `#RRGGBB`. Other platforms have no portable no-dep source -> `null`
+/// (honest degrade), matching the renderer's "fall back to the configured
+/// accent" path.
+pub fn system_accent_color() -> Value {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::Command;
+        let out = Command::new("reg")
+            .args([
+                "query",
+                r"HKCU\SOFTWARE\Microsoft\Windows\DWM",
+                "/v",
+                "AccentColor",
+            ])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .output();
+        if let Ok(o) = out {
+            let text = String::from_utf8_lossy(&o.stdout);
+            // Line shape: "    AccentColor    REG_DWORD    0xaabbggrr"
+            for tok in text.split_whitespace() {
+                let hex = tok.strip_prefix("0x").or_else(|| tok.strip_prefix("0X"));
+                if let Some(hex) = hex {
+                    if let Ok(v) = u32::from_str_radix(hex, 16) {
+                        let r = v & 0xFF;
+                        let g = (v >> 8) & 0xFF;
+                        let b = (v >> 16) & 0xFF;
+                        return Value::String(format!("#{:02X}{:02X}{:02X}", r, g, b));
+                    }
+                }
+            }
+        }
+        Value::Null
+    }
+    #[cfg(not(windows))]
+    {
+        Value::Null
+    }
+}
+
 // --- Media library import (filesystem stat + insert) -----------------------
 
 /// detectType by extension (matches SharedMediaLibrary VIDEO/AUDIO/IMAGE sets;

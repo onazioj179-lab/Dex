@@ -7,35 +7,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from '
 import DOMPurify from 'dompurify';
 
 const MarkdownEditor: React.FC = () => {
-  const [content, setContent] = useState(`# Welcome to DEX Markdown Editor
-
-## Features
-- **Live preview** as you type
-- *Italic*, **bold**, and \`inline code\`
-- Headings (H1-H6)
-- Lists, blockquotes, and code blocks
-- Split-pane or full-screen modes
-
-## Code Example
-\`\`\`javascript
-function hello() {
-  console.log("Hello, DEX!");
-}
-\`\`\`
-
-## Table
-| Feature | Status |
-|---------|--------|
-| Editor  | Done   |
-| Preview | Done   |
-| Export  | Done   |
-
-> Tip: Use the toolbar buttons for quick formatting.
-
----
-
-Happy writing!
-`);
+  const [content, setContent] = useState('');
   const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('split');
   const [wordWrap, setWordWrap] = useState(true);
   const [fileName, setFileName] = useState('untitled.md');
@@ -249,8 +221,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   toolbar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px 12px', borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.08))',
-    flexShrink: 0, gap: 8,
+    padding: '6px var(--space-3)', borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.08))',
+    flexShrink: 0, gap: 'var(--space-2)',
   },
   toolbarLeft: { display: 'flex', alignItems: 'center', gap: 4 },
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 6 },
@@ -273,7 +245,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 4, padding: 2,
   },
   viewBtn: {
-    padding: '4px 8px', borderRadius: 3, border: 'none',
+    padding: '4px var(--space-2)', borderRadius: 3, border: 'none',
     fontSize: 12, cursor: 'pointer',
   },
   panes: {
@@ -286,16 +258,16 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', height: '100%', resize: 'none',
     background: 'transparent', border: 'none',
     color: 'var(--color-text-primary)',
-    fontSize: 14, lineHeight: 1.6, padding: '16px 20px',
+    fontSize: 14, lineHeight: 1.6, padding: 'var(--space-4) var(--space-5)',
     fontFamily: 'var(--font-mono)',
     outline: 'none', tabSize: 2,
   },
   preview: {
-    padding: '16px 24px', fontSize: 14, lineHeight: 1.7,
+    padding: 'var(--space-4) var(--space-6)', fontSize: 14, lineHeight: 1.7,
     color: 'var(--color-text-primary)',
   },
   statusBar: {
-    display: 'flex', gap: 16, padding: '4px 16px',
+    display: 'flex', gap: 'var(--space-4)', padding: '4px var(--space-4)',
     borderTop: '1px solid var(--color-border, rgba(255,255,255,0.08))',
     fontSize: 11, color: 'var(--color-text-secondary)', flexShrink: 0,
   },

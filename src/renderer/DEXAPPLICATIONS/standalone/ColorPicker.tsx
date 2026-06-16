@@ -225,7 +225,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   previewBar: {
     height: 80, display: 'flex', alignItems: 'flex-end',
-    justifyContent: 'flex-end', padding: 12, flexShrink: 0,
+    justifyContent: 'flex-end', padding: 'var(--space-3)', flexShrink: 0,
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   previewText: {
@@ -234,7 +234,7 @@ const s: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
   sliders: {
-    padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12,
+    padding: 'var(--space-4) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
   },
   sliderRow: {
     display: 'flex', alignItems: 'center', gap: 10,
@@ -251,11 +251,11 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
   },
   values: {
-    display: 'flex', gap: 8, padding: '0 20px 12px',
+    display: 'flex', gap: 'var(--space-2)', padding: '0 var(--space-5) var(--space-3)',
   },
   valueChip: {
     flex: 1, display: 'flex', flexDirection: 'column', gap: 2,
-    padding: '8px 10px', borderRadius: 6, border: 'none',
+    padding: 'var(--space-2) 10px', borderRadius: 6, border: 'none',
     background: 'var(--color-bg-surface)', cursor: 'pointer',
     transition: 'all 0.15s ease', textAlign: 'left',
     fontFamily: 'var(--font-family)',
@@ -272,17 +272,17 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: 'center', fontSize: 12, fontWeight: 600,
     color: 'var(--color-success)', padding: '4px 0',
   },
-  hexRow: { padding: '0 20px 12px' },
+  hexRow: { padding: '0 var(--space-5) var(--space-3)' },
   hexInput: {
-    width: '100%', padding: '8px 12px', borderRadius: 6,
+    width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6,
     border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
     color: 'var(--color-text-primary)', fontSize: 14,
     fontFamily: 'var(--font-mono)', outline: 'none',
     textAlign: 'center', boxSizing: 'border-box',
   },
-  section: { padding: '0 20px 12px' },
+  section: { padding: '0 var(--space-5) var(--space-3)' },
   sectionLabel: {
-    marginBottom: 8,
+    marginBottom: 'var(--space-2)',
   },
   palette: {
     display: 'flex', flexWrap: 'wrap', gap: 6,

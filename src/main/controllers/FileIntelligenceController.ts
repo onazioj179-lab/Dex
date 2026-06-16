@@ -15,7 +15,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileIntelligence, FileMetadata, OrganizationSuggestion } from '../core/FileIntelligence';
 import { mediaAnalyzer } from '../core/MediaAnalyzer';
-import { fileWatcher, FileChangeEvent } from '../core/FileWatcher';
+import { fileWatcherManager, FileChangeEvent } from '../core/FileWatcherManager';
 
 // -----------------------------------------------------------------------------
 // IPC Channel Names
@@ -122,7 +122,7 @@ export class FileIntelligenceController {
     
     ipcMain.handle(CHANNELS.REVOKE_PATH, async (_, dirPath: string) => {
       fileIntelligence.revokePath(dirPath);
-      fileWatcher.unwatch(dirPath);
+      fileWatcherManager.unwatchPath(dirPath);
       return { success: true };
     });
     
@@ -259,19 +259,19 @@ export class FileIntelligenceController {
     
     // Watching
     ipcMain.handle(CHANNELS.START_WATCHING, async (_, dirPath: string, options?: { recursive?: boolean }) => {
-      const success = fileWatcher.watch({ path: dirPath, ...options });
+      const success = fileWatcherManager.watchPath({ path: dirPath, ...options });
       return { success };
     });
-    
+
     ipcMain.handle(CHANNELS.STOP_WATCHING, async (_, dirPath: string) => {
-      fileWatcher.unwatch(dirPath);
+      fileWatcherManager.unwatchPath(dirPath);
       return { success: true };
     });
-    
+
     ipcMain.handle(CHANNELS.GET_WATCHER_STATUS, async () => {
       return {
-        service: fileWatcher.getServiceStatus(),
-        watchers: fileWatcher.getAllStatuses(),
+        service: fileWatcherManager.getPathWatcherServiceStatus(),
+        watchers: fileWatcherManager.getAllPathWatcherStatuses(),
       };
     });
   }
@@ -282,11 +282,11 @@ export class FileIntelligenceController {
   
   private setupEventForwarding(): void {
     // Forward file watcher events to renderer
-    fileWatcher.on('change', (event: FileChangeEvent) => {
+    fileWatcherManager.on('change', (event: FileChangeEvent) => {
       this.sendToRenderer(CHANNELS.FILE_CHANGE, event);
     });
-    
-    fileWatcher.on('changes', (batch: { basePath: string; events: FileChangeEvent[]; count: number }) => {
+
+    fileWatcherManager.on('changes', (batch: { basePath: string; events: FileChangeEvent[]; count: number }) => {
       this.sendToRenderer(CHANNELS.FILE_CHANGE, batch);
     });
     

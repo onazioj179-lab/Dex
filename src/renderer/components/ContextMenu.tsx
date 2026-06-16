@@ -146,7 +146,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
 .dex-ctx-sub:hover:not([aria-disabled="true"]) { background: var(--color-accent-light); }`}</style>
       {items.map((item, i) => {
         if (item.divider && !item.label) {
-          return <div key={item.id ?? ('div-' + i)} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 8px' }} />;
+          return <div key={item.id ?? ('div-' + i)} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />;
         }
 
         const curActionIdx = ++actionIdx;
@@ -185,8 +185,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                padding: '6px 12px',
+                gap: 'var(--space-2)',
+                padding: '6px var(--space-3)',
                 margin: '0 4px',
                 borderRadius: 4,
                 fontSize: 13,
@@ -204,7 +204,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
               )}
               <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
               {item.shortcut && (
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: '"SF Mono", monospace', marginLeft: 12, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: '"SF Mono", monospace', marginLeft: 'var(--space-3)', flexShrink: 0 }}>
                   {item.shortcut}
                 </span>
               )}
@@ -228,8 +228,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                       role="menuitem"
                       onClick={() => { if (!sub.disabled) { (sub.onClick ?? sub.onSelect)?.(); onClose(); } }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 12px', margin: '0 4px', borderRadius: 4,
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                        padding: '6px var(--space-3)', margin: '0 4px', borderRadius: 4,
                         fontSize: 13, fontWeight: 500, cursor: sub.disabled ? 'default' : 'pointer',
                         color: sub.danger ? 'var(--color-error, #ff453a)' : sub.disabled ? 'var(--color-text-tertiary)' : 'var(--color-text-primary, #fff)',
                       }}
@@ -244,7 +244,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                 </div>
               )}
             </div>
-            {item.dividerAfter && <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px 8px' }} />}
+            {item.dividerAfter && <div style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />}
           </React.Fragment>
         );
       })}

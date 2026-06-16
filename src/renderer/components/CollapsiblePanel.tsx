@@ -261,7 +261,7 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '8px 12px',
+            padding: 'var(--space-2) var(--space-3)',
             borderBottom: `1px solid ${colors.border.subtle}`,
             background: colors.bg.surface,
           }}

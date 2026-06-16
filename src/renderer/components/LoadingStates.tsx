@@ -369,7 +369,7 @@ export const LoadingOverlay = memo<LoadingOverlayProps>(({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
+        gap: 'var(--space-3)',
         background,
         zIndex,
         backdropFilter: 'var(--blur-sm)',
@@ -414,12 +414,12 @@ SkeletonParagraph.displayName = 'SkeletonParagraph';
 export const SkeletonCard = memo<{ width?: number | string }>(({ width = '100%' }) => (
   <div style={{
     width,
-    padding: 16,
+    padding: 'var(--space-4)',
     borderRadius: 10,
     background: 'var(--color-bg-elevated)',
     border: '1px solid var(--color-border-subtle)',
   }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
       <Skeleton variant="circular" width={40} height={40} />
       <div style={{ flex: 1 }}>
         <Skeleton width="60%" height={14} variant="text" />
@@ -437,9 +437,9 @@ export const SkeletonListItem = memo<{ count?: number; height?: number }>(({
   count = 5,
   height = 56,
 }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
     {Array.from({ length: count }, (_, i) => (
-      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, height }}>
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', height }}>
         <Skeleton variant="circular" width={36} height={36} />
         <div style={{ flex: 1 }}>
           <Skeleton width="50%" height={14} variant="text" />

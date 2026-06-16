@@ -200,7 +200,7 @@ function PlanHeaderCell({ plan, period, isCurrent, studioSeats, onStudioSeatsCha
             }}
             style={{
               width: '100%',
-              padding: '4px 8px',
+              padding: '4px var(--space-2)',
               fontSize: fontSize.sm,
               color: 'var(--color-text-primary)',
               background: 'var(--color-bg-inset, #101012)',

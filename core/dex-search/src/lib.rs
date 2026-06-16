@@ -55,6 +55,15 @@ const TEXT_EXTS: &[&str] = &[
 ];
 const MAX_CONTENT_BYTES: u64 = 262_144; // 256 KB per file
 
+/// Directory names that are never indexed: build output + vendored dependencies.
+/// Indexing these is pure noise + bloat (e.g. a Rust `target/` or JS `dist/` can
+/// hold tens of thousands of generated files). Dot-dirs (.git, .next, ...) are
+/// already skipped separately.
+const SKIP_DIRS: &[&str] = &[
+    "node_modules", "$recycle.bin", "target", "dist", "build", "out",
+    "coverage", "vendor", "__pycache__",
+];
+
 fn read_text_content(path: &Path, size: u64) -> String {
     if size == 0 || size > MAX_CONTENT_BYTES {
         return String::new();
@@ -228,7 +237,7 @@ fn walk(root: &Path, max: usize) -> Vec<(PathBuf, u64, u64)> {
             };
             if meta.is_dir() {
                 let name = entry.file_name().to_string_lossy().to_lowercase();
-                if name.starts_with('.') || name == "node_modules" || name == "$recycle.bin" {
+                if name.starts_with('.') || SKIP_DIRS.contains(&name.as_str()) {
                     continue;
                 }
                 stack.push(entry.path());
@@ -304,5 +313,26 @@ mod tests {
         let hits = idx.search("brown", 10);
         assert!(hits.iter().any(|h| h.name == "notes.txt"), "content search should find notes.txt");
         assert!(!hits.iter().any(|h| h.name == "other.txt"));
+    }
+
+    #[test]
+    fn skips_build_and_dependency_dirs() {
+        let index_dir = tempfile::tempdir().unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        std::fs::write(data_dir.path().join("keep.txt"), b"x").unwrap();
+        // Files inside node_modules / target must NOT be indexed.
+        let nm = data_dir.path().join("node_modules");
+        std::fs::create_dir_all(&nm).unwrap();
+        std::fs::write(nm.join("dep.txt"), b"x").unwrap();
+        let tgt = data_dir.path().join("target");
+        std::fs::create_dir_all(&tgt).unwrap();
+        std::fs::write(tgt.join("artifact.txt"), b"x").unwrap();
+
+        let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
+        let n = idx.index_path(data_dir.path(), 1000).unwrap();
+        assert_eq!(n, 1, "only keep.txt should be indexed");
+        assert!(idx.search("dep", 10).is_empty());
+        assert!(idx.search("artifact", 10).is_empty());
+        assert!(idx.search("keep", 10).iter().any(|h| h.name == "keep.txt"));
     }
 }

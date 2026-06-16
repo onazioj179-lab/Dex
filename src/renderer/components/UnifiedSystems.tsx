@@ -76,7 +76,7 @@ export function NotificationBell(): React.ReactElement {
           border: 'none',
           cursor: 'pointer',
           position: 'relative',
-          padding: '6px 8px',
+          padding: '6px var(--space-2)',
           color: 'var(--color-text-primary)',
           fontSize: '18px',
         }}
@@ -174,7 +174,7 @@ function NotificationPanel(): React.ReactElement {
     >
       <div
         style={{
-          padding: '12px 16px',
+          padding: 'var(--space-3) var(--space-4)',
           borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
           display: 'flex',
           alignItems: 'center',
@@ -182,7 +182,7 @@ function NotificationPanel(): React.ReactElement {
         }}
       >
         <span style={{ color: 'var(--color-text-primary)', fontWeight: 600, fontSize: '14px' }}>Notifications</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <button aria-label="Mark all notifications as read" onClick={() => markAllRead()} style={pillBtnStyle}>
             Mark all read
           </button>
@@ -198,13 +198,13 @@ function NotificationPanel(): React.ReactElement {
         </div>
       </div>
       {doNotDisturb && (
-        <div style={{ padding: '8px 16px', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+        <div style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
           Do Not Disturb is active
         </div>
       )}
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {notifications.length === 0 ? (
-          <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '13px' }}>
+          <div style={{ padding: 'var(--space-10) var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '13px' }}>
             No notifications
           </div>
         ) : (
@@ -213,7 +213,7 @@ function NotificationPanel(): React.ReactElement {
               <div
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 16px 4px',
+                  padding: 'var(--space-2) var(--space-4) 4px',
                 }}
               >
                 <span className="dex-caps" style={{ color: 'var(--color-text-secondary)', fontSize: '11px' }}>
@@ -236,7 +236,7 @@ function NotificationPanel(): React.ReactElement {
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
                   style={{
-                    padding: '10px 16px',
+                    padding: '10px var(--space-4)',
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
                     background: n.read === 0 ? 'rgba(59,130,246,0.08)' : 'transparent',
@@ -301,7 +301,7 @@ const pillBtnStyle: React.CSSProperties = {
   borderRadius: '4px',
   color: 'var(--color-text-secondary)',
   fontSize: '11px',
-  padding: '4px 8px',
+  padding: '4px var(--space-2)',
   cursor: 'pointer',
 };
 
@@ -383,7 +383,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
           flexDirection: 'column',
         }}
       >
-        <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
+        <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
           <input
             ref={inputRef}
             value={query}
@@ -394,7 +394,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
               background: 'var(--color-bg-hover)',
               border: '1px solid var(--color-border, #3a3a3c)',
               borderRadius: '8px',
-              padding: '12px 16px',
+              padding: 'var(--space-3) var(--space-4)',
               color: 'var(--color-text-primary)',
               fontSize: '15px',
               outline: 'none',
@@ -403,12 +403,12 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {searching && (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '13px' }}>
+            <div style={{ padding: 'var(--space-5)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '13px' }}>
               Searching...
             </div>
           )}
           {!searching && query && results.length === 0 && (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '13px' }}>
+            <div style={{ padding: 'var(--space-10) var(--space-5)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '13px' }}>
               No results found
             </div>
           )}
@@ -419,7 +419,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
               <div key={group.source}>
                 <div
                   style={{
-                    padding: '10px 16px 6px',
+                    padding: '10px var(--space-4) 6px',
                     color: 'var(--color-text-secondary)',
                     fontSize: '11px',
                     fontWeight: 700,
@@ -434,7 +434,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
                     key={`${group.source}-${i}`}
                     onClick={() => handleResultClick(result)}
                     style={{
-                      padding: '10px 16px',
+                      padding: '10px var(--space-4)',
                       cursor: 'pointer',
                       borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
                       display: 'flex',
@@ -453,7 +453,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
                       </div>
                     </div>
                     {result.timestamp && (
-                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: '11px', flexShrink: 0, marginLeft: '12px' }}>
+                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: '11px', flexShrink: 0, marginLeft: 'var(--space-3)' }}>
                         {formatTime(result.timestamp)}
                       </span>
                     )}
@@ -467,7 +467,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
                     style={{
                       display: 'block',
                       width: '100%',
-                      padding: '8px 16px',
+                      padding: 'var(--space-2) var(--space-4)',
                       background: 'none',
                       border: 'none',
                       color: 'var(--color-accent, #3b82f6)',
@@ -483,7 +483,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
             );
           })}
         </div>
-        <div style={{ padding: '8px 16px', borderTop: '1px solid var(--color-border-subtle, #2c2c2e)', color: 'var(--color-text-tertiary)', fontSize: '11px', textAlign: 'center' }}>
+        <div style={{ padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-border-subtle, #2c2c2e)', color: 'var(--color-text-tertiary)', fontSize: '11px', textAlign: 'center' }}>
           Ctrl+Shift+F to toggle
         </div>
       </div>
@@ -526,7 +526,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
         background: 'var(--color-bg-surface)',
         borderTop: '1px solid var(--color-border-subtle, #2c2c2e)',
         zIndex: 'var(--z-dock)' as any,
-        padding: '4px 12px',
+        padding: '4px var(--space-3)',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
@@ -540,7 +540,7 @@ export function TaskQueueStrip(): React.ReactElement | null {
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            padding: '4px 8px',
+            padding: '4px var(--space-2)',
             borderRadius: '4px',
             cursor: 'pointer',
             background: selectedTaskId === task.id ? 'var(--color-bg-hover)' : 'transparent',
@@ -597,7 +597,7 @@ function TaskDetailView({ taskId, onClose }: { taskId: string; onClose: () => vo
   if (!task) return null;
 
   return (
-    <div style={{ padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '6px', marginTop: '4px' }}>
+    <div style={{ padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '6px', marginTop: '4px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
         <span style={{ color: 'var(--color-text-primary)', fontSize: '13px', fontWeight: 600 }}>{task.name}</span>
         <button onClick={onClose} aria-label="Close task details" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '14px' }}>x</button>
@@ -730,7 +730,7 @@ export function ScratchpadOverlay(): React.ReactElement | null {
         <div
           onMouseDown={handleMouseDown}
           style={{
-            padding: '8px 12px',
+            padding: 'var(--space-2) var(--space-3)',
             borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)',
             display: 'flex',
             alignItems: 'center',
@@ -753,14 +753,14 @@ export function ScratchpadOverlay(): React.ReactElement | null {
             border: 'none',
             color: 'var(--color-text-primary)',
             fontSize: '13px',
-            padding: '12px',
+            padding: 'var(--space-3)',
             resize: 'none',
             outline: 'none',
             lineHeight: 1.6,
             fontFamily: 'inherit',
           }}
         />
-        <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div style={{ padding: 'var(--space-2) var(--space-3)', borderTop: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
           {!confirmClear ? (
             <button onClick={() => setConfirmClear(true)} aria-label="Clear scratchpad" style={pillBtnStyle}>Clear</button>
           ) : (
@@ -844,21 +844,21 @@ export function FeedbackPanel(): React.ReactElement | null {
         overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
+      <div style={{ padding: '14px var(--space-4) 10px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)' }}>
         <span style={{ color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 600 }}>Send Feedback</span>
       </div>
       {submitted ? (
-        <div style={{ padding: '20px 16px' }}>
-          <div style={{ color: 'var(--color-success, #22c55e)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>Report saved</div>
+        <div style={{ padding: 'var(--space-5) var(--space-4)' }}>
+          <div style={{ color: 'var(--color-success, #22c55e)', fontSize: '13px', fontWeight: 500, marginBottom: 'var(--space-2)' }}>Report saved</div>
           <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', wordBreak: 'break-all' }}>{savedPath}</div>
-          <div style={{ color: 'var(--color-text-tertiary)', fontSize: '12px', marginTop: '8px' }}>
+          <div style={{ color: 'var(--color-text-tertiary)', fontSize: '12px', marginTop: 'var(--space-2)' }}>
             You can send this file to the DEX support channel.
           </div>
-          <button onClick={() => setPanelOpen(false)} aria-label="Close feedback panel" style={{ ...pillBtnStyle, marginTop: '12px' }}>Close</button>
+          <button onClick={() => setPanelOpen(false)} aria-label="Close feedback panel" style={{ ...pillBtnStyle, marginTop: 'var(--space-3)' }}>Close</button>
         </div>
       ) : (
-        <div style={{ padding: '12px 16px' }}>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+        <div style={{ padding: 'var(--space-3) var(--space-4)' }}>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: 'var(--space-3)' }}>
             {types.map((t) => (
               <button
                 key={t.value}
@@ -898,7 +898,7 @@ export function FeedbackPanel(): React.ReactElement | null {
               fontFamily: 'inherit',
             }}
           />
-          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
               <input type="checkbox" checked={includeSystemInfo} onChange={(e) => setIncludeSystemInfo(e.target.checked)} />
               Include system info
@@ -908,7 +908,7 @@ export function FeedbackPanel(): React.ReactElement | null {
             </button>
           </div>
           {showSystemInfo && systemInfoPreview && (
-            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--color-bg-hover)', borderRadius: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+            <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
               <div>DEX Version: {systemInfoPreview.dexVersion}</div>
               <div>OS: {systemInfoPreview.osName} {systemInfoPreview.osVersion}</div>
               <div>Capability Tier: {systemInfoPreview.capabilityTier}</div>
@@ -921,9 +921,9 @@ export function FeedbackPanel(): React.ReactElement | null {
             disabled={!description.trim() || submitting}
             aria-label="Submit feedback"
             style={{
-              marginTop: '12px',
+              marginTop: 'var(--space-3)',
               width: '100%',
-              padding: '8px',
+              padding: 'var(--space-2)',
               background: description.trim() ? 'var(--color-accent, #3b82f6)' : 'var(--color-bg-hover)',
               border: 'none',
               borderRadius: '6px',
@@ -976,7 +976,7 @@ export function RecycleBinView(): React.ReactElement {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: 'var(--color-text-primary)' }}>
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Recycle Bin ({count})</h2>
         {count > 0 && (
           <button
@@ -993,7 +993,7 @@ export function RecycleBinView(): React.ReactElement {
         )}
       </div>
       {apps.length > 1 && (
-        <div style={{ padding: '8px 16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div style={{ padding: 'var(--space-2) var(--space-4)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <button onClick={() => setAppFilter('all')} aria-label="Filter: All apps" aria-pressed={appFilter === 'all'} style={{ ...pillBtnStyle, color: appFilter === 'all' ? 'var(--color-accent, #3b82f6)' : 'var(--color-text-secondary)' }}>All</button>
           {apps.map((a) => (
             <button key={a} onClick={() => setAppFilter(a)} aria-label={`Filter: ${a}`} aria-pressed={appFilter === a} style={{ ...pillBtnStyle, color: appFilter === a ? 'var(--color-accent, #3b82f6)' : 'var(--color-text-secondary)' }}>
@@ -1002,14 +1002,14 @@ export function RecycleBinView(): React.ReactElement {
           ))}
         </div>
       )}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 var(--space-4)' }}>
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
+          <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
         ) : items.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Recycle bin is empty</div>
+          <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Recycle bin is empty</div>
         ) : (
           items.map((item) => (
-            <div key={item.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div key={item.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border-subtle, #2c2c2e)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {item.item_name}
@@ -1060,7 +1060,7 @@ export function BatchActionBar(): React.ReactElement | null {
         borderRadius: '10px',
         boxShadow: 'var(--pg-shadow-popover)',
         zIndex: 'var(--z-dock)' as any,
-        padding: '8px 16px',
+        padding: 'var(--space-2) var(--space-4)',
         display: 'flex',
         alignItems: 'center',
         gap: '10px',
@@ -1107,7 +1107,7 @@ export function DetachButton({ appId }: { appId: string }): React.ReactElement {
         borderRadius: '4px',
         color: 'var(--color-text-secondary)',
         fontSize: '11px',
-        padding: '4px 8px',
+        padding: '4px var(--space-2)',
         cursor: 'pointer',
       }}
       title={detached ? 'Return to main window' : 'Open in new window'}

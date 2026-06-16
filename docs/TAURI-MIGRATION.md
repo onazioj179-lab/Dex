@@ -594,8 +594,12 @@ arms before the db guard:
   - `scratchpad:updateContent/saveNow` — persist content directly (no in-memory
     buffer needed) (cmd_scratchpad.rs).
   - `file-watcher:addFolder/importFile` — folder dialog + DB insert / stat+insert
-    (cmd_file_watcher.rs). LIVE fs-watch events deferred (need the renderer event
-    bridge). `cargo check` green (first try).
+    (cmd_file_watcher.rs). LIVE fs-watch events now DONE (2026-06-15): the `notify`
+    crate watches each configured folder (managed `FileWatchState` table; started
+    in setup() via `start_all`, and on `addFolder`; torn down on `removeFolder`).
+    New media files auto-import into `media_library` or push `file-watcher:newFile`
+    {folderId, filepath, filename} (matchesFilter/getMediaType ported). `removeFolder`
+    moved to the AppHandle-backed arm so the watcher stops alongside the DELETE.
 
 **Merge consolidation DONE (2026-06-10): local command layer + cloud refinement
 (PR #19) reconciled.** Both lines of work landed in one merge. The cloud PR
@@ -641,10 +645,13 @@ markRead/markAllRead/clearAll/delete. `cargo check` + `tsc` green; renderer
 delivery still needs an in-app smoke test (subscriptions are UI-triggered).
 
 **Remaining non-DB items:**
-  - **file-watcher live fs events** — `notify` crate + emit
-    `file-watcher:detected` through the (now live) event bridge.
-  - Live multiwindow detach, live theme apply + theme-schedule timer —
-    BrowserWindow/OS-theme bound.
+  - Theme-schedule application DONE (2026-06-15, renderer-side): the schedule was
+    persisted (theme_schedule.rs) but never applied. `featureSuiteStore`
+    `resolveScheduledTheme` (pure, vitest 6/6) + `applyScheduledTheme` now apply
+    light/dark on every schedule change, and App.tsx applies on boot + re-checks
+    each minute (manual/scheduled/solar; 'system' leaves the user/OS theme alone).
+    Done in the renderer (local time is trivial in JS — no native tz dep / timer).
+  - Live multiwindow detach — BrowserWindow-bound (still todo).
   - **Networking:** live-collab mDNS/peer sync.
 Use `__dexDegradeReport()` (see Verify) to order these by real usage. Then the
 non-DB engines from the phase plan: transfer/device, audio sink, PTY, rewind
@@ -678,19 +685,24 @@ than 3%.
 | Scanner | findDuplicates | done (`core/dex-scanner`) |
 | Automation | run/executeNew | partial (id-based store-backed runs need a native store) |
 | AI router | `smart_router_route` (dedicated command) | done (`core/dex-smart-router`) |
+| AI runtime | `ai-runtime:` buildRequest/parseResponse/assembleStream/chat/chatStreamed | done (`core/dex-ai-runtime` + `ai_runtime.rs`; OpenAI-compatible build/parse + blocking `ureq` HTTP transport) |
+| Rewind | `rewind:` buildTimeline/reconstruct | done (`core/dex-rewind` + `rewind.rs`; pure session/workspace reconstruction) |
 | Notifications | full `notifications:*` | done (`notifications.rs`, managed store) |
 | Activity feed | full `activity-feed:*` | done (`activity_feed.rs`, shared dex.db) |
 | Changelog / Color labels / Dashboard | full `*:*` | done (`changelog.rs`, `color_labels.rs`, `dashboard.rs`) |
 | Goal system / Help / Journal | full `*:*` | done (`goal_system.rs`, `help_system.rs` (FTS5), `journal.rs`) |
 | Layout / Read-later / Recycle bin | full `*:*` | done (`layout.rs`, `read_later.rs`, `recycle_bin.rs`) |
 | Time tracking / Word count | full `*:*` | done (`time_tracking.rs`, `word_count.rs`) |
+| Workflows store | `workflows:getAll/save/delete` | done (`workflows.rs`, shared dex.db, lossless data column; unit-tested CRUD) |
+| Security: permissions + integrity + threats | `security:getPermissions/getPermission/togglePermission/getLog/getReport`, `security:register-file-integrity/verify-file-integrity`, `security:get-threats/resolve-threat` | done (`security.rs`, SecurityController core; required-perm lock + audit log + report; SHA-256 integrity tamper detection feeding the threat list; resolve-threat; 3 unit tests). Remaining `security:*`: layered-status/deep-checks (Electron-sandbox-specific — would misreport in a webview). NOTE: the `keys:*` KeyManager has NO renderer consumer (verified — no `dex.keys.*` call anywhere); it was a main-process-internal subsystem (transfer encryption), so it is NOT NEEDED in the webview architecture — dex-vault serves renderer crypto. |
 | Licensing / telemetry | full `licensing:*` | done (`licensing.rs`, self-contained SHA-256) |
 | **Dialogs (file/folder)** | — | todo (use Tauri dialog plugin to avoid event-loop deadlock) |
-| **Transfer / device / pairing** | — | todo (network protocols) |
-| **Audio playback sink** | — | todo (device output; analysis already native) |
-| **PTY / terminal** | — | todo |
+| HTTP transfer (LAN share) | `httpTransfer:` start/stop/info/share/unshare/pickAndShare/acceptUpload + `transfer:selectFiles` (+ `http-transfer:*` events) | done (`http_transfer.rs`; `tiny_http` LAN server, download/upload + pending-accept, no-dep LAN-IP, 30-min expiry; multipart parser unit-tested 4/4; live serving needs in-app start) |
+| **Transfer / device / pairing (DTP)** | — | todo (device-to-device: mDNS discovery + custom TCP + encryption; not single-machine verifiable) |
+| Audio playback sink | — | NOT NEEDED (2026-06-15): the Music app (`pages/Audio.tsx`) plays renderer-side via `HTMLAudioElement` + `AudioContext` (crossfade + gapless preload). In a webview shell that IS the correct path; a native cpal/rodio sink would be redundant + wrong (playback outside the webview). Native decode/waveform stays in `dex-audio` for analysis. |
+| Terminal / PTY | `pty:` spawn/write/resize/kill/list (+ `pty:data`/`pty:exit` events) | done (`terminal.rs`; piped-stdio shell sessions, PtyService parity, no node-pty) |
 | **Security/Workflow controllers** | — | todo (largest; phase last) |
-| **OS theme accent** | — | todo |
+| OS theme accent | `theme:getSystemAccentColor` | done on Windows (`native_ops::system_accent_color`, DWM AccentColor via `reg`, verified -> #0078D4); null degrade on mac/linux |
 
 Crates in `src-tauri`: `sysinfo`, `open`, `arboard`, `trash` (+ path-dep core crates).
 
@@ -701,7 +713,9 @@ Crates in `src-tauri`: `sysinfo`, `open`, `arboard`, `trash` (+ path-dep core cr
 - **P1 — Everyday gaps (current).** Notifications (wired both shells), native
   file/folder dialogs, OS theme accent, finish OS controls (guarded
   shutdown/restart/sleep), automation native store.
-- **P2 — Heavy engines.** Audio playback sink, transfer/device/pairing, PTY/terminal.
+- **P2 — Heavy engines.** PTY/terminal DONE (`terminal.rs`); audio playback sink
+  NOT NEEDED (renderer-side HTML5/Web Audio — see table). Remaining: transfer/device/
+  pairing (DTP — needs a second device to verify).
 - **P3 — Big controllers.** Security, workflow, agents, microservices — the long
   tail of the ~2,369 handlers; port by what real usage hits, measured via the
   degrade-log (see Verify).

@@ -19,6 +19,7 @@ import { type ExifData, loadExifFromPath } from '../utils/exifParser';
 import DexIcon from '../components/DexIcon';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
 
@@ -348,8 +349,8 @@ function VirtualizedMediaGrid<T extends { id: string }>({ parentRef, items, colu
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'grid',
                 gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: 16,
-                paddingBottom: 16,
+                gap: 'var(--space-4)',
+                paddingBottom: 'var(--space-4)',
               }}
             >
               {rowItems.map(renderItem)}
@@ -463,6 +464,29 @@ export const Gallery: React.FC = () => {
   const sortedMedia = useMemo(() =>
     [...filteredMedia].sort((a, b) => b.date.getTime() - a.date.getTime()),
   [filteredMedia]);
+
+  // -- uki context: let the assistant see the active album, view, and selection.
+  // Registered once; a latest-value ref keeps the resolver reading live state.
+  // Mirrors the Notes/Tasks/Files resolvers (UKI Workspace Awareness initiative).
+  const ukiCtxRef = useRef({ selectedAlbum, viewMode, selectedItems, sortedMedia });
+  useEffect(() => { ukiCtxRef.current = { selectedAlbum, viewMode, selectedItems, sortedMedia }; });
+  useEffect(() => {
+    registerUkiAppContext('gallery', () => {
+      const c = ukiCtxRef.current;
+      return {
+        appId: 'gallery',
+        currentFile: `Album: ${c.selectedAlbum}`,
+        selectionText: c.selectedItems.size > 0 ? `${c.selectedItems.size} item(s) selected` : undefined,
+        custom: {
+          album: c.selectedAlbum,
+          view: c.viewMode,
+          itemCount: c.sortedMedia.length,
+          selectedCount: c.selectedItems.size,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('gallery');
+  }, []);
 
   const selectAll = useCallback(() => {
     setSelectedItems(new Set(filteredMedia.map(m => m.id)));
@@ -818,6 +842,11 @@ export const Gallery: React.FC = () => {
 
   // Progressive loading: render items in batches for smooth scrolling
   const ITEMS_PER_PAGE = 60;
+  // Switch the grid to the windowed renderer once a library passes this size.
+  // Lower than ITEMS_PER_PAGE so medium libraries (30-60) also window their rows
+  // instead of mounting every thumbnail at once; tiny libraries stay plain to
+  // avoid the virtualizer's measure pass causing a one-frame layout shift.
+  const GRID_VIRTUALIZE_THRESHOLD = 30;
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   // Reset visible count when album/filter changes
   useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [selectedAlbum]);
@@ -836,7 +865,7 @@ export const Gallery: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMoreItems]);
 
-  // Phase 4: Virtualized grid (used when visibleMedia.length >= 60)
+  // Phase 4: Virtualized grid (used when visibleMedia.length >= GRID_VIRTUALIZE_THRESHOLD)
   const gridScrollRef = useRef<HTMLDivElement | null>(null);
   const [columnsCount, setColumnsCount] = useState(6);
   useEffect(() => {
@@ -978,7 +1007,7 @@ export const Gallery: React.FC = () => {
           </button>
         </div>
         {!sidebarCollapsed && (
-        <div style={styles.albumList}>
+        <div className="dex-scroll-fade-y" style={styles.albumList}>
           <div className="dex-label-caps" style={styles.sectionLabel}>Library</div>
           {ALBUMS.slice(0, 4).map(album => (
             <button
@@ -1018,7 +1047,7 @@ export const Gallery: React.FC = () => {
         </div>
         )}
         {sidebarCollapsed && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 0', overflow: 'auto' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 'var(--space-2) 0', overflow: 'auto' }}>
             {ALBUMS.map(album => (
               <button
                 key={album.id}
@@ -1048,7 +1077,7 @@ export const Gallery: React.FC = () => {
             <span style={styles.itemCount}>
               {sortedMedia.length} item{sortedMedia.length !== 1 ? 's' : ''}
               {sortedMedia.filter(m => m.type === 'video').length > 0 && (
-                <span style={{ marginLeft: 8, color: 'var(--color-tag-purple, #bf5af2)' }}>
+                <span style={{ marginLeft: 'var(--space-2)', color: 'var(--color-tag-purple, #bf5af2)' }}>
                   {sortedMedia.filter(m => m.type === 'video').length} video{sortedMedia.filter(m => m.type === 'video').length !== 1 ? 's' : ''}
                 </span>
               )}
@@ -1074,7 +1103,7 @@ export const Gallery: React.FC = () => {
         {/* Gallery content */}
         <div style={styles.content}>
           {loading ? (
-            <div style={{ ...styles.grid, padding: 16 }}>
+            <div style={{ ...styles.grid, padding: 'var(--space-4)' }}>
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} style={{ ...styles.gridItem, background: 'var(--color-border-subtle)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>
                   <div style={{ ...styles.thumbnail, background: 'var(--color-bg-hover)' }} />
@@ -1085,7 +1114,7 @@ export const Gallery: React.FC = () => {
             </div>
           ) : sortedMedia.length === 0 ? (
             <div style={styles.emptyState}>
-              <div style={{ width: 80, height: 80, borderRadius: 14, background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <div style={{ width: 80, height: 80, borderRadius: 14, background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-5)' }}>
                 <span style={{ fontSize: 36, color: 'var(--color-accent)' }}>{selectedAlbum === 'videos' ? Icons.video : Icons.photo}</span>
               </div>
               <div style={styles.emptyTitle}>
@@ -1093,7 +1122,7 @@ export const Gallery: React.FC = () => {
                   : selectedAlbum === 'videos' ? 'No videos yet'
                   : 'Your gallery is empty'}
               </div>
-              <div style={{ ...styles.emptySubtitle, maxWidth: 300, lineHeight: 1.6, marginBottom: 16 }}>
+              <div style={{ ...styles.emptySubtitle, maxWidth: 300, lineHeight: 1.6, marginBottom: 'var(--space-4)' }}>
                 {selectedAlbum === 'favorites' ? 'Click the heart icon on any photo or video to add it to favorites.'
                   : selectedAlbum === 'videos' ? 'Add video files to your Videos folder and they\'ll appear here.'
                   : 'Add images and videos to your Pictures or Videos folder to see them here.'}
@@ -1106,7 +1135,7 @@ export const Gallery: React.FC = () => {
                   } catch { toast.error('Could not open folder'); }
                 }}
                 style={{
-                  padding: '8px 20px', borderRadius: 6,
+                  padding: 'var(--space-2) var(--space-5)', borderRadius: 6,
                   background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)',
                   border: 'none', fontSize: 13, fontWeight: 600,
                   cursor: 'pointer', transition: 'opacity 0.2s',
@@ -1158,7 +1187,7 @@ export const Gallery: React.FC = () => {
                 </div>
               );
               // Avoid layout shift on tiny libraries
-              if (visibleMedia.length < 60) {
+              if (visibleMedia.length < GRID_VIRTUALIZE_THRESHOLD) {
                 return <div style={styles.grid}>{visibleMedia.map(renderGridItem)}</div>;
               }
               return (
@@ -1209,11 +1238,11 @@ export const Gallery: React.FC = () => {
 
           {/* Load More sentinel for infinite scroll */}
           {hasMoreItems && (
-            <div ref={loadMoreRef} style={{ display: 'flex', justifyContent: 'center', padding: '20px 0 8px' }}>
+            <div ref={loadMoreRef} style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-5) 0 var(--space-2)' }}>
               <button
                 onClick={() => setVisibleCount(c => c + ITEMS_PER_PAGE)}
                 aria-label="Load more media"
-                style={{ padding: '8px 28px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'background 0.15s' }}
+                style={{ padding: 'var(--space-2) 28px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'background 0.15s' }}
               >
                 Load More ({sortedMedia.length - visibleCount} remaining)
               </button>
@@ -1250,7 +1279,7 @@ export const Gallery: React.FC = () => {
         </div>
 
         {/* Pro Features Toolbar - horizontal scroll, no wrap */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px 12px', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface-solid)', flexShrink: 0, overflowX: 'auto', overflowY: 'hidden' }} className="scrollbar-hidden">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px var(--space-3)', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface-solid)', flexShrink: 0, overflowX: 'auto', overflowY: 'hidden' }} className="scrollbar-hidden">
           {[
             { label: 'Smart Albums', fn: () => setShowSmartAlbums(v => !v), active: showSmartAlbums },
             { label: 'EXIF', fn: () => setShowExifPanel(v => !v), active: showExifPanel },
@@ -1262,7 +1291,7 @@ export const Gallery: React.FC = () => {
             { label: 'Compare', fn: () => setShowCompareMode(v => !v), active: showCompareMode },
             { label: 'Slideshow', fn: () => setShowSlideshow(v => !v), active: showSlideshow },
           ].map(b => (
-            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
+            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
           ))}
         </div>
       </div>
@@ -1279,7 +1308,7 @@ export const Gallery: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             {smartAlbumRules.map((album, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) 10px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', marginBottom: 4 }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}><path d="M1 3.5A1.5 1.5 0 012.5 2h3.379a1.5 1.5 0 011.06.44L8.062 3.56A1.5 1.5 0 009.122 4H13.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z" fill="currentColor"/></svg>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{album.name}</div>
@@ -1301,14 +1330,14 @@ export const Gallery: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>EXIF / Metadata</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowExifPanel(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12, maxHeight: 280, overflowY: 'auto' }}>
+          <div style={{ padding: 'var(--space-3)', maxHeight: 280, overflowY: 'auto' }}>
             {[{ label: 'Filename', value: selectedMedia.name }, { label: 'Type', value: selectedMedia.type }, { label: 'Format', value: selectedMedia.format || 'Unknown' }, { label: 'Dimensions', value: (currentExif?.width && currentExif?.height) ? `${currentExif.width}×${currentExif.height}` : selectedMedia.width && selectedMedia.height ? `${selectedMedia.width}×${selectedMedia.height}` : '—' }, { label: 'Size', value: formatSize(selectedMedia.size) }, { label: 'Date', value: currentExif?.dateTime || formatDate(selectedMedia.date) }, { label: 'Camera', value: currentExif?.camera || '—' }, { label: 'Lens', value: currentExif?.lens || '—' }, { label: 'ISO', value: currentExif?.iso || '—' }, { label: 'Aperture', value: currentExif?.aperture || '—' }, { label: 'Shutter', value: currentExif?.shutterSpeed || '—' }, { label: 'Focal Length', value: currentExif?.focalLength || '—' }, { label: 'Color Space', value: currentExif?.colorSpace || '—' }, { label: 'GPS', value: currentExif?.gpsLat != null && currentExif?.gpsLon != null ? `${currentExif.gpsLat.toFixed(4)}, ${currentExif.gpsLon.toFixed(4)}` : '—' }].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--color-border-subtle)' }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{row.label}</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{row.value}</span>
               </div>
             ))}
-            <div style={{ marginTop: 8, height: 60, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ marginTop: 'var(--space-2)', height: 60, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {currentExif?.gpsLat != null && currentExif?.gpsLon != null ? (
                 <span style={{ fontSize: 11, color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => window.open(`https://www.openstreetmap.org/?mlat=${currentExif.gpsLat}&mlon=${currentExif.gpsLon}#map=15/${currentExif.gpsLat}/${currentExif.gpsLon}`, '_blank')}>
                   <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 00-5 5c0 3.5 5 9 5 9s5-5.5 5-9a5 5 0 00-5-5zm0 7a2 2 0 110-4 2 2 0 010 4z" fill="currentColor"/></svg>
@@ -1329,9 +1358,9 @@ export const Gallery: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Face Groups</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowFaceDetection(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             {faceGroups.map((g, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2 }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: g.color + '20', border: `2px solid ${g.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2a3 3 0 100 6 3 3 0 000-6zM3 12.5C3 10.567 5.239 9 8 9s5 1.567 5 3.5c0 .276-.224.5-.5.5h-9a.5.5 0 01-.5-.5z" fill={g.color}/></svg>
                 </div>
@@ -1361,21 +1390,21 @@ export const Gallery: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Tags</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowTagSystem(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-              <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Add tag..." onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim() && selectedMedia) { setMediaTags(t => ({ ...t, [selectedMedia.id]: [...(t[selectedMedia.id] || []), tagInput.trim()] })); setTagInput(''); } }} style={{ flex: 1, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }} />
-              <button aria-label="Add tag" onClick={() => { if (tagInput.trim() && selectedMedia) { setMediaTags(t => ({ ...t, [selectedMedia.id]: [...(t[selectedMedia.id] || []), tagInput.trim()] })); setTagInput(''); } }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}>+</button>
+          <div style={{ padding: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
+              <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Add tag..." onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim() && selectedMedia) { setMediaTags(t => ({ ...t, [selectedMedia.id]: [...(t[selectedMedia.id] || []), tagInput.trim()] })); setTagInput(''); } }} style={{ flex: 1, padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }} />
+              <button aria-label="Add tag" onClick={() => { if (tagInput.trim() && selectedMedia) { setMediaTags(t => ({ ...t, [selectedMedia.id]: [...(t[selectedMedia.id] || []), tagInput.trim()] })); setTagInput(''); } }} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}>+</button>
             </div>
             {selectedMedia && (mediaTags[selectedMedia.id] || []).length > 0 ? (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {(mediaTags[selectedMedia.id] || []).map((tag, i) => (
-                  <span key={i} style={{ padding: '2px 8px', borderRadius: 8, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', color: 'var(--color-accent)', fontSize: 11 }}>
+                  <span key={i} style={{ padding: '2px var(--space-2)', borderRadius: 8, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', color: 'var(--color-accent)', fontSize: 11 }}>
                     {tag} <span style={{ cursor: 'pointer', marginLeft: 2, display: 'inline-flex', verticalAlign: 'middle' }} onClick={() => { if (selectedMedia) setMediaTags(t => ({ ...t, [selectedMedia.id]: (t[selectedMedia.id] || []).filter((_, j) => j !== i) })); }}><DexIcon name="close" size={9} /></span>
                   </span>
                 ))}
               </div>
-            ) : <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 8 }}>No tags yet</div>}
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8 }}>Popular: landscape, portrait, night, macro, street</div>
+            ) : <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-2)' }}>No tags yet</div>}
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' }}>Popular: landscape, portrait, night, macro, street</div>
           </div>
         </div>
       )}
@@ -1387,9 +1416,9 @@ export const Gallery: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Quick Adjust</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowQuickAdjust(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             {[{ label: 'Exposure', value: adjustExposure, set: setAdjustExposure, min: -100, max: 100, color: 'var(--color-warning)' }, { label: 'Contrast', value: adjustContrast, set: setAdjustContrast, min: -100, max: 100, color: 'var(--color-accent)' }, { label: 'Saturation', value: adjustSaturation, set: setAdjustSaturation, min: -100, max: 100, color: 'var(--color-success)' }, { label: 'Temperature', value: adjustTemp, set: setAdjustTemp, min: -100, max: 100, color: 'var(--color-warning)' }].map(s => (
-              <div key={s.label} style={{ marginBottom: 8 }}>
+              <div key={s.label} style={{ marginBottom: 'var(--space-2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 11, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value > 0 ? '+' : ''}{s.value}</span></div>
                 <input type="range" min={s.min} max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: s.color }} />
               </div>
@@ -1432,15 +1461,15 @@ export const Gallery: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crop & Rotate</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropRotate(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '3:2'] as const).map(a => (
-                <button key={a} aria-label={`Set crop ratio ${a}`} aria-pressed={cropRatio === a} onClick={() => setCropRatio(a)} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: cropRatio === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropRatio === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
+                <button key={a} aria-label={`Set crop ratio ${a}`} aria-pressed={cropRatio === a} onClick={() => setCropRatio(a)} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: cropRatio === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropRatio === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Straighten</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{straightenAngle}°</span></div>
-            <input type="range" min="-45" max="45" value={straightenAngle} onChange={e => setStraightenAngle(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 8 }} />
+            <input type="range" min="-45" max="45" value={straightenAngle} onChange={e => setStraightenAngle(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'flex', gap: 4 }}>
               <button aria-label="Rotate clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 90) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-cw" size={10} /> 90</button>
               <button aria-label="Rotate counter-clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 270) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-ccw" size={10} /> 90</button>
@@ -1511,7 +1540,7 @@ export const Gallery: React.FC = () => {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Compare Mode</span>
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCompareMode(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
-          <div style={{ flex: 1, display: 'flex', gap: 2, padding: 12 }}>
+          <div style={{ flex: 1, display: 'flex', gap: 2, padding: 'var(--space-3)' }}>
             <div style={{ flex: 1, borderRadius: 6, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>BEFORE</div>
               {selectedMedia ? <div style={{ width: 60, height: 60, borderRadius: 4, background: getPlaceholderColor(selectedMedia.id) }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select image</span>}
@@ -1543,10 +1572,10 @@ export const Gallery: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Interval</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{slideshowInterval}s</span></div>
             <input type="range" min="1" max="15" value={slideshowInterval} onChange={e => setSlideshowInterval(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Photos Included</div>
-            <div style={{ padding: 8, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
+            <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10, textAlign: 'center' }}>
               <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>{media.filter(m => m.type === 'image').length} photos from {selectedAlbum === 'all' ? 'All Photos' : selectedAlbum}</span>
             </div>
-            <button onClick={startSlideshow} aria-label="Start slideshow" style={{ width: '100%', padding: '8px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><DexIcon name="play" size={12} /> Start Slideshow</button>
+            <button onClick={startSlideshow} aria-label="Start slideshow" style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><DexIcon name="play" size={12} /> Start Slideshow</button>
           </div>
         </div>
         </div>
@@ -1575,7 +1604,7 @@ export const Gallery: React.FC = () => {
                            'scaleIn 0.6s ease',
               }}
             />
-            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 16, padding: '8px 20px', background: 'rgba(0,0,0,0.80)', borderRadius: 14 }}>
+            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-2) var(--space-5)', background: 'rgba(0,0,0,0.80)', borderRadius: 14 }}>
               <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>{current.name}</span>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{slideshowIndex + 1} / {images.length}</span>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Click to exit</span>
@@ -1591,7 +1620,7 @@ export const Gallery: React.FC = () => {
             <button style={styles.lightboxClose} aria-label="Close lightbox" onClick={() => setSelectedMedia(null)}>{Icons.close}</button>
             <span style={styles.lightboxTitle}>
               {selectedMedia.name}
-              {selectedMedia.type === 'video' && <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 3, background: 'color-mix(in srgb, var(--color-tag-purple, #bf5af2) 20%, transparent)', color: 'var(--color-tag-purple, #bf5af2)', fontSize: 11 }}>Video</span>}
+              {selectedMedia.type === 'video' && <span style={{ marginLeft: 'var(--space-2)', padding: '2px var(--space-2)', borderRadius: 3, background: 'color-mix(in srgb, var(--color-tag-purple, #bf5af2) 20%, transparent)', color: 'var(--color-tag-purple, #bf5af2)', fontSize: 11 }}>Video</span>}
             </span>
             <div style={styles.lightboxActions}>
               <button style={{...styles.lightboxBtn, color: favorites.includes(selectedMedia.id) ? 'var(--color-error)' : 'var(--color-text-secondary)'}} aria-label={favorites.includes(selectedMedia.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => toggleFavorite(selectedMedia.id)}>
@@ -1672,7 +1701,7 @@ export const Gallery: React.FC = () => {
                       position: 'absolute', bottom: 0, left: 0, right: 0,
                       background: 'rgba(0,0,0,0.80)',
                       borderRadius: '0 0 10px 10px',
-                      padding: '8px 16px 10px',
+                      padding: 'var(--space-2) var(--space-4) 10px',
                       display: 'flex', flexDirection: 'column', gap: 6,
                       opacity: showVideoControls ? 1 : 0,
                       transition: 'opacity 0.3s ease',
@@ -1699,7 +1728,7 @@ export const Gallery: React.FC = () => {
                         }} />
                       </div>
                       {/* Controls row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                         <button onClick={toggleVideoPlay} style={{
                           background: 'none', border: 'none', cursor: 'pointer', padding: 4,
                           color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center',
@@ -1771,7 +1800,7 @@ export const Gallery: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, color: 'var(--color-text-secondary)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
                     {Icons.video}
                     <span style={{ fontSize: 14 }}>No video source</span>
                   </div>
@@ -1813,7 +1842,7 @@ export const Gallery: React.FC = () => {
                       border: '1px solid var(--color-border)',
                     }}>
                       <button onClick={zoomOut} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center' }} aria-label="Zoom out">{Icons.zoomOut}</button>
-                      <button onClick={zoomReset} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 42, textAlign: 'center' }} aria-label="Reset zoom">
+                      <button onClick={zoomReset} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 42, textAlign: 'center' }} aria-label="Reset zoom">
                         {Math.round(imgZoom * 100)}%
                       </button>
                       <button onClick={zoomIn} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center' }} aria-label="Zoom in">{Icons.zoomIn}</button>
@@ -1833,7 +1862,7 @@ export const Gallery: React.FC = () => {
           </div>
 
           <div style={styles.lightboxFooter}>
-            <span style={{ padding: '2px 8px', borderRadius: 3, background: 'var(--color-border-subtle)', fontSize: 11, fontWeight: 500 }}>
+            <span style={{ padding: '2px var(--space-2)', borderRadius: 3, background: 'var(--color-border-subtle)', fontSize: 11, fontWeight: 500 }}>
               {getMediaFormat(selectedMedia)}
             </span>
             <span>{selectedMedia.type === 'video' ? 'Video' : 'Photo'}</span>
@@ -1852,8 +1881,8 @@ export const Gallery: React.FC = () => {
             <div style={{
               position: 'absolute', top: 52, right: 0, bottom: 40, width: 280,
               background: 'var(--color-bg-elevated)',
-              borderLeft: '1px solid var(--color-border-subtle)', padding: 20,
-              display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', zIndex: 110,
+              borderLeft: '1px solid var(--color-border-subtle)', padding: 'var(--space-5)',
+              display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', overflow: 'auto', zIndex: 110,
             }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Info</span>
 
@@ -1943,30 +1972,30 @@ const styles: Record<string, React.CSSProperties> = {
   sidebar: { width: 'var(--pg-sidebar-width)' as any, background: 'var(--pg-sidebar)', borderRight: '1px solid var(--pg-border)', display: 'flex', flexDirection: 'column' as const },
   sidebarHeader: { height: 36, display: 'flex', alignItems: 'center', padding: '0 14px', borderBottom: '1px solid var(--pg-border)' },
   sidebarTitle: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' },
-  albumList: { flex: 1, overflow: 'auto', padding: 8 },
-  sectionLabel: { fontSize: 10.5, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, padding: '12px 10px 4px', letterSpacing: 0.8 },
-  albumItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', height: 'var(--pg-row-height)' as any, borderRadius: 'var(--pg-row-radius)' as any, border: 'none', cursor: 'pointer', fontSize: 12.5, width: '100%', textAlign: 'left' as const, transition: 'background-color 0.12s ease, color 0.12s ease' },
+  albumList: { flex: 1, overflow: 'auto', padding: 'var(--space-2)' },
+  sectionLabel: { fontSize: 10.5, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, padding: 'var(--space-3) 10px 4px', letterSpacing: 0.8 },
+  albumItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px var(--space-3)', height: 'var(--pg-row-height)' as any, borderRadius: 'var(--pg-row-radius)' as any, border: 'none', cursor: 'pointer', fontSize: 12.5, width: '100%', textAlign: 'left' as const, transition: 'background-color 0.12s ease, color 0.12s ease' },
   albumCount: { fontSize: 11.5, color: 'var(--color-text-tertiary)' },
 
   // Main
   main: { flex: 1, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
-  toolbar: { height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-toolbar)' },
+  toolbar: { height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-4)', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-toolbar)' },
   title: { fontSize: 14, fontWeight: 700 },
-  toolbarRight: { display: 'flex', alignItems: 'center', gap: 16 },
+  toolbarRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
   itemCount: { fontSize: 13, color: 'var(--color-text-muted)' },
   viewToggle: { display: 'flex', background: 'var(--color-bg-glass)', borderRadius: 4, padding: 2 },
   viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 3, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
 
   // Content
-  content: { flex: 1, overflow: 'auto', padding: 20, scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
-  emptyState: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' as const },
-  emptyIcon: { fontSize: 48, color: 'var(--color-text-muted)', marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 },
+  content: { flex: 1, overflow: 'auto', padding: 'var(--space-5)', scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
+  emptyState: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px var(--space-5)', textAlign: 'center' as const },
+  emptyIcon: { fontSize: 48, color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' },
+  emptyTitle: { fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)' },
   emptySubtitle: { fontSize: 14, color: 'var(--color-text-muted)' },
 
   // Grid View
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16, contain: 'layout' as any },
-  gridItem: { display: 'flex', flexDirection: 'column' as const, gap: 8, cursor: 'pointer', transition: 'transform 0.15s ease, opacity 0.15s ease', contentVisibility: 'auto' as any, containIntrinsicSize: '140px 180px' as any },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-4)', contain: 'layout' as any },
+  gridItem: { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)', cursor: 'pointer', transition: 'transform 0.15s ease, opacity 0.15s ease', contentVisibility: 'auto' as any, containIntrinsicSize: '140px 180px' as any },
   thumbnail: { aspectRatio: '1', borderRadius: 6, position: 'relative' as const, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   videoOverlay: { position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: 6 },
   playBadge: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-primary)' },
@@ -1976,7 +2005,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // List View
   list: { display: 'flex', flexDirection: 'column' as const, gap: 2 },
-  listItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 6, cursor: 'pointer' },
+  listItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, cursor: 'pointer' },
   listThumb: { width: 48, height: 48, borderRadius: 4 },
   listInfo: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 2 },
   listName: { fontSize: 14, color: 'var(--color-text-primary)' },
@@ -1984,26 +2013,26 @@ const styles: Record<string, React.CSSProperties> = {
   listFavBtn: { width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' },
 
   // Recent Media Section (bottom)
-  recentSection: { marginTop: 32, paddingTop: 20, borderTop: '1px solid var(--color-border)' },
-  recentHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  recentSection: { marginTop: 'var(--space-8)', paddingTop: 'var(--space-5)', borderTop: '1px solid var(--color-border)' },
+  recentHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' },
   recentTitle: { fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' },
   recentCount: { fontSize: 12, color: 'var(--color-text-muted)' },
-  recentStrip: { display: 'flex', gap: 12, overflowX: 'auto' as const, paddingBottom: 12, scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, scrollSnapType: 'x mandatory' as any },
+  recentStrip: { display: 'flex', gap: 'var(--space-3)', overflowX: 'auto' as const, paddingBottom: 'var(--space-3)', scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, scrollSnapType: 'x mandatory' as any },
   recentItem: { flexShrink: 0, width: 100, display: 'flex', flexDirection: 'column' as const, gap: 6, cursor: 'pointer', scrollSnapAlign: 'start' as any },
   recentThumb: { width: 100, height: 100, borderRadius: 6, position: 'relative' as const, overflow: 'hidden' },
   recentName: { fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center' as const, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
 
   // Lightbox
   lightbox: { position: 'absolute' as const, inset: 0, background: 'rgba(0,0,0,0.96)', display: 'flex', flexDirection: 'column' as const, zIndex: 'var(--z-modal)' },
-  lightboxHeader: { height: 52, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 16, borderBottom: '1px solid var(--color-border)' },
+  lightboxHeader: { height: 52, display: 'flex', alignItems: 'center', padding: '0 var(--space-4)', gap: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' },
   lightboxClose: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 4, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer' },
   lightboxTitle: { flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' },
-  lightboxActions: { display: 'flex', gap: 8 },
+  lightboxActions: { display: 'flex', gap: 'var(--space-2)' },
   lightboxBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-secondary)', cursor: 'pointer', transition: 'all 0.15s ease' },
-  lightboxContent: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, gap: 20 },
+  lightboxContent: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)', gap: 'var(--space-5)' },
   navBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'all 0.15s ease' },
   lightboxImage: { flex: 1, maxWidth: '80%', aspectRatio: '16/10', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  lightboxFooter: { height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, fontSize: 13, color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border)' },
+  lightboxFooter: { height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-5)', fontSize: 13, color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border)' },
 };
 
 Gallery.displayName = 'Gallery';

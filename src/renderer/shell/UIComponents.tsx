@@ -98,7 +98,7 @@ export const DexCheckbox: React.FC<{
     <label style={{
       display: 'inline-flex',
       alignItems: 'center',
-      gap: 8,
+      gap: 'var(--space-2)',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
       userSelect: 'none',
@@ -173,7 +173,7 @@ export function DexRadioGroup<T extends string = string>({
   };
 
   return (
-    <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       {options.map(opt => {
         const selected = opt.value === value;
         const isDisabled = disabled || opt.disabled;
@@ -181,7 +181,7 @@ export function DexRadioGroup<T extends string = string>({
           <label
             key={opt.value}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)',
               cursor: isDisabled ? 'not-allowed' : 'pointer',
               opacity: isDisabled ? 0.5 : 1, userSelect: 'none',
             }}
@@ -377,7 +377,7 @@ export const DexInput: React.FC<{
         onBlur={() => setFocused(false)}
         style={{
           width: '100%',
-          padding: '8px 12px',
+          padding: 'var(--space-2) var(--space-3)',
           fontSize: 13,
           fontFamily: 'var(--font-family)',
           color: 'var(--color-text-primary)',
@@ -441,7 +441,7 @@ export const DexButton: React.FC<{
       onPointerLeave={() => setPressed(false)}
       style={{
         height: 'var(--dex-control-h-md, 32px)',
-        padding: '0 16px',
+        padding: '0 var(--space-4)',
         borderRadius: 6,
         border: variant === 'ghost' ? '1px solid var(--color-border-subtle)' : 'none',
         background: bg,
@@ -486,7 +486,7 @@ export const DexListItem: React.FC<{
       style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '8px 12px',
+        padding: 'var(--space-2) var(--space-3)',
         borderRadius: 4,
         cursor: 'pointer',
         position: 'relative',
@@ -508,7 +508,7 @@ export const DexListItem: React.FC<{
           transform: 'translateY(-50%)',
           width: 2,
           height: '60%',
-          borderRadius: 1,
+          borderRadius: 2,
           background: 'var(--color-accent)',
         }} />
       )}
@@ -799,7 +799,7 @@ export const EmptyState: React.FC<{
 }> = ({ icon, title, subtitle, action }) => (
   <div style={{
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    gap: 10, padding: '40px 24px', textAlign: 'center',
+    gap: 10, padding: 'var(--space-10) var(--space-6)', textAlign: 'center',
     color: 'var(--color-text-tertiary)',
   }}>
     {icon && (
@@ -819,7 +819,7 @@ export const EmptyState: React.FC<{
       <button
         onClick={action.onClick}
         style={{
-          marginTop: 8, padding: '6px 16px', borderRadius: 6, border: '1px solid var(--color-border)',
+          marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, border: '1px solid var(--color-border)',
           background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
           fontSize: 12, fontWeight: 500, cursor: 'pointer',
           transition: 'background 0.1s',
@@ -865,7 +865,7 @@ export const LoadingState: React.FC<{
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      gap: 12, padding: size === 'sm' ? '20px 16px' : '40px 24px',
+      gap: 'var(--space-3)', padding: size === 'sm' ? '20px 16px' : '40px 24px',
     }}>
       <div style={{
         width: dim, height: dim, borderRadius: '50%',
@@ -894,7 +894,7 @@ export const AppToolbar: React.FC<{
 }> = ({ left, center, right, style }) => (
   <div style={{
     height: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 12px', flexShrink: 0,
+    padding: '0 var(--space-3)', flexShrink: 0,
     background: 'var(--color-bg-elevated)',
     borderBottom: '1px solid var(--color-border-subtle)',
     position: 'relative', zIndex: 100,
@@ -962,7 +962,7 @@ export function DexTabs<T extends string = string>({
             }}
             style={{
               position: 'relative',
-              padding: '8px 14px',
+              padding: 'var(--space-2) 14px',
               background: 'transparent',
               border: 'none',
               borderBottom: '2px solid transparent',

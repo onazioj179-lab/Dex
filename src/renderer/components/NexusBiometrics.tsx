@@ -99,17 +99,17 @@ export const NexusBiometrics: React.FC = () => {
   const allUnavailable = capabilities.length > 0 && capabilities.every(c => !c.available);
 
   return (
-    <div style={{ padding: 0, fontSize: 13, color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
+    <div style={{ padding: 0, fontSize: 13, color: 'var(--color-text-primary)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', height: '100%' }}>
       <GlassToolbar title="Nexus Biometrics" />
 
-      <div style={{ padding: '0 16px 16px', overflowY: 'auto' }}>
-        <p style={{ margin: '0 0 12px', color: 'var(--color-text-secondary)', fontSize: 12.5, lineHeight: 1.5 }}>
+      <div style={{ padding: '0 var(--space-4) var(--space-4)', overflowY: 'auto' }}>
+        <p style={{ margin: '0 0 var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 12.5, lineHeight: 1.5 }}>
           Local biometric factors for unlocking the identity vault and confirming privileged actions.
           Templates never leave this device.
         </p>
 
         {status && (
-          <GlassSurface variant="card" style={{ padding: 10, marginBottom: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          <GlassSurface variant="card" style={{ padding: 10, marginBottom: 'var(--space-3)', fontSize: 12, color: 'var(--color-text-secondary)' }}>
             {status}
           </GlassSurface>
         )}
@@ -127,7 +127,7 @@ export const NexusBiometrics: React.FC = () => {
               <div style={metaStyle}>provider: {cap.provider}{cap.notes ? ` — ${cap.notes}` : ''}</div>
             </div>
             <span style={{
-              fontSize: 10.5, padding: '2px 8px', borderRadius: 999,
+              fontSize: 10.5, padding: '2px var(--space-2)', borderRadius: 999,
               background: cap.available ? 'rgba(52,199,89,0.15)' : 'rgba(255,255,255,0.04)',
               color: cap.available ? '#5cd17a' : 'var(--color-text-tertiary)',
               border: cap.available ? '1px solid rgba(52,199,89,0.3)' : '1px solid var(--pg-border)',
@@ -137,7 +137,7 @@ export const NexusBiometrics: React.FC = () => {
         ))}
 
         {enrollKind && (
-          <GlassSurface variant="card" style={{ padding: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <GlassSurface variant="card" style={{ padding: 'var(--space-3)', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>Label for {enrollKind}:</span>
             <input
               autoFocus
@@ -179,11 +179,11 @@ export const NexusBiometrics: React.FC = () => {
 
 const rowSurfaceStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 10,
-  padding: 12, marginBottom: 8,
+  padding: 'var(--space-3)', marginBottom: 'var(--space-2)',
 };
 
 const titleLineStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8,
+  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
   fontSize: 13, color: 'var(--color-text-primary)',
 };
 
@@ -192,12 +192,12 @@ const metaStyle: React.CSSProperties = {
 };
 
 const emptyStyle: React.CSSProperties = {
-  padding: '12px 4px', color: 'var(--color-text-tertiary)', fontSize: 12,
+  padding: 'var(--space-3) 4px', color: 'var(--color-text-tertiary)', fontSize: 12,
 };
 
 const btnStyle = (variant: 'accent' | 'muted' | 'danger'): React.CSSProperties => {
   const base: React.CSSProperties = {
-    padding: '6px 12px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+    padding: '6px var(--space-3)', borderRadius: 4, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
   };

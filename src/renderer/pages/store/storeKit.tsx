@@ -229,7 +229,7 @@ export function storeButton(variant: 'accent' | 'muted' | 'danger'): React.CSSPr
     justifyContent: 'center',
     gap: 6,
     padding: '0 14px',
-    borderRadius: 7,
+    borderRadius: 6,
     border: '1px solid var(--pg-border-strong)',
     color: 'var(--color-text-primary)',
     background: 'var(--color-bg-surface)',
@@ -280,9 +280,9 @@ export function AppTile({
         textAlign: 'left',
         cursor: 'pointer',
         display: 'flex',
-        gap: 12,
+        gap: 'var(--space-3)',
         alignItems: 'center',
-        padding: 12,
+        padding: 'var(--space-3)',
         width: variant === 'rail' ? 280 : '100%',
         flexShrink: variant === 'rail' ? 0 : 1,
         color: 'var(--color-text-primary)',
@@ -300,7 +300,7 @@ export function AppTile({
         <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {primaryCategory ? categoryLabel(primaryCategory) : entry.manifest.contentRating}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 1 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 1 }}>
           {ratingCount > 0 ? (
             <>
               <StarRating value={rating} size={12} />
@@ -324,7 +324,7 @@ export function AppTile({
 export function SectionTitle({ icon, title, action }: { icon?: string; title: string; action?: React.ReactNode }): React.ReactElement {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, margin: '4px 0 10px' }}>
-      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-primary)' }}>
+      <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-text-primary)' }}>
         {icon && <span aria-hidden style={{ color: 'var(--color-accent)', display: 'inline-flex' }}><DexIcon name={icon} size={15} /></span>}
         {title}
       </h2>
