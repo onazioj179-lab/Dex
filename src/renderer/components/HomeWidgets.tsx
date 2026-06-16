@@ -1419,7 +1419,7 @@ const RecentNotesWidget: React.FC = () => {
       {recent.length === 0 ? (
         <DashEmpty icon="notes" label="No notes yet" hint="Create a note and it shows up here." />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {recent.map(n => {
             const preview = (n.plain_text || '').replace(/\s+/g, ' ').trim();
             return (
@@ -1879,10 +1879,10 @@ export const HomeDashboard: React.FC = () => {
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
-        // Bento rows kept at 168px: measured (2026-06-15) that the cards are
-        // content-sized, not oversized — tighter rows clip real content (Recent
-        // Notes needs ~176, Pinned Apps ~270). The "empty" look is empty-STATE
-        // widgets (no data yet), which is honest, not a density bug.
+        // 168px rows; the oversized/empty look came from SPANS, not row height —
+        // Current Tasks (2 items) was a 2-row `tall` card and Rewind a 2x2 `large`
+        // card, leaving huge empty space. Cards are now sized to their content and
+        // their list bodies scroll, so the bento stays compact + aligned.
         gridAutoRows: '168px',
         gridAutoFlow: 'dense',
         gridAutoColumns: '1fr',
@@ -1893,9 +1893,9 @@ export const HomeDashboard: React.FC = () => {
     >
       <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><RecentProjectsWidget /></div>
       <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><RecentNotesWidget /></div>
-      <div style={{ ...BENTO_SPAN['tall'], minWidth: 0, minHeight: 0, display: 'flex' }}><CurrentTasksWidget /></div>
+      <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><CurrentTasksWidget /></div>
       <div style={{ ...BENTO_SPAN['small'], minWidth: 0, minHeight: 0, display: 'flex' }}><ActiveWorkflowsWidget /></div>
-      <div style={{ ...BENTO_SPAN['large'], minWidth: 0, minHeight: 0, display: 'flex' }}><RewindSummaryWidget /></div>
+      <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><RewindSummaryWidget /></div>
       <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><AiSuggestionsWidget /></div>
       <div style={{ ...BENTO_SPAN['wide'], minWidth: 0, minHeight: 0, display: 'flex' }}><PinnedAppsWidget /></div>
     </div>

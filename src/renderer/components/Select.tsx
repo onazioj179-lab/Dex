@@ -11,6 +11,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import DexIcon from './DexIcon';
+import { useDropdownPosition } from '../hooks/useDropdownPosition';
 
 // ==================== TYPES ====================
 
@@ -93,6 +94,8 @@ export const Select: React.FC<SelectProps> = ({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useDropdownPosition(isOpen, containerRef, menuRef, { matchWidth: true });
 
   const currentValue = controlledValue !== undefined ? controlledValue : value;
   const selectedOption = options.find(o => o.value === currentValue);
@@ -353,7 +356,7 @@ export const Select: React.FC<SelectProps> = ({
       </div>
 
       {isOpen && (
-        <div style={styles.menu}>
+        <div ref={menuRef} style={{ ...styles.menu, ...menuStyle }}>
           {loading ? (
             <div style={styles.loading}>Loading...</div>
           ) : filteredOptions.length === 0 ? (
@@ -383,7 +386,7 @@ export const Select: React.FC<SelectProps> = ({
                           <div style={styles.optionDescription}>{option.description}</div>
                         )}
                       </div>
-                      {option.value === currentValue && <span>check</span>}
+                      {option.value === currentValue && <DexIcon name="check" size={14} />}
                     </div>
                   );
                 })}
@@ -409,7 +412,7 @@ export const Select: React.FC<SelectProps> = ({
                     <div style={styles.optionDescription}>{option.description}</div>
                   )}
                 </div>
-                {option.value === currentValue && <span>check</span>}
+                {option.value === currentValue && <DexIcon name="check" size={14} />}
               </div>
             ))
           )}
@@ -439,6 +442,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useDropdownPosition(isOpen, containerRef, menuRef, { matchWidth: true });
 
   const currentValues = controlledValue !== undefined ? controlledValue : values;
   const selectedOptions = options.filter(o => currentValues.includes(o.value));
@@ -623,7 +628,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       </div>
 
       {isOpen && (
-        <div style={styles.menu}>
+        <div ref={menuRef} style={{ ...styles.menu, ...menuStyle }}>
           {filteredOptions.map(option => {
             const isSelected = currentValues.includes(option.value);
             const isDisabled = option.disabled ||

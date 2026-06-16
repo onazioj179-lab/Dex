@@ -1021,7 +1021,6 @@ export const AppManager: React.FC = () => {
 
   // -- Dock hover preview state -----------------------------------------------
   const [dockPreview, setDockPreview] = useState<{ id: string; x: number; y: number } | null>(null);
-  const dockPreviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dockPreviewPinnedId, setDockPreviewPinnedId] = useState<string | null>(null);
   const [dockPeekAnnouncement, setDockPeekAnnouncement] = useState('');
 
@@ -3933,20 +3932,6 @@ export const AppManager: React.FC = () => {
           transformOrigin: 'bottom center',
           willChange: dockMagnification ? 'transform' : 'auto',
         }}
-          onMouseEnter={(e) => {
-            if (dockPreviewTimer.current) clearTimeout(dockPreviewTimer.current);
-            const el = e.currentTarget;
-            const rect = el.getBoundingClientRect();
-            dockPreviewTimer.current = setTimeout(() => {
-              setDockPreview({ id: item.id, x: rect.left + rect.width / 2, y: rect.top });
-              setDockPeekAnnouncement(`Dock peek opened for ${item.label}`);
-            }, 400);
-          }}
-          onMouseLeave={() => {
-            if (dockPreviewTimer.current) clearTimeout(dockPreviewTimer.current);
-            dockPreviewTimer.current = null;
-            if (dockPreviewPinnedId !== item.id) setDockPreview(null);
-          }}
         >
 
           <button

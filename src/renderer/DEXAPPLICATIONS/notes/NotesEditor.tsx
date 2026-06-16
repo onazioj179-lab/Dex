@@ -90,6 +90,12 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'inlinecode', label: 'Inline Code', icon: '`', command: 'inlineCode' },
     { id: 'link', label: 'Link', icon: 'LK', command: 'link' },
   ],
+  [
+    { id: 'table', label: 'Insert Table', icon: 'TBL', command: 'table' },
+    { id: 'callout-note', label: 'Callout: Note', icon: 'Note', command: 'callout', arg: 'note' },
+    { id: 'callout-warning', label: 'Callout: Warning', icon: 'Warn', command: 'callout', arg: 'warning' },
+    { id: 'callout-tip', label: 'Callout: Tip', icon: 'Tip', command: 'callout', arg: 'tip' },
+  ],
 ];
 
 // ---------------------------------------------------------------------------
@@ -677,6 +683,45 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
           rng.deleteContents();
           rng.insertNode(pre);
         }
+        emitChange();
+        break;
+      }
+      case 'callout': {
+        // Insert the RENDERED callout HTML so it shows styled immediately;
+        // htmlToDoc reverses it via the data-callout attribute on save, so the
+        // marker round-trips (see NotesDocumentModel parseElement 'blockquote').
+        pushUndo();
+        const type = action.arg === 'warning' || action.arg === 'tip' ? action.arg : 'note';
+        const label = type === 'warning' ? 'Warning' : type === 'tip' ? 'Tip' : 'Note';
+        const html =
+          `<blockquote class="callout callout-${type}" data-callout="${type}">` +
+          `<div class="callout-title" contenteditable="false">` +
+          `<span class="callout-icon" aria-hidden="true"></span>` +
+          `<span class="callout-label">${label}</span></div>` +
+          `<div class="callout-body"><p><br></p></div></blockquote><p><br></p>`;
+        editorRef.current?.focus();
+        document.execCommand('insertHTML', false, html);
+        emitChange();
+        break;
+      }
+      case 'table': {
+        // Insert a 3x3 starter table (first row = headers). Cells inherit the
+        // editor's contentEditable so they're editable; htmlToDoc parses
+        // table/tr/td|th back to the model so it persists + round-trips.
+        pushUndo();
+        const cols = 3;
+        const rows = 3;
+        let html = '<table><tbody><tr>';
+        for (let c = 0; c < cols; c++) html += `<th>Header ${c + 1}</th>`;
+        html += '</tr>';
+        for (let r = 1; r < rows; r++) {
+          html += '<tr>';
+          for (let c = 0; c < cols; c++) html += '<td><br></td>';
+          html += '</tr>';
+        }
+        html += '</tbody></table><p><br></p>';
+        editorRef.current?.focus();
+        document.execCommand('insertHTML', false, html);
         emitChange();
         break;
       }

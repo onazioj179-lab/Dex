@@ -19,6 +19,7 @@ import { type ExifData, loadExifFromPath } from '../utils/exifParser';
 import DexIcon from '../components/DexIcon';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
 
@@ -463,6 +464,29 @@ export const Gallery: React.FC = () => {
   const sortedMedia = useMemo(() =>
     [...filteredMedia].sort((a, b) => b.date.getTime() - a.date.getTime()),
   [filteredMedia]);
+
+  // -- uki context: let the assistant see the active album, view, and selection.
+  // Registered once; a latest-value ref keeps the resolver reading live state.
+  // Mirrors the Notes/Tasks/Files resolvers (UKI Workspace Awareness initiative).
+  const ukiCtxRef = useRef({ selectedAlbum, viewMode, selectedItems, sortedMedia });
+  useEffect(() => { ukiCtxRef.current = { selectedAlbum, viewMode, selectedItems, sortedMedia }; });
+  useEffect(() => {
+    registerUkiAppContext('gallery', () => {
+      const c = ukiCtxRef.current;
+      return {
+        appId: 'gallery',
+        currentFile: `Album: ${c.selectedAlbum}`,
+        selectionText: c.selectedItems.size > 0 ? `${c.selectedItems.size} item(s) selected` : undefined,
+        custom: {
+          album: c.selectedAlbum,
+          view: c.viewMode,
+          itemCount: c.sortedMedia.length,
+          selectedCount: c.selectedItems.size,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('gallery');
+  }, []);
 
   const selectAll = useCallback(() => {
     setSelectedItems(new Set(filteredMedia.map(m => m.id)));
