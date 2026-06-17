@@ -4,6 +4,8 @@
  * Professional batch media encoding and transcoding
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
+import { clampEventToViewport } from '../../utils/menuPosition';
+import { CreativeSlider, SegmentedControl } from '../../components/controls';
 import { useRunningApps } from '../../store/runningApps';
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
@@ -1245,10 +1247,6 @@ const Forge: React.FC = () => {
     statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
     modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
     checkbox: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 0', cursor: 'pointer', fontSize: '11px', fontWeight: 600 },
-    sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },
-    sliderLabel: { width: '90px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
-    slider: { flex: 1, accentColor: 'var(--color-accent)' },
-    sliderValue: { width: '36px', fontSize: '11px', textAlign: 'right', color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontWeight: 600 },
     select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px var(--space-2)', fontSize: '11px', cursor: 'pointer', width: '100%', fontWeight: 600, transition: 'all 0.12s ease' },
   }), []);
 
@@ -1530,11 +1528,7 @@ const Forge: React.FC = () => {
             {activeTab === 'settings' && (
               <div>
                 <div style={styles.sectionTitle}>Encoding</div>
-                <div style={styles.sliderRow}>
-                  <span style={styles.sliderLabel}>Parallel Jobs</span>
-                  <input type="range" min="1" max="8" value={parallelJobs} onChange={(e) => setParallelJobs(Number(e.target.value))} style={styles.slider} />
-                  <span style={styles.sliderValue}>{parallelJobs}</span>
-                </div>
+                <CreativeSlider label="Parallel Jobs" min={1} max={8} step={1} value={parallelJobs} onChange={setParallelJobs} displayValue={parallelJobs} accentColor="var(--color-accent)" />
                 
                 <div style={styles.checkbox} onClick={() => setUseHardwareAccel(!useHardwareAccel)}>
                   <div style={{ width: '14px', height: '14px', background: useHardwareAccel ? 'var(--color-accent)' : 'var(--color-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1565,11 +1559,7 @@ const Forge: React.FC = () => {
                   <span>Audio Normalization</span>
                 </div>
                 {audioNormalize && (
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Target LUFS</span>
-                    <input type="range" min="-24" max="-6" value={audioNormTarget} onChange={(e) => setAudioNormTarget(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{audioNormTarget}</span>
-                  </div>
+                  <CreativeSlider label="Target LUFS" min={-24} max={-6} step={1} value={audioNormTarget} onChange={setAudioNormTarget} displayValue={audioNormTarget} accentColor="var(--color-accent)" />
                 )}
 
                 <div style={{ ...styles.sectionTitle, marginTop: 'var(--space-4)' }}>Output</div>
@@ -1624,7 +1614,7 @@ const Forge: React.FC = () => {
                 key={job.id}
                 style={{ ...styles.jobItem, ...(selectedJobId === job.id ? styles.jobItemSelected : {}) }}
                 onClick={() => setSelectedJobId(job.id)}
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedJobId(job.id); setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, jobId: job.id }); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedJobId(job.id); const p = clampEventToViewport(e); setCtxMenu({ visible: true, x: p.left, y: p.top, jobId: job.id }); }}
               >
                 <div style={styles.jobIcon}>{Icons.video}</div>
                 <div style={styles.jobInfo}>
@@ -1866,11 +1856,7 @@ const Forge: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Frame Format</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 'var(--space-3)' }}>
-              {(['tiff', 'png', 'exr', 'dpx'] as const).map(f => (
-                <button key={f} aria-label={`Select ${f} format`} aria-pressed={imgSeqFormat === f} onClick={() => setImgSeqFormat(f)} style={{ padding: 'var(--space-2) 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: imgSeqFormat === f ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: imgSeqFormat === f ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
-              ))}
-            </div>
+            <SegmentedControl options={(['tiff', 'png', 'exr', 'dpx'] as const).map(f => ({ value: f, label: f.toUpperCase() }))} value={imgSeqFormat} onChange={setImgSeqFormat} accentColor="var(--color-accent)" variant="outlined" columns={4} size="sm" style={{ marginBottom: 'var(--space-3)' }} />
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>frame_[####].{imgSeqFormat}</div>
@@ -1923,11 +1909,7 @@ const Forge: React.FC = () => {
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Output Format</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 'var(--space-3)' }}>
-              {(['wav', 'mp3', 'flac', 'aac'] as const).map(f => (
-                <button key={f} aria-label={`Select ${f} audio format`} aria-pressed={audioExtractFormat === f} onClick={() => setAudioExtractFormat(f)} style={{ padding: 'var(--space-2) 4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: audioExtractFormat === f ? 'rgba(191,90,242,0.15)' : 'var(--color-border-subtle)', color: audioExtractFormat === f ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{f}</button>
-              ))}
-            </div>
+            <SegmentedControl options={(['wav', 'mp3', 'flac', 'aac'] as const).map(f => ({ value: f, label: f.toUpperCase() }))} value={audioExtractFormat} onChange={setAudioExtractFormat} accentColor="#bf5af2" variant="outlined" columns={4} size="sm" style={{ marginBottom: 'var(--space-3)' }} />
             <div style={{ padding: 10, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               {[{ label: 'Sample Rate', value: '48 kHz' }, { label: 'Channels', value: 'Stereo' }, { label: 'Bit Depth', value: audioExtractFormat === 'wav' || audioExtractFormat === 'flac' ? '24-bit' : '16-bit' }].map(i => (
                 <div key={i.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{i.label}</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{i.value}</span></div>
@@ -1961,7 +1943,7 @@ const Forge: React.FC = () => {
                 };
                 recorder.start(100); source.start(0);
                 source.onended = () => { if (recorder.state === 'recording') recorder.stop(); };
-              } catch (err: any) { toast.error('Audio extraction failed: ' + (err?.message || 'Unknown error')); }
+              } catch (err: any) { console.error('[Forge] audio extraction failed:', err); toast.error('Could not extract audio. Try a different file or format.'); }
             }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Extract Audio</button>
           </div>
         </div>
@@ -1975,22 +1957,22 @@ const Forge: React.FC = () => {
             <button aria-label="Close Watermark Overlay" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowWatermark(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              {(['text', 'image'] as const).map(t => (
-                <button key={t} aria-label={`Select ${t} watermark type`} aria-pressed={watermarkType === t} onClick={() => setWatermarkType(t)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: watermarkType === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
-              ))}
-            </div>
+            <SegmentedControl options={(['text', 'image'] as const)} value={watermarkType} onChange={setWatermarkType} accentColor="var(--color-accent)" variant="outlined" size="sm" style={{ marginBottom: 10, width: '100%' }} />
             {watermarkType === 'text' && (
               <input value={watermarkText} onChange={e => setWatermarkText(e.target.value)} placeholder="Watermark text..." style={{ width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: '#E0E0E0', fontSize: 11, marginBottom: 'var(--space-2)' }} />
             )}
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Position</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 'var(--space-2)' }}>
-              {(['top-left', 'top-center', 'top-right', 'bottom-left', 'center', 'bottom-right'] as const).map((p) => (
-                <button key={p} aria-label={`Set watermark position ${p}`} onClick={() => setWatermarkPosition(p)} style={{ padding: 4, borderRadius: 2, border: '1px solid var(--color-bg-hover)', background: watermarkPosition === p ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: watermarkPosition === p ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p === 'center' ? '●' : p.split('-').map(w => w[0].toUpperCase()).join('')}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Opacity</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{watermarkOpacity}%</span></div>
-            <input type="range" min="5" max="100" value={watermarkOpacity} onChange={e => setWatermarkOpacity(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 10 }} />
+            <SegmentedControl
+              options={(['top-left', 'top-center', 'top-right', 'bottom-left', 'center', 'bottom-right'] as const).map(p => ({ value: p, label: p === 'center' ? '●' : p.split('-').map(w => w[0].toUpperCase()).join('') }))}
+              value={watermarkPosition}
+              onChange={setWatermarkPosition}
+              accentColor="var(--color-accent)"
+              variant="outlined"
+              columns={3}
+              size="sm"
+              style={{ marginBottom: 'var(--space-2)' }}
+            />
+            <CreativeSlider label="Opacity" min={5} max={100} step={1} value={watermarkOpacity} onChange={setWatermarkOpacity} unit="%" accentColor="var(--color-accent)" layout="stacked" style={{ marginBottom: 10 }} />
             <button aria-label="Apply watermark" onClick={() => {
               if (!selectedJob) { toast.warning('Select a job first'); return; }
               setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, watermark: { type: watermarkType, text: watermarkText, opacity: watermarkOpacity, position: watermarkPosition } } as any : j));
@@ -2117,8 +2099,7 @@ const Forge: React.FC = () => {
             <select value={subBurnFont} onChange={e => setSubBurnFont(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11, marginBottom: 'var(--space-2)' }}>
               {['Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Impact'].map(f => <option key={f} value={f}>{f}</option>)}
             </select>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Font Size</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{subBurnSize}px</span></div>
-            <input type="range" min="12" max="64" value={subBurnSize} onChange={e => setSubBurnSize(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
+            <CreativeSlider label="Font Size" min={12} max={64} step={1} value={subBurnSize} onChange={setSubBurnSize} unit="px" accentColor="var(--color-accent)" layout="stacked" style={{ marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Position</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Bottom</option><option>Top</option><option>Center</option></select></div>
               <div><div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>Style</div><select style={{ width: '100%', padding: '4px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }}><option>Outline</option><option>Shadow</option><option>Box</option></select></div>
@@ -2377,7 +2358,8 @@ const Forge: React.FC = () => {
                   }]);
                   toast.success(`Smart join complete — ${merged.duration.toFixed(1)}s`);
                 } catch (err: any) {
-                  toast.error('Smart join failed: ' + (err?.message || 'Unknown error'));
+                  console.error('[Forge] smart join failed:', err);
+                  toast.error('Unable to combine audio. Please check file compatibility.');
                 }
                 setShowConcat(false);
               }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: '1px solid var(--color-warning-muted, rgba(255,149,10,0.2))', background: 'var(--color-warning-muted, rgba(255,149,10,0.08))', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, cursor: concatOrder.length < 2 ? 'not-allowed' : 'pointer', opacity: concatOrder.length < 2 ? 0.4 : 1 }}>Smart Join (re-encode)</button>

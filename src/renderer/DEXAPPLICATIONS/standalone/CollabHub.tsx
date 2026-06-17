@@ -556,9 +556,10 @@ const CollabHub: React.FC = () => {
         }
       }));
     } catch (err: any) {
-      setError(err.message);
+      console.error('[CollabHub] access request failed:', err);
+      setError('Could not update the access request. Please try again.');
       window.dispatchEvent(new CustomEvent('dex-toast', {
-        detail: { type: 'error', message: err.message }
+        detail: { type: 'error', message: 'Could not update the access request. Please try again.' }
       }));
     } finally {
       setIsLoading(false);

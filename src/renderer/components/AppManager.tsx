@@ -22,6 +22,7 @@ import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
 import { useUkiStore } from '../store/ukiStore';
 import { glassModal, adaptiveShadow } from '../styles/glassMenu';
 import FloatingLauncher from './FloatingLauncher';
+import { clampEventToViewport } from '../utils/menuPosition';
 import { spotlightEngine } from '../shell/SpotlightEngine';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
@@ -642,6 +643,8 @@ export const AppManager: React.FC = () => {
   const {
     runningApps, currentAppId, launchApp, closeApp: closeRunningApp, setCurrentApp: setCurrentRunningApp,
   } = useRunningApps();
+  // MRU launch history (persisted, max 20) -- drives the App Menu "Recent" row.
+  const sessionHistory = useRunningApps(s => s.sessionHistory);
   const sendAssetToApp = useCreativeSuite(s => s.sendToApp);
 
   // App pinning store. The dock was removed in favour of the FloatingLauncher,
@@ -2210,6 +2213,41 @@ export const AppManager: React.FC = () => {
     });
   }, [detachedApps, getShellWorkspace, autoTileAll]);
 
+  // Four-grid (and any rows x cols) layout -- the brief's "Four-grid layout".
+  // applySplitRatio only does a single ROW of columns; this places windows into a
+  // proper grid (row-major), reusing the same min-size guard + clamp discipline,
+  // and falls back to the min-size-aware tiler when a cell would be smaller than a
+  // window's minimum.
+  const applyGridLayout = useCallback((cols: number, rows: number) => {
+    const ids = Array.from(detachedApps.keys());
+    if (ids.length === 0 || cols < 1 || rows < 1) return;
+    const workspace = getShellWorkspace(0);
+    const PAD = 6;
+    const n = Math.min(ids.length, cols * rows);
+    const placed = ids.slice(0, n);
+    const colW = Math.floor((workspace.w - PAD * (cols + 1)) / cols);
+    const rowH = Math.floor((workspace.h - PAD * (rows + 1)) / rows);
+    const maxMinW = Math.max(...placed.map(id => APP_WINDOW_MIN_SIZES[id]?.w ?? 360));
+    const maxMinH = Math.max(...placed.map(id => APP_WINDOW_MIN_SIZES[id]?.h ?? 240));
+    if (colW < maxMinW || rowH < maxMinH) {
+      autoTileAll();
+      void notify({ title: 'Tiled instead', body: 'Not enough room for that grid', source: 'workspace' });
+      return;
+    }
+    setDetachedApps(prev => {
+      const next = new Map(prev);
+      for (let i = 0; i < n; i++) {
+        const id = placed[i];
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = workspace.x + PAD + col * (colW + PAD);
+        const y = workspace.y + PAD + row * (rowH + PAD);
+        if (next.get(id)) next.set(id, { x, y, w: colW, h: rowH, z: nextDetachZ() });
+      }
+      return next;
+    });
+  }, [detachedApps, getShellWorkspace, autoTileAll]);
+
   useEffect(() => {
     const onResize = () => {
       const workspace = getShellWorkspace(0);
@@ -2241,13 +2279,19 @@ export const AppManager: React.FC = () => {
       const ratios = (e as CustomEvent).detail?.ratios as number[] | undefined;
       if (Array.isArray(ratios) && ratios.length) applySplitRatio(ratios);
     };
+    const onGrid = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      applyGridLayout(Number(d.cols) || 2, Number(d.rows) || 2);
+    };
     window.addEventListener('dex-arrange-windows', onArrange);
     window.addEventListener('dex-split-layout', onSplit);
+    window.addEventListener('dex-grid-layout', onGrid);
     return () => {
       window.removeEventListener('dex-arrange-windows', onArrange);
       window.removeEventListener('dex-split-layout', onSplit);
+      window.removeEventListener('dex-grid-layout', onGrid);
     };
-  }, [autoTileAll, applySplitRatio]);
+  }, [autoTileAll, applySplitRatio, applyGridLayout]);
 
   // Keyboard shortcuts -- use ref-based handler to avoid re-registering on every state change
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -2933,10 +2977,12 @@ export const AppManager: React.FC = () => {
                   </button>
                 </div>
               )}
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, letterSpacing: '-0.01em' }}>{getLabel(appId)}</span>
-              {/* System-style window controls (right side) */}
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{getLabel(appId)}</span>
+              {/* System-style window controls (right side) -- flexShrink:0 + the
+                  title's minWidth:0 above guarantee these are never pushed off the
+                  right edge by a long title or a narrow/maximized window. */}
               {windowControls !== 'traffic' && (
-                <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                   {/* Minimize button */}
                   <button
                     onClick={() => minimizeFloatingApp(appId)}
@@ -3047,7 +3093,7 @@ export const AppManager: React.FC = () => {
                       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
                   </button>
-                </>
+                </div>
               )}
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -3847,7 +3893,7 @@ export const AppManager: React.FC = () => {
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {windowControls === 'traffic' && (
           <div
             className="traffic-light-group"
@@ -4008,20 +4054,25 @@ export const AppManager: React.FC = () => {
           );
         })()}
       </span>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {/* Date + time live in the draggable Clock widget on Home (user-placed).
             Keeping the topbar minimal -- only system status indicators here. */}
-        {/* Battery - always visible */}
-        <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
-          <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1.5, background: batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
-          <div style={{ position: 'absolute', right: -2.5, width: 1.5, height: 3.5, borderRadius: '0 0.5px 0.5px 0', background: 'var(--color-text-tertiary)' }} />
+        {/* Secondary status (battery / wifi / permission pills) collapses on
+            narrow screens (see .dex-topbar-secondary in globals.css) so the
+            essential window controls are never pushed off the right edge. It all
+            stays reachable from the control-center popover. */}
+        <div className="dex-topbar-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+          {/* Battery */}
+          <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
+            <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1.5, background: batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
+            <div style={{ position: 'absolute', right: -2.5, width: 1.5, height: 3.5, borderRadius: '0 0.5px 0.5px 0', background: 'var(--color-text-tertiary)' }} />
+          </div>
+          {batteryCharging && <svg width="7" height="7" viewBox="0 0 24 24" fill="var(--color-warning)" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>}
+          {/* WiFi indicator - compact dot */}
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
+          {/* Quick Controls -- network mode + permission pills with popovers */}
+          <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
         </div>
-        {batteryCharging && <svg width="7" height="7" viewBox="0 0 24 24" fill="var(--color-warning)" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>}
-        {/* WiFi indicator - compact dot */}
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
-
-        {/* Quick Controls -- network mode + permission pills with popovers */}
-        <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
 
         {/* Notification Center bell -- opens the single hub-backed center */}
         <button
@@ -4229,7 +4280,7 @@ export const AppManager: React.FC = () => {
           )}
         </div>
         {windowControls === 'system' && (
-          <div style={{ display: 'flex', alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <div style={{ width: 1, height: 12, background: 'var(--color-border-subtle)', margin: '0 2px' }} />
             <button style={winBtnStyle} onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window">{Icons.minimize}</button>
             <button style={winBtnStyle} onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window">{Icons.maximize}</button>
@@ -4476,7 +4527,7 @@ export const AppManager: React.FC = () => {
         onNavigate={(appId) => { setShowSpotlight(false); setCurrentApp(appId as AppId); }}
       />
 
-      {/* App Menu Overlay -- bottom popup from dock */}
+      {/* App Menu Overlay -- the launcher's own panel (no dock inheritance) */}
       {showAppMenu && (
         <>
           <div
@@ -4489,6 +4540,19 @@ export const AppManager: React.FC = () => {
               pointerEvents: 'auto',
             } as React.CSSProperties}
           />
+          {/* Centering happens via this flex wrapper -- NOT a transform on the
+              panel. A global low-perf-tier rule strips `transform` on hover/focus
+              (transform: none !important), which would otherwise yank a
+              transform-centred panel sideways the moment the cursor entered it.
+              Flexbox centering is layout, immune to that, so the panel is rock
+              steady -- same place every time, never moves under the cursor. */}
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              pointerEvents: 'none',
+            } as React.CSSProperties}
+          >
           <div
             data-dex-overlay
             data-dex-app-menu-panel
@@ -4498,11 +4562,8 @@ export const AppManager: React.FC = () => {
               // Own system, not the dock: a STATIC, dead-centred panel. Same
               // location, dimensions, and alignment every time it opens -- no
               // edge anchoring, no dock-relative math, nothing that moves.
-              position: 'fixed',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 9700,
+              position: 'relative',
+              pointerEvents: 'auto',
               width: 'min(520px, 92vw)',
               maxHeight: 'min(620px, calc(100vh - 96px))',
               overflowY: 'auto',
@@ -4522,60 +4583,52 @@ export const AppManager: React.FC = () => {
             <style>{`
               @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>All Apps</span>
-              <button
-                onClick={() => { setShowAppMenu(false); setShowSpotlight(true); }}
-                aria-label="Search"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '4px 9px', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-                Search
-              </button>
+            {/* Inline search -- the App Menu searches its OWN apps (type to filter),
+                no longer bouncing to a separate surface. Auto-focused on open. */}
+            <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.4" strokeLinecap="round" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input
+                ref={appMenuSearchRef}
+                autoFocus
+                value={appMenuSearch}
+                onChange={(e) => setAppMenuSearch(e.target.value)}
+                placeholder="Search apps"
+                aria-label="Search apps"
+                onKeyDown={(e) => {
+                  const panel = e.currentTarget.closest('[data-dex-app-menu-panel]');
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    if (appMenuSearch) setAppMenuSearch(''); else { setShowAppMenu(false); }
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    panel?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus();
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    panel?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.click();
+                  }
+                }}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 30px', fontSize: 13, borderRadius: 8, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
+              />
             </div>
             {(() => {
-              const filtered = Array.from(new Map(LAUNCHPAD_APPS.map(app => [app.id, app])).values());
-              return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', columnGap: 2, rowGap: 4 }}
-              aria-label="All applications"
-              data-launchpad-grid=""
-              onKeyDown={(e) => {
-                // Grid arrow-key navigation. Columns are derived from the actual
-                // wrapped layout (buttons sharing the first row's offsetTop), so
-                // Up/Down move a true row regardless of viewport width.
-                const btns = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
-                const idx = btns.indexOf(document.activeElement as HTMLButtonElement);
-                if (idx < 0 || btns.length === 0) return;
-                const firstTop = btns[0].offsetTop;
-                const cols = Math.max(1, btns.filter(b => b.offsetTop === firstTop).length);
-                let next = idx;
-                if (e.key === 'ArrowRight') next = (idx + 1) % btns.length;
-                else if (e.key === 'ArrowLeft') next = (idx - 1 + btns.length) % btns.length;
-                else if (e.key === 'ArrowDown') next = Math.min(idx + cols, btns.length - 1);
-                else if (e.key === 'ArrowUp') next = Math.max(idx - cols, 0);
-                else if (e.key === 'Home') next = 0;
-                else if (e.key === 'End') next = btns.length - 1;
-                else return;
-                e.preventDefault();
-                btns[next]?.focus();
-              }}
-            >
-              {filtered.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>No apps found</div>
-              )}
-              {filtered.map(app => {
+              const all = Array.from(new Map(LAUNCHPAD_APPS.map(app => [app.id, app])).values());
+              const byId = new Map(all.map(app => [app.id, app]));
+              const q = appMenuSearch.trim().toLowerCase();
+
+              const renderTile = (app: (typeof LAUNCHPAD_APPS)[number], keyPrefix: string) => {
                 const icon = Icons[app.id] || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={24} color={app.color} />;
                 const isActive = currentApp === app.id;
                 const isRunning = runningApps.some(a => a.id === app.id);
                 return (
                   <button
-                    key={app.id}
+                    key={`${keyPrefix}:${app.id}`}
                     data-launchpad-app-id={app.id}
                     onClick={() => { setCurrentApp(app.id as AppId); setShowAppMenu(false); }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setLaunchpadCtx({ appId: app.id, label: app.label, x: e.clientX, y: e.clientY });
+                      const p = clampEventToViewport(e, { width: 200, height: 220 });
+                      setLaunchpadCtx({ appId: app.id, label: app.label, x: p.left, y: p.top });
                     }}
                     // Stable hover: a background tint only -- the icon never moves
                     // under the cursor (no lift / scale / bounce). The target stays
@@ -4608,10 +4661,69 @@ export const AppManager: React.FC = () => {
                     )}
                   </button>
                 );
-              })}
+              };
+
+              const sectionHeader = (label: string, key: string) => (
+                <div key={key} role="presentation" style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', padding: 'var(--space-2) 4px 2px' }}>{label}</div>
+              );
+
+              let body: React.ReactNode;
+              if (q) {
+                // Flat, ranked filter across every app -- label first, then id.
+                const matches = all.filter(a => a.label.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
+                body = matches.length
+                  ? matches.map(a => renderTile(a, 'search'))
+                  : <div style={{ gridColumn: '1 / -1', color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>No apps match &ldquo;{appMenuSearch.trim()}&rdquo;</div>;
+              } else {
+                // Organized view: Recent (most-recently-used) then category sections.
+                const nodes: React.ReactNode[] = [];
+                const recent = sessionHistory.map(id => byId.get(id as AppId)).filter((a): a is (typeof LAUNCHPAD_APPS)[number] => !!a).slice(0, 6);
+                if (recent.length) {
+                  nodes.push(sectionHeader('Recent', 'sec-recent'));
+                  recent.forEach(a => nodes.push(renderTile(a, 'recent')));
+                }
+                APP_MENU_CATEGORIES.forEach(cat => {
+                  nodes.push(sectionHeader(cat.label, `sec-${cat.label}`));
+                  cat.apps.forEach(a => nodes.push(renderTile(a, cat.label)));
+                });
+                body = nodes;
+              }
+
+              return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', columnGap: 2, rowGap: 4 }}
+              aria-label="Applications"
+              data-launchpad-grid=""
+              onKeyDown={(e) => {
+                // Grid arrow-key navigation. Columns are derived from the actual
+                // wrapped layout (tiles sharing the first row's offsetTop), so
+                // Up/Down move a true row regardless of viewport width. Section
+                // headers aren't buttons, so they're transparent to tile nav.
+                const btns = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button[data-launchpad-app-id]'));
+                const idx = btns.indexOf(document.activeElement as HTMLButtonElement);
+                if (idx < 0 || btns.length === 0) return;
+                const firstTop = btns[0].offsetTop;
+                const cols = Math.max(1, btns.filter(b => b.offsetTop === firstTop).length);
+                let next = idx;
+                if (e.key === 'ArrowRight') next = (idx + 1) % btns.length;
+                else if (e.key === 'ArrowLeft') next = (idx - 1 + btns.length) % btns.length;
+                else if (e.key === 'ArrowDown') next = Math.min(idx + cols, btns.length - 1);
+                else if (e.key === 'ArrowUp') {
+                  // From the top row, step back up into the search field.
+                  if (idx < cols) { e.preventDefault(); appMenuSearchRef.current?.focus(); return; }
+                  next = Math.max(idx - cols, 0);
+                }
+                else if (e.key === 'Home') next = 0;
+                else if (e.key === 'End') next = btns.length - 1;
+                else return;
+                e.preventDefault();
+                btns[next]?.focus();
+              }}
+            >
+              {body}
             </div>
               );
             })()}
+          </div>
           </div>
         </>
       )}
@@ -4635,7 +4747,10 @@ export const AppManager: React.FC = () => {
               }
             }}
             style={{
-              position: 'fixed', left: Math.min(launchpadCtx.x, window.innerWidth - 200), top: Math.min(launchpadCtx.y, window.innerHeight - 200),
+              // Coords are already kept on-screen at capture time via
+              // clampEventToViewport (see the launchpad onContextMenu handler),
+              // so no second magic-number clamp is needed here.
+              position: 'fixed', left: launchpadCtx.x, top: launchpadCtx.y,
               // Material (background/border/shadow) now comes from the unified
               // .dex-surface-overlay class — the canonical overlay surface for
               // context menus. Blur is perf-tier/thermal gated automatically.
@@ -4690,7 +4805,7 @@ export const AppManager: React.FC = () => {
       {/* Floating Launcher -- a draggable orb, placeable anywhere, that opens the
           app grid + search. A stable alternative to the fixed dock that never
           shifts as apps open/close. */}
-      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
+      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} onSearch={() => { setShowSpotlight(true); }} />
 
       {/* App Switcher HUD -- Ctrl+Tab visual overlay */}
       <AppSwitcher visible={switcherVisible} apps={runningApps} selectedIndex={switcherIndex} />

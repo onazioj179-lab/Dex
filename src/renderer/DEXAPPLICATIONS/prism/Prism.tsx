@@ -85,6 +85,16 @@ import {
 import { getAdaptiveDPR, getPerfTier } from '../../utils/adaptiveCanvas';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 import { AdjustmentControls } from './AdjustmentControls';
+import { CreativeSlider, type CreativeSliderProps, SegmentedControl } from '../../components/controls';
+import { clampEventToViewport } from '../../utils/menuPosition';
+
+// Prism's value sliders all share the app accent (#ff375f) and an 80px label
+// column; this thin wrapper bakes those in so call sites stay declarative and the
+// panel stays aligned with the other label rows. The shared row itself lives in
+// components/controls/CreativeSlider -- one source of truth across creative apps.
+const PrismSlider: React.FC<CreativeSliderProps> = (props) => (
+  <CreativeSlider accentColor="#ff375f" labelWidth={80} {...props} />
+);
 
 // ===========================================================================
 // DEX PRISM - Professional Image Editor
@@ -2621,8 +2631,6 @@ const Prism: React.FC = () => {
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px', transition: 'all 0.12s ease' },
     sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },
     sliderLabel: { width: '80px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
-    slider: { flex: 1, accentColor: '#ff375f', height: '4px' },
-    sliderValue: { width: '36px', fontSize: '11px', textAlign: 'right', color: '#ff375f', fontFamily: 'var(--font-mono)', fontWeight: 600 },
     colorPicker: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px' },
     colorSwatch: { width: '24px', height: '24px', borderRadius: '4px', border: '1px solid var(--color-border-default)', cursor: 'pointer' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
@@ -2982,11 +2990,14 @@ const Prism: React.FC = () => {
               {(activeTool === 'pointer' || activeTool === 'wand' || activeTool === 'lasso') && (
                 <>
                   <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Selection:</span>
-                  {(['new', 'add', 'subtract', 'intersect'] as const).map(m => (
-                    <button key={m} onClick={() => setSelection(prev => ({ ...prev, mode: m }))} aria-label={`${m} selection mode`} style={{ ...styles.btn, padding: '2px var(--space-2)', fontSize: '11px', ...(selection.mode === m ? { background: 'rgba(236,72,153,0.15)', borderColor: '#ff375f' } : {}) }}>
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </button>
-                  ))}
+                  <SegmentedControl
+                    options={['new', 'add', 'subtract', 'intersect'] as const}
+                    value={selection.mode}
+                    onChange={(m) => setSelection(prev => ({ ...prev, mode: m }))}
+                    accentColor="#ff375f"
+                    variant="subtle"
+                    aria-label="Selection mode"
+                  />
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
                   <span style={{ color: 'var(--color-text-muted)' }}>Feather:</span>
                   <input aria-label="Selection feather radius" type="range" min="0" max="50" value={selection.feather} onChange={(e) => setSelection(prev => ({ ...prev, feather: Number(e.target.value) }))} style={{ width: '60px', accentColor: '#ff375f' }} />
@@ -3015,11 +3026,14 @@ const Prism: React.FC = () => {
               {activeTool === 'gradient' && (
                 <>
                   <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Gradient:</span>
-                  {(['linear', 'radial', 'angular', 'diamond', 'reflected'] as const).map(gt => (
-                    <button key={gt} onClick={() => setGradientType(gt)} aria-label={`${gt} gradient`} style={{ ...styles.btn, padding: '2px var(--space-2)', fontSize: '11px', ...(gradientType === gt ? { background: 'rgba(236,72,153,0.15)', borderColor: '#ff375f' } : {}) }}>
-                      {gt.charAt(0).toUpperCase() + gt.slice(1)}
-                    </button>
-                  ))}
+                  <SegmentedControl
+                    options={['linear', 'radial', 'angular', 'diamond', 'reflected'] as const}
+                    value={gradientType}
+                    onChange={setGradientType}
+                    accentColor="#ff375f"
+                    variant="subtle"
+                    aria-label="Gradient type"
+                  />
                 </>
               )}
               {(activeTool === 'clone' || activeTool === 'heal') && (
@@ -3252,58 +3266,16 @@ const Prism: React.FC = () => {
           {/* Adjustments Panel */}
           {activePanel === 'adjustments' && (
             <div style={styles.panelContent}>
-              <div style={styles.sliderRow}>
-                <span style={styles.sliderLabel}>Brightness</span>
-                <input aria-label="Brightness adjustment" type="range" min="-100" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} style={styles.slider} />
-                <span style={styles.sliderValue}>{brightness}</span>
-              </div>
-              <div style={styles.sliderRow}>
-                <span style={styles.sliderLabel}>Contrast</span>
-                <input aria-label="Contrast adjustment" type="range" min="-100" max="100" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} style={styles.slider} />
-                <span style={styles.sliderValue}>{contrast}</span>
-              </div>
-              <div style={styles.sliderRow}>
-                <span style={styles.sliderLabel}>Saturation</span>
-                <input aria-label="Saturation adjustment" type="range" min="-100" max="100" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} style={styles.slider} />
-                <span style={styles.sliderValue}>{saturation}</span>
-              </div>
-              <div style={styles.sliderRow}>
-                <span style={styles.sliderLabel}>Exposure</span>
-                <input aria-label="Exposure adjustment" type="range" min="-100" max="100" value={exposure} onChange={(e) => setExposure(Number(e.target.value))} style={styles.slider} />
-                <span style={styles.sliderValue}>{exposure}</span>
-              </div>
-              <>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Highlights</span>
-                    <input aria-label="Highlights adjustment" type="range" min="-100" max="100" value={highlights} onChange={(e) => setHighlights(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{highlights}</span>
-                  </div>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Shadows</span>
-                    <input aria-label="Shadows adjustment" type="range" min="-100" max="100" value={shadows} onChange={(e) => setShadows(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{shadows}</span>
-                  </div>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Temperature</span>
-                    <input aria-label="Temperature adjustment" type="range" min="-100" max="100" value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{temperature}</span>
-                  </div>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Tint</span>
-                    <input aria-label="Tint adjustment" type="range" min="-100" max="100" value={tint} onChange={(e) => setTint(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{tint}</span>
-                  </div>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Vibrance</span>
-                    <input aria-label="Vibrance adjustment" type="range" min="-100" max="100" value={vibrance} onChange={(e) => setVibrance(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{vibrance}</span>
-                  </div>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Hue</span>
-                    <input aria-label="Hue adjustment" type="range" min="-180" max="180" value={hue} onChange={(e) => setHue(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{hue}</span>
-                  </div>
-                </>
+              <PrismSlider label="Brightness" min={-100} max={100} value={brightness} onChange={setBrightness} />
+              <PrismSlider label="Contrast" min={-100} max={100} value={contrast} onChange={setContrast} />
+              <PrismSlider label="Saturation" min={-100} max={100} value={saturation} onChange={setSaturation} />
+              <PrismSlider label="Exposure" min={-100} max={100} value={exposure} onChange={setExposure} />
+              <PrismSlider label="Highlights" min={-100} max={100} value={highlights} onChange={setHighlights} />
+              <PrismSlider label="Shadows" min={-100} max={100} value={shadows} onChange={setShadows} />
+              <PrismSlider label="Temperature" min={-100} max={100} value={temperature} onChange={setTemperature} />
+              <PrismSlider label="Tint" min={-100} max={100} value={tint} onChange={setTint} />
+              <PrismSlider label="Vibrance" min={-100} max={100} value={vibrance} onChange={setVibrance} />
+              <PrismSlider label="Hue" min={-180} max={180} value={hue} onChange={setHue} />
 
               {/* Quick Adjustments from PrismFeatures */}
               <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-3)' }}>
@@ -3357,11 +3329,7 @@ const Prism: React.FC = () => {
               </div>
               {activeFilter && (
                 <div style={{ marginTop: 'var(--space-3)', padding: '10px', background: 'rgba(236,72,153,0.05)', borderRadius: '6px', border: '1px solid rgba(236,72,153,0.2)' }}>
-                  <div style={styles.sliderRow}>
-                    <span style={styles.sliderLabel}>Intensity</span>
-                    <input aria-label="Filter intensity" type="range" min="0" max="100" value={filterIntensity} onChange={(e) => setFilterIntensity(Number(e.target.value))} style={styles.slider} />
-                    <span style={styles.sliderValue}>{filterIntensity}%</span>
-                  </div>
+                  <PrismSlider label="Intensity" min={0} max={100} value={filterIntensity} onChange={setFilterIntensity} unit="%" />
                   <button
                     onClick={() => {
                       const canvas = canvasRef.current;
@@ -3444,7 +3412,7 @@ const Prism: React.FC = () => {
                   key={layer.id}
                   style={{ ...styles.layerItem, ...(selectedLayerId === layer.id ? styles.layerItemSelected : {}) }}
                   onClick={() => setSelectedLayerId(layer.id)}
-                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layer.id); setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, layerId: layer.id }); }}
+                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layer.id); const p = clampEventToViewport(e); setCtxMenu({ visible: true, x: p.left, y: p.top, layerId: layer.id }); }}
                 >
                   <div style={styles.layerThumb}>
                     {layer.type === 'image' ? Icons.image : layer.type === 'text' ? Icons.text : Icons.shape}
@@ -3467,11 +3435,7 @@ const Prism: React.FC = () => {
             {/* Layer Properties */}
             {selectedLayer && (
               <div style={{ padding: 'var(--space-2)', borderTop: '1px solid var(--color-border)' }}>
-                <div style={styles.sliderRow}>
-                  <span style={styles.sliderLabel}>Opacity</span>
-                  <input type="range" min="0" max="100" value={selectedLayer.opacity} onChange={(e) => updateLayerOpacity(selectedLayer.id, Number(e.target.value))} style={styles.slider} />
-                  <span style={styles.sliderValue}>{selectedLayer.opacity}%</span>
-                </div>
+                <PrismSlider label="Opacity" min={0} max={100} value={selectedLayer.opacity} onChange={(v) => updateLayerOpacity(selectedLayer.id, v)} unit="%" />
                 <div style={styles.sliderRow}>
                   <span style={styles.sliderLabel}>Blend</span>
                   <select

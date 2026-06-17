@@ -102,11 +102,8 @@ fn decode_mono<F: FnMut(f32)>(path: &str, mut sink: F) -> Result<usize, String> 
         .map_err(|e| e.to_string())?;
 
     let mut emitted: usize = 0;
-    'outer: loop {
-        let packet = match format.next_packet() {
-            Ok(p) => p,
-            Err(_) => break, // end of stream / IO end
-        };
+    // Decode until the demuxer stops yielding packets (end of stream / IO end).
+    'outer: while let Ok(packet) = format.next_packet() {
         if packet.track_id() != track_id {
             continue;
         }

@@ -5,6 +5,8 @@
  * OPTIMIZED: Multi-window support, memory management, 10+ instances
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { clampEventToViewport } from '../../utils/menuPosition';
+import { CreativeSlider } from '../../components/controls';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { detectTempo, detectOnsets } from '../../../shared/media/beatDetect';
@@ -3387,7 +3389,7 @@ const Imosion: React.FC = () => {
       setShowExportModal(false);
     } catch (error) {
       console.error('[Export] Failed:', error);
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}` } }));
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Export failed. Please check the format and try again.' } }));
     } finally {
       setIsExporting(false);
       setExportProgress(0);
@@ -5493,7 +5495,7 @@ const Imosion: React.FC = () => {
                 key={track.id} 
                 className={`track-row ${dropTarget?.trackId === track.id ? 'drop-target' : ''}`}
                 onClick={() => setSelectedTrack(track.id)} 
-                onContextMenu={(e) => { e.preventDefault(); setContextMenu({ visible: true, x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 200), trackId: track.id, clipId: null, busId: null }); }} 
+                onContextMenu={(e) => { e.preventDefault(); const p = clampEventToViewport(e); setContextMenu({ visible: true, x: p.left, y: p.top, trackId: track.id, clipId: null, busId: null }); }}
                 onDragOver={(e) => handleTrackDragOver(e, track.id)}
                 onDrop={(e) => handleTrackDrop(e, track.id)}
                 onDragLeave={() => setDropTarget(null)}
@@ -5522,7 +5524,7 @@ const Imosion: React.FC = () => {
                         setShowClipEditor(true);
                       }
                     }} 
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ visible: true, x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 200), trackId: track.id, clipId: clip.id, busId: null }); }} 
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); const p = clampEventToViewport(e); setContextMenu({ visible: true, x: p.left, y: p.top, trackId: track.id, clipId: clip.id, busId: null }); }}
                     style={{ position: 'absolute', top: '6px', bottom: '6px', left: `${clip.startTime * zoom}px`, width: `${Math.max(clip.duration * zoom, 30)}px`, background: `linear-gradient(180deg, ${track.color}30, ${track.color}18)`, borderRadius: '4px', cursor: clipEdit.mode === 'split' ? 'crosshair' : clipResizing?.clipId === clip.id ? 'ew-resize' : 'grab', border: `1px solid ${track.color}50`, overflow: 'hidden', boxShadow: dragState.sourceId === clip.id ? `0 4px 16px rgba(0,0,0,0.5), 0 0 0 2px ${track.color}` : '0 2px 4px rgba(0,0,0,0.2)', opacity: dragState.sourceId === clip.id ? 0.5 : 1, transition: 'opacity 0.15s, box-shadow 0.15s' }}
                   >
                     {/* Left resize handle */}
@@ -6347,8 +6349,8 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Stereo Image</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Width</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.stereoWidth}%</span></div><input type="range" min="0" max="200" value={masterSettings.stereoWidth} onChange={e => setMasterSettings(s => ({ ...s, stereoWidth: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>M/S Balance</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.midSideBalance > 0 ? '+' : ''}{masterSettings.midSideBalance}</span></div><input type="range" min="-100" max="100" value={masterSettings.midSideBalance} onChange={e => setMasterSettings(s => ({ ...s, midSideBalance: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} /></div>
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Width" min={0} max={200} step={1} value={masterSettings.stereoWidth} onChange={v => setMasterSettings(s => ({ ...s, stereoWidth: v }))} accentColor="var(--color-accent)" unit="%" />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="M/S Balance" min={-100} max={100} step={1} value={masterSettings.midSideBalance} onChange={v => setMasterSettings(s => ({ ...s, midSideBalance: v }))} accentColor="var(--color-accent)" format={v => `${v > 0 ? '+' : ''}${v}`} />
                   </div>
                 </div>
                 
@@ -6356,9 +6358,9 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-success)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tone</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Low Shelf</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.lowShelf > 0 ? '+' : ''}{masterSettings.lowShelf} dB</span></div><input type="range" min="-12" max="12" step="0.5" value={masterSettings.lowShelf} onChange={e => setMasterSettings(s => ({ ...s, lowShelf: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>High Shelf</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.highShelf > 0 ? '+' : ''}{masterSettings.highShelf} dB</span></div><input type="range" min="-12" max="12" step="0.5" value={masterSettings.highShelf} onChange={e => setMasterSettings(s => ({ ...s, highShelf: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Bass Enhance</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.bassEnhance}%</span></div><input type="range" min="0" max="100" value={masterSettings.bassEnhance} onChange={e => setMasterSettings(s => ({ ...s, bassEnhance: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-success)' }} /></div>
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Low Shelf" min={-12} max={12} step={0.5} value={masterSettings.lowShelf} onChange={v => setMasterSettings(s => ({ ...s, lowShelf: v }))} accentColor="var(--color-success)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="High Shelf" min={-12} max={12} step={0.5} value={masterSettings.highShelf} onChange={v => setMasterSettings(s => ({ ...s, highShelf: v }))} accentColor="var(--color-success)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Bass Enhance" min={0} max={100} step={1} value={masterSettings.bassEnhance} onChange={v => setMasterSettings(s => ({ ...s, bassEnhance: v }))} accentColor="var(--color-success)" unit="%" />
                   </div>
                 </div>
                 
@@ -6366,9 +6368,9 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Multiband</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Low</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.multiband.lowGain > 0 ? '+' : ''}{masterSettings.multiband.lowGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.lowGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, lowGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Mid</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.multiband.midGain > 0 ? '+' : ''}{masterSettings.multiband.midGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.midGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, midGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>High</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.multiband.highGain > 0 ? '+' : ''}{masterSettings.multiband.highGain} dB</span></div><input type="range" min="-6" max="6" step="0.5" value={masterSettings.multiband.highGain} onChange={e => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, highGain: +e.target.value } }))} style={{ width: '100%', accentColor: 'var(--color-warning)' }} /></div>
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Low" min={-6} max={6} step={0.5} value={masterSettings.multiband.lowGain} onChange={v => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, lowGain: v } }))} accentColor="var(--color-warning)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Mid" min={-6} max={6} step={0.5} value={masterSettings.multiband.midGain} onChange={v => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, midGain: v } }))} accentColor="var(--color-warning)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="High" min={-6} max={6} step={0.5} value={masterSettings.multiband.highGain} onChange={v => setMasterSettings(s => ({ ...s, multiband: { ...s.multiband, highGain: v } }))} accentColor="var(--color-warning)" format={v => `${v > 0 ? '+' : ''}${v} dB`} />
                   </div>
                 </div>
                 
@@ -6376,7 +6378,7 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: '#ff375f', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Character</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Analog Warmth</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.analogWarmth}%</span></div><input type="range" min="0" max="100" value={masterSettings.analogWarmth} onChange={e => setMasterSettings(s => ({ ...s, analogWarmth: +e.target.value }))} style={{ width: '100%', accentColor: '#ff375f' }} /></div>
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Analog Warmth" min={0} max={100} step={1} value={masterSettings.analogWarmth} onChange={v => setMasterSettings(s => ({ ...s, analogWarmth: v }))} accentColor="#ff375f" unit="%" />
                   </div>
                 </div>
                 
@@ -6384,8 +6386,8 @@ const Imosion: React.FC = () => {
                 <div style={{ background: 'var(--color-bg-surface)', borderRadius: '6px', padding: '14px', border: '1px solid #1f1f23' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-error)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Loudness</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Target</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.loudnessTarget} LUFS</span></div><input type="range" min="-24" max="0" value={masterSettings.loudnessTarget} onChange={e => setMasterSettings(s => ({ ...s, loudnessTarget: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /></div>
-                    <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><label style={{ fontSize: '9px', color: 'var(--color-text-tertiary)' }}>Ceiling</label><span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>{masterSettings.limiterCeiling.toFixed(1)} dB</span></div><input type="range" min="-6" max="0" step="0.1" value={masterSettings.limiterCeiling} onChange={e => setMasterSettings(s => ({ ...s, limiterCeiling: +e.target.value }))} style={{ width: '100%', accentColor: 'var(--color-error)' }} /></div>
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Target" min={-24} max={0} step={1} value={masterSettings.loudnessTarget} onChange={v => setMasterSettings(s => ({ ...s, loudnessTarget: v }))} accentColor="var(--color-error)" unit=" LUFS" />
+                    <CreativeSlider layout="stacked" dense style={{ marginBottom: 0 }} label="Ceiling" min={-6} max={0} step={0.1} value={masterSettings.limiterCeiling} onChange={v => setMasterSettings(s => ({ ...s, limiterCeiling: v }))} accentColor="var(--color-error)" format={v => `${v.toFixed(1)} dB`} />
                     <button aria-label="Toggle Limiter" onClick={() => setMasterSettings(s => ({ ...s, limiterEnabled: !s.limiterEnabled }))} style={{ padding: '6px 10px', borderRadius: '3px', border: '1px solid', borderColor: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-bg-hover)', background: masterSettings.limiterEnabled ? 'rgba(255,69,58,0.15)' : '#0f0f12', color: masterSettings.limiterEnabled ? 'var(--color-error)' : 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>Limiter {masterSettings.limiterEnabled ? 'ON' : 'OFF'}</button>
                   </div>
                 </div>
@@ -6631,14 +6633,10 @@ const Imosion: React.FC = () => {
                 <div style={{ width: 160, borderLeft: '1px solid #1a1a1e', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Output</div>
                   <div style={{ background: 'var(--color-bg-base)', borderRadius: 4, padding: 'var(--space-2)', border: '1px solid #1a1a1e' }}>
-                    <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Volume</div>
-                    <input type="range" min={0} max={100} value={Math.round(inst.volume * 100)} onChange={e => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, volume: Number(e.target.value) / 100 } : t))} style={{ width: '100%', accentColor: INSTRUMENT_COLORS[inst.instrument.type], height: 3 }} />
-                    <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{Math.round(inst.volume * 100)}%</div>
+                    <CreativeSlider layout="column" dense style={{ marginBottom: 0 }} label="Volume" min={0} max={100} step={1} value={Math.round(inst.volume * 100)} onChange={v => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, volume: v / 100 } : t))} accentColor={INSTRUMENT_COLORS[inst.instrument.type]} unit="%" />
                   </div>
                   <div style={{ background: 'var(--color-bg-base)', borderRadius: 4, padding: 'var(--space-2)', border: '1px solid #1a1a1e' }}>
-                    <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Pan</div>
-                    <input type="range" min={-100} max={100} value={Math.round(inst.pan * 100)} onChange={e => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, pan: Number(e.target.value) / 100 } : t))} style={{ width: '100%', accentColor: INSTRUMENT_COLORS[inst.instrument.type], height: 3 }} />
-                    <div style={{ fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>{inst.pan === 0 ? 'C' : inst.pan > 0 ? `R${Math.round(inst.pan * 100)}` : `L${Math.abs(Math.round(inst.pan * 100))}`}</div>
+                    <CreativeSlider layout="column" dense style={{ marginBottom: 0 }} label="Pan" min={-100} max={100} step={1} value={Math.round(inst.pan * 100)} onChange={v => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, pan: v / 100 } : t))} accentColor={INSTRUMENT_COLORS[inst.instrument.type]} format={v => v === 0 ? 'C' : v > 0 ? `R${v}` : `L${Math.abs(v)}`} />
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button aria-label="Mute instrument track" onClick={() => setInstrumentTracks(prev => prev.map(t => t.id === inst.id ? { ...t, muted: !t.muted } : t))} style={{ flex: 1, padding: '5px', borderRadius: 3, border: '1px solid #27272a', background: inst.muted ? 'rgba(10,132,255,0.2)' : '#18181b', color: inst.muted ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>M</button>

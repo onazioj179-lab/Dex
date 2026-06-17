@@ -45,7 +45,6 @@ export default defineConfig({
             return 'react-vendor';
           }
           if (id.includes('node_modules/zustand')) return 'zustand-vendor';
-          if (id.includes('node_modules/lucide-react')) return 'icons-vendor';
           if (id.includes('node_modules/dompurify')) return 'sanitize-vendor';
           if (id.includes('node_modules/d3-force')) return 'd3-vendor';
           // These two runtime deps had no vendor rule and were being inlined into

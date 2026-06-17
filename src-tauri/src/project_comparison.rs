@@ -76,6 +76,7 @@ fn query_list(conn: &Connection, sql: &str, p: Vec<SqlValue>) -> Value {
 ///  - null/undefined  -> {}
 ///  - non-object      -> { prefix: obj }
 ///  - object          -> recurse each own key
+///
 /// The returned Vec keeps first-seen order so the diff field ordering matches
 /// JS object key iteration order exactly.
 fn flatten(obj: &Value, prefix: &str, out: &mut Vec<(String, Value)>) {

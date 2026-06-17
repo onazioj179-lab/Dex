@@ -158,7 +158,7 @@ pub fn reconstruct_workspace(events: &[ActivityEvent]) -> ReconstructedWorkspace
     let (primary, app_ids) = primary_app(events);
 
     let mut by_recency: Vec<&ActivityEvent> = events.iter().collect();
-    by_recency.sort_by(|a, b| b.ts.cmp(&a.ts)); // most-recent first, stable
+    by_recency.sort_by_key(|b| std::cmp::Reverse(b.ts)); // most-recent first, stable
 
     let mut seen: HashSet<String> = HashSet::new();
     let mut files: Vec<String> = Vec::new();

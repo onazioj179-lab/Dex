@@ -586,7 +586,7 @@ fn files_recent(app: &tauri::AppHandle, limit: usize) -> Value {
     {
         files.extend(walk_collect(&dir, 3000));
     }
-    files.sort_by(|a, b| b.1.modified().ok().cmp(&a.1.modified().ok()));
+    files.sort_by_key(|b| std::cmp::Reverse(b.1.modified().ok()));
     let out: Vec<Value> = files
         .iter()
         .take(limit)

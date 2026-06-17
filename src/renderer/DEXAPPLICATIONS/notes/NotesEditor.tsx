@@ -27,6 +27,17 @@ import {
 import { askConfiguredLLM, hasConfiguredProvider } from '../../uki/providers/connect';
 import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemplates';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
+
+// ---------------------------------------------------------------------------
+// Document statistics helpers
+// ---------------------------------------------------------------------------
+
+/** Rough sentence count: text split on terminators, non-empty segments. */
+function countSentences(text: string): number {
+  return text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
+}
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -358,6 +369,33 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   const [isEmpty, setIsEmpty] = useState(true);
   const [charCount, setCharCount] = useState(0);
   const [wdCount, setWdCount] = useState(0);
+  const [sentenceCount, setSentenceCount] = useState(0);
+  // Reading level (Flesch-Kincaid grade + ease band) -- shown once a note is long
+  // enough for the score to be meaningful. Computed in the debounced pass below.
+  const [readability, setReadability] = useState('');
+  // -- Outline (document headings -> navigable table of contents) -------------
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [headings, setHeadings] = useState<{ level: number; text: string }[]>([]);
+
+  // Rebuild the heading list straight off the live editor DOM (cheap; runs with
+  // the other live counts). Order matches the DOM so the outline can scroll to
+  // the Nth heading by index.
+  const refreshHeadings = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) { setHeadings([]); return; }
+    const hs = Array.from(el.querySelectorAll('h1,h2,h3')).map((h) => ({
+      level: Number(h.tagName.slice(1)) || 1,
+      text: (h.textContent || '').trim(),
+    })).filter((h) => h.text.length > 0);
+    setHeadings(hs);
+  }, []);
+
+  const scrollToHeading = useCallback((index: number) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const target = el.querySelectorAll('h1,h2,h3')[index] as HTMLElement | undefined;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -378,10 +416,17 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       const text = (editorRef.current?.textContent || '').trim();
       if (!text) return undefined;
       const selection = window.getSelection()?.toString().trim();
+      // Idea: give UKI the note's size + reading level so it can reason about the
+      // document it's looking at (e.g. "summarise this" knows it's a 1,200-word,
+      // Grade-11 piece). Reuses the shared documentStats util.
+      const s = analyzeText(text);
       return {
         appId: 'notes',
         currentFile: text.split('\n')[0]?.slice(0, 80) || undefined,
         selectionText: selection || undefined,
+        custom: {
+          length: `${s.words} words · ${s.readingTimeMinutes} min read${s.words >= 30 ? ` · Grade ${s.gradeLevel} (${s.readability})` : ''}`,
+        },
       };
     });
     return () => unregisterUkiAppContext('notes');
@@ -398,8 +443,10 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       setIsEmpty(!text.trim());
       setCharCount(text.length);
       setWdCount(countWords(text));
+      setSentenceCount(countSentences(text));
+      refreshHeadings();
     }
-  }, [content]);
+  }, [content, refreshHeadings]);
 
   // Auto-focus editor so user can start typing immediately
   useEffect(() => {
@@ -441,6 +488,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     setIsEmpty(!liveText.trim());
     setCharCount(liveText.length);
     setWdCount(countWords(liveText));
+    setSentenceCount(countSentences(liveText));
+    refreshHeadings();
 
     // Debounce the heavy work: parse HTML -> doc, serialize, extract plain text,
     // then notify the parent (which itself persists). onChange timing is
@@ -452,6 +501,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       const serialized = serializeDoc(doc);
       const plainText = docToPlainText(doc);
       const words = countWords(plainText);
+      const stats = analyzeText(plainText);
+      setReadability(stats.words >= 30 ? `Grade ${stats.gradeLevel} · ${stats.readability}` : '');
       lastContent.current = serialized;
       onChange(serialized, plainText, words);
     }, 300);
@@ -1065,6 +1116,20 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               </button>
             ))}
           </div>
+          {/* Outline toggle — opens the heading table of contents */}
+          <div style={styles.toolbarSep} />
+          <button
+            aria-label="Toggle outline"
+            aria-pressed={outlineOpen}
+            title="Outline — jump to document headings"
+            style={{ ...styles.toolbarBtn, ...(outlineOpen ? { background: 'var(--color-bg-active, rgba(255,255,255,0.12))', color: 'var(--color-accent, #4a9eff)' } : {}) }}
+            onMouseDown={e => { e.preventDefault(); setOutlineOpen(o => !o); }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -1137,11 +1202,66 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             ))}
           </div>
         )}
+
+        {/* Outline panel — navigable table of contents built from headings */}
+        {outlineOpen && (
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: 230, zIndex: 5,
+            background: 'var(--color-bg-surface, #161618)',
+            borderLeft: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 10px', borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+              color: 'var(--color-text-tertiary, #8a8a8a)',
+            }}>
+              <span>Outline</span>
+              <button
+                aria-label="Close outline"
+                onMouseDown={e => { e.preventDefault(); setOutlineOpen(false); }}
+                style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+              >×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+              {headings.length === 0 ? (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--color-text-tertiary, #8a8a8a)', lineHeight: 1.4 }}>
+                  No headings yet. Use H1/H2/H3 to build an outline.
+                </div>
+              ) : (
+                headings.map((h, i) => (
+                  <button
+                    key={i}
+                    onClick={() => scrollToHeading(i)}
+                    title={h.text}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: 'var(--color-text-secondary, #c8c8c8)', fontSize: 12.5, lineHeight: 1.4,
+                      padding: '5px 12px', paddingLeft: 12 + (h.level - 1) * 14,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      fontWeight: h.level === 1 ? 600 : 400,
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    {h.text}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Status Bar */}
       <div style={styles.statusBar}>
-        <span>{wdCount} words, {charCount} characters</span>
+        <span title="Document statistics">
+          {wdCount.toLocaleString()} words · {charCount.toLocaleString()} characters · {sentenceCount.toLocaleString()} sentence{sentenceCount === 1 ? '' : 's'}
+          {wdCount > 0 ? ` · ${readingTimeMinutes(wdCount)} min read` : ''}
+          {readability ? ` · ${readability}` : ''}
+        </span>
         {aiStatus && <span style={styles.aiStatus}>{aiStatus}</span>}
         <span>{editorMode === 'edit' ? 'Editing' : editorMode === 'preview' ? 'Preview' : 'Split View'}</span>
       </div>

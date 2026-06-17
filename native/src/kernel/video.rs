@@ -245,11 +245,8 @@ pub fn video_probe(file_path: String) -> napi::Result<VideoContainerInfo> {
                                     if &m_type == HDLR {
                                         // hdlr: version(1) + flags(3) + pre_defined(4) + handler(4)
                                         let mut hdlr_buf = [0u8; 12];
-                                        if reader.read_exact(&mut hdlr_buf).is_ok() {
-                                            match &hdlr_buf[8..12] {
-                                                b"soun" => { has_audio = true; }
-                                                _ => {}
-                                            }
+                                        if reader.read_exact(&mut hdlr_buf).is_ok() && &hdlr_buf[8..12] == b"soun" {
+                                            has_audio = true;
                                         }
                                         break;
                                     }

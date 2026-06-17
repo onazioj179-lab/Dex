@@ -38,7 +38,7 @@ impl KernelCache {
     fn get(&self, key: &str) -> Option<Vec<u8>> {
         // Check old (hottest) tier — single lock, clone within scope
         {
-            let maybe = self.old.lock().get(key).map(|v| v.clone());
+            let maybe = self.old.lock().get(key).cloned();
             if let Some(val) = maybe {
                 CACHE_HITS.fetch_add(1, Ordering::Relaxed);
                 return Some(val);
@@ -46,7 +46,7 @@ impl KernelCache {
         }
         // Check mature tier — clone within lock scope, then promote without re-locking
         {
-            let maybe = self.mature.lock().get(key).map(|v| v.clone());
+            let maybe = self.mature.lock().get(key).cloned();
             if let Some(val) = maybe {
                 CACHE_HITS.fetch_add(1, Ordering::Relaxed);
                 let mut count = self.access_counts.entry(key.to_string()).or_insert(0);
@@ -63,7 +63,7 @@ impl KernelCache {
         }
         // Check young tier — same pattern: clone within lock, then promote
         {
-            let maybe = self.young.lock().get(key).map(|v| v.clone());
+            let maybe = self.young.lock().get(key).cloned();
             if let Some(val) = maybe {
                 CACHE_HITS.fetch_add(1, Ordering::Relaxed);
                 let mut count = self.access_counts.entry(key.to_string()).or_insert(0);
@@ -197,7 +197,7 @@ pub fn kernel_init_memory(young_cap: Option<u32>, mature_cap: Option<u32>, old_c
 
 #[napi]
 pub fn kernel_cache_get(key: String) -> Option<Buffer> {
-    get_cache().get(&key).map(|v| Buffer::from(v))
+    get_cache().get(&key).map(Buffer::from)
 }
 
 #[napi]

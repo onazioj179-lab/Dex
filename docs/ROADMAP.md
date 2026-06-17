@@ -65,6 +65,164 @@
 > of truth; the thin, unused shadow component in `AppWrapper.tsx` (plus its dead
 > loading-style keys orphaned by the `DexLoader` reroute) was removed. Verified:
 > full tsc clean + component import suite green.
+>
+> **Unified Creative Design Language -- Creative Control Kit (2026-06-16).** The
+> creative apps had hand-rolled the SAME labeled value-slider row ~190 times and
+> segmented "pick-one" strips ~40 times, each drifting per app. New shared,
+> accent-aware kit in `components/controls/` (`CreativeSlider`, `SegmentedControl`
+> with `outlined`/`subtle` variants) is now the single source of truth. First
+> adoptions: Prism (image editor) -- all 12 value sliders + the selection-mode and
+> gradient-type segmented controls migrated, dead `slider`/`sliderValue` styles
+> removed; and Flux (motion) -- the 5 transform sliders migrated, all four dead
+> slider-style keys removed. Each app keeps its accent (`#ff375f` / `#bf5af2`) via
+> a thin prop/wrapper. Verified: full tsc clean + `creative-controls` and
+> component tests green (21). REMAINING (mechanical rollout, same pattern): the
+> rest of Prism/Flux's non-row sliders, plus Vinx, Imosion, Forge, and Axl's
+> local control set -> the kit.
+>
+> **Cursor-anchored menu placement -- never off-screen (2026-06-16).** Context
+> menus across the shell + creative suite each hand-rolled `Math.min(clientX,
+> innerWidth - 200)` -- magic sizes, no edge margin, and most creative apps
+> (Flux, Prism, Forge, Axl, Vinx) stored RAW `clientX/clientY` with no clamp at
+> all, so a right-click near a screen edge opened partly off-screen. New tested
+> util `renderer/utils/menuPosition.ts` (`clampMenuToViewport` + the
+> `clampEventToViewport` handler helper) is the single rule; it keeps the whole
+> menu inside a margin on both axes and handles menus larger than the viewport.
+> Adopted at 13 sites: Home (2), the launchpad context menu (AppManager), Files,
+> the shared `components.tsx` context menu, and the creative apps Prism, Flux,
+> Forge, Axl, Vinx (timeline + media browser), Imosion (track + clip). Complements
+> `useDropdownPosition` (which handles anchored dropdowns). Verified: full tsc
+> clean + `menuPosition` unit tests (8) green. (The Apps Menu surface itself was
+> already a static, viewport-clamped, scrollable centred panel -- left as-is.)
+> FOLLOW-UP (2026-06-16): Home (2) + the launchpad menu still re-clamped at
+> RENDER with a second magic `Math.min(..., innerWidth - N)` on top of the
+> capture-time clamp -- a redundant double-clamp whose stale `N` could fight the
+> util. Removed all three; capture-time `clampEventToViewport` is now the sole
+> placement rule everywhere, and the Home desktop menu's size estimate was
+> corrected (200x300 -> 220x420) to match its true height so the single clamp is
+> accurate. tsc clean.
+>
+> **Window multitasking -- 60/40 split preset (2026-06-16).** The ratio-split
+> engine (`applySplitRatio`, min-width-aware) already shipped with 50/50, 70/30,
+> and 60/20/20 presets in the Command Palette, but the owner brief explicitly
+> lists 50/50, 60/40, AND 70/30 -- 60/40 was the one missing ratio. Added the
+> `split-6040` palette command (`[0.6, 0.4]`). No engine change; it reuses the
+> proven, tested split path.
+>
+> **Dedicated UKI button (2026-06-16).** UKI was only reachable via a keyboard
+> shortcut (Ctrl+Shift+U) and the command palette -- no persistent, visible entry
+> the owner brief asks for. Added a small always-visible UKI orb as a companion to
+> the `FloatingLauncher`: it rides with the launcher using the same clamped
+> placement, flips below the orb when near the top edge (never off-screen), and
+> toggles the assistant via `useUkiStore.getState().togglePanel()`. tsc clean.
+> NOTE: much of this navigation/cohesion brief was already shipped -- Apps Menu is
+> a static viewport-clamped scrollable panel, Home already has freeform
+> drag-and-persist pinned files/apps/widgets, the radius scale
+> (`--radius-xs..2xl/full`) already exists, and the named verbose toolbar labels
+> ("Import File", etc.) are already iconified (the one "Open File" hit is a proper
+> labelled File MENU item, correctly left alone).
+>
+> **Dedicated Search control + dropdown radius consistency + dock finding
+> (2026-06-16).** Closed the three items left above. (1) Search: the universal
+> `SpotlightSearch` overlay still existed and rendered (`showSpotlight`) but its
+> ONLY trigger was the removed dock Search button -- so universal search had no
+> entry point. Added a dedicated Search satellite to the `FloatingLauncher`
+> cluster (alongside the new UKI one), wired via a new `onSearch` prop to
+> `setShowSpotlight(true)` in AppManager; the two satellites stack on whichever
+> side of the orb has room (never off-screen). (2) Pill/radius: aligned the shared
+> `Select` control + menu (4 sites) from magic `borderRadius: 6` to the canonical
+> `var(--radius-lg)` token -- consistency without pill-ifying (the established
+> DEX-Sharp identity is deliberately DISCRETE radii, not pills, so aggressive
+> pill restyling was correctly NOT done). (3) Dock removal: NOT dead code --
+> `dockPinStore`/`useDockPins` is live infrastructure consumed by `pinRegistry.ts`
+> and covered by 3 test suites; the Apps Menu already carries no dock positioning
+> math, so there is nothing to safely remove. Verified: full tsc clean + 29 tests
+> green (menuPosition + creative-controls + component suites).
+>
+> **Window manager -- Four-Grid (2x2) layout (2026-06-16).** The Strategic
+> Completion brief lists a "Four-grid layout" under Window Manager, but the split
+> engine (`applySplitRatio`) only tiled a single ROW of columns -- no 2x2 quad.
+> Added `applyGridLayout(cols, rows)` in AppManager (row-major placement, reusing
+> the same min-size guard + `clampWindowToWorkspace` discipline, falling back to
+> the min-size-aware tiler when a cell would be below a window's minimum), a
+> `dex-grid-layout {cols,rows}` event, and a "Four-Grid Layout" Command Palette
+> entry (`grid-2x2`). Reuses the proven detached-window path; no new persistence.
+> The rest of this brief was found already shipped (Workspace Memory = the
+> persisted window manifest + presets + runningApps; split presets incl. 60/40;
+> universal Ctrl+K search incl. the new Search satellite; menu placement; creative
+> control kit; Home freeform) or native-blocked here (Rust/C++/ML engines for
+> DAW/video/CAD/indexing). Verified: full tsc clean.
+>
+> **Notes Document Intelligence + UKI file awareness (2026-06-16).** Completed the
+> plan's Notes "document statistics" / "professional document features" gap and
+> consolidated scattered helpers. New shared, tested util
+> `src/shared/text/documentStats.ts` (`analyzeText`: words, characters, sentences,
+> paragraphs, syllables, reading + speaking time, Flesch reading-ease and
+> Flesch-Kincaid GRADE LEVEL, readability band) -- the single source of truth,
+> replacing NotesEditor's private `readingMinutes` and complementing
+> NotesDocumentModel's `countWords`. NotesEditor's status bar now shows reading
+> LEVEL (e.g. "Grade 8 · Plain"), gated to notes >= 30 words so the score is
+> meaningful. PITCH shipped in the same work: the Notes UKI context resolver now
+> reports the open note's length + reading level via the snapshot `custom` field,
+> so UKI actually knows the document it's looking at ("summarise this" knows it's
+> a 1,200-word Grade-11 piece) -- advancing the plan's "UKI context awareness:
+> file awareness". The util is reusable for DEX Code file metrics + further UKI
+> context. Verified: full tsc clean + 45 unit tests green (documentStats 16 +
+> menuPosition + creative-controls + component suites).
+>
+> **Creative Control Kit rollout -- Forge + Vinx (2026-06-16).** Continued the
+> kit adoption across the creative suite. FIRST extended `CreativeSlider` with a
+> `layout` prop: `inline` (label | slider | value) and new `stacked` (label+value
+> header above a full-width slider) -- so the kit faithfully covers BOTH creative
+> idioms (Prism/Flux used inline; Vinx/Forge effect panels use stacked), making
+> migration a true drop-in rather than a restyle. Then migrated: Forge -- 5
+> sliders (Parallel Jobs, Target LUFS, Bitrate, Watermark Opacity, Subtitle Font
+> Size) + the Watermark Type segmented control, and removed its 4 now-dead
+> `slider*` style keys; Vinx -- all 9 effect sliders (mask feather/opacity/
+> expansion, stabilization smoothness + rolling shutter, the 3 noise-reduction
+> strengths, snap distance) via the stacked layout. DEFERRED (honest): Imosion's
+> mastering panel (its 9px micro-labels need a `dense` size variant first, and the
+> file is 17k lines -- a focused pass), Vinx's segmented controls (their state
+> types vary and could break the generic without per-control checking), and
+> Forge's grid-layout button groups. Verified: full tsc clean + 26 unit tests
+> green (creative-controls + documentStats + menuPosition).
+>
+> **Creative Control Kit rollout -- Imosion + Vinx segmented (2026-06-16).**
+> Pushed the kit deeper. Two more kit variants: `CreativeSlider` gained a `dense`
+> prop (9px micro-labels for pro racks) and `SegmentedControl` gained a `fill`
+> prop (equal-width segments). Then migrated: Imosion -- all 11 mastering-rack
+> sliders (Stereo width/balance, Tone shelves + bass, 3-band Multiband, Analog
+> Warmth, Loudness target + ceiling) via `layout="stacked" dense` with
+> `marginBottom:0` so the panel's flex `gap` keeps spacing pixel-identical; Vinx
+> -- all 5 segmented controls (mask shape, stabilization method + crop mode, noise
+> method, EQ preset) via `SegmentedControl ... fill`, preserving the multi-select
+> EQ-preset's band-loading onChange. The kit now backs Prism, Flux, Forge, Vinx,
+> and Imosion. COMPLETED the last patterns too (no leftovers): added a `columns`
+> mode to `SegmentedControl` (grid of N equal columns) and a `column` layout to
+> `CreativeSlider` (label on top, full-width slider, value centered below -- the
+> mixer-cell idiom), then migrated Forge's 3 grid button-groups (img-sequence +
+> audio-extract format pickers via `columns={4}`, the 3x2 watermark-position
+> picker via `columns={3}`) and Imosion's instrument-cell Volume + Pan via
+> `layout="column" dense` (Pan keeps its C/L/R readout through `format`). The
+> Creative Control Kit rollout is now COMPLETE across all five creative apps --
+> every inline slider/segmented/grid control that maps to the kit is migrated.
+> Verified: full tsc clean + 26 unit tests green.
+>
+> **Code-health pass -- dead-module removal (2026-06-16).** Internal-consolidation
+> brief: "remove dead code / unused services / technical debt." Removed 10
+> never-imported renderer modules after proving each had ZERO consumers (the
+> `components/` and `services/` barrels are themselves imported nowhere; no direct
+> path-imports; no JSX usage; only a stray docs mention): `PageTransition`,
+> `ScrollEnhancements`, `SmoothZoom`, `CollapsiblePanel`, `EnhancedKnob`,
+> `NumberInput`, `components/ColorPicker` (NOT the live standalone ColorPicker),
+> `RichTextInput`, `HelpOverlay`, and the orphaned `services/AppStateMachine.tsx`
+> (StateRenderer + Default*UI + unused hooks). Trimmed `components/index.ts` to the
+> one live survivor (`ResizablePanel`) and dropped the `AppStateMachine` block from
+> `services/index.ts`. `tsc` is the backstop -- it would fail on any missed
+> reference. Verified: full tsc clean (0 errors) + component-import + kit tests
+> green (21). Note: `EnhancedKnob`/`NumberInput`/`ColorPicker` were the OLD
+> unadopted control library, now superseded by the shared Creative Control Kit --
+> so this also removes a duplicate-system per the brief.
 
 ## Next major phase: uki AI + intelligence everywhere (owner brief, 2026-06-09)
 

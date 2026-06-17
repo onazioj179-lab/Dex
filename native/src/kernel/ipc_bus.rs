@@ -31,7 +31,7 @@ impl MessageBatcher {
 
     fn enqueue(&self, channel: &str, payload: Vec<u8>) -> Option<Vec<Vec<u8>>> {
         MSG_SENT.fetch_add(1, Ordering::Relaxed);
-        let mut entry = self.channels.entry(channel.to_string()).or_insert_with(Vec::new);
+        let mut entry = self.channels.entry(channel.to_string()).or_default();
         entry.push(payload);
         let total_bytes: usize = entry.iter().map(|p| p.len()).sum();
         if entry.len() >= self.max_batch || total_bytes >= self.max_bytes {

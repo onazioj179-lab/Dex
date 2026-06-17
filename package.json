@@ -74,7 +74,6 @@
     "electron-updater": "^6.7.3",
     "idb-keyval": "^6.2.2",
     "loudness": "^0.4.2",
-    "lucide-react": "^1.7.0",
     "node-schedule": "^2.1.1",
     "ps-list": "^8.1.1",
     "react": "^18.2.0",
