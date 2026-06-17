@@ -206,7 +206,7 @@ fn delete_layout(conn: &Connection, name: &str) -> Value {
         .ok();
     match built_in {
         None => json!(false),
-        Some(b) if b == 1 => json!(false),
+        Some(1) => json!(false),
         Some(_) => {
             let _ = conn.execute("DELETE FROM workspace_layouts WHERE name = ?", params![name]);
             json!(true)

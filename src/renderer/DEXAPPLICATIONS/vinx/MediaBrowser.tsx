@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from 'react';
+import { clampEventToViewport } from '../../utils/menuPosition';
 import { useVinxStore } from './VinxStore';
 import type { MediaItem, MediaBin } from './VinxTypes';
 import {
@@ -279,7 +280,8 @@ const MediaTab: React.FC = memo(() => {
     e.preventDefault();
     e.stopPropagation();
     setSelectedMedia(mediaId);
-    setCtxMenu({ x: e.clientX, y: e.clientY, mediaId });
+    const p = clampEventToViewport(e);
+    setCtxMenu({ x: p.left, y: p.top, mediaId });
   }, [setSelectedMedia]);
 
   useEffect(() => {

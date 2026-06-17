@@ -528,7 +528,8 @@ export const Workflows: React.FC = () => {
     const dex = window.dex;
     if (dex?.workflows?.execute) {
       dex.workflows.execute(id).catch((err: unknown) => {
-        toast.error(`Workflow failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        console.error('[Workflows] execute failed:', err);
+        toast.error('Workflow failed to run. Check its configuration and try again.');
       });
     }
   }, [toast]);

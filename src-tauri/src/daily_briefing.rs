@@ -206,13 +206,13 @@ fn compute_briefing(conn: &Connection) -> Value {
                 let status = t.get("status").and_then(|v| v.as_str());
                 let not_completed = status != Some("completed");
                 match due {
-                    Some(d) if d == yesterday && d != "" && not_completed => {
+                    Some(d) if d == yesterday && !d.is_empty() && not_completed => {
                         unfinished_tasks.push(map_task(t));
                     }
                     _ => {}
                 }
                 match due {
-                    Some(d) if d == today && d != "" && not_completed => {
+                    Some(d) if d == today && !d.is_empty() && not_completed => {
                         due_today_tasks.push(map_task(t));
                     }
                     _ => {}

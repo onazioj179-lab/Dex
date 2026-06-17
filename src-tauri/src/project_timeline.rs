@@ -140,7 +140,8 @@ fn gather_versions(
         Ok(r) => r,
         Err(_) => return,
     };
-    let out: Vec<(i64, Option<String>, Option<String>, Option<String>)> =
+    type ProjectRow = (i64, Option<String>, Option<String>, Option<String>);
+    let out: Vec<ProjectRow> =
         rows.filter_map(|r| r.ok()).collect();
 
     for (id, pname, label, created_at) in out {
@@ -332,7 +333,8 @@ fn gather_activities(
         Ok(r) => r,
         Err(_) => return,
     };
-    let out: Vec<(i64, Option<String>, Option<String>, Option<String>)> =
+    type EventRow = (i64, Option<String>, Option<String>, Option<String>);
+    let out: Vec<EventRow> =
         rows.filter_map(|r| r.ok()).collect();
 
     for (id, event_type, title, created_at) in out {

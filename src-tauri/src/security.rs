@@ -153,6 +153,9 @@ fn verify_integrity(state: &mut SecurityState, path: &str) -> Value {
 
 /// The permissions registry — a faithful copy of `PERMISSIONS_REGISTRY`.
 fn default_registry() -> Vec<Permission> {
+    // Compact constructor: 9 args map 1:1 to Permission's fields so the registry
+    // below reads as a concise table. A struct/builder would bloat 15+ call sites.
+    #[allow(clippy::too_many_arguments)]
     fn p(
         id: &'static str, name: &'static str, description: &'static str, reason: &'static str,
         required: bool, enabled: bool, scope: &'static str, risks: Vec<&'static str>, mitigations: Vec<&'static str>,

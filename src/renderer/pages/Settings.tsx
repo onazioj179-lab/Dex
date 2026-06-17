@@ -313,7 +313,7 @@ const SystemMonitorPanel: React.FC = () => {
 
   const refresh = React.useCallback(async () => {
     if (!dexApi?.system?.getProcesses) {
-      setError('System monitor unavailable in this build (no dex.system bridge).');
+      setError('The system monitor is not available in this build.');
       setLoading(false);
       return;
     }
@@ -326,7 +326,8 @@ const SystemMonitorPanel: React.FC = () => {
       if (stat) setStatus(stat);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load processes');
+      console.warn('[Settings] load processes failed:', e);
+      setError('Could not load the process list. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -340,7 +341,7 @@ const SystemMonitorPanel: React.FC = () => {
 
   const handleEndProcess = React.useCallback(async (pid: number, name: string) => {
     if (!dexApi?.power?.closeProcess) {
-      alert('Process termination is not available in this build.');
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Ending processes is not available in this build.' } }));
       return;
     }
     const ok = await confirm({
@@ -354,12 +355,14 @@ const SystemMonitorPanel: React.FC = () => {
     try {
       const result = await dexApi.power.closeProcess(pid, false);
       if (!result?.ok && !result?.success) {
-        alert(`Failed to end process: ${result?.error || 'unknown error'}`);
+        console.warn('[Settings] closeProcess failed:', result?.error);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't end "${name}". It may require elevated permissions.` } }));
       } else {
         setProcesses(prev => prev.filter(p => p.pid !== pid));
       }
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : 'failed'}`);
+      console.error('[Settings] closeProcess error:', e);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't end "${name}". Please try again.` } }));
     } finally {
       setBusyPid(null);
     }

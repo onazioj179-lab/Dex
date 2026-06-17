@@ -37,6 +37,14 @@ export interface CreativeSliderProps {
   labelWidth?: number;
   /** Hide the numeric readout entirely. */
   hideValue?: boolean;
+  /**
+   * `inline` (default): label | slider | value in one row.
+   * `stacked`: a label + value header above a full-width slider -- the idiom the
+   * creative inspector panels (Vinx / Imosion / Forge effect panels) already use.
+   */
+  layout?: 'inline' | 'stacked' | 'column';
+  /** 9px micro-labels for dense pro panels (e.g. the DAW mastering rack). */
+  dense?: boolean;
   'aria-label'?: string;
   className?: string;
   style?: React.CSSProperties;
@@ -56,6 +64,8 @@ export const CreativeSlider = memo<CreativeSliderProps>(({
   disabled = false,
   labelWidth = 72,
   hideValue = false,
+  layout = 'inline',
+  dense = false,
   className,
   style,
   ...rest
@@ -70,6 +80,52 @@ export const CreativeSlider = memo<CreativeSliderProps>(({
     : format ? format(value)
     : `${value}${unit ?? ''}`;
 
+  const labelFs = dense ? 9 : 11;
+
+  const sliderInput = (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={handleChange}
+      disabled={disabled}
+      aria-label={rest['aria-label'] ?? label}
+      style={layout === 'inline'
+        ? { flex: 1, minWidth: 0, height: 4, accentColor, cursor: disabled ? 'not-allowed' : 'pointer' }
+        : { width: '100%', height: 4, accentColor, cursor: disabled ? 'not-allowed' : 'pointer' }}
+    />
+  );
+
+  // Stacked: label + value header above a full-width slider.
+  if (layout === 'stacked') {
+    return (
+      <div className={className} style={{ marginBottom: 'var(--space-2)', opacity: disabled ? 0.5 : 1, ...style }}>
+        {(label || !hideValue) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            {label && <span style={{ fontSize: labelFs, fontWeight: 600, color: 'var(--color-text-tertiary)' }}>{label}</span>}
+            {!hideValue && <span style={{ fontSize: labelFs, fontWeight: 600, color: accentColor, fontFamily: 'var(--font-mono)' }}>{readout}</span>}
+          </div>
+        )}
+        {sliderInput}
+      </div>
+    );
+  }
+
+  // Column: label on top, full-width slider, value centered below -- the compact
+  // mixer-cell idiom (e.g. Imosion instrument Volume/Pan).
+  if (layout === 'column') {
+    return (
+      <div className={className} style={{ marginBottom: 'var(--space-2)', opacity: disabled ? 0.5 : 1, ...style }}>
+        {label && <div style={{ fontSize: labelFs, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{label}</div>}
+        {sliderInput}
+        {!hideValue && <div style={{ fontSize: labelFs, fontWeight: 600, color: accentColor, fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: 4 }}>{readout}</div>}
+      </div>
+    );
+  }
+
+  // Inline: label | slider | value in one row.
   return (
     <div
       className={className}
@@ -81,26 +137,16 @@ export const CreativeSlider = memo<CreativeSliderProps>(({
       {label && (
         <span style={{
           width: labelWidth, flexShrink: 0,
-          fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)',
+          fontSize: labelFs, fontWeight: 600, color: 'var(--color-text-tertiary)',
         }}>
           {label}
         </span>
       )}
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={handleChange}
-        disabled={disabled}
-        aria-label={rest['aria-label'] ?? label}
-        style={{ flex: 1, minWidth: 0, height: 4, accentColor, cursor: disabled ? 'not-allowed' : 'pointer' }}
-      />
+      {sliderInput}
       {!hideValue && (
         <span style={{
           width: 40, flexShrink: 0, textAlign: 'right',
-          fontSize: 11, fontWeight: 600, color: accentColor, fontFamily: 'var(--font-mono)',
+          fontSize: labelFs, fontWeight: 600, color: accentColor, fontFamily: 'var(--font-mono)',
         }}>
           {readout}
         </span>

@@ -74,25 +74,6 @@ export {
   clearCrashReports,
 } from './ErrorBoundary';
 
-// App State Machine
-export {
-  // Types
-  type AppStateType,
-  type StateContext,
-  type StateMachineConfig,
-  type StateTransition,
-  
-  // Store
-  useAppStateMachine,
-  
-  // Hooks
-  useAppState,
-  useNetworkAwareState,
-  
-  // Components
-  StateRenderer,
-} from './AppStateMachine';
-
 // Performance Monitor
 export {
   // Types

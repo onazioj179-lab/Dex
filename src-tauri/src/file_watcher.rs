@@ -16,6 +16,7 @@
 //!     watcher, so it degrades honestly rather than fabricating a path/watch.
 //!   - `file-watcher:importFile` needs `fs.statSync` for the file size before
 //!     inserting into `media_library`, so it degrades honestly.
+//!
 //! The DB-backed config reads (`getFolders`) and the persisted delete
 //! (`removeFolder`) are ported faithfully; the live-watcher teardown that
 //! `removeFolder` also performs is simply absent here (no watcher exists), which

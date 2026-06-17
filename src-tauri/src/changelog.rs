@@ -171,7 +171,8 @@ fn generate_from_activity(conn: &Connection, args: &Value) -> Value {
         Ok(r) => r,
         Err(_) => return json!(0),
     };
-    let activities: Vec<(String, String, Option<String>, Option<String>, Option<String>)> =
+    type ActivityRow = (String, String, Option<String>, Option<String>, Option<String>);
+    let activities: Vec<ActivityRow> =
         rows.filter_map(|r| r.ok()).collect();
     drop(stmt);
 
@@ -402,7 +403,7 @@ fn sort_by_count_desc(map: &Map<String, Value>) -> Vec<(String, i64)> {
         .iter()
         .map(|(k, val)| (k.clone(), val.as_i64().unwrap_or(0)))
         .collect();
-    v.sort_by(|a, b| b.1.cmp(&a.1));
+    v.sort_by_key(|b| std::cmp::Reverse(b.1));
     v
 }
 
