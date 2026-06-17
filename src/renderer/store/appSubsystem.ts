@@ -561,8 +561,8 @@ interface AppSubsystemState {
   getAllActiveInstances: () => AppInstance[];
 }
 
-// Helper to generate unique IDs
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+// Helper to generate unique IDs (shared canonical)
+import { generateId } from '../../shared/util/id';
 
 export const useAppSubsystem = create<AppSubsystemState>()(
   persist(

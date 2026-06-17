@@ -299,9 +299,7 @@ function clamp01(n: number): number {
   return n;
 }
 
-function truncate(s: string, n: number): string {
-  return s.length <= n ? s : s.slice(0, n - 1) + '\u2026';
-}
+import { truncate } from '../../../shared/util/text';
 
 // ---------------------------------------------------------------------------
 // Lazy singleton wired into the live DEX subsystems. Renderer/main IPC

@@ -66,13 +66,9 @@ export const settingsListStyle: React.CSSProperties = {
   flexDirection: 'column',
 };
 
-/** Format bytes as a human readable string (1024-based). */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
+/** Format bytes -- re-exported from the shared format canonical. */
+import { formatBytes } from '../../../shared/format/units';
+export { formatBytes };
 
 /** Format a ms timestamp as a relative "5m ago" / "2d ago" string. */
 export function formatRelative(ms: number, now: number = Date.now()): string {

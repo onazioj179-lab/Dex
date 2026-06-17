@@ -82,7 +82,7 @@ export function resolveRouting(graph: MixGraph): ResolvedRoute[] {
   return out;
 }
 
-function clamp(v: number, lo: number, hi: number): number { return v < lo ? lo : v > hi ? hi : v; }
+import { clamp } from '../../math/num';
 
 /** dBFS conversion. */
 export function linearToDb(x: number): number { return x > 0 ? 20 * Math.log10(x) : -Infinity; }

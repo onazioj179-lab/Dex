@@ -46,9 +46,8 @@ export interface VoiceSettings {
 // Constants
 // -----------------------------------------------------------------------------
 
-function generateId(): string {
-  return `voice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId as sharedGenerateId } from '../../shared/util/id';
+function generateId(): string { return sharedGenerateId('voice'); }
 
 const DEFAULT_SETTINGS: VoiceSettings = {
   audioFormat: 'webm',

@@ -142,13 +142,14 @@ const PREFERS_REDUCED_MOTION = typeof window !== 'undefined' && window.matchMedi
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
   : false;
 
-// Parse #rrggbb -> [r,g,b]. Cached so repeated palette lookups stay cheap.
+// Parse hex -> [r,g,b] via the shared canonical, cached for repeated palette lookups.
+import { hexToRgb as sharedHexToRgb } from '../../../shared/creative/colorUtils';
 const _hexCache = new Map<string, [number, number, number]>();
 function hexToRgb(hex: string): [number, number, number] {
   let v = _hexCache.get(hex);
   if (v) return v;
-  const h = hex.replace('#', '');
-  v = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  const c = sharedHexToRgb(hex);
+  v = c ? [c.r, c.g, c.b] : [0, 0, 0];
   _hexCache.set(hex, v);
   return v;
 }

@@ -301,20 +301,13 @@ export const DEFAULT_TRANSFORM_SETTINGS: TransformSettings = {
 
 // ==================== UTILITY FUNCTIONS ====================
 
-// Generate unique ID
-export const generateId = (prefix: string = 'id'): string => {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
+// Generate unique ID -- thin app default over the shared canonical
+import { generateId as sharedGenerateId } from '../../../shared/util/id';
+export const generateId = (prefix: string = 'id'): string => sharedGenerateId(prefix);
 
-// Convert hex to RGB
-export const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : null;
-};
+// Convert hex to RGB -- shared canonical (also handles #rgb shorthand).
+import { hexToRgb } from '../../../shared/creative/colorUtils';
+export { hexToRgb };
 
 // Convert RGB to hex
 export const rgbToHex = (r: number, g: number, b: number): string => {

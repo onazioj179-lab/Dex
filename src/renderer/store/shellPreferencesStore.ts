@@ -240,12 +240,7 @@ export function applyLowEndMode(prefs: Pick<ShellPreferences, 'lowEndMode'>): vo
   }
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const m = /^#?([a-f0-9]{6})$/i.exec(hex);
-  if (!m) return null;
-  const int = parseInt(m[1], 16);
-  return { r: (int >> 16) & 0xff, g: (int >> 8) & 0xff, b: int & 0xff };
-}
+import { hexToRgb } from '../../shared/creative/colorUtils';
 
 // ---------------------------------------------------------------------------
 // Store

@@ -14,6 +14,7 @@ import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
+import { formatClock } from '../../shared/format/units';
 import { loadAudioMetadata } from '../utils/id3Parser';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
@@ -597,11 +598,7 @@ export const Audio: React.FC = () => {
     saveFavorites(favorites);
   }, [favorites]);
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const formatTime = (seconds: number): string => formatClock(seconds);
 
   const toggleFavorite = (id: string) => {
     setFavorites(prev => 

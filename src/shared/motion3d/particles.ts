@@ -153,7 +153,7 @@ export class ParticleSystem {
   }
 }
 
-function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
+import { lerp } from '../math/num';
 function clamp01(v: number): number { return v < 0 ? 0 : v > 1 ? 1 : v; }
 function lcg(seed: number): () => number {
   let s = (seed | 0) || 1;

@@ -47,9 +47,8 @@ export interface MediaStats {
 // Constants
 // -----------------------------------------------------------------------------
 
-function generateId(): string {
-  return `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId as sharedGenerateId } from '../../shared/util/id';
+function generateId(): string { return sharedGenerateId('media'); }
 
 const MIME_TYPE_MAP: Record<string, MediaType> = {
   'image/jpeg': 'image',

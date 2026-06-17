@@ -86,4 +86,4 @@ export class ParticleEmitter {
   configure(patch: Partial<EmitterConfig>): void { this.cfg = { ...this.cfg, ...patch }; }
 }
 
-function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
+import { lerp } from '../../shared/math/num';

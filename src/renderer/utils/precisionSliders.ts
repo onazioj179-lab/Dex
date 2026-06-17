@@ -29,9 +29,7 @@ function getStep(slider: HTMLInputElement, fine: boolean): number {
   return fine ? safeStep / 10 : safeStep;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
+import { clamp } from '../../shared/math/num';
 
 function nudge(slider: HTMLInputElement, deltaSteps: number, fine: boolean): void {
   if (slider.disabled) return;

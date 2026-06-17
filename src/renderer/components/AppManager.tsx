@@ -456,7 +456,9 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
   // New apps
   { id: 'screenrecorder', label: 'Screen Rec', color: '#FF453A' },
   { id: 'presentation', label: 'Presentation', color: '#FF9F0A' },
-  { id: 'pdfviewer', label: 'PDF Viewer', color: '#5E5CE6' },
+  // PDF Viewer removed as a standalone app -- PDFs now open in Files (which has
+  // its own built-in PDF preview/Quick Look). The pdfviewer component is kept
+  // for any existing deep links but no longer appears in the launcher.
   { id: 'pixelart', label: 'Pixel Art', color: '#34C759' },
 ];
 
@@ -4282,8 +4284,14 @@ export const AppManager: React.FC = () => {
         {windowControls === 'system' && (
           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <div style={{ width: 1, height: 12, background: 'var(--color-border-subtle)', margin: '0 2px' }} />
-            <button style={winBtnStyle} onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window">{Icons.minimize}</button>
-            <button style={winBtnStyle} onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window">{Icons.maximize}</button>
+            <button style={winBtnStyle} onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window"
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >{Icons.minimize}</button>
+            <button style={winBtnStyle} onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window"
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >{Icons.maximize}</button>
             <button style={winBtnStyle} onClick={handleClose} data-tip="Close" aria-label="Close window"
               onMouseEnter={e => { e.currentTarget.style.background = '#e81123'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
