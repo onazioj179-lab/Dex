@@ -62,17 +62,9 @@ export interface TimelineKeyframe<V = number> {
   easing?: EasingName | EasingFn;
 }
 
-/** Clamp a number to [min, max]. */
-export function clamp(value: number, min: number, max: number): number {
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
-
-/** Linear interpolate between a and b at parameter t in [0, 1]. */
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
+/** clamp / lerp now live in the shared math canonical (src/shared/math/num). */
+import { clamp, lerp } from '../math/num';
+export { clamp, lerp };
 
 /**
  * Sort keyframes by time ascending. Stable; tolerates undefined input.

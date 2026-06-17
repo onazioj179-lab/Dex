@@ -147,7 +147,7 @@ interface PerformanceMonitorState {
   getSystemHealth: () => 'healthy' | 'degraded' | 'critical';
 }
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+import { generateId } from '../../shared/util/id';
 
 export const usePerformanceMonitor = create<PerformanceMonitorState>((set, get) => {
   let monitoringInterval: NodeJS.Timeout | null = null;

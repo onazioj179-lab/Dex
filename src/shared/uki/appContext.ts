@@ -89,7 +89,7 @@ export function formatContextForPrompt(snap: AppContextSnapshot, maxChars = 800)
   return joined.length > maxChars ? joined.slice(0, maxChars - 1) + '…' : joined;
 }
 
-function truncate(s: string, n: number): string { const str = String(s ?? ''); return str.length > n ? str.slice(0, n - 1) + '…' : str; }
+import { truncate } from '../util/text';
 function stringify(v: unknown): string {
   if (v === undefined || v === null) return '';
   if (typeof v === 'string') return v;

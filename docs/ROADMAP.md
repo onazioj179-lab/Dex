@@ -8,16 +8,14 @@
 >
 > **Release theme (2026-06-10): Refinement & Consolidation.** No major feature
 > expansion — performance, consistency, reliability, clarity, fluidity,
-> stability, discoverability, maintainability. The full program and its live
-> status are in [REFINEMENT.md](REFINEMENT.md); the Tauri migration below is
-> its Priority 1 engine.
+> stability, discoverability, maintainability. The Tauri migration below is its
+> Priority 1 engine.
 >
-> **DEX 5.5 system-refinement brief (owner, 2026-06-13)** is reconciled,
-> status-mapped, and sequenced in [DEX-5.5.md](DEX-5.5.md) — the release-level
-> umbrella plan. Much of its visual / security / native-foundation scope already
-> shipped (full-flat UI, Dex-font, per-app sweep, security+leak audit, native
-> search/AI-routing/rewind/notification crates). The remaining user-visible value
-> is sequenced there, led by a unified search UI.
+> **DEX 5.5 system-refinement brief (owner, 2026-06-13).** Much of its visual /
+> security / native-foundation scope already shipped (full-flat UI, Dex-font,
+> per-app sweep, security+leak audit, native search/AI-routing/rewind/notification
+> crates) and the helper-consolidation pass is complete. Remaining user-visible
+> value is sequenced in this roadmap, led by a unified search UI.
 >
 > **v5.5 "DEX Sharp" UI program (started 2026-06-12).** Owner direction: a
 > unique, mature, precise external identity — not a macOS/Windows clone. Sharp
@@ -108,6 +106,59 @@
 > lists 50/50, 60/40, AND 70/30 -- 60/40 was the one missing ratio. Added the
 > `split-6040` palette command (`[0.6, 0.4]`). No engine change; it reuses the
 > proven, tested split path.
+>
+> **Single source of truth -- `generateId` consolidation (2026-06-16).** The
+> ephemeral `${prefix}-${Date.now()}-${random}` id helper had been copy-pasted as
+> ~20 slightly-drifting local definitions (some `substr`, some `slice`, varying
+> lengths) across apps, stores, and services -- exactly the "Remove Duplicate
+> Systems" target. New canonical `src/shared/util/id.ts` `generateId(prefix?)` is
+> now the one source; importable from main + renderer + shared (unlike the old
+> renderer-only `utils/index` copy). Re-pointed 16 renderer sites: the renderer
+> barrel + the 5 creative-app `*Features.ts` helpers (thin wrappers preserve each
+> original default prefix -- `id` / `job` / `vinx` -- so arg-less callers are
+> byte-for-byte unchanged), and 10 no-prefix service/store copies (overrideStore,
+> missionStore, appSubsystem, CollaborationSystem, LifecycleManager,
+> IntegrityMonitor, ErrorBoundary, PerformanceMonitor, SystemServices, VinxAudio).
+> DELIBERATELY LEFT: the crypto-based ids (`main/store/DataStore`,
+> `main/plugins/PluginEngine`, `main/core/DataImportManager` use `crypto.randomUUID`
+> / `randomBytes` -- must stay unpredictable, NOT Math.random), the counter-based
+> ARIA-id generator in `utils/accessibility` (different contract), and the
+> main-process controller copies (separate compile unit -- a safe follow-up).
+> Verified: renderer + main `tsc --noEmit` both clean. ALSO confirmed this pass:
+> an app/page/component resource-leak sweep found ZERO unbounded leaks (every
+> effect that registers an interval/listener/observer/rAF pairs it with cleanup) --
+> nothing to fix there.
+>
+> **Single source of truth -- full helper consolidation pass (2026-06-16).**
+> Extending the `generateId` work above across the rest of the duplicate-helper
+> surface ("do 100/100"). Each cluster keeps ONE canonical and preserves every
+> caller's exact behavior; genuinely-divergent helpers are consolidated by
+> behavior (shared core + thin local adapter), never force-merged. (1) `clamp` /
+> `lerp` -> `shared/math/num.ts`: 11 files (numbers.ts/timeline/mixGraph/colorUtils/
+> motion3d/improvements500{math,particles,perlinNoise}/utils-barrel/precisionSliders/
+> FloatingLauncher); intentional supersets (controlMath swapped-bounds, dsp/
+> comfortPrefs non-finite), 1-arg 0..255 byte-clamps, clamp01 and useCallback hooks
+> were LEFT. (2) `formatBytes`/`formatSize`/`formatFileSize` -> `shared/format/units.ts`:
+> 15 renderer copies -- and this FIXES a latent MB-cap bug (Gallery/Notes/Rewind/
+> AutoSave rendered "5000 MB" instead of "4.9 GB"); Files keeps its `'--'` empty-row
+> placeholder via a wrapper. (3) `hexToRgb` -> `shared/creative/colorUtils.ts`: 9
+> files via LOCAL ADAPTERS that preserve each call-site's return shape (`{r,g,b}` /
+> tuple / `number[]`) and fallback (`{0,0,0}` / `[255,0,0]` / null) with zero
+> call-site edits -- the safe way to unify return-type-divergent copies. (4)
+> `truncate` + `escapeHtml` -> new `shared/util/text.ts` (escapeHtml unified to the
+> 5-char version -- a small XSS-hardening for the HTTP transfer page). (5) new
+> `formatClock(seconds)` canonical + the uniform seconds->clock media players
+> (Audio/NoiseGenerator/PiP/Gallery). (6) 5 main-process `generateId` copies
+> (Logger + Voice/Ideas/Media/Learning controllers; crypto ones still excluded) --
+> confirmed main resolves `src/shared/*` imports at runtime (15+ existing files do).
+> DELIBERATELY LEFT (divergent / low value, tracked): the relative-time
+> `formatTime`/`formatRelativeTime` copies (distinct older-than cutoffs), Timer's
+> padded `mm:ss` countdown, the frames/bars domain formatters (closure state --
+> must NOT merge), the main-process `formatBytes` diagnostic methods, and
+> positional `rgbToHex` (needs arg adaptation). Verified: renderer + main
+> `tsc --noEmit` both clean across the full ~55-file change; the two heavy test
+> suites that timed out under full-parallel load (uki-compressed-memory,
+> vault-hardening) pass in isolation (load flakiness, not a regression).
 >
 > **Dedicated UKI button (2026-06-16).** UKI was only reachable via a keyboard
 > shortcut (Ctrl+Shift+U) and the command palette -- no persistent, visible entry
@@ -520,7 +571,7 @@ REMAINING (lower leverage / deferred):
   - Creative-Suite-Completion brief (owner, 2026-06-16) captured: DAW/video/design/
     CAD pro tools, Notes (tables/outline/stats), DEX Code (multi-cursor/refactor),
     gaming + app-store + asset ecosystem, UI density/consistency pass. Multi-session,
-    mostly per-app renderer work; sequenced in DEX-5.5.md. STARTED with Terminal
+    mostly per-app renderer work; sequenced in this roadmap. STARTED with Terminal
     multi-session tabs (above). The big-app tool work (DAW razor/slice, video blade,
     etc.) is real per-app feature work, not a single sweep.
 

@@ -692,8 +692,9 @@ export const DEFAULT_TRACK_HEIGHTS = {
 
 export const TRACK_HEADER_WIDTH = 160;
 
+import { generateId as sharedGenerateId } from '../../../shared/util/id';
 export function generateId(prefix: string = 'vinx'): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return sharedGenerateId(prefix);
 }
 
 export function formatTimecode(frame: number, fps: number): string {

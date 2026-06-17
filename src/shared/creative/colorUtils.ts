@@ -13,7 +13,7 @@
 export interface RGB { r: number; g: number; b: number }
 export interface HSL { h: number; s: number; l: number }
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+import { clamp } from '../math/num';
 
 /** Parse "#rgb" / "#rrggbb" (with or without '#') to RGB, or null. */
 export function hexToRgb(hex: string): RGB | null {

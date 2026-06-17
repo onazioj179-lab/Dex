@@ -293,20 +293,14 @@ const saveFavorites = async (favorites: string[]) => {
 // HELPERS
 // ===========================================================================
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
-};
+// Shared canonical size formatter (full ladder, fixes the old MB cap).
+import { formatBytes as formatSize } from '../../shared/format/units';
 
 const formatDate = (date: Date): string => date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 
-const formatDuration = (seconds?: number): string => {
-  if (!seconds) return '';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-};
+// Seconds -> clock via the shared canonical; keep the empty-string guard for images.
+import { formatClock } from '../../shared/format/units';
+const formatDuration = (seconds?: number): string => (seconds ? formatClock(seconds) : '');
 
 const PLACEHOLDER_COLORS = ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info, #64d2ff)', 'var(--color-accent)', 'var(--color-accent-alt, #5e5ce6)', 'var(--color-tag-purple, #bf5af2)'];
 const getPlaceholderColor = (id: string): string => PLACEHOLDER_COLORS[Math.abs([...id].reduce((a, c) => a + c.charCodeAt(0), 0)) % PLACEHOLDER_COLORS.length];

@@ -35,11 +35,8 @@ const hexToHsl = (hex: string): HSL => {
   return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
 };
 
-const hexToRgb = (hex: string) => ({
-  r: parseInt(hex.slice(1, 3), 16),
-  g: parseInt(hex.slice(3, 5), 16),
-  b: parseInt(hex.slice(5, 7), 16),
-});
+import { hexToRgb as sharedHexToRgb } from '../../../shared/creative/colorUtils';
+const hexToRgb = (hex: string) => sharedHexToRgb(hex) ?? { r: 0, g: 0, b: 0 };
 
 const PRESETS = [
   'var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-success)',

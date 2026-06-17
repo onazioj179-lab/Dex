@@ -19,6 +19,7 @@ import { usePatternLearning, type Suggestion } from '../services/usePatternLearn
 import { sharedTick } from '../services/SharedTick';
 import DexIcon from './DexIcon';
 import { platform } from '../utils';
+import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import { space, radius, fontSize, zIndex } from '../styles/tokens';
 
 // ======================================================================
@@ -690,13 +691,7 @@ const StorageWidget: React.FC = () => {
     sharedTick.subscribe(tickId, fetchStorage, 60000);
     return () => sharedTick.unsubscribe(tickId);
   }, []);
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
+  const formatBytes = (bytes: number) => sharedFormatBytes(bytes);
   const usedPercent = storage.total > 0 ? Math.round((storage.used / storage.total) * 100) : 0;
   const color = usedPercent > 90 ? 'var(--color-error)' : usedPercent > 70 ? 'var(--color-warning)' : 'var(--color-accent)';
   return (

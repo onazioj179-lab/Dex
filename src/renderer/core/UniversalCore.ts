@@ -9,6 +9,7 @@
 // ===========================================================================
 
 import { EventEmitter } from 'events';
+import { hexToRgb as sharedHexToRgb } from '../../shared/creative/colorUtils';
 
 // ===========================================================================
 // UNIVERSAL TYPES
@@ -145,12 +146,8 @@ export class AccessibilityEngine extends EventEmitter {
   }
 
   private hexToRgb(hex: string): number[] {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? [
-      parseInt(result[1], 16),
-      parseInt(result[2], 16),
-      parseInt(result[3], 16)
-    ] : [0, 0, 0];
+    const c = sharedHexToRgb(hex);
+    return c ? [c.r, c.g, c.b] : [0, 0, 0];
   }
 }
 

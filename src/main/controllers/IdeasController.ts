@@ -54,9 +54,8 @@ export interface IdeasStats {
 // Constants
 // -----------------------------------------------------------------------------
 
-function generateId(): string {
-  return `idea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId as sharedGenerateId } from '../../shared/util/id';
+function generateId(): string { return sharedGenerateId('idea'); }
 
 const DEFAULT_COLORS = [
   '#6366f1', // Indigo

@@ -185,9 +185,7 @@ function getFileLabel(name: string): string {
   return '[FILE]';
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeHtml } from '../../shared/util/text';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
+import { formatBytes } from '../../shared/format/units';
 import { useAppTracking, useFileTracking } from '../services/usePatternLearning';
 import DexIcon from '../components/DexIcon';
 import { useToastHelpers } from '../components/Toast';
@@ -837,13 +838,8 @@ export const Files: React.FC = () => {
     }
   };
 
-  const formatSize = (bytes: number): string => {
-    if (bytes === 0) return '--';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-  };
+  // Keep the '--' placeholder for empty/zero rows; otherwise use the shared canonical.
+  const formatSize = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : '--');
 
   const formatDate = (date: Date): string => {
     const now = new Date();

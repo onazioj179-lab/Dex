@@ -33,8 +33,8 @@
 
 ## The 1000-shortcut triage
 
-[`shortcuts-1000.md`](shortcuts-1000.md) enumerates every possible key combo
-(Ctrl+A … Ctrl+Shift+Alt+F5) as raw *capacity* — 1000 slots, all unassigned. We do
+The full key-combo space — every possible combo from Ctrl+A to Ctrl+Shift+Alt+F5 —
+is raw *capacity*: ~1000 slots, all unassigned. We do
 **not** need 1000 bindings. The catalog assigns only the **ergonomic subset**:
 
 - **App launches** — `Ctrl/Cmd+1..9` and a few `Alt/Option+<letter>` (Notes=Ctrl+4,

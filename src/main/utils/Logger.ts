@@ -20,9 +20,7 @@ interface LogEntry {
   data?: any;
 }
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '../../shared/util/id';
 
 export class Logger {
   private logs: LogEntry[] = [];

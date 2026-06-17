@@ -24,9 +24,10 @@ export { useThrottledClick, throttleClick, debounceClick } from './useThrottledC
 export { useSuspendableRAF,useSuspendableInterval, useAppActive } from './perfAware';
 
 // Common utility functions
-export const generateId = (prefix: string = 'id'): string => {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
+// generateId: one canonical implementation for the whole codebase (consolidation
+// audit) — re-exported here for existing importers, default prefix preserved.
+import { generateId as sharedGenerateId } from '../../shared/util/id';
+export const generateId = (prefix: string = 'id'): string => sharedGenerateId(prefix);
 
 // Debounce / throttle: one canonical implementation for the whole codebase
 // (consolidation audit finding 6) — re-exported here for existing importers.
@@ -34,32 +35,16 @@ export const generateId = (prefix: string = 'id'): string => {
 // replaces dropped the final call), which is the documented semantic.
 export { debounce, throttle } from '../../shared/perf/helpers';
 
-export const clamp = (value: number, min: number, max: number): number => {
-  return Math.max(min, Math.min(max, value));
-};
+// clamp / lerp: one canonical implementation in the shared math module.
+import { clamp, lerp } from '../../shared/math/num';
+import { hexToRgb as sharedHexToRgb } from '../../shared/creative/colorUtils';
+export { clamp, lerp };
 
-export const lerp = (start: number, end: number, t: number): number => {
-  return start + (end - start) * t;
-};
+// Size formatting: one canonical implementation in the shared format module.
+export { formatBytes } from '../../shared/format/units';
 
-export const formatBytes = (bytes: number, decimals: number = 2): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
-};
-
-export const formatDuration = (seconds: number): string => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-  return `${m}:${String(s).padStart(2, '0')}`;
-};
+// Seconds -> clock string ("1:23", "1:23:45"): one canonical in the shared format module.
+export { formatClock as formatDuration } from '../../shared/format/units';
 
 export const formatTime = (date: Date | number): string => {
   const d = typeof date === 'number' ? new Date(date) : date;
@@ -210,14 +195,7 @@ export const keyboard = {
 
 // Color utilities
 export const color = {
-  hexToRgb: (hex: string): { r: number; g: number; b: number } | null => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16),
-    } : null;
-  },
+  hexToRgb: sharedHexToRgb,
   
   rgbToHex: (r: number, g: number, b: number): string => {
     return '#' + [r, g, b].map(x => {

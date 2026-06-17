@@ -703,19 +703,22 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         }}
       />
 
-      {/* Search container — centered by a full-size flex wrapper (no translateX) */}
+      {/* Search container — rolls out from the dock (bottom-right) rather than a
+          centered modal, so it appears right where the user clicked the dock
+          Search button instead of jumping to the middle of the screen. */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 'var(--z-spotlight)',
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-        paddingTop: '16vh', pointerEvents: 'none',
+        display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end',
+        padding: '0 24px 104px 24px', pointerEvents: 'none',
       }}>
       <div
         ref={containerRef}
         style={{
-          transform: 'scale(1)',
+          transformOrigin: 'bottom right',
+          animation: isReduceMotion() ? 'none' : 'dexSpotlightRollOut 0.2s cubic-bezier(0.2,0.9,0.3,1)',
           pointerEvents: 'auto',
-          width: 'min(640px, 90vw)',
-          maxHeight: 520,
+          width: 'min(560px, 92vw)',
+          maxHeight: 'min(520px, 70vh)',
           display: 'flex', flexDirection: 'column',
           background: 'var(--color-bg-surface-solid, #141416)',
           border: '1px solid var(--color-border)',

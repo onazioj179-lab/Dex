@@ -158,7 +158,7 @@ interface FileServiceState {
   clearAccessLog: (appId?: string) => void;
 }
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+import { generateId } from '../../shared/util/id';
 
 export const useFileService = create<FileServiceState>((set, get) => ({
   status: 'healthy',

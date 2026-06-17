@@ -33,9 +33,7 @@ export interface FloatingLauncherProps {
   onSearch?: () => void;
 }
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
-}
+import { clamp } from '../../shared/math/num';
 
 export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSearch }) => {
   const { x, y, enabled, setPosition } = useFloatingLauncher();
@@ -120,29 +118,37 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const groupBottom = Math.max(...tops) + SIZE;
   const BPAD = 5;
 
-  const memberStyle = (hover: boolean, top: number, isAnchor: boolean): React.CSSProperties => ({
-    position: 'fixed',
-    left: pos.x,
-    top,
-    width: SIZE,
-    height: SIZE,
-    zIndex: 'var(--z-dock)' as unknown as number,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '50%',
-    border: '1px solid var(--color-border, rgba(255,255,255,0.14))',
-    background: 'var(--color-bg-glass, rgba(22,22,24,0.78))',
-    boxShadow: dragging
-      ? '0 14px 40px rgba(0,0,0,0.5), 0 0 0 1px var(--color-border-strong, rgba(255,255,255,0.22))'
-      : 'var(--pg-shadow-popover, 0 8px 24px rgba(0,0,0,0.4))',
-    cursor: dragging ? 'grabbing' : 'grab',
-    padding: 0,
-    outline: 'none',
-    touchAction: 'none',
-    transform: dragging && isAnchor ? 'scale(1.06)' : hover ? 'scale(1.05)' : 'scale(1)',
-    transition: 'transform 0.14s cubic-bezier(0.2,0.9,0.3,1), box-shadow 0.16s ease',
-  });
+  const memberStyle = (hover: boolean, top: number, isAnchor: boolean): React.CSSProperties => {
+    const scale = dragging && isAnchor ? 1.06 : hover ? 1.05 : 1;
+    return {
+      position: 'fixed',
+      left: 0,
+      top: 0,
+      width: SIZE,
+      height: SIZE,
+      zIndex: 'var(--z-dock)' as unknown as number,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '50%',
+      border: '1px solid var(--color-border, rgba(255,255,255,0.14))',
+      background: 'var(--color-bg-glass, rgba(22,22,24,0.78))',
+      boxShadow: dragging
+        ? '0 14px 40px rgba(0,0,0,0.5), 0 0 0 1px var(--color-border-strong, rgba(255,255,255,0.22))'
+        : 'var(--pg-shadow-popover, 0 8px 24px rgba(0,0,0,0.4))',
+      cursor: dragging ? 'grabbing' : 'grab',
+      padding: 0,
+      outline: 'none',
+      touchAction: 'none',
+      // GPU-composited positioning via transform (not left/top) so dragging is
+      // smooth -- only a compositor move per frame, no layout/paint. The
+      // transition is OFF while dragging so the orb tracks the pointer 1:1
+      // instead of easing behind it; the gentle hover/release ease stays otherwise.
+      transform: `translate3d(${pos.x}px, ${top}px, 0) scale(${scale})`,
+      willChange: dragging ? 'transform' : 'auto',
+      transition: dragging ? 'none' : 'transform 0.14s cubic-bezier(0.2,0.9,0.3,1), box-shadow 0.16s ease',
+    };
+  };
 
   const memberHandlers = (action: () => void, setHover: (v: boolean) => void) => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => beginPress(e, action),
@@ -161,8 +167,8 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         aria-hidden="true"
         style={{
           position: 'fixed',
-          left: pos.x - BPAD,
-          top: groupTop - BPAD,
+          left: 0,
+          top: 0,
           width: SIZE + BPAD * 2,
           height: groupBottom - groupTop + BPAD * 2,
           borderRadius: SIZE / 2 + BPAD,
@@ -171,6 +177,9 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           zIndex: 'var(--z-dock)' as unknown as number,
           pointerEvents: 'none',
           opacity: dragging ? 1 : 0.85,
+          // Transform-positioned so it tracks the group smoothly while dragging.
+          transform: `translate3d(${pos.x - BPAD}px, ${groupTop - BPAD}px, 0)`,
+          willChange: dragging ? 'transform' : 'auto',
           transition: 'opacity 0.16s ease',
         }}
       />
