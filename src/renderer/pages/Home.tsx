@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { clampEventToViewport } from '../utils/menuPosition';
 import { sharedTick } from '../services/SharedTick';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useLiveActivity, type LiveActivity, type ActivityType } from '../utils/liveActivity';
@@ -496,7 +497,8 @@ export const Home: React.FC = () => {
     const tag = (e.target as HTMLElement).tagName.toLowerCase();
     if (tag === 'button' || tag === 'input' || tag === 'a') return;
     e.preventDefault();
-    setCtxMenu({ x: e.clientX, y: e.clientY });
+    const p = clampEventToViewport(e, { width: 220, height: 420 });
+    setCtxMenu({ x: p.left, y: p.top });
   }, []);
 
 
@@ -754,7 +756,7 @@ export const Home: React.FC = () => {
               }
             }}
             style={{
-              position: 'fixed', left: Math.min(ctxMenu.x, window.innerWidth - 220), top: Math.min(ctxMenu.y, window.innerHeight - 420),
+              position: 'fixed', left: ctxMenu.x, top: ctxMenu.y,
               zIndex: Z_CONTEXT_MENU, minWidth: 200, padding: '5px 0',
               background: 'var(--color-bg-elevated)',
               borderRadius: 10, border: '1px solid var(--color-border-subtle)',
@@ -991,7 +993,8 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
   const handleContext = (e: React.MouseEvent, appId?: string) => {
     e.preventDefault();
     e.stopPropagation();
-    setCtxMenu({ x: e.clientX, y: e.clientY, appId });
+    const p = clampEventToViewport(e, { width: 200, height: 300 });
+    setCtxMenu({ x: p.left, y: p.top, appId });
   };
 
   const appsToShow = apps.map(a => {
@@ -1072,8 +1075,8 @@ const QuickAccessApps: React.FC<{ onLaunch: (appId: string) => void }> = ({ onLa
             role="menu"
             style={{
               position: 'fixed',
-              left: Math.min(ctxMenu.x, window.innerWidth - 200),
-              top: Math.min(ctxMenu.y, window.innerHeight - 300),
+              left: ctxMenu.x,
+              top: ctxMenu.y,
               zIndex: Z_CONTEXT_MENU,
               minWidth: 180,
               padding: '6px 0',

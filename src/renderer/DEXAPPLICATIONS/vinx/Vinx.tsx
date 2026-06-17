@@ -11,6 +11,8 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState, memo } from 'react';
+import { clampMenuToViewport, currentViewport } from '../../utils/menuPosition';
+import { CreativeSlider, SegmentedControl } from '../../components/controls';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { planSilenceRemoval } from '../../../shared/media/silenceDetect';
@@ -1150,7 +1152,7 @@ const VinxEditor: React.FC = () => {
             />
           }
           inspector={<Inspector />}
-          timeline={<Timeline onSeek={handleSeek} onClipContextMenu={(clipId, trackId, x, y) => { selectClip(clipId, false); setCtxMenu({ visible: true, x, y, clipId, trackId }); }} />}
+          timeline={<Timeline onSeek={handleSeek} onClipContextMenu={(clipId, trackId, x, y) => { selectClip(clipId, false); const p = clampMenuToViewport({ x, y }, { width: 224, height: 320 }, currentViewport()); setCtxMenu({ visible: true, x: p.left, y: p.top, clipId, trackId }); }} />}
         />
       </div>
 
@@ -1411,32 +1413,10 @@ const VinxEditor: React.FC = () => {
             <button aria-label="Close Mask Editor" style={{ ...toolbarBtnStyle, fontSize: 14, padding: 2 }} onClick={toggleMaskEditor}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              {['Ellipse', 'Rectangle', 'Pen', 'Freehand'].map(shape => (
-                <button key={shape} aria-label={`${shape} mask shape`} onClick={() => setMaskShape(shape)} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: `1px solid ${maskShape === shape ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-bg-hover)'}`, background: maskShape === shape ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'var(--color-border-subtle)', color: maskShape === shape ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{shape}</button>
-              ))}
-            </div>
-            <div style={{ marginBottom: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Feather</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{maskFeather} px</span>
-              </div>
-              <input type="range" min="0" max="100" value={maskFeather} onChange={e => setMaskFeather(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-            </div>
-            <div style={{ marginBottom: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Opacity</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{maskOpacity}%</span>
-              </div>
-              <input type="range" min="0" max="100" value={maskOpacity} onChange={e => setMaskOpacity(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-            </div>
-            <div style={{ marginBottom: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Expansion</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{maskExpansion} px</span>
-              </div>
-              <input type="range" min="-50" max="50" value={maskExpansion} onChange={e => setMaskExpansion(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-            </div>
+            <SegmentedControl options={['Ellipse', 'Rectangle', 'Pen', 'Freehand']} value={maskShape} onChange={setMaskShape} accentColor="var(--color-accent)" variant="outlined" fill size="sm" style={{ marginBottom: 10 }} />
+            <CreativeSlider label="Feather" min={0} max={100} step={1} value={maskFeather} onChange={setMaskFeather} accentColor="var(--color-accent)" unit=" px" layout="stacked" />
+            <CreativeSlider label="Opacity" min={0} max={100} step={1} value={maskOpacity} onChange={setMaskOpacity} accentColor="var(--color-accent)" unit="%" layout="stacked" />
+            <CreativeSlider label="Expansion" min={-50} max={50} step={1} value={maskExpansion} onChange={setMaskExpansion} accentColor="var(--color-accent)" unit=" px" layout="stacked" />
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               <button aria-label="Invert mask" onClick={() => setMaskInverted(!maskInverted)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: `1px solid ${maskInverted ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-bg-hover)'}`, background: maskInverted ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'var(--color-border-subtle)', color: maskInverted ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Invert</button>
               <button aria-label="Reset mask" onClick={() => { setMaskFeather(0); setMaskOpacity(100); setMaskExpansion(0); setMaskInverted(false); }} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Reset</button>
@@ -1762,36 +1742,16 @@ const VinxEditor: React.FC = () => {
               <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Select a clip to stabilize</div>
             ) : (
               <>
-                <div style={{ marginBottom: 'var(--space-2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Smoothness</span>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{stabSmoothness}%</span>
-                  </div>
-                  <input type="range" min="0" max="100" value={stabSmoothness} onChange={e => setStabSmoothness(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-                </div>
+                <CreativeSlider label="Smoothness" min={0} max={100} step={1} value={stabSmoothness} onChange={setStabSmoothness} accentColor="var(--color-accent)" unit="%" layout="stacked" />
                 <div style={{ marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Method</span>
-                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                    {['Warp', 'Position', 'Pos+Scale+Rot'].map(m => (
-                      <button key={m} onClick={() => setStabMethod(m)} aria-label={`Stabilization method: ${m}`} aria-pressed={stabMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
-                    ))}
-                  </div>
+                  <SegmentedControl options={['Warp', 'Position', 'Pos+Scale+Rot']} value={stabMethod} onChange={setStabMethod} accentColor="var(--color-accent)" variant="outlined" fill size="sm" style={{ marginTop: 4 }} />
                 </div>
                 <div style={{ marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Crop Mode</span>
-                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                    {['Auto', 'Stabilize Only', 'Smooth'].map(m => (
-                      <button key={m} onClick={() => setStabCropMode(m)} aria-label={`Stabilization crop mode: ${m}`} aria-pressed={stabCropMode === m} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: stabCropMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: stabCropMode === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
-                    ))}
-                  </div>
+                  <SegmentedControl options={['Auto', 'Stabilize Only', 'Smooth']} value={stabCropMode} onChange={setStabCropMode} accentColor="var(--color-accent)" variant="outlined" fill size="sm" style={{ marginTop: 4 }} />
                 </div>
-                <div style={{ marginBottom: 'var(--space-2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Rolling Shutter</span>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{stabRollingShutter}%</span>
-                  </div>
-                  <input type="range" min="0" max="100" value={stabRollingShutter} onChange={e => setStabRollingShutter(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-                </div>
+                <CreativeSlider label="Rolling Shutter" min={0} max={100} step={1} value={stabRollingShutter} onChange={setStabRollingShutter} accentColor="var(--color-accent)" unit="%" layout="stacked" />
                 <button onClick={() => { if (selectedClipIds.length > 0) setClipStabilization(selectedClipIds[0], { enabled: true, smoothness: stabSmoothness, method: stabMethod.toLowerCase().replace('+', '_') as any, cropMode: stabCropMode.toLowerCase().replace(' ', '_') as any, rollingShutter: stabRollingShutter }); }} aria-label="Apply stabilization" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stabilization</button>
               </>
             )}
@@ -1813,24 +1773,14 @@ const VinxEditor: React.FC = () => {
               <>
                 <div style={{ marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Method</span>
-                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                    {['Temporal', 'Spatial', 'Combined'].map(m => (
-                      <button key={m} onClick={() => setNrMethod(m)} aria-label={`Noise reduction method: ${m}`} aria-pressed={nrMethod === m} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: nrMethod === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: nrMethod === m ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
-                    ))}
-                  </div>
+                  <SegmentedControl options={['Temporal', 'Spatial', 'Combined']} value={nrMethod} onChange={setNrMethod} accentColor="var(--color-accent)" variant="outlined" fill size="sm" style={{ marginTop: 4 }} />
                 </div>
                 {[
                   { label: 'Temporal Strength', val: nrTemporal, set: setNrTemporal },
                   { label: 'Spatial Strength', val: nrSpatial, set: setNrSpatial },
                   { label: 'Detail Preservation', val: nrDetail, set: setNrDetail },
                 ].map(s => (
-                  <div key={s.label} style={{ marginBottom: 'var(--space-2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.val}%</span>
-                    </div>
-                    <input type="range" min="0" max="100" value={s.val} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-                  </div>
+                  <CreativeSlider key={s.label} label={s.label} min={0} max={100} step={1} value={s.val} onChange={s.set} accentColor="var(--color-accent)" unit="%" layout="stacked" />
                 ))}
                 <button onClick={() => { if (selectedClipIds.length > 0) setClipNoiseReduction(selectedClipIds[0], { enabled: true, temporalStrength: nrTemporal, spatialStrength: nrSpatial, detailPreservation: nrDetail, method: nrMethod.toLowerCase() as any }); }} aria-label="Apply noise reduction" style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.1)', color: 'var(--color-success)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Noise Reduction</button>
               </>
@@ -1899,17 +1849,19 @@ const VinxEditor: React.FC = () => {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[
-                { name: 'Flat', bands: [0,0,0,0,0,0] },
-                { name: 'Voice', bands: [-2,1,4,3,0,0] },
-                { name: 'Music', bands: [3,1,0,1,3,0] },
-                { name: 'Bass Boost', bands: [6,4,0,-1,-2,0] },
-                { name: 'High Cut', bands: [0,0,0,-4,-8,0] },
-              ].map(preset => (
-                <button key={preset.name} onClick={() => { setEqPreset(preset.name); setEqBands(preset.bands); }} aria-label={`EQ preset: ${preset.name}`} aria-pressed={eqPreset === preset.name} style={{ flex: 1, padding: '4px 0', borderRadius: 3, border: `1px solid ${eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'}`, background: eqPreset === preset.name ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === preset.name ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>{preset.name}</button>
-              ))}
-            </div>
+            <SegmentedControl
+              options={['Flat', 'Voice', 'Music', 'Bass Boost', 'High Cut']}
+              value={eqPreset}
+              onChange={(name) => {
+                const presetBands: Record<string, number[]> = { Flat: [0,0,0,0,0,0], Voice: [-2,1,4,3,0,0], Music: [3,1,0,1,3,0], 'Bass Boost': [6,4,0,-1,-2,0], 'High Cut': [0,0,0,-4,-8,0] };
+                setEqPreset(name);
+                if (presetBands[name]) setEqBands(presetBands[name]);
+              }}
+              accentColor="var(--color-accent)"
+              variant="outlined"
+              fill
+              size="sm"
+            />
           </div>
         </div>
       )}
@@ -1935,11 +1887,7 @@ const VinxEditor: React.FC = () => {
               </label>
             ))}
             <div style={{ marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Snap Distance</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{snapSettings.snapDistance}px</span>
-              </div>
-              <input type="range" min="2" max="30" value={snapSettings.snapDistance} onChange={e => setSnapSettings({ snapDistance: parseInt(e.target.value) })} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
+              <CreativeSlider label="Snap Distance" min={2} max={30} step={1} value={snapSettings.snapDistance} onChange={(v) => setSnapSettings({ snapDistance: v })} accentColor="var(--color-accent)" unit="px" layout="stacked" />
             </div>
           </div>
         </div>

@@ -143,7 +143,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
             {/* Message */}
             <h2 style={styles.errorTitle}>{this.props.appName} stopped working</h2>
             <p style={styles.errorMessage}>
-              {error?.message || 'An unexpected error occurred'}
+              This app ran into a problem and stopped. Your other apps and data are safe — you can reopen it to continue.
             </p>
 
             {/* Actions */}
@@ -167,13 +167,17 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
               </button>
             </div>
 
-            {/* Debug info (collapsed) */}
-            <details style={styles.errorDetails}>
-              <summary style={styles.detailsSummary}>Technical Details</summary>
-              <pre style={styles.stackTrace}>
-                {error?.stack}
-              </pre>
-            </details>
+            {/* Debug info -- DEV builds only. End users never see raw stack
+                traces; the full crash detail is still captured to the console and
+                the persisted crash log (see componentDidCatch) for diagnostics. */}
+            {import.meta.env.DEV && (
+              <details style={styles.errorDetails}>
+                <summary style={styles.detailsSummary}>Technical Details</summary>
+                <pre style={styles.stackTrace}>
+                  {error?.stack}
+                </pre>
+              </details>
+            )}
           </div>
         </div>
       );

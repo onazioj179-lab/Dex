@@ -155,7 +155,7 @@ fn set_goal(conn: &Connection, args: &Value) -> Value {
 /// updateProgress(pct): clamp 0..100, persist, return the row.
 fn update_progress(conn: &Connection, args: &Value) -> Value {
     let raw = args.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0);
-    let pct = raw.max(0.0).min(100.0);
+    let pct = raw.clamp(0.0, 100.0);
     let week_start = current_week_start(conn);
     update_progress_value(conn, &week_start, pct);
     get_current_goal(conn)

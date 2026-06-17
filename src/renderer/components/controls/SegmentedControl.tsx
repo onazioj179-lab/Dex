@@ -31,6 +31,10 @@ export interface SegmentedControlProps<T extends string> {
    * matches the creative apps' existing inline toolbar segments.
    */
   variant?: 'outlined' | 'subtle';
+  /** Stretch segments to equal width (flex:1), filling the row. */
+  fill?: boolean;
+  /** Lay segments out as a grid of N equal columns instead of a single row. */
+  columns?: number;
   size?: 'sm' | 'md';
   disabled?: boolean;
   'aria-label'?: string;
@@ -60,6 +64,8 @@ export function SegmentedControl<T extends string>({
   onChange,
   accentColor = 'var(--color-accent)',
   variant = 'outlined',
+  fill = false,
+  columns,
   size = 'sm',
   disabled = false,
   className,
@@ -72,7 +78,12 @@ export function SegmentedControl<T extends string>({
       role="group"
       aria-label={rest['aria-label']}
       className={className}
-      style={{ display: 'inline-flex', gap: 4, opacity: disabled ? 0.5 : 1, ...style }}
+      style={{
+        display: columns ? 'grid' : (fill ? 'flex' : 'inline-flex'),
+        gridTemplateColumns: columns ? `repeat(${columns}, 1fr)` : undefined,
+        width: (columns || fill) ? '100%' : undefined,
+        gap: 4, opacity: disabled ? 0.5 : 1, ...style,
+      }}
     >
       {options.map((o) => {
         const v = optionValue(o);
@@ -89,7 +100,8 @@ export function SegmentedControl<T extends string>({
             style={{
               padding: size === 'sm' ? '2px var(--space-2)' : '4px var(--space-3)',
               fontSize: 11, fontWeight: 600,
-              display: 'inline-flex', alignItems: 'center', gap: 4,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              ...(fill ? { flex: 1 } : {}),
               borderRadius: subtle ? 6 : 4,
               border: subtle ? 'none' : `1px solid ${active ? accentColor : 'var(--color-border-subtle)'}`,
               background: active ? tint : 'transparent',

@@ -234,8 +234,9 @@ function deliverAsset(
     acknowledgeDelivery(req.id);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Import failed';
+    console.error('[CreativeSuiteBridge] delivery failed:', err);
     reportDeliveryError(req.id, msg);
-    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Failed to import "${req.asset.name}" into ${appId}: ${msg}` } }));
+    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Couldn't import "${req.asset.name}" into ${appId}. Please check the file and try again.` } }));
   }
 }
 

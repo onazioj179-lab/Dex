@@ -16,7 +16,7 @@ use serde_json::{json, Map, Value};
 
 /// The `version_history` table is created by DatabaseManager (db.rs callers run
 /// each subsystem's ensure_schema). Mirror it here as CREATE TABLE IF NOT EXISTS
-/// + indexes (copied verbatim from DatabaseManager.ts) so the schema is present
+/// and indexes (copied verbatim from DatabaseManager.ts) so the schema is present
 /// even if this subsystem ensures first.
 pub fn ensure_schema(conn: &Connection) {
     let _ = conn.execute_batch(

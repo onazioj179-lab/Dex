@@ -173,7 +173,7 @@ pub fn group_by_type(root: &Path, max: usize) -> Vec<TypeGroup> {
             paths,
         })
         .collect();
-    out.sort_by(|a, b| b.count.cmp(&a.count));
+    out.sort_by_key(|b| std::cmp::Reverse(b.count));
     out
 }
 

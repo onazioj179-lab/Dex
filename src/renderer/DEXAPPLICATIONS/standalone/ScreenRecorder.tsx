@@ -130,8 +130,8 @@ const ScreenRecorder: React.FC = () => {
         setElapsed(prev => prev + 1);
       }, 1000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMsg(`Capture failed: ${msg}`);
+      console.error('[ScreenRecorder] capture failed:', err);
+      setErrorMsg('Screen capture failed. Please check recording permissions and try again.');
       cleanupStream();
       setState('idle');
     }

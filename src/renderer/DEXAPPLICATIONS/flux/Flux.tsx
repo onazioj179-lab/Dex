@@ -12,6 +12,8 @@ import { useCollaborationFeatures, collabButtonStyles } from '../../hooks/useCol
 import DexIcon from '../../components/DexIcon';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import { ResizablePanel } from '../../components/ResizablePanel';
+import { CreativeSlider } from '../../components/controls';
+import { clampEventToViewport } from '../../utils/menuPosition';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAutoSave, loadAutoSave } from '../../utils/useAutoSave';
 import { useAppTracking } from '../../services/usePatternLearning';
@@ -2266,10 +2268,6 @@ const Flux: React.FC = () => {
     modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
     libraryGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' },
     libraryItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', background: 'var(--color-bg-hover)', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
-    sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },
-    sliderLabel: { width: '70px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
-    slider: { flex: 1, accentColor: '#bf5af2' },
-    sliderValue: { width: '36px', fontSize: '11px', textAlign: 'right', color: '#bf5af2', fontFamily: 'var(--font-mono)', fontWeight: 600 },
   }), [showTimeline, timelineHeight, isTimelineResizing]);
 
   return (
@@ -2869,31 +2867,11 @@ const Flux: React.FC = () => {
                 {activeTab === 'inspector' && selectedLayer && (
                   <div>
                     <div style={{ marginBottom: 'var(--space-3)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Transform</div>
-                    <div style={styles.sliderRow}>
-                      <span style={styles.sliderLabel}>Position X</span>
-                      <input type="range" min="0" max={canvasSize.width} value={selectedLayer.transform.x} style={styles.slider} onChange={(e) => updateLayerTransform({ x: Number(e.target.value) })} />
-                      <span style={styles.sliderValue}>{Math.round(selectedLayer.transform.x)}</span>
-                    </div>
-                    <div style={styles.sliderRow}>
-                      <span style={styles.sliderLabel}>Position Y</span>
-                      <input type="range" min="0" max={canvasSize.height} value={selectedLayer.transform.y} style={styles.slider} onChange={(e) => updateLayerTransform({ y: Number(e.target.value) })} />
-                      <span style={styles.sliderValue}>{Math.round(selectedLayer.transform.y)}</span>
-                    </div>
-                    <div style={styles.sliderRow}>
-                      <span style={styles.sliderLabel}>Scale</span>
-                      <input type="range" min="0" max="400" value={selectedLayer.transform.scaleX} style={styles.slider} onChange={(e) => { const v = Number(e.target.value); updateLayerTransform({ scaleX: v, scaleY: v }); }} />
-                      <span style={styles.sliderValue}>{selectedLayer.transform.scaleX}%</span>
-                    </div>
-                    <div style={styles.sliderRow}>
-                      <span style={styles.sliderLabel}>Rotation</span>
-                      <input type="range" min="-180" max="180" value={selectedLayer.transform.rotationZ} style={styles.slider} onChange={(e) => updateLayerTransform({ rotationZ: Number(e.target.value) })} />
-                      <span style={styles.sliderValue}>{selectedLayer.transform.rotationZ}</span>
-                    </div>
-                    <div style={styles.sliderRow}>
-                      <span style={styles.sliderLabel}>Opacity</span>
-                      <input type="range" min="0" max="100" value={selectedLayer.transform.opacity} style={styles.slider} onChange={(e) => updateLayerTransform({ opacity: Number(e.target.value) })} />
-                      <span style={styles.sliderValue}>{selectedLayer.transform.opacity}%</span>
-                    </div>
+                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Position X" min={0} max={canvasSize.width} value={selectedLayer.transform.x} displayValue={Math.round(selectedLayer.transform.x)} onChange={(v) => updateLayerTransform({ x: v })} />
+                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Position Y" min={0} max={canvasSize.height} value={selectedLayer.transform.y} displayValue={Math.round(selectedLayer.transform.y)} onChange={(v) => updateLayerTransform({ y: v })} />
+                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Scale" min={0} max={400} value={selectedLayer.transform.scaleX} unit="%" onChange={(v) => updateLayerTransform({ scaleX: v, scaleY: v })} />
+                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Rotation" min={-180} max={180} value={selectedLayer.transform.rotationZ} onChange={(v) => updateLayerTransform({ rotationZ: v })} />
+                    <CreativeSlider accentColor="#bf5af2" labelWidth={70} label="Opacity" min={0} max={100} value={selectedLayer.transform.opacity} unit="%" onChange={(v) => updateLayerTransform({ opacity: v })} />
                     
                     {/* Easing curve editor */}
                     <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Easing</div>
@@ -3043,7 +3021,7 @@ const Flux: React.FC = () => {
                       key={layer.id}
                       style={{ ...styles.layerItem, ...(selectedLayerId === layer.id ? styles.layerItemSelected : {}) }}
                       onClick={() => setSelectedLayerId(layer.id)}
-                      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layer.id); setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, layerId: layer.id }); }}
+                      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layer.id); const p = clampEventToViewport(e); setCtxMenu({ visible: true, x: p.left, y: p.top, layerId: layer.id }); }}
                     >
                       <button style={styles.iconBtn} onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }} aria-label={`Toggle ${layer.name} visibility`}>
                         {layer.visible ? Icons.eye : Icons.eyeOff}

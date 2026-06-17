@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { clampEventToViewport } from '../../utils/menuPosition';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
@@ -1299,7 +1300,7 @@ const AXL: React.FC = () => {
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
             onWheel={handleWheel}
-            onContextMenu={e => { e.preventDefault(); setCtxMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
+            onContextMenu={e => { e.preventDefault(); const p = clampEventToViewport(e); setCtxMenu({ visible: true, x: p.left, y: p.top }); }}
             style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none', imageRendering: 'auto' }}
           />
 

@@ -112,6 +112,9 @@ fn num_or_null(n: f64) -> Value {
 
 /// Pure sunrise/sunset computation (matches computeSunTimes verbatim): simplified
 /// declination + hour-angle model returning "HH:MM" strings, clamped to [0,23.99].
+// max/min (not clamp): at the poles tan(±90°) is ±inf and a NaN can arise; the
+// max/min chain folds those to the bound, whereas f64::clamp would propagate NaN.
+#[allow(clippy::manual_clamp)]
 fn compute_sun_times(lat: f64, lon: f64) -> (String, String) {
     use std::f64::consts::PI;
 
@@ -134,6 +137,9 @@ fn compute_sun_times(lat: f64, lon: f64) -> (String, String) {
 }
 
 /// h -> "HH:MM" clamped into [0, 23.99] (matches the TS `clamp` closure).
+// max/min (not f64::clamp): keeps a NaN hour folded to a bound rather than
+// propagating NaN into the formatted time (see compute_sun_times note).
+#[allow(clippy::manual_clamp)]
 fn clamp_time(h: f64) -> String {
     let clamped = h.max(0.0).min(23.99);
     let hours = clamped.floor() as i64;

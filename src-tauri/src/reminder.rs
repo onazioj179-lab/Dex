@@ -134,8 +134,7 @@ fn create(conn: &Connection, params_obj: &Value) -> Value {
 
     let id = conn.last_insert_rowid();
     let sql = format!("{} WHERE id = ?", SELECT_ALL);
-    let out = conn.query_row(&sql, params![id], row_to_json).unwrap_or(Value::Null);
-    out
+    conn.query_row(&sql, params![id], row_to_json).unwrap_or(Value::Null)
 }
 
 /// reminder:getAll — getAll(includeCompleted=false). Returns Reminder[].

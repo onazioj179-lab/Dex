@@ -98,7 +98,8 @@ const SendToMenu: React.FC<SendToMenuProps> = ({ sourceApp, assetKind, getAsset,
       if (!detail) return;
       const { status, error } = detail as { requestId: string; status: string; error?: string };
       if (status === 'failed' && error) {
-        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Delivery failed: ${error}` } }));
+        console.warn('[SendToMenu] delivery failed:', error);
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Could not deliver to the target app. Please try again.' } }));
       }
     };
     window.addEventListener('dex-creative-ack', handler);

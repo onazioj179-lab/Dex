@@ -101,6 +101,10 @@ const SELECT_COLS: &str =
     "SELECT id, name, widgets, is_default, created_at, updated_at FROM dashboard_layouts";
 
 /// Fetch a single layout by id, or null (matches getLayout).
+// `let out` then return it (not a bare tail expr): the binding drops the
+// stmt-borrowing iterator before `stmt` does -- inlining trips "stmt does not
+// live long enough" (confirmed). Same pattern in get_default below.
+#[allow(clippy::let_and_return)]
 fn get_layout(conn: &Connection, id: i64) -> Value {
     let sql = format!("{} WHERE id = ?", SELECT_COLS);
     let mut stmt = match conn.prepare(&sql) {
@@ -132,6 +136,7 @@ fn get_layouts(conn: &Connection) -> Value {
 }
 
 /// Default layout, or null (matches getDefaultLayout).
+#[allow(clippy::let_and_return)] // see get_layout: binding drops the borrow before stmt
 fn get_default(conn: &Connection) -> Value {
     let sql = format!("{} WHERE is_default = 1", SELECT_COLS);
     let mut stmt = match conn.prepare(&sql) {

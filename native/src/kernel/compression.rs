@@ -23,12 +23,14 @@ use zstd;
 
 #[napi]
 #[derive(Debug, PartialEq, Eq)]
+#[derive(Default)]
 pub enum CompressionAlgorithm {
     /// Fast compression similar to LZ4 - best for small blocks < 4KB
     /// 2-3x faster than balanced, lower ratio
     Fast = 0,
     /// Balanced compression similar to LZFSE - recommended default
     /// Matches zlib-5 ratio at 2-3x speed
+    #[default]
     Balanced = 1,
     /// High ratio similar to LZMA - best for archival
     /// Slower but maximum compression
@@ -37,11 +39,6 @@ pub enum CompressionAlgorithm {
     Adaptive = 3,
 }
 
-impl Default for CompressionAlgorithm {
-    fn default() -> Self {
-        CompressionAlgorithm::Balanced
-    }
-}
 
 #[napi]
 #[derive(Debug, PartialEq, Eq)]
@@ -454,11 +451,7 @@ pub fn get_ram_compression_stats() -> RamCompressionStats {
         1.0
     };
     
-    let saved = if uncompressed > compressed {
-        uncompressed - compressed
-    } else {
-        0
-    };
+    let saved = uncompressed.saturating_sub(compressed);
     
     RamCompressionStats {
         total_uncompressed: uncompressed as f64,
