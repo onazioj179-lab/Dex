@@ -50,9 +50,7 @@ export function renderMarkdownLite(src: string): string {
   return out.join('\n');
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
+import { escapeHtml } from '../../shared/util/text';
 
 function safeUrl(url: string): string {
   const t = url.trim().toLowerCase();

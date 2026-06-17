@@ -15,6 +15,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { Folder, NoteListItem, NoteAttachment, NoteTemplate, SortField, SortDirection, ViewMode, EditorMode } from '../../store/notesStore';
 import { useFocusTrap } from '../../utils/useFocusTrap';
+import { formatBytes as sharedFormatBytes } from '../../../shared/format/units';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../../components/ContextMenu';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
 
@@ -1242,11 +1243,7 @@ export const AttachmentPanel: React.FC<AttachmentPanelProps> = memo(({
   onRemove,
   onOpen,
 }) => {
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
+  const formatSize = (bytes: number) => sharedFormatBytes(bytes);
 
   return (
     <div style={{ padding: 'var(--space-2) var(--space-3)' }}>

@@ -1636,14 +1636,8 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   return { r, g, b };
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : { r: 0, g: 0, b: 0 };
-}
+import { hexToRgb as sharedHexToRgb } from '../../../shared/creative/colorUtils';
+function hexToRgb(hex: string): { r: number; g: number; b: number } { return sharedHexToRgb(hex) ?? { r: 0, g: 0, b: 0 }; }
 
 function gaussianBlur(imageData: ImageData, radius: number): ImageData {
   const result = new ImageData(

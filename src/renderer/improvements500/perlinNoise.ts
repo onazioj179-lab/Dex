@@ -36,9 +36,7 @@ function fade(t: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + t * (b - a);
-}
+import { lerp } from '../../shared/math/num';
 
 function grad2(hash: number, x: number, y: number): number {
   const h = hash & 7;

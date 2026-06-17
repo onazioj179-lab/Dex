@@ -1925,14 +1925,8 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : { r: 0, g: 0, b: 0 };
-}
+import { hexToRgb as sharedHexToRgb } from '../../../shared/creative/colorUtils';
+function hexToRgb(hex: string): { r: number; g: number; b: number } { return sharedHexToRgb(hex) ?? { r: 0, g: 0, b: 0 }; }
 
 function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
   r /= 255; g /= 255; b /= 255;

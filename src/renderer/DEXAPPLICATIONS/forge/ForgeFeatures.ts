@@ -539,19 +539,13 @@ export function detectGPUCapabilities(): HardwareInfo {
 
 // ==================== UTILITY FUNCTIONS ====================
 
-// Generate unique ID
-export const generateId = (prefix: string = 'job'): string => {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
+// Generate unique ID -- thin app default over the shared canonical
+import { generateId as sharedGenerateId } from '../../../shared/util/id';
+export const generateId = (prefix: string = 'job'): string => sharedGenerateId(prefix);
 
 // Format file size
-export const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
+import { formatBytes as formatFileSize } from '../../../shared/format/units';
+export { formatFileSize };
 
 // Format duration
 export const formatDuration = (seconds: number): string => {

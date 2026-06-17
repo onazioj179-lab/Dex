@@ -8,13 +8,8 @@
  * smoothstep / wrap / modulo). Hot-path safe; no allocations.
  */
 
-export function clamp(value: number, min: number, max: number): number {
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
-
-export function lerp(a: number, b: number, t: number): number { return a + (b - a) * t; }
+import { clamp, lerp } from '../../shared/math/num';
+export { clamp, lerp };
 
 export function inverseLerp(a: number, b: number, value: number): number {
   if (a === b) return 0;

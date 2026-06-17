@@ -303,10 +303,9 @@ export const COMPOSITION_PRESETS = [
 
 // ==================== UTILITY FUNCTIONS ====================
 
-// Generate unique ID
-export const generateId = (prefix: string = 'id'): string => {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
+// Generate unique ID -- thin app default over the shared canonical
+import { generateId as sharedGenerateId } from '../../../shared/util/id';
+export const generateId = (prefix: string = 'id'): string => sharedGenerateId(prefix);
 
 // Calculate bezier curve value
 export const cubicBezier = (t: number, p0: number, p1: number, p2: number, p3: number): number => {

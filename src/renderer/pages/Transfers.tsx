@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useToastHelpers } from '../components/Toast';
+import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 
 // QR Code encoder — Version 1-4 byte mode with L error correction (item 108)
@@ -588,12 +589,7 @@ const Transfers: React.FC = () => {
   }, [activeTab, devices]);
 
   // Utils
-  const formatSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  };
+  const formatSize = (bytes: number): string => sharedFormatBytes(bytes);
 
   const formatSpeed = (bytesPerSec: number): string => {
     if (bytesPerSec < 1024 * 1024) return `${(bytesPerSec / 1024).toFixed(0)} KB/s`;

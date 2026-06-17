@@ -238,7 +238,7 @@ interface LifecycleManagerState {
   getProcessCount: () => number;
 }
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+import { generateId } from '../../shared/util/id';
 
 export const useLifecycleManager = create<LifecycleManagerState>()(
   persist(

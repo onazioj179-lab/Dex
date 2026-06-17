@@ -34,6 +34,16 @@ export function formatDuration(ms: number): string {
   return `${secs}s`;
 }
 
+/** "1:23" / "1:23:45" -- a media-player clock from a SECONDS value (rolls to hours). */
+export function formatClock(seconds: number): string {
+  const total = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 /** "just now", "5m ago", "3h ago", "2d ago", or a date for older. */
 export function formatRelativeTime(ts: number, now: number = Date.now()): string {
   const diff = now - ts;

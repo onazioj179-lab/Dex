@@ -1760,9 +1760,7 @@ export class AudioEngine {
 // HELPER FUNCTIONS
 // =============================================================================
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+import { generateId } from '../../../shared/util/id';
 
 function createDefaultEffect(type: AudioEffectType): AudioEffect {
   switch (type) {
