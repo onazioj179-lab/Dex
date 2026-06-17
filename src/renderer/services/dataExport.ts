@@ -197,7 +197,8 @@ export function importData(jsonString: string): ImportResult {
           localStorage.setItem(section.storageKey, JSON.stringify(data[section.key]));
           imported++;
         } catch (e: any) {
-          errors.push(`Failed to import ${section.label}: ${e.message}`);
+          console.warn(`[dataExport] failed to import ${section.label}:`, e);
+          errors.push(`Couldn't import ${section.label}.`);
           skipped++;
         }
       }
@@ -205,7 +206,8 @@ export function importData(jsonString: string): ImportResult {
 
     return { success: true, imported, skipped, errors, timestamp: Date.now() };
   } catch (e: any) {
-    return { success: false, imported: 0, skipped: 0, errors: [`Parse error: ${e.message}`], timestamp: Date.now() };
+    console.error('[dataExport] import parse failed:', e);
+    return { success: false, imported: 0, skipped: 0, errors: ['Could not read the backup file — it may be corrupt or invalid.'], timestamp: Date.now() };
   }
 }
 

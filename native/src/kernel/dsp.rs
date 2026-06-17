@@ -400,7 +400,7 @@ pub fn dsp_convolve(samples: Vec<f64>, impulse: Vec<f64>, mix: f64) -> Vec<f64> 
         let output: Vec<f64> = (0..out_len)
             .into_par_iter()
             .map(|i| {
-                let start = if i >= ir_len - 1 { i - (ir_len - 1) } else { 0 };
+                let start = i.saturating_sub(ir_len - 1);
                 let end = i.min(n - 1);
                 let mut sum = 0.0;
                 for j in start..=end {

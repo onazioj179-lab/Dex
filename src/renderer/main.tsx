@@ -316,9 +316,9 @@ class RootErrorBoundary extends React.Component<
           }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff453a" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>DEX encountered a critical error</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>DEX needs to restart</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', maxWidth: 400, textAlign: 'center' }}>
-            {this.state.error?.message || 'Unknown error'}
+            Something went wrong and DEX has to reload. Your data is safe — reloading will restore your workspace.
           </div>
           <button
             onClick={() => window.location.reload()}

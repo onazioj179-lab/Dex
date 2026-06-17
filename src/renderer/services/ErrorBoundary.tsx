@@ -450,21 +450,24 @@ const CrashScreen: React.FC<CrashScreenProps> = ({
           </button>
         </div>
 
-        {/* Debug info */}
-        <details style={styles.details}>
-          <summary style={styles.summary}>Technical Details</summary>
-          <pre style={styles.pre}>
-            <strong>Instance:</strong> {instanceId.slice(-12)}{'\n'}
-            <strong>Error:</strong> {error?.name || 'Unknown'}{'\n'}
-            <strong>Message:</strong> {error?.message || 'No message'}{'\n'}
-            {error?.stack && (
-              <>
-                <strong>Stack:</strong>{'\n'}
-                {error.stack.split('\n').slice(0, 5).join('\n')}
-              </>
-            )}
-          </pre>
-        </details>
+        {/* Debug info -- DEV builds only. End users never see raw stack traces;
+            the crash is still logged internally for diagnostics. */}
+        {import.meta.env.DEV && (
+          <details style={styles.details}>
+            <summary style={styles.summary}>Technical Details</summary>
+            <pre style={styles.pre}>
+              <strong>Instance:</strong> {instanceId.slice(-12)}{'\n'}
+              <strong>Error:</strong> {error?.name || 'Unknown'}{'\n'}
+              <strong>Message:</strong> {error?.message || 'No message'}{'\n'}
+              {error?.stack && (
+                <>
+                  <strong>Stack:</strong>{'\n'}
+                  {error.stack.split('\n').slice(0, 5).join('\n')}
+                </>
+              )}
+            </pre>
+          </details>
+        )}
       </div>
     </div>
   );

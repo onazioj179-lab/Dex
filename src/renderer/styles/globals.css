@@ -171,12 +171,17 @@ html[data-thermal-state="critical"] *::after {
 html[data-thermal-state="critical"] [data-decorative="true"] { display: none !important; }
 
 
-/* ── Focus-Visible Ring (Tahoe a11y) ──────────────────────────────────────── */
-/* CRITICAL: Use !important to override inline `outline: none` styles scattered
-   across the codebase. This ensures keyboard users always see focus indicators
-   while mouse users get the clean look developers intended. */
+/* ── Focus-Visible Ring (Tahoe a11y) — SINGLE SOURCE OF TRUTH ─────────────────
+   The one canonical keyboard-focus ring for the whole app. Outline (not
+   box-shadow) so it can never be clipped by overflow:hidden / rounded-clip
+   ancestors, which are pervasive in the windowed UI; theme-aware via
+   --color-accent. !important is required to beat the inline `outline: none`
+   styles scattered across inline-styled controls. Component- and media-scoped
+   variants (high-contrast, dark-mode, .dex-menu-item, range thumb, etc.) layer
+   on top by higher specificity. Do NOT add more bare `:focus-visible` blocks —
+   the previous duplicates fought over the cascade and produced a doubled ring. */
 :focus-visible {
-  outline: 2px solid rgba(74, 158, 255, 0.55) !important;
+  outline: 2px solid var(--color-accent, #4a9eff) !important;
   outline-offset: 2px !important;
   border-radius: var(--radius-sm);
 }
@@ -184,15 +189,14 @@ html[data-thermal-state="critical"] [data-decorative="true"] { display: none !im
   outline: none !important;
 }
 
-/* Specific focus styles for interactive elements */
-button:focus-visible,
-[role="button"]:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--color-accent, rgba(74, 158, 255, 0.55)) !important;
-  outline-offset: 2px !important;
+/* ── Narrow-window top bar ────────────────────────────────────────────────────
+   On small screens the title bar runs out of room and the window controls
+   (close / minimize / maximize) used to overflow off the right edge, leaving no
+   way to close or move apps. Collapse the secondary status cluster (battery,
+   wifi, permission pills) first — it stays reachable from the control-center
+   popover — so the essential controls always fit. */
+@media (max-width: 640px) {
+  .dex-topbar-secondary { display: none !important; }
 }
 
 /* Custom focus ring for checkbox/radio to match design */
@@ -3730,15 +3734,8 @@ select option {
   padding: 6px 10px;
 }
 
-/* Subtle focus ring that feels native */
-:focus-visible {
-  outline: 2px solid rgba(10, 132, 255, 0.6);
-  outline-offset: 1px;
-  border-radius: inherit;
-}
-:focus:not(:focus-visible) {
-  outline: none;
-}
+/* Keyboard focus ring is defined once, near the top of this file (search
+   "SINGLE SOURCE OF TRUTH"). Duplicate bare :focus-visible block removed. */
 
 /* Loading cursor for async operations */
 [data-loading="true"] {
@@ -4665,13 +4662,11 @@ input[type="range"]:hover::-webkit-slider-thumb {
    nothing in the product used; DEX motion is functional only (state changes,
    entrances), 150-220ms on the standard curve. */
 
-/* Keyboard focus ring -- single canonical ring from the token layer
-   (theme-aware; --dex-focus-ring flips with light mode). !important is
-   intentional: it must beat inline `outline: none` for accessibility. */
-:focus-visible {
-  outline: none;
-  box-shadow: var(--dex-focus-ring, 0 0 0 2px #0c0c0e, 0 0 0 4px #4a9eff) !important;
-}
+/* Keyboard focus ring is the outline-based canonical near the top of this file
+   ("SINGLE SOURCE OF TRUTH"); this box-shadow variant was removed because it
+   could be clipped by overflow:hidden ancestors and fought the outline rule for
+   the cascade. The --dex-focus-ring token remains for the opt-in .dex-focusable
+   utility (see design-tokens.css). */
 
 /* Smooth tooltip animations */
 @keyframes tooltipFadeIn {
@@ -5112,11 +5107,8 @@ html.focus-mode,
   display: none !important;
 }
 
-/* Enhanced focus indicators for keyboard navigation */
-:focus-visible {
-  outline: 2px solid var(--color-accent, #4a9eff) !important;
-  outline-offset: 2px !important;
-}
+/* Keyboard focus ring: see the canonical block ("SINGLE SOURCE OF TRUTH").
+   Duplicate bare :focus-visible block removed. */
 
 /* Skip link for screen readers */
 .dex-skip-link {
@@ -5705,26 +5697,10 @@ html[style*="font-size: 120"] * {
    ACCESSIBILITY ENHANCEMENTS
    ============================================================================= */
 
-/* Focus visible styles for keyboard navigation */
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-/* Skip focus ring for mouse users */
-:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* High contrast focus for important controls */
-button:focus-visible,
-[role="button"]:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.2);
-}
+/* Keyboard focus ring + mouse-focus reset are defined once near the top of this
+   file ("SINGLE SOURCE OF TRUTH"). These duplicate :focus-visible / button
+   blocks were removed; the genuinely-scoped high-contrast and dark-mode
+   overrides remain below. */
 
 /* Screen reader only text */
 .sr-only,

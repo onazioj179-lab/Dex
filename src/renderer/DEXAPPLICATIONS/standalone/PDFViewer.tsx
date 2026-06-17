@@ -95,7 +95,8 @@ const PDFViewer: React.FC = () => {
       setDocKey(digest);
       setPage(1);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
+      console.error('[PDFViewer] open failed:', err);
+      setErrorMsg('Could not open this PDF. The file may be unsupported or unavailable.');
     }
   }, []);
 

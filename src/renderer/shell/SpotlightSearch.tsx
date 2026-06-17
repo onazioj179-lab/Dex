@@ -289,7 +289,8 @@ const VoiceMicButton: React.FC<VoiceMicButtonProps> = memo(({ onTranscript }) =>
       // Tell the user we're listening so the click isn't silent
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Listening… speak now', duration: 1500 } }));
     } catch (err: any) {
-      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `Could not start voice search: ${err?.message || err}` } }));
+      console.warn('[Spotlight] voice search failed:', err);
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Voice search is not available right now. Please try again.' } }));
       setListening(false);
     }
   }, [onTranscript]);

@@ -164,7 +164,7 @@ impl NotificationStore {
             .values()
             .filter(|n| n.persistent && !n.dismissed)
             .collect();
-        persistent.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        persistent.sort_by_key(|a| a.timestamp);
         let start = persistent.len().saturating_sub(self.config.persistent_history_limit);
         let keep = &persistent[start..];
         let _ = std::fs::create_dir_all(&self.data_dir);
@@ -211,7 +211,7 @@ impl NotificationStore {
             .values()
             .map(|n| (n.id.clone(), n.timestamp, n.persistent))
             .collect();
-        by_age.sort_by(|a, b| a.1.cmp(&b.1)); // oldest first
+        by_age.sort_by_key(|a| a.1); // oldest first
         let mut over = self.notifications.len().saturating_sub(self.config.max_notifications);
         for (id, _, persistent) in by_age {
             if over == 0 {
@@ -333,7 +333,7 @@ impl NotificationStore {
             .filter(|n| !n.dismissed && Self::matches_filter(n, filter))
             .cloned()
             .collect();
-        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        results.sort_by_key(|b| std::cmp::Reverse(b.timestamp));
         results
     }
 

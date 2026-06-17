@@ -6,87 +6,12 @@
 // =============================================================================
 /**
  * Component Library Index
- * 
- * Central export for all reusable UI components.
- * Import from '@/components' or '../components'
+ *
+ * Central export for reusable UI components. The 2026-06-16 code-health pass
+ * removed nine never-imported library modules (PageTransition, ScrollEnhancements,
+ * SmoothZoom, CollapsiblePanel, EnhancedKnob, NumberInput, ColorPicker,
+ * RichTextInput, HelpOverlay); ResizablePanel is the live survivor.
  */
-
-// ---------------------------------------------------------------------------
-// Layout & Panels
-// ---------------------------------------------------------------------------
-
-export {
-  CollapsiblePanel,
-  PanelToggleButton,
-  type CollapsiblePanelProps,
-} from './CollapsiblePanel';
-
-// ---------------------------------------------------------------------------
-// Navigation & Transitions
-// ---------------------------------------------------------------------------
-
-export {
-  PageTransition,
-  FadeIn,
-  Stagger,
-  type PageTransitionProps,
-} from './PageTransition';
-
-// ---------------------------------------------------------------------------
-// Scroll & Containers
-// ---------------------------------------------------------------------------
-
-export {
-  ScrollContainer,
-  MomentumScroll,
-  useStickyHeader,
-  type ScrollContainerProps,
-} from './ScrollEnhancements';
-
-// ---------------------------------------------------------------------------
-// Zoom & Pan
-// ---------------------------------------------------------------------------
-
-export {
-  SmoothZoomProvider,
-  ZoomContainer,
-  ZoomControls,
-  useSmoothZoom,
-  useZoomKeyboard,
-  type Transform,
-  type ZoomBounds,
-  type SmoothZoomProviderProps,
-  type ZoomContainerProps,
-  type ZoomControlsProps,
-} from './SmoothZoom';
-
-// ---------------------------------------------------------------------------
-// Controls & Inputs
-// ---------------------------------------------------------------------------
-
-export {
-  EnhancedKnob,
-  EnhancedSlider,
-  type EnhancedKnobProps,
-  type EnhancedSliderProps,
-} from './EnhancedKnob';
-
-export {
-  NumberInput,
-  CoordinateInput,
-  SizeInput,
-  type NumberInputProps,
-  type CoordinateInputProps,
-  type SizeInputProps,
-} from './NumberInput';
-
-export {
-  ColorPicker,
-  useRecentColors,
-  type ColorPickerProps,
-  type HSLColor,
-  type RGBColor,
-} from './ColorPicker';
 
 // ---------------------------------------------------------------------------
 // Resizable Panels
@@ -98,27 +23,3 @@ export {
   type ResizablePanelProps,
   type ResizeDirection,
 } from './ResizablePanel';
-
-// ---------------------------------------------------------------------------
-// Text Editing
-// ---------------------------------------------------------------------------
-
-export {
-  RichTextInput,
-  useFindReplace,
-  type RichTextInputProps,
-  type RichTextInputRef,
-  type TextStats,
-  type Selection,
-  type FindReplaceState,
-} from './RichTextInput';
-
-// ---------------------------------------------------------------------------
-// Help & Onboarding
-// ---------------------------------------------------------------------------
-
-export {
-  HelpOverlay,
-  HelpTooltip,
-  useHelp,
-} from './HelpOverlay';

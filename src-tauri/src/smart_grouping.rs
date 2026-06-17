@@ -224,7 +224,7 @@ fn run_grouping(conn: &Connection, now: i64) -> Value {
             // over insertion order, descending by frequency.
             let mut entries: Vec<(String, i64)> =
                 freq_order.iter().map(|w| (w.clone(), word_freq[w])).collect();
-            entries.sort_by(|a, b| b.1.cmp(&a.1));
+            entries.sort_by_key(|b| std::cmp::Reverse(b.1));
             let top_words: Vec<String> =
                 entries.into_iter().take(3).map(|(w, _)| w).collect();
 

@@ -35,7 +35,7 @@ impl WriteCoalescer {
     }
 
     fn enqueue(&self, path: String, offset: u64, data: Vec<u8>) {
-        let mut entry = self.pending.entry(path).or_insert_with(Vec::new);
+        let mut entry = self.pending.entry(path).or_default();
         entry.push(WriteEntry { offset, data });
         if entry.len() >= self.max_batch {
             COALESCED_WRITES.fetch_add(1, Ordering::Relaxed);
@@ -184,6 +184,9 @@ pub async fn kernel_flush_writes(path: Option<String>) -> napi::Result<u32> {
         let mut file = tokio::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            // Positional seek+write below relies on the existing bytes staying
+            // put, so do NOT truncate (this makes the existing default explicit).
+            .truncate(false)
             .open(&file_path)
             .await
             .map_err(|e| napi::Error::from_reason(format!("open failed: {}", e)))?;
@@ -234,7 +237,7 @@ pub async fn kernel_prefetch_files(paths: Vec<String>) -> napi::Result<u32> {
         let sem = sem.clone();
         tokio::spawn(async move {
             let _permit = sem.acquire_owned().await
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
             if get_read_cache().get(&p).is_some() {
                 return Ok::<bool, std::io::Error>(false); // already cached
             }
@@ -267,7 +270,7 @@ pub async fn kernel_batch_stat(paths: Vec<String>) -> napi::Result<Vec<String>> 
         let sem = sem.clone();
         tokio::spawn(async move {
             let _permit = sem.acquire_owned().await
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "semaphore closed"))?;
+                .map_err(|_| std::io::Error::other("semaphore closed"))?;
             match tokio::fs::metadata(&p).await {
                 Ok(m) => Ok::<String, std::io::Error>(format!(
                     "{{\"path\":{},\"size\":{},\"exists\":true,\"isDir\":{}}}",

@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { clampEventToViewport } from '../utils/menuPosition';
 import { useAppTracking, useFileTracking } from '../services/usePatternLearning';
 import DexIcon from '../components/DexIcon';
 import { useToastHelpers } from '../components/Toast';
@@ -675,10 +676,8 @@ export const Files: React.FC = () => {
   const handleFileContextMenu = (e: React.MouseEvent, file: FileItem) => {
     e.preventDefault();
     e.stopPropagation();
-    const menuW = 200, menuH = 280;
-    const x = Math.min(e.clientX, window.innerWidth - menuW);
-    const y = Math.min(e.clientY, window.innerHeight - menuH);
-    setContextMenu({ x, y, file });
+    const { left, top } = clampEventToViewport(e, { width: 200, height: 280 });
+    setContextMenu({ x: left, y: top, file });
   };
 
   const handleCopyFile = (file: FileItem) => {

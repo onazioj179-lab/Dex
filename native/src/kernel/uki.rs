@@ -67,7 +67,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
 
     let mut prev = vec![0usize; n + 1];
     let mut curr = vec![0usize; n + 1];
-    for j in 0..=n { prev[j] = j; }
+    for (j, p) in prev.iter_mut().enumerate() { *p = j; }
 
     for i in 1..=m {
         curr[0] = i;
@@ -311,12 +311,9 @@ fn parse_intent(raw: &str) -> ParsedIntent {
     for pat in patterns.iter() {
         let mut matched = 0usize;
         for kw in &pat.keywords {
-            // Exact token match
-            if tokens.iter().any(|t| t == kw) {
-                matched += 1;
-            }
-            // Also check substring for multi-word tokens
-            else if lower.contains(kw) {
+            // Count a keyword as matched on an exact token hit OR a substring hit
+            // (the latter covers multi-word tokens).
+            if tokens.iter().any(|t| t == kw) || lower.contains(kw) {
                 matched += 1;
             }
         }
@@ -748,7 +745,7 @@ fn memory_search<'a>(archive: &'a MemoryArchive, query: &str, limit: usize) -> V
 }
 
 /// Get recent context for hybrid recall (auto-injected into NLU pipeline).
-fn memory_recent_context<'a>(archive: &'a MemoryArchive, limit: usize) -> Vec<&'a MemoryRecord> {
+fn memory_recent_context(archive: &MemoryArchive, limit: usize) -> Vec<&MemoryRecord> {
     let mut recent: Vec<&MemoryRecord> = archive.records.iter().collect();
     recent.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     recent.truncate(limit);
@@ -804,7 +801,7 @@ pub fn uki_knowledge_load() -> napi::Result<String> {
 pub fn uki_knowledge_save() -> napi::Result<()> {
     let knowledge = get_knowledge();
     let read = knowledge.read();
-    save_knowledge_encrypted(&*read)
+    save_knowledge_encrypted(&read)
         .map_err(|e| napi::Error::from_reason(format!("Knowledge save failed: {}", e)))?;
     Ok(())
 }

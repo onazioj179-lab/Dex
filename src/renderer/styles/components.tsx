@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, forwardRef } from 'react';
+import { clampEventToViewport } from '../utils/menuPosition';
 import { space, radius, fontSize, iconSize, zIndex, transition, padding, colors, button as buttonTokens, input as inputTokens, modal as modalTokens, emptyState as emptyStateTokens } from './tokens';
 
 // ---------------------------------------------------------------------------
@@ -3785,12 +3786,8 @@ export const DexContextMenu: React.FC<DexContextMenuProps> = ({
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    
-    // Calculate position to stay within viewport
-    const x = Math.min(e.clientX, window.innerWidth - 200);
-    const y = Math.min(e.clientY, window.innerHeight - 300);
-    
-    setPosition({ x, y });
+    const { left, top } = clampEventToViewport(e, { width: 200, height: 300 });
+    setPosition({ x: left, y: top });
     setOpen(true);
   };
 

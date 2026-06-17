@@ -18,6 +18,7 @@
 //!     DB layer, so they contribute no results.
 //!   - Rewind Journal scans userData/rewind/*.json on disk — no fs index in this
 //!     layer, so it contributes no results.
+//!
 //! In every case a missing/unavailable source yields an empty list, exactly as
 //! the TS Promise.allSettled drops failed/empty sources from the output.
 //!
