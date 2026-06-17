@@ -691,6 +691,13 @@ button, a, input, select, textarea,
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Spotlight search rolling out from the dock (bottom-right). Pair with
+   transform-origin: bottom right so it grows from the dock Search button. */
+@keyframes dexSpotlightRollOut {
+  from { opacity: 0; transform: scale(0.86) translateY(14px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 @keyframes fadeOut {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(8px); }

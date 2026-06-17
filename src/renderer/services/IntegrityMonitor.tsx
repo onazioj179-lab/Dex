@@ -93,7 +93,7 @@ export interface DiagnosticReport {
 // INTEGRITY CHECKS
 // ===========================================================================
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+import { generateId } from '../../shared/util/id';
 
 const createCheckResult = (
   type: CheckType,

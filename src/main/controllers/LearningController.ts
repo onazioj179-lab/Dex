@@ -94,9 +94,7 @@ const MAX_EVENTS = 5000; // Keep memory low
 const MIN_OCCURRENCES_FOR_PATTERN = 3;
 const COMBINATION_WINDOW_MS = 60000; // 1 minute window for combinations
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '../../shared/util/id';
 
 // ===========================================================================
 // Learning Controller

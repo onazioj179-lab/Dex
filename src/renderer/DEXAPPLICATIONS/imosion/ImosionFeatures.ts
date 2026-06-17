@@ -452,10 +452,9 @@ export interface ReferenceTrack {
 
 // ==================== UTILITY FUNCTIONS ====================
 
-// Generate unique ID
-export const generateId = (prefix: string = 'id'): string => {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
+// Generate unique ID -- thin app default over the shared canonical
+import { generateId as sharedGenerateId } from '../../../shared/util/id';
+export const generateId = (prefix: string = 'id'): string => sharedGenerateId(prefix);
 
 // Convert bars to seconds
 export const barsToSeconds = (bars: number, bpm: number, timeSignature: { num: number; denom: number }): number => {

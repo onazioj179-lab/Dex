@@ -9,10 +9,8 @@
  * Pure: no DOM, no IO, no locale surprises (fixed rules for deterministic UI).
  */
 
-/** Clamp a number into [lo, hi]. */
-export function clamp(n: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, n));
-}
+/** Clamp a number into [lo, hi] -- re-exported from the shared math canonical. */
+export { clamp } from '../math/num';
 
 /** "999", "1.2k", "3.4M", "1.0B" — compact magnitude. */
 export function formatCount(n: number): string {

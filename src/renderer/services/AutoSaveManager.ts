@@ -503,8 +503,6 @@ export function formatSaveTime(timestamp: number): string {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+// Size formatting now uses the shared canonical (full ladder, fixes the old MB cap).
+import { formatBytes as formatFileSize } from '../../shared/format/units';
+export { formatFileSize };

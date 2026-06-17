@@ -431,17 +431,12 @@ export const Home: React.FC = () => {
 
   useEffect(() => {
     const forceHomeRepaint = () => {
+      // Bump the nonce: this alternates the desktop's opacity by a hair (see the
+      // home root's inline style), forcing the compositor to re-rasterize the
+      // home layer when the window is restored. A forced reflow backs it up in
+      // case React batches the state update past the first paint.
       setRepaintNonce(n => (n + 1) % 1000);
-      requestAnimationFrame(() => {
-        const el = desktopRef.current;
-        if (!el) return;
-        el.style.willChange = 'transform, opacity';
-        el.style.transform = 'translateZ(0)';
-        void el.offsetHeight;
-        requestAnimationFrame(() => {
-          if (desktopRef.current) desktopRef.current.style.willChange = 'auto';
-        });
-      });
+      requestAnimationFrame(() => { void desktopRef.current?.offsetHeight; });
     };
     window.addEventListener('focus', forceHomeRepaint);
     window.addEventListener('dex:idle-pause', forceHomeRepaint as EventListener);
@@ -537,7 +532,15 @@ export const Home: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        transform: repaintNonce % 2 === 0 ? 'translateZ(0)' : 'translate3d(0,0,0)',
+        transform: 'translateZ(0)',
+        // Nudge opacity by a hair on each repaint nonce. Opacity is a compositor
+        // property, so any change forces the home layer to re-rasterize -- this
+        // reliably fixes the blank home after the DEX window is minimized to the
+        // taskbar and restored (some GPU drivers drop the layer's raster while
+        // hidden). The previous translateZ(0) <-> translate3d(0,0,0) alternation
+        // produced an IDENTICAL matrix, so the compositor saw no change and the
+        // home never repainted -- leaving only the wallpaper.
+        opacity: repaintNonce % 2 === 0 ? 1 : 0.999,
       }}
     >
       {/* Wallpaper Layer -- Item 151: GPU-accelerated with will-change */}

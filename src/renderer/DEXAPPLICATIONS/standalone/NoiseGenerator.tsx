@@ -5,6 +5,7 @@
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { formatClock } from '../../../shared/format/units';
 
 interface SoundPreset {
   id: string;
@@ -206,11 +207,7 @@ const NoiseGenerator: React.FC = () => {
     }
   };
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  };
+  const formatTime = (secs: number) => formatClock(secs);
 
   const currentPreset = PRESETS.find(p => p.id === activePreset)!;
 

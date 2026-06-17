@@ -12,6 +12,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from './DexIcon';
+import { formatClock } from '../../shared/format/units';
 import { Z_PIP } from '../../shared/zIndex';
 
 // ---------------------------------------------------------------------------
@@ -344,11 +345,7 @@ export const PictureInPicture: React.FC<PiPProps> = memo(({
     videoRef.current.muted = next;
   }, [muted]);
 
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  const formatTime = (sec: number) => formatClock(sec);
 
   // Cleanup
   useEffect(() => {

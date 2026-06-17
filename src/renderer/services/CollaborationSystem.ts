@@ -161,7 +161,7 @@ export interface CollaborationState {
 // UTILITIES
 // ---------------------------------------------------------------------------
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+import { generateId } from '../../shared/util/id';
 
 const generatePin = () => Math.random().toString().slice(2, 8);
 

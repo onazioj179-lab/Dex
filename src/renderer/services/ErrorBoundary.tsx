@@ -73,7 +73,7 @@ interface CrashReport {
 // CRASH REPORTER
 // ===========================================================================
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+import { generateId } from '../../shared/util/id';
 
 const crashReports: CrashReport[] = [];
 const MAX_CRASH_REPORTS = 50;

@@ -29,9 +29,7 @@ import type {
 // UTILITY FUNCTIONS
 // -----------------------------------------------------------------------------
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '../../shared/util/id';
 
 function generateCodename(): string {
   const adjectives = ['IRON', 'SHADOW', 'PHOENIX', 'ATLAS', 'NOVA', 'DELTA', 'OMEGA', 'APEX', 'CIPHER', 'PRISM'];
