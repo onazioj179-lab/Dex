@@ -12,7 +12,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Button } from '../../ui/Button';
-import { TextInput } from '../../ui/TextInput';
+import { DexSearchInput } from '../../styles/components';
 import { colors, fontSize, fontWeight, space } from '../../styles/tokens';
 import { SettingsPaneShell, settingsRowStyle, settingsListStyle, formatRelative } from './SettingsPaneShell';
 import {
@@ -50,13 +50,14 @@ export function ActivityPane(props: ActivityPaneProps): React.JSX.Element {
       testId="settings-pane-activity"
     >
       <div style={{ display: 'flex', gap: space[2], alignItems: 'center' }}>
-        <TextInput
+        <DexSearchInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch('')}
           placeholder="Filter events..."
           aria-label="Filter activity events"
           data-testid="activity-search"
-          style={{ flex: 1 }}
+          fullWidth
         />
         <Button
           variant="subtle"

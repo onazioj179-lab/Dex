@@ -98,6 +98,22 @@ export interface AskOptions {
   modelId?: string;
   /** Override the routing goal (else the stored goal, defaulting to 'auto'). */
   goal?: RoutingGoal;
+  /**
+   * Image attachments (data URLs) for vision — e.g. a screenshot from UKI's
+   * "look at my screen". When present, routing is restricted to vision-capable
+   * models; if none is configured the call returns null (caller degrades).
+   */
+  images?: string[];
+}
+
+/** True when a configured provider exposes at least one vision-capable model. */
+export function hasVisionProvider(): boolean {
+  return configuredCandidates('auto').some((c) => c.vision);
+}
+
+/** The configured model ids that support vision (for image-bearing requests). */
+function visionModelIds(goal: RoutingGoal): Set<string> {
+  return new Set(configuredCandidates(goal).filter((c) => c.vision).map((c) => c.id));
 }
 
 /**
@@ -114,13 +130,20 @@ export async function askConfiguredLLM(
   // turn (so a cheap/fast first pick degrades to the next on failure). An
   // explicit modelId override pins exactly one model.
   const goal = opts.goal ?? getRoutingGoal();
-  const modelIds = opts.modelId ? [opts.modelId] : routeConfiguredModels(goal, userText);
+  let modelIds = opts.modelId ? [opts.modelId] : routeConfiguredModels(goal, userText);
+  // With image attachments, only vision-capable models can answer; degrade (null)
+  // when none is configured rather than sending images a text model will drop.
+  if (opts.images && opts.images.length) {
+    const vision = visionModelIds(goal);
+    const visionFirst = modelIds.filter((id) => vision.has(id));
+    modelIds = visionFirst.length ? visionFirst : [...vision];
+  }
   if (modelIds.length === 0) return null;
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...(opts.history ?? []),
-    { role: 'user', content: userText },
+    { role: 'user', content: userText, ...(opts.images && opts.images.length ? { images: opts.images } : {}) },
   ];
 
   try {
@@ -206,9 +229,17 @@ export async function streamConfiguredLLM(
   // Streaming commits tokens as they arrive, so it can't fall back mid-reply —
   // it streams from the Smart Router's top pick (or an explicit override).
   const goal = opts.goal ?? getRoutingGoal();
-  const modelId = opts.modelId
+  let modelId = opts.modelId
     ?? routeConfiguredModels(goal, userText)[0]
     ?? pickConfiguredModelId(configuredProviders());
+  // With image attachments, pin a vision-capable model; degrade (null) if the
+  // chosen model can't see images and no vision model is configured.
+  if (opts.images && opts.images.length) {
+    const vision = visionModelIds(goal);
+    if (!modelId || !vision.has(modelId)) {
+      modelId = routeConfiguredModels(goal, userText).find((id) => vision.has(id)) ?? [...vision][0] ?? null;
+    }
+  }
   if (!modelId) return null;
   const provider = providerForModel(modelId);
   if (!provider) return null;
@@ -219,7 +250,7 @@ export async function streamConfiguredLLM(
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...(opts.history ?? []),
-    { role: 'user', content: userText },
+    { role: 'user', content: userText, ...(opts.images && opts.images.length ? { images: opts.images } : {}) },
   ];
 
   const httpReq = provider.buildChatRequest(

@@ -10,6 +10,8 @@
 // Items 151-175 of the 1000-item improvement plan
 // =============================================================================
 
+import { framesToDropTimecode, dropTimecodeToFrames } from '../../../shared/format/timecode';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -1468,19 +1470,28 @@ export class TimelineEngine {
   }
   
   frameToTimecode(frame: number): string {
+    // NTSC fractional rates use SMPTE drop-frame so the timecode tracks the wall
+    // clock (non-drop drifts ~3.6s/hour at 29.97).
+    if (Math.abs(this.frameRate - 29.97) < 0.05) return framesToDropTimecode(frame, 30);
+    if (Math.abs(this.frameRate - 59.94) < 0.05) return framesToDropTimecode(frame, 60);
     const totalSeconds = frame / this.frameRate;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = Math.floor(totalSeconds % 60);
     const frames = Math.floor(frame % this.frameRate);
-    
+
     return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}:${pad(frames)}`;
   }
-  
+
   timecodeToFrame(timecode: string): number {
+    // Drop-frame parse for NTSC rates or any ';'-delimited (drop-frame) timecode.
+    if (timecode.includes(';') || Math.abs(this.frameRate - 29.97) < 0.05 || Math.abs(this.frameRate - 59.94) < 0.05) {
+      const df = dropTimecodeToFrames(timecode, this.frameRate > 45 ? 60 : 30);
+      if (df !== null) return df;
+    }
     const parts = timecode.split(':').map(Number);
     const [hours, minutes, seconds, frames] = parts;
-    
+
     return (hours * 3600 + minutes * 60 + seconds) * this.frameRate + frames;
   }
   

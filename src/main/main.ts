@@ -13,7 +13,7 @@
  */
 
 // Electron
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, globalShortcut, dialog, systemPreferences, screen, powerMonitor, desktopCapturer } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, globalShortcut, dialog, systemPreferences, screen, powerMonitor, powerSaveBlocker, desktopCapturer } from 'electron';
 import * as log from 'electron-log';
 
 // Node.js
@@ -31,6 +31,9 @@ import { createHash } from 'crypto';
 import { ActionController } from './controllers/ActionController';
 import { AutomationController } from './controllers/AutomationController';
 import { codeController } from './controllers/CodeController';
+import { registerGitHandlers } from './controllers/GitController';
+import { registerEnvHandlers } from './controllers/EnvController';
+import { registerSshHandlers } from './controllers/SshController';
 import { connectionController } from './controllers/ConnectionController';
 import { dataController } from './controllers/DataController';
 import { dataExport } from './controllers/DataExportController';
@@ -622,6 +625,16 @@ class DexApp {
     log.info('[DEX] Stage 1: App ready');
     this.logger.info('Dex starting up...');
 
+    // Keep the display awake while DEX runs. Without this the OS blanks the
+    // monitor on idle (the "screen goes off/blank until I tap" bug). DEX is a
+    // live desktop -- the Home screen and apps must stay visible when idle.
+    try {
+      powerSaveBlocker.start('prevent-display-sleep');
+      log.info('[DEX] powerSaveBlocker: prevent-display-sleep active');
+    } catch (e) {
+      log.warn('[DEX] powerSaveBlocker failed to start', e);
+    }
+
     // Native Rust module status
     try {
       const { logNativeStatus } = require('./native/bridge');
@@ -743,6 +756,9 @@ class DexApp {
     transferController;
     httpTransferServer;
     safeInit('dtpController', () => { initDTPController(); startDTP(); });
+    safeInit('gitController', () => registerGitHandlers());
+    safeInit('envController', () => registerEnvHandlers());
+    safeInit('sshController', () => registerSshHandlers());
     codeController;
     storageManager;
 
@@ -1612,6 +1628,16 @@ class DexApp {
       log.info('[DEX] Renderer finished loading');
       this.logger.info('Renderer finished loading');
 
+      // Startup timeline: mark the renderer-loaded instant, and GUARANTEE the
+      // summary is logged. It previously fired only on the renderer's first
+      // heartbeat IPC -- which can be delayed or never arrive, leaving every run
+      // with an empty 'total=0ms' line and no usable startup numbers. This
+      // fallback completes it a few seconds after load; complete() is idempotent
+      // (the heartbeat path wins if it fires first), so a REAL phase breakdown is
+      // always recorded for diagnostics.
+      startupTimeline.mark('renderer:did-finish-load');
+      setTimeout(() => { try { startupTimeline.complete(); } catch { /* already completed */ } }, 4000);
+
       // After a stable run, clear the GPU crash count so a one-off crash never
       // permanently forces software rendering. A GPU that keeps crashing at
       // startup re-trips the flag before this fires.
@@ -1652,13 +1678,28 @@ class DexApp {
         if (crashCount >= MAX_CRASHES_IN_WINDOW) {
           log.error(`[DEX] Renderer crashed ${crashCount} times in ${CRASH_WINDOW_MS / 1000}s`);
           if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+            // Re-entry target = the real app (dev server or built index). A plain
+            // <a href> link is used (not inline JS) so the page's CSP can't block
+            // it; automatic reloads are paused, but a deliberate user click may
+            // retry (crashCount resets after the 60s window anyway).
+            const entryUrl = process.env.VITE_DEV_SERVER_URL
+              || (process.env.NODE_ENV === 'development'
+                ? 'http://localhost:5173'
+                : encodeURI('file:///' + path.join(__dirname, '../renderer/index.html').replace(/\\/g, '/')));
             this.mainWindow.webContents.loadURL(
               'data:text/html;charset=utf-8,' +
-              encodeURIComponent(`<!DOCTYPE html><html><head><title>DEX</title></head>
-              <body style="margin:0;background:#09090b;color:#f8fafc;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;">
-              <h1 style="font-size:24px;margin:0 0 16px;font-weight:600;">DEX</h1>
-              <div style="font-size:14px;color:#f59e0b;margin-bottom:8px;">This window is having repeated problems.</div>
-              <div style="font-size:12px;color:#a1a1aa;">Contact support if this continues.</div>
+              encodeURIComponent(`<!DOCTYPE html><html><head><meta name="color-scheme" content="dark light"><title>DEX</title>
+              <style>
+                :root{--bg:#09090b;--fg:#f8fafc;--muted:#a1a1aa;--warn:#f59e0b;--btn:#1f2937;--btnfg:#f8fafc;--border:rgba(255,255,255,0.16);}
+                @media (prefers-color-scheme: light){:root{--bg:#f5f5f7;--fg:#1c1c1e;--muted:#6b7280;--warn:#b45309;--btn:#e5e7eb;--btnfg:#111827;--border:rgba(0,0,0,0.16);}}
+                body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:6px;}
+                a.btn{margin-top:18px;padding:9px 20px;border-radius:8px;background:var(--btn);color:var(--btnfg);border:1px solid var(--border);text-decoration:none;font-size:13px;font-weight:600;}
+              </style></head>
+              <body>
+              <h1 style="font-size:24px;margin:0 0 6px;font-weight:600;">DEX</h1>
+              <div style="font-size:14px;color:var(--warn);">This window hit repeated problems and paused to recover.</div>
+              <div style="font-size:12px;color:var(--muted);max-width:360px;text-align:center;line-height:1.5;">Your workspace and open windows are saved -- they will be restored when DEX reloads.</div>
+              <a class="btn" href="${entryUrl}">Reload DEX</a>
               </body></html>`)
             );
           }
@@ -1684,15 +1725,49 @@ class DexApp {
         }, reloadDelay);
       });
 
+      // Unresponsive recovery: give the renderer a grace period to recover on its
+      // own; if it is still hung, offer the user a choice via a NATIVE dialog
+      // (which works even though the renderer is frozen) instead of silently
+      // waiting for the OS to kill it. Never force-crash (that kills webview tabs
+      // and media). The timer is cancelled the moment the window goes responsive.
+      const UNRESPONSIVE_GRACE_MS = 6000;
+      let unresponsiveTimer: NodeJS.Timeout | null = null;
       this.mainWindow.on('unresponsive', () => {
         log.warn('[DEX] Window became unresponsive');
         securityAudit.log('system', 'renderer-unresponsive', 'Window became unresponsive');
-        // Do NOT force-crash the renderer — it kills all webview tabs and playing media.
-        // Instead, log and wait for natural recovery.
+        if (unresponsiveTimer) clearTimeout(unresponsiveTimer);
+        unresponsiveTimer = setTimeout(() => {
+          unresponsiveTimer = null;
+          if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+          dialog.showMessageBox(this.mainWindow, {
+            type: 'warning',
+            title: 'DEX is not responding',
+            message: 'This window stopped responding.',
+            detail: 'You can keep waiting for it to recover, or reload it now. Your workspace and open windows are saved and will be restored.',
+            buttons: ['Keep waiting', 'Reload window'],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
+          }).then(({ response }) => {
+            if (response === 1 && this.mainWindow && !this.mainWindow.isDestroyed()) {
+              log.info('[DEX] User chose to reload an unresponsive window');
+              this.mainWindow.webContents.reload();
+              setTimeout(() => {
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                  this.mainWindow.webContents.send('renderer:crash-recovery', {
+                    message: 'This window was reloaded after it stopped responding. Your work has been restored.',
+                    reason: 'unresponsive',
+                  });
+                }
+              }, 1000);
+            }
+          }).catch(() => { /* dialog dismissed */ });
+        }, UNRESPONSIVE_GRACE_MS);
       });
 
       this.mainWindow.on('responsive', () => {
         log.info('[DEX] Window became responsive again');
+        if (unresponsiveTimer) { clearTimeout(unresponsiveTimer); unresponsiveTimer = null; }
       });
     }
 
@@ -1703,7 +1778,11 @@ class DexApp {
           ...details.responseHeaders,
           'Content-Security-Policy': [
             "default-src 'self'; " +
-            "script-src 'self'; " +
+            // 'unsafe-eval' is required by the DEX Code / DexScript runtime, which
+            // runs the user's own transpiled script via new Function(). Without it
+            // DexCode cannot run any code. Mirror of the index.html meta CSP. The
+            // runtime sandboxes user code (window/fetch/Function/storage nulled).
+            "script-src 'self' 'unsafe-eval'; " +
             "style-src 'self' 'unsafe-inline'; " +
             "img-src 'self' data: blob:; " +
             "media-src 'self' blob: data: https:; " +
@@ -3185,6 +3264,45 @@ class DexApp {
         const { NativeProcesses } = await import('./native/bridge');
         const result = NativeProcesses.close(pid, !!force);
         return result || { success: false, message: 'Native bridge unavailable' };
+      } catch (e: any) {
+        return { success: false, message: e?.message || String(e) };
+      }
+    });
+
+    // Tier 5 (45): kill a process AND all of its descendants. Cross-platform via
+    // the OS tools (taskkill /T on Windows, pgrep walk on POSIX) so it needs no
+    // native module. Defensive: bad PIDs and partial failures resolve, never throw.
+    ipcMain.handle('system:killProcessTree', async (_evt, pid: number, force?: boolean) => {
+      try {
+        if (typeof pid !== 'number' || !Number.isFinite(pid) || pid <= 0) {
+          return { success: false, message: 'Invalid PID' };
+        }
+        const { execFile } = await import('child_process');
+        if (process.platform === 'win32') {
+          return await new Promise((resolve) => {
+            const args = ['/PID', String(pid), '/T'];
+            if (force) args.push('/F');
+            execFile('taskkill', args, { windowsHide: true }, (err, _out, stderr) => {
+              if (err) resolve({ success: false, message: (stderr || (err as Error).message || '').trim() || 'taskkill failed' });
+              else resolve({ success: true, message: 'Process tree terminated' });
+            });
+          });
+        }
+        // POSIX: gather descendants depth-first via `pgrep -P`, kill leaves first.
+        const descendants: number[] = [];
+        const walk = async (p: number): Promise<void> => {
+          const kids = await new Promise<number[]>((res) => {
+            execFile('pgrep', ['-P', String(p)], (e, stdout) => {
+              if (e || !stdout) { res([]); return; }
+              res(stdout.split('\n').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n > 0));
+            });
+          });
+          for (const k of kids) { await walk(k); descendants.push(k); }
+        };
+        await walk(pid);
+        const sig: NodeJS.Signals = force ? 'SIGKILL' : 'SIGTERM';
+        for (const p of [...descendants, pid]) { try { process.kill(p, sig); } catch { /* already gone */ } }
+        return { success: true, message: `Terminated ${descendants.length + 1} process(es)` };
       } catch (e: any) {
         return { success: false, message: e?.message || String(e) };
       }

@@ -260,7 +260,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 18,
     alignItems: 'flex-start',
     padding: 22,
-    borderRadius: 12,
+    borderRadius: 10,
     flexWrap: 'wrap',
   },
   metaRow: {

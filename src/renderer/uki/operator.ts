@@ -37,22 +37,47 @@ export function getActiveProjectId(): string | undefined {
   }
 }
 
-/** Rank workflow templates by overlap with currently-open apps. */
-export function suggestWorkflows(openAppIds: readonly string[] = [], limit = 3): WorkflowTemplate[] {
+/** Map a Project Space kind to the workflow tag it favours (DEX 5.6). */
+const KIND_TO_WORKFLOW_TAG: Record<string, string> = {
+  development: 'dev',
+  design: 'design',
+  audio: 'music',
+  research: 'research',
+};
+
+/**
+ * Rank workflow templates by overlap with currently-open apps, biased by the
+ * active Project Space kind (DEX 5.6) — so a Development space surfaces the
+ * Development workflow even before its apps are open. Pure + deterministic.
+ */
+export function suggestWorkflows(
+  openAppIds: readonly string[] = [],
+  limit = 3,
+  activeWorkspaceKind?: string,
+): WorkflowTemplate[] {
   const open = new Set(openAppIds);
-  if (open.size === 0) return WORKFLOW_TEMPLATES.slice(0, limit);
-  return WORKFLOW_TEMPLATES
-    .map((t) => ({ t, score: t.apps.reduce((n, a) => n + (open.has(a) ? 1 : 0), 0) }))
+  const kindTag = activeWorkspaceKind ? KIND_TO_WORKFLOW_TAG[activeWorkspaceKind] : undefined;
+  if (open.size === 0 && !kindTag) return WORKFLOW_TEMPLATES.slice(0, limit);
+  const ranked = WORKFLOW_TEMPLATES
+    .map((t) => {
+      const appScore = t.apps.reduce((n, a) => n + (open.has(a) ? 1 : 0), 0);
+      const kindScore = kindTag && t.tags.includes(kindTag) ? 2 : 0;
+      return { t, score: appScore + kindScore };
+    })
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((s) => s.t);
+  // A kind with no open-app overlap still deserves the default head as a fallback.
+  return ranked.length > 0 ? ranked : WORKFLOW_TEMPLATES.slice(0, limit);
 }
 
 export interface OperatorBriefing {
   foregroundAppId?: string;
   openAppIds: readonly string[];
   activeProjectId?: string;
+  /** Active Project Space (DEX 5.6): name + semantic kind. */
+  activeWorkspace?: { id: string; name: string; kind: string };
   online: boolean;
   localTime: string;
   /** Workflow templates that fit what is currently open (best-effort). */
@@ -67,9 +92,10 @@ export function buildOperatorBriefing(ctx: LiveContext = liveContext()): Operato
     foregroundAppId: ctx.foregroundAppId,
     openAppIds: ctx.openAppIds,
     activeProjectId: getActiveProjectId(),
+    activeWorkspace: ctx.activeWorkspace,
     online: ctx.online,
     localTime: ctx.localTime,
-    relevantWorkflows: suggestWorkflows(ctx.openAppIds),
+    relevantWorkflows: suggestWorkflows(ctx.openAppIds, 3, ctx.activeWorkspace?.kind),
     systemPolicy: getWorkloadStatus().policy,
   };
 }
@@ -133,6 +159,7 @@ export function toPromptContext(b: OperatorBriefing = buildOperatorBriefing()): 
     openAppIds: b.openAppIds,
     localTime: b.localTime,
     online: b.online,
+    activeWorkspace: b.activeWorkspace ? { name: b.activeWorkspace.name, kind: b.activeWorkspace.kind } : undefined,
     activeProjectId: b.activeProjectId,
     activeWorkflows: b.relevantWorkflows.map((w) => w.id),
   };
@@ -142,6 +169,7 @@ export function toPromptContext(b: OperatorBriefing = buildOperatorBriefing()): 
 export function formatOperatorBriefing(b: OperatorBriefing = buildOperatorBriefing(), maxChars = 600): string {
   const lines: string[] = [];
   lines.push(`time: ${b.localTime}${b.online ? '' : ' (offline)'}`);
+  if (b.activeWorkspace) lines.push(`workspace: ${b.activeWorkspace.name} (${b.activeWorkspace.kind})`);
   if (b.foregroundAppId) lines.push(`foreground: ${b.foregroundAppId}`);
   if (b.openAppIds.length) lines.push(`open: ${b.openAppIds.join(', ')}`);
   if (b.activeProjectId) lines.push(`project: ${b.activeProjectId}`);

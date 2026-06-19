@@ -164,6 +164,7 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
 
   // ---------------- Permissions ----------------
   { label: 'Permissions', section: 'permissions', desc: 'Per-grant app permissions, revoke and auto-disable', keywords: 'permission grant revoke privacy access camera microphone' },
+  { label: 'UKI Assistant Access', section: 'permissions', desc: 'See and control exactly what the UKI assistant may access', keywords: 'ai assistant uki capability screen read file write shell clipboard network grant revoke permission allow' },
 
   // ---------------- Creator Access ----------------
   { label: 'Creator Access', section: 'creator', desc: 'Owner-only Creative Full Access unlock', keywords: 'owner creator unlock signature' },

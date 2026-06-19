@@ -15,10 +15,13 @@
  *
  * Endpoints:
  *   - Wikipedia REST summary: https://en.wikipedia.org/api/rest_v1/page/summary
+ *   - Wikipedia title search:  https://en.wikipedia.org/w/rest.php/v1/search/title
  *   - Open-Meteo (weather, no key): https://api.open-meteo.com/v1/forecast
  *   - Open-Meteo geocoding: https://geocoding-api.open-meteo.com/v1/search
  *   - WorldTimeAPI: https://worldtimeapi.org/api/timezone
  *   - DuckDuckGo Instant Answer: https://api.duckduckgo.com (limited)
+ *   - Free Dictionary: https://api.dictionaryapi.dev/api/v2/entries/en
+ *   - ExchangeRate (open, no key): https://open.er-api.com/v6/latest
  *
  * Caching: every successful response is stored in UkiCache with a
  * sensible TTL. Offline calls fall back to last cached value.
@@ -97,6 +100,32 @@ export async function lookupWikipedia(query: string, signal?: AbortSignal): Prom
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve a free-text query to the closest Wikipedia article title, then return
+ * its summary. More forgiving than {@link lookupWikipedia}, which needs the exact
+ * page slug — this first runs a title search so "who invented the telephone" or
+ * "ada lovelace" land on the right article. Falls back to a direct summary lookup
+ * when the search endpoint yields nothing.
+ */
+export async function searchWikipedia(query: string, signal?: AbortSignal): Promise<WikiSummary | null> {
+  const q = query.trim();
+  if (!q) return null;
+  try {
+    const found = await fetchJson<{ pages?: Array<{ title: string }> }>(
+      `https://en.wikipedia.org/w/rest.php/v1/search/title?q=${encodeURIComponent(q)}&limit=1`,
+      { ttlMs: 24 * 60 * 60 * 1000, cacheKey: `wikisearch:${q.toLowerCase()}`, signal },
+    );
+    const title = found.pages?.[0]?.title;
+    if (title) {
+      const hit = await lookupWikipedia(title, signal);
+      if (hit) return hit;
+    }
+  } catch {
+    /* fall through to a direct summary attempt */
+  }
+  return lookupWikipedia(q, signal);
 }
 
 // ---------- Weather (Open-Meteo) ----------
@@ -191,6 +220,86 @@ export async function lookupInstantAnswer(query: string, signal?: AbortSignal): 
     );
     if (!raw.Abstract) return null;
     return { abstract: raw.Abstract, abstractSource: raw.AbstractSource, abstractURL: raw.AbstractURL, heading: raw.Heading };
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Dictionary (dictionaryapi.dev) ----------
+
+export interface WordDefinition {
+  word: string;
+  phonetic?: string;
+  partOfSpeech?: string;
+  definition: string;
+  example?: string;
+}
+
+/**
+ * Look up the primary definition of a single English word. Keyless and CORS-
+ * enabled. Returns null for phrases, unknown words, or any network failure.
+ */
+export async function lookupDictionary(word: string, signal?: AbortSignal): Promise<WordDefinition | null> {
+  const w = word.trim().toLowerCase().replace(/[^a-z'-]+/g, '');
+  if (!w) return null;
+  try {
+    const raw = await fetchJson<Array<{
+      word: string;
+      phonetic?: string;
+      phonetics?: Array<{ text?: string }>;
+      meanings?: Array<{ partOfSpeech?: string; definitions?: Array<{ definition: string; example?: string }> }>;
+    }>>(
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`,
+      { ttlMs: 7 * 24 * 60 * 60 * 1000, cacheKey: `dict:${w}`, signal },
+    );
+    const entry = raw?.[0];
+    const meaning = entry?.meanings?.find((m) => m.definitions?.length);
+    const def = meaning?.definitions?.[0];
+    if (!entry || !def?.definition) return null;
+    return {
+      word: entry.word || w,
+      phonetic: entry.phonetic || entry.phonetics?.find((p) => p.text)?.text,
+      partOfSpeech: meaning?.partOfSpeech,
+      definition: def.definition,
+      example: def.example,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Currency (ExchangeRate open endpoint) ----------
+
+export interface CurrencyConversion {
+  amount: number;
+  from: string;
+  to: string;
+  rate: number;
+  result: number;
+}
+
+/**
+ * Convert an amount between two ISO-4217 currency codes using the keyless
+ * open.er-api.com endpoint. Rates are cached per base for an hour. Returns null
+ * for unknown codes or any failure. Codes are normalised to upper-case.
+ */
+export async function convertCurrency(
+  amount: number,
+  from: string,
+  to: string,
+  signal?: AbortSignal,
+): Promise<CurrencyConversion | null> {
+  const base = from.trim().toUpperCase();
+  const quote = to.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(base) || !/^[A-Z]{3}$/.test(quote) || !Number.isFinite(amount)) return null;
+  try {
+    const raw = await fetchJson<{ result?: string; rates?: Record<string, number> }>(
+      `https://open.er-api.com/v6/latest/${base}`,
+      { ttlMs: 60 * 60 * 1000, cacheKey: `fx:${base}`, signal },
+    );
+    const rate = raw.rates?.[quote];
+    if (raw.result === 'error' || typeof rate !== 'number') return null;
+    return { amount, from: base, to: quote, rate, result: amount * rate };
   } catch {
     return null;
   }

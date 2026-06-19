@@ -147,7 +147,7 @@ const styles: Record<string, React.CSSProperties> = {
   messageBubble: {
     maxWidth: '75%',
     padding: '10px 14px',
-    borderRadius: 12,
+    borderRadius: 10,
     fontSize: fontSize.base,
     lineHeight: 1.45,
     color: '#fff',
@@ -219,7 +219,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-end',
     gap: space[2],
     background: 'rgba(255,255,255,0.06)',
-    borderRadius: 14,
+    borderRadius: 10,
     padding: '6px 6px 6px var(--space-4)',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
@@ -299,7 +299,7 @@ const styles: Record<string, React.CSSProperties> = {
   emptyIcon: {
     width: 64,
     height: 64,
-    borderRadius: 12,
+    borderRadius: 10,
     background: 'rgba(255,255,255,0.05)',
     display: 'flex',
     alignItems: 'center',
@@ -577,7 +577,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, onClose }) => {
                             marginTop: space[1],
                             padding: '4px 6px',
                             background: 'rgba(255,255,255,0.1)',
-                            borderRadius: 12,
+                            borderRadius: 10,
                             width: 'fit-content',
                           }}>
                             {QUICK_REACTIONS.map(emoji => (

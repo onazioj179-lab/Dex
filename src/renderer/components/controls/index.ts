@@ -15,3 +15,5 @@ export {
   type SegmentedControlProps,
   type SegmentedOption,
 } from './SegmentedControl';
+export { IconButton, type IconButtonProps } from './IconButton';
+export { Pill, type PillProps } from './Pill';

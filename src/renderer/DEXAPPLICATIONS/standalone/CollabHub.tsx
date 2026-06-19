@@ -18,7 +18,9 @@ import {
   hasPermission,
 } from '../../services/CollaborationSystem';
 import ShareDialog from '../../components/ShareDialog';
+import { EmptyState } from '../../components/EmptyState';
 import ChatPanel from '../../components/ChatPanel';
+import { DexSearchInput } from '../../styles/components';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -140,7 +142,7 @@ const styles: Record<string, React.CSSProperties> = {
   card: {
     background: 'var(--color-bg-elevated, linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%))',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 'var(--space-5)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -253,7 +255,7 @@ const styles: Record<string, React.CSSProperties> = {
   emptyIcon: {
     width: 80,
     height: 80,
-    borderRadius: 14,
+    borderRadius: 10,
     background: 'linear-gradient(135deg, rgba(94,92,230,0.15), rgba(191,90,242,0.1))',
     display: 'flex',
     alignItems: 'center',
@@ -308,24 +310,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 6,
   },
-  searchBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '10px var(--space-4)',
-    background: 'var(--color-bg-hover, rgba(255,255,255,0.06))',
-    borderRadius: 10,
-    marginBottom: 'var(--space-5)',
-    border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-  },
-  searchInput: {
-    flex: 1,
-    background: 'transparent',
-    border: 'none',
-    outline: 'none',
-    color: 'var(--color-text-primary, #fff)',
-    fontSize: 14,
-  },
   filterChips: {
     display: 'flex',
     gap: 'var(--space-2)',
@@ -343,9 +327,9 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   filterChipActive: {
-    background: 'var(--color-accent-soft, rgba(10,132,255,0.15))',
-    borderColor: 'var(--color-accent-muted, rgba(10,132,255,0.3))',
-    color: 'var(--color-accent-text, #0a84ff)',
+    background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
+    borderColor: 'var(--dex-focus-color, #fff)',
+    color: 'var(--color-text-primary)',
   },
   errorBanner: {
     display: 'flex',
@@ -366,7 +350,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 10,
   },
 };
 
@@ -700,17 +684,14 @@ const CollabHub: React.FC = () => {
         {/* Search */}
         {activeTab !== 'checkpoints' && activeTab !== 'activity' && (
           <>
-            <div style={styles.searchBar}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input
-                style={styles.searchInput}
-                placeholder="Search projects..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
+            <DexSearchInput
+              fullWidth
+              placeholder="Search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+              style={{ marginBottom: 'var(--space-5)' }}
+            />
 
             <div style={styles.filterChips}>
               {['All', 'vinx', 'imosion', 'prism', 'flux', 'forge', 'axl'].map(f => (
@@ -732,20 +713,18 @@ const CollabHub: React.FC = () => {
         {/* Projects Grid */}
         {(activeTab === 'projects' || activeTab === 'shared') && (
           projectList.length === 0 ? (
-            <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#5e5ce6" strokeWidth="1.5">
+            <EmptyState
+              title={activeTab === 'shared' ? 'Nothing shared with you yet' : 'No projects yet'}
+              description={activeTab === 'shared'
+                ? 'Projects other people share with you will appear here.'
+                : 'Start a shared project to collaborate in real time across DEX creative apps.'}
+              icon={(
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-              </div>
-              <div style={styles.emptyTitle}>No projects yet</div>
-              <button
-                style={{ ...styles.actionBtn, ...styles.actionBtnPrimary, marginTop: 'var(--space-6)' }}
-                onClick={handleCreateProject}
-              >
-                Create Project
-              </button>
-            </div>
+              )}
+              actions={activeTab === 'shared' ? undefined : [{ label: 'Create project', onClick: handleCreateProject }]}
+            />
           ) : (
             <div style={styles.grid}>
               {projectList.map(project => {

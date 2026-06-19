@@ -131,6 +131,55 @@ export function dexDegradeReport(): Array<{
     .sort((a, b) => b.nulls - a.nulls || b.calls - a.calls);
 }
 
+// -----------------------------------------------------------------------------
+// Binary-over-bridge standard. The JSON `dex_ipc` bridge can't carry binary, so
+// ArrayBuffers/TypedArrays are tunnelled as a self-describing envelope
+// `{ __dexBinary: "<base64>" }`. tauriCompat encodes such ARGS on the way out and
+// decodes such RESULTS on the way back into a real ArrayBuffer — so renderer call
+// sites that expect binary (fs:readFileHead, file read/save, …) work unchanged.
+// The Rust side mirrors this (e.g. fs_ops::read_file_head, voice-memo save).
+// -----------------------------------------------------------------------------
+const BINARY_TAG = '__dexBinary';
+
+function abToBase64(buf: ArrayBufferLike): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const chunk = 0x8000; // 32KB — chunked to avoid call-stack limits on big files
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...Array.from(bytes.subarray(i, i + chunk)));
+  }
+  return btoa(bin);
+}
+
+function base64ToAb(b64: string): ArrayBuffer {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/** Encode any ArrayBuffer/TypedArray arg into the binary envelope. */
+function encodeBinaryArgs(args: unknown[]): unknown[] {
+  return args.map((a) => {
+    if (a instanceof ArrayBuffer) return { [BINARY_TAG]: abToBase64(a) };
+    if (ArrayBuffer.isView(a)) {
+      const v = a as ArrayBufferView;
+      const slice = v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength);
+      return { [BINARY_TAG]: abToBase64(slice) };
+    }
+    return a;
+  });
+}
+
+/** Decode a `{ __dexBinary }` result back into an ArrayBuffer. */
+function decodeBinaryResult(res: unknown): unknown {
+  if (res && typeof res === 'object' && !Array.isArray(res)) {
+    const tag = (res as Record<string, unknown>)[BINARY_TAG];
+    if (typeof tag === 'string') return base64ToAb(tag);
+  }
+  return res;
+}
+
 /** Route one IPC channel call to the native `dex_ipc` dispatcher. */
 function dexIpc(channel: string, args: unknown[]): Promise<unknown> {
   // Some channels never needed the backend — they compute values the renderer
@@ -146,10 +195,10 @@ function dexIpc(channel: string, args: unknown[]): Promise<unknown> {
   }
   const invoke = tauriInvoke();
   if (!invoke) return Promise.resolve(null);
-  return invoke('dex_ipc', { channel, args })
+  return invoke('dex_ipc', { channel, args: encodeBinaryArgs(args) })
     .then((res) => {
       recordChannel(channel, res === null || res === undefined);
-      return res;
+      return decodeBinaryResult(res);
     })
     .catch((err) => {
       // Never let a backend gap throw into the UI during the migration.

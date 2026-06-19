@@ -21,6 +21,8 @@ import { UKIPatternStore } from '../services/UKIPatternStore';
 import { buildSystemPrompt } from '../uki';
 import { streamConfiguredLLM, hasConfiguredProvider } from '../uki/providers/connect';
 import { formatUkiContexts } from '../uki/appContextRegistry';
+import { getActiveWorkspace } from '../uki/context';
+import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../uki/answerEngine';
 
 // ===========================================================================
 // SLASH COMMANDS — power-user surface for the UKI panel
@@ -1437,10 +1439,12 @@ const UkiOverlay: React.FC = () => {
     streamTimerRef.current = setTimeout(tick, speed);
   }, [commitTurn]);
 
-  const handleSendText = useCallback(async () => {
-    const text = inputText.trim();
+  const handleSendText = useCallback(async (override?: string) => {
+    // `override` lets other surfaces (e.g. Nexus) drive UKI with an explicit
+    // query instead of the bound input box.
+    const text = (typeof override === 'string' ? override : inputText).trim();
     if (!text) return;
-    setInputText('');
+    if (typeof override !== 'string') setInputText('');
     useUkiStore.getState().setError(null);
     // Reset thought trace and start a new reasoning chain.
     thoughtStepsRef.current = [];
@@ -1536,9 +1540,30 @@ const UkiOverlay: React.FC = () => {
       return;
     }
 
-    // Check for web search commands
+    // Knowledge questions (weather, define, currency, time, who/what is) answered
+    // from keyless public APIs. When no LLM is configured we speak the grounded
+    // answer directly; when one is, we fold the fresh fact into the prompt below
+    // so the model replies conversationally without stale or invented facts.
+    let grounding: string | null = null;
+    if (classifyKnowledgeIntent(text) !== 'none') {
+      pushStep('Probing knowledge intent (public APIs)');
+      const knowledge = await answerFactualQuestion(normalizeText(text));
+      if (knowledge) {
+        if (!hasConfiguredProvider()) {
+          pushStep(`Answered from ${knowledge.sourceLabel ?? 'public knowledge API'}`);
+          const sourced = knowledge.sourceLabel ? `${knowledge.text}\n\nSource: ${knowledge.sourceLabel}` : knowledge.text;
+          streamResponse(empathyPrefix + sourced, 'knowledge', text);
+          return;
+        }
+        grounding = groundingLine(knowledge);
+        pushStep('Grounded with live facts -- handing to LLM');
+      }
+    }
+
+    // Check for web search commands. Skip when we already have grounded facts to
+    // hand the LLM -- a "what is X" we can answer shouldn't bounce to the browser.
     pushStep('Probing web-search intent');
-    const searchQuery = trySearchCommand(text);
+    const searchQuery = grounding ? null : trySearchCommand(text);
     if (searchQuery) {
       pushStep('Routing to web search');
       const reply = dispatchWebSearch(searchQuery);
@@ -1564,17 +1589,20 @@ const UkiOverlay: React.FC = () => {
         openIds = (ra.runningApps ?? []).map(a => a.id);
         isOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
       } catch { /* best-effort context */ }
+      const ws = getActiveWorkspace();
       const sysPrompt = buildSystemPrompt({
         foregroundAppId: fgApp,
         openAppIds: openIds,
         online: isOnline,
         localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        activeWorkspace: ws ? { name: ws.name, kind: ws.kind } : undefined,
       });
       // Fold in live app context (what the user is looking at across Notes/Tasks/
       // Files, etc.) so the overlay's answers are grounded in the current state,
       // same as the uki chat app does.
       const appCtx = formatUkiContexts();
-      const groundedPrompt = appCtx ? `${sysPrompt}\n\n[What the user is looking at]\n${appCtx}` : sysPrompt;
+      const factsBlock = grounding ? `\n\n[Live facts retrieved just now -- use these, they are current]\n${grounding}` : '';
+      const groundedPrompt = (appCtx ? `${sysPrompt}\n\n[What the user is looking at]\n${appCtx}` : sysPrompt) + factsBlock;
       // Give the model a little conversational context (last few turns).
       const recent = useUkiStore.getState().conversationHistory.slice(-4);
       const history = recent.flatMap(t => ([
@@ -1643,6 +1671,20 @@ const UkiOverlay: React.FC = () => {
     }
   }, [inputText, streamResponse, commitTurn]);
 
+  // Global "ask UKI" bridge: any surface can dispatch
+  //   window.dispatchEvent(new CustomEvent('dex-uki-ask', { detail: { query } }))
+  // to open the panel and run a query through the full reasoning pipeline.
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const q = (e as CustomEvent<{ query?: string }>).detail?.query?.trim();
+      if (!q) return;
+      useUkiStore.getState().setState('processing'); // forces the panel visible
+      void handleSendText(q);
+    };
+    window.addEventListener('dex-uki-ask', onAsk as EventListener);
+    return () => window.removeEventListener('dex-uki-ask', onAsk as EventListener);
+  }, [handleSendText]);
+
   // Auto-scroll to bottom when content changes
   useEffect(() => {
     if (scrollRef.current) {
@@ -1706,12 +1748,12 @@ const UkiOverlay: React.FC = () => {
       `}</style>
 
       <div onMouseDown={handleDragStart} style={{
-        background: 'var(--color-bg-hover)',
-        backdropFilter: 'var(--blur-xl) saturate(180%)',
-        WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
+        // Solid surface matching the app-menu panel -- no washed-out translucent
+        // glass (was bg-hover + blur-xl saturate) and no gloss sheen highlight.
+        background: 'var(--color-bg-elevated, #1c1c1e)',
         border: '1px solid var(--color-border-subtle)',
-        borderRadius: 12,
-        boxShadow: 'var(--pg-shadow-popover), var(--pg-gloss-top)',
+        borderRadius: 10,
+        boxShadow: 'var(--pg-shadow-popover)',
         overflow: 'hidden',
         cursor: draggingRef.current ? 'grabbing' : 'grab',
       }}>
@@ -1725,7 +1767,6 @@ const UkiOverlay: React.FC = () => {
           <div style={{
             width: 8, height: 8, borderRadius: '50%',
             background: stateInfo.color,
-            boxShadow: `0 0 8px ${stateInfo.color}80`,
             animation: isActive ? 'ukiPulse 1.5s ease-in-out infinite' : 'none',
           }} />
           <span style={{
@@ -2133,7 +2174,7 @@ const UkiOverlay: React.FC = () => {
             aria-label="Ask UKI"
           />
           <button
-            onClick={handleSendText}
+            onClick={() => handleSendText()}
             disabled={!inputText.trim() || isThinking || state === 'processing' || state === 'thinking'}
             style={{
               width: 32, height: 32, borderRadius: 8,

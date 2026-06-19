@@ -34,10 +34,13 @@ function emit(name: string, detail: unknown): void {
   window.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
-function pause(reason: IdleReason): void {
-  if (_isPaused) return;
-  _isPaused = true;
-  emit('dex:idle-pause', { reason });
+function pause(_reason: IdleReason): void {
+  // DISABLED by request: idle/blur must NOT affect DEX apps. Previously this
+  // suspended in-app polling/animations/timers and triggered cache flushes,
+  // which made the desktop read as "blank/off until you tap". Nothing pauses on
+  // idle anymore -- every app keeps running fully. (resume() then never fires
+  // because _isPaused stays false, which is correct.)
+  return;
 }
 
 function resume(reason: ResumeReason): void {

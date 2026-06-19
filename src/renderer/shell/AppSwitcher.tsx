@@ -50,7 +50,7 @@ const AppSwitcher: React.FC<AppSwitcherProps> = memo(({ visible, apps, selectedI
       <style>{`@keyframes switcherIn { from { opacity: 0; transform: translate(-50%,-50%) scale(0.94); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }`}</style>
       {apps.map((app, i) => {
         const def = APP_DEFINITIONS[app.id];
-        const color = def?.color || '#8E8E93';
+        const color = def?.color || 'var(--color-text-tertiary)';
         const name = def?.name || app.id;
         const isSelected = i === selectedIndex;
 

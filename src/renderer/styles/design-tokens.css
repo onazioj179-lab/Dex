@@ -72,8 +72,14 @@
   --dex-motion-slow: 220ms;
   --dex-transition: var(--dex-motion) var(--dex-ease);
 
-  /* ---- Focus: keyboard-accessible ring -------------------------------- */
-  --dex-focus-ring: 0 0 0 2px var(--dex-bg), 0 0 0 4px var(--dex-accent);
+  /* ---- Focus: keyboard-accessible ring --------------------------------
+     Monochrome focus identity (owner direction): focus + selection read in
+     WHITE on dark (near-black on light, see [data-theme="light"] below) so the
+     ring is crisp in both themes and stays distinct from the blue accent, which
+     is reserved for primary actions. */
+  --dex-focus-color: #ffffff;
+  --dex-focus-glow: rgba(255, 255, 255, 0.22);
+  --dex-focus-ring: 0 0 0 2px var(--dex-bg), 0 0 0 4px var(--dex-focus-color);
 
   /* ---- Modal widths: responsive by construction (never overflow) ------- */
   --dex-modal-sm: min(400px, calc(100vw - 32px));
@@ -117,6 +123,10 @@
   --dex-hairline: 1px solid rgba(0, 0, 0, 0.1);
   --dex-hairline-strong: 1px solid rgba(0, 0, 0, 0.16);
   --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
+  /* Light-mode focus: near-black so the white-on-dark ring inverts and stays
+     visible on light surfaces. */
+  --dex-focus-color: #1a1a1a;
+  --dex-focus-glow: rgba(0, 0, 0, 0.16);
 }
 
 /* Reduced motion: honour the OS setting. */

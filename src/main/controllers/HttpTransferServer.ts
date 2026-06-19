@@ -142,7 +142,7 @@ function generateWebUI(files: SharedFile[], hostName: string): string {
       </label>
       <div id="upload-status" style="margin-top:12px;font-size:12px;color:#71717a"></div>
     </div>
-    <div class="footer">Powered by DEX Platform &middot; Files expire in 30 minutes</div>
+    <div class="footer">Files expire in 30 minutes</div>
   </div>
   <script>
     async function uploadFiles(files) {

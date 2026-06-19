@@ -16,6 +16,7 @@ import { useToastHelpers } from '../components/Toast';
 import { glassPanel, glassButton, glassMenu } from '../styles/glassMenu';
 import { useRunningApps } from '../store/runningApps';
 import { useConfirm } from '../components/ConfirmDialog';
+import { DexSearchInput } from '../styles/components';
 import {
   BalanceIcon, RocketIcon, BatteryIcon, MuteIcon, SettingsIcon,
   BarChartIcon, GaugeIcon, MemoryIcon, BoltIcon, ThermometerIcon,
@@ -416,15 +417,13 @@ export const Power: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Processes ({sortedProcesses.length})</h3>
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                <input
-                  placeholder="Filter processes..."
+                <DexSearchInput
+                  size="sm"
+                  placeholder="Filter"
                   value={searchFilter}
                   onChange={e => setSearchFilter(e.target.value)}
-                  style={{
-                    padding: '6px var(--space-3)', borderRadius: 6, fontSize: 12,
-                    background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)', outline: 'none', width: 180,
-                  }}
+                  onClear={() => setSearchFilter('')}
+                  style={{ width: 180 }}
                 />
                 {selectedPid && (
                   <button onClick={() => handleKill(selectedPid)} style={{ ...glassButton, padding: '6px var(--space-3)', fontSize: 12, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)', border: '1px solid rgba(255,69,58,0.25)' }}>
@@ -507,7 +506,7 @@ export const Power: React.FC = () => {
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>Battery</h3>
 
             {/* Main battery display */}
-            <div style={{ ...glassPanel, padding: 'var(--space-6)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 'var(--space-6)' }}>
+            <div style={{ ...glassPanel, padding: 'var(--space-6)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 'var(--space-6)' }}>
               <div style={{ position: 'relative', width: 80, height: 80 }}>
                 <svg width="80" height="80" viewBox="0 0 80 80">
                   <circle cx="40" cy="40" r="35" fill="none" stroke="var(--color-border-subtle)" strokeWidth="6" />

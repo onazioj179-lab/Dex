@@ -8,6 +8,8 @@
 // Pure SVG icons, consistent styling, no emojis
 // ===========================================================================
 
+import { escapeHtml } from '../../shared/util/text';
+
 // ===========================================================================
 // ICONS - Pure SVG Sharp Style
 // ===========================================================================
@@ -758,9 +760,11 @@ export class UIManager {
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.style.cssText = ComponentStyles.toast.base + ComponentStyles.toast[type];
+    // Escape the message: callers pass user-derived text (imported asset/part
+    // names, file names), so raw interpolation into innerHTML is an XSS sink.
     toast.innerHTML = `
       ${createIcon({ name: type === 'success' ? 'check' : type === 'warning' ? 'warning' : type === 'error' ? 'error' : 'info', size: 18 })}
-      <span>${message}</span>
+      <span>${escapeHtml(message)}</span>
     `;
 
     let container = document.getElementById('toast-container');

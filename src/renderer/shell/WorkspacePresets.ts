@@ -32,28 +32,11 @@ export interface WorkspacePreset {
 const STORAGE_KEY = 'dex-workspace-presets';
 const MAX_PRESETS = 24;
 
-/**
- * Built-in starter workspaces (DEX 5.5 maturity initiative). Unlike saved
- * presets these carry no geometry — applying one opens its apps and lets the
- * min-size-aware auto-arrange tile them, so a starter looks right on any display.
- * App ids are the real launchable apps (dexcode = DEX Code, axl = Canvas).
- */
-export interface WorkspaceTemplate {
-  id: string;
-  name: string;
-  description: string;
-  /** Windowed apps to open and tile (UKI is not a window — see `uki`). */
-  apps: string[];
-  /** Also summon the UKI assistant overlay (a global overlay, not a tiled window). */
-  uki?: boolean;
-}
-
-export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
-  { id: 'tpl-dev', name: 'Development', description: 'DEX Code · Files · UKI', apps: ['dexcode', 'files'], uki: true },
-  { id: 'tpl-writing', name: 'Writing', description: 'Notes · Browser · UKI', apps: ['notes', 'browser'], uki: true },
-  { id: 'tpl-research', name: 'Research', description: 'Browser · Notes · Rewind · UKI', apps: ['browser', 'notes', 'rewind'], uki: true },
-  { id: 'tpl-creative', name: 'Creative', description: 'Canvas · Gallery · Notes · UKI', apps: ['axl', 'gallery', 'notes'], uki: true },
-];
+// NOTE (DEX 5.6): the built-in starter set lives in services/workflowTemplates.ts
+// (`WORKFLOW_TEMPLATES`) as the single source — they now open as real, kind-tagged
+// Project Spaces via services/projectSpaces.ts `openWorkflowSpace()`. The old
+// geometry-less `WORKSPACE_TEMPLATES` here (+ the `dex-workspace-apply-template`
+// event path) were removed to retire the duplicate template system.
 
 function read(): WorkspacePreset[] {
   try {

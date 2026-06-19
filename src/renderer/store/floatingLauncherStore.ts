@@ -5,14 +5,19 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// Floating Launcher position store. The launcher is a single draggable orb the
-// user can place ANYWHERE on screen (not a content-width dock that shifts as
-// apps open/close). Its position persists across restarts. `x < 0` means
-// "unset" -> the launcher resolves a sensible default corner at render time.
+// Floating Launcher position store. The launcher is "The DEX Bar" -- a single
+// draggable command bar the user can place ANYWHERE on screen (not a
+// content-width dock that shifts as apps open/close). Its position persists
+// across restarts. `x < 0` means "unset" -> the bar resolves a sensible default
+// placement (bottom-centre) at render time.
+//
+// KEY is v2: the v6 redesign changed the launcher from a vertical orb stack to a
+// horizontal bar, so a fresh default placement is wanted rather than a stale
+// orb-anchor coordinate.
 
 import { create } from 'zustand';
 
-const KEY = 'dex-floating-launcher-v1';
+const KEY = 'dex-floating-launcher-v2';
 
 export interface FloatingLauncherState {
   /** Top-left x in px. < 0 = unset (use default corner). */

@@ -21,6 +21,7 @@ import { useAppTransition } from '../utils/motionHooks';
 import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
 import { useUkiStore } from '../store/ukiStore';
 import { glassModal, adaptiveShadow } from '../styles/glassMenu';
+import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
 import { clampEventToViewport } from '../utils/menuPosition';
 import { spotlightEngine } from '../shell/SpotlightEngine';
@@ -32,7 +33,11 @@ import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionC
 import { setSoundEnabled, isSoundEnabled } from '../shell/SpatialAudio';
 import DexIcon from './DexIcon';
 import UkiOverlay from './UkiOverlay';
-import { DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS } from '../uki';
+// Deep import (not the '../uki' barrel): AppManager only needs these two static
+// data constants, but the barrel re-exports the entire assistant (answerEngine,
+// memory, freeApis, …). Importing from the barrel here drags all of it onto the
+// eager startup path. Pull straight from the source module instead.
+import { DEX_GLOBAL_SHORTCUTS, DEX_WORKFLOWS } from '../uki/knowledge';
 import { AppErrorBoundary as CanonicalErrorBoundary } from '../services/ErrorBoundary';
 import { getStoredTier, shouldKeepAlive, getMaxConcurrentApps, type DeviceTier } from '../services/TierManager';
 
@@ -44,7 +49,6 @@ import { AppOverview } from '../shell/AppOverview';
 import { NotificationBanners, NotificationCenter, useBannerNotifications } from '../shell/NotificationBanners';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
-import StageManager, { STAGE_STRIP_WIDTH } from '../shell/StageManager';
 import AppSwitcher from '../shell/AppSwitcher';
 import { loadEngagement, saveEngagement, incrementStat, checkAchievements, recordSessionStart, recordAppUsage, type Achievement, type EngagementState } from '../services/engagement';
 import { notify } from '../services/notify';
@@ -55,6 +59,8 @@ import { idleContinuity } from '../services/IdleContinuity';
 import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
+import { useStageStore, type StageWindowRef } from '../store/stageStore';
+import { ContextBus } from '../services/ContextBus';
 import { useCreativeSuite, type AssetKind, type CreativeAppId } from '../services/CreativeSuiteBridge';
 import { CalmFocusEngine } from '../../shared/phase15/calmFocus';
 import { WorkspaceSnapshotStore } from '../../shared/phase15/workspaceSnapshot';
@@ -159,6 +165,7 @@ const Rewind = lazyRetry(() => import('../DEXAPPLICATIONS/rewind/Rewind'));
 const KanbanApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/KanbanApp'));
 const AchievementsApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Achievements'));
 const RecycleBin = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/RecycleBin'));
+const LiveActivityBrowser = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/LiveActivityBrowser'));
 const Axl = lazyRetry(() => import('../DEXAPPLICATIONS/axl/Axl'));
 const Stopwatch = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Stopwatch'));
 const UnitConverter = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/UnitConverter'));
@@ -178,6 +185,10 @@ const ScreenRecorder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Scr
 const PresentationBuilder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PresentationBuilder'));
 const PDFViewer = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PDFViewer'));
 const PixelArt = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PixelArt'));
+const DexMaps = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Maps'));
+const GitClient = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/GitClient'));
+const EnvManager = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/EnvManager'));
+const SshClient = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/SshClient'));
 
 // -- App ID type (all 22) --------------------------------------------------
 type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transfers'
@@ -186,7 +197,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'calculator' | 'calendar' | 'passwordgenerator' | 'rewind' | 'kanban' | 'achievements' | 'recyclebin'
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'timer'
-  | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart';
+  | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity';
 
 // Default floating window sizes per app. New launches open in the full inner
 // workspace; these sizes are used when users explicitly restore/detach.
@@ -235,6 +246,10 @@ const APP_WINDOW_SIZES: Record<string, { w: number; h: number; maximized?: boole
   presentation: { w: 1100, h: 700, maximized: true },
   pdfviewer: { w: 900, h: 650, maximized: true },
   pixelart: { w: 900, h: 640, maximized: true },
+  maps: { w: 960, h: 660 },
+  git: { w: 820, h: 620 },
+  env: { w: 760, h: 600 },
+  ssh: { w: 760, h: 640 },
 };
 
 const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
@@ -270,6 +285,7 @@ const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
   games: { w: 760, h: 520 },
   dexcode: { w: 760, h: 500 },
   collabhub: { w: 760, h: 520 },
+  maps: { w: 640, h: 460 },
 };
 
 const getUsableFloatingBounds = (
@@ -300,12 +316,12 @@ const IS_WINDOWS = navigator.platform.includes('Win');
 // at full performance.
 const HEAVY_APP_IDS: ReadonlySet<AppId> = new Set<AppId>([
   'videoeditor', 'imosion', 'prism', 'flux', 'forge', 'axl', 'nexus', 'dexcode',
-  'canvas', 'pixelart', 'screenrecorder',
+  'canvas', 'pixelart', 'screenrecorder', 'maps',
 ]);
 
 // Map AppId to lazy component
 const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
-  home: Home, files: Files, browser: Browser, settings: Settings, taskmanager: TaskManager, transfers: Transfers,
+  home: Home, files: Files, browser: Browser, settings: Settings, taskmanager: TaskManager, liveactivity: LiveActivityBrowser, transfers: Transfers,
   notes: Notes, tasks: Tasks, power: Power, workflows: Workflows,
   gallery: Gallery, audio: AudioPage, store: Store, games: Games,
   videoeditor: VideoEditor, imosion: Imosion, prism: Prism, flux: Flux, forge: Forge,
@@ -320,6 +336,10 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   nexus: Nexus, learn: Learn, collabhub: CollabHub,
   canvas: Canvas, timer: Timer,
   screenrecorder: ScreenRecorder, presentation: PresentationBuilder, pdfviewer: PDFViewer, pixelart: PixelArt,
+  maps: DexMaps,
+  git: GitClient,
+  env: EnvManager,
+  ssh: SshClient,
 };
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
@@ -355,6 +375,7 @@ const Icons: Record<string, JSX.Element> = {
   flux: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
   forge: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   calculator: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="8" y2="18.01"/><line x1="12" y1="18" x2="16" y2="18"/></svg>,
+  maps: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>,
   calendar: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   settings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   transfers: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
@@ -397,70 +418,81 @@ const Icons: Record<string, JSX.Element> = {
 };
 
 // All apps for Launchpad -- full DEX app surface organized by category.
-// Keep aligned with APP_DEFINITIONS in src/renderer/store/runningApps.ts.
-const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = [
+// Brand color is DERIVED from APP_DEFINITIONS (the single source of truth in
+// src/renderer/store/runningApps.ts) so the dock, title bar, app switcher, and
+// Launchpad can never drift apart again. Only launcher-only ids that have no
+// registry entry need an explicit override below.
+const LAUNCHPAD_COLOR_OVERRIDES: Partial<Record<string, string>> = {
+  uki: 'var(--color-accent)',
+};
+const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   // System
-  { id: 'settings', label: 'Settings', color: 'var(--color-text-tertiary)' },
-  { id: 'taskmanager', label: 'Task Manager', color: 'var(--color-accent)' },
-  { id: 'power', label: 'Power', color: 'var(--color-error)' },
-  { id: 'recyclebin', label: 'Trash', color: 'var(--color-text-tertiary)' },
+  { id: 'settings', label: 'Settings' },
+  { id: 'taskmanager', label: 'Task Manager' },
+  { id: 'liveactivity', label: 'Live Activity' },
+  { id: 'power', label: 'Power' },
+  { id: 'recyclebin', label: 'Trash' },
   // Productivity
-  { id: 'files', label: 'Files', color: '#339AF0' },
-  { id: 'browser', label: 'Browser', color: '#5E5CE6' },
-  { id: 'notes', label: 'Notes', color: 'var(--color-warning)' },
-  { id: 'tasks', label: 'Tasks', color: 'var(--color-warning)' },
-  { id: 'calendar', label: 'Calendar', color: 'var(--color-error)' },
-  { id: 'workflows', label: 'Workflows', color: '#BF5AF2' },
-  { id: 'store', label: 'Store', color: '#0A84FF' },
-  { id: 'games', label: 'Games', color: '#30D158' },
+  { id: 'files', label: 'Files' },
+  { id: 'browser', label: 'Browser' },
+  { id: 'notes', label: 'Notes' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'workflows', label: 'Workflows' },
+  { id: 'store', label: 'Store' },
+  { id: 'games', label: 'Games' },
   // Creative Suite
-  { id: 'videoeditor', label: 'VINX', color: '#BF5AF2' },
-  { id: 'imosion', label: 'Imosion', color: 'var(--color-success)' },
-  { id: 'prism', label: 'PRISM', color: 'var(--color-success)' },
-  { id: 'flux', label: 'FLUX', color: '#64D2FF' },
-  { id: 'forge', label: 'FORGE', color: 'var(--color-warning)' },
+  { id: 'videoeditor', label: 'VINX' },
+  { id: 'imosion', label: 'Imosion' },
+  { id: 'prism', label: 'PRISM' },
+  { id: 'flux', label: 'FLUX' },
+  { id: 'forge', label: 'FORGE' },
   // Media
-  { id: 'gallery', label: 'Gallery', color: '#FF375F' },
-  { id: 'audio', label: 'Audio', color: '#FC3D39' },
+  { id: 'gallery', label: 'Gallery' },
+  { id: 'audio', label: 'Audio' },
   // Tools
-  { id: 'uki', label: 'uki', color: 'var(--color-accent)' },
-  { id: 'calculator', label: 'Calculator', color: 'var(--color-text-tertiary)' },
-  { id: 'passwordgenerator', label: 'Passwords', color: 'var(--color-success)' },
-  { id: 'transfers', label: 'Share', color: '#32D74B' },
-  { id: 'rewind', label: 'Rewind', color: 'var(--color-accent)' },
-  { id: 'stopwatch', label: 'Stopwatch', color: 'var(--color-warning)' },
-  { id: 'unitconverter', label: 'Converter', color: '#64D2FF' },
-  { id: 'pomodoro', label: 'Pomodoro', color: 'var(--color-error)' },
-  { id: 'qrcode', label: 'QR Code', color: 'var(--color-text-primary)' },
-  { id: 'colorpicker', label: 'Colors', color: '#BF5AF2' },
+  { id: 'uki', label: 'uki' },
+  { id: 'calculator', label: 'Calculator' },
+  { id: 'passwordgenerator', label: 'Passwords' },
+  { id: 'transfers', label: 'Share' },
+  { id: 'rewind', label: 'Rewind' },
+  { id: 'stopwatch', label: 'Stopwatch' },
+  { id: 'unitconverter', label: 'Converter' },
+  { id: 'pomodoro', label: 'Pomodoro' },
+  { id: 'qrcode', label: 'QR Code' },
+  { id: 'colorpicker', label: 'Colors' },
   // Project Management
-  { id: 'kanban', label: 'Kanban', color: '#5E5CE6' },
+  { id: 'kanban', label: 'Kanban' },
   // Achievements
-  { id: 'achievements', label: 'Trophies', color: '#FF9500' },
+  { id: 'achievements', label: 'Trophies' },
   // Engineering
-  { id: 'axl', label: 'AXL', color: 'var(--color-accent)' },
+  { id: 'axl', label: 'AXL' },
   // New Apps
-  { id: 'weather', label: 'Weather', color: '#64D2FF' },
-  { id: 'worldclock', label: 'World Clock', color: '#AC8E68' },
-  { id: 'noisegenerator', label: 'Noise', color: 'var(--color-success)' },
-  { id: 'dexcode', label: 'DexCode', color: 'var(--color-success)' },
+  { id: 'weather', label: 'Weather' },
+  { id: 'worldclock', label: 'World Clock' },
+  { id: 'noisegenerator', label: 'Noise' },
+  { id: 'dexcode', label: 'DexCode' },
   // Visualization
-  { id: 'nexus', label: 'Nexus', color: 'var(--color-accent)' },
+  { id: 'nexus', label: 'Nexus' },
   // Intelligence
-  { id: 'learn', label: 'Learn', color: '#5E5CE6' },
+  { id: 'learn', label: 'Learn' },
   // Collaboration
-  { id: 'collabhub', label: 'Collab Hub', color: '#5E5CE6' },
+  { id: 'collabhub', label: 'Collab Hub' },
   // Canvas & Timer
-  { id: 'canvas', label: 'Canvas', color: '#FF9500' },
-  { id: 'timer', label: 'Timer', color: '#30D158' },
+  { id: 'canvas', label: 'Canvas' },
+  { id: 'timer', label: 'Timer' },
+  { id: 'maps', label: 'DEX Maps' },
   // New apps
-  { id: 'screenrecorder', label: 'Screen Rec', color: '#FF453A' },
-  { id: 'presentation', label: 'Presentation', color: '#FF9F0A' },
+  { id: 'screenrecorder', label: 'Screen Rec' },
+  { id: 'presentation', label: 'Presentation' },
   // PDF Viewer removed as a standalone app -- PDFs now open in Files (which has
   // its own built-in PDF preview/Quick Look). The pdfviewer component is kept
   // for any existing deep links but no longer appears in the launcher.
-  { id: 'pixelart', label: 'Pixel Art', color: '#34C759' },
-];
+  { id: 'pixelart', label: 'Pixel Art' },
+] as { id: AppId; label: string }[]).map(a => ({
+  ...a,
+  color: LAUNCHPAD_COLOR_OVERRIDES[a.id] || APP_DEFINITIONS[a.id]?.color || 'var(--color-text-tertiary)',
+}));
 
 // -- App menu categories (module-level, computed once) --------------------
 const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }[] = (() => {
@@ -476,6 +508,7 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     stopwatch: 'Tools', unitconverter: 'Tools', pomodoro: 'Tools', qrcode: 'Tools', colorpicker: 'Tools',
     weather: 'Tools', worldclock: 'Tools',
     canvas: 'Tools', timer: 'Tools',
+    maps: 'Tools',
     nexus: 'Tools',
     learn: 'Tools',
     screenrecorder: 'Media', presentation: 'Productivity', pdfviewer: 'Productivity', pixelart: 'Creative Suite',
@@ -570,7 +603,7 @@ const AppErrorBoundary: React.FC<{ appId: string; children: React.ReactNode }> =
       instanceId={appId}
       appId={appId}
       appName={def?.name || appId}
-      appColor={def?.color || '#8E8E93'}
+      appColor={def?.color || 'var(--color-text-tertiary)'}
     >
       {children}
     </CanonicalErrorBoundary>
@@ -991,18 +1024,6 @@ export const AppManager: React.FC = () => {
   }, []);
 
 
-  // -- Stage Manager (macOS Tahoe) -- off by default, user activates in Settings ----
-  const [stageManagerOn, setStageManagerOn] = useState(() => {
-    try { return localStorage.getItem('dex-stage-manager') === 'true'; } catch { return false; }
-  });
-  useEffect(() => {
-    const handler = () => {
-      try { setStageManagerOn(localStorage.getItem('dex-stage-manager') !== 'false'); } catch (e) { console.warn('[DEX]', e); }
-    };
-    window.addEventListener('dex-stage-manager-changed', handler);
-    return () => window.removeEventListener('dex-stage-manager-changed', handler);
-  }, []);
-
   // -- App Tab Bar -- persistent running-app tabs, toggle in Settings ------
   const [showAppTabBar, setShowAppTabBar] = useState(() => {
     try { return localStorage.getItem('dex-app-tab-bar') !== 'false'; } catch { return true; }
@@ -1015,15 +1036,16 @@ export const AppManager: React.FC = () => {
     return () => window.removeEventListener('dex-app-tab-bar-changed', handler);
   }, []);
 
-  // Compute the focused (highest-z) floating app for Stage Manager highlight
+  // Compute the focused (highest-z) floating app (drives window-focus highlight).
   const focusedFloatingAppId = useMemo(() => {
     let maxZ = -1, id: string | null = null;
     detachedApps.forEach((b, appId) => { if (b.z > maxZ) { maxZ = b.z; id = appId; } });
     return id;
   }, [detachedApps]);
 
-  // Stage Manager left offset for floating windows
-  const stageOffset = stageManagerOn && runningApps.filter(a => a.id !== 'home').length > 0 ? STAGE_STRIP_WIDTH : 0;
+  // No left strip is reserved (Stage Manager removed in 5.6); floating windows
+  // use the full workspace width.
+  const stageOffset = 0;
 
   const getShellWorkspace = useCallback((padding = 0) => {
     // OS-grade work area. Detached windows are positioned RELATIVE to the content
@@ -1094,23 +1116,11 @@ export const AppManager: React.FC = () => {
   // reward -- and the reward moment is the entire point. Newly satisfied
   // achievements now always surface on the unified notification path (banner +
   // Notification Center), with a one-tap "View" into the Trophies app.
-  const rewardUnlocks = useCallback((unlocked: Achievement[]) => {
-    if (!unlocked.length) return;
-    const headline = unlocked.reduce((best, a) => (a.points > best.points ? a : best), unlocked[0]);
-    const totalPts = unlocked.reduce((sum, a) => sum + a.points, 0);
-    const single = unlocked.length === 1;
-    const openTrophies = () => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'achievements' } }));
-    void notify({
-      title: single ? `Achievement unlocked: ${headline.title}` : `${unlocked.length} achievements unlocked!`,
-      body: single
-        ? `${headline.description}  ·  +${headline.points} pts`
-        : `Including "${headline.title}"  ·  +${totalPts} pts total`,
-      icon: 'success',
-      priority: 'normal',
-      source: 'Achievements',
-      action: { target: 'achievements', label: 'View' },
-      actions: [{ label: 'View', onClick: openTrophies }],
-    });
+  const rewardUnlocks = useCallback((_unlocked: Achievement[]) => {
+    // Achievement-unlock BANNERS suppressed at the owner's request -- they popped
+    // up repeatedly while opening lots of apps. The achievements are still RECORDED
+    // (saveEngagement in applyEngagement) and remain visible in the Trophies app;
+    // only the intrusive top banner is gone. Restore by re-adding the notify() call.
   }, []);
 
   const applyEngagement = useCallback((mutate: (s: EngagementState) => EngagementState) => {
@@ -1894,8 +1904,8 @@ export const AppManager: React.FC = () => {
     // offer can read it. The journal gates what actually restores, so keeping the
     // last non-empty manifest is safe.
     if (snaps.length === 0) return;
-    scheduleWindowManifest(snaps, stageManagerOn ? 'stage' : undefined);
-  }, [detachedApps, minimizedApps, focusedFloatingAppId, stageManagerOn]);
+    scheduleWindowManifest(snaps);
+  }, [detachedApps, minimizedApps, focusedFloatingAppId]);
 
   // -- Workspace presets ("workspace memory") --------------------------------
   // Save the current floating-window layout under a name, and restore a saved
@@ -1914,7 +1924,7 @@ export const AppManager: React.FC = () => {
           minimized: minimizedApps.has(appId), focused: focusedFloatingAppId === appId,
         });
       });
-      const preset = saveWorkspacePreset(name, snaps, stageManagerOn ? 'stage' : undefined);
+      const preset = saveWorkspacePreset(name, snaps);
       window.dispatchEvent(new CustomEvent('dex-workspace-presets-changed'));
       void notify({
         title: 'Workspace saved',
@@ -1948,39 +1958,81 @@ export const AppManager: React.FC = () => {
       });
       void notify({ title: 'Workspace restored', body: `"${preset.name}"`, source: 'workspace' });
     };
-    // Apply a built-in starter workspace: open each app as a floating window via
-    // the proven `dex-open-in-window` path (launch + detach), then let the
-    // min-size-aware auto-arrange tile them — no saved geometry, so the layout
-    // fits whatever display it lands on.
-    const onApplyTemplate = (e: Event) => {
-      const detail = (e as CustomEvent).detail || {};
-      const apps = (detail.apps as string[] | undefined) || [];
-      const wantUki = !!detail.uki;
-      if (!apps.length && !wantUki) return;
-      let opened = 0;
-      for (const appId of apps) {
-        if (!APP_DEFINITIONS[appId as AppId]) continue;
-        window.dispatchEvent(new CustomEvent('dex-open-in-window', { detail: { appId } }));
-        opened++;
-      }
-      // UKI is a global overlay assistant, not a tiled window — summon it (only
-      // if not already open, so we never toggle it shut).
-      if (wantUki) {
-        try { if (!useUkiStore.getState().showPanel) useUkiStore.getState().togglePanel(); } catch { /* store not ready */ }
-      }
-      // Each open detaches on the next frame; give them a beat, then tile.
-      setTimeout(() => window.dispatchEvent(new CustomEvent('dex-arrange-windows')), 200);
-      void notify({ title: 'Workspace opened', body: `${opened} app${opened === 1 ? '' : 's'} arranged${wantUki ? ' · UKI' : ''}`, source: 'workspace' });
-    };
+    // (DEX 5.6) The old `dex-workspace-apply-template` path was retired: built-in
+    // starter workspaces now open as real Project Spaces via
+    // services/projectSpaces.ts `openWorkflowSpace()`, which drives the
+    // `continuity:stage` restore handler above.
     window.addEventListener('dex-workspace-save', onSave);
     window.addEventListener('dex-workspace-restore', onRestore);
-    window.addEventListener('dex-workspace-apply-template', onApplyTemplate);
     return () => {
       window.removeEventListener('dex-workspace-save', onSave);
       window.removeEventListener('dex-workspace-restore', onRestore);
-      window.removeEventListener('dex-workspace-apply-template', onApplyTemplate);
     };
-  }, [detachedApps, minimizedApps, focusedFloatingAppId, stageManagerOn, getShellWorkspace]);
+  }, [detachedApps, minimizedApps, focusedFloatingAppId, getShellWorkspace]);
+
+  // -- Project Space switching (DEX 5.6 Workspace Intelligence) --------------
+  // Switching the active Stage is now a real context switch: capture the
+  // OUTGOING space's window layout, then restore the INCOMING space's layout —
+  // close floating windows that don't belong to it and open + place the ones
+  // that do. A space with no saved layout stays transparent (current windows are
+  // left untouched) so a brand-new space never blanks the desktop. Reuses the
+  // same launch + clamp path as preset/crash restore; closes go through the
+  // veto-aware close so an unsaved-changes guard can still cancel.
+  useEffect(() => {
+    const captureCurrentLayout = (): StageWindowRef[] => {
+      const refs: StageWindowRef[] = [];
+      detachedApps.forEach((b, appId) => {
+        refs.push({
+          appId, z: b.z,
+          x: Math.round(b.x), y: Math.round(b.y),
+          width: Math.round(b.w), height: Math.round(b.h),
+          minimized: minimizedApps.has(appId),
+        });
+      });
+      return refs;
+    };
+    const off = ContextBus.on('continuity:stage', ({ stageId, previousStageId }) => {
+      const stageApi = useStageStore.getState();
+      // 1) Remember the outgoing space's current arrangement.
+      if (previousStageId && previousStageId !== stageId) {
+        stageApi.captureWindows(previousStageId, captureCurrentLayout(), focusedFloatingAppId || undefined);
+      }
+      // 2) Restore the incoming space (skip if it has no remembered layout).
+      const target = stageApi.stages.find(s => s.id === stageId);
+      const targetWins = target?.windows ?? [];
+      if (targetWins.length === 0) return;
+      const targetIds = new Set(targetWins.map(w => w.appId));
+      // Close floating windows that don't belong to the incoming space.
+      for (const appId of Array.from(detachedApps.keys())) {
+        if (!targetIds.has(appId)) handleCloseApp(appId);
+      }
+      // Launch + place the incoming space's windows.
+      const launch = useRunningApps.getState().launchApp;
+      for (const w of targetWins) {
+        const def = APP_DEFINITIONS[w.appId as AppId];
+        if (def) launch({ id: w.appId, name: def.name, icon: def.icon || w.appId, color: def.color });
+      }
+      const ws = getShellWorkspace(0);
+      const mins: string[] = [];
+      requestAnimationFrame(() => {
+        setDetachedApps(prev => {
+          const next = new Map(prev);
+          for (const w of targetWins) {
+            // Geometry-bearing refs restore their layout; id-only refs are left
+            // for the auto-arranger (handled by the existing dex-arrange path).
+            if (w.x == null || w.y == null || w.width == null || w.height == null) continue;
+            const c = clampWindowToWorkspace({ x: w.x, y: w.y, w: w.width, h: w.height }, ws);
+            next.set(w.appId, { ...c, z: w.z ?? 1 });
+            if (w.minimized) mins.push(w.appId);
+          }
+          return next;
+        });
+        if (mins.length) setMinimizedApps(prev => { const n = new Set(prev); mins.forEach(id => n.add(id)); return n; });
+      });
+      void notify({ title: 'Space restored', body: `"${target?.name ?? 'Workspace'}" — ${targetWins.length} window${targetWins.length === 1 ? '' : 's'}`, source: 'workspace' });
+    });
+    return off;
+  }, [detachedApps, minimizedApps, focusedFloatingAppId, getShellWorkspace, handleCloseApp]);
 
   // Event bridge: open apps as floating windows from spotlight/search
   useEffect(() => {
@@ -2386,6 +2438,16 @@ export const AppManager: React.FC = () => {
         }
         return;
       }
+      // Ctrl+Alt+1..9 -- jump to Project Space N (mirrors Ctrl+1..9 for apps;
+      // OS-style virtual-desktop switch). Must precede the app ctrlMap, which
+      // ignores Alt. setActiveStage drives the continuity:stage restore + toast.
+      if ((e.ctrlKey || e.metaKey) && e.altKey && /^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        const st = useStageStore.getState();
+        const target = st.stages[parseInt(e.key, 10) - 1];
+        if (target && target.id !== st.activeStageId) st.setActiveStage(target.id);
+        return;
+      }
       const ctrlMap: Record<string, AppId> = { '1': 'home', '2': 'settings', '3': 'files', '4': 'notes', '5': 'tasks', '6': 'browser', '7': 'gallery', '8': 'calendar', '9': 'kanban' };
       if ((e.ctrlKey || e.metaKey) && ctrlMap[e.key]) { e.preventDefault(); setCurrentApp(ctrlMap[e.key]); return; }
       const altMap: Record<string, AppId> = { 'v': 'videoeditor', 'i': 'imosion', 'r': 'prism', 'f': 'flux', 'g': 'forge', 'p': 'power', 'c': 'calculator', 't': 'transfers' };
@@ -2505,6 +2567,7 @@ export const AppManager: React.FC = () => {
       worldclock: ['timezone', 'clock', 'time', 'utc', 'gmt', 'world'],
       canvas: ['draw', 'paint', 'sketch', 'whiteboard', 'doodle', 'art'],
       timer: ['countdown', 'alarm', 'minute', 'hour', 'time'],
+      maps: ['map', 'navigation', 'directions', 'location', 'gps', 'route', 'place', 'geo'],
       noisegenerator: ['noise', 'white noise', 'ambient', 'focus', 'sleep', 'sound', 'rain'],
       dexcode: ['code', 'script', 'dexscript', 'program', 'run', 'developer', 'coding'],
     };
@@ -2834,6 +2897,12 @@ export const AppManager: React.FC = () => {
                 justifyContent: 'center',
                 touchAction: 'none',
                 WebkitAppRegion: 'drag',
+                // Own stacking context above the app surface so an app's own
+                // full-screen overlays (modals at position:fixed; z-index:var(--z-max))
+                // can never paint over the close / minimize / maximize controls.
+                // Pairs with the app-content wrapper below (isolated at z-index 0).
+                position: 'relative',
+                zIndex: 50,
               } as React.CSSProperties}
               onDoubleClick={() => { tileWindow(appId, 'maximize'); }}
               onPointerDown={(e) => {
@@ -2956,7 +3025,7 @@ export const AppManager: React.FC = () => {
               {/* App icon with color background */}
               {(() => {
                 const appDef = APP_DEFINITIONS[appId];
-                const appColor = appDef?.color || LAUNCHPAD_APPS.find(a => a.id === appId)?.color || '#8E8E93';
+                const appColor = appDef?.color || LAUNCHPAD_APPS.find(a => a.id === appId)?.color || 'var(--color-text-tertiary)';
                 return (
                   <div style={{ width: 22, height: 22, borderRadius: 4, background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                     {AppIconPngs[appId]
@@ -3098,7 +3167,7 @@ export const AppManager: React.FC = () => {
                 </div>
               )}
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
               <AppErrorBoundary appId={appId}>
                 <Suspense fallback={<Loading appId={appId} />}>
                   <Comp />
@@ -3771,7 +3840,7 @@ export const AppManager: React.FC = () => {
           const def = APP_DEFINITIONS[app.id];
           const isActive = currentApp === app.id;
           const isDragging = draggingTab === app.id;
-          const color = def?.color || '#8E8E93';
+          const color = def?.color || 'var(--color-text-tertiary)';
           const icon = Icons[app.id];
           return (
             <div
@@ -3795,8 +3864,8 @@ export const AppManager: React.FC = () => {
               title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 10px 0 var(--space-2)', height: 26, borderRadius: 4,
-                background: isActive ? 'rgba(74,158,255,0.16)' : isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
+                padding: '0 12px', height: 26, borderRadius: 13, /* pill-shaped tabs (owner request) */
+                background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'rgba(255,255,255,0.04)' : 'transparent',
                 border: isDragging ? '1px dashed var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
                 transform: 'none',
@@ -3865,10 +3934,10 @@ export const AppManager: React.FC = () => {
             opacity: 0.97,
           }}
         >
-          <span style={{ display: 'flex', color: ghostDef?.color || '#8E8E93', alignItems: 'center', flexShrink: 0 }}>
+          <span style={{ display: 'flex', color: ghostDef?.color || 'var(--color-text-tertiary)', alignItems: 'center', flexShrink: 0 }}>
             {AppIconPngs[draggingTab as AppId]
               ? <AppIconImg appId={draggingTab as AppId} size={14} />
-              : (Icons[draggingTab as AppId] || <DexIcon name={ghostDef?.icon || draggingTab} size={14} color={ghostDef?.color || '#8E8E93'} />)}
+              : (Icons[draggingTab as AppId] || <DexIcon name={ghostDef?.icon || draggingTab} size={14} color={ghostDef?.color || 'var(--color-text-tertiary)'} />)}
           </span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
             {ghostDef?.name || draggingTab}
@@ -3886,12 +3955,12 @@ export const AppManager: React.FC = () => {
     <div data-tauri-drag-region style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      // DEX Sharp: solid, placed chrome — matches the dock tone (#0E0E11) so the
-      // top bar reads as crisp bespoke chrome, not a washed-out translucent slab.
-      // (Blur was already a no-op platform-wide; dropping it removes dead cost.)
-      background: '#0E0E11',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.06), 0 1px 8px rgba(0,0,0,0.28)',
+      // Master overhaul: glass top bar -- frosted, wallpaper shows through (Part 2.2).
+      background: 'var(--glass-bg, rgba(12,12,12,0.85))',
+      backdropFilter: 'var(--glass-blur, blur(20px))',
+      WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
+      borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
+      boxShadow: '0 1px 8px rgba(0,0,0,0.28)',
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -3921,7 +3990,7 @@ export const AppManager: React.FC = () => {
         <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
-        <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--color-accent)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
+        <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--dex-focus-color, #fff)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
       </div>
@@ -3961,13 +4030,13 @@ export const AppManager: React.FC = () => {
             }}>
               {activeCreative.length > 0 ? activeCreative.slice(0, 3).map(a => {
                 const def = APP_DEFINITIONS[a.id];
-                const col = def?.color || '#8E8E93';
+                const col = def?.color || 'var(--color-text-tertiary)';
                 return (
                   <button key={a.id} onClick={() => { if (minimizedApps.has(a.id)) restoreFloatingApp(a.id); setCurrentApp(a.id as AppId); }}
                     title={def?.name || a.id}
                     aria-label={`Switch to ${def?.name || a.id}`}
                     style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', color: 'inherit' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0, boxShadow: `0 0 4px ${col}60` }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0 }} />
                     <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)', maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def?.name || a.id}</span>
                   </button>
                 );
@@ -4025,7 +4094,7 @@ export const AppManager: React.FC = () => {
                     >
                       {Array.from(minimizedApps).map(id => {
                         const def = APP_DEFINITIONS[id];
-                        const col = def?.color || '#8E8E93';
+                        const col = def?.color || 'var(--color-text-tertiary)';
                         return (
                           <button
                             key={id}
@@ -4076,33 +4145,9 @@ export const AppManager: React.FC = () => {
           <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
         </div>
 
-        {/* Notification Center bell -- opens the single hub-backed center */}
-        <button
-          onClick={() => setShowNotifCenter(v => !v)}
-          title="Notification Center"
-          aria-label="Open notification center"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, height: 18, borderRadius: 4, position: 'relative',
-            background: showNotifCenter ? 'var(--color-border)' : 'transparent',
-            border: 'none', cursor: 'pointer', padding: 0,
-            transition: 'background 0.15s ease',
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-          onMouseLeave={e => { if (!showNotifCenter) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          {hubUnreadCount > 0 && (
-            <span style={{
-              position: 'absolute', top: 0, right: 0,
-              width: 6, height: 6, borderRadius: '50%',
-              background: 'var(--color-accent)',
-              border: '1px solid var(--color-bg-base)',
-            }} />
-          )}
-        </button>
+        {/* Notification Center bell removed at the owner's request -- the top bar
+            stays minimal (system status + control center only). The hub-backed
+            notification center is still reachable from the control-center menu. */}
         {/* Menu dropdown trigger */}
         <div style={{ position: 'relative' }}>
           <button
@@ -4134,11 +4179,12 @@ export const AppManager: React.FC = () => {
                 style={{
                   position: 'absolute', top: 24, right: 0, zIndex: 'var(--z-max)',
                   minWidth: 220, padding: '6px 0',
-                  background: 'var(--color-bg-glass)',
-                  backdropFilter: 'var(--blur-xl) saturate(180%)',
-                  WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-                  borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)',
-                  boxShadow: 'var(--pg-shadow-modal), var(--pg-gloss-top)',
+                  // Master overhaul: glass control-center popover (Part 2.2 / Part 4 Pop UI).
+                  background: 'var(--glass-bg, rgba(12,12,12,0.85))',
+                  backdropFilter: 'var(--glass-blur, blur(20px))',
+                  WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
+                  borderRadius: 10, border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
+                  boxShadow: 'var(--pg-shadow-modal)',
                   animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
                   transformOrigin: 'top right',
                 }}
@@ -4342,66 +4388,17 @@ export const AppManager: React.FC = () => {
         </>
       )}
 
-      {/* Stage Manager -- macOS Tahoe left strip */}
-      {stageManagerOn && (
-        <StageManager
-          apps={runningApps.filter(a => a.id !== 'home')}
-          focusedAppId={focusedFloatingAppId || currentAppId}
-          anyMaximized={anyWindowMaximized}
-          onSelect={(id) => {
-            // Restore from minimized if needed, bring to front
-            if (minimizedApps.has(id)) restoreFloatingApp(id);
-            bringToFront(id as AppId);
-            setCurrentApp(id as AppId);
-            // Track achievement
-            window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'stageManagerSplits', amount: 1 } }));
-          }}
-          onClose={(id) => handleCloseApp(id)}
-          icons={Icons}
-        />
-      )}
-
-      {/* Left edge touch/pen affordance for Stage Manager toggle */}
-      {!stageManagerOn && runningApps.filter(a => a.id !== 'home').length > 0 && (
-        <div
-          onClick={() => {
-            setStageManagerOn(true);
-            localStorage.setItem('dex-stage-manager', 'true');
-            window.dispatchEvent(new CustomEvent('dex-stage-manager-changed'));
-          }}
-          onTouchStart={() => {
-            setStageManagerOn(true);
-            localStorage.setItem('dex-stage-manager', 'true');
-            window.dispatchEvent(new CustomEvent('dex-stage-manager-changed'));
-          }}
-          aria-label="Show Stage Manager"
-          role="button"
-          tabIndex={0}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              setStageManagerOn(true);
-              localStorage.setItem('dex-stage-manager', 'true');
-              window.dispatchEvent(new CustomEvent('dex-stage-manager-changed'));
-            }
-          }}
-          style={{
-            position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)',
-            width: 6, height: 48, borderRadius: '0 3px 3px 0',
-            background: 'var(--color-text-tertiary)',
-            opacity: 0.3, cursor: 'pointer', zIndex: 5001,
-            transition: 'opacity 0.2s ease, width 0.2s ease',
-            pointerEvents: 'auto',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.opacity = '0.65'; e.currentTarget.style.width = '10px'; }}
-          onMouseLeave={e => { e.currentTarget.style.opacity = '0.3'; e.currentTarget.style.width = '6px'; }}
-        />
-      )}
+      {/* Stage Manager removed (DEX 5.6): windows are managed natively -- click to
+          focus, Ctrl+Tab to switch, dock / Apps menu to launch, drag-snap + tile +
+          Project Spaces for layout/persistence. No separate management strip. */}
 
       {/* Content area -- supports split-screen tiling */}
       {splitMode === 'off' ? (
         <div ref={contentRef} role="main" aria-label="App content" style={{
           flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden',
-          background: 'transparent',
+          // SOLID per owner request -- was 'transparent', which let the desktop
+          // wallpaper bleed through every opened app (Browser, etc.).
+          background: 'var(--color-bg-base)',
           borderRadius: 0,
           contain: 'layout style',
         }}>
@@ -4579,9 +4576,12 @@ export const AppManager: React.FC = () => {
               scrollbarWidth: 'none',
               WebkitOverflowScrolling: 'touch',
               overscrollBehaviorY: 'contain',
-              background: 'var(--color-bg-elevated, #1c1c1e)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 12,
+              // Master overhaul: glass app launcher panel (Part 3.7 / Part 4).
+              background: 'var(--glass-bg, rgba(12,12,12,0.85))',
+              backdropFilter: 'var(--glass-blur, blur(24px))',
+              WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
+              border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
+              borderRadius: 14,
               padding: 'var(--space-4)',
               boxShadow: 'var(--pg-shadow-modal)',
               // Precision motion: pure opacity fade, no movement / scale / bounce.
@@ -4592,14 +4592,18 @@ export const AppManager: React.FC = () => {
               @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
             {/* Inline search -- the App Menu searches its OWN apps (type to filter),
-                no longer bouncing to a separate surface. Auto-focused on open. */}
-            <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.4" strokeLinecap="round" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-              <input
+                no longer bouncing to a separate surface. Auto-focused on open.
+                Uses the canonical DexSearchInput (built-in icon + clear button) so
+                the field matches every other search surface pixel-for-pixel. */}
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <DexSearchInput
                 ref={appMenuSearchRef}
+                size="md"
+                fullWidth
                 autoFocus
                 value={appMenuSearch}
                 onChange={(e) => setAppMenuSearch(e.target.value)}
+                onClear={() => { setAppMenuSearch(''); appMenuSearchRef.current?.focus(); }}
                 placeholder="Search apps"
                 aria-label="Search apps"
                 onKeyDown={(e) => {
@@ -4615,7 +4619,6 @@ export const AppManager: React.FC = () => {
                     panel?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.click();
                   }
                 }}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 30px', fontSize: 13, borderRadius: 8, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
               />
             </div>
             {(() => {
@@ -4793,7 +4796,7 @@ export const AppManager: React.FC = () => {
                     color: item.danger ? 'var(--color-error)' : 'var(--color-text-primary)',
                     cursor: 'pointer', transition: 'background 0.08s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-border-subtle)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   {item.label}

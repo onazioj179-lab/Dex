@@ -213,6 +213,12 @@ const WorldClock: React.FC = () => {
               <button style={s.removeBtn} onClick={() => removeZone(zone.id)} aria-label={`Remove ${zone.label}`}>×</button>
               <div style={s.clockLabel}>{zone.label}</div>
               <div style={s.clockOffset}>{formatOffset(zone)}</div>
+              {(() => {
+                // Hour difference vs the user's local time (DST-correct: both are
+                // wall-clock Dates, so the ms delta is the true offset).
+                const dh = Math.round((zoneTime.getTime() - now.getTime()) / 3600000);
+                return <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{dh === 0 ? 'Same as here' : `${dh > 0 ? '+' : ''}${dh}h vs here`}</div>;
+              })()}
               {showAnalog && <AnalogClock time={zoneTime} size={100} />}
               <div style={s.clockTime}>{formatTime(zoneTime)}</div>
               <div style={s.clockDate}>{formatDate(zoneTime)}</div>
@@ -268,7 +274,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   clockCard: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-    padding: 'var(--space-5) var(--space-4)', borderRadius: 12,
+    padding: 'var(--space-5) var(--space-4)', borderRadius: 10,
     border: '1px solid var(--color-border, var(--color-bg-hover))',
     position: 'relative' as const, gap: 4,
   },

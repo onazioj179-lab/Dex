@@ -347,7 +347,7 @@ pub fn create(app: &tauri::AppHandle, args: &Value) -> Value {
 
 /// UTC `YYYY-MM-DD` for an epoch-millis instant (mirrors
 /// `new Date(ms).toISOString().split('T')[0]`).
-fn utc_date(ms: i64) -> String {
+pub(crate) fn utc_date(ms: i64) -> String {
     let (y, mo, d, _, _, _, _) = civil_from_ms(ms);
     format!("{:04}-{:02}-{:02}", y, mo, d)
 }
@@ -366,7 +366,7 @@ fn utc_iso(ms: i64) -> String {
 /// second, millisecond). Uses Howard Hinnant's days_from_civil inverse so no
 /// extra date crate is needed (rules: only rusqlite + serde_json + flate2 + the
 /// crate helpers).
-fn civil_from_ms(ms: i64) -> (i64, u32, u32, u32, u32, u32, u32) {
+pub(crate) fn civil_from_ms(ms: i64) -> (i64, u32, u32, u32, u32, u32, u32) {
     let total_secs = ms.div_euclid(1000);
     let milli = ms.rem_euclid(1000) as u32;
     let days = total_secs.div_euclid(86_400);

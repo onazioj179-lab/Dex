@@ -17,8 +17,78 @@
  */
 
 import React, { useState, useEffect, useCallback, memo } from 'react';
-import { listPresets, deletePreset, renamePreset, WORKSPACE_TEMPLATES, type WorkspacePreset, type WorkspaceTemplate } from '../shell/WorkspacePresets';
+import { listPresets, deletePreset, renamePreset, type WorkspacePreset } from '../shell/WorkspacePresets';
+import { useStageStore, STAGE_KIND_META, STAGE_KINDS, STAGE_DEFAULT_ID, type StageKind } from '../store/stageStore';
+import { openWorkflowSpace, WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../services/projectSpaces';
 import { useFocusTrap } from '../utils/useFocusTrap';
+
+// -- Project Spaces (DEX 5.6) ---------------------------------------------
+// The active workspace context (a Stage with a semantic kind). Lives alongside
+// saved layouts so all "workspace" management is in one dialog: switch the
+// active space, retag its kind, or remove a space you no longer need.
+const ProjectSpacesSection: React.FC<{ btn: React.CSSProperties }> = memo(({ btn }) => {
+  const stages = useStageStore((s) => s.stages);
+  const activeStageId = useStageStore((s) => s.activeStageId);
+  const setActiveStage = useStageStore((s) => s.setActiveStage);
+  const setKind = useStageStore((s) => s.setKind);
+  const createStage = useStageStore((s) => s.createStage);
+  const deleteStage = useStageStore((s) => s.deleteStage);
+
+  const addSpace = useCallback(() => {
+    const name = window.prompt('Name this project space:');
+    if (name && name.trim()) setActiveStage(createStage({ name: name.trim() }));
+  }, [createStage, setActiveStage]);
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Project Spaces</div>
+        <button style={{ ...btn, borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }} onClick={addSpace}>+ New space</button>
+      </div>
+      {stages.map((s) => {
+        const kind = (s.kind ?? 'general') as StageKind;
+        const meta = STAGE_KIND_META[kind];
+        const isActive = s.id === activeStageId;
+        return (
+          <div
+            key={s.id}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
+              padding: '10px var(--space-3)', borderRadius: 8,
+              background: 'var(--color-bg-hover)',
+              border: `1px solid ${isActive ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0, flex: 1 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.accent, flexShrink: 0 }} aria-hidden />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s.name}{isActive && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-accent)' }}>ACTIVE</span>}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
+                  {meta.label}{s.windows.length > 0 ? ` · ${s.windows.length} window${s.windows.length === 1 ? '' : 's'}` : ''}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+              <select
+                value={kind}
+                onChange={(e) => setKind(s.id, e.target.value as StageKind)}
+                aria-label={`Kind for ${s.name}`}
+                style={{ ...btn, padding: '5px 6px', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
+              >
+                {STAGE_KINDS.map((k) => <option key={k} value={k}>{STAGE_KIND_META[k].label}</option>)}
+              </select>
+              {!isActive && <button style={{ ...btn, borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }} onClick={() => setActiveStage(s.id)}>Switch</button>}
+              {s.id !== STAGE_DEFAULT_ID && <button style={{ ...btn, color: 'var(--color-error, #ff453a)' }} onClick={() => deleteStage(s.id)}>Delete</button>}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+});
+ProjectSpacesSection.displayName = 'ProjectSpacesSection';
 
 const WorkspacePresetsPanel: React.FC = () => {
   const [visible, setVisible] = useState(false);
@@ -52,8 +122,10 @@ const WorkspacePresetsPanel: React.FC = () => {
     setVisible(false);
   }, []);
 
-  const applyTemplate = useCallback((t: WorkspaceTemplate) => {
-    window.dispatchEvent(new CustomEvent('dex-workspace-apply-template', { detail: { apps: t.apps, uki: t.uki } }));
+  const applyTemplate = useCallback((t: WorkflowTemplate) => {
+    // Starter layouts now open as real, kind-tagged Project Spaces (the single
+    // workflow-template source), not ephemeral tiled windows.
+    openWorkflowSpace(t.id);
     setVisible(false);
   }, []);
 
@@ -113,10 +185,13 @@ const WorkspacePresetsPanel: React.FC = () => {
         </div>
 
         <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {/* Built-in starter layouts — open a ready-made multi-app workspace
-              (apps launch + auto-arrange). Always available, even with no saves. */}
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', padding: '0 2px' }}>Starter layouts</div>
-          {WORKSPACE_TEMPLATES.map(t => (
+          {/* Project Spaces — the active workspace context (switch / retag / remove). */}
+          <ProjectSpacesSection btn={btn} />
+
+          {/* Built-in starter workspaces — open a ready-made multi-app Project
+              Space (kind-tagged, apps tiled). Always available, even with no saves. */}
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', padding: 'var(--space-2) 2px 0' }}>Starter workspaces</div>
+          {WORKFLOW_TEMPLATES.map(t => (
             <div
               key={t.id}
               style={{

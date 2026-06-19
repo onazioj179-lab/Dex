@@ -13,6 +13,7 @@ import type { ToolMode } from '../types';
 import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useUIStore } from '../stores/uiStore';
+import { IconButton, Pill } from '../../../components/controls';
 
 interface ToolDef {
   mode: ToolMode;
@@ -29,34 +30,10 @@ const TOOLS: ToolDef[] = [
   { mode: 'measure', label: 'Measure', shortcut: 'M', icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12h5l2-9 4 18 3-9h6"/></svg> },
 ];
 
-function toolBtnStyle(active: boolean): React.CSSProperties {
-  return {
-    width: 24,
-    height: 24,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 4,
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'all 0.12s',
-    color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-    background: active ? 'var(--color-accent-light)' : 'transparent',
-    boxShadow: active ? 'inset 0 -1px 0 var(--color-accent)' : 'none',
-  };
-}
-
-// Bare-button hover: subtle background only when not active/selected.
-function hoverHandlers(active: boolean) {
-  return {
-    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!active) e.currentTarget.style.background = 'var(--color-bg-hover)';
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!active) e.currentTarget.style.background = 'transparent';
-    },
-  };
-}
+// Square icon buttons and rounded action pills now come from the shared
+// Creative Control Kit (../../../components/controls) so every creative app's
+// toolbar speaks one design language. Disabled-state opacity is passed through
+// as an inline style override where needed (undo/redo).
 
 interface ToolbarProps {
   onExport: (format: 'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf') => void;
@@ -95,20 +72,18 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
       <div style={{ width: 1, height: 14, background: 'var(--color-border-subtle)', margin: '0 2px' }} />
 
       {/* Undo/Redo */}
-      <button onClick={handleUndo} disabled={undoStack.length === 0} title="Undo (Ctrl+Z)" aria-label="Undo" {...hoverHandlers(false)} style={{ ...toolBtnStyle(false), opacity: undoStack.length > 0 ? 1 : 0.4, cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease' }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-      </button>
-      <button onClick={handleRedo} disabled={redoStack.length === 0} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" {...hoverHandlers(false)} style={{ ...toolBtnStyle(false), opacity: redoStack.length > 0 ? 1 : 0.4, cursor: redoStack.length > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease' }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
-      </button>
+      <IconButton onClick={handleUndo} disabled={undoStack.length === 0} title="Undo (Ctrl+Z)" aria-label="Undo"
+        style={{ opacity: undoStack.length > 0 ? 1 : 0.4, transition: 'opacity 0.15s ease' }}
+        icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>} />
+      <IconButton onClick={handleRedo} disabled={redoStack.length === 0} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"
+        style={{ opacity: redoStack.length > 0 ? 1 : 0.4, transition: 'opacity 0.15s ease' }}
+        icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>} />
 
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
 
       {/* Tool modes */}
       {TOOLS.map(t => (
-        <button key={t.mode} onClick={() => setTool(t.mode)} title={`${t.label} (${t.shortcut})`} aria-label={t.label} aria-pressed={tool === t.mode} {...hoverHandlers(tool === t.mode)} style={toolBtnStyle(tool === t.mode)}>
-          {t.icon}
-        </button>
+        <IconButton key={t.mode} onClick={() => setTool(t.mode)} title={`${t.label} (${t.shortcut})`} aria-label={t.label} active={tool === t.mode} icon={t.icon} />
       ))}
 
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
@@ -123,42 +98,35 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
         { type: 'tube' as const, label: 'Tube', icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><ellipse cx="12" cy="5" rx="4" ry="1.5"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/></svg> },
         { type: 'wedge' as const, label: 'Wedge', icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h20L22 8H2v12z"/><path d="M2 8l10-6 10 6"/></svg> },
       ].map(prim => (
-        <button key={prim.type} onClick={() => addPrimitive(prim.type)} title={`Add ${prim.label}`} aria-label={`Add ${prim.label}`} {...hoverHandlers(false)} style={toolBtnStyle(false)}>
-          {prim.icon}
-        </button>
+        <IconButton key={prim.type} onClick={() => addPrimitive(prim.type)} title={`Add ${prim.label}`} aria-label={`Add ${prim.label}`} icon={prim.icon} />
       ))}
 
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
 
       {/* Actions */}
-      <button onClick={ui.togglePartsLibrary} title="Parts Library" aria-label="Parts Library" aria-pressed={ui.showPartsLibrary} {...hoverHandlers(ui.showPartsLibrary)} style={toolBtnStyle(ui.showPartsLibrary)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"/></svg>
-      </button>
-      <button onClick={() => { generateBOM(); ui.toggleBOM(); }} title="Generate BOM" aria-label="Generate Bill of Materials" aria-pressed={ui.showBOM} {...hoverHandlers(ui.showBOM)} style={toolBtnStyle(ui.showBOM)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-      </button>
-      <button onClick={() => {
+      <IconButton onClick={ui.togglePartsLibrary} title="Parts Library" aria-label="Parts Library" active={ui.showPartsLibrary}
+        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"/></svg>} />
+      <IconButton onClick={() => { generateBOM(); ui.toggleBOM(); }} title="Generate BOM" aria-label="Generate Bill of Materials" active={ui.showBOM}
+        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>} />
+      <IconButton onClick={() => {
         if (!ui.showSimulation) {
           ui.toggleSimulation();
           return;
         }
         onRunSimulation();
-      }} title="Simulation" aria-label="Run Simulation" aria-pressed={ui.showSimulation} {...hoverHandlers(ui.showSimulation)} style={toolBtnStyle(ui.showSimulation)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-      </button>
-      <button onClick={toggleExplodedView} title="Exploded View (X)" aria-label="Exploded View" aria-pressed={project.assembly.exploded} {...hoverHandlers(project.assembly.exploded)} style={toolBtnStyle(project.assembly.exploded)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 3l5 5-5 5"/><path d="M8 3L3 8l5 5"/><path d="M12 14v7"/><path d="M12 3v4"/></svg>
-      </button>
+      }} title="Simulation" aria-label="Run Simulation" active={ui.showSimulation}
+        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>} />
+      <IconButton onClick={toggleExplodedView} title="Exploded View (X)" aria-label="Exploded View" active={project.assembly.exploded}
+        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 3l5 5-5 5"/><path d="M8 3L3 8l5 5"/><path d="M12 14v7"/><path d="M12 3v4"/></svg>} />
 
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
 
       {/* Export dropdown */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <button onClick={(e) => { e.stopPropagation(); ui.toggleExport(); }} title="Export" aria-label="Export" aria-expanded={ui.showExport} aria-haspopup="menu" {...hoverHandlers(ui.showExport)}
-          style={{ ...toolBtnStyle(ui.showExport), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Export</span>
-        </button>
+        <Pill onClick={(e) => { e.stopPropagation(); ui.toggleExport(); }} title="Export" aria-label="Export" aria-expanded={ui.showExport} aria-haspopup="menu" active={ui.showExport}
+          icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}>
+          Export
+        </Pill>
         {ui.showExport && (
           <div role="menu" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'var(--color-bg-surface-solid, #2C2C2E)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: 'var(--pg-shadow-popover)', padding: 4, minWidth: 160, maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(320px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)' }} onClick={(e) => e.stopPropagation()}>
             {(['stl', 'gltf', 'dxf', 'pdf', 'json', 'png'] as const).map(fmt => (
@@ -181,39 +149,35 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
       <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)', margin: '0 4px' }} />
 
       {/* Feature */}
-      <button onClick={(e) => {
+      <Pill onClick={(e) => {
         e.stopPropagation();
         if (!ui.showFeatureCreate) {
           ui.toggleFeatureCreate();
           return;
         }
         onAddFeature();
-      }} title="Add Feature" aria-label="Add Feature" aria-expanded={ui.showFeatureCreate} {...hoverHandlers(ui.showFeatureCreate)}
-        style={{ ...toolBtnStyle(ui.showFeatureCreate), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
-        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Feature</span>
-      </button>
+      }} title="Add Feature" aria-label="Add Feature" aria-expanded={ui.showFeatureCreate} active={ui.showFeatureCreate}
+        icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>}>
+        Feature
+      </Pill>
 
       {/* GD&T */}
-      <button onClick={ui.toggleGDTCreate} title="GD&T Annotation" aria-label="GD&T Annotation" aria-pressed={ui.showGDTCreate} {...hoverHandlers(ui.showGDTCreate)}
-        style={{ ...toolBtnStyle(ui.showGDTCreate), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>GD&T</span>
-      </button>
+      <Pill onClick={ui.toggleGDTCreate} title="GD&T Annotation" aria-label="GD&T Annotation" active={ui.showGDTCreate}
+        icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>}>
+        GD&T
+      </Pill>
 
       {/* Constraints */}
-      <button onClick={ui.toggleConstraintPanel} title="Assembly Constraints" aria-label="Assembly Constraints" aria-pressed={ui.showConstraintPanel} {...hoverHandlers(ui.showConstraintPanel)}
-        style={{ ...toolBtnStyle(ui.showConstraintPanel), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>Constrain</span>
-      </button>
+      <Pill onClick={ui.toggleConstraintPanel} title="Assembly Constraints" aria-label="Assembly Constraints" active={ui.showConstraintPanel}
+        icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>}>
+        Constrain
+      </Pill>
 
       {/* AI */}
-      <button onClick={ui.toggleAI} title="AI Design Copilot" aria-label="AI Design Copilot" aria-pressed={ui.showAI} {...hoverHandlers(ui.showAI)}
-        style={{ ...toolBtnStyle(ui.showAI), width: 'auto', padding: '0 10px', gap: 4, display: 'flex', alignItems: 'center' }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>
-        <span style={{ fontSize: 10, whiteSpace: 'nowrap' }}>AI</span>
-      </button>
+      <Pill onClick={ui.toggleAI} title="AI Design Copilot" aria-label="AI Design Copilot" active={ui.showAI}
+        icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg>}>
+        AI
+      </Pill>
     </div>
   );
 };

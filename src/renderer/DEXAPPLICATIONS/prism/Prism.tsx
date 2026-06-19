@@ -21,6 +21,7 @@ import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { upscaleByFactor } from '../../../shared/creative/resample';
 import { denoiseImage } from '../../../shared/creative/denoise';
 import { autoLevels } from '../../../shared/creative/autoLevels';
+import { applyLensCorrection } from '../../../shared/creative/lensCorrect';
 import {
   ADJUSTMENT_PRESETS,
   QUICK_EXPORT_PRESETS,
@@ -2607,12 +2608,12 @@ const Prism: React.FC = () => {
     logo: { fontSize: '12px', fontWeight: 600, color: '#ff375f', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
-    btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease', whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: '#ff375f', border: '1px solid #ff375f', color: '#fff', fontWeight: 700, borderRadius: '6px' },
+    btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease', whiteSpace: 'nowrap', flexShrink: 0 },
+    btnPrimary: { background: '#ff375f', border: '1px solid #ff375f', color: '#fff', fontWeight: 700, borderRadius: '9999px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px', overflow: 'auto' },
-    toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '6px', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.12s ease' },
-    toolBtnActive: { background: '#ff375f', color: '#fff', boxShadow: '0 0 0 2px rgba(255,55,95,0.35)' },
+    toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '9999px', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.12s ease' },
+    toolBtnActive: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', color: 'var(--color-text-primary)', boxShadow: 'none' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     canvasContainer: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', background: 'var(--color-bg-inset)' },
     canvas: { boxShadow: '0 4px 16px rgba(0,0,0,0.3)', borderRadius: '2px', cursor: activeTool === 'hand' ? 'grab' : activeTool === 'zoom' ? 'zoom-in' : 'crosshair' },
@@ -2622,22 +2623,22 @@ const Prism: React.FC = () => {
     panelTitle: { fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#ff375f', letterSpacing: '1px' },
     panelContent: { padding: '10px', flex: 1, overflowY: 'auto', minHeight: 0 },
     layerItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '6px', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent', transition: 'all 0.12s ease' },
-    layerItemSelected: { background: '#2e1520', border: '1px solid #4a2035' },
+    layerItemSelected: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', border: '1px solid var(--dex-focus-color, #fff)' },
     layerThumb: { width: '28px', height: '28px', background: '#2e1520', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     layerInfo: { flex: 1 },
     layerName: { fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' },
     layerType: { fontSize: '11px', color: '#ff375f', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px', fontWeight: 600 },
     layerActions: { display: 'flex', gap: '6px' },
-    iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px', transition: 'all 0.12s ease' },
+    iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px', transition: 'all 0.12s ease' },
     sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },
     sliderLabel: { width: '80px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600 },
     colorPicker: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px' },
     colorSwatch: { width: '24px', height: '24px', borderRadius: '4px', border: '1px solid var(--color-border-default)', cursor: 'pointer' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
     tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', transition: 'all 0.12s ease' },
-    tabActive: { color: '#ff375f', borderBottom: '2px solid #ff375f' },
+    tabActive: { color: 'var(--color-text-primary)', borderBottom: '2px solid var(--dex-focus-color, #fff)' },
     statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
-    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
+    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-bg-hover)', transition: 'all 0.12s ease', fontWeight: 600 },
     select: { background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: '6px', color: 'var(--color-text-primary)', padding: '6px var(--space-2)', fontSize: '11px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.12s ease' },
   }), [activeTool]);
 
@@ -2758,7 +2759,7 @@ const Prism: React.FC = () => {
                   { label: 'Gradient Map', active: showGradientMap, fn: () => setShowGradientMap(v => !v) },
                   { label: 'Color LUT', active: showColorLookup, fn: () => setShowColorLookup(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>FILTERS</div>
@@ -2772,7 +2773,7 @@ const Prism: React.FC = () => {
                   { label: 'Add Noise', active: showAddNoise, fn: () => setShowAddNoise(v => !v) },
                   { label: 'HDR Merge', active: showHDRMerge, fn: () => setShowHDRMerge(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>SELECTION</div>
@@ -2782,14 +2783,14 @@ const Prism: React.FC = () => {
                   { label: 'Refine Edge', active: showRefineEdge, fn: () => setShowRefineEdge(v => !v) },
                   { label: 'Quick Mask', active: quickMaskMode, fn: () => setQuickMaskMode(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>RETOUCHING</div>
                 {[
                   { label: 'Spot Healing', active: showSpotHealing, fn: () => setShowSpotHealing(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>TRANSFORM</div>
@@ -2797,7 +2798,7 @@ const Prism: React.FC = () => {
                   { label: 'Canvas Size', active: showCanvasSize, fn: () => { setCanvasSizeNew({ width: canvasSize.width, height: canvasSize.height }); setShowCanvasSize(v => !v); } },
                   { label: 'Rotate Image', active: showImageRotation, fn: () => setShowImageRotation(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>COLOR</div>
@@ -2806,7 +2807,7 @@ const Prism: React.FC = () => {
                   { label: 'Posterize', active: showPosterize, fn: () => setShowPosterize(v => !v) },
                   { label: 'Threshold', active: showThreshold, fn: () => setShowThreshold(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>COMPOSITION</div>
@@ -2817,7 +2818,7 @@ const Prism: React.FC = () => {
                   { label: 'Focus Stack', active: showFocusStack, fn: () => setShowFocusStack(v => !v) },
                   { label: 'RAW Develop', active: showRAWDevelop, fn: () => setShowRAWDevelop(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>EXPORT</div>
@@ -2827,7 +2828,7 @@ const Prism: React.FC = () => {
                   { label: 'Artboards', active: showArtboards, fn: () => setShowArtboards(v => !v) },
                   { label: 'Asset Library', active: showAssetLibrary, fn: () => setShowAssetLibrary(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>VIEW</div>
@@ -2836,7 +2837,7 @@ const Prism: React.FC = () => {
                   { label: 'Guides', active: showGuidesPanel, fn: () => setShowGuidesPanel(v => !v) },
                   { label: 'Actions', active: showActions, fn: () => setShowActions(v => !v) },
                 ].map(item => (
-                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? '#ff375f' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: '#ff375f' }}>ON</span>}</div>
+                  <div key={item.label} className="prism-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowFeaturesMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>ON</span>}</div>
                 ))}
               </div>
             )}
@@ -2931,10 +2932,10 @@ const Prism: React.FC = () => {
                             alignItems: 'center',
                             gap: 'var(--space-2)',
                             padding: '6px var(--space-2)',
-                            background: activeTool === toolId ? 'rgba(255,55,95,0.15)' : 'transparent',
+                            background: activeTool === toolId ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
                             border: 'none',
                             borderRadius: 4,
-                            color: activeTool === toolId ? '#ff375f' : 'var(--color-text-primary)',
+                            color: 'var(--color-text-primary)',
                             cursor: 'pointer',
                             fontSize: 11,
                             textAlign: 'left',
@@ -3052,7 +3053,7 @@ const Prism: React.FC = () => {
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>|</span>
                   <span style={{ color: 'var(--color-text-muted)' }}>Range:</span>
                   {(['shadows', 'midtones', 'highlights'] as const).map(r => (
-                    <button key={r} onClick={() => setDodgeBurnRange(r)} aria-label={`${r} range`} style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid ' + (dodgeBurnRange === r ? 'rgba(255,159,10,0.3)' : 'var(--color-bg-hover)'), background: dodgeBurnRange === r ? 'rgba(255,159,10,0.1)' : 'transparent', color: dodgeBurnRange === r ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{r.charAt(0).toUpperCase() + r.slice(1)}</button>
+                    <button key={r} onClick={() => setDodgeBurnRange(r)} aria-label={`${r} range`} style={{ padding: '2px 6px', borderRadius: 9999, border: '1px solid ' + (dodgeBurnRange === r ? 'rgba(255,159,10,0.3)' : 'var(--color-bg-hover)'), background: dodgeBurnRange === r ? 'rgba(255,159,10,0.1)' : 'transparent', color: dodgeBurnRange === r ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{r.charAt(0).toUpperCase() + r.slice(1)}</button>
                   ))}
                 </>
               )}
@@ -3072,11 +3073,11 @@ const Prism: React.FC = () => {
                   <input aria-label="Text font size" type="number" min="8" max="200" value={textFontSize} onChange={e => setTextFontSize(Number(e.target.value))} style={{ width: '44px', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-bg-hover)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 11, padding: '2px 4px', textAlign: 'center' }} />
                   <span style={{ color: 'var(--color-text-muted)', fontSize: 9 }}>px</span>
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 2px' }}>|</span>
-                  <button onClick={() => setTextBold(b => !b)} aria-label="Toggle bold" style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid ' + (textBold ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textBold ? 'rgba(236,72,153,0.1)' : 'transparent', color: textBold ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>B</button>
-                  <button onClick={() => setTextItalic(i => !i)} aria-label="Toggle italic" style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid ' + (textItalic ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textItalic ? 'rgba(236,72,153,0.1)' : 'transparent', color: textItalic ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 11, fontStyle: 'italic', cursor: 'pointer' }}>I</button>
+                  <button onClick={() => setTextBold(b => !b)} aria-label="Toggle bold" style={{ padding: '2px 6px', borderRadius: 9999, border: '1px solid ' + (textBold ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textBold ? 'rgba(236,72,153,0.1)' : 'transparent', color: textBold ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>B</button>
+                  <button onClick={() => setTextItalic(i => !i)} aria-label="Toggle italic" style={{ padding: '2px 6px', borderRadius: 9999, border: '1px solid ' + (textItalic ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textItalic ? 'rgba(236,72,153,0.1)' : 'transparent', color: textItalic ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 11, fontStyle: 'italic', cursor: 'pointer' }}>I</button>
                   <span style={{ color: 'var(--color-text-muted)', margin: '0 2px' }}>|</span>
                   {(['left', 'center', 'right'] as const).map(a => (
-                    <button key={a} onClick={() => setTextAlign(a)} aria-label={`Align ${a}`} style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid ' + (textAlign === a ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textAlign === a ? 'rgba(236,72,153,0.1)' : 'transparent', color: textAlign === a ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
+                    <button key={a} onClick={() => setTextAlign(a)} aria-label={`Align ${a}`} style={{ padding: '2px 6px', borderRadius: 9999, border: '1px solid ' + (textAlign === a ? 'rgba(236,72,153,0.3)' : 'var(--color-bg-hover)'), background: textAlign === a ? 'rgba(236,72,153,0.1)' : 'transparent', color: textAlign === a ? '#ff375f' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>
                       <DexIcon name={a === 'left' ? 'align-left' : a === 'center' ? 'align-center' : 'align-right'} size={11} />
                     </button>
                   ))}
@@ -3145,7 +3146,7 @@ const Prism: React.FC = () => {
             )}
             {/* Zoom Controls Overlay */}
             <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '8px', padding: '6px var(--space-3)', zIndex: 40 }}>
-              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '4px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.max(10, z - 10))} title="Zoom Out" aria-label="Zoom out">-</button>
+              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.max(10, z - 10))} title="Zoom Out" aria-label="Zoom out">-</button>
               <input 
                 type="range" 
                 min="10" 
@@ -3156,9 +3157,9 @@ const Prism: React.FC = () => {
                 style={{ width: '100px', accentColor: '#ff375f', cursor: 'pointer' }} 
                 title={`Canvas zoom: ${Math.round(zoom)}%`}
               />
-              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '4px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.min(500, z + 10))} title="Zoom In" aria-label="Zoom in">+</button>
-              <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom)}%</span>
-              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '4px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '11px' }} onClick={() => setZoom(100)} title="Reset to 100%" aria-label="Reset zoom">Fit</button>
+              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '12px' }} onClick={() => setZoom(z => Math.min(500, z + 10))} title="Zoom In" aria-label="Zoom in">+</button>
+              <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(zoom)}%</span>
+              <button style={{ background: 'var(--color-border)', border: 'none', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px var(--space-2)', fontSize: '11px' }} onClick={() => setZoom(100)} title="Reset to 100%" aria-label="Reset zoom">Fit</button>
             </div>
           </div>
         </div>
@@ -3190,7 +3191,7 @@ const Prism: React.FC = () => {
             <div style={styles.panelContent}>
               <div style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-3)' }}>
                 {(['filters', 'brushes', 'styles'] as const).map(cat => (
-                  <button key={cat} onClick={() => setPresetType(cat)} aria-label={`${cat} presets`} style={{ flex: 1, padding: '6px var(--space-2)', borderRadius: '4px', border: 'none', background: presetType === cat ? 'var(--color-accent)' : 'var(--color-bg-tertiary)', color: presetType === cat ? 'white' : 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
+                  <button key={cat} onClick={() => setPresetType(cat)} aria-label={`${cat} presets`} style={{ flex: 1, padding: '6px var(--space-2)', borderRadius: '9999px', border: 'none', background: presetType === cat ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-bg-tertiary)', color: presetType === cat ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
                 ))}
               </div>
               
@@ -3281,9 +3282,9 @@ const Prism: React.FC = () => {
               <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid var(--color-border-subtle)', paddingTop: 'var(--space-3)' }}>
                 <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>Tools</div>
                 <div style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                  <button aria-label={showCurves ? 'Hide Curves panel' : 'Show Curves panel'} onClick={() => setShowCurves(v => !v)} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid ' + (showCurves ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showCurves ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showCurves ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Curves</button>
-                  <button aria-label={showLevels ? 'Hide Levels panel' : 'Show Levels panel'} onClick={() => setShowLevels(v => !v)} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid ' + (showLevels ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showLevels ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showLevels ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Levels</button>
-                  <button aria-label="Reset all quick adjustments" onClick={() => { setBrightness(0); setContrast(0); setSaturation(0); setExposure(0); setHighlights(0); setShadows(0); setTemperature(0); setTint(0); setVibrance(0); setHue(0); }} style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Reset All</button>
+                  <button aria-label={showCurves ? 'Hide Curves panel' : 'Show Curves panel'} onClick={() => setShowCurves(v => !v)} style={{ padding: '4px 10px', borderRadius: '9999px', border: '1px solid ' + (showCurves ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showCurves ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showCurves ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Curves</button>
+                  <button aria-label={showLevels ? 'Hide Levels panel' : 'Show Levels panel'} onClick={() => setShowLevels(v => !v)} style={{ padding: '4px 10px', borderRadius: '9999px', border: '1px solid ' + (showLevels ? 'rgba(236,72,153,0.3)' : 'var(--color-border-subtle)'), background: showLevels ? 'rgba(236,72,153,0.08)' : 'var(--color-bg-tertiary)', color: showLevels ? '#ff375f' : 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Levels</button>
+                  <button aria-label="Reset all quick adjustments" onClick={() => { setBrightness(0); setContrast(0); setSaturation(0); setExposure(0); setHighlights(0); setShadows(0); setTemperature(0); setTint(0); setVibrance(0); setHue(0); }} style={{ padding: '4px 10px', borderRadius: '9999px', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Reset All</button>
                 </div>
                 <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>Quick Adjustments</div>
                 {ADJUSTMENT_PRESETS.map((preset, idx) => (
@@ -3321,7 +3322,7 @@ const Prism: React.FC = () => {
                   { name: 'B&W', id: 'bw' as FilterName, color: '#6b7280' },
                   { name: 'Sepia', id: 'sepia' as FilterName, color: '#a16207' },
                 ]).map(filter => (
-                  <button key={filter.id} onClick={() => setActiveFilter(activeFilter === filter.id ? null : filter.id)} aria-label={`${filter.name} filter`} style={{ ...styles.btn, flexDirection: 'column', padding: 'var(--space-3) var(--space-2)', border: activeFilter === filter.id ? '1px solid #ff375f' : undefined }}>
+                  <button key={filter.id} onClick={() => setActiveFilter(activeFilter === filter.id ? null : filter.id)} aria-label={`${filter.name} filter`} style={{ ...styles.btn, flexDirection: 'column', padding: 'var(--space-3) var(--space-2)', border: activeFilter === filter.id ? '1px solid var(--dex-focus-color, #fff)' : undefined }}>
                     <div style={{ width: '40px', height: '40px', background: `linear-gradient(135deg, ${filter.color}, ${filter.color}88)`, borderRadius: '4px', marginBottom: '4px' }} />
                     <span style={{ fontSize: '11px' }}>{filter.name}</span>
                   </button>
@@ -3360,7 +3361,7 @@ const Prism: React.FC = () => {
               <span style={styles.panelTitle}>Histogram</span>
               <div style={{ display: 'flex', gap: 2 }}>
                 {(['rgb', 'r', 'g', 'b', 'lum'] as const).map(ch => (
-                  <button key={ch} aria-label={`${ch} channel`} onClick={() => setHistChannel(ch)} style={{ padding: '1px 5px', borderRadius: 2, border: 'none', background: histChannel === ch ? 'rgba(10,132,255,0.2)' : 'transparent', color: histChannel === ch ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{ch}</button>
+                  <button key={ch} aria-label={`${ch} channel`} onClick={() => setHistChannel(ch)} style={{ padding: '1px 5px', borderRadius: 9999, border: 'none', background: histChannel === ch ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: histChannel === ch ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase' }}>{ch}</button>
                 ))}
               </div>
             </div>
@@ -3487,7 +3488,7 @@ const Prism: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Sampling Area</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-3)' }}>
               {(['auto', 'rectangular', 'custom'] as const).map(m => (
-                <button key={m} onClick={() => setContentAwareSampling(m)} aria-label={`${m} sampling mode`} aria-pressed={contentAwareSampling === m} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: contentAwareSampling === m ? 'rgba(10,132,255,0.15)' : 'var(--color-border-subtle)', color: contentAwareSampling === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
+                <button key={m} onClick={() => setContentAwareSampling(m)} aria-label={`${m} sampling mode`} aria-pressed={contentAwareSampling === m} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: contentAwareSampling === m ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: contentAwareSampling === m ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
               ))}
             </div>
             <button aria-label="Generate content-aware fill" onClick={() => {
@@ -3583,7 +3584,7 @@ const Prism: React.FC = () => {
               // Save result back to active layer
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowContentAwareFill(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Generate Fill</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Generate Fill</button>
           </div>
         </div>
       )}
@@ -3598,7 +3599,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3, marginBottom: 10 }}>
               {([{ id: 'push', sym: '→' }, { id: 'pull', sym: '←' }, { id: 'bloat', sym: '◉' }, { id: 'pinch', sym: '◎' }, { id: 'twirl', sym: '↻' }] as const).map(t => (
-                <button key={t.id} onClick={() => setLiquifyTool(t.id)} aria-label={`Liquify ${t.id} tool`} aria-pressed={liquifyTool === t.id} style={{ padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: liquifyTool === t.id ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'var(--color-border-subtle)', color: liquifyTool === t.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer' }}>{t.sym}</button>
+                <button key={t.id} onClick={() => setLiquifyTool(t.id)} aria-label={`Liquify ${t.id} tool`} aria-pressed={liquifyTool === t.id} style={{ padding: '6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: liquifyTool === t.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: liquifyTool === t.id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 12, cursor: 'pointer' }}>{t.sym}</button>
               ))}
             </div>
             {[{ label: 'Brush Size', value: liquifyBrushSize, set: setLiquifyBrushSize, max: 200 }, { label: 'Pressure', value: liquifyPressure, set: setLiquifyPressure, max: 100 }].map(s => (
@@ -3611,7 +3612,7 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4, width: '100%' }}>Click on canvas to set center{liquifyCenter ? ` (${Math.round(liquifyCenter.x)}, ${Math.round(liquifyCenter.y)})` : ''}</span>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-              <button aria-label="Reconstruct liquify" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Liquify Reconstruct'); }} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>Reconstruct</button>
+              <button aria-label="Reconstruct liquify" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Liquify Reconstruct'); }} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>Reconstruct</button>
               <button aria-label="Apply liquify" onClick={() => {
                 const canvas = canvasRef.current; if (!canvas) return;
                 const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -3651,7 +3652,7 @@ const Prism: React.FC = () => {
                 }
                 ctx.putImageData(dst, 0, 0);
                 setShowLiquify(false);
-              }} style={{ flex: 1, padding: '5px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+              }} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
             </div>
           </div>
         </div>
@@ -3753,7 +3754,7 @@ const Prism: React.FC = () => {
               setLayers(prev => [highLayer, lowLayer, ...prev]);
               setSelectedLayerId(highLayer.id);
               setShowFreqSeparation(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Separation Layers</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Separation Layers</button>
           </div>
         </div>
       )}
@@ -3798,7 +3799,7 @@ const Prism: React.FC = () => {
               }
               setSelection(prev => ({ ...prev, mask }));
               setShowColorRange(false);
-            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Select Range</button>
+            }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Select Range</button>
           </div>
         </div>
       )}
@@ -3815,7 +3816,7 @@ const Prism: React.FC = () => {
               <div key={cat} style={{ marginBottom: 'var(--space-2)' }}>
                 <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{cat}</div>
                 {LAYER_STYLE_PRESETS.filter(p => p.category === cat).map(preset => (
-                  <button key={preset.id} onClick={() => setActiveStylePreset(activeStylePreset === preset.id ? null : preset.id)} aria-label={`Apply ${preset.name} layer style`} aria-pressed={activeStylePreset === preset.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid ' + (activeStylePreset === preset.id ? 'rgba(10,132,255,0.3)' : 'var(--color-border-subtle)'), background: activeStylePreset === preset.id ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>
+                  <button key={preset.id} onClick={() => setActiveStylePreset(activeStylePreset === preset.id ? null : preset.id)} aria-label={`Apply ${preset.name} layer style`} aria-pressed={activeStylePreset === preset.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid ' + (activeStylePreset === preset.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'), background: activeStylePreset === preset.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer', marginBottom: 2, textAlign: 'left' }}>
                     <div style={{ width: 24, height: 24, borderRadius: 3, background: 'var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-tertiary)' }}>{preset.effects[0].type === 'dropShadow' ? <DexIcon name="layers" size={12} /> : preset.effects[0].type === 'outerGlow' ? <DexIcon name="sparkles" size={12} /> : preset.effects[0].type === 'bevel' ? <DexIcon name="diamond" size={12} /> : <DexIcon name="circle" size={12} />}</div>
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{preset.name}</div>
@@ -3840,7 +3841,7 @@ const Prism: React.FC = () => {
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             <div style={{ width: 120, borderRight: '1px solid var(--color-bg-hover)', padding: 'var(--space-2)', overflowY: 'auto' }}>
               {(['artistic', 'distort', 'sketch', 'texture', 'stylize'] as const).map(cat => (
-                <button key={cat} onClick={() => setFilterGalleryCategory(cat)} aria-label={`${cat} filter category`} aria-pressed={filterGalleryCategory === cat} style={{ display: 'block', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: 'none', background: filterGalleryCategory === cat ? 'rgba(10,132,255,0.12)' : 'transparent', color: filterGalleryCategory === cat ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat}</button>
+                <button key={cat} onClick={() => setFilterGalleryCategory(cat)} aria-label={`${cat} filter category`} aria-pressed={filterGalleryCategory === cat} style={{ display: 'block', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: 'none', background: filterGalleryCategory === cat ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: filterGalleryCategory === cat ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat}</button>
               ))}
             </div>
             <div style={{ flex: 1, padding: 'var(--space-3)', overflowY: 'auto' }}>
@@ -3877,7 +3878,7 @@ const Prism: React.FC = () => {
                 <input type="range" min={s.min} max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: s.color }} />
               </div>
             ))}
-            <button aria-label="Auto-detect lens profile" onClick={() => { setLensDistortion(0); setLensChromaticAb(0); setLensVignette(-15); }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Auto-Detect Lens Profile</button>
+            <button aria-label="Auto-detect lens profile" onClick={() => { setLensDistortion(0); setLensChromaticAb(0); setLensVignette(-15); }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Auto-Detect Lens Profile</button>
             <button aria-label="Apply lens correction" onClick={() => {
               const canvas = canvasRef.current; if (!canvas) return;
               const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -3885,33 +3886,17 @@ const Prism: React.FC = () => {
               const w = canvas.width, h = canvas.height;
               const src = ctx.getImageData(0, 0, w, h);
               const dst = ctx.createImageData(w, h);
-              const cx = w / 2, cy = h / 2;
-              const maxR = Math.sqrt(cx * cx + cy * cy);
-              const k1 = lensDistortion / 5000;
-              const k2 = lensChromaticAb / 10000;
-              const vign = lensVignette / 100;
-              for (let y = 0; y < h; y++) {
-                for (let x = 0; x < w; x++) {
-                  const dx = (x - cx) / maxR, dy = (y - cy) / maxR;
-                  const r2 = dx * dx + dy * dy;
-                  const distort = 1 + k1 * r2 + k2 * r2 * r2;
-                  const sx = Math.round(cx + dx * distort * maxR);
-                  const sy = Math.round(cy + dy * distort * maxR);
-                  const di = (y * w + x) * 4;
-                  if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
-                    const si = (sy * w + sx) * 4;
-                    const vignetteScale = 1 + vign * r2;
-                    dst.data[di] = Math.max(0, Math.min(255, src.data[si] * vignetteScale));
-                    dst.data[di + 1] = Math.max(0, Math.min(255, src.data[si + 1] * vignetteScale));
-                    dst.data[di + 2] = Math.max(0, Math.min(255, src.data[si + 2] * vignetteScale));
-                    dst.data[di + 3] = src.data[si + 3];
-                  }
-                }
-              }
+              // Genuine transverse chromatic-aberration: red/blue are sampled at
+              // slightly different radii than green (see applyLensCorrection).
+              dst.data.set(applyLensCorrection(src.data, w, h, {
+                distortion: lensDistortion / 5000,
+                chromatic: lensChromaticAb / 2000,
+                vignette: lensVignette / 100,
+              }));
               ctx.putImageData(dst, 0, 0);
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowLensCorrection(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Apply</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Apply</button>
           </div>
         </div>
       )}
@@ -3932,14 +3917,14 @@ const Prism: React.FC = () => {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>Drop exposures or click to add</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>Drop exposures</div>
             {[{ label: 'Tone Mapping', options: ['Reinhard', 'ACES', 'Filmic'] }, { label: 'Ghost Removal', options: ['Off', 'Low', 'High'] }].map(s => (
               <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{s.label}</span>
                 <select style={{ padding: '3px 6px', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 9 }}>{s.options.map(o => <option key={o}>{o}</option>)}</select>
               </div>
             ))}
-            <button aria-label="Merge HDR exposures" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('HDR Merge'); const w = canvas.width, h = canvas.height; const imgData = ctx.getImageData(0, 0, w, h); const d = imgData.data; for (let i = 0; i < d.length; i += 4) { const lum = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) / 255; const toneMap = lum < 0.3 ? lum * 1.4 : lum > 0.7 ? 1 - (1 - lum) * 0.7 + 0.3 : lum * 1.1; const scale = lum > 0 ? toneMap / lum : 1; d[i] = Math.min(255, d[i] * scale * 1.05); d[i+1] = Math.min(255, d[i+1] * scale * 1.02); d[i+2] = Math.min(255, d[i+2] * scale); } ctx.putImageData(imgData, 0, 0); setShowHDRMerge(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Merge HDR</button>
+            <button aria-label="Merge HDR exposures" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('HDR Merge'); const w = canvas.width, h = canvas.height; const imgData = ctx.getImageData(0, 0, w, h); const d = imgData.data; for (let i = 0; i < d.length; i += 4) { const lum = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) / 255; const toneMap = lum < 0.3 ? lum * 1.4 : lum > 0.7 ? 1 - (1 - lum) * 0.7 + 0.3 : lum * 1.1; const scale = lum > 0 ? toneMap / lum : 1; d[i] = Math.min(255, d[i] * scale * 1.05); d[i+1] = Math.min(255, d[i+1] * scale * 1.02); d[i+2] = Math.min(255, d[i+2] * scale); } ctx.putImageData(imgData, 0, 0); setShowHDRMerge(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Merge HDR</button>
           </div>
         </div>
       )}
@@ -3954,7 +3939,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 'var(--space-4)' }}>
             <div onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.accept = 'image/*'; input.onchange = () => { if (input.files) setBatchFiles(Array.from(input.files)); }; input.click(); }} style={{ padding: 'var(--space-5)', borderRadius: 6, border: '2px dashed var(--color-border)', textAlign: 'center', marginBottom: 'var(--space-3)', cursor: 'pointer' }}>
               <div style={{ fontSize: 20, marginBottom: 4 }}>--</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Drop files here or click to select</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Drop files here</div>
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{batchFiles.length} files selected</div>
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Apply Preset</div>
@@ -4014,7 +3999,7 @@ const Prism: React.FC = () => {
                 });
               }
               setShowBatchProcess(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Process {batchFiles.length || 'All'} Files</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Process {batchFiles.length || 'All'} Files</button>
           </div>
         </div>
       )}
@@ -4030,7 +4015,7 @@ const Prism: React.FC = () => {
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>White Balance</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['auto', 'daylight', 'cloudy', 'tungsten', 'fluorescent'] as const).map(wb => (
-                <button key={wb} onClick={() => setRawWhiteBalance(wb)} aria-label={`Set white balance to ${wb}`} aria-pressed={rawWhiteBalance === wb} style={{ padding: '3px 6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: rawWhiteBalance === wb ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'var(--color-border-subtle)', color: rawWhiteBalance === wb ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', textTransform: 'capitalize' }}>{wb}</button>
+                <button key={wb} onClick={() => setRawWhiteBalance(wb)} aria-label={`Set white balance to ${wb}`} aria-pressed={rawWhiteBalance === wb} style={{ padding: '3px 6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: rawWhiteBalance === wb ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: rawWhiteBalance === wb ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', textTransform: 'capitalize' }}>{wb}</button>
               ))}
             </div>
             <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Develop</div>
@@ -4040,7 +4025,7 @@ const Prism: React.FC = () => {
                 <input type="range" min={s.min} max={s.max} step={s.label === 'Exposure' ? 0.1 : 1} value={s.value} onChange={e => s.set(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
               </div>
             ))}
-            <button aria-label="Apply RAW development" onClick={() => { const wbTemp: Record<string, number> = { auto: 0, daylight: 10, cloudy: 20, tungsten: -30, fluorescent: -15 }; const tempShift = wbTemp[rawWhiteBalance] || 0; setTemperature(tempShift); setExposure(rawExposure); setHighlights(Math.round(-rawRecovery * 0.5)); pushHistory('RAW Develop'); setShowRAWDevelop(false); }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Development</button>
+            <button aria-label="Apply RAW development" onClick={() => { const wbTemp: Record<string, number> = { auto: 0, daylight: 10, cloudy: 20, tungsten: -30, fluorescent: -15 }; const tempShift = wbTemp[rawWhiteBalance] || 0; setTemperature(tempShift); setExposure(rawExposure); setHighlights(Math.round(-rawRecovery * 0.5)); pushHistory('RAW Develop'); setShowRAWDevelop(false); }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Development</button>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6, textAlign: 'center' }}>Supports CR2, NEF, ARW, DNG</div>
           </div>
         </div>
@@ -4054,7 +4039,7 @@ const Prism: React.FC = () => {
             <button aria-label="Close Artboards panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowArtboards(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add new artboard" onClick={() => setArtboards(prev => [...prev, { id: `ab-${Date.now()}`, name: `Artboard ${prev.length + 1}`, x: prev.length * 100, y: 0, width: canvasSize.width, height: canvasSize.height }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ New Artboard</button>
+            <button aria-label="Add new artboard" onClick={() => setArtboards(prev => [...prev, { id: `ab-${Date.now()}`, name: `Artboard ${prev.length + 1}`, x: prev.length * 100, y: 0, width: canvasSize.width, height: canvasSize.height }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ New Artboard</button>
             {artboards.length === 0 ? (
               <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No artboards. Working on single canvas.</div>
             ) : (
@@ -4080,7 +4065,7 @@ const Prism: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: 4, padding: '6px 10px', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 }}>
             {(['shapes', 'patterns', 'gradients', 'swatches'] as const).map(cat => (
-              <button key={cat} onClick={() => setAssetCategory(cat)} aria-label={`Show ${cat} assets`} aria-pressed={assetCategory === cat} style={{ padding: '4px 10px', borderRadius: 3, border: 'none', background: assetCategory === cat ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'transparent', color: assetCategory === cat ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
+              <button key={cat} onClick={() => setAssetCategory(cat)} aria-label={`Show ${cat} assets`} aria-pressed={assetCategory === cat} style={{ padding: '4px 10px', borderRadius: 9999, border: 'none', background: assetCategory === cat ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', color: assetCategory === cat ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
             ))}
           </div>
           <div style={{ flex: 1, padding: 10, overflowY: 'auto' }}>
@@ -4106,9 +4091,9 @@ const Prism: React.FC = () => {
             <button aria-label="Close Slice Export panel" style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowSliceExport(false)}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
-            <button aria-label="Add slice region" onClick={() => setSlices(prev => [...prev, { id: `slice-${Date.now()}`, name: `Slice ${prev.length + 1}`, x: 0, y: 0, width: 200, height: 200, format: 'png', quality: 80 }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Slice Region</button>
+            <button aria-label="Add slice region" onClick={() => setSlices(prev => [...prev, { id: `slice-${Date.now()}`, name: `Slice ${prev.length + 1}`, x: 0, y: 0, width: 200, height: 200, format: 'png', quality: 80 }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Slice Region</button>
             {slices.length === 0 ? (
-              <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Draw regions on canvas or click to add</div>
+              <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Draw regions on canvas</div>
             ) : (
               slices.map((s, i) => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px var(--space-2)', borderRadius: 4, background: 'var(--color-border-subtle)', marginBottom: 3 }}>
@@ -4122,7 +4107,7 @@ const Prism: React.FC = () => {
               ))
             )}
             {slices.length > 0 && (
-              <button aria-label="Export all slices" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; slices.forEach((sl, idx) => { const sliceCanvas = document.createElement('canvas'); sliceCanvas.width = sl.width; sliceCanvas.height = sl.height; const ctx = sliceCanvas.getContext('2d'); if (!ctx) return; ctx.drawImage(canvas, sl.x, sl.y, sl.width, sl.height, 0, 0, sl.width, sl.height); const mimeType = sl.format === 'jpg' ? 'image/jpeg' : sl.format === 'webp' ? 'image/webp' : 'image/png'; sliceCanvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sl.name}.${sl.format}`; a.click(); URL.revokeObjectURL(url); }, mimeType, sl.quality / 100); }); setShowSliceExport(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Export All Slices</button>
+              <button aria-label="Export all slices" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; slices.forEach((sl, idx) => { const sliceCanvas = document.createElement('canvas'); sliceCanvas.width = sl.width; sliceCanvas.height = sl.height; const ctx = sliceCanvas.getContext('2d'); if (!ctx) return; ctx.drawImage(canvas, sl.x, sl.y, sl.width, sl.height, 0, 0, sl.width, sl.height); const mimeType = sl.format === 'jpg' ? 'image/jpeg' : sl.format === 'webp' ? 'image/webp' : 'image/png'; sliceCanvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sl.name}.${sl.format}`; a.click(); URL.revokeObjectURL(url); }, mimeType, sl.quality / 100); }); setShowSliceExport(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Export All Slices</button>
             )}
           </div>
         </div>
@@ -4154,11 +4139,11 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Source Mode</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['Proximity', 'Create Texture', 'Content-Aware'].map(m => (
-                  <button key={m} aria-label={`${m} healing source mode`} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: m === 'Proximity' ? 'rgba(255,159,10,0.12)' : 'var(--color-border-subtle)', color: m === 'Proximity' ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                  <button key={m} aria-label={`${m} healing source mode`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Proximity' ? 'rgba(255,159,10,0.12)' : 'var(--color-border-subtle)', color: m === 'Proximity' ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
                 ))}
               </div>
             </div>
-            <div style={{ padding: 14, textAlign: 'center', borderRadius: 4, background: 'var(--color-bg-inset)', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Click and drag over blemishes to heal</div>
+            <div style={{ padding: 14, textAlign: 'center', borderRadius: 4, background: 'var(--color-bg-inset)', color: 'var(--color-text-tertiary)', fontSize: 11 }}>Drag over blemishes</div>
           </div>
         </div>
       )}
@@ -4176,10 +4161,10 @@ const Prism: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 600, marginBottom: 2 }}>AI Subject Detection</div>
               <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>Automatically detect and select the main subject</div>
             </div>
-            <button aria-label="Select subject" style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>Select Subject</button>
+            <button aria-label="Select subject" style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>Select Subject</button>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              <button aria-label="Refine edge" style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Refine Edge</button>
-              <button aria-label="Invert selection" style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Invert</button>
+              <button aria-label="Refine edge" style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Refine Edge</button>
+              <button aria-label="Invert selection" style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer' }}>Invert</button>
             </div>
             <div style={{ marginBottom: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -4208,8 +4193,8 @@ const Prism: React.FC = () => {
           </div>
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              <button aria-label="View linked smart objects" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Linked</button>
-              <button aria-label="View embedded smart objects" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Embedded</button>
+              <button aria-label="View linked smart objects" style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Linked</button>
+              <button aria-label="View embedded smart objects" style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>Embedded</button>
             </div>
             <div style={{ padding: 14, borderRadius: 6, background: 'var(--color-bg-inset)', textAlign: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 20, marginBottom: 4 }}>{(() => { const sel = layers.find(l => l.id === selectedLayerId); return sel && sel.name.startsWith('[SO] ') ? <DexIcon name="package" size={20} /> : '--'; })()}</div>
@@ -4222,19 +4207,19 @@ const Prism: React.FC = () => {
                 if (!sel || sel.name.startsWith('[SO] ')) return;
                 pushHistory('Convert to Smart Object');
                 setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, name: `[SO] ${l.name}`, locked: true } : l));
-              }} style={{ padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Convert to Smart Object</button>
+              }} style={{ padding: '6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Convert to Smart Object</button>
               <button aria-label="Edit smart object contents" onClick={() => {
                 const sel = layers.find(l => l.id === selectedLayerId);
                 if (!sel || !sel.name.startsWith('[SO] ')) return;
                 setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, locked: false } : l));
-              }} style={{ padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Edit Contents</button>
-              <button aria-label="Replace smart object contents" style={{ padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Replace Contents...</button>
+              }} style={{ padding: '6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Edit Contents</button>
+              <button aria-label="Replace smart object contents" style={{ padding: '6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Replace Contents...</button>
               <button aria-label="Rasterize smart object" onClick={() => {
                 const sel = layers.find(l => l.id === selectedLayerId);
                 if (!sel || !sel.name.startsWith('[SO] ')) return;
                 pushHistory('Rasterize');
                 setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, name: l.name.replace('[SO] ', ''), locked: false } : l));
-              }} style={{ padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Rasterize</button>
+              }} style={{ padding: '6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 9, cursor: 'pointer', textAlign: 'left' }}>Rasterize</button>
             </div>
           </div>
         </div>
@@ -4251,13 +4236,12 @@ const Prism: React.FC = () => {
             <div style={{ padding: 30, borderRadius: 6, border: '2px dashed var(--color-border-subtle)', textAlign: 'center', marginBottom: 'var(--space-3)', cursor: 'pointer' }}>
               <div style={{ fontSize: 24, marginBottom: 6 }}>--</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Drop panorama images here</div>
-              <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>or click to browse (minimum 2 images)</div>
             </div>
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Projection</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['Cylindrical', 'Spherical', 'Perspective', 'Auto'].map(p => (
-                  <button key={p} aria-label={`${p} panorama projection`} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: p === 'Cylindrical' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: p === 'Cylindrical' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p}</button>
+                  <button key={p} aria-label={`${p} panorama projection`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: p === 'Cylindrical' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: p === 'Cylindrical' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p}</button>
                 ))}
               </div>
             </div>
@@ -4333,7 +4317,7 @@ const Prism: React.FC = () => {
                 setShowPanorama(false);
               };
               input.click();
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Stitch Panorama</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Stitch Panorama</button>
           </div>
         </div>
       )}
@@ -4349,7 +4333,6 @@ const Prism: React.FC = () => {
             <div style={{ padding: 30, borderRadius: 6, border: '2px dashed var(--color-border-subtle)', textAlign: 'center', marginBottom: 'var(--space-3)', cursor: 'pointer' }}>
               <div style={{ fontSize: 24, marginBottom: 6 }}>--</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 600 }}>Drop focus bracket images here</div>
-              <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2 }}>Different focus distances from the same scene</div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
               <label style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -4365,7 +4348,7 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Blend Method</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['Weighted Average', 'Depth Map', 'Pyramid'].map(m => (
-                  <button key={m} aria-label={`${m} blend method`} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: m === 'Depth Map' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: m === 'Depth Map' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                  <button key={m} aria-label={`${m} blend method`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Depth Map' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: m === 'Depth Map' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
                 ))}
               </div>
             </div>
@@ -4427,7 +4410,7 @@ const Prism: React.FC = () => {
                 setShowFocusStack(false);
               };
               input.click();
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Stack & Merge</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Stack & Merge</button>
           </div>
         </div>
       )}
@@ -4444,7 +4427,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {(['rgb', 'r', 'g', 'b'] as const).map(ch => (
-                <button key={ch} onClick={() => setCurvesChannel(ch)} aria-label={`${ch.toUpperCase()} channel`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (curvesChannel === ch ? (ch === 'rgb' ? 'var(--color-text-tertiary)' : ch === 'r' ? 'rgba(255,59,48,0.3)' : ch === 'g' ? 'rgba(48,209,88,0.3)' : 'rgba(10,132,255,0.3)') : 'var(--color-bg-hover)'), background: curvesChannel === ch ? (ch === 'rgb' ? 'var(--color-border-subtle)' : ch === 'r' ? 'rgba(255,59,48,0.1)' : ch === 'g' ? 'rgba(48,209,88,0.1)' : 'rgba(10,132,255,0.1)') : 'var(--color-border-subtle)', color: curvesChannel === ch ? (ch === 'rgb' ? '#fff' : ch === 'r' ? 'var(--color-error)' : ch === 'g' ? 'var(--color-success)' : 'var(--color-accent)') : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{ch.toUpperCase()}</button>
+                <button key={ch} onClick={() => setCurvesChannel(ch)} aria-label={`${ch.toUpperCase()} channel`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (curvesChannel === ch ? (ch === 'rgb' ? 'var(--color-text-tertiary)' : ch === 'r' ? 'rgba(255,59,48,0.3)' : ch === 'g' ? 'rgba(48,209,88,0.3)' : 'rgba(10,132,255,0.3)') : 'var(--color-bg-hover)'), background: curvesChannel === ch ? (ch === 'rgb' ? 'var(--color-border-subtle)' : ch === 'r' ? 'rgba(255,59,48,0.1)' : ch === 'g' ? 'rgba(48,209,88,0.1)' : 'rgba(10,132,255,0.1)') : 'var(--color-border-subtle)', color: curvesChannel === ch ? (ch === 'rgb' ? '#fff' : ch === 'r' ? 'var(--color-error)' : ch === 'g' ? 'var(--color-success)' : 'var(--color-accent)') : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{ch.toUpperCase()}</button>
               ))}
             </div>
             <div style={{ position: 'relative', width: 280, height: 200, background: 'var(--color-bg-base)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', marginBottom: 'var(--space-2)' }}>
@@ -4483,8 +4466,8 @@ const Prism: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--color-text-tertiary)' }}>
               <span>Input: 0-255</span>
-              <button aria-label="Add curve point" onClick={() => setCurvesPoints(prev => ({ ...prev, [curvesChannel]: [...prev[curvesChannel].slice(0, -1), { x: 128, y: 128 }, prev[curvesChannel][prev[curvesChannel].length - 1]] }))} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>+ Point</button>
-              <button aria-label="Reset curves" onClick={() => setCurvesPoints(prev => ({ ...prev, [curvesChannel]: [{ x: 0, y: 0 }, { x: 255, y: 255 }] }))} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>Reset</button>
+              <button aria-label="Add curve point" onClick={() => setCurvesPoints(prev => ({ ...prev, [curvesChannel]: [...prev[curvesChannel].slice(0, -1), { x: 128, y: 128 }, prev[curvesChannel][prev[curvesChannel].length - 1]] }))} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 9999, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>+ Point</button>
+              <button aria-label="Reset curves" onClick={() => setCurvesPoints(prev => ({ ...prev, [curvesChannel]: [{ x: 0, y: 0 }, { x: 255, y: 255 }] }))} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 9999, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>Reset</button>
             </div>
             <button aria-label="Apply curves adjustment" onClick={() => {
               const canvas = canvasRef.current; if (!canvas) return;
@@ -4521,7 +4504,7 @@ const Prism: React.FC = () => {
               ctx.putImageData(imgData, 0, 0);
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowCurves(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4536,7 +4519,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {(['rgb', 'r', 'g', 'b'] as const).map(ch => (
-                <button key={ch} onClick={() => setLevelsChannel(ch)} aria-label={`${ch.toUpperCase()} channel`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (levelsChannel === ch ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: levelsChannel === ch ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: levelsChannel === ch ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{ch.toUpperCase()}</button>
+                <button key={ch} onClick={() => setLevelsChannel(ch)} aria-label={`${ch.toUpperCase()} channel`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (levelsChannel === ch ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: levelsChannel === ch ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: levelsChannel === ch ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{ch.toUpperCase()}</button>
               ))}
             </div>
             <div style={{ height: 60, background: 'var(--color-bg-base)', borderRadius: 3, marginBottom: 'var(--space-2)', border: '1px solid var(--color-bg-hover)', display: 'flex', alignItems: 'flex-end', padding: '0 2px' }}>
@@ -4592,7 +4575,7 @@ const Prism: React.FC = () => {
               ctx.putImageData(imgData, 0, 0);
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowLevels(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4608,7 +4591,7 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', alignSelf: 'center', marginRight: 4 }}>Output:</span>
               {(['r', 'g', 'b'] as const).map(ch => (
-                <button key={ch} onClick={() => setChannelMixerOutput(ch)} aria-label={`Output ${ch.toUpperCase()} channel`} style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid ' + (channelMixerOutput === ch ? (ch === 'r' ? 'rgba(255,59,48,0.3)' : ch === 'g' ? 'rgba(48,209,88,0.3)' : 'rgba(10,132,255,0.3)') : 'var(--color-bg-hover)'), background: channelMixerOutput === ch ? (ch === 'r' ? 'rgba(255,59,48,0.1)' : ch === 'g' ? 'rgba(48,209,88,0.1)' : 'rgba(10,132,255,0.1)') : 'transparent', color: channelMixerOutput === ch ? (ch === 'r' ? 'var(--color-error)' : ch === 'g' ? 'var(--color-success)' : 'var(--color-accent)') : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{ch.toUpperCase()}</button>
+                <button key={ch} onClick={() => setChannelMixerOutput(ch)} aria-label={`Output ${ch.toUpperCase()} channel`} style={{ padding: '3px 10px', borderRadius: 9999, border: '1px solid ' + (channelMixerOutput === ch ? (ch === 'r' ? 'rgba(255,59,48,0.3)' : ch === 'g' ? 'rgba(48,209,88,0.3)' : 'rgba(10,132,255,0.3)') : 'var(--color-bg-hover)'), background: channelMixerOutput === ch ? (ch === 'r' ? 'rgba(255,59,48,0.1)' : ch === 'g' ? 'rgba(48,209,88,0.1)' : 'rgba(10,132,255,0.1)') : 'transparent', color: channelMixerOutput === ch ? (ch === 'r' ? 'var(--color-error)' : ch === 'g' ? 'var(--color-success)' : 'var(--color-accent)') : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{ch.toUpperCase()}</button>
               ))}
             </div>
             {(['r', 'g', 'b'] as const).map(src => (
@@ -4647,7 +4630,7 @@ const Prism: React.FC = () => {
               ctx.putImageData(imgData, 0, 0);
               setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l));
               setShowChannelMixer(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4662,7 +4645,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
               {(['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks'] as const).map(t => (
-                <button key={t} onClick={() => { setSelectiveColorTarget(t); setSelectiveColorAdj({ cyan: 0, magenta: 0, yellow: 0, black: 0 }); }} aria-label={`Select ${t}`} style={{ padding: '3px 6px', borderRadius: 3, border: '1px solid ' + (selectiveColorTarget === t ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: selectiveColorTarget === t ? 'rgba(10,132,255,0.12)' : 'var(--color-border-subtle)', color: selectiveColorTarget === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                <button key={t} onClick={() => { setSelectiveColorTarget(t); setSelectiveColorAdj({ cyan: 0, magenta: 0, yellow: 0, black: 0 }); }} aria-label={`Select ${t}`} style={{ padding: '3px 6px', borderRadius: 9999, border: '1px solid ' + (selectiveColorTarget === t ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: selectiveColorTarget === t ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: selectiveColorTarget === t ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
               ))}
             </div>
             {(['cyan', 'magenta', 'yellow', 'black'] as const).map(c => (
@@ -4713,7 +4696,7 @@ const Prism: React.FC = () => {
               }
               ctx.putImageData(imgData, 0, 0);
               setShowSelectiveColor(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Apply</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Apply</button>
           </div>
         </div>
       )}
@@ -4728,9 +4711,9 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
               {[{ l: 'Warming (85)', c: '#ec8a00' }, { l: 'Warming (81)', c: '#ebb113' }, { l: 'Cooling (80)', c: '#006ddb' }, { l: 'Cooling (82)', c: '#4aa5ff' }, { l: 'Deep Red', c: '#cc3300' }, { l: 'Deep Blue', c: '#003399' }, { l: 'Deep Emerald', c: '#006633' }, { l: 'Sepia', c: '#a07030' }, { l: 'Violet', c: '#553399' }, { l: 'Orange', c: '#ff6600' }].map(f => (
-                <button key={f.l} onClick={() => setPhotoFilterColor(f.c)} aria-label={`Apply ${f.l} filter`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 3, border: '1px solid ' + (photoFilterColor === f.c ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: photoFilterColor === f.c ? 'rgba(10,132,255,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer' }}>
+                <button key={f.l} onClick={() => setPhotoFilterColor(f.c)} aria-label={`Apply ${f.l} filter`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 9999, border: '1px solid ' + (photoFilterColor === f.c ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: photoFilterColor === f.c ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer' }}>
                   <div style={{ width: 10, height: 10, borderRadius: 2, background: f.c }} />
-                  <span style={{ fontSize: 11, color: photoFilterColor === f.c ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>{f.l}</span>
+                  <span style={{ fontSize: 11, color: photoFilterColor === f.c ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>{f.l}</span>
                 </button>
               ))}
             </div>
@@ -4762,8 +4745,8 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {[{ id: 'cinematic-warm', name: 'Cinematic Warm', desc: 'Orange & teal Hollywood look' }, { id: 'cinematic-cold', name: 'Cinematic Cold', desc: 'Desaturated cool-blue thriller' }, { id: 'vintage-amber', name: 'Vintage Amber', desc: 'Faded golden analog film' }, { id: 'cross-processed', name: 'Cross Processed', desc: 'Strong color shifts, high contrast' }, { id: 'moonlight', name: 'Moonlight', desc: 'Cool blue night-time grade' }, { id: 'bleach-bypass', name: 'Bleach Bypass', desc: 'Desaturated high-contrast silver' }, { id: 'candlelight', name: 'Candlelight', desc: 'Warm low-light tungsten glow' }, { id: 'fuji-velvia', name: 'Fuji Velvia 50', desc: 'Vivid landscape film emulation' }, { id: 'kodak-portra', name: 'Kodak Portra 400', desc: 'Natural skin-tone portrait film' }, { id: 'b-roll-flat', name: 'B-Roll Flat', desc: 'Log/flat for maximum grading flexibility' }].map(lut => (
-                <button key={lut.id} onClick={() => setColorLookupPreset(lut.id)} aria-label={`Apply ${lut.name} LUT`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid ' + (colorLookupPreset === lut.id ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: colorLookupPreset === lut.id ? 'rgba(10,132,255,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 11, color: colorLookupPreset === lut.id ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontWeight: 600 }}>{lut.name}</span>
+                <button key={lut.id} onClick={() => setColorLookupPreset(lut.id)} aria-label={`Apply ${lut.name} LUT`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '6px var(--space-2)', borderRadius: 4, border: '1px solid ' + (colorLookupPreset === lut.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: colorLookupPreset === lut.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 11, color: colorLookupPreset === lut.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 600 }}>{lut.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{lut.desc}</span>
                 </button>
               ))}
@@ -4786,12 +4769,12 @@ const Prism: React.FC = () => {
             <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Source</span>
-                <input type="color" value={replaceColorSource} onChange={e => setReplaceColorSource(e.target.value)} style={{ width: 40, height: 40, border: '2px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                <input type="color" value={replaceColorSource} onChange={e => setReplaceColorSource(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
               </div>
               <span style={{ fontSize: 16, color: 'var(--color-text-tertiary)' }}>→</span>
               <div style={{ textAlign: 'center' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Target</span>
-                <input type="color" value={replaceColorTarget} onChange={e => setReplaceColorTarget(e.target.value)} style={{ width: 40, height: 40, border: '2px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
+                <input type="color" value={replaceColorTarget} onChange={e => setReplaceColorTarget(e.target.value)} style={{ width: 40, height: 40, border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', background: 'none' }} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
@@ -4799,7 +4782,7 @@ const Prism: React.FC = () => {
               <input type="range" min="0" max="200" value={replaceColorFuzziness} onChange={e => setReplaceColorFuzziness(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{replaceColorFuzziness}</span>
             </div>
-            <button aria-label="Apply color replacement" style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Replace</button>
+            <button aria-label="Apply color replacement" style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Replace</button>
           </div>
         </div>
       )}
@@ -4818,9 +4801,9 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 20, textAlign: 'right' }}>{posterizeLevels}</span>
             </div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              {[2, 4, 6, 8, 16].map(l => <button key={l} onClick={() => setPosterizeLevels(l)} aria-label={`${l} levels`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (posterizeLevels === l ? 'var(--color-accent-light, rgba(10,132,255,0.3))' : 'var(--color-bg-hover)'), background: posterizeLevels === l ? 'var(--color-accent-muted, rgba(10,132,255,0.1))' : 'var(--color-border-subtle)', color: posterizeLevels === l ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>{l}</button>)}
+              {[2, 4, 6, 8, 16].map(l => <button key={l} onClick={() => setPosterizeLevels(l)} aria-label={`${l} levels`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (posterizeLevels === l ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: posterizeLevels === l ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: posterizeLevels === l ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 9, cursor: 'pointer' }}>{l}</button>)}
             </div>
-            <button aria-label="Apply posterize effect" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Posterize'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const lvl = posterizeLevels; for (let i = 0; i < d.length; i += 4) { for (let c = 0; c < 3; c++) { d[i + c] = Math.round(Math.round(d[i + c] / 255 * (lvl - 1)) / (lvl - 1) * 255); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowPosterize(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply posterize effect" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Posterize'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const lvl = posterizeLevels; for (let i = 0; i < d.length; i += 4) { for (let c = 0; c < 3; c++) { d[i + c] = Math.round(Math.round(d[i + c] / 255 * (lvl - 1)) / (lvl - 1) * 255); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowPosterize(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4841,7 +4824,7 @@ const Prism: React.FC = () => {
               <input type="range" min="1" max="255" value={thresholdValue} onChange={e => setThresholdValue(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--color-accent)' }} />
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 22, textAlign: 'right' }}>{thresholdValue}</span>
             </div>
-            <button aria-label="Apply threshold effect" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Threshold'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; for (let i = 0; i < d.length; i += 4) { const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; const v = lum >= thresholdValue ? 255 : 0; d[i] = v; d[i + 1] = v; d[i + 2] = v; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowThreshold(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply threshold effect" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Threshold'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; for (let i = 0; i < d.length; i += 4) { const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; const v = lum >= thresholdValue ? 255 : 0; d[i] = v; d[i + 1] = v; d[i + 2] = v; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowThreshold(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4870,12 +4853,12 @@ const Prism: React.FC = () => {
             <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Anchor</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, width: 90, marginBottom: 10 }}>
               {(['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'] as const).map(a => (
-                <button key={a} onClick={() => setCanvasSizeAnchor(a)} aria-label={`Anchor ${a}`} style={{ width: 26, height: 26, borderRadius: 3, border: '1px solid ' + (canvasSizeAnchor === a ? 'var(--color-accent-light, rgba(10,132,255,0.4))' : 'var(--color-border-subtle)'), background: canvasSizeAnchor === a ? 'var(--color-accent-muted, rgba(10,132,255,0.2))' : 'var(--color-border-subtle)', cursor: 'pointer' }}>
-                  {canvasSizeAnchor === a && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-accent)', margin: 'auto' }} />}
+                <button key={a} onClick={() => setCanvasSizeAnchor(a)} aria-label={`Anchor ${a}`} style={{ width: 26, height: 26, borderRadius: 3, border: '1px solid ' + (canvasSizeAnchor === a ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'), background: canvasSizeAnchor === a ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer' }}>
+                  {canvasSizeAnchor === a && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--dex-focus-color, #fff)', margin: 'auto' }} />}
                 </button>
               ))}
             </div>
-            <button aria-label="Apply canvas resize" onClick={() => { setCanvasSize(canvasSizeNew); setShowCanvasSize(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply canvas resize" onClick={() => { setCanvasSize(canvasSizeNew); setShowCanvasSize(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4911,7 +4894,7 @@ const Prism: React.FC = () => {
                     pushHistory('Flip Vertical');
                   }
                   setShowImageRotation(false);
-                }} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.12s ease' }}>
+                }} style={{ padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.12s ease' }}>
                   <span style={{ fontSize: 14 }}>{r.icon}</span> {r.label}
                 </button>
               ))}
@@ -4927,7 +4910,7 @@ const Prism: React.FC = () => {
                 pushHistory(`Rotate ${arbitraryAngle}°`);
               }
               setShowImageRotation(false);
-            }} style={{ width: '100%', padding: '6px', marginTop: 6, borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.12s ease' }}>Apply Rotation</button>
+            }} style={{ width: '100%', padding: '6px', marginTop: 6, borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.12s ease' }}>Apply Rotation</button>
           </div>
         </div>
       )}
@@ -4942,7 +4925,7 @@ const Prism: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['shadows', 'midtones', 'highlights'] as const).map(t => (
-                <button key={t} onClick={() => setColorBalanceTone(t)} aria-label={`${t} tone`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (colorBalanceTone === t ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: colorBalanceTone === t ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: colorBalanceTone === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                <button key={t} onClick={() => setColorBalanceTone(t)} aria-label={`${t} tone`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (colorBalanceTone === t ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: colorBalanceTone === t ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: colorBalanceTone === t ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
               ))}
             </div>
             {[{ label: 'Cyan / Red', key: 'cr' as const }, { label: 'Magenta / Green', key: 'mg' as const }, { label: 'Yellow / Blue', key: 'yb' as const }].map(s => (
@@ -4967,7 +4950,7 @@ const Prism: React.FC = () => {
             <div style={{ height: 24, borderRadius: 3, marginBottom: 10, background: `linear-gradient(to right, ${gradientMapStops.map(s => `${s.color} ${s.offset * 100}%`).join(', ')})` }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
               {[{ n: 'B&W', s: [{ offset: 0, color: '#000' }, { offset: 1, color: '#fff' }] }, { n: 'Duotone Blue', s: [{ offset: 0, color: '#000022' }, { offset: 1, color: '#4488ff' }] }, { n: 'Sunset', s: [{ offset: 0, color: '#1a0a2e' }, { offset: 0.5, color: '#ff6b35' }, { offset: 1, color: '#f7c948' }] }, { n: 'Infrared', s: [{ offset: 0, color: '#000' }, { offset: 0.5, color: '#ff0066' }, { offset: 1, color: '#ffccdd' }] }, { n: 'Thermal', s: [{ offset: 0, color: '#000033' }, { offset: 0.33, color: '#0066ff' }, { offset: 0.66, color: '#ff3300' }, { offset: 1, color: '#ffff00' }] }, { n: 'Teal-Orange', s: [{ offset: 0, color: '#003344' }, { offset: 1, color: '#ff8844' }] }].map(p => (
-                <button key={p.n} onClick={() => setGradientMapStops(p.s)} aria-label={`Apply ${p.n} gradient map`} style={{ padding: '3px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p.n}</button>
+                <button key={p.n} onClick={() => setGradientMapStops(p.s)} aria-label={`Apply ${p.n} gradient map`} style={{ padding: '3px var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p.n}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 'var(--space-2)' }}>
@@ -4977,9 +4960,9 @@ const Prism: React.FC = () => {
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{Math.round(stop.offset * 100)}%</span>
                 </div>
               ))}
-              <button aria-label="Add gradient stop" onClick={() => setGradientMapStops(prev => [...prev.slice(0, -1), { offset: 0.5, color: '#888888' }, prev[prev.length - 1]])} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 3, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>+</button>
+              <button aria-label="Add gradient stop" onClick={() => setGradientMapStops(prev => [...prev.slice(0, -1), { offset: 0.5, color: '#888888' }, prev[prev.length - 1]])} style={{ background: 'var(--color-bg-hover)', border: 'none', borderRadius: 9999, color: 'var(--color-text-tertiary)', fontSize: 9, padding: '2px 6px', cursor: 'pointer' }}>+</button>
             </div>
-            <button aria-label="Apply gradient map" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Gradient Map'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const stops = gradientMapStops; const parseHex = (hex: string) => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }; const lut: number[][] = []; for (let i = 0; i < 256; i++) { const t = i / 255; let s0 = stops[0], s1 = stops[stops.length - 1]; for (let j = 0; j < stops.length - 1; j++) { if (t >= stops[j].offset && t <= stops[j + 1].offset) { s0 = stops[j]; s1 = stops[j + 1]; break; } } const range = s1.offset - s0.offset; const f = range > 0 ? (t - s0.offset) / range : 0; const c0 = parseHex(s0.color); const c1 = parseHex(s1.color); lut.push([Math.round(c0[0] + (c1[0] - c0[0]) * f), Math.round(c0[1] + (c1[1] - c0[1]) * f), Math.round(c0[2] + (c1[2] - c0[2]) * f)]); } for (let i = 0; i < d.length; i += 4) { const lum = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114); const c = lut[lum]; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowGradientMap(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply gradient map" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Gradient Map'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const stops = gradientMapStops; const parseHex = (hex: string) => { const h = hex.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }; const lut: number[][] = []; for (let i = 0; i < 256; i++) { const t = i / 255; let s0 = stops[0], s1 = stops[stops.length - 1]; for (let j = 0; j < stops.length - 1; j++) { if (t >= stops[j].offset && t <= stops[j + 1].offset) { s0 = stops[j]; s1 = stops[j + 1]; break; } } const range = s1.offset - s0.offset; const f = range > 0 ? (t - s0.offset) / range : 0; const c0 = parseHex(s0.color); const c1 = parseHex(s1.color); lut.push([Math.round(c0[0] + (c1[0] - c0[0]) * f), Math.round(c0[1] + (c1[1] - c0[1]) * f), Math.round(c0[2] + (c1[2] - c0[2]) * f)]); } for (let i = 0; i < d.length; i += 4) { const lum = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114); const c = lut[lum]; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowGradientMap(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -4999,7 +4982,7 @@ const Prism: React.FC = () => {
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 32, textAlign: 'right' }}>{s.label === 'Radius' ? unsharpRadius.toFixed(1) : s.val}{s.unit}</span>
               </div>
             ))}
-            <button aria-label="Apply unsharp mask" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Unsharp Mask'); applyFilter(ctx, canvasSize.width, canvasSize.height, 'sharpen', { intensity: unsharpAmount / 5, radius: unsharpRadius }, selection.mask); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowUnsharpMask(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Apply</button>
+            <button aria-label="Apply unsharp mask" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Unsharp Mask'); applyFilter(ctx, canvasSize.width, canvasSize.height, 'sharpen', { intensity: unsharpAmount / 5, radius: unsharpRadius }, selection.mask); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowUnsharpMask(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Apply</button>
           </div>
         </div>
       )}
@@ -5021,7 +5004,7 @@ const Prism: React.FC = () => {
               <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Distribution</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {(['uniform', 'gaussian'] as const).map(d => (
-                  <button key={d} onClick={() => setNoiseDistribution(d)} aria-label={`${d} noise distribution`} style={{ flex: 1, padding: '4px', borderRadius: 4, border: '1px solid ' + (noiseDistribution === d ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: noiseDistribution === d ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: noiseDistribution === d ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{d}</button>
+                  <button key={d} onClick={() => setNoiseDistribution(d)} aria-label={`${d} noise distribution`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (noiseDistribution === d ? 'rgba(10,132,255,0.3)' : 'var(--color-bg-hover)'), background: noiseDistribution === d ? 'rgba(10,132,255,0.1)' : 'var(--color-border-subtle)', color: noiseDistribution === d ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{d}</button>
                 ))}
               </div>
             </div>
@@ -5029,7 +5012,7 @@ const Prism: React.FC = () => {
               <input type="checkbox" checked={noiseMonochrome} onChange={e => setNoiseMonochrome(e.target.checked)} style={{ accentColor: 'var(--color-accent)' }} />
               Monochromatic
             </label>
-            <button aria-label="Apply noise" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Add Noise'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const amt = noiseAmount / 100; for (let i = 0; i < d.length; i += 4) { const n = noiseDistribution === 'gaussian' ? (((Math.random() + Math.random() + Math.random() + Math.random() + Math.random() + Math.random()) - 3) / 3) * 255 * amt : (Math.random() - 0.5) * 255 * amt; if (noiseMonochrome) { d[i] = Math.min(255, Math.max(0, d[i] + n)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + n)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + n)); } else { d[i] = Math.min(255, Math.max(0, d[i] + (Math.random() - 0.5) * 255 * amt)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + (Math.random() - 0.5) * 255 * amt)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + (Math.random() - 0.5) * 255 * amt)); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowAddNoise(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply noise" onClick={() => { const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return; pushHistory('Add Noise'); const imgData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height); const d = imgData.data; const amt = noiseAmount / 100; for (let i = 0; i < d.length; i += 4) { const n = noiseDistribution === 'gaussian' ? (((Math.random() + Math.random() + Math.random() + Math.random() + Math.random() + Math.random()) - 3) / 3) * 255 * amt : (Math.random() - 0.5) * 255 * amt; if (noiseMonochrome) { d[i] = Math.min(255, Math.max(0, d[i] + n)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + n)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + n)); } else { d[i] = Math.min(255, Math.max(0, d[i] + (Math.random() - 0.5) * 255 * amt)); d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + (Math.random() - 0.5) * 255 * amt)); d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + (Math.random() - 0.5) * 255 * amt)); } } ctx.putImageData(imgData, 0, 0); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, imageData: canvas.toDataURL() } : l)); setShowAddNoise(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}
@@ -5043,8 +5026,8 @@ const Prism: React.FC = () => {
           </div>
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              <button aria-label="Add horizontal guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'h', position: Math.round(canvasSize.height / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Horizontal</button>
-              <button aria-label="Add vertical guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'v', position: Math.round(canvasSize.width / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid rgba(48,209,88,0.2)', background: 'rgba(48,209,88,0.08)', color: 'var(--color-success)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Vertical</button>
+              <button aria-label="Add horizontal guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'h', position: Math.round(canvasSize.height / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Horizontal</button>
+              <button aria-label="Add vertical guide" onClick={() => setGuides(prev => [...prev, { id: `g-${Date.now()}`, orientation: 'v', position: Math.round(canvasSize.width / 2) }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid rgba(48,209,88,0.2)', background: 'rgba(48,209,88,0.08)', color: 'var(--color-success)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ Vertical</button>
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {guides.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No guides yet</div>}
@@ -5059,7 +5042,7 @@ const Prism: React.FC = () => {
               ))}
             </div>
             {guides.length > 0 && (
-              <button aria-label="Clear all guides" onClick={() => setGuides([])} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 9, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Clear All Guides</button>
+              <button aria-label="Clear all guides" onClick={() => setGuides([])} style={{ width: '100%', padding: '5px', borderRadius: 9999, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 9, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Clear All Guides</button>
             )}
           </div>
         </div>
@@ -5074,17 +5057,17 @@ const Prism: React.FC = () => {
           </div>
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              <button aria-label="New action" onClick={() => setActions(prev => [...prev, { id: `a-${Date.now()}`, name: `Action ${prev.length + 1}`, steps: [] }])} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ New Action</button>
-              <button aria-label={actionsRecording ? 'Stop recording' : 'Record action'} onClick={() => setActionsRecording(v => !v)} style={{ padding: '5px 10px', borderRadius: 4, border: '1px solid ' + (actionsRecording ? 'rgba(255,59,48,0.3)' : 'var(--color-bg-hover)'), background: actionsRecording ? 'rgba(255,59,48,0.12)' : 'var(--color-border-subtle)', color: actionsRecording ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{actionsRecording ? <><svg width="8" height="8" viewBox="0 0 16 16" fill="#FF453A" style={{ marginRight: 4 }}><circle cx="8" cy="8" r="6"/></svg> Stop</> : <><svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 4 }}><circle cx="8" cy="8" r="6"/></svg> Record</>}</button>
+              <button aria-label="New action" onClick={() => setActions(prev => [...prev, { id: `a-${Date.now()}`, name: `Action ${prev.length + 1}`, steps: [] }])} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-accent-light, rgba(10,132,255,0.2))', background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', color: 'var(--color-accent)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>+ New Action</button>
+              <button aria-label={actionsRecording ? 'Stop recording' : 'Record action'} onClick={() => setActionsRecording(v => !v)} style={{ padding: '5px 10px', borderRadius: 9999, border: '1px solid ' + (actionsRecording ? 'rgba(255,59,48,0.3)' : 'var(--color-bg-hover)'), background: actionsRecording ? 'rgba(255,59,48,0.12)' : 'var(--color-border-subtle)', color: actionsRecording ? 'var(--color-error)' : 'var(--color-text-tertiary)', fontSize: 9, fontWeight: 600, cursor: 'pointer' }}>{actionsRecording ? <><svg width="8" height="8" viewBox="0 0 16 16" fill="#FF453A" style={{ marginRight: 4 }}><circle cx="8" cy="8" r="6"/></svg> Stop</> : <><svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 4 }}><circle cx="8" cy="8" r="6"/></svg> Record</>}</button>
             </div>
-            {actionsRecording && <div style={{ padding: '6px var(--space-2)', borderRadius: 4, background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.15)', marginBottom: 'var(--space-2)', fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}>Recording... perform your edits now</div>}
+            {actionsRecording && <div style={{ padding: '6px var(--space-2)', borderRadius: 4, background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.15)', marginBottom: 'var(--space-2)', fontSize: 9, color: 'var(--color-error)', fontWeight: 600 }}>Recording</div>}
             <div style={{ maxHeight: 250, overflowY: 'auto' }}>
               {actions.map(a => (
                 <div key={a.id} style={{ padding: 'var(--space-2)', marginBottom: 4, borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{a.name}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button aria-label={`Play action ${a.name}`} style={{ background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: 3, color: 'var(--color-success)', fontSize: 11, padding: '1px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+                      <button aria-label={`Play action ${a.name}`} style={{ background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)', borderRadius: 9999, color: 'var(--color-success)', fontSize: 11, padding: '1px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
                       <button aria-label={`Delete action ${a.name}`} onClick={() => setActions(prev => prev.filter(aa => aa.id !== a.id))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button>
                     </div>
                   </div>
@@ -5107,7 +5090,7 @@ const Prism: React.FC = () => {
             <div style={{ marginBottom: 6, fontSize: 9, color: 'var(--color-text-tertiary)' }}>View Mode</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
               {['Marching Ants', 'Overlay', 'On Black', 'On White', 'B&W'].map(v => (
-                <button key={v} aria-label={`${v} view mode`} style={{ flex: 1, padding: '3px 2px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: v === 'Marching Ants' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: v === 'Marching Ants' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, cursor: 'pointer' }}>{v}</button>
+                <button key={v} aria-label={`${v} view mode`} style={{ flex: 1, padding: '3px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: v === 'Marching Ants' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: v === 'Marching Ants' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, cursor: 'pointer' }}>{v}</button>
               ))}
             </div>
             {[{ label: 'Smooth', val: refineEdgeSmooth, set: setRefineEdgeSmooth, max: 100 }, { label: 'Feather', val: refineEdgeFeather, set: setRefineEdgeFeather, max: 250 }, { label: 'Contrast', val: refineEdgeContrast, set: setRefineEdgeContrast, max: 100 }, { label: 'Shift Edge', val: refineEdgeShift, set: setRefineEdgeShift, max: 100 }].map(s => (
@@ -5120,10 +5103,10 @@ const Prism: React.FC = () => {
             <div style={{ marginTop: 6, marginBottom: 6, fontSize: 9, color: 'var(--color-text-tertiary)' }}>Output To</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {['Selection', 'Layer Mask', 'New Layer', 'New Doc'].map(o => (
-                <button key={o} aria-label={`Output to ${o}`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: o === 'Selection' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: o === 'Selection' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{o}</button>
+                <button key={o} aria-label={`Output to ${o}`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: o === 'Selection' ? 'var(--color-accent-muted, rgba(10,132,255,0.12))' : 'var(--color-border-subtle)', color: o === 'Selection' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 7, fontWeight: 600, cursor: 'pointer' }}>{o}</button>
               ))}
             </div>
-            <button aria-label="Apply refine edge" style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
+            <button aria-label="Apply refine edge" style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-accent)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply</button>
           </div>
         </div>
       )}

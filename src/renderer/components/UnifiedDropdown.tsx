@@ -100,7 +100,6 @@ const styles = {
     inset: 0,
     zIndex: zIndexTokens.modal - 1,
     background: 'rgba(0, 0, 0, 0.2)',
-    backdropFilter: 'blur(2px)',
   },
   container: {
     position: 'fixed' as const,
@@ -109,9 +108,7 @@ const styles = {
     flexDirection: 'column' as const,
     minWidth: 180,
     maxWidth: 'min(320px, calc(100vw - 48px))',
-    background: 'var(--color-bg-glass-strong, rgba(28, 28, 32, 0.92))',
-    backdropFilter: 'var(--blur-lg) saturate(180%)',
-    WebkitBackdropFilter: 'var(--blur-lg) saturate(180%)',
+    background: 'var(--color-bg-surface-solid, #141416)',
     border: `1px solid ${colors.border.default}`,
     borderRadius: radius.lg,
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2)',

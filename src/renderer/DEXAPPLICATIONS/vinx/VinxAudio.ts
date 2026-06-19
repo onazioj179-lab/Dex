@@ -1085,8 +1085,10 @@ export class AudioEngine {
   
   normalizeToLUFS(buffer: AudioBuffer, targetLUFS: number): AudioBuffer {
     const measurement = this.measureLoudness(buffer);
-    const gainDB = targetLUFS - measurement.integratedLUFS;
-    const gain = Math.pow(10, gainDB / 20);
+    // True-peak-safe: clamp the gain so normalization never pushes a loud master
+    // into clipping (the old flat gain applied no headroom check).
+    const { gainDb } = loudnessTargetGain(measurement.integratedLUFS, targetLUFS, measurement.truePeak);
+    const gain = Math.pow(10, gainDb / 20);
     
     const newBuffer = this.audioContext.createBuffer(
       buffer.numberOfChannels,
@@ -1761,6 +1763,7 @@ export class AudioEngine {
 // =============================================================================
 
 import { generateId } from '../../../shared/util/id';
+import { loudnessTargetGain } from '../../../shared/audio/dsp';
 
 function createDefaultEffect(type: AudioEffectType): AudioEffect {
   switch (type) {

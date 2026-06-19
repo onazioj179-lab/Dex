@@ -64,6 +64,18 @@ const saveHistory = (history: string[]) => {
   } catch { /* ignore */ }
 };
 
+// WCAG 2.x relative luminance + contrast ratio (pure, unit-tested). Used for the
+// accessibility readout so designers can check legibility against black/white.
+function relLuminance(hex: string): number {
+  const { r, g, b } = hexToRgb(hex);
+  const lin = (c: number) => { const cs = c / 255; return cs <= 0.03928 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+export function contrastRatio(hexA: string, hexB: string): number {
+  const l1 = relLuminance(hexA), l2 = relLuminance(hexB);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
 const ColorPicker: React.FC = () => {
   const [hsl, setHsl] = useState<HSL>({ h: 210, s: 100, l: 60 });
   const [hexInput, setHexInput] = useState('');
@@ -210,6 +222,24 @@ const ColorPicker: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* WCAG contrast — legibility of this color against white / black */}
+      <div style={s.section}>
+        <div className="dex-label-caps" style={s.sectionLabel}>Contrast</div>
+        {([['#FFFFFF', 'on white'], ['#000000', 'on black']] as const).map(([bg, label]) => {
+          const ratio = contrastRatio(hex, bg);
+          const aa = ratio >= 4.5, aaa = ratio >= 7;
+          return (
+            <div key={bg} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px var(--space-1)', fontSize: 12 }}>
+              <span style={{ color: 'var(--color-text-secondary)' }}>{ratio.toFixed(2)}:1 <span style={{ color: 'var(--color-text-tertiary)' }}>{label}</span></span>
+              <span style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>
+                <span style={{ color: aa ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>AA</span>
+                <span style={{ color: aaa ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>AAA</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

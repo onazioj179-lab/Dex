@@ -602,11 +602,10 @@ export const NotificationCenter: React.FC<{
         width: 'min(360px, calc(100vw - 48px))', zIndex: 'var(--z-notification)',
         background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border-subtle)',
-        borderRadius: 12,
+        borderRadius: 10,
         boxShadow: 'var(--pg-shadow-popover-strong)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
-        backdropFilter: 'var(--blur-xl)',
         animation: isReduceMotion() ? 'none' : 'notifCenterIn 0.22s cubic-bezier(0.23,1,0.32,1)',
       }}>
         <style>{`

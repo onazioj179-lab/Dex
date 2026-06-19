@@ -14,6 +14,14 @@
 //
 import React, { useEffect, useState, useCallback } from 'react';
 import { resolvePlan, limitsFor, planLabel } from '../../../shared/plan';
+import {
+  describeCapabilities,
+  grant as grantCapability,
+  revoke as revokeCapability,
+  type CapabilityInfo,
+  type Capability,
+  type CapabilityStatus,
+} from '../../uki/permissions';
 
 // ---------- Shared design tokens (kept inline to avoid prop drilling) ----------
 const PANEL: React.CSSProperties = {
@@ -115,6 +123,106 @@ function timeLeft(expiresAt: number): string {
   return `${days} d left`;
 }
 
+// ---------------------------------------------------------------------------
+// UKI Assistant Access — the AI half of the permission center.
+// Surfaces uki/permissions.ts (describe/grant/revoke) so the user can see and
+// control exactly what the assistant may access, and why. Rendered inside the
+// PermissionsPanel below so "Permissions" is a single AI + system center, and
+// `dex perms` ("grant or revoke from settings") now points at a real surface.
+// ---------------------------------------------------------------------------
+const STATUS_DOT: Record<CapabilityStatus, string> = {
+  granted: 'var(--color-success, #30d158)',
+  denied: 'var(--color-text-tertiary, #8e8e93)',
+  'hard-denied': 'var(--color-error, #ff453a)',
+};
+
+const UkiAccessSection: React.FC = () => {
+  const [caps, setCaps] = useState<CapabilityInfo[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try { setCaps(await describeCapabilities()); } catch { /* localStorage unavailable */ }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const setGrant = useCallback(async (cap: Capability, scope: 'session' | 'persistent') => {
+    setBusy(true);
+    try { await grantCapability(cap, scope); await refresh(); }
+    catch (err) { console.warn('[uki-perms] grant failed', err); }
+    finally { setBusy(false); }
+  }, [refresh]);
+
+  const clearGrant = useCallback(async (cap: Capability) => {
+    setBusy(true);
+    try { await revokeCapability(cap); await refresh(); }
+    catch (err) { console.warn('[uki-perms] revoke failed', err); }
+    finally { setBusy(false); }
+  }, [refresh]);
+
+  const grantedCount = caps.filter(c => c.status === 'granted').length;
+
+  const revokeAllUki = useCallback(async () => {
+    if (!confirm('Revoke every UKI assistant capability?')) return;
+    setBusy(true);
+    try {
+      for (const c of caps) {
+        if (c.status === 'granted') await revokeCapability(c.capability);
+      }
+      await refresh();
+    } finally { setBusy(false); }
+  }, [caps, refresh]);
+
+  return (
+    <>
+      <h3 style={TITLE}>UKI Assistant Access</h3>
+      <p style={{ ...DESC, marginTop: 0, marginBottom: 'var(--space-2)' }}>
+        What the UKI assistant may access, and why. Nothing is assumed — grant only
+        what you want it to use. &ldquo;Allow once&rdquo; lapses automatically after 4 hours.
+      </p>
+      <div style={SECTION}>
+        {caps.map((c) => {
+          const granted = c.status === 'granted';
+          const hard = c.status === 'hard-denied';
+          return (
+            <div key={c.capability} style={ROW}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_DOT[c.status], flex: '0 0 auto' }} />
+                  {c.label}
+                  {granted && (
+                    <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', fontWeight: 400 }}>
+                      {c.scope === 'persistent' ? 'Always' : timeLeft(c.expiresTs ?? 0)}
+                    </span>
+                  )}
+                </div>
+                <div style={DESC}>{c.rationale}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flex: '0 0 auto' }}>
+                {hard ? (
+                  <span style={{ fontSize: 11, color: 'var(--color-error)' }}>Blocked</span>
+                ) : granted ? (
+                  <button style={BTN_DANGER} onClick={() => clearGrant(c.capability)} disabled={busy}>Revoke</button>
+                ) : (
+                  <>
+                    <button style={BTN} onClick={() => setGrant(c.capability, 'session')} disabled={busy} title="Grant for this session (4h)">Allow once</button>
+                    <button style={BTN_PRIMARY} onClick={() => setGrant(c.capability, 'persistent')} disabled={busy} title="Grant until revoked">Always</button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div>
+        <button style={BTN_DANGER} onClick={revokeAllUki} disabled={busy || grantedCount === 0}>
+          Revoke all assistant access ({grantedCount})
+        </button>
+      </div>
+    </>
+  );
+};
+
 export const PermissionsPanel: React.FC = () => {
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -164,8 +272,9 @@ export const PermissionsPanel: React.FC = () => {
       <div>
         <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Permissions</h2>
         <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-          Saved decisions for screen recording, camera, microphone, location, clipboard, files, and more.
-          Related capabilities are batched into a single prompt — revoking here clears the whole batch.
+          Saved decisions for screen recording, camera, microphone, location, clipboard, files, and more —
+          plus what the UKI assistant may access, below. Related capabilities are batched into a single
+          prompt; revoking here clears the whole batch.
         </p>
       </div>
 
@@ -218,6 +327,8 @@ export const PermissionsPanel: React.FC = () => {
           ))
         )}
       </div>
+
+      <UkiAccessSection />
     </div>
   );
 };

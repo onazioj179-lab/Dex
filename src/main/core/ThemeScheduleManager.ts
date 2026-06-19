@@ -25,11 +25,22 @@ class ThemeScheduleManager {
   private mainWindow: BrowserWindow | null = null;
   private checkInterval: ReturnType<typeof setInterval> | null = null;
   private currentTheme: string = 'system';
+  private ipcRegistered = false;
+
+  constructor() {
+    // Register IPC handlers at construction (module import = very early in main
+    // startup) rather than in initialize(), which runs deep in the BATCHED
+    // feature-suite init. The renderer's FeatureStore calls theme-schedule:getInfo
+    // during its own early boot, and was racing ahead of the late initialize() ->
+    // "No handler registered for 'theme-schedule:getInfo'". The handlers only read
+    // databaseManager/nativeTheme (no mainWindow needed), so registering them here
+    // is safe and removes the race + the startup console error.
+    this.registerIPC();
+  }
 
   initialize(mainWindow: BrowserWindow): void {
     this.mainWindow = mainWindow;
     this.loadSchedule();
-    this.registerIPC();
     this.startScheduleCheck();
     log.info('[ThemeSchedule] Theme schedule manager initialized');
   }
@@ -173,6 +184,8 @@ class ThemeScheduleManager {
   }
 
   private registerIPC(): void {
+    if (this.ipcRegistered) return;
+    this.ipcRegistered = true;
     ipcMain.handle('theme-schedule:getInfo', async () => {
       return this.getCurrentInfo();
     });

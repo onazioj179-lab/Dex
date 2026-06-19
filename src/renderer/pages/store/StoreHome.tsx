@@ -179,7 +179,7 @@ function FeaturedHero({
         position: 'relative',
         overflow: 'hidden',
         padding: 22,
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'linear-gradient(135deg, rgba(10,132,255,0.16), rgba(94,92,230,0.10) 60%, rgba(255,255,255,0.02))',
       }}
     >

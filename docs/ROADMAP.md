@@ -1,5 +1,374 @@
 # DEX — Roadmap (single source of truth)
 
+> **Active goal (2026-06-19): Calendar redesign + Tauri migration push.**
+> (1) Calendar reskinned to the icon-grid design (the mock): Monday-first week,
+> pill day headers, true-black rounded tile cells, per-event app icons +
+> notification dots, bold "today". Added an optional `icon` field to events with an
+> icon picker in the New Event modal; mirrored the Monday-first + icon change into
+> the FloatingLauncher calendar widget so the two stay consistent. Renderer-only,
+> `tsc` 0. (2) Tauri migration resumed: ported `analytics:*` (11 channels,
+> `src-tauri/src/analytics.rs`) and the rest of `power:*` (`PowerController.ts` ->
+> `src-tauri/src/power.rs`: profiles/stats/resource-hogs/quick-boost/cleanup) and
+> `mode:*` (6 channels, KV-backed CRUD + active-state via `modes_dispatch`) at
+> Electron parity. THEN a multi-agent workflow bulk-ported 22 more clean subsystems
+> (~110 channels: activity/duplicates/focus/memory/operations/perf/reader/resource/
+> rule/sessions/split/splitview/stability/startup/systemHealth/tags/user/voiceNotes
+> + logs/patterns/permissions/notes); 5 over-included namespaces (auth/settings/theme
+> already native; render-error/renderer shimmed) were dropped; heavy channels degrade
+> honestly (not faked). THEN round-2: a workflow bulk-ported ~119 more subsystems
+> (264 channels) across nearly every remaining namespace. main.rs mod count 74->222;
+> `cargo check` 0 errors, `tsc` GREEN. INCIDENT: round-2 agents ran `git checkout
+> main.rs`, wiping all uncommitted wiring; recovered by re-wiring from the surviving
+> module files (lost helpers rebuilt as modules modes.rs/projects.rs). LESSON: COMMIT
+> before workflows; agents must never touch shared files. Deferred (degrade to null):
+> rewind:getDaySummary, auth:setup:*, files:organizeByType. Details in
+> docs/TAURI-MIGRATION.md. Calendar follow-up still parked (15/16 icon render).
+
+> **v6 program (started 2026-06-18, in progress).** Full-system audit + refinement;
+> plan in `.claude/plans/i-need-a-prompt-stateless-harp.md`. **Phase 0 DONE + VERIFIED**
+> (renderer+main `tsc` 0, launcher test 6/6, renderer build green):
+> FloatingLauncher jump/jitter/recompute fixed -- one symmetric clamp helper +
+> rAF-coalesced drag + memoized geometry/style; clamp extracted to
+> `components/floatingLauncherGeometry.ts` with a unit test
+> (`tests/unit/floating-launcher-geometry.test.ts`). Theme-aware crash-fallback HTML
+> with a CSP-safe reload link + restore hint (`main.ts`). Unresponsive-renderer
+> recovery -- grace timer -> native Reload/Wait dialog (`main.ts` + `SessionHardening`).
+> WindowManifest switched from starve-prone trailing debounce to a throttle
+> (leading-edge + guaranteed write per interval; force-kill now loses <=1s).
+> Notes toolbar labels -> DexIcon glyphs; Task Manager low-signal metrics
+> (uptime/network/disk) demoted to Advanced. **P3 per-app conformance sweep DONE**
+> (parallel 8-point audit over the whole roster -- matrix: ~37/45 apps PASS; nearly
+> every flag was a FALSE POSITIVE -- `var(--x, #fallback)` fallbacks, categorical
+> data palettes (Calendar/NoiseGenerator/ColorPicker/PixelArt), intentional bespoke
+> brand colors (Prism pink, CollabHub gradients), and the MapLibre marker literal
+> (a CSS var can't resolve in an SVG fill). The one genuine chrome fix -- TaskManager
+> `toneFor` hex -> `var(--color-error|warning|success)` -- landed; verified tsc 0).
+> P2.3 STARTED: a pure `isOnScreen` frustum-cull helper added to Nexus, applied to
+> the star + particle fields (safe -- they already had depth/alpha `continue`
+> guards); verified tsc 0 + build green. **Track G -- first creative feature DONE:
+> AXL accurate mass properties** (`axl/axlMassProperties.ts`): exact mesh
+> volume/area/centroid (divergence theorem) + closed-form primitives (box/cylinder/
+> sphere/cone/torus/tube/wedge), replacing the old bbox/`vol^(2/3)*6` approximations.
+> Wired into two real consumers -- the user-facing "mass properties" analysis
+> breakdown (now reports accurate surface area) and the thermal sim's deltaT -- not
+> orphaned. Verified: 10/10 unit tests (`tests/unit/axl-mass-properties.test.ts`),
+> tsc 0, build green. **Track G batch 2 -- 3 more confirmed-genuine gaps DONE**
+> (agents verified each was actually absent first): UnitConverter Energy category
+> (J/kJ/cal/kcal/Wh/kWh); Kanban WIP-limit enforcement (the `limit` field existed
+> but was never checked -- now blocks over-limit adds + toast); ColorPicker WCAG
+> contrast readout (AA/AAA vs white/black; pure `contrastRatio` + 4 unit tests).
+> Verified: tsc 0, 20/20 unit tests, build green. CONFIRMED-REMAINING queue
+> (agent-verified absent, pure-core+wire, buildable without an app run): Forge
+> output-file-size estimator, WorldClock timezone-diff, MarkdownEditor TOC, Pomodoro
+> stats persistence, Flux LAB color interpolation, Vinx drop-frame timecode +
+> sidechain envelope + loudness-target gain. CONFIRMED AGAIN: most "creative
+> flagship" features ALREADY EXIST (Imosion LUFS/true-peak/RMS + multiband + limiter;
+> Vinx masks/multicam/color), so the real gaps are narrow + scattered -- "1000
+> features" is mostly already-built, not a backlog of that size.
+> **Track G batch 3 DONE:** Flux hex-color keyframe interpolation (the engine
+> STEPPED colors before -- now a linear-light tween; `lerpHexColor` + 4 tests) and
+> Forge output-file-size estimator (bitrate*duration*overhead; shown in each job
+> row; + 3 tests). Verified tsc 0, build green. **Track G batch 4 DONE:** WorldClock
+> per-clock "+Nh vs here" timezone diff (DST-correct); Pomodoro today-scoped stats
+> persistence (sessions + focus-minutes survive reload, roll over at midnight) +
+> "min focused today" readout; MarkdownEditor document Outline (TOC) that parses
+> ATX headings and jumps the editor caret. Verified tsc 0, build green.
+> **Track G batch 5 DONE (final named queue):** Vinx SMPTE drop-frame timecode
+> (`shared/format/timecode.ts` + wired into `VinxTimeline.frameToTimecode`/
+> `timecodeToFrame` for 29.97/59.94 -- non-drop drifts ~3.6s/hr) and true-peak-safe
+> loudness-target gain (`shared/audio/dsp.ts` `loudnessTargetGain`, wired into
+> `VinxAudio.normalizeToLUFS` so normalization can't clip). Sidechain envelope
+> SKIPPED -- `envelopeFollower` already provides it (no duplication).
+> **NAMED TRACK-G QUEUE COMPLETE: 11 features shipped, 36 v6 unit tests across 7
+> files all green, build green.** **Track G batch 6 DONE:** Canvas shape tools
+> (line/rectangle/circle with live drag-preview, alongside pen/eraser/highlighter)
+> and PixelArt sprite-sheet export (all frames in one PNG via native canvas --
+> replaced the disabled "Export GIF"; a hand-rolled GIF-LZW encoder was rejected as
+> unverifiable headlessly / corrupt-risk). 13 Track-G features total, tsc 0, build
+> green. A gap-hunt this round also caught + REVERTED a would-be duplicate (a median
+> filter -- `shared/creative/denoise.medianDenoise` already exists + is wired):
+> proof the platform is mature and further hunts are false-positive-heavy.
+> **Track G batch 7 DONE:** PasswordGenerator entropy-bits readout (pure
+> `passwordEntropyBits` length*log2(pool) + 4 tests, shown by the strength bar) and
+> Timer persisted user presets (save/reuse custom durations across sessions,
+> right-click to remove). A utility-app hunt this round eliminated most candidates
+> as already-built (Stopwatch lap stats, brown noise, Calendar ICS). 15 Track-G
+> features total; 40 v6 unit tests; tsc 0; build green. QR error-correction-level
+> selection was DEFERRED (a wrong QR is unscannable -- same unverifiable-codec risk
+> as the rejected GIF encoder).
+> **Track G batch 8 DONE:** Files natural-name sort (wired the existing
+> `shared/format/naturalSort.naturalCompare` into Files.tsx -- "file2" before
+> "file10"; was lexical `localeCompare`) and DexCode jump-to-matching-bracket
+> (Ctrl/Cmd+M) via a new pure `shared/format/bracketMatcher` (+ 5 tests). A
+> dev/system hunt confirmed-eliminated Terminal tab-completion + Ctrl+R history +
+> Rewind session-grouping + fuzzy-search as already-built. 17 Track-G features
+> total; 45 v6 unit tests across 9 files; tsc 0; build green.
+> **Track G batch 9 DONE (standalone-app sweep):** DexCode live selection stats
+> (Sel N ch / N ln in the status bar, via onSelect); Stopwatch lap statistics
+> footer (avg / median / spread) on a new pure `shared/format/lapStats`;
+> Calendar same-day double-booking detection -- a "Conflict" tag in the day list
+> + a warning outline on overlapping week-view events, via a new pure
+> `shared/calendar/eventConflicts`; Weather built-in advisories banner (heat/cold/
+> wind/storm/UV/visibility) via a new pure `shared/weather/alerts`; RecycleBin
+> multi-select with bulk Restore/Delete + select-all-visible (selection auto-prunes
+> to the filtered set so bulk acts only on visible items). 22 Track-G features
+> total; 61 v6 unit tests across 12 files (lap-stats 6, event-conflicts 5,
+> weather-alerts 5); tsc 0.
+> **Track G batch 10 DONE (productivity/utility sweep):** QR Code scalable SVG
+> export (print-quality, spec-correct quiet zone) via a new pure
+> `shared/format/qrSvg`; Workflows structural validation -- cycle / dangling-edge /
+> orphan detection surfaced as an advisory chip in the editor -- via a new pure
+> `shared/workflow/validate` (the existing topo-sort silently mis-ordered cyclic
+> graphs); Markdown editor lightweight lint (heading-skip, empty link/image URL,
+> empty link text, unbalanced code fence) shown as a status-bar issue count via a
+> new pure `shared/format/markdownLint`. NOTE: Calculator's `2+3*4=20` is correct
+> immediate-execution (Casio / macOS-basic) semantics, NOT a bug -- left as-is
+> (rewriting to algebraic precedence would be an invasive UX change). 25 Track-G
+> features total; 77 v6 unit tests across 15 files (qr-svg 4, workflow-validate 6,
+> markdown-lint 6); tsc 0, renderer build green.
+> **Track G batch 11 DONE:** UnitConverter "find a unit" search -- type "km",
+> "pounds", "MB", "kWh" to jump straight to the right category + unit -- via a new
+> pure `shared/format/unitSearch` (alias table + exact-symbol/label/prefix/
+> substring fallback). 26 Track-G features total; 82 v6 unit tests across 16 files
+> (unit-search 5); tsc 0. Flux was inspected for the "bezier curve editor"
+> flagship: its Newton-Raphson cubic-bezier easing solver is already correct and
+> complete (the "would need proper implementation" comment is stale) -- left as-is.
+> P4 a11y was checked: icon-only buttons across the renderer already carry
+> aria-label/title (grep found zero offenders) -- already mature, not churned.
+> HONEST STATE: the headless-verifiable feature seam is now largely mined out; the
+> remaining named v6 work (P1 startup/render perf, P2 Nexus culling + Spotlight
+> incremental index + Prism layer virtualization) is all MEASURE-FIRST and needs
+> the Electron app run with synthetic large data on the owner's machine -- not
+> verifiable in this headless session.
+> **Track G batch 12 DONE:** Learn "When You Work" insight -- synthesizes the
+> existing hourly + day-of-week heatmaps into a one-line peak summary ("Most
+> active 9:00-12:00", "Busiest day Wed") via a new pure
+> `shared/format/activityInsights` (sliding-window peak + argmax). 27 Track-G
+> features total; 89 v6 unit tests across 17 files (activity-insights 7); tsc 0,
+> renderer build green. A final-group survey (NoiseGenerator / PresentationBuilder
+> / Nexus / Achievements / Learn / Prism / Imosion) returned mostly "NONE -- already
+> mature"; the few remaining candidates are moderate-wiring creative features with
+> verification risk and were deliberately NOT force-shipped: Prism chromatic-
+> aberration correction (pure image math, heavy filter-pipeline wiring), Imosion
+> integrated/short-term LUFS metering (BS.1770 K-weighting -- hard to verify exactly
+> headlessly; correlation/RMS would be exact but the live-meter wiring is heavy),
+> Nexus graph centrality (would re-drive node sizing -- visual-layout risk). These
+> are the honest next candidates IF the owner wants them with explicit caveats.
+> **Track G batch 13 DONE (owner chose "caveated creative features"):** pure math
+> written + exactly unit-tested, deep wiring tsc/build-verified but NOT
+> runtime-verified headlessly (owner accepted that caveat).
+> (1) PRISM lens correction -- the "Chromatic Ab." slider was a no-op: it only added
+> a higher-order RADIAL geometric term applied identically to all 3 channels, so it
+> produced zero color separation. Fixed with a new pure `shared/creative/lensCorrect`
+> (genuine transverse CA: red/blue sampled at different radii than green) + distortion
+> + vignette in one pass; rewired Prism's Apply handler to use it. (2) IMOSION metering
+> -- added `computeSignalLevels` (peak/RMS/crest) to `shared/audio/dsp`, replaced the
+> recorder meter's duplicated inline peak/rms math with it, and added a live crest-
+> factor (CF) readout next to the level meter. (Full stereo-correlation / true BS.1770
+> LUFS deferred: needs L/R analyser splits + K-weighting -- heavy + hard to verify
+> exactly headlessly.) (3) NEXUS knowledge graph -- new pure `shared/graph/centrality`
+> (normalized degree centrality); hub nodes now render larger (radius += centrality)
+> instead of sizing by file size alone. 30 Track-G features total; 103 v6 unit tests
+> across 20 files (lens-correct 4, signal-levels 5, graph-centrality 5); tsc 0
+> (renderer + main), renderer build green.
+> **P3 CONFORMANCE SWEEP DONE (every app, nothing skipped):** ran the 8-point
+> checklist across all ~50 surfaces (utilities, creative suite, shell/pages) via
+> 3 parallel audits; full matrix written to `docs/V6-CONFORMANCE.md`. Codebase is
+> mature -> nearly all PASS. GENUINE fails fixed: PomodoroTimer stray `longBreak`
+> color -> token; Imosion level-meter gradient + 6x muted menu/transport text ->
+> semantic tokens; Kanban CardDetail modal got an Escape-to-close handler. FALSE
+> POSITIVES deliberately NOT churned (documented with reasons): categorical data
+> palettes (ColorPicker/Canvas/NoiseGenerator/Nexus/Calendar/Kanban) are correct
+> hex, `var(--token,#hex)` fallbacks are defensive (tokens exist), console.error
+> on failure paths is acceptable diagnostics. tsc 0 (renderer + main), build green.
+> **P2 SCALE -- VERIFY-ONLY outcome (measure-first mandate honored):** Nexus
+> ALREADY frustum-culls its hot draw loops (`isOnScreen` at Nexus.tsx:1417/1467);
+> extending cull to connection line-segments is NOT correctness-safe blind
+> (endpoint-only culling can drop a segment that crosses the viewport) and 1M nodes
+> needs WebGL (out of scope) -> the cheap win is in place, rest is measure-gated.
+> Spotlight's 60s full index rebuild is fine for DEX's real <10K corpus; incremental
+> indexing is a large architectural change that the plan gates to a measured 100K
+> corpus on the owner's machine. Files uses load-more pagination (not a true
+> virtualizer) -- swap is measure-gated. NONE changed blind. REMAINING v6 = P1
+> startup + the above P2 items, ALL measure-first and requiring the Electron app run
+> with synthetic large data on the owner's machine; plus env-blocked release signing.
+> **P1/P4 FINALIZATION DONE -> v6 = 6.0.0:** (P1.1) startup INSTRUMENTATION was
+> already fully wired (`StartupTimeline` marks process:entry -> app:ready ->
+> IPC:setup -> window:create -> renderer:first-heartbeat, logs a sorted summary on
+> complete(), exposes a `startup:timeline` IPC snapshot) -- so cold-start numbers
+> are captured automatically on the owner's next run; dynamic-import deferrals stay
+> correctly gated on those numbers. (P1.2 + P2 budget guards) NEW
+> `tests/unit/v6-performance-guards.test.ts` -- hard regression budgets over the
+> REAL shipped pure functions (FloatingLauncher clampToBounds 100k, Nexus
+> degreeCentrality 10k/30k, Prism applyLensCorrection 160x160, Calendar
+> findEventConflicts 5k) + a synthetic Spotlight-scale 100k filter (the plan's
+> prescribed index budget guard); all pass. (P4) version 5.7.0 -> 6.0.0
+> (package.json + PLATFORM_VERSION); SHORTCUTS.md gained a per-app shortcuts section
+> (DexCode Ctrl/Cmd+M, universal Escape); release/update config verified coherent
+> (electron-builder + electron-updater + release.js -- real sign/publish env-blocked,
+> needs owner certs); security sanity of the diff = minimal surface (pure fns + UI,
+> no new IPC/eval/network/injection; qrMatrixToSVG only takes #rrggbb from color
+> input). 124 unit tests across 23 files (incl. existing budget + animationBudgetK3
+> suites); tsc 0 (renderer + main); renderer build green.
+> **P2 ALGORITHMIC SCALE -- NOW MEASURED (real numbers, not hypothesis):** the v6
+> perf guards now LOG their measured medians. On this machine: Spotlight
+> filter+score over 100k items = 9.50ms; Nexus degree centrality 10k nodes/30k
+> edges = 1.23ms; Prism lens correction 160x160 = 2.56ms; Calendar conflict scan
+> 5k events = 2.09ms; FloatingLauncher clamp x100k = 5.48ms. CONCLUSION: the
+> renderer-side ALGORITHMS are fast at scale, so the hypothesized P2 optimizations
+> (Spotlight incremental index, additional Nexus culling) are NOT warranted -- the
+> measurement disproves the need. The only scale costs NOT captured by a pure-fn
+> benchmark are React reconciliation of un-windowed lists (Files) and Canvas2D
+> paint FPS (Nexus) -- those need the real render/paint loop with large data in the
+> running Electron app, and would be regressive to rewrite blind.
+> **CRITICAL: PACKAGED-APP BLANK-SCREEN FIXED (found via live packaging + CDP).**
+> Packaging v6.0.0 and remote-debugging the running renderer revealed the packaged
+> build was shipping a BLANK WHITE SCREEN -- the renderer crashed at load (root had
+> 0 children). Two stacked production-only chunk-ordering crashes, invisible in the
+> dev server / web preview (which serve unbundled ESM):
+>   1. `TypeError: Cannot read properties of undefined (reading 'useState')` from
+>      zustand-vendor -- zustand was split into its own chunk that evaluated before
+>      React's exports initialized. FIX: fold zustand into react-vendor
+>      (vite.config.ts manualChunks).
+>   2. `TypeError: ...reading 'memo'` from app-axl (exposed after #1) -- Rollup's
+>      shared CJS-interop helper (commonjsHelpers, a VIRTUAL module) was absorbed
+>      into the maps chunk, so react-vendor imported it back -> react-vendor ->
+>      app-chunk cycle -> eager app chunks (axl/maps) evaluated React.memo before
+>      React loaded. FIX: pin `commonjsHelpers` to react-vendor so it is a
+>      self-contained leaf (kills the circular-chunk warnings too).
+> VERIFIED via CDP on the repackaged app: root=1 child, body text 547 chars (Home
+> UI: "RECENT PROJECTS / RECENT NOTES"), ZERO exceptions; all 3 launcher orbs
+> render. The packaged DEX desktop app now actually loads instead of a white screen.
+> **REAL STARTUP NUMBERS (now that the renderer loads):** StartupTimeline logged
+> `total=9428ms` (window:create 727ms, IPC:setup 51ms, marks 0ms). ~0.78s is named
+> main-process phases; the other ~8.6s is the RENDERER bundle load -- dominated by
+> the eager modulepreload of heavy app chunks (axl 520KB, maps 1MB, imosion 429KB,
+> flux, notes, rewind, forge). CONCRETE P1 TARGET, data-backed: make those heavy
+> apps truly lazy (they should only load when opened) to cut startup from ~9.4s.
+> (Minor non-fatal: a `theme-schedule:getInfo` IPC handler is unregistered; the
+> ScreenGuard "blank screen" warning fires transiently pre-mount but root renders.)
+> **PACKAGED-APP BUG HUNT (via CDP remote-debugging the running build).** Swept all
+> 43 apps by driving launchApp over CDP: ZERO crash-on-open, ZERO network/resource
+> failures (the app is solid post blank-screen fix). Found + FIXED two real issues,
+> verified live in the repackaged app:
+>   1. `theme-schedule:getInfo` "No handler registered" -- a startup RACE: the
+>      renderer's FeatureStore calls it during early boot, but ThemeScheduleManager
+>      registered its IPC handlers deep in the BATCHED feature-suite init (after the
+>      call). FIX: register the theme-schedule:* handlers in the manager CONSTRUCTOR
+>      (module-import = very early), with an ipcRegistered guard; initialize() no
+>      longer re-registers. CDP re-verify: invoke now returns OK {schedule:{...}},
+>      IPC_FAILURES=[].
+>   2. Dead security `<meta>` tags -- `X-Frame-Options` and CSP `frame-ancestors` are
+>      ignored when delivered via <meta> (HTTP-header-only), logging console errors
+>      every launch; no-ops for a file:// desktop app. FIX: removed from
+>      src/renderer/index.html (comment left on where to set them as real HTTP
+>      headers if needed). CDP re-verify: CSP/FRAME_ERRORS=[].
+> NOT changed by design: ScreenGuard's transient pre-mount "blank screen" warning
+> (it is the detector that CAUGHT the real blank screen -- do not weaken); the
+> ReleaseManager update-check error (env/config -- no latest.yml in the configured
+> GitHub update repo; could be error->info later). tsc 0 (main + renderer), packaged
+> + CDP-verified (root renders, zero exceptions).
+> **VISUAL BUG TOUR (CDP screenshots of the packaged app -- DEX is not a Start-menu
+> app so computer-use can't grab it; drove it via Page.captureScreenshot + launchApp
+> over the debug port instead).** Home / Settings / Prism / Nexus all render
+> correctly (verified by screenshot) -- no visual bugs; the FloatingLauncher orbs
+> render as clean circles. FOUND + FIXED a real one: **DEX Maps was completely
+> broken** in the package -- showed "Maps unavailable / map engine could not start".
+> Root cause: the CSP `child-src https: http:` (worker-src falls back to it)
+> blocked MapLibre GL's `blob:` Web Worker ("Refused to create a worker from
+> 'blob:...'"). And the CSP `connect-src` whitelisted only the AI APIs -- NOT the
+> map/weather data hosts, so even with the worker fixed, tiles + Weather forecast +
+> UKI answer-engine fetches would be blocked. FIX (src/renderer/index.html CSP):
+> added `worker-src 'self' blob:`; added `https://tiles.openfreemap.org` to img-src
+> + connect-src; added `https://api.open-meteo.com` (Weather forecast),
+> `https://geocoding-api.open-meteo.com` (Maps + Weather geocoding),
+> `https://api-inference.huggingface.co` / `https://api.duckduckgo.com` /
+> `https://en.wikipedia.org` (UKI answer engine) to connect-src. These features
+> were silently CSP-broken in every packaged build. VERIFIED after repackage:
+> Maps now renders a full interactive vector map (SF/Oakland Bay Area -- streets,
+> districts, freeways, labels), MapLibre canvas mounted, "Maps unavailable" gone,
+> CSP_BLOCKS=[]. tsc 0, packaged + CDP-verified.
+> **P1 STARTUP -- LAZY-APP CHUNKING DONE + VERIFIED (wall-clock measurement blocked).**
+> The packaged index.html was eagerly `modulepreload`-ing 11 HEAVY app chunks (axl
+> 520KB, imosion 429KB, flux, forge, rewind, nexus, dexcode, uki, notes) even though
+> AppManager lazy-imports them. Root cause: shared renderer infra (stores/services/
+> components/UKI engine + the shared NotesDocumentModel) was scattered by Rollup INTO
+> app chunks, so the entry statically imported those app chunks for the shared
+> symbols. FIX (vite.config.ts manualChunks): a `dex-app-core` chunk consolidating
+> renderer infra (store|services|components|hooks|contexts|providers|ui|uki|styles|
+> utils) + pinning NotesDocumentModel. RESULT (build-verified): ZERO circular-chunk
+> warnings, ZERO app chunks eagerly preloaded -- modulepreload is now only
+> react-vendor + dex-shared + dex-app-core. Repackaged + CDP-verified: renders clean
+> (root=1, zero exceptions, no new chunk crash). This is a real architectural/memory
+> win (heavy apps load on-demand). CAVEAT: the wall-clock startup number is NOT
+> reliably measurable headlessly -- StartupTimeline.complete() fires on the
+> renderer's rAF HEARTBEAT, which Chromium THROTTLES while the launched window is
+> minimized/occluded (also triggers false watchdog "renderer frozen" events). So the
+> 9093ms vs 9428ms delta is within throttle noise, NOT a trustworthy figure. window:
+> create+IPC:setup are only ~660ms; the rest is renderer mount + main-process init.
+> TRUE before/after needs a FOREGROUND launch on the owner's machine (read
+> `[StartupTimeline] total=` from %APPDATA%/dex/logs/dex.log). Next safe lever:
+> defer/parallelize main-process init (controllers + feature-suite batches).
+> **OWNER UI FIXES (live-driven via CDP, all verified in the packaged app):**
+>   (1) FloatingLauncher ORB SCATTER (the big one) -- the owner's screenshot showed
+>   the 3 orbs split across opposite corners and "can't move all 3 / glitches." Root
+>   cause: the drag clamped the cluster ANCHOR as a single orb (but the stack is 3
+>   orbs/~152px tall) AND flipped stack direction mid-drag when the anchor crossed a
+>   threshold (or the viewport changed on maximize) -> orbs snapped across the anchor
+>   / off-screen. FIX: new pure `clampClusterToBounds` reserves room for the WHOLE
+>   stack so it always stays on-screen, and the geometry now ALWAYS stacks upward
+>   (removed the flip) -> the 3 orbs move as one rigid unit. CDP-verified: dragging
+>   the launcher -400/-300 moved all 3 by the same delta, still sameX + 53px gaps,
+>   {together:true}. 11/11 geometry unit tests (5 new cluster tests).
+>   (2) Notification-center BELL removed from the top bar (owner request) -- verified
+>   gone (bell present? false). The update/30-day badge was KEPT (owner kept it).
+>   (3) Orb HOVER glitch -- it was just too subtle (bg-elevated->bg-hover ~4 levels,
+>   read as no-response); now bg + border + icon brighten together (crisp, still the
+>   app-menu fill language, no glow/scale).
+>   (4) All 3 orbs OPEN correctly -- CDP-verified: launcher->app menu, UKI->panel,
+>   search->search input. tsc 0, packaged + CDP-verified.
+> **v6 STATUS = COMPLETE for everything verifiable headlessly.** The ONLY remaining
+> work is inherently measure-first and needs the Electron app run on the owner's
+> machine: read the auto-logged StartupTimeline numbers, then (only if a phase
+> >10%) land dynamic-import deferrals; benchmark Files/Spotlight/Nexus at real scale
+> and apply virtualizer/incremental-index/WebGL ONLY if measured slow; and run the
+> real signed release. None can be honestly done or verified in a headless session.
+> **FLOATING LAUNCHER REDESIGN + SYSTEM HOVER CLEANUP (6.0.x UI polish):** rebuilt
+> the 3-orb FloatingLauncher to clean solid chrome -- removed the washed-out white
+> group "plate", the white-tint orb borders, the drag glow ring, and the accent-blue
+> icon highlight. Orbs are solid `--color-bg-elevated` + subtle `--color-border-
+> subtle`; hover now uses the SAME language as the app-menu button -- a subtle
+> `--color-bg-hover` fill (no glow/scale/ring), icon brightens secondary->primary.
+> SYSTEM-WIDE: fixed the pervasive offender in globals.css "Item 48" -- a blue glow
+> (`box-shadow: 0 0 6px rgba(74,158,255,0.1)`) was applied to EVERY button in every
+> app on hover; replaced with the consistent `background-color: var(--color-bg-hover)`
+> fill (inline-styled buttons keep their look; bare buttons get the one standard
+> tint). Verified LIVE in the Vite preview (stylesheet inspection: old glow gone, new
+> bg-hover rule present, all 3 orbs render solid) + renderer build green. Other
+> "highlights" triaged as legitimate, NOT churned: subtle surface fills, focus-visible
+> rings, the .widget card outline, the transient snap-zone drag preview.
+> **POP-UI PASS + ORB GLITCH FIX (follow-up):** (orb glitch) the redesign left three
+> circular orbs stacked GAP=7px apart each carrying an 18px-blur popover shadow ->
+> the shadows bled into a muddy dark blob between them; replaced with a tight
+> contained shadow (`0 2px 8px` rest / `0 10px 26px` drag) so stacked orbs stay
+> crisp. Verified live: all 3 orbs render solid `rgb(26,26,30)`, correct stacked
+> positions, no overlap. (pop-ui) The UKI overlay panel was a washed-out translucent
+> GLASS surface (`background: var(--color-bg-hover)` + `backdrop-filter: blur-xl
+> saturate(180%)` + a `--pg-gloss-top` sheen + a glowing state dot) -- inconsistent
+> with the SOLID app-menu panel and exactly the washed look + gloss the owner
+> dislikes. Rebuilt it solid (`--color-bg-elevated`, no backdrop blur, no gloss,
+> dot glow removed) to match the app menu. Verified live: panel bg now solid
+> rgb(26,26,30), `backdrop-filter: none`, opens from the orb. Also aligned the
+> launchpad context-menu item hover to the canonical `--color-bg-hover` fill. tsc 0,
+> build green. (The repeated FloatingLauncher errors in the preview console are stale
+> -- frozen single HMR timestamp; DOM proves the live component renders fine.)
+> REMAINING: P1 perf (measure-first), P2
+> scale -- node/wire/label frustum-culling + Spotlight incremental index + Prism
+> 400+-layer virtualization (all MEASURE-FIRST: real FPS/index gains need the
+> Electron app run with synthetic large data, not verifiable headlessly), P4
+> cross-cutting, Track G (~1000 additive features, multi-session). DEFERRED: full
+> WindowManifest cross-process disk mirror (needs a preload IPC channel).
+>
 > This is the one forward-looking plan. Completed goal/handoff/sprint/audit
 > writeups were removed (2026-06-09 cleanup); their work is done and lives in
 > git history. Anything still pending is captured here. The detailed, actively
@@ -77,6 +446,131 @@
 > component tests green (21). REMAINING (mechanical rollout, same pattern): the
 > rest of Prism/Flux's non-row sliders, plus Vinx, Imosion, Forge, and Axl's
 > local control set -> the kit.
+>
+> **v5.7 milestone -- Creative Completion & Whole-System Patch (started
+> 2026-06-18).** Owner brief: finish the cycle as v5.7 -- creative-app completion,
+> color discipline, window-frame integrity, UKI/DEX-Now intelligence, a new DEX
+> Maps app, and a no-app-left-out sweep. Plan in
+> `.claude/plans/i-need-a-prompt-stateless-harp.md`. SHIPPED: version BUMPED to
+> 5.7.0 (package.json + PLATFORM_VERSION/BUILD_DATE in store/runningApps.ts, dated
+> 2026-06-18) once the substantive gate cleared -- see close-out at the end of this
+> block. The "3000" framing was always directional, not a literal patch count.
+> DONE + VERIFIED (tsc --noEmit 0 errors + `npm run build:renderer` green +
+> 38/38 provider tests):
+> - **Window-frame integrity (A1).** Root cause found: heavy apps render
+>   `position:fixed; inset:0` overlays at `z-index:var(--z-max)` that the window's
+>   `contain:layout style paint` traps INSIDE the window, painting over its own
+>   36px title bar -> close/min/max vanish when maximized. Fix (surgical, in the
+>   LIVE detached-window path `AppManager.tsx`, NOT the dead `shell/FloatingWindow.tsx`):
+>   the app-content wrapper became an isolated stacking context at `z-index:0`
+>   (`isolation:isolate`) and the title bar lifted to `z-index:50` -- so no in-app
+>   overlay, however high its z, can ever cover the controls. No brittle CSS
+>   `!important` cap needed.
+> - **Color discipline (A2).** `LAUNCHPAD_APPS` (`AppManager.tsx`) re-declared 45
+>   app colors that DRIFTED from the canonical `APP_DEFINITIONS` (`store/runningApps.ts`)
+>   -- imosion/unitconverter/qrcode/achievements/worldclock/dexcode showed one
+>   color in the dock/title bar and another in Launchpad. Launchpad now DERIVES
+>   color from `APP_DEFINITIONS` (single source; tiny override map for launcher-only
+>   `uki`); the bare `'#8E8E93'` app-color fallbacks were tokenized to
+>   `var(--color-text-tertiary)`; added `--color-app-maps` token.
+> - **Shared control primitives (A3).** New `IconButton` + `Pill` in the Creative
+>   Control Kit (`components/controls/`), pixel-matching the hand-rolled
+>   `toolBtnStyle`/`hoverHandlers` + `borderRadius:9999` pills. Axl's toolbar
+>   (`axl/components/Toolbar.tsx`) fully migrated as the reference -- local
+>   `toolBtnStyle`/`hoverHandlers` deleted.
+> - **Empty/idle states (A4).** Vinx MediaBrowser + CollabHub empty states upgraded
+>   to the shared `EmptyState` with real CTAs (removing a hardcoded `#5e5ce6`); Axl
+>   "No modifiers" became a clickable hint that opens the add-modifier menu.
+> - **DEX Maps -- NEW app (E).** `standalone/Maps.tsx` on MapLibre GL + free,
+>   key-less OpenFreeMap vector tiles; Open-Meteo geocoding search (the codebase's
+>   existing no-key pattern); custom DEX-token-styled controls (no color noise);
+>   light/minimal basemap toggle; UKI-driven via a `dex-maps-goto` window event +
+>   a `[data-app-content]` mirror for screen-context. Registered across every
+>   surface (lazy import, `AppId`, `APP_COMPONENTS`, window sizes, `HEAVY_APP_IDS`,
+>   `Icons`, `DexIcon` `maps` glyph, `LAUNCHPAD_APPS`, `appToCat`, `APP_KEYWORDS`,
+>   `APP_DEFINITIONS`). `maplibre-gl` added to deps; lazy-chunked (~287 kB gzip,
+>   zero startup cost).
+> - **UKI computer-awareness + DEX Now disk (D, partial).** UKI's
+>   `liveContext()` (`uki/context.ts`) gained a cached `DeviceInfo` layer
+>   (`ensureDeviceInfo()` fetches `os:getSystemInfo` once; `getDeviceInfo()` reads
+>   it synchronously), and `Uki.tsx`'s system prompt now carries a `Device:`
+>   line -- so uki can answer "what's my CPU / how much RAM / what OS." The Home
+>   `SystemStatusWidget` gained a live **Disk** bar (`system:getStorage`, 30s
+>   cadence) alongside its existing CPU/Memory/GPU/network. NOTE (accurate
+>   findings this pass, to avoid rebuilding): DEX Now's live system widget ALREADY
+>   existed and polls `system:getStats` every 5s; DexNotes ALREADY does full-text
+>   body search (`n.plain_text` + title + tags, multi-term AND) plus a backend
+>   FTS + in-document find-nav -- those "gaps" are closed.
+> - **UKI vision -- agentic screen awareness (D, DONE).** UKI can now "look at the
+>   screen" and answer with a vision model. Implemented end-to-end: (a) the provider
+>   contract gained optional `images?: string[]` on `ChatMessage` + a shared
+>   `parseDataUrl` (`uki/providers/types.ts`); (b) multimodal request formatting for
+>   the vision providers -- OpenAI `image_url`, Anthropic base64 `image` source,
+>   Google `inline_data` (`openai.ts`/`anthropic.ts`/`google.ts`); (c) `connect.ts`
+>   plumbs images through `askConfiguredLLM`/`streamConfiguredLLM`, RESTRICTS routing
+>   to vision-capable models when images are attached (degrades to null -> text if
+>   none configured), and adds `hasVisionProvider()`; (d) `uki/screenCapture.ts`
+>   grabs a still via the existing `screencapture:getSources` main handler (no new
+>   native surface; thumbnail-res); (e) `Uki.tsx` has a "look at my screen" toggle
+>   in the composer, shown ONLY when capture + a vision provider are both available,
+>   that attaches a screenshot to the next message and disarms. Degrades cleanly with
+>   no key / on the web shell. Verified: tsc 0 errors + all 38 provider tests pass
+>   (text-only path byte-identical). NOTE: capture is thumbnail-resolution (the
+>   shared handler caps it) -- raising it is a future main-process tweak.
+> - **Live Activity feed activated (B/D).** The Home "Live Activity" feed
+>   (`utils/liveActivity.ts`, rendered by `pages/Home.tsx`) was ORPHANED -- defined
+>   and rendered, but no app ever dispatched to it. Wired Forge (`forge/Forge.tsx`):
+>   a centralized, whole-percent-throttled effect mirrors each encode job into the
+>   feed (`dispatchActivity`/`updateActivity`/`completeActivity`), so encoding now
+>   shows a live progress card on Home. Then extended (parallel agents) to FOUR
+>   producers via the same centralized, percent-throttled one-effect pattern:
+>   Forge encode (`forge/Forge.tsx`), Vinx export (`vinx/Vinx.tsx`, watching
+>   `exportJobs`), Transfers (`pages/Transfers.tsx`, watching `activeTransfers`),
+>   and Browser downloads (`pages/Browser.tsx`, watching `downloads`). Collab/Nexus
+>   sync was investigated and SKIPPED -- collaboration is local/in-memory with no
+>   real sync-progress to surface (declined to fabricate a card).
+> - **Reality check (important).** Repeated investigation shows the codebase is far
+>   MORE complete than this milestone plan (built from a high-level scan) assumed.
+>   Already shipped + working, NOT gaps: Vinx masks (full `ClipMask` model +
+>   add/remove store actions + a complete Mask Editor panel with shape/feather/
+>   opacity/expansion/invert/list), DexNotes full-text search, the live system
+>   widget. The genuinely-remaining work is NARROW + DEEP, not a broad "3000
+>   patches" effort: (1) UKI vision needs a provider-contract rework -- `ChatMessage.
+>   content` is a plain string with no image parts, so every provider's
+>   `buildChatRequest` would need image support (`uki/providers/types.ts`);
+>   (2) Notes font controls need new marks in the tree-based `NotesDocumentModel`;
+>   (3) the `IconButton`/`Pill` rollout does NOT fit the other creative toolbars:
+>   parallel agents migrated AXL cleanly + Imosion's undo/redo (2 clean cases), but
+>   Flux/Prism made ZERO changes -- each app's toolbar predates the kit with its own
+>   bespoke visual system (round 9999px pills, 11px type, per-app accent like Flux
+>   `#bf5af2` / Prism `#ff375f`, dropdown-trigger buttons), so a faithful migration
+>   would need per-button `style` overrides and risk visible change. Verdict: NOT
+>   cheap consistency work; leave each app's toolbar as-is (AXL is the reference).
+> CLOSE-OUT (gate cleared -> bumped to 5.7.0):
+> - **C -- DexNotes FONT controls: DONE.** A Word-style default-font picker (family
+>   Sans/Serif/Mono/System + size) in the editor toolbar, applied to the editor and
+>   persisted across notes via localStorage (`notes/NotesEditor.tsx`). Deliberately
+>   editor-level (not per-selection): per-selection fonts would require new marks in
+>   the tree-based `NotesDocumentModel` + HTML round-trip parsing -- high-risk on a
+>   core app, low marginal value, so out of scope. Notes full-text search already
+>   existed.
+> - **C -- DexCode REPL: DONE.** A single-line expression REPL at the bottom of the
+>   output pane (`standalone/DexCode.tsx`) that evals via the existing
+>   `executeDexScript` and appends output. Stateless per entry (the runtime is
+>   whole-program/stateless) -- a quick scratchpad, labelled as such.
+> - **C -- standalone color sweep: SKIPPED (justified).** The standalone apps already
+>   use tokens; their remaining hardcoded colors are intentional (palettes, swatches,
+>   syntax themes, Nexus archive-gray). A blind sweep is near-zero-yield + high-risk,
+>   so not done. The real color-noise source (the app-color registry) was fixed in A2.
+> - **Audit residual closed:** the milestone-completion audit found a missed bare
+>   `'#8E8E93'` in `shell/AppSwitcher.tsx` + `shell/SpotlightEngine.ts` -> tokenized
+>   to `var(--color-text-tertiary)`; zero bare app-color grays remain.
+> - **B (deep creative) + toolbar rollout: NOT done, by design.** The audit confirmed
+>   the creative apps are already feature-complete (Vinx masks etc. shipped), and the
+>   toolbar rollout doesn't fit the bespoke Flux/Prism systems. These are NOT gaps.
+> - **F -- version BUMPED to 5.7.0.** package.json 5.5.0 -> 5.7.0; PLATFORM_VERSION
+>   4.4.0 -> 5.7.0 + BUILD_DATE 2026-06-18. Real-time system-info push subscriptions
+>   remain an optional future enhancement (pull-based IPC works today).
 >
 > **Cursor-anchored menu placement -- never off-screen (2026-06-16).** Context
 > menus across the shell + creative suite each hand-rolled `Math.min(clientX,
@@ -274,6 +768,519 @@
 > green (21). Note: `EnhancedKnob`/`NumberInput`/`ColorPicker` were the OLD
 > unadopted control library, now superseded by the shared Creative Control Kit --
 > so this also removes a duplicate-system per the brief.
+
+> **DEX 5.6 Foundation Phase -- Project Spaces + UKI workspace awareness
+> (2026-06-17).** Opens the 5.6 "Workspace Intelligence" pillar. The window-
+> LAYOUT systems were already mature (WorkspacePresets/templates/panel, the
+> runningApps crash journal, WindowManifest, the live `stageStore` Stage context),
+> but two foundation gaps blocked everything 5.6 wants UKI to know: (1) a Stage had
+> no SEMANTIC dimension -- what KIND of work it is -- so "Project Spaces"
+> (Development/Design/Audio/Video/Research/Personal) didn't exist as a concept; and
+> (2) UKI was blind to the active workspace -- `liveContext()` reported open/recent
+> apps but never the workspace, and the `UkiContextSnapshotRecord.workspaceId` field
+> + identity.ts's "Active workspace" awareness claim were both unpopulated. Rather
+> than add a 4th parallel workspace store, ELEVATED the existing live Stage:
+> `stageStore` gains a `StageKind` + `STAGE_KIND_META` single-source-of-truth +
+> `setKind` + a v2 persist migration (`migrateStagePersist` defaults old stages to
+> `general`), and is exposed on `window.__dexStageStore` (mirrors
+> `__dexRunningApps`). Wired end-to-end into UKI: `uki/context.ts` gains
+> `getActiveWorkspace()` (dependency-light, no circular import) feeding both
+> `liveContext().activeWorkspace` and the long-reserved `snapshot().workspaceId`;
+> BOTH prompt builders now ground on it -- the Uki chat app (`Uki.tsx` adds an
+> "Active workspace" line) and the overlay (`identity.ts` `UkiContextSnapshot`
+> gains `activeWorkspace` -> a `workspace=name(kind)` context bit, passed from
+> `UkiOverlay`). Made it real UI, not backend plumbing: the Command Palette gets
+> "New Project Space" + per-space "Switch Space" commands (kind-labelled), and the
+> Workspace dialog (`WorkspacePresetsPanel`) gains a "Project Spaces" section to
+> switch / retag-kind / delete spaces in one place. Verified: renderer `tsc
+> --noEmit` clean + 34 unit tests green (new `tests/unit/workspace-spaces.test.ts`
+> covering kind metadata, the persist migration, `getActiveWorkspace` ->
+> `liveContext` flow, and prompt grounding). NEXT in this pillar: register UKI
+> app-context resolvers per app (Files/Tasks/creative), and have `DexProject`
+> open/save bind a project to its Project Space so "open project -> restore the
+> space + layout" closes (the `DexProject.workspace` field already carries the
+> data).
+
+> **DEX 5.6 Foundation Phase -- Project Spaces now SWITCH windows (2026-06-17,
+> batch 2).** Closed the biggest gap from batch 1: switching a Project Space did
+> nothing to windows -- the `stageStore` `captureWindows` action was NEVER called
+> and nothing reacted to the `continuity:stage` event, so spaces were inert
+> labels. Now a space switch is a real context switch. `StageWindowRef` gained
+> optional geometry (`x/y/width/height/maximized`), and AppManager subscribes to
+> `continuity:stage`: it (1) captures the OUTGOING space's live floating-window
+> layout into that stage, then (2) restores the INCOMING space -- closes floating
+> windows that don't belong to it (through the existing veto-aware close, so an
+> unsaved-changes guard can still cancel) and launches + clamps the ones that do,
+> reusing the proven preset/crash restore path. A space with NO saved layout is
+> left transparent (current windows untouched) so a brand-new space never blanks
+> the desktop; it self-organizes into a clean switch once it has a captured
+> layout. Bonus: populating `stage.windows` revives the dormant per-stage app list
+> already rendered in TaskManager, and the Project Spaces panel now shows each
+> space's window count. Verified END-TO-END in the live preview: opened Files +
+> Notes as windows, switched to a calculator-only "Dev" space (Files/Notes closed,
+> Calculator opened, default space captured [files,notes] with geometry), then
+> switched back (Calculator closed, Files+Notes restored at their exact geometry).
+> Renderer `tsc --noEmit` clean + 12 unit tests green (capture + switch-event
+> coverage added to `tests/unit/workspace-spaces.test.ts`). NEXT: bind `DexProject`
+> open to its Project Space; per-monitor space layouts; optional "merge into
+> current space" modifier on switch.
+
+> **DEX 5.6 Foundation Phase -- Workflow->Space + DexCode UKI awareness
+> (2026-06-17, batch 3).** Unified three previously-DORMANT systems into one
+> working feature and added the last missing per-app UKI resolver. (1)
+> Workflow->Project Space: `workflowTemplates.instantiateWorkflow()` (builds a
+> `.dexproject` manifest + tiled `WorkspaceSnapshot`) and
+> `DexProject.announceProjectFocus()` (emits `continuity:project`, consumed by the
+> UKI operator + Nexus) were BOTH never called -- pure dead plumbing. New
+> `services/projectSpaces.ts` `openWorkflowSpace(id)` ties them together: maps the
+> template's tags to a `StageKind`, creates a Project Space pre-loaded with the
+> template's window layout, activates it (the batch-2 `continuity:stage` handler
+> opens + tiles the apps), and announces the project so UKI/Nexus light up. Wired
+> to 6 new Command Palette commands ("Open Workspace: Design / Music / Research /
+> Development / Study / Writing"). Verified LIVE: clicking "Open Workspace:
+> Development Workspace" created an active development-kind space and actually
+> opened dexcode + browser + files (runningApps confirmed). (2) DexCode UKI
+> resolver: registers a `dexcode` app-context resolver (open file path, language,
+> line count, dirty state, cursor) so UKI knows what code the user is editing --
+> the dev-workspace half of UKI awareness; the per-app resolver set
+> (Notes/Tasks/Files/Gallery/Rewind/+DexCode) is now broad. (3) Per-monitor space
+> layouts: investigated and NOT built -- DEX is a single-viewport app
+> (`getShellWorkspace`'s arg is padding, not a display index; `WindowSnapshot.
+> displayId` is a never-used placeholder; the renderer never receives the main
+> process's `MultiMonitorManager` data). Real per-monitor support is an
+> architectural rewrite (main->renderer display IPC + per-display workspace
+> bounds), deliberately deferred rather than faked. Verified: renderer `tsc
+> --noEmit` clean + 15 unit tests green (workflow->space mapping/creation added to
+> `tests/unit/workspace-spaces.test.ts`) + live boot clean with the new wiring.
+> NOTE: `WORKSPACE_TEMPLATES` (shell/WorkspacePresets, apps-only starter layouts)
+> and `WORKFLOW_TEMPLATES` (geometry+tags, now the Project-Space producer) are
+> parallel template sets -- a future consolidation candidate, left as-is to avoid
+> churn this batch.
+
+> **DEX 5.6 Foundation Phase -- template consolidation + space hotkeys (2026-06-17,
+> batch 4).** Closed the duplicate flagged in batch 3 and added OS-style space
+> switching. (1) Removed the duplicate starter-template system: deleted
+> `WORKSPACE_TEMPLATES` + `WorkspaceTemplate` (shell/WorkspacePresets, geometry-less
+> apps-only, 4 entries) and the now-unused `dex-workspace-apply-template` event +
+> AppManager `onApplyTemplate` handler. `WORKFLOW_TEMPLATES` (services/
+> workflowTemplates, 6 entries, geometry+tags) is now the SINGLE starter source --
+> the Workspace dialog's "Starter workspaces" section opens them as real,
+> kind-tagged Project Spaces via `openWorkflowSpace()` (same path as the palette).
+> Verified live: the panel shows all 6 (Design/Music/Research/Development/Study/
+> Writing) and clicking "Design Workspace" opened a design-kind space with prism +
+> files + browser. (NB: `Workflows.tsx` has its OWN name-colliding
+> `WORKFLOW_TEMPLATES` for automation node-graphs -- unrelated, untouched.) (2)
+> Project Space hotkeys: `Ctrl/Cmd+Alt+1..9` jumps to space N (mirrors the
+> `Ctrl+1..9` app idiom; placed before the app ctrlMap which ignores Alt; no
+> collision -- the Ctrl+Alt+Arrow tile family and Alt+letter app family are
+> untouched). Documented in docs/SHORTCUTS.md. A `Ctrl+Alt+Arrow` cycle binding was
+> prototyped then REVERTED on finding it shadows the existing focused-window tile
+> shortcut. Verified live (Ctrl+Alt+2 jumped to the 2nd space). Renderer `tsc
+> --noEmit` clean + 15 unit tests green. The Workspace Intelligence pillar
+> (identity + kind + UKI awareness + window save/restore on switch + workflow->space
+> + hotkeys, one template source) is now a complete, verified foundation.
+
+> **DEX 5.6 -- four-pillar slice: Search / UKI / Rewind / Security (2026-06-17,
+> batch 5).** One real, verified slice of each remaining 5.6 pillar (owner: "all,
+> no skips"). (1) SEARCH: universal search (`SpotlightEngine`) now indexes Project
+> Spaces as `actions` ("Switch to <name>", kind subtitle, setActiveStage) -- the
+> active workspace is switchable straight from Ctrl-search. Synchronous stage-store
+> read alongside the settings/actions sources. (2) UKI: `operator.suggestWorkflows`
+> is now workspace-aware -- a `KIND_TO_WORKFLOW_TAG` bias surfaces the matching
+> workflow for the active space kind (Development space -> Development workflow)
+> even before its apps open; `activeWorkspace` now flows through OperatorBriefing ->
+> toPromptContext -> formatOperatorBriefing into the prompt. (3) REWIND: new
+> renderer-side `store/stageActivityLog.ts` (persisted, timestamped space-switch
+> log, recorded from `setActiveStage`) + `spaceAt(ts)`; Rewind session pills now
+> show a Project-Space badge (the space active at the session's start) -- "what
+> workspace was I in". (4) SECURITY: the audit backlog was already largely done
+> (PtyService allowlist + src-tauri fs containment shipped; source index.html CSP
+> already has object-src/base-uri/form-action/frame-ancestors -- the audit had read
+> a stale dist/ artifact). A fresh XSS-sink sweep found + fixed TWO REAL latent
+> sinks: `CleanUI.showToast` interpolated user-derived text (imported asset/part/
+> file names -- a part named `<img onerror>` in an STL/AXL import would execute)
+> raw into innerHTML -> now `escapeHtml`'d; and `stability.safeSetInnerHTML` was
+> misleadingly named (assigned raw html) -> now `DOMPurify.sanitize`. Verified:
+> renderer `tsc --noEmit` clean + 21 unit tests green (added suggestWorkflows
+> workspace-bias + stageActivityLog/spaceAt coverage) + clean app boot with all new
+> imports (no circular deps). HONEST LIMITS: the Spotlight overlay render and
+> Rewind's backend-fed timeline can't be exercised in the backend-less Vite preview
+> (env limit) -- both render paths are tsc-validated + pattern-consistent + their
+> pure logic is unit-tested. NOT built: per-monitor space layouts (needs main->
+> renderer display IPC, architectural); main-window `sandbox:true` (Electron-only,
+> unverifiable here, risks preload breakage -- left for an Electron smoke-test).
+
+> **DEX 5.6 -- Universal Command Layer in search (2026-06-17, batch 6).**
+> Delivered the expanded 5.6 brief's "Universal Search: Commands" + dedicated
+> "Universal Command Layer" (Raycast/Spotlight-style) section. The user-facing
+> universal search (`SpotlightEngine`) now indexes, in its synchronous build path
+> alongside the new Project-Spaces source: (1) the DEX command catalog's ACTION
+> commands (system/window/navigation -- Lock DEX, Tile Left/Right, Split, Arrange,
+> Maximize, Back/Forward, Compact, UKI toggle) under the `commands` category, each
+> run through the ONE canonical `executeDexCommand` (app-launch commands skipped --
+> already indexed, no duplication); and (2) the 6 starter workspaces
+> (`WORKFLOW_TEMPLATES`) as `actions` ("Open Development Workspace" -> opens a
+> kind-tagged Project Space via `openWorkflowSpace`). So Ctrl-search is now a
+> command runner, not just a finder. Reuses the single command catalog + executor
+> + workflow source -- zero parallel systems. Verified LIVE in preview: searching
+> "lock" surfaces "Lock DEX · System command" under a COMMANDS section; "development
+> workspace" surfaces "Open Development Workspace · Starter workspace"; clean boot
+> with the widened import graph (no cycles). Renderer `tsc --noEmit` clean. With
+> batch 5's Project-Spaces-in-search, universal search now reaches apps, settings,
+> files, notes, tasks, projects, workflows, spaces, AND runnable commands -- the
+> brief's "everything searchable". REMAINING in this pillar: contextual NL commands
+> ("open latest project", "export current video") need per-app target resolution;
+> browser-history + AI-conversation sources are backend-fed (Tauri/Electron parity).
+
+> **DEX 5.6 -- three parallel slices: Terminal / UKI skill packs / Browser
+> (2026-06-17, batch 7).** Ran three disjoint-file slices concurrently (owner:
+> "parallelize it"), integrated + verified together. (1) DEX TERMINAL "AI command
+> suggestions": a live, keyboard-navigable `dex <cmd>` suggestion dropdown in
+> `Terminal.tsx` -- as you type `dex <partial>` it shows the top ranked catalog
+> matches (typo-tolerant `suggestDexCommands`) with label + alias + platform
+> shortcut; Up/Down select, Enter runs it through the EXISTING `handleDexInput`
+> path, Esc dismisses; reuses the one catalog + Tab-completion data (no parallel
+> system), never overlaps Ctrl+R. (2) UKI AGENT SKILL PACKS (Priority 1): new pure
+> `uki/skillPacks.ts` (`SKILL_PACKS` for developer/music/video/design/research +
+> `relevantSkillPacks({activeKind,openApps})` selector + `formatSkillPacksForPrompt`)
+> folded into the Uki chat `buildSystemPrompt` -- in a Development space UKI is told
+> "Developer skills available: Git Assistant, Refactor Assistant, Debug Assistant",
+> etc.; unit-tested (`tests/unit/skill-packs.test.ts`). (3) BROWSER session restore
+> (Browser Expansion): `Browser.tsx` now persists open tabs (url+title+pinned) +
+> active tab to `localStorage` (`dex-browser-session`, debounced) and lazily
+> restores them on mount with corrupt-JSON-safe fallback to a single blank tab --
+> no prior session persistence existed (not a duplicate). Verified: full renderer
+> `tsc --noEmit` clean across all three + 59 unit tests green (skill-packs +
+> workspace-spaces + dexCommands) + clean app boot with Browser & DexCode (hosts
+> the terminal) mounting error-free + the browser session writing the correct
+> durable shape to localStorage. Method note: 3 general-purpose worker agents on
+> strictly disjoint files (Terminal.tsx / skillPacks+Uki.tsx+test / Browser.tsx),
+> implement-only (no self-tsc to avoid cross-contamination), parent ran the single
+> integrated verification.
+
+> **DEX 5.6 -- UKI Answer Engine: public APIs wired into the assistant
+> (2026-06-17, batch 8).** Delivered the roadmap's "Free APIs" integration + UKI
+> "information / internal web search / clear English responses". The free-API
+> layer (`uki/freeApis.ts`) had Wikipedia/Weather/Time/DuckDuckGo but was ORPHANED
+> -- nothing in the answer flow called it, and UKI's "web search" just dumped the
+> query into a Google tab without answering. Fixed end-to-end: (1) EXPANDED
+> `freeApis` with the remaining keyless + CORS sources from the brief --
+> `searchWikipedia` (title-search -> summary, so "who invented X" resolves),
+> `lookupDictionary` (dictionaryapi.dev), `convertCurrency` (open.er-api.com /
+> ExchangeRate). (2) NEW `uki/answerEngine.ts` -- a pure, ordered intent classifier
+> (`classifyKnowledgeIntent`: weather/define/currency/time/lookup) + per-intent
+> extractors (place, word, currency triplet, IANA tz via a city table, topic) +
+> `answerFactualQuestion` that runs the right API and formats ONE clear English
+> sentence with a source label. (3) WIRED into both UKI surfaces -- the
+> `UkiOverlay` pipeline and the standalone `Uki` chat: a knowledge question is
+> answered DIRECTLY from the public API when no LLM key is configured (so factual
+> Q&A now works with zero setup, and offline from cache), and folded into the
+> system prompt as `[Live facts retrieved just now]` grounding when a provider IS
+> configured (so the model answers conversationally with CURRENT data, not stale
+> training knowledge). The "what is X" path no longer bounces to the browser when
+> we can answer it. Verified: renderer `tsc --noEmit` clean + 21 new unit tests
+> green (classification + every extractor + grounding formatting) + full suite.
+> HONEST LIMITS: the live network calls aren't exercised in-suite (keyless public
+> endpoints, no injectable fetch in `freeApis`); the classify/extract/format logic
+> that decides WHICH call and HOW it reads is fully unit-tested. NOT added:
+> key-requiring sources from the brief (Alpha Vantage, NewsAPI/GNews, Tavily, Brave,
+> Unsplash) -- they need a Settings key surface + secret storage, a separate slice.
+
+> **DEX 5.6 -- Stage Manager REMOVED + refinement-brief triage (2026-06-17,
+> batch 8).** Owner pivot to stabilization/refinement ("stop feature expansion").
+> Headline: COMPLETELY removed the Stage Manager (the macOS-Tahoe left-edge app
+> strip -- the "separate management layer" the brief calls clutter). Deleted
+> `shell/StageManager.tsx` and every tendril: AppManager import + `stageManagerOn`
+> state/effect + left-offset reserve (`stageOffset` now 0) + both render blocks
+> (strip + re-enable handle) + the `'stage'` manifest/preset stageId labels;
+> `shellPreferencesStore.stageManagerPinned` (interface/default/coerce/setter);
+> both Settings toggles. KEPT the `stageStore` Project Spaces (identity + window
+> save/restore on switch + persistence) -- that IS the brief's requested "window
+> memory / window grouping / workspace persistence" replacement, NOT part of the
+> strip. Window management is now fully native: click-to-focus, Ctrl+Tab switcher,
+> dock / Apps menu launch, drag-snap + tile + split + Ctrl+Alt+N Project Spaces.
+> The `dex-stage-manager` localStorage key stays in the ErrorBoundary
+> reset-allowlist so a settings reset cleans up the orphaned value. Verified:
+> renderer `tsc --noEmit` clean + 31 unit tests green + LIVE boot clean with the
+> strip gone (`[aria-label="Stage Manager"]` absent) and switching intact
+> (setCurrentApp/bringToFront round-trip) + zero console errors.
+> REST OF THE BRIEF -- TRIAGE (scouted, verified): FOUR items are ALREADY DONE (do
+> not re-chase) -- maximized-window controls always visible (permanent title bar,
+> no `!isMaximized` gate), resize glow/highlight removed (bare transparent
+> handles), Browser solid (zero backdrop-filter), Terminal not clipped. Dock /
+> Apps-menu rewrites + platform-wide de-glass also shipped in the 5.5 DEX-Sharp
+> program. TOOLTIP removal: no hover-spam component exists (custom tooltips are
+> focus-only / barely used); the noise is ~418 native `title=` across 71 files,
+> many on icon-only buttons where blanket removal breaks accessibility -- needs a
+> careful `title`->`aria-label` codemod (own scoped pass), NOT a blanket sweep.
+
+> **DEX 5.6 -- FloatingLauncher hover/tap glitch fix (2026-06-17, batch 10).**
+> User-reported (screen recording): hovering/tapping near the bottom-right launcher
+> made the menu / search / UKI buttons "glitch". Diagnosed from the recording
+> (frame extraction + montages) + code + a live preview repro: (a) the three
+> launcher buttons carried native `title=` tooltips ("Search" / "UKI assistant" /
+> "Launcher --- click to open...") -- the floating-label boxes that pop in/out on
+> hover (visible in the recording; matches the brief's "remove hover tooltips / no
+> floating labels"); (b) the press-vs-drag `MOVE_THRESHOLD` was only 4px, so a
+> touch tap with slight finger jitter flipped the whole cluster into drag state
+> (shadow + backdrop + scale flash). Fix (FloatingLauncher.tsx): removed the three
+> native `title=` attributes (kept `aria-label`, so screen-reader accessibility is
+> preserved) and raised `MOVE_THRESHOLD` 4 -> 8px so a tap stays a clean click.
+> Verified live: the buttons now expose NO `title` (zero hover tooltip), keep their
+> aria-labels, and a clean press still fires (Search press opens Spotlight). tsc
+> clean. FOLLOW-UP (same day): user reported the orbs STILL felt jittery on hover +
+> asked about the all-apps-open stress case. Measured under load -- opened apps
+> until DEX's concurrent-app CAP kicked in (tier-based; 6 in the preview tier, "App
+> Limit Reached" beyond) + sampled Search/UKI orb positions 40x while jiggling the
+> mouse: ZERO px movement, no errors -> no position-drift bug, shell stable. Two
+> more fixes: (3) removed the orbs' `scale(1.05)` HOVER grow (the only thing that
+> changed on hover -- a decorative shimmer; hover feedback is now icon-color only,
+> geometry never moves); verified hoverScalesOrb:false. (4) `resolve()` now GUARDS
+> a degenerate 0x0 viewport -- the preview caught it computing a NEGATIVE
+> off-screen corner (0-SIZE-EDGE_PAD = -64) when innerWidth/Height momentarily read
+> 0 (minimize/restore, DPI/monitor change, pre-layout), which flashes the cluster
+> off-screen + back; now keeps a safe on-screen value + re-resolves on resize.
+> Verified: real viewport (779x730) -> orbs correct bottom-right + on-screen; 0x0
+> viewport -> x>=0 (was -64). Re-verified all: no tooltip, no hover scale, clean
+> press still opens Search/UKI/menu, 60px drag still repositions, tsc clean. NOTE:
+> launcher slice of the global "Tooltip Removal Program"; the broader ~418 native
+> `title=` over 71 files still wants a careful `title`->`aria-label` codemod.
+
+> **DEX 5.6 -- AI Permission Center (2026-06-17, batch 11).** Delivered the
+> Security/Permissions pillar's missing "AI permissions" surface. The UKI
+> capability model (`uki/permissions.ts`: `describeCapabilities` + `grant`/`revoke`
+> + `ALL_CAPABILITIES`, with plain-language label + rationale + scope/expiry per
+> capability) was ORPHANED -- read-only via the `dex perms` terminal command,
+> which even told the user to "Grant or revoke from UKI settings" while no such UI
+> existed. Wired it into the real Settings -> Permissions panel: a new "UKI
+> Assistant Access" section (folded into `settingsPanels/AccessPanels.tsx`'s
+> `PermissionsPanel`, so Permissions is now ONE AI + system center) lists every
+> capability with a status dot (granted/denied/hard-denied), its rationale, and
+> per-capability controls -- "Allow once" (4h session grant), "Always" (persistent),
+> and "Revoke", plus a "Revoke all assistant access (N)" action. The `dex perms`
+> footer now points at the real location, and `settingsSearchIndex.ts` indexes the
+> section so it is searchable. Reuses the existing localStorage-backed
+> `uki/cache.ts`, so it works with zero setup and persists. Verified: renderer
+> `tsc --noEmit` clean + new `tests/unit/uki-permissions.test.ts` (6 tests:
+> describe order/defaults, session vs persistent grant + expiry, revoke isolation,
+> re-grant replace, expired-session prune) + LIVE in preview -- opened Settings ->
+> Permissions, clicked "Allow once" on Read files, confirmed the persisted grant
+> (file-read/session/expiry), the row flipping to "Revoke", and the count updating
+> to "(1)". BONUS robustness fix: `DexIcon` crashed the whole app shell on
+> `name.charAt(0)` when an icon `name` was undefined (a presentational component
+> should degrade, never crash) -- now renders a safe `?` fallback. (Found while
+> driving the preview; the trigger in that case was a malformed test-harness launch
+> call, but the guard is correct defense-in-depth regardless.) NEXT in this pillar:
+> the brief's remaining permission facets (plugin permissions, browser isolation,
+> download safety checks) each map to their own existing subsystem and are separate
+> slices; the native per-origin `PermissionsPanel` grants list needs the packaged
+> `dexNative.permissions` bridge (unavailable in the web preview).
+
+> **DEX 5.6 -- Global Search 2.0: open browser tabs searchable (2026-06-17).**
+> Extends the Universal Command Layer (batch 6) search spine. SpotlightEngine now
+> indexes the user's OPEN BROWSER TABS in its sync build path: reads the persisted
+> browser session (`localStorage 'dex-browser-session'`, the batch-7 restore data --
+> no IPC), indexes each tab with a real URL as a `web` result ("<page title> ·
+> Browser tab"), skips blank "New Tab"s, and on select routes through the SAME
+> `_launchAppWithContext('browser', url)` -> `dex-spotlight-navigate` path web
+> results already use (zero Browser.tsx change). Verified LIVE on a real viewport:
+> seeded a 2-tab session, reloaded, opened Spotlight via the Search orb -> "MDN" and
+> "github" each surfaced their tab with a "Browser tab" subtitle, and Enter fired
+> `dex-spotlight-navigate {appId:'browser', contextId:'https://github.com/dex'}`.
+> tsc clean. Universal search now reaches apps/settings/files/notes/tasks/projects/
+> workflows/spaces/commands/browser-tabs. REMAINING search sources (downloads,
+> media, AI conversations, full browser history) are backend-fed (Tauri/Electron) --
+> separate slice. The rest of the "Engineering Deep Dive" brief is largely already
+> shipped this cycle (unified ContextBus event bus; crash recovery + last-session
+> restore = self-healing; concurrent-app cap + WorkloadGovernor + xenon = health
+> layer; UKI awareness/answer-engine/skill-packs; Stage Manager removed) or
+> architectural (Unified Runtime/Resource/Memory managers, multi-monitor = need
+> main<->renderer IPC; C++/Rust engine work = native-blocked here).
+
+> **DEX 5.6 -- DEX Code made functional + IDE-feel fixes (2026-06-17).** User
+> reported (from a screen recording) DexCode "test code not showing", "can't
+> collapse the side", broken code display. Diagnosed + fixed FOUR real bugs, two
+> of them critical: (1) SYNTAX HIGHLIGHTER CORRUPTION -- `highlightDexScript`
+> chained `String.replace` passes that re-scanned their own inserted markup (the
+> string regex matched the quotes inside `class="dex-syn-comment"`), rendering
+> garbled `<span class="&lt;span">` over the code. Rewrote it as a single-pass
+> tokenizer (no re-scan); 5 unit tests (`tests/unit/dexcode-highlight.test.ts`).
+> Verified live: clean spans. (2) DEXCODE COULD NOT RUN ANY CODE -- the DexScript
+> runtime executes transpiled JS via `new Function()`, which the hardened CSP
+> (`script-src 'self'`, no `unsafe-eval`) blocked -> every run returned the CSP
+> error instead of output. THAT was "test code not showing". Added `'unsafe-eval'`
+> to BOTH the renderer index.html meta CSP AND the main.ts response-header CSP.
+> (3) Once eval was allowed, a SECOND masked bug surfaced: the runtime's sandbox
+> did `const eval = undefined` under `"use strict"` -- itself a strict-mode
+> SyntaxError. Removed that one illegal line (eval can't be lexically shadowed in
+> strict mode; Function/window/fetch/storage stay shadowed). Verified live: running
+> `print("hello " + (2+3))` + a `for x in 1..3` loop + `math.sqrt(16)` now prints
+> `hello 5 / row 1 / row 2 / row 3 / 4`. (4) `runCode` deferred execution via
+> `requestAnimationFrame`, which is PAUSED for backgrounded/unfocused windows ->
+> runs silently dropped; switched to `setTimeout(0)`. PLUS: collapsible sidebar
+> (Ctrl+B + Navigator toggle + persisted) for the IDE feel. Renderer + main `tsc`
+> clean, 5 highlighter tests green. **SECURITY FLAG (owner decision):** re-allowing
+> `'unsafe-eval'` widens the renderer XSS surface -- it partially relaxes the CSP
+> hardening from the 2026-06-13 audit. It is the pragmatic unblock for the app's
+> own scripting runtime (user runs their own code; globals are sandboxed). The
+> stricter long-term alternative is moving DexScript execution to a main-process
+> Node `vm` sandbox over IPC (keeps the renderer eval-free) -- not done here.
+> ALSO landed this session (parallel workers, before the DexCode dive): Notes
+> inline "New from template" picker (wired the orphaned DEFAULT_NOTE_TEMPLATES),
+> DexCode resizable+persisted bottom terminal panel, and a Permission Center dialog
+> (`components/PermissionCenter.tsx`, Command Palette "UKI Permissions") wiring the
+> previously UI-less `uki/permissions.ts` grant/revoke API -- verified live
+> (grant -> "1 of 9 allowed", revoke -> "0 of 9").
+
+> **DEX 5.6 -- creative-suite + search slices (2026-06-17), correcting an
+> over-deferral.** After the owner pushed back that "blocked" was hiding buildable
+> work, re-scoped: the TRULY blocked set is only C++/SIMD/napi native + ML;
+> multi-monitor is a real window-layer rework; but creative-app FEATURES and
+> several "backend-fed" search sources are renderer-buildable. Shipped 3 buildable
+> slices (2 parallel workers on disjoint app folders + 1 self): (1) AXL Design
+> Tokens panel -- new `axl/components/DesignTokensPanel.tsx` + a "TOKENS" tab in
+> PropertiesPanel; color/number tokens, persisted (`dex-axl-design-tokens`,
+> corrupt-safe, seeded defaults), color tokens apply to the selected part via the
+> existing `setPartMaterial` (no store surgery), numbers copy to clipboard.
+> VERIFIED LIVE: TOKENS tab renders the 5 seeded tokens as editable rows. (2)
+> Imosion Chords & Scales -- new PURE `imosion/musicTheory.ts` (`scaleNotes`,
+> `diatonicChords`, 7 scales) + a reference panel toggled from the Panels dropdown
+> (separate from the existing audio-driving Chord Trigger). VERIFIED: 8 unit tests
+> (`tests/unit/imosion-music-theory.test.ts`) green (C-major/A-minor/pentatonic
+> correctness), tsc clean, app mounts with no console errors, toggle present --
+> BUT the panel's live render could NOT be isolated in the preview (Imosion's
+> overlapping-panel + dropdown UI defeats synthetic clicks); logic is tested, UI is
+> additive + tsc-clean but visually UNVERIFIED. (3) Global Search: browser HISTORY
+> now indexed in SpotlightEngine (reads `localStorage 'dex-browser-history'`,
+> deduped by URL, most-recent-first, capped 40) -- I'd mislabeled this "backend-fed"
+> but it's renderer localStorage. VERIFIED LIVE: search "Hacker" -> "Hacker News ·
+> History". Renderer tsc clean + 8 new tests green.
+
+> **DEX 5.6 -- creative-suite UI declutter + Vinx markers (2026-06-17).** Owner
+> brief: "aggressive UI/UX refinement -- remove empty-state walls, verbose text,
+> do not explain obvious actions." (1) Vinx TIMELINE MARKERS landed (a parallel
+> worker that DIED before its final report -- but the edits were complete + compile
+> clean): `MarkerFlags` ruler overlay (same frame->pixel mapping as ticks/playhead,
+> click-to-seek, right-click-remove), an "+ Marker" button (M), and the Marker
+> Manager list made click-to-seek; `addMarker`/`updateMarker` added to VinxStore
+> (`removeMarker`/`markers` pre-existed). VERIFIED LIVE: "+ Marker" x2 -> 2 ruler
+> flags, no errors. (2) Imosion declutter: removed the timeline-toolbar "Import"
+> button AND the empty-state wall ("No tracks yet" + Add Track + Import Audio
+> buttons) -> a clean drag-first empty state (faint icon + "Drag audio here"; the
+> whole area is a drop target). Import is now drag-in or File > Import Audio.
+> Removed the "No tracks yet. Add a track to attach notes." side-panel line too.
+> (3) Cross-app "don't explain obvious actions" removals: the curve-editor tutorial
+> hints in Vinx Inspector ("Click to add · Drag to adjust · Double-click to
+> remove"), Prism AdjustmentControls ("Click to add - drag to shape ..."), and the
+> Vinx speed-curve "Click to add speed points" -- all removed (pro tools don't
+> print these). Renderer tsc clean, apps mount with no console errors. NOTE: the
+> full aggressive-refinement brief (global pill design language, AXL 3D-nav
+> overhaul, Nexus visual reset, mixer redesign, overlay/slide-over system) is a
+> large multi-session design pass; this slice covers its #1 ask (empty-state +
+> verbose-text removal). The drag-OUT-after-export ask is a native Electron
+> `webContents.startDrag` feature (main-process, not preview-verifiable) -- deferred
+> honestly, drag-IN already works.
+
+> **DEX 5.6 -- pill button language at the source (2026-06-17).** Owner brief:
+> "pill design language globally; replace heavy rectangular controls + thick
+> borders + glow with pill controls / rounded chips; consistency mandatory."
+> Refined the CANONICAL button at its source (`styles/design-system.css` `.btn`)
+> rather than touching N files: base `.btn` -> `border-radius: 9999px` (full pill)
+> + `box-shadow: none` (was a 3-layer drop/inset shadow); `.btn-primary` /
+> `.btn-secondary` / `.btn-danger` (+ their hovers) lost their colored GLOW
+> box-shadows (`rgba(10,132,255,.3)` etc.) -> flat fills + hairline borders, hover
+> feedback now via fill/border only. Imosion injects its own global `.btn` (radius
+> 6px) that shadows the design-system one while mounted, so its `.btn` /
+> `.btn-primary` / `.btn-danger` radii were bumped to 9999px too for consistency.
+> VERIFIED LIVE: every `.btn` (11 sampled) now computes `border-radius: 9999px` +
+> `box-shadow: none`; app mounts with no console errors. High-leverage: one CSS
+> source sharpens every `.btn` toolbar/dialog button across the creative suite +
+> shell. REMAINING for the full pill sweep: the many buttons that use INLINE styles
+> (not `.btn`) -- e.g. some Imosion/Vinx/Prism panel buttons -- still carry square
+> radii; those are per-file and a larger follow-up. (KNOWN debt surfaced: Imosion's
+> runtime-injected `<style>` leaks `.btn`/`.section-title` globally while it's
+> mounted -- a scoping cleanup for later.)
+
+> **DEX 5.6 -- pill sweep across the creative apps (2026-06-17).** Extended the
+> source-level `.btn` pill+flat language (prior entry) into the INLINE-styled
+> buttons of Prism, Flux, and Forge (3 parallel workers, disjoint app folders,
+> visual-only/additive). Each: square button/chip radii (3-8px) -> `9999px` pills;
+> icon-only buttons -> circles; removed the accent GLOW box-shadows on active
+> tool-toggles (`toolBtnActive` `0 0 0 2px rgba(<accent>,.35)` in Prism + Flux) ->
+> flat; thick borders -> hairline; and trimmed leftover verbose/tutorial copy
+> (Prism: "Drop X or click to add" -> "Drop X" on exposures/files/regions/blemishes/
+> panorama/focus-bracket + "Recording..." -> "Recording"; Flux: easing/motion-blur
+> tutorial lines collapsed). Inputs, list rows, cards, swatches, grids, and true
+> modal/popover elevation correctly left alone. Verified: renderer tsc clean; all
+> 3 apps mount with NO console errors; live foreground sample -> Prism 35 / Flux 20
+> / Forge confirmed pill buttons (Open/Save/Export/Import toolbars now flat pills).
+> REMAINING for the pill sweep: Vinx + AXL inline buttons (not yet swept), the
+> imported `collabButton` style (shared hook, out of the per-app scope), and a few
+> per-app color-identity nits the workers flagged (Forge/Flux primary buttons use
+> cyan not their app accent). Nexus is a deeper "visual reset" (reduce glow/effects)
+> -- a separate design task, not a button sweep.
+
+> **DEX 5.6 -- pill sweep COMPLETE across the creative suite (2026-06-17).** Vinx +
+> AXL swept (2 more parallel workers), finishing the set. Vinx: `toolbarBtnStyle`/
+> `playbackSpeedBtnStyle`/`addTrackBtnStyle`/`zoomBtnStyle`/HeaderBtn + all inline
+> action buttons (+Add Track, +Marker, Capture, Apply Reframe/Stabilization, Match
+> Colors, mask buttons) -> pills; removed the `toolbarBtnActiveStyle` inset accent
+> shadow; trimmed "No subtitle tracks. Add one..."/"No markers. Press M..."/"Import
+> media to get started" empty-states to one-liners; ExportDialog + Inspector
+> buttons pilled. AXL: Toolbar action buttons + DesignTokensPanel + PropertiesPanel
+> + ModifierStack + Axl.tsx segmented controls/panel actions -> pills, modifier
+> empty-state trimmed. Both correctly left inputs, tool-icons, grids, list rows,
+> cards, and modal/popover elevation alone. VERIFIED: renderer tsc clean; both
+> mount with NO console errors; live foreground sample -> Vinx 56 pills (the "+
+> Marker" button computes 9999px), AXL 56 pills. PILL LANGUAGE NOW COVERS: global
+> `.btn` + Imosion + Prism + Flux + Forge + Vinx + AXL. STILL OUT: the DEX SHELL
+> chrome (top-bar nav / permission indicators, radius 4px) -- a separate shell pass,
+> not part of the creative-suite brief; the imported `collabButton`; a few cyan-vs-
+> app-accent primary-button color nits; and NEXUS (deeper "visual reset" -- reduce
+> glow/effects, its own design task). The pill sweep itself is done + verified.
+>
+> **DEX 5.6 -- Nexus rebuilt as the UKI command HUD (2026-06-17).** Owner ask: a
+> simpler, working, interactable, sharp, UKI-driven Nexus matching a target-locator
+> HUD reference. DELETED the old 3044-line five-mode Canvas2D 3D graph
+> (starfield/grid/cluster/knowledge/security, perspective projection, arc-reactor
+> avatar, file auto-scan, drag-camera) and replaced it with a focused ~620-line
+> single-view HUD: concentric tick rings + orange cardinal accent arcs + dotted
+> ring + crosshair + diagonal corner-framing lines + corner brackets, a central
+> reticle that IS UKI (colour/pulse/sweep track the live `useUkiStore` state +
+> mic `audioLevel`), and a ring of REAL markers drawn from the live Nexus memory
+> graph (`getNexusModel().byKind` over all kinds, recency-ranked, +UKI
+> `knowledgeNodes`, deduped, cap 28). Sharp DOM chrome wired to real numbers: TL
+> identity+tier (`getTierLabel`), TR "TARGET LOCATOR / N TRACKED / active-5m", BL
+> warning chip (`getSecuritySummary().recentBlocksLastHour` -> "N BLOCKED" / "ALL
+> CLEAR"), BR "SHIELD score / nodes mapped", plus two live SVG dial gauges
+> (memory/activity). Genuinely interactable: drag-rotate the ring, hover marker ->
+> tooltip, click marker -> selection read-out, click the core or the mic button ->
+> `startListening`/`stopListening`, filter field dims non-matching markers, "/"
+> focuses ask + Esc clears. The ask field DRIVES UKI end-to-end via a new
+> `dex-uki-ask` bridge: `UkiOverlay.handleSendText` now takes an optional explicit
+> query and a global listener opens the panel + runs the full reasoning pipeline.
+> Kept the tested pure data layer (`nexusGraphSimulation.ts` + all
+> `shared/nexus/*`) intact -- only the UI was replaced. Respects reduced-motion +
+> perf-tier (dotted-ring density, RAF paused when backgrounded) + DPR. VERIFIED:
+> renderer tsc clean (0 errors); live preview -> HUD renders matching the
+> reference, zero console errors through full interaction, mic toggles real UKI
+> state, `dex-uki-ask` opens UKI, filter input live.
+>
+> **DEX 5.6 -- Nexus HUD made theme-consistent (2026-06-17, follow-up).** Owner:
+> "where is the blue coming from -- match DEX design." The first cut hardcoded a
+> cyan/orange HUD palette (`#64D2FF` etc.) that ignored the app accent. Reworked
+> Nexus to be fully DEX-token-driven: DOM chrome uses `var(--color-*)` directly,
+> and the canvas reads the same tokens via `getComputedStyle` into a palette
+> (refreshed on the read-out interval, so a theme/accent change re-colours the
+> HUD too -- no hardcoded blues). Structure/rings/markers lead with
+> `--color-accent`; the "armed" arcs use `--color-warning`; state + kind colours
+> map to `--color-success`/`--color-info`/`--color-error`/`--color-text`. Marker
+> colours carry a token KEY (entities) or a resolved literal (knowledge nodes,
+> `var()`-aware), so entity markers live-retheme. VERIFIED: renderer tsc clean;
+> live preview -> accent resolves to the app's own `rgb(59,130,246)`, HUD renders
+> in the app blue (no cyan), no Nexus console errors. (Note: a separate concurrent
+> "DEX Bar" rewrite of `FloatingLauncher.tsx` is mid-flight and currently throwing
+> in that component -- unrelated to Nexus, left for that batch.)
 
 ## Next major phase: uki AI + intelligence everywhere (owner brief, 2026-06-09)
 

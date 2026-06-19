@@ -265,6 +265,34 @@ const PixelArt: React.FC = () => {
     a.remove();
   }, [frame, size, currentFrame]);
 
+  // Export every frame as one horizontal sprite-sheet PNG -- the standard
+  // pixel-art animation deliverable (game engines slice it by frame width).
+  // Native canvas toDataURL, so it's correct by construction (no codec needed).
+  const exportSheet = useCallback(() => {
+    if (frames.length === 0) return;
+    const off = document.createElement('canvas');
+    off.width = size * frames.length;
+    off.height = size;
+    const ctx = off.getContext('2d');
+    if (!ctx) return;
+    frames.forEach((f, fi) => {
+      const ox = fi * size;
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const px = f[y][x];
+          if (px) { ctx.fillStyle = px; ctx.fillRect(ox + x, y, 1, 1); }
+        }
+      }
+    });
+    const url = off.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dex-pixelart-${size}x${size}-${frames.length}frames-sheet.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [frames, size]);
+
   // Build a data-URL thumbnail for a single frame.
   const renderThumb = useCallback((f: Frame): string => {
     const off = document.createElement('canvas');
@@ -319,7 +347,7 @@ const PixelArt: React.FC = () => {
           </select>
           <button onClick={clearFrame} style={toolBtn}>Clear</button>
           <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent)', color: '#fff', border: 'none' }}>Export PNG</button>
-          <button disabled style={{ ...toolBtn, opacity: 0.5, cursor: 'not-allowed' }} title="Animation export coming soon">Export GIF</button>
+          <button onClick={exportSheet} disabled={frames.length < 2} style={{ ...toolBtn, ...(frames.length < 2 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} title={frames.length < 2 ? 'Add a second frame to export a sprite sheet' : 'Export all frames as one sprite-sheet PNG'}>Export Sheet</button>
         </div>
       </div>
 

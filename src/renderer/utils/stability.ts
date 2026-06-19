@@ -10,6 +10,7 @@
 // =============================================================================
 
 import { logError, safeStorage, getHardwareProfile } from './compatibility';
+import DOMPurify from 'dompurify';
 
 // =============================================================================
 // GLOBAL ERROR HANDLING
@@ -475,13 +476,16 @@ export function safeAddEventListener<K extends keyof HTMLElementEventMap>(
 }
 
 /**
- * Safely set innerHTML
+ * Safely set innerHTML — sanitizes with DOMPurify so the "safe" in the name is
+ * real (it previously assigned raw html, an XSS sink for any untrusted caller).
+ * Standard formatting markup survives; scripts / event handlers / javascript:
+ * URLs are stripped.
  */
 export function safeSetInnerHTML(element: HTMLElement | null, html: string): void {
   if (!element) return;
-  
+
   try {
-    element.innerHTML = html;
+    element.innerHTML = DOMPurify.sanitize(html);
   } catch (e) {
     console.error('[DEX Stability] Failed to set innerHTML:', e);
     element.textContent = html.replace(/<[^>]*>/g, '');

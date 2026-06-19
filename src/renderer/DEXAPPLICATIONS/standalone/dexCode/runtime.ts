@@ -149,7 +149,9 @@ export function executeDexScript(source: string): DexScriptResult {
       const document = undefined;
       const fetch = undefined;
       const XMLHttpRequest = undefined;
-      const eval = undefined;
+      // NOTE: 'eval' cannot be lexically shadowed in strict mode (SyntaxError),
+      // so it is intentionally not redeclared here. Function/window/etc. below
+      // are still shadowed to block the common escape hatches.
       const Function = undefined;
       const importScripts = undefined;
       const localStorage = undefined;

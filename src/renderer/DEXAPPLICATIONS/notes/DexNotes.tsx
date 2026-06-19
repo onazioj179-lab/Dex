@@ -778,6 +778,8 @@ const DexNotes: React.FC = () => {
               selectedNoteId={selectedNoteId}
               onSelect={store.selectNote}
               onCreate={() => store.createNote()}
+              onCreateFromTemplate={(id) => store.createFromTemplate(id)}
+              templates={templates}
               onDelete={handleDeleteWithConfirm}
               onTogglePin={store.togglePin}
               onToggleFavorite={store.toggleFavorite}

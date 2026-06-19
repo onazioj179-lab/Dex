@@ -100,9 +100,44 @@ export interface DexAPI {
     getStatus: () => Promise<any>;
     getProcesses: () => Promise<any[]>;
     killProcess: (pid: number, force?: boolean) => Promise<{ success: boolean; message: string }>;
+    killProcessTree: (pid: number, force?: boolean) => Promise<{ success: boolean; message: string }>;
     claimResources: (enable: boolean) => Promise<any>;
     reservationStatus: () => Promise<any>;
     releasePid: (pid: number) => Promise<any>;
+  };
+
+  // Git (Tier 5 / 43) — wraps the system git binary, scoped to a repo path.
+  git: {
+    check: () => Promise<{ available: boolean; version: string }>;
+    status: (cwd: string) => Promise<any>;
+    log: (cwd: string, count?: number) => Promise<any[]>;
+    branches: (cwd: string) => Promise<{ current: string | null; branches: string[] }>;
+    stage: (cwd: string, files: string[]) => Promise<{ success: boolean; message: string }>;
+    unstage: (cwd: string, files: string[]) => Promise<{ success: boolean; message: string }>;
+    commit: (cwd: string, message: string) => Promise<{ success: boolean; message: string }>;
+    push: (cwd: string) => Promise<{ success: boolean; message: string }>;
+    pull: (cwd: string) => Promise<{ success: boolean; message: string }>;
+    checkout: (cwd: string, branch: string) => Promise<{ success: boolean; message: string }>;
+    diff: (cwd: string, file: string) => Promise<string>;
+  };
+
+  // Environment variables (Tier 5 / 44)
+  env: {
+    listSystem: () => Promise<Array<{ name: string; value: string }>>;
+    getManaged: () => Promise<{ global: Record<string, string>; apps: Record<string, Record<string, string>> }>;
+    setManaged: (scope: string, name: string, value: string) => Promise<{ success: boolean; message: string }>;
+    deleteManaged: (scope: string, name: string) => Promise<{ success: boolean; message: string }>;
+  };
+
+  // SSH client (Tier 5 / 42)
+  ssh: {
+    check: () => Promise<{ ssh: boolean; keygen: boolean }>;
+    listProfiles: () => Promise<any[]>;
+    saveProfile: (profile: any) => Promise<any>;
+    deleteProfile: (id: string) => Promise<{ success: boolean; message: string }>;
+    listKeys: () => Promise<Array<{ path: string; type: string; fingerprint: string; comment: string }>>;
+    generateKey: (opts: { type?: string; name?: string; comment?: string }) => Promise<any>;
+    connectCommand: (id: string) => Promise<{ command: string; message: string }>;
   };
 
   // Power & Performance
@@ -1777,6 +1812,9 @@ const invokePrefixAllowlist = [
   'data:',
   'health:',
   'diagnostics:',
+  'git:',
+  'env:',
+  'ssh:',
   'encryption:',
   'security:',
   'vault:',
@@ -1981,11 +2019,43 @@ const api: DexAPI = {
     getStatus: () => ipcRenderer.invoke('system:getStatus'),
     getProcesses: () => ipcRenderer.invoke('system:getProcesses'),
     killProcess: (pid: number, force?: boolean) => ipcRenderer.invoke('system:killProcess', pid, !!force),
+    killProcessTree: (pid: number, force?: boolean) => ipcRenderer.invoke('system:killProcessTree', pid, !!force),
     // Performance Reservation (lower priority of background processes)
     claimResources: (enable: boolean, options?: Record<string, unknown>) =>
       ipcRenderer.invoke('system:claimResources', enable, options),
     reservationStatus: () => ipcRenderer.invoke('system:reservationStatus'),
     releasePid: (pid: number) => ipcRenderer.invoke('system:releasePid', pid),
+  },
+
+  git: {
+    check: () => ipcRenderer.invoke('git:check'),
+    status: (cwd: string) => ipcRenderer.invoke('git:status', cwd),
+    log: (cwd: string, count?: number) => ipcRenderer.invoke('git:log', cwd, count),
+    branches: (cwd: string) => ipcRenderer.invoke('git:branches', cwd),
+    stage: (cwd: string, files: string[]) => ipcRenderer.invoke('git:stage', cwd, files),
+    unstage: (cwd: string, files: string[]) => ipcRenderer.invoke('git:unstage', cwd, files),
+    commit: (cwd: string, message: string) => ipcRenderer.invoke('git:commit', cwd, message),
+    push: (cwd: string) => ipcRenderer.invoke('git:push', cwd),
+    pull: (cwd: string) => ipcRenderer.invoke('git:pull', cwd),
+    checkout: (cwd: string, branch: string) => ipcRenderer.invoke('git:checkout', cwd, branch),
+    diff: (cwd: string, file: string) => ipcRenderer.invoke('git:diff', cwd, file),
+  },
+
+  env: {
+    listSystem: () => ipcRenderer.invoke('env:listSystem'),
+    getManaged: () => ipcRenderer.invoke('env:getManaged'),
+    setManaged: (scope: string, name: string, value: string) => ipcRenderer.invoke('env:setManaged', scope, name, value),
+    deleteManaged: (scope: string, name: string) => ipcRenderer.invoke('env:deleteManaged', scope, name),
+  },
+
+  ssh: {
+    check: () => ipcRenderer.invoke('ssh:check'),
+    listProfiles: () => ipcRenderer.invoke('ssh:listProfiles'),
+    saveProfile: (profile: any) => ipcRenderer.invoke('ssh:saveProfile', profile),
+    deleteProfile: (id: string) => ipcRenderer.invoke('ssh:deleteProfile', id),
+    listKeys: () => ipcRenderer.invoke('ssh:listKeys'),
+    generateKey: (opts: { type?: string; name?: string; comment?: string }) => ipcRenderer.invoke('ssh:generateKey', opts),
+    connectCommand: (id: string) => ipcRenderer.invoke('ssh:connectCommand', id),
   },
 
   defense: {

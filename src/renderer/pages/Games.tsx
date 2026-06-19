@@ -9,6 +9,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { glassPanel, glassButton } from '../styles/glassMenu';
+import { DexSearchInput } from '../styles/components';
 import DexIcon from '../components/DexIcon';
 import EmptyState from '../components/EmptyState';
 import type { DiscoveredGame, LaunchPlan, PlaytimeRecord } from '../../shared/games/launcher';
@@ -20,14 +21,6 @@ const rowStyle: React.CSSProperties = {
   background: 'var(--color-bg-surface)',
   border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  ...rowStyle,
-  minWidth: 220,
-  padding: 'var(--space-2) 10px',
-  color: 'var(--color-text-primary)',
-  outline: 'none',
 };
 
 const ipc = (): IpcBridge => {
@@ -115,18 +108,20 @@ export default function Games(): React.ReactElement {
 
   return (
     <div className="p-6 h-full overflow-auto" style={glassPanel}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
         <div>
           <h1 className="text-2xl font-semibold">Games</h1>
           <div className="text-xs opacity-70">{games.length} discovered</div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <DexSearchInput
             aria-label="Search games"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onClear={() => setQuery('')}
             placeholder="Search games"
-            style={inputStyle}
+            size="md"
+            style={{ minWidth: 220 }}
           />
           <button style={glassButton} onClick={refresh} disabled={scanning || busy !== null}>Refresh</button>
           <button style={glassButton} onClick={onScan} disabled={scanning}>
