@@ -1542,7 +1542,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 4,
     padding: 48,
-    borderRadius: 14,
+    borderRadius: 10,
     border: '2px dashed color-mix(in srgb, var(--color-accent) 60%, transparent)',
     background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
   },

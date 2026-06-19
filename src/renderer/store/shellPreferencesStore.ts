@@ -51,8 +51,6 @@ export interface ShellPreferences {
   preventTabRefreshOnSleep: boolean;
   /** Allow clipboard history to sync across signed-in devices. */
   clipboardCloudSync: boolean;
-  /** Pin Stage Manager strip open (disables auto-collapse on mouse-leave / maximize). */
-  stageManagerPinned: boolean;
   /** Show the always-on-top MiniPulse system monitor pill. */
   miniPulseEnabled: boolean;
   /** Automatically recover crashed apps (bounded retries, then crash card). */
@@ -72,7 +70,6 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   respectUpdateChoice: true,
   preventTabRefreshOnSleep: true,
   clipboardCloudSync: false,
-  stageManagerPinned: false,
   miniPulseEnabled: false,
   autoRecoverApps: true,
 };
@@ -90,7 +87,6 @@ interface ShellPreferencesActions {
   setRespectUpdateChoice: (enabled: boolean) => void;
   setPreventTabRefreshOnSleep: (enabled: boolean) => void;
   setClipboardCloudSync: (enabled: boolean) => void;
-  setStageManagerPinned: (enabled: boolean) => void;
   setMiniPulseEnabled: (enabled: boolean) => void;
   setAutoRecoverApps: (enabled: boolean) => void;
   reset: () => void;
@@ -135,7 +131,6 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.respectUpdateChoice = o.respectUpdateChoice !== false; // default true
   base.preventTabRefreshOnSleep = o.preventTabRefreshOnSleep !== false;
   base.clipboardCloudSync = o.clipboardCloudSync === true;
-  base.stageManagerPinned = o.stageManagerPinned === true;
   base.miniPulseEnabled = o.miniPulseEnabled === true;
   base.autoRecoverApps = o.autoRecoverApps !== false; // default true
   return base;
@@ -334,7 +329,6 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
     setRespectUpdateChoice: (enabled) => update({ respectUpdateChoice: enabled }),
     setPreventTabRefreshOnSleep: (enabled) => update({ preventTabRefreshOnSleep: enabled }),
     setClipboardCloudSync: (enabled) => update({ clipboardCloudSync: enabled }),
-    setStageManagerPinned: (enabled) => update({ stageManagerPinned: enabled }),
     setMiniPulseEnabled: (enabled) => update({ miniPulseEnabled: enabled }),
     setAutoRecoverApps: (enabled) => update({ autoRecoverApps: enabled }),
 

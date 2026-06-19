@@ -23,7 +23,8 @@ export interface SegmentedControlProps<T extends string> {
   options: ReadonlyArray<SegmentedOption<T>>;
   value: T;
   onChange: (value: T) => void;
-  /** Per-app accent for the active segment. Defaults to the DEX accent. */
+  /** @deprecated Selection is now monochrome white system-wide; accepted for
+   *  back-compat but no longer affects the active segment's color. */
   accentColor?: string;
   /**
    * `outlined` (default): each segment carries a hairline border.
@@ -62,7 +63,6 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
-  accentColor = 'var(--color-accent)',
   variant = 'outlined',
   fill = false,
   columns,
@@ -88,7 +88,9 @@ export function SegmentedControl<T extends string>({
       {options.map((o) => {
         const v = optionValue(o);
         const active = v === value;
-        const tint = `color-mix(in srgb, ${accentColor} ${subtle ? 15 : 16}%, transparent)`;
+        // Monochrome selection: the active segment reads white (theme-aware),
+        // not the per-app accent. accentColor is intentionally ignored.
+        const tint = `color-mix(in srgb, var(--dex-focus-color, #fff) ${subtle ? 12 : 14}%, transparent)`;
         return (
           <button
             key={v}
@@ -103,9 +105,9 @@ export function SegmentedControl<T extends string>({
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               ...(fill ? { flex: 1 } : {}),
               borderRadius: subtle ? 6 : 4,
-              border: subtle ? 'none' : `1px solid ${active ? accentColor : 'var(--color-border-subtle)'}`,
+              border: subtle ? 'none' : `1px solid ${active ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}`,
               background: active ? tint : 'transparent',
-              color: active ? accentColor : 'var(--color-text-secondary)',
+              color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               cursor: disabled ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap',
             }}

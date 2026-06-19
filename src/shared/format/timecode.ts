@@ -52,3 +52,39 @@ export function framesToSeconds(frames: number, fps: number): number {
 export function secondsToTimecode(seconds: number, fps: number): string {
   return framesToTimecode(secondsToFrames(seconds, fps), fps);
 }
+
+// -- Drop-frame timecode (NTSC 29.97 / 59.94) -------------------------------
+// At the 1000/1001 NTSC rate, non-drop timecode drifts ~3.6s/hour from the wall
+// clock. Drop-frame fixes this by SKIPPING `d` frame-NUMBERS (not real frames) at
+// the start of every minute except every 10th minute (d = 2 at 30 nominal fps,
+// 4 at 60). Convention uses ';' before the frames field. Pure (SMPTE algorithm).
+export function framesToDropTimecode(frames: number, nominalFps = 30): string {
+  const fps = Math.max(1, Math.round(nominalFps));
+  const d = Math.round(nominalFps * 0.0666666); // dropped frame-numbers per minute
+  const framesPer10Min = fps * 600 - d * 9;
+  const framesPerMin = fps * 60 - d;
+  let f = Math.max(0, Math.floor(frames));
+  const tenMins = Math.floor(f / framesPer10Min);
+  const rem = f % framesPer10Min;
+  f += rem > d
+    ? d * 9 * tenMins + d * Math.floor((rem - d) / framesPerMin)
+    : d * 9 * tenMins;
+  const ff = f % fps;
+  const ss = Math.floor(f / fps) % 60;
+  const mm = Math.floor(f / (fps * 60)) % 60;
+  const hh = Math.floor(f / (fps * 3600)) % 24;
+  return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)};${pad2(ff)}`;
+}
+
+/** Parse a drop-frame "HH:MM:SS;FF" (or with ':') to a real frame count, or null. */
+export function dropTimecodeToFrames(tc: string, nominalFps = 30): number | null {
+  const parts = tc.trim().split(/[:;]/).map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0)) return null;
+  const fps = Math.max(1, Math.round(nominalFps));
+  const [hh, mm, ss, ff] = parts;
+  if (mm >= 60 || ss >= 60 || ff >= fps) return null;
+  const d = Math.round(nominalFps * 0.0666666);
+  const totalMinutes = hh * 60 + mm;
+  const dropped = d * (totalMinutes - Math.floor(totalMinutes / 10));
+  return ((hh * 3600 + mm * 60 + ss) * fps + ff) - dropped;
+}

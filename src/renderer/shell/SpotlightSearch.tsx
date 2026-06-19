@@ -566,7 +566,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           height: 50, padding: '0 var(--space-5)',
           // DEX Sharp 2.0: a dark, fully-opaque pill (no blur in full-flat mode, so
           // translucency would just muddy the wallpaper). Crisp, not bleachy.
-          background: 'var(--color-bg-glass)',
+          background: 'var(--color-bg-surface-solid, #141416)',
           border: '1px solid var(--color-border)',
           borderRadius: 9999,
           transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
@@ -613,16 +613,16 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
               aria-label="Clear search"
               style={{
-                width: 18, height: 18, borderRadius: 8,
-                background: 'rgba(120,120,128,0.32)',
+                width: 28, height: 28, borderRadius: 14,
+                background: 'var(--color-bg-active)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'rgba(235,235,245,0.85)',
+                color: 'var(--color-text-secondary)',
                 transition: 'background 0.12s ease',
                 flexShrink: 0,
               }}
             >
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </button>
@@ -645,10 +645,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               scrollBehavior: 'smooth',
               // Fully opaque so Home wallpaper/widgets never bleed through and
               // make results unreadable (full-flat: no blur to lean on).
-              background: 'var(--color-bg-glass)',
-              backdropFilter: 'var(--blur-xl) saturate(180%)',
-              WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-              border: '1px solid rgba(255,255,255,0.10)',
+              background: 'var(--color-bg-surface-solid, #141416)',
+              border: '1px solid var(--color-border)',
               borderRadius: 10,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: '4px',
@@ -720,10 +718,13 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           width: 'min(560px, 92vw)',
           maxHeight: 'min(520px, 70vh)',
           display: 'flex', flexDirection: 'column',
-          background: 'var(--color-bg-surface-solid, #141416)',
-          border: '1px solid var(--color-border)',
+          // Master overhaul: glass search overlay (Part 3.7).
+          background: 'var(--glass-bg, rgba(12,12,12,0.85))',
+          backdropFilter: 'var(--glass-blur, blur(24px))',
+          WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
+          border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
           borderRadius: 10,
-          boxShadow: 'var(--pg-shadow-modal), 0 0 0 1px var(--color-bg-hover), var(--pg-gloss-top)',
+          boxShadow: 'var(--pg-shadow-modal)',
           overflow: 'hidden',
         }}
       >
@@ -743,7 +744,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             value={query}
             onChange={e => handleSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search apps, settings, files, actions..."
+            placeholder="Search"
             aria-label="Spotlight Search"
             role="combobox"
             aria-expanded={flatResults.length > 0}
@@ -766,11 +767,12 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
               aria-label="Clear search"
               style={{
-                width: 22, height: 22, borderRadius: 10,
-                background: 'var(--color-border)',
+                width: 28, height: 28, borderRadius: 14,
+                background: 'var(--color-bg-active)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--color-text-secondary)',
+                flexShrink: 0,
               }}
             >
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -836,20 +838,17 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             padding: 'var(--space-8) var(--space-5)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No results for "{query}"</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', opacity: 0.5, marginTop: 4 }}>Xenon is searching deeper — try a different term or check the web</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', opacity: 0.5, marginTop: 4 }}>Try a different search term.</div>
           </div>
         )}
 
         {/* Footer hints */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '6px var(--space-4)',
           borderTop: '1px solid var(--color-bg-hover)',
           flexShrink: 0,
         }}>
-          <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', letterSpacing: '0.04em', fontWeight: 500 }}>
-            Powered by Xenon
-          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {[
             { keys: ['↑', '↓'], label: 'Navigate' },

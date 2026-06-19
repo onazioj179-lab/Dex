@@ -6,7 +6,7 @@
  */
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { clampEventToViewport } from '../../utils/menuPosition';
-import { CreativeSlider } from '../../components/controls';
+import { CreativeSlider, IconButton } from '../../components/controls';
 import { enginePendingApplier, type OpApplyResult } from '../../../shared/uki/creativeCommand';
 import type { CreativeOp } from '../../../shared/uki/creativeActions';
 import { detectTempo, detectOnsets } from '../../../shared/media/beatDetect';
@@ -36,6 +36,15 @@ import {
 import type { MetronomeSettings, Region, Marker } from './ImosionFeatures';
 import { getDiatonicChords, midiToFrequency } from './ImosionChords';
 import {
+  scaleNotes as theoryScaleNotes,
+  diatonicChords as theoryDiatonicChords,
+  CHROMATIC_NOTES,
+  SCALE_NAMES,
+  SCALE_LABELS,
+  type RootNote,
+  type ScaleName,
+} from './musicTheory';
+import {
   extractWaveformPeaks,
   audioBufferToAIFF,
   generateMetronomeClick,
@@ -46,6 +55,8 @@ import {
   getAutomationValue,
   drawAutomationLane,
 } from './ImosionEngine';
+import { computeSignalLevels } from '../../../shared/audio/dsp';
+import { DexSearchInput } from '../../styles/components';
 
 // ==================== APP IDENTITY ====================
 export const IMOSION_VERSION = '1.0.0';
@@ -1830,7 +1841,7 @@ const TrackChannelStrip = memo<{
             const isClip = level > 1.0;
             return (
               <div key={ch} style={{ width: '3px', height: '100%', background: 'var(--color-bg-tertiary)', borderRadius: '2px', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${pct}%`, background: isClip ? 'linear-gradient(to top, #30d158, #ff9f0a 60%, #ff453a)' : `linear-gradient(to top, #30d158, ${track.color})`, borderRadius: '2px', transition: 'height 0.08s ease-out' }} />
+                <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${pct}%`, background: isClip ? 'linear-gradient(to top, var(--color-success), var(--color-warning) 60%, var(--color-error))' : `linear-gradient(to top, var(--color-success), ${track.color})`, borderRadius: '2px', transition: 'height 0.08s ease-out' }} />
               </div>
             );
           })}
@@ -2480,6 +2491,7 @@ const Imosion: React.FC = () => {
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showPanelsMenu, setShowPanelsMenu] = useState(false);
   const [inputLevel, setInputLevel] = useState(0);
+  const [meterStats, setMeterStats] = useState<{ peakDb: number; crestDb: number } | null>(null);
   const [viewMode, setViewMode] = useState<'arrange' | 'mixer' | 'beatmaker' | 'pianoroll'>('arrange');
 
   // ===== PIANO ROLL =====
@@ -2495,6 +2507,29 @@ const Imosion: React.FC = () => {
   const [showChordTrigger, setShowChordTrigger] = useState(false);
   const [chordIncludeSeventh, setChordIncludeSeventh] = useState(false);
   const [chordTriggerMode, setChordTriggerMode] = useState<'major' | 'minor'>('major');
+
+  // ===== CHORDS & SCALES HELPER (pure music-theory reference) =====
+  const [showChordsScales, setShowChordsScales] = useState(false);
+  const [chordsScalesRoot, setChordsScalesRoot] = useState<RootNote>(() => {
+    try {
+      const saved = localStorage.getItem('imosion-chords-scales-root');
+      if (saved && (CHROMATIC_NOTES as readonly string[]).includes(saved)) return saved as RootNote;
+    } catch { /* corrupt or unavailable storage -- fall through to default */ }
+    return 'C';
+  });
+  const [chordsScalesScale, setChordsScalesScale] = useState<ScaleName>(() => {
+    try {
+      const saved = localStorage.getItem('imosion-chords-scales-scale');
+      if (saved && (SCALE_NAMES as string[]).includes(saved)) return saved as ScaleName;
+    } catch { /* corrupt or unavailable storage -- fall through to default */ }
+    return 'major';
+  });
+  useEffect(() => {
+    try { localStorage.setItem('imosion-chords-scales-root', chordsScalesRoot); } catch { /* ignore */ }
+  }, [chordsScalesRoot]);
+  useEffect(() => {
+    try { localStorage.setItem('imosion-chords-scales-scale', chordsScalesScale); } catch { /* ignore */ }
+  }, [chordsScalesScale]);
 
   // ===== INSTRUMENT TRACKS =====
   const [instrumentTracks, setInstrumentTracks] = useState<InstrumentTrack[]>([]);
@@ -4175,17 +4210,10 @@ const Imosion: React.FC = () => {
         if (now - lastLevelFrame < levelBudget * 0.9) return;
         lastLevelFrame = now;
         analyser.getFloatTimeDomainData(dataArray);
-        let peak = 0;
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          const abs = Math.abs(dataArray[i]);
-          if (abs > peak) peak = abs;
-          sum += dataArray[i] * dataArray[i];
-        }
-        const rms = Math.sqrt(sum / dataArray.length);
-        // Use peak for more responsive metering
-        const db = 20 * Math.log10(Math.max(peak, rms) + 0.0001);
-        setInputLevel(Math.max(0, Math.min(1, (db + 60) / 60)));
+        const levels = computeSignalLevels(dataArray);
+        // Use peak for more responsive metering (normalize -60..0 dBFS -> 0..1).
+        setInputLevel(Math.max(0, Math.min(1, (levels.peakDb + 60) / 60)));
+        setMeterStats({ peakDb: levels.peakDb, crestDb: levels.crestDb });
       };
       updateLevel();
 
@@ -4198,6 +4226,7 @@ const Imosion: React.FC = () => {
         stream.getTracks().forEach(t => t.stop());
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
         setInputLevel(0);
+        setMeterStats(null);
         if (chunksRef.current.length > 0) {
           const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
           const url = URL.createObjectURL(blob);
@@ -5022,7 +5051,7 @@ const Imosion: React.FC = () => {
           padding: 4px 8px;
           background: var(--color-border-subtle);
           border: 1px solid var(--color-bg-hover);
-          border-radius: 6px;
+          border-radius: 9999px;
           color: var(--color-text-muted);
           cursor: pointer;
           font-size: 10px;
@@ -5031,9 +5060,9 @@ const Imosion: React.FC = () => {
         .btn:hover { background: #1e3a28; color: #30d158; border-color: #2a5e3a; }
         .btn-active { background: #1e3a28; color: #30d158; border-color: #30d158; }
         .btn-icon { padding: 4px 6px; }
-        .btn-primary { background: #30d158; border-color: #30d158; color: #000; font-weight: 700; border-radius: 6px; }
+        .btn-primary { background: #30d158; border-color: #30d158; color: #000; font-weight: 700; border-radius: 9999px; }
         .btn-primary:hover { background: #34d85c; }
-        .btn-danger { background: var(--color-error); border-color: var(--color-error); color: #fff; border-radius: 6px; }
+        .btn-danger { background: var(--color-error); border-color: var(--color-error); color: #fff; border-radius: 9999px; }
         .divider { width: 1px; height: 18px; background: var(--color-border-subtle); margin: 0 4px; }
         .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #30d158; }
         .frosted-dropdown { background: var(--color-bg-elevated, #1C1C1E); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 14px 36px rgba(0,0,0,0.42); }
@@ -5061,7 +5090,7 @@ const Imosion: React.FC = () => {
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* File Menu */}
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowFileMenu(false)}>
-            <button aria-label="File menu" onClick={(e) => { e.stopPropagation(); setShowFileMenu(!showFileMenu); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>File {Icon.chevron}</button>
+            <button aria-label="File menu" onClick={(e) => { e.stopPropagation(); setShowFileMenu(!showFileMenu); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>File {Icon.chevron}</button>
             {showFileMenu && (
               <div className="tooltip frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '180px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(360px, calc(100vh - 72px))', zIndex: 'var(--z-modal)', padding: '4px', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { applyTemplate(DEFAULT_TEMPLATES[3]); setShowFileMenu(false); }}>{Icon.plus} New Project</div>
@@ -5078,13 +5107,13 @@ const Imosion: React.FC = () => {
                   <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-accent)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { collab.openShareDialog(); setShowFileMenu(false); }}><DexIcon name="user-plus" size={14} /> Share Project</div>
                 )}
                 <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: '#86868b', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { closeApp('imosion'); setShowFileMenu(false); }}>{Icon.close} Exit</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} onClick={() => { closeApp('imosion'); setShowFileMenu(false); }}>{Icon.close} Exit</div>
               </div>
             )}
           </div>
           {/* Tools Menu */}
           <div style={{ position: 'relative', flexShrink: 0 }} onMouseLeave={() => setShowToolsMenu(false)}>
-            <button aria-label="Tools menu" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(!showToolsMenu); setShowFileMenu(false); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: '#86868b', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools {Icon.chevron}</button>
+            <button aria-label="Tools menu" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(!showToolsMenu); setShowFileMenu(false); }} style={{ background: 'transparent', border: 'none', fontSize: '11px', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools {Icon.chevron}</button>
             {showToolsMenu && (
               <div className="tooltip frosted-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', minWidth: '200px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '4px var(--space-3) 2px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>PROCESSING</div>
@@ -5139,17 +5168,19 @@ const Imosion: React.FC = () => {
           </div>
           <div style={{ width: '1px', height: '18px', background: 'var(--color-border-subtle)' }} />
           {/* Undo/Redo */}
-          <button aria-label="Undo" onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" style={{ width: '24px', height: '24px', borderRadius: '4px', border: 'none', background: 'transparent', color: historyIndex <= 0 ? 'var(--color-text-disabled, #48484a)' : 'var(--color-text-secondary)', cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: historyIndex <= 0 ? 0.4 : 1, transition: 'opacity 0.15s ease, color 0.15s ease' }}>{Icon.undo}</button>
-          <button aria-label="Redo" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" style={{ width: '24px', height: '24px', borderRadius: '4px', border: 'none', background: 'transparent', color: historyIndex >= history.length - 1 ? 'var(--color-text-disabled, #48484a)' : 'var(--color-text-secondary)', cursor: historyIndex >= history.length - 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: historyIndex >= history.length - 1 ? 0.4 : 1, transition: 'opacity 0.15s ease, color 0.15s ease' }}>{Icon.redo}</button>
+          <IconButton aria-label="Undo" onClick={undo} disabled={historyIndex <= 0} title="Undo (Ctrl+Z)" icon={Icon.undo}
+            style={{ color: historyIndex <= 0 ? 'var(--color-text-disabled, #48484a)' : 'var(--color-text-secondary)', opacity: historyIndex <= 0 ? 0.4 : 1, transition: 'opacity 0.15s ease, color 0.15s ease' }} />
+          <IconButton aria-label="Redo" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)" icon={Icon.redo}
+            style={{ color: historyIndex >= history.length - 1 ? 'var(--color-text-disabled, #48484a)' : 'var(--color-text-secondary)', opacity: historyIndex >= history.length - 1 ? 0.4 : 1, transition: 'opacity 0.15s ease, color 0.15s ease' }} />
         </div>
 
         {/* Center: Transport + LCD */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', minWidth: 0, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
           {/* Transport Controls */}
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-border-subtle)', borderRadius: '8px', padding: '2px', border: '1px solid var(--color-bg-hover)' }}>
-            <button aria-label="Rewind" onClick={() => setCurrentTime(0)} title="Rewind" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: 'transparent', color: '#86868b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.rewind}</button>
+            <button aria-label="Rewind" onClick={() => setCurrentTime(0)} title="Rewind" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.rewind}</button>
             <button aria-label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} onClick={() => { if (isRecording) stopRecording(); setIsPlaying(!isPlaying); }} title={isPlaying ? 'Pause (Space)' : 'Play (Space)'} style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: isPlaying ? 'var(--color-success)' : 'transparent', color: isPlaying ? '#000' : 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{isPlaying ? Icon.pause : Icon.play}</button>
-            <button aria-label="Stop" onClick={() => { setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); }} title="Stop" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: 'transparent', color: '#86868b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.stop}</button>
+            <button aria-label="Stop" onClick={() => { setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); }} title="Stop" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.stop}</button>
             <button aria-label={isRecording ? 'Stop Recording' : 'Record (R)'} onClick={isRecording ? stopRecording : startRecording} title={isRecording ? 'Stop Recording' : 'Record (R)'} style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: isRecording ? 'var(--color-error)' : 'transparent', color: isRecording ? '#fff' : 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.record}</button>
             <div style={{ width: '1px', height: '16px', background: 'var(--color-bg-hover)' }} />
             <button aria-label="Loop" onClick={() => setIsLooping(!isLooping)} title="Loop (L)" style={{ width: '28px', height: '26px', borderRadius: '4px', border: 'none', background: isLooping ? '#0d2847' : 'transparent', color: isLooping ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.loop}</button>
@@ -5245,6 +5276,7 @@ const Imosion: React.FC = () => {
                 <div style={{ padding: '6px var(--space-3) 4px', fontSize: '9px', color: 'var(--color-text-tertiary)', fontWeight: 600, letterSpacing: '0.8px' }}>VIEW</div>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showAutomation ? 'var(--color-warning)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowAutomation(a => !a); setShowPanelsMenu(false); }}>Automation{showAutomation && <span style={{ fontSize: '9px', color: 'var(--color-warning)' }}>ON</span>}</div>
                 <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showInstrumentBrowser ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowInstrumentBrowser(b => !b); setShowPanelsMenu(false); }}>Instruments{showInstrumentBrowser && <span style={{ fontSize: '9px', color: '#bf5af2' }}>ON</span>}</div>
+                <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showChordsScales ? '#FF6B35' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowChordsScales(s => !s); setShowPanelsMenu(false); }}>Chords &amp; Scales{showChordsScales && <span style={{ fontSize: '9px', color: '#FF6B35' }}>ON</span>}</div>
                 {selectedInstrument && <div className="dropdown-item" style={{ padding: '7px var(--space-3)', fontSize: '11px', color: showInstrumentEditor ? '#bf5af2' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { setShowInstrumentEditor(b => !b); setShowPanelsMenu(false); }}>Edit Instrument{showInstrumentEditor && <span style={{ fontSize: '9px', color: '#bf5af2' }}>ON</span>}</div>}
               </div>
             )}
@@ -5263,7 +5295,14 @@ const Imosion: React.FC = () => {
           <div style={{ flex: 1, height: '3px', background: 'var(--color-border-subtle)', borderRadius: '2px', overflow: 'hidden', maxWidth: '140px' }}>
             <div style={{ height: '100%', width: `${inputLevel * 100}%`, background: inputLevel > 0.85 ? 'var(--color-error)' : inputLevel > 0.6 ? 'var(--color-warning)' : '#3a3a3c', transition: 'width 0.05s', borderRadius: '2px' }} />
           </div>
-          <span style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: 'var(--font-mono)', minWidth: '35px' }}>{inputLevel > 0 ? `${Math.round((inputLevel - 1) * 60)}dB` : '-dB'}</span>
+          <span style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: 'var(--font-mono)', minWidth: '46px' }}>
+            {meterStats && meterStats.peakDb > -120 ? `${meterStats.peakDb.toFixed(1)}dB` : '-dB'}
+          </span>
+          {meterStats && meterStats.crestDb > 0 && (
+            <span title="Crest factor (peak - RMS): dynamics indicator" style={{ fontSize: '9px', color: '#3a3a3c', fontFamily: 'var(--font-mono)', minWidth: '52px' }}>
+              CF {meterStats.crestDb.toFixed(1)}
+            </span>
+          )}
         </div>
       )}
 
@@ -5364,7 +5403,8 @@ const Imosion: React.FC = () => {
               <button aria-label="Split" onClick={() => setClipEdit(e => ({ ...e, mode: e.mode === 'split' ? 'none' : 'split' }))} className={`btn ${clipEdit.mode === 'split' ? 'btn-active' : ''}`}>{Icon.scissors} Split</button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button aria-label="Import" onClick={() => fileInputRef.current?.click()} className="btn" style={{ color: 'var(--color-success)' }}>{Icon.upload} Import</button>
+              {/* No "Import" button in the timeline toolbar -- real DAWs import via
+                  File > Import Audio or drag-and-drop, both of which still work. */}
               <button aria-label="Export" onClick={() => setShowExportModal(true)} className="btn" style={{ color: 'var(--color-accent)' }}>{Icon.download} Export</button>
               <div className="divider" />
               <button aria-label="FX Bus" onClick={() => addBus('fx')} className="btn">{Icon.bus} FX Bus</button>
@@ -5499,7 +5539,7 @@ const Imosion: React.FC = () => {
                 onDragOver={(e) => handleTrackDragOver(e, track.id)}
                 onDrop={(e) => handleTrackDrop(e, track.id)}
                 onDragLeave={() => setDropTarget(null)}
-                style={{ height: '62px', borderBottom: '1px solid var(--color-border-subtle)', background: selectedTrack === track.id ? 'rgba(10,132,255,0.04)' : trackIdx % 2 === 0 ? 'transparent' : 'var(--color-border-subtle)', position: 'relative', zIndex: 2 }}
+                style={{ height: '62px', borderBottom: '1px solid var(--color-border-subtle)', background: selectedTrack === track.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : trackIdx % 2 === 0 ? 'transparent' : 'var(--color-border-subtle)', position: 'relative', zIndex: 2 }}
               >
                 {/* Drop indicator */}
                 {dropTarget?.trackId === track.id && (
@@ -5601,17 +5641,14 @@ const Imosion: React.FC = () => {
                 ))}
               </div>
             ))}
-            {/* Empty state for a project with no tracks. Wrapper ignores pointer
-                events so file drop onto the grid still works; only the buttons
-                are interactive. */}
+            {/* Empty state: clean + drag-first. No buttons or "no tracks" copy --
+                the whole area is a drop target (pointer-events:none lets the drop
+                through), so the normal way in is to drag audio here; the "+" in the
+                track header and File > Import Audio remain for the menu path. */}
             {tracks.length === 0 && (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', pointerEvents: 'none', zIndex: 5 }}>
-                <div style={{ color: 'var(--color-text-disabled)', opacity: 0.6 }}><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>No tracks yet</div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '4px', pointerEvents: 'auto' }}>
-                  <button aria-label="Add a track" onClick={addTrack} style={{ padding: '6px var(--space-3)', background: '#0d2847', border: '1px solid #153d6b', borderRadius: '4px', color: 'var(--color-accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>{Icon.plus} Add Track</button>
-                  <button aria-label="Import audio files" onClick={() => fileInputRef.current?.click()} style={{ padding: '6px var(--space-3)', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-secondary)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>{Icon.upload} Import Audio</button>
-                </div>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', pointerEvents: 'none', zIndex: 5 }}>
+                <div style={{ color: 'var(--color-text-disabled)', opacity: 0.28 }}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-text-tertiary)', opacity: 0.7, letterSpacing: '0.04em' }}>Drag audio here</div>
               </div>
             )}
             <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${currentTime * zoom}px`, width: '2px', background: 'var(--color-error)', zIndex: 100, pointerEvents: 'none' }} />
@@ -5888,7 +5925,7 @@ const Imosion: React.FC = () => {
               <div style={{ width: 80, flexShrink: 0, borderRight: '1px solid var(--color-border-subtle)' }}>
                 <div style={{ height: 24 }} /> {/* Spacer for step numbers */}
                 {beatKit.pads.map((pad, ri) => (
-                  <div key={ri} onClick={() => setActivePad(ri === activePad ? -1 : ri)} style={{ height: 28, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '9px', fontWeight: 600, color: activePad === ri ? '#bf5af2' : 'var(--color-text-secondary)', cursor: 'pointer', background: activePad === ri ? 'rgba(191,90,242,0.08)' : 'transparent', borderBottom: '1px solid var(--color-border-subtle)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                  <div key={ri} onClick={() => setActivePad(ri === activePad ? -1 : ri)} style={{ height: 28, display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '9px', fontWeight: 600, color: activePad === ri ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', background: activePad === ri ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent', borderBottom: '1px solid var(--color-border-subtle)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                     {pad}
                   </div>
                 ))}
@@ -6310,6 +6347,57 @@ const Imosion: React.FC = () => {
           </div>
         )}
 
+        {/* ===== CHORDS & SCALES HELPER PANEL (pure music-theory reference) ===== */}
+        {showChordsScales && (() => {
+          const notes = theoryScaleNotes(chordsScalesRoot, chordsScalesScale);
+          const chords = theoryDiatonicChords(chordsScalesRoot, chordsScalesScale);
+          const copyNotes = () => {
+            try { navigator.clipboard?.writeText(notes.join(' ')); } catch { /* clipboard unavailable */ }
+          };
+          const qualityColor = (q: string) =>
+            q === 'major' ? '#FF6B35'
+              : q === 'minor' ? '#bf5af2'
+              : q === 'diminished' ? 'var(--color-error)'
+              : 'var(--color-warning)';
+          return (
+            <div style={{ position: 'absolute', top: 56, right: 12, width: 280, background: 'var(--color-bg-elevated)', border: '1px solid #27272a', borderRadius: 6, padding: 10, zIndex: 21, boxShadow: 'var(--pg-shadow-context)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#FF6B35' }}>Chords &amp; Scales</span>
+                <button aria-label="Close Chords and Scales" onClick={() => setShowChordsScales(false)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)' }}>
+                <select aria-label="Root note" value={chordsScalesRoot} onChange={e => setChordsScalesRoot(e.target.value as RootNote)} style={{ flex: '0 0 64px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
+                  {CHROMATIC_NOTES.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <select aria-label="Scale" value={chordsScalesScale} onChange={e => setChordsScalesScale(e.target.value as ScaleName)} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '3px 6px', cursor: 'pointer' }}>
+                  {SCALE_NAMES.map(s => <option key={s} value={s}>{SCALE_LABELS[s]}</option>)}
+                </select>
+              </div>
+              {/* Scale notes */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', color: 'var(--color-text-tertiary)' }}>SCALE NOTES</span>
+                <button aria-label="Copy scale notes" onClick={copyNotes} title="Copy notes to clipboard" style={{ padding: '2px 6px', borderRadius: 2, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: 'var(--color-text-tertiary)', fontSize: 8, fontWeight: 600, cursor: 'pointer' }}>Copy</button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 'var(--space-2)' }}>
+                {notes.map((n, i) => (
+                  <span key={`${n}-${i}`} style={{ padding: '2px 6px', borderRadius: 3, border: '1px solid #27272a', background: i === 0 ? 'rgba(255,107,53,0.14)' : 'var(--color-bg-hover)', color: i === 0 ? '#FF6B35' : 'var(--color-text-secondary)', fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{n}</span>
+                ))}
+              </div>
+              {/* Diatonic chords */}
+              <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>DIATONIC CHORDS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(chords.length, 7)}, 1fr)`, gap: 4 }}>
+                {chords.map((c, i) => (
+                  <div key={i} title={`${c.numeral}  ${c.name} — ${c.notes.join(' ')}`} style={{ padding: '6px 2px', borderRadius: 3, border: '1px solid #27272a', background: 'var(--color-bg-hover)', color: qualityColor(c.quality), fontSize: 9, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <span>{c.numeral}</span>
+                    <span style={{ fontSize: 8, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{c.name}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, fontSize: 8, color: 'var(--color-text-tertiary)', textAlign: 'center' }}>Reference only — does not alter the project</div>
+            </div>
+          );
+        })()}
+
         {/* Mastering Panel Modal */}
         {showMasteringPanel && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-max)' }}>
@@ -6332,7 +6420,7 @@ const Imosion: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                   {MASTERING_PRESETS.map(preset => (
-                    <button aria-label={preset.description} key={preset.id} onClick={() => applyMasteringPreset(preset.id)} title={preset.description} style={{ padding: '5px 10px', borderRadius: '3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? '#bf5af2' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'rgba(191,90,242,0.15)' : '#141417', color: selectedMasteringPreset === preset.id ? '#c084fc' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s' }}>{preset.name}</button>
+                    <button aria-label={preset.description} key={preset.id} onClick={() => applyMasteringPreset(preset.id)} title={preset.description} style={{ padding: '5px 10px', borderRadius: '3px', border: '1px solid', borderColor: selectedMasteringPreset === preset.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)', background: selectedMasteringPreset === preset.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : '#141417', color: selectedMasteringPreset === preset.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s' }}>{preset.name}</button>
                   ))}
                   {customMasteringPresets.map(preset => (
                     <div key={preset.id} style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
@@ -7187,7 +7275,6 @@ const Imosion: React.FC = () => {
             <button aria-label="Close Track Notes panel" onClick={() => setShowTrackNotes(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10, maxHeight: 280, overflowY: 'auto' }}>
-            {tracks.length === 0 && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No tracks yet. Add a track to attach notes.</div>}
             {tracks.map(t => (
               <div key={t.id} style={{ marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 2 }}>{t.name}</span>
@@ -7414,11 +7501,13 @@ const Imosion: React.FC = () => {
             
             {/* Search */}
             <div style={{ padding: '10px 14px', borderBottom: '1px solid #1f1f23' }}>
-              <input 
-                value={pluginSearchQuery} 
-                onChange={(e) => setPluginSearchQuery(e.target.value)} 
-                placeholder="Search plugins by name, vendor, or category..." 
-                style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-base)', border: '1px solid #27272a', borderRadius: '4px', color: 'var(--color-text-primary)', fontSize: '11px' }} 
+              <DexSearchInput
+                size="sm"
+                fullWidth
+                value={pluginSearchQuery}
+                onChange={(e) => setPluginSearchQuery(e.target.value)}
+                onClear={() => setPluginSearchQuery('')}
+                placeholder="Search"
               />
             </div>
 
@@ -8514,9 +8603,9 @@ const Imosion: React.FC = () => {
               </div>
             ) : (
               midiInputs.map(inp => (
-                <div key={inp.id} onClick={() => setActiveMidiInput(inp.id)} style={{ padding: '6px var(--space-2)', borderRadius: 4, cursor: 'pointer', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', background: activeMidiInput === inp.id ? 'rgba(10,132,255,0.12)' : 'var(--color-border-subtle)', border: `1px solid ${activeMidiInput === inp.id ? 'rgba(10,132,255,0.3)' : 'var(--color-border-subtle)'}` }}>
+                <div key={inp.id} onClick={() => setActiveMidiInput(inp.id)} style={{ padding: '6px var(--space-2)', borderRadius: 4, cursor: 'pointer', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', background: activeMidiInput === inp.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', border: `1px solid ${activeMidiInput === inp.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle)'}` }}>
                   <div style={{ width: 6, height: 6, borderRadius: 3, background: inp.connected ? 'var(--color-success)' : 'var(--color-error)' }} />
-                  <span style={{ fontSize: 10, color: activeMidiInput === inp.id ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontWeight: activeMidiInput === inp.id ? 600 : 400 }}>{inp.name}</span>
+                  <span style={{ fontSize: 10, color: activeMidiInput === inp.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: activeMidiInput === inp.id ? 600 : 400 }}>{inp.name}</span>
                 </div>
               ))
             )}

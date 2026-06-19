@@ -11,13 +11,18 @@
 // Degrades cleanly when no provider key is set or under the web shell.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DexSearchInput } from '../../styles/components';
 import {
   streamConfiguredLLM,
   hasConfiguredProvider,
+  hasVisionProvider,
 } from '../../uki/providers/connect';
-import { liveContext } from '../../uki/context';
+import { captureScreenImage, isScreenCaptureAvailable } from '../../uki/screenCapture';
+import { liveContext, ensureDeviceInfo, type DeviceInfo } from '../../uki/context';
 import { formatUkiContexts } from '../../uki/appContextRegistry';
+import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
+import { classifyKnowledgeIntent, answerFactualQuestion, groundingLine } from '../../uki/answerEngine';
 import type { ChatMessage } from '../../uki/providers/types';
 
 interface Conversation {
@@ -39,13 +44,29 @@ const SYSTEM_PROMPT =
   'Be concise, helpful, and proactive. When the user asks you to do something across ' +
   'their apps (notes, tasks, files, media), explain the steps clearly. Use markdown for code.';
 
+const OS_NAMES: Record<string, string> = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
+
+/** Compact one-liner describing the user's machine, for the [Live context] block. */
+function formatDevice(d: DeviceInfo): string {
+  const os = [OS_NAMES[d.platform ?? ''] ?? d.platform, d.osVersion].filter(Boolean).join(' ');
+  const arch = d.arch ? ` (${d.arch})` : '';
+  const cpu = d.cpuModel
+    ? `, ${d.cpuModel}${d.cpuCores ? ` ${d.cpuCores}-core` : ''}`
+    : (d.cpuCores ? `, ${d.cpuCores}-core CPU` : '');
+  const ram = d.totalMemoryBytes ? `, ${Math.round(d.totalMemoryBytes / (1024 ** 3))} GB RAM` : '';
+  return `${os}${arch}${cpu}${ram}`.trim();
+}
+
 /** Compact live-context block appended to the system prompt so uki knows what the
- *  user is looking at (foreground/open/recent apps, local time, connectivity).
+ *  user is looking at (foreground/open/recent apps, local time, connectivity) and
+ *  what machine it is running on (DEX 5.7 device awareness).
  *  Built per-send from the dependency-light snapshot in uki/context.ts. */
-function buildSystemPrompt(): string {
+function buildSystemPrompt(grounding?: string | null): string {
   const c = liveContext();
   const parts = [
     `Local time: ${c.localTime}.`,
+    c.device ? `Device: ${formatDevice(c.device)}.` : '',
+    c.activeWorkspace ? `Active workspace: "${c.activeWorkspace.name}" (a ${c.activeWorkspace.kind} space).` : '',
     c.foregroundAppId ? `The user is currently in the "${c.foregroundAppId}" app.` : '',
     c.openAppIds.length ? `Open apps: ${c.openAppIds.join(', ')}.` : '',
     c.sessionHistory.length ? `Recently used: ${c.sessionHistory.slice(-5).join(', ')}.` : '',
@@ -53,10 +74,19 @@ function buildSystemPrompt(): string {
     `Network: ${c.online ? 'online' : 'offline'}.`,
   ].filter(Boolean);
   let prompt = `${SYSTEM_PROMPT}\n\n[Live context] ${parts.join(' ')}`;
+  // Domain skill packs relevant to the active Project Space and/or open apps
+  // (DEX 5.6) — e.g. Git/Refactor/Debug for a development space. Compact and
+  // token-bounded so the prompt stays lean; see uki/skillPacks.ts.
+  const packs = relevantSkillPacks({ activeKind: c.activeWorkspace?.kind, openApps: c.openAppIds });
+  const skillBlock = formatSkillPacksForPrompt(packs);
+  if (skillBlock) prompt += `\n\n[Relevant skill packs]\n${skillBlock}`;
   // Deep per-app context (e.g. the open note's title + selection) when any app
   // has registered a resolver — see uki/appContextRegistry.ts.
   const appCtx = formatUkiContexts();
   if (appCtx) prompt += `\n\n[What the user is looking at]\n${appCtx}`;
+  // Fresh facts pulled from public APIs for this turn (weather/currency/lookup),
+  // so the model answers with current data instead of stale training knowledge.
+  if (grounding) prompt += `\n\n[Live facts retrieved just now -- use these, they are current]\n${grounding}`;
   return prompt;
 }
 
@@ -89,6 +119,11 @@ export default function Uki(): React.ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [pendingAction, setPendingAction] = useState<{ plan: ChatCommand['plan']; summary: string } | null>(null);
+  // "Look at my screen": when armed, the next free-form message attaches a
+  // screenshot for a vision-capable model. Only offered when both screen capture
+  // (Electron) and a vision provider are available.
+  const [lookAtScreen, setLookAtScreen] = useState(false);
+  const screenVisionReady = isScreenCaptureAvailable() && hasVisionProvider();
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -105,6 +140,9 @@ export default function Uki(): React.ReactElement {
 
   useEffect(() => {
     void refreshConversations();
+    // Warm the device/hardware cache once so uki can answer questions about the
+    // user's computer (CPU/RAM/OS) from its [Live context] block (DEX 5.7).
+    void ensureDeviceInfo();
   }, [refreshConversations]);
 
   useEffect(() => {
@@ -274,6 +312,24 @@ export default function Uki(): React.ReactElement {
       return;
     }
 
+    // Knowledge question? Pull a grounded answer from the keyless public APIs.
+    // With no provider configured we reply with it directly (so factual questions
+    // work without a key); with one configured we fold it into the prompt below.
+    let grounding: string | null = null;
+    if (classifyKnowledgeIntent(text) !== 'none') {
+      const knowledge = await answerFactualQuestion(text);
+      if (knowledge) {
+        if (!hasConfiguredProvider()) {
+          const sourced = knowledge.sourceLabel ? `${knowledge.text}\n\n_Source: ${knowledge.sourceLabel}_` : knowledge.text;
+          const reply: Message = { id: newId(), role: 'copilot', content: sourced, timestamp: Date.now() };
+          setMessages((m) => [...m, reply]);
+          if (cid) { void dexInvoke('uki-chat:appendMessage', cid, reply); void refreshConversations(); }
+          return;
+        }
+        grounding = groundingLine(knowledge);
+      }
+    }
+
     // Re-check live (the once-on-mount value can be stale if a key was just added).
     const isConfigured = hasConfiguredProvider();
     if (isConfigured !== configured) setConfigured(isConfigured);
@@ -297,16 +353,24 @@ export default function Uki(): React.ReactElement {
       role: m.role === 'copilot' ? 'assistant' : m.role === 'system' ? 'system' : 'user',
       content: m.content,
     }));
+    // "Look at my screen": grab a still for this turn, then disarm the toggle so
+    // it only applies to this one message. Capture failure degrades to text-only.
+    let images: string[] | undefined;
+    if (lookAtScreen) {
+      setLookAtScreen(false);
+      const shot = await captureScreenImage();
+      if (shot) images = [shot];
+    }
     let full = '';
     try {
       const result = await streamConfiguredLLM(
         text,
-        buildSystemPrompt(),
+        buildSystemPrompt(grounding),
         (_token, running) => {
           full = running;
           setStreamingText(running);
         },
-        { history, signal: controller.signal },
+        { history, signal: controller.signal, images },
       );
       full = (result ?? full).trim();
     } catch {
@@ -358,11 +422,14 @@ export default function Uki(): React.ReactElement {
             + New
           </button>
         </div>
-        <input
+        <DexSearchInput
+          size="sm"
+          fullWidth
           style={S.searchInput}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search conversations"
+          onClear={() => setSearch('')}
+          placeholder="Search"
           aria-label="Search conversations"
         />
         <div style={S.convList}>
@@ -473,6 +540,26 @@ export default function Uki(): React.ReactElement {
             rows={1}
             aria-label="Message uki"
           />
+          {screenVisionReady && (
+            <button
+              type="button"
+              onClick={() => setLookAtScreen((v) => !v)}
+              title={lookAtScreen ? 'A screenshot will be attached to your next message' : 'Look at my screen (attach a screenshot for vision)'}
+              aria-label="Look at my screen"
+              aria-pressed={lookAtScreen}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 10px', flexShrink: 0, cursor: 'pointer',
+                background: lookAtScreen ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
+                color: lookAtScreen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                border: '1px solid var(--color-border)', borderRadius: 8,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </button>
+          )}
           <button
             style={{ ...S.sendBtn, ...(!busy && !input.trim() ? S.sendBtnDisabled : null) }}
             onClick={() => (busy ? stop() : void send())}
@@ -493,7 +580,7 @@ const S: Record<string, React.CSSProperties> = {
   sidebarHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px var(--space-2)' },
   brand: { fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-accent)' },
   newBtn: { background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  searchInput: { margin: '0 var(--space-3) 10px', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, outline: 'none' },
+  searchInput: { margin: '0 var(--space-3) 10px' },
   convList: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 var(--space-2) var(--space-2)' },
   convEmpty: { padding: 'var(--space-3) var(--space-2)', color: 'var(--color-text-tertiary)', fontSize: 12 },
   convItem: { display: 'flex', alignItems: 'center', gap: 6, padding: 'var(--space-2) 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 2 },

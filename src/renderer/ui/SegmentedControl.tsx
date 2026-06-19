@@ -150,9 +150,9 @@ function SegmentedControlInner<T extends string = string>(
               padding: `0 ${size === 'sm' ? 10 : 12}px`,
               border: 'none',
               borderRadius: radius.sm,
-              background: active ? 'var(--color-accent, #4A9EFF)' : 'transparent',
+              background: active ? 'var(--color-bg-active, #252528)' : 'transparent',
               color: active
-                ? 'var(--color-accent-text, #fff)'
+                ? 'var(--color-text-primary, #fff)'
                 : 'var(--color-text-secondary, #B8B8BD)',
               fontFamily: 'inherit',
               fontSize: size === 'sm' ? fontSize.xs : fontSize.sm,
@@ -165,7 +165,7 @@ function SegmentedControlInner<T extends string = string>(
             }}
             onFocus={e => {
               if (!active) e.currentTarget.style.background = 'var(--color-bg-hover, #1E1E22)';
-              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(74, 158, 255, 0.20)';
+              e.currentTarget.style.boxShadow = '0 0 0 2px var(--dex-focus-glow, rgba(255,255,255,0.22))';
             }}
             onBlur={e => {
               if (!active) e.currentTarget.style.background = 'transparent';

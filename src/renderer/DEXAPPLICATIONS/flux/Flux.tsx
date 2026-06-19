@@ -2231,12 +2231,12 @@ const Flux: React.FC = () => {
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 700, color: '#bf5af2', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
-    btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '6px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: '#bf5af2', color: '#fff', border: '1px solid #bf5af2', borderRadius: '6px' },
+    btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
+    btnPrimary: { background: '#bf5af2', color: '#fff', border: '1px solid #bf5af2', borderRadius: '9999px' },
     workspace: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px' },
-    toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '6px', color: 'var(--color-text-muted)', cursor: 'pointer' },
-    toolBtnActive: { background: '#bf5af2', color: '#fff', boxShadow: '0 0 0 2px rgba(191,90,242,0.35)' },
+    toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '9999px', color: 'var(--color-text-muted)', cursor: 'pointer' },
+    toolBtnActive: { background: '#bf5af2', color: '#fff' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     canvasArea: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     canvasContainer: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-inset)', position: 'relative' },
@@ -2244,17 +2244,17 @@ const Flux: React.FC = () => {
     sidebar: { width: '100%', height: '100%', background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
     tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
-    tabActive: { color: '#bf5af2', borderBottom: '2px solid #bf5af2' },
+    tabActive: { color: 'var(--color-text-primary)', borderBottom: '2px solid var(--dex-focus-color, #fff)' },
     panelContent: { flex: 1, minHeight: 0, padding: '10px', overflow: 'auto', scrollbarWidth: 'thin' } as any,
     timeline: { position: 'relative', height: showTimeline ? timelineHeight : 32, flexShrink: 0, background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', transition: isTimelineResizing ? 'none' : 'height 0.2s ease' },
     timelineHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '6px 10px', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)' },
     transportControls: { display: 'flex', alignItems: 'center', gap: '4px' },
-    transportBtn: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', color: 'var(--color-text-primary)', cursor: 'pointer' },
-    timeDisplay: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: '6px', color: '#bf5af2', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
+    transportBtn: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: '9999px', color: 'var(--color-text-primary)', cursor: 'pointer' },
+    timeDisplay: { fontFamily: 'var(--font-mono)', fontSize: '11px', padding: '4px var(--space-2)', background: 'var(--color-bg-inset)', borderRadius: '9999px', color: '#bf5af2', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
     timelineTracks: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     layerList: { width: '170px', flexShrink: 0, minHeight: 0, background: 'var(--color-bg-inset)', borderRight: '1px solid var(--color-border-subtle)', overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin' } as any,
     layerItem: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px var(--space-2)', borderBottom: '1px solid var(--color-border-subtle)', cursor: 'pointer' },
-    layerItemSelected: { background: 'rgba(191,90,242,0.1)', borderLeft: '2px solid #bf5af2' },
+    layerItemSelected: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', borderLeft: '2px solid var(--dex-focus-color, #fff)' },
     layerIcon: { width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' },
     layerName: { flex: 1, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 },
     trackArea: { flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative', background: 'var(--color-bg-inset)' },
@@ -2263,9 +2263,9 @@ const Flux: React.FC = () => {
     playhead: { position: 'absolute', top: 0, width: '1px', background: 'var(--color-error)', zIndex: 50 },
     ruler: { height: '20px', background: 'var(--color-bg-inset)', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end' },
     behaviorItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
-    iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '4px' },
+    iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px' },
     statusBar: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-3)', height: 24, background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1c 100%)', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-text-tertiary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
-    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
+    modeToggle: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '9999px', cursor: 'pointer', fontSize: '11px', border: '1px solid var(--color-border-subtle)', fontWeight: 600 },
     libraryGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' },
     libraryItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px', background: 'var(--color-bg-hover)', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
   }), [showTimeline, timelineHeight, isTimelineResizing]);
@@ -2596,7 +2596,7 @@ const Flux: React.FC = () => {
                   title={`Canvas scale: ${Math.round(viewScale)}%`}
                 />
                 <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} title="Zoom In" aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
-                <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '4px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
+                <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
                 <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(50)} title="Reset to 50%" aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
               </div>
             </div>
@@ -2636,7 +2636,7 @@ const Flux: React.FC = () => {
                   <div>
                     <div style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-3)' }}>
                       {(['animations', 'effects', 'particles', 'easings'] as const).map(cat => (
-                        <button key={cat} onClick={() => setPresetCategory(cat)} aria-label={`${cat} presets`} style={{ flex: 1, padding: '6px var(--space-2)', borderRadius: '4px', border: 'none', background: presetCategory === cat ? 'var(--color-accent)' : 'var(--color-bg-tertiary)', color: presetCategory === cat ? 'white' : 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
+                        <button key={cat} onClick={() => setPresetCategory(cat)} aria-label={`${cat} presets`} style={{ flex: 1, padding: '6px var(--space-2)', borderRadius: '9999px', border: 'none', background: presetCategory === cat ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-tertiary)', color: presetCategory === cat ? 'var(--color-bg-base)' : 'var(--color-text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{cat}</button>
                       ))}
                     </div>
                     
@@ -2730,9 +2730,11 @@ const Flux: React.FC = () => {
                     {presetCategory === 'easings' && (
                       <>
                         {/* Honest hint: these presets write the selected layer's easing curve. */}
-                        <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                          {selectedLayerId ? 'Click a preset to set this layer’s easing curve.' : 'Select a layer to apply an easing preset.'}
-                        </div>
+                        {!selectedLayerId && (
+                          <div style={{ marginBottom: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                            Select a layer first.
+                          </div>
+                        )}
                         {(['basic', 'power', 'elastic', 'bounce', 'back', 'custom'] as const).map(cat => {
                           const items = EASING_PRESETS.filter(p => p.category === cat);
                           if (!items.length) return null;
@@ -3334,7 +3336,7 @@ const Flux: React.FC = () => {
               } catch (err: any) {
                 setExpressionError(err.message || 'Invalid expression');
               }
-            }} style={{ width: '100%', marginTop: 'var(--space-2)', padding: '6px 0', borderRadius: 4, border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.12)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to {expressionTarget}</button>
+            }} style={{ width: '100%', marginTop: 'var(--space-2)', padding: '6px 0', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.3)', background: 'rgba(191,90,242,0.12)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply to {expressionTarget}</button>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', marginBottom: 4 }}>Templates</div>
             {EXPRESSION_TEMPLATES.map(t => (
               <button key={t.name} onClick={() => { setExpressionCode(t.code); setExpressionError(null); }} aria-label={`Insert ${t.name} expression`} title={t.description} style={{ display: 'block', width: '100%', padding: '4px var(--space-2)', borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', marginBottom: 2, textAlign: 'left', fontFamily: 'var(--font-mono)' }}>
@@ -3387,7 +3389,7 @@ const Flux: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Material</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
               {['Metal', 'Glass', 'Plastic', 'Wood', 'Chrome', 'Gold', 'Matte', 'Neon'].map(m => (
-                <button key={m} aria-label={`${m} material`} style={{ padding: '4px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
+                <button key={m} aria-label={`${m} material`} style={{ padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
           </div>
@@ -3404,7 +3406,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {['WebM VP9', 'WebM VP8'].map(f => (
-                <button key={f} aria-label={`${f} export format`} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: f === 'WebM VP9' ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: f === 'WebM VP9' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
+                <button key={f} aria-label={`${f} export format`} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: f === 'WebM VP9' ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: f === 'WebM VP9' ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Palette Colors</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{gifPalette}</span></div>
@@ -3465,7 +3467,7 @@ const Flux: React.FC = () => {
                 }
               };
               renderNextFrame();
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
           </div>
         </div>
       )}
@@ -3548,7 +3550,7 @@ const Flux: React.FC = () => {
               a.href = url; a.download = `flux-lottie-${Date.now()}.json`;
               a.click(); URL.revokeObjectURL(url);
               setShowLottieExport(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'var(--color-warning)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Export Lottie JSON</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-warning)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}>Export Lottie JSON</button>
           </div>
         </div>
       )}
@@ -3596,7 +3598,7 @@ const Flux: React.FC = () => {
             <button aria-label="Create null object" onClick={() => {
               const id = addLayer('shape');
               setLayers(prev => prev.map(l => l.id === id ? { ...l, name: `Null ${layers.filter(ll => ll.name.startsWith('Null')).length + 1}`, type: 'null' as any, transform: { ...l.transform, opacity: 0 } } : l));
-            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
+            }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
             <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Parent Layer</span>
               <select style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
@@ -3647,7 +3649,7 @@ const Flux: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Ease Curve</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['Linear', 'Ease In', 'Ease Out', 'Ease Both'].map(e => (
-                  <button key={e} aria-label={`${e} easing`} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: e === 'Ease Both' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: e === 'Ease Both' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{e}</button>
+                  <button key={e} aria-label={`${e} easing`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: e === 'Ease Both' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: e === 'Ease Both' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{e}</button>
                 ))}
               </div>
             </div>
@@ -3661,7 +3663,7 @@ const Flux: React.FC = () => {
                 Closed Path
               </label>
             </div>
-            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: false }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: 'easeInOut' }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: 'easeInOut' }); } setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
+            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: false }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: 'easeInOut' }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: 'easeInOut' }); } setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
           </div>
         </div>
       )}
@@ -3676,12 +3678,12 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {['Add', 'Subtract', 'Intersect'].map(op => (
-                <button key={op} onClick={() => setMaskType(op.toLowerCase() as 'add' | 'subtract' | 'intersect')} aria-label={`${op} mask mode`} aria-pressed={maskType === op.toLowerCase()} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: maskType === op.toLowerCase() ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: maskType === op.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{op}</button>
+                <button key={op} onClick={() => setMaskType(op.toLowerCase() as 'add' | 'subtract' | 'intersect')} aria-label={`${op} mask mode`} aria-pressed={maskType === op.toLowerCase()} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: maskType === op.toLowerCase() ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: maskType === op.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{op}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {['Ellipse', 'Rectangle', 'Pen'].map(shape => (
-                <button key={shape} aria-label={`${shape} mask shape`} onClick={() => { if (!selectedLayerId) return; const s = shape.toLowerCase() as 'ellipse' | 'rectangle'; if (shape === 'Pen') return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, masks: [...(l.masks || []), { id: `mask-${Date.now()}`, shape: s, mode: maskType, feather: maskFeather, opacity: maskOpacity, expansion: maskExpansion }] } : l)); }} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{shape}</button>
+                <button key={shape} aria-label={`${shape} mask shape`} onClick={() => { if (!selectedLayerId) return; const s = shape.toLowerCase() as 'ellipse' | 'rectangle'; if (shape === 'Pen') return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, masks: [...(l.masks || []), { id: `mask-${Date.now()}`, shape: s, mode: maskType, feather: maskFeather, opacity: maskOpacity, expansion: maskExpansion }] } : l)); }} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{shape}</button>
               ))}
             </div>
             <div style={{ marginBottom: 6 }}>
@@ -3725,7 +3727,7 @@ const Flux: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Emitter Shape</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['Point', 'Line', 'Circle', 'Rectangle', 'Sphere'].map(s => (
-                  <button key={s} aria-label={`${s} emitter shape`} style={{ flex: 1, padding: '4px 0', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: s === 'Point' ? 'rgba(255,159,10,0.12)' : 'var(--color-border-subtle)', color: s === 'Point' ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{s}</button>
+                  <button key={s} aria-label={`${s} emitter shape`} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: s === 'Point' ? 'rgba(255,159,10,0.12)' : 'var(--color-border-subtle)', color: s === 'Point' ? 'var(--color-warning)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{s}</button>
                 ))}
               </div>
             </div>
@@ -3782,7 +3784,7 @@ const Flux: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, display: 'block' }}>Frequency Band</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {([['sub', 'Sub Bass'], ['bass', 'Bass'], ['mids', 'Mids'], ['hiMids', 'Hi-Mids'], ['treble', 'Treble']] as const).map(([k, label]) => (
-                  <button key={k} aria-label={`${label} frequency band`} onClick={() => setAudioReactiveBand(k)} style={{ flex: 1, padding: '3px 0', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: audioReactiveBand === k ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: audioReactiveBand === k ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
+                  <button key={k} aria-label={`${label} frequency band`} onClick={() => setAudioReactiveBand(k)} style={{ flex: 1, padding: '3px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: audioReactiveBand === k ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: audioReactiveBand === k ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
                 ))}
               </div>
             </div>
@@ -3860,7 +3862,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 6 }}>Matte Type</span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
               {([['alpha', 'Alpha Matte'], ['alphaInverted', 'Alpha Inv'], ['luma', 'Luma Matte'], ['lumaInverted', 'Luma Inv']] as const).map(([val, label]) => (
-                <button key={val} onClick={() => setMatteType(val)} aria-label={label} style={{ padding: '6px', borderRadius: 4, border: '1px solid ' + (matteType === val ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: matteType === val ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: matteType === val ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
+                <button key={val} onClick={() => setMatteType(val)} aria-label={label} style={{ padding: '6px', borderRadius: 9999, border: '1px solid ' + (matteType === val ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: matteType === val ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: matteType === val ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
               ))}
             </div>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Matte Layer</span>
@@ -3868,7 +3870,7 @@ const Flux: React.FC = () => {
               <option value="">None</option>
               {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <button aria-label="Apply track matte" onClick={() => { if (!selectedLayerId || !matteLayerSelect) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, matteLayerId: matteLayerSelect, matteType } : l)); setShowTrackMattes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Matte</button>
+            <button aria-label="Apply track matte" onClick={() => { if (!selectedLayerId || !matteLayerSelect) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, matteLayerId: matteLayerSelect, matteType } : l)); setShowTrackMattes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Matte</button>
           </div>
         </div>
       )}
@@ -3910,7 +3912,7 @@ const Flux: React.FC = () => {
               setLayers(prev => [groupLayer, ...prev.filter(l => l.id !== selectedLayerId)]);
               setSelectedLayerId(groupLayer.id);
               setShowPrecompose(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
           </div>
         </div>
       )}
@@ -3929,7 +3931,7 @@ const Flux: React.FC = () => {
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 30, textAlign: 'right' }}>{timeRemapSpeed}%</span>
             </div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              {[25, 50, 100, 200, 400].map(s => <button key={s} onClick={() => setTimeRemapSpeed(s)} aria-label={`${s}% speed`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (timeRemapSpeed === s ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: timeRemapSpeed === s ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: timeRemapSpeed === s ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{s}%</button>)}
+              {[25, 50, 100, 200, 400].map(s => <button key={s} onClick={() => setTimeRemapSpeed(s)} aria-label={`${s}% speed`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (timeRemapSpeed === s ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: timeRemapSpeed === s ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: timeRemapSpeed === s ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{s}%</button>)}
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
               <input type="checkbox" checked={timeRemapReverse} onChange={e => setTimeRemapReverse(e.target.checked)} style={{ accentColor: '#bf5af2' }} />
@@ -3990,7 +3992,7 @@ const Flux: React.FC = () => {
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-tertiary)' }}>Mode</div>
             <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
               {['Simultaneously', 'Individually'].map(m => (
-                <button key={m} aria-label={`${m} trim mode`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: m === 'Simultaneously' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: m === 'Simultaneously' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                <button key={m} aria-label={`${m} trim mode`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Simultaneously' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: m === 'Simultaneously' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
           </div>
@@ -4008,7 +4010,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Property</span>
             <div style={{ display: 'flex', gap: 3, marginBottom: 'var(--space-2)' }}>
               {(['position', 'rotation', 'scale', 'opacity'] as const).map(p => (
-                <button key={p} onClick={() => setWiggleProperty(p)} aria-label={`Wiggle ${p}`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (wiggleProperty === p ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: wiggleProperty === p ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: wiggleProperty === p ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{p}</button>
+                <button key={p} onClick={() => setWiggleProperty(p)} aria-label={`Wiggle ${p}`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (wiggleProperty === p ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: wiggleProperty === p ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: wiggleProperty === p ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{p}</button>
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -4031,7 +4033,7 @@ const Flux: React.FC = () => {
                   : b),
               } : l));
               setShowAutoWiggle(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Wiggle</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Wiggle</button>
           </div>
         </div>
       )}
@@ -4098,7 +4100,7 @@ const Flux: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {['blur', 'glow', 'colorCorrect', 'sharpen', 'vignette'].map(e => (
-                    <button key={e} aria-label={`Add ${e} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = [...layer.filters, { id: `fx-${Date.now()}`, type: e as any, enabled: true, settings: {} }]; setLayers(nl); } }} style={{ flex: 1, padding: '4px 2px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', textTransform: 'capitalize' }}>{e}</button>
+                    <button key={e} aria-label={`Add ${e} effect`} onClick={() => { const nl = [...layers]; const layer = nl.find(l => l.id === selectedLayerId); if (layer) { layer.filters = [...layer.filters, { id: `fx-${Date.now()}`, type: e as any, enabled: true, settings: {} }]; setLayers(nl); } }} style={{ flex: 1, padding: '4px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', textTransform: 'capitalize' }}>{e}</button>
                   ))}
                 </div>
               </>
@@ -4118,7 +4120,7 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Rig Type</span>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['orbit', 'twoNode', 'poi'] as const).map(t => (
-                <button key={t} onClick={() => setCameraRigType(t)} aria-label={`${t} camera rig`} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid ' + (cameraRigType === t ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: cameraRigType === t ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: cameraRigType === t ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t === 'twoNode' ? '2-Node' : t === 'poi' ? 'POI' : 'Orbit'}</button>
+                <button key={t} onClick={() => setCameraRigType(t)} aria-label={`${t} camera rig`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid ' + (cameraRigType === t ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: cameraRigType === t ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: cameraRigType === t ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t === 'twoNode' ? '2-Node' : t === 'poi' ? 'POI' : 'Orbit'}</button>
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -4150,7 +4152,7 @@ const Flux: React.FC = () => {
               setSelectedLayerId(rigLayer.id);
               window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera Rig created (FOV: ${cameraFov}${cameraDof ? ', DOF enabled' : ''})`, type: 'success' } }));
               setShowCameraRig(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
           </div>
         </div>
       )}
@@ -4165,13 +4167,13 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
               {[{ id: 'studio', name: 'Studio', desc: 'Soft diffused lighting' }, { id: 'outdoor', name: 'Outdoor HDR', desc: 'Daylight environment' }, { id: 'sunset', name: 'Golden Hour', desc: 'Warm directional light' }, { id: 'night', name: 'Night City', desc: 'Urban neon reflections' }, { id: 'gradient', name: 'Gradient Sky', desc: 'Smooth color backdrop' }, { id: 'abstract', name: 'Abstract', desc: 'Colorful patterns' }].map(e => (
-                <button key={e.id} onClick={() => setEnvMapPreset(e.id)} aria-label={`Select ${e.name} environment`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (envMapPreset === e.id ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: envMapPreset === e.id ? 'rgba(191,90,242,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
-                  <div style={{ fontSize: 11, color: envMapPreset === e.id ? '#bf5af2' : 'var(--color-text-secondary)', fontWeight: 600 }}>{e.name}</div>
+                <button key={e.id} onClick={() => setEnvMapPreset(e.id)} aria-label={`Select ${e.name} environment`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (envMapPreset === e.id ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: envMapPreset === e.id ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
+                  <div style={{ fontSize: 11, color: envMapPreset === e.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 600 }}>{e.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{e.desc}</div>
                 </button>
               ))}
             </div>
-            <div style={{ padding: 'var(--space-2)', borderRadius: 4, border: '2px dashed var(--color-border-subtle)', textAlign: 'center', cursor: 'pointer' }}>
+            <div style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px dashed var(--color-border-subtle)', textAlign: 'center', cursor: 'pointer' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Load custom HDRI / EXR file</span>
             </div>
           </div>
@@ -4221,8 +4223,8 @@ const Flux: React.FC = () => {
                       setRenderQueue(prev => prev.map(j => j.id === queuedJobs[0].id ? { ...j, status: expired ? 'error' as const : 'done' as const, progress: expired ? 0 : 100 } : j));
                     }
                   }, 500);
-                }} style={{ flex: 1, padding: '7px', borderRadius: 4, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Render All</button>
-                <button aria-label="Clear render queue" onClick={() => setRenderQueue([])} style={{ padding: '7px var(--space-3)', borderRadius: 4, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
+                }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Render All</button>
+                <button aria-label="Clear render queue" onClick={() => setRenderQueue([])} style={{ padding: '7px var(--space-3)', borderRadius: 9999, border: '1px solid rgba(255,59,48,0.15)', background: 'rgba(255,59,48,0.06)', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
               </div>
             )}
           </div>
@@ -4237,7 +4239,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Markers panel" onClick={() => setShowMarkers(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Add marker at current time" onClick={() => setMarkers(prev => [...prev, { id: `m-${Date.now()}`, time: currentTime, label: `Marker ${prev.length + 1}`, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2', '#FF375F'][prev.length % 6] }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Marker at Frame {currentTime}</button>
+            <button aria-label="Add marker at current time" onClick={() => setMarkers(prev => [...prev, { id: `m-${Date.now()}`, time: currentTime, label: `Marker ${prev.length + 1}`, color: ['var(--color-error)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-accent)', '#bf5af2', '#FF375F'][prev.length % 6] }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Add Marker at Frame {currentTime}</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {markers.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No markers</div>}
               {markers.map(m => (
@@ -4245,7 +4247,7 @@ const Flux: React.FC = () => {
                   <div style={{ width: 10, height: 10, borderRadius: 2, background: m.color }} />
                   <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 35 }}>F{m.time}</span>
                   <input type="text" value={m.label} onChange={e => setMarkers(prev => prev.map(mm => mm.id === m.id ? { ...mm, label: e.target.value } : mm))} style={{ flex: 1, background: 'var(--color-bg-hover)', border: '1px solid var(--color-bg-hover)', borderRadius: 2, color: '#ccc', fontSize: 11, padding: '2px 4px' }} />
-                  <button aria-label="Go to marker" onClick={() => { setCurrentTime(m.time); setPlayheadPosition(m.time); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11, padding: '2px 4px', borderRadius: 2 }} className="dex-hover-bg">Go</button>
+                  <button aria-label="Go to marker" onClick={() => { setCurrentTime(m.time); setPlayheadPosition(m.time); }} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 11, padding: '2px 4px', borderRadius: 9999 }} className="dex-hover-bg">Go</button>
                   <button aria-label="Delete marker" onClick={() => setMarkers(prev => prev.filter(mm => mm.id !== m.id))} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 12 }}><DexIcon name="close" size={12} /></button>
                 </div>
               ))}
@@ -4278,13 +4280,13 @@ const Flux: React.FC = () => {
                     else if (a.t === 'Bottom') t.y = canvasSize.height;
                     return { ...l, transform: t };
                   }));
-                }} style={{ padding: '6px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name={a.l} size={12} /></button>
+                }} style={{ padding: '6px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DexIcon name={a.l} size={12} /></button>
               ))}
             </div>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 6 }}>Distribute</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
               {['H Spacing', 'V Spacing', 'H Centers', 'V Centers'].map(d => (
-                <button key={d} aria-label={`Distribute ${d}`} style={{ padding: '5px 2px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{d}</button>
+                <button key={d} aria-label={`Distribute ${d}`} style={{ padding: '5px 2px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{d}</button>
               ))}
             </div>
           </div>
@@ -4320,7 +4322,7 @@ const Flux: React.FC = () => {
             <button aria-label="Close Snapshots panel" onClick={() => setShowSnapshot(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }}><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 10 }}>
-            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString() }])} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
+            <button aria-label="Take snapshot" onClick={() => setSnapshots(prev => [...prev, { id: `snap-${Date.now()}`, name: `Snapshot ${prev.length + 1}`, time: new Date().toLocaleTimeString() }])} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px solid rgba(191,90,242,0.2)', background: 'rgba(191,90,242,0.08)', color: '#bf5af2', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{verticalAlign:'middle',marginRight:4,display:'inline'}}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take Snapshot</button>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {snapshots.length === 0 && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textAlign: 'center', padding: 'var(--space-3)' }}>No snapshots taken</div>}
               {snapshots.map(s => (
@@ -4356,7 +4358,7 @@ const Flux: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               {['Frame Mix', 'Pixel Motion'].map(m => (
-                <button key={m} aria-label={`${m} blend mode`} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: m === 'Frame Mix' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: m === 'Frame Mix' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
+                <button key={m} aria-label={`${m} blend mode`} style={{ flex: 1, padding: '5px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: m === 'Frame Mix' ? 'rgba(191,90,242,0.12)' : 'var(--color-border-subtle)', color: m === 'Frame Mix' ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{m}</button>
               ))}
             </div>
           </div>
@@ -4427,7 +4429,7 @@ const Flux: React.FC = () => {
                 startTime: l.startTime + staggerOffset * i,
               })));
               setShowStagger(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stagger</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: '#bf5af2', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stagger</button>
           </div>
         </div>
       )}
@@ -4450,12 +4452,12 @@ const Flux: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4, marginTop: 4 }}>Line Cap</span>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               {(['butt', 'round', 'square'] as const).map(c => (
-                <button key={c} onClick={() => setStrokeCap(c)} aria-label={`${c} line cap`} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid ' + (strokeCap === c ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: strokeCap === c ? 'rgba(191,90,242,0.1)' : 'var(--color-border-subtle)', color: strokeCap === c ? '#bf5af2' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{c}</button>
+                <button key={c} onClick={() => setStrokeCap(c)} aria-label={`${c} line cap`} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid ' + (strokeCap === c ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: strokeCap === c ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', color: strokeCap === c ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{c}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               {[{ n: 'Solid', d: 0, g: 0 }, { n: 'Dotted', d: 2, g: 4 }, { n: 'Dashed', d: 10, g: 5 }, { n: 'Dash-Dot', d: 10, g: 3 }].map(p => (
-                <button key={p.n} aria-label={`${p.n} stroke pattern`} onClick={() => { setStrokeDash(p.d); setStrokeGap(p.g); }} style={{ flex: 1, padding: '4px', borderRadius: 3, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p.n}</button>
+                <button key={p.n} aria-label={`${p.n} stroke pattern`} onClick={() => { setStrokeDash(p.d); setStrokeGap(p.g); }} style={{ flex: 1, padding: '4px', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer' }}>{p.n}</button>
               ))}
             </div>
           </div>
@@ -4480,7 +4482,7 @@ const Flux: React.FC = () => {
               <input type="range" min="0" max="720" value={motionBlurShutter} onChange={e => setMotionBlurShutter(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{motionBlurShutter}°</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>Higher samples = better quality, slower render. Shutter angle controls blur intensity (180° = standard film).</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '6px var(--space-2)', borderRadius: 3, background: 'var(--color-bg-inset, rgba(0,0,0,0.2))' }}>180° = standard film.</div>
           </div>
         </div>
       )}
@@ -4495,8 +4497,8 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
               {[{ f: 'mp4', c: 'h264', q: 'YouTube / Web' }, { f: 'mp4', c: 'h265', q: 'High Quality HEVC' }, { f: 'webm', c: 'vp9', q: 'Web Optimized' }, { f: 'mov', c: 'prores', q: 'ProRes Master' }, { f: 'png', c: 'png', q: 'PNG Sequence' }, { f: 'gif', c: 'gif', q: 'Animated GIF' }].map(p => (
-                <button key={p.q} onClick={() => { setExportFormat(p.f); setExportCodec(p.c); }} aria-label={`Export as ${p.q}`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (exportFormat === p.f && exportCodec === p.c ? 'rgba(191,90,242,0.3)' : 'var(--color-bg-hover)'), background: exportFormat === p.f && exportCodec === p.c ? 'rgba(191,90,242,0.08)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
-                  <div style={{ fontSize: 11, color: exportFormat === p.f && exportCodec === p.c ? '#bf5af2' : 'var(--color-text-secondary)', fontWeight: 600 }}>{p.f.toUpperCase()} / {p.c.toUpperCase()}</div>
+                <button key={p.q} onClick={() => { setExportFormat(p.f); setExportCodec(p.c); }} aria-label={`Export as ${p.q}`} style={{ padding: 'var(--space-2)', borderRadius: 4, border: '1px solid ' + (exportFormat === p.f && exportCodec === p.c ? 'var(--dex-focus-color, #fff)' : 'var(--color-bg-hover)'), background: exportFormat === p.f && exportCodec === p.c ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'left' }}>
+                  <div style={{ fontSize: 11, color: exportFormat === p.f && exportCodec === p.c ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: 600 }}>{p.f.toUpperCase()} / {p.c.toUpperCase()}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{p.q}</div>
                 </button>
               ))}
@@ -4506,7 +4508,7 @@ const Flux: React.FC = () => {
               <input type="range" min="10" max="100" value={exportQuality} onChange={e => setExportQuality(Number(e.target.value))} style={{ flex: 1, accentColor: '#bf5af2' }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 26, textAlign: 'right' }}>{exportQuality}%</span>
             </div>
-            <button aria-label="Export with selected preset" onClick={() => { setShowExportPresets(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 4, border: 'none', background: 'linear-gradient(135deg, #bf5af2, #9b59b6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
+            <button aria-label="Export with selected preset" onClick={() => { setShowExportPresets(false); }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'linear-gradient(135deg, #bf5af2, #9b59b6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><DexIcon name="download" size={12} />Export</button>
           </div>
         </div>
       )}

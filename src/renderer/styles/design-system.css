@@ -66,9 +66,12 @@
      plus an inherited text-shadow keeps widgets, dashboard panels, and shortcuts
      readable on any wallpaper -- resolving the earlier full-transparency attempt
      that left content unreadable. No backdrop-filter: cheap on every perf tier. */
-  --dex-desktop-scrim: rgba(12, 12, 14, 0.30);
-  --dex-desktop-scrim-hover: rgba(18, 18, 22, 0.46);
-  --dex-desktop-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  /* SOLID desktop (owner killed the wallpaper): the home widgets must be opaque
+     cards or they vanish against the flat background, so the scrim is now a solid
+     surface, not a translucent tint over a wallpaper. */
+  --dex-desktop-scrim: var(--color-bg-surface, #161618);
+  --dex-desktop-scrim-hover: var(--color-bg-hover, #1e1e22);
+  --dex-desktop-text-shadow: none;
   --dex-desktop-object-shadow: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 
   /* Text -- Crisp whites with visible secondary */
@@ -137,6 +140,7 @@
   --color-app-kanban: #5E5CE6;
   --color-app-weather: #64D2FF;
   --color-app-nexus: #0A84FF;
+  --color-app-maps: #0A84FF;
 
   /* Borders -- Visible on charcoal */
   --color-border: rgba(255, 255, 255, 0.14);
@@ -145,6 +149,37 @@
   --color-border-strong: rgba(255, 255, 255, 0.22);
   --color-border-glass: rgba(255, 255, 255, 0.16);
   --color-border-highlight: rgba(255, 255, 255, 0.18);
+
+  /* =====================================================================
+     DEX MASTER OVERHAUL -- Part 1 design tokens (additive layer).
+     Used by the new OS shell chrome (top bar, dock, orbs, launcher) and
+     system-app surfaces. NEW names only -- the existing --color-bg-*,
+     --radius-*, --text-* scales are intentionally left untouched so current
+     consumers (incl. the excluded creative apps) are unaffected.
+     ===================================================================== */
+  /* True-black surface hierarchy */
+  --color-void:    #000000;   /* desktop / absolute base */
+  --color-base:    #080808;   /* app shell background */
+  --color-surface: #111111;   /* cards, panels, elevated areas */
+  --color-overlay: #1a1a1a;   /* modals, dropdowns, popovers */
+  --color-raised:  #222222;   /* hover / selected rows */
+  /* Glass -- floating UI only (dock, top bar, orbs, overlays, modals) */
+  --glass-bg:     rgba(12, 12, 12, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-blur:   blur(20px);
+  --glass-tint:   rgba(80, 80, 120, 0.04);
+  /* Border tiers (spec aliases) */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border-visible: rgba(255, 255, 255, 0.10);
+  --border-active:  rgba(255, 255, 255, 0.20);
+  /* Accent -- white only; status colors carry the semantics */
+  --accent:     #ffffff;
+  --accent-dim: rgba(255, 255, 255, 0.12);
+  --text-inactive: #444444;
+  /* Status -- minimal, functional use only */
+  --status-ok:    #00cc44;
+  --status-warn:  #ffaa00;
+  --status-error: #ff3333;
 
   /* Shadows — DEX 6.0 reduced-glass redesign (GOAL-6D): intensity -40%, same
      pass the --pg-shadow-* tier got. Highlights (inset white gloss) and the
@@ -167,7 +202,7 @@
   --shadow-depth-4: 0 4px 10px rgba(0, 0, 0, 0.18), 0 16px 48px rgba(0, 0, 0, 0.24);
   --shadow-inset: inset 0 1px 4px rgba(0, 0, 0, 0.18);
   --shadow-dock: 0 -4px 32px rgba(0, 0, 0, 0.30), 0 0 12px rgba(74, 158, 255, 0.05);
-  --shadow-focus: 0 0 0 2.5px rgba(74, 158, 255, 0.40);
+  --shadow-focus: 0 0 0 2.5px color-mix(in srgb, var(--dex-focus-color, #fff) 40%, transparent);
   --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.27), 0 8px 28px rgba(0, 0, 0, 0.21), 0 0 8px rgba(74, 158, 255, 0.06);
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -182,12 +217,15 @@
     --pg-sidebar: var(--color-bg-glass, rgba(10, 10, 12, 0.91));
     --pg-toolbar: var(--color-bg-glass, rgba(18, 18, 22, 0.89));
   --pg-row-hover: rgba(255, 255, 255, 0.05);
-  --pg-row-active: rgba(74, 158, 255, 0.12);
+  /* Selection is monochrome (owner direction): a neutral white/dark tint via the
+     theme-aware focus color, not the blue accent. color-mix resolves at use time,
+     so --dex-focus-color (defined in design-tokens.css) is available by render. */
+  --pg-row-active: color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent);
 
   /* Hairline borders and gloss */
   --pg-border: rgba(255, 255, 255, 0.07);
   --pg-border-strong: rgba(255, 255, 255, 0.13);
-  --pg-border-active: rgba(74, 158, 255, 0.45);
+  --pg-border-active: color-mix(in srgb, var(--dex-focus-color, #fff) 45%, transparent);
   --pg-gloss-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --pg-gloss-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.55);
 
@@ -1599,11 +1637,13 @@ img, svg {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   letter-spacing: 0;
-  border-radius: var(--radius-lg);
+  /* Pill design language (DEX 5.6): full-radius chips, flat -- no drop/inset
+     shadow or glow. Definition comes from the fill + hairline border per variant. */
+  border-radius: 9999px;
   transition: all 0.12s ease;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.24), 0 0.5px 1px rgba(0,0,0,0.18), inset 0 0.5px 0 rgba(255,255,255,0.06);
+  box-shadow: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1646,13 +1686,13 @@ img, svg {
   background: var(--color-accent);
   color: var(--color-text-inverse);
   border: 1px solid var(--color-accent);
-  box-shadow: 0 2px 6px rgba(10,132,255,0.3), 0 1px 2px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.15);
+  box-shadow: none;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
-  box-shadow: 0 4px 12px rgba(10,132,255,0.35), 0 2px 4px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.18);
+  box-shadow: none;
 }
 
 .btn-primary:active:not(:disabled) {
@@ -1663,25 +1703,25 @@ img, svg {
   background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-default);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.06);
+  box-shadow: none;
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--color-bg-hover);
   border-color: var(--color-border-strong);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 0.5px 0 rgba(255,255,255,0.08);
+  box-shadow: none;
 }
 
 .btn-danger {
   background: var(--color-error);
   color: var(--color-text-primary);
   border: 1px solid var(--color-error);
-  box-shadow: 0 2px 6px rgba(255,69,58,0.3), 0 1px 2px rgba(0,0,0,0.2), inset 0 0.5px 0 rgba(255,255,255,0.1);
+  box-shadow: none;
 }
 
 .btn-danger:hover:not(:disabled) {
   opacity: 0.9;
-  box-shadow: 0 4px 12px rgba(255,69,58,0.35), 0 2px 4px rgba(0,0,0,0.25);
+  box-shadow: none;
 }
 
 .btn-danger:active:not(:disabled) {
@@ -5081,6 +5121,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 
 .min-h-0 { min-height: 0; }
 .min-w-0 { min-width: 0; }
+.h-full { height: 100%; }
+.w-full { width: 100%; }
+.min-h-full { min-height: 100%; }
+.h-screen { height: 100vh; }
+.w-screen { width: 100vw; }
 .max-w-sm { max-width: 384px; }
 .max-w-md { max-width: 448px; }
 .max-w-lg { max-width: 512px; }
@@ -6893,15 +6938,14 @@ html, body {
   min-height: 48px;
 }
 
-/* ----- ARIA Live Region Styles ----- */
-[aria-live="polite"],
-[aria-live="assertive"] {
-  position: absolute;
-  left: -10000px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
+/* ----- ARIA Live Region Styles -----
+   Do NOT visually hide all [aria-live] regions off-screen. aria-live is an
+   announcement hint that is frequently placed on VISIBLE content — status
+   lines, empty/error states, the autosave + lock-screen messages, and the
+   shared EmptyState / ErrorState components (role="status"/"alert"). A blanket
+   off-screen rule here pushed every one of those out of view. Screen-reader-only
+   announcers must opt in explicitly via .dex-sr-only / .sr-only instead (e.g.
+   the #dex-live-region announcer in AppManager). */
 
 /* ═══════════════════════════════════════════════════════════════════════════
   SECTION 29: MODAL & OVERLAY FIXES

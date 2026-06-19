@@ -7,6 +7,34 @@
 //! return shapes as the Electron manager. The event-bus auto-recording is an
 //! internal Electron concern (not an IPC channel); the renderer-facing surface
 //! is the five handlers below, which are ported faithfully.
+//!
+//! ----------------------------------------------------------------------------
+//! ADDENDUM — the `activity:*` namespace (NOT `activity-feed:*`).
+//! ----------------------------------------------------------------------------
+//! This file also hosts a SECOND, unrelated subsystem: the five `activity:*`
+//! handlers in src/main/main.ts (getAll / getRecent / markRead / markAllRead /
+//! clearAll). Those wrap `this.dataStore.get/set('activities')` — DataStore is a
+//! single electron-store named `dex-data` whose `activities` value is a flat
+//! array of records { id, type, title, timestamp, read, data? }. This is the
+//! same DataStore-KV tier already ported for `modes:*` and `projects:*` in
+//! main.rs, so the port uses the native KV store (crate::kv_get / crate::kv_set)
+//! under the SAME top-level key "activities".
+//!
+//! DIVERGENCE (name): the file's required `dispatch(app, channel, args)` entry
+//! point name is already taken by the SQLite feed's `dispatch(conn, ...)` above
+//! (wired in main.rs as `activity-feed::dispatch(conn, ...)`). Two functions
+//! can't share the name `dispatch` with different signatures, and editing
+//! main.rs is out of scope here, so the `activity:*` entry point is exposed as
+//! `dispatch_kv(app, channel, args)`. The orchestrator should route
+//! `channel.starts_with("activity:")` to `activity_feed::dispatch_kv`. Nothing
+//! creates records (no id gen / no timestamps) — the feed is populated by other
+//! subsystems — so this is read + mark-read + clear only. Return shapes match
+//! the Electron handlers exactly:
+//!   - getAll      -> activities array (or [])
+//!   - getRecent   -> last 20, reversed (newest-first)
+//!   - markRead    -> { success: true }
+//!   - markAllRead -> { success: true }
+//!   - clearAll    -> { success: true }
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection, Row};
@@ -151,6 +179,84 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
             json!({ "success": true })
         }
         "activity-feed:record" => record(conn, args),
+        _ => Value::Null,
+    }
+}
+
+// ============================================================================
+// `activity:*` namespace — DataStore-KV port (see ADDENDUM in the file header).
+// Backs the `activities` array via crate::kv_get / crate::kv_set, mirroring the
+// `modes:*` / `projects:*` ports in main.rs.
+// ============================================================================
+
+// dataStore.get('activities') || []  — any non-array value falls back to [].
+fn read_activities(app: &tauri::AppHandle) -> Vec<Value> {
+    match crate::kv_get(app, "activities") {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    }
+}
+
+fn write_activities(app: &tauri::AppHandle, activities: &[Value]) {
+    crate::kv_set(app, "activities", json!(activities));
+}
+
+/// Route an `activity:*` channel. Args are the positional JSON array the
+/// renderer sent (see tauriCompat.ts).
+pub fn dispatch_kv(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+    match channel {
+        // dataStore.get('activities') || []
+        "activity:getAll" => json!(read_activities(app)),
+
+        // activities.slice(-20).reverse()
+        "activity:getRecent" => {
+            let activities = read_activities(app);
+            let start = activities.len().saturating_sub(20);
+            let mut recent: Vec<Value> = activities[start..].to_vec();
+            recent.reverse();
+            json!(recent)
+        }
+
+        // find by id, set read=true if present, persist; always { success: true }
+        "activity:markRead" => {
+            let activity_id = args.get(0).and_then(|v| v.as_str());
+            let mut activities = read_activities(app);
+            if let Some(id) = activity_id {
+                let mut changed = false;
+                for a in activities.iter_mut() {
+                    if a.get("id").and_then(|v| v.as_str()) == Some(id) {
+                        if let Some(obj) = a.as_object_mut() {
+                            obj.insert("read".into(), json!(true));
+                        }
+                        changed = true;
+                        break;
+                    }
+                }
+                if changed {
+                    write_activities(app, &activities);
+                }
+            }
+            json!({ "success": true })
+        }
+
+        // set read=true on every activity, persist; { success: true }
+        "activity:markAllRead" => {
+            let mut activities = read_activities(app);
+            for a in activities.iter_mut() {
+                if let Some(obj) = a.as_object_mut() {
+                    obj.insert("read".into(), json!(true));
+                }
+            }
+            write_activities(app, &activities);
+            json!({ "success": true })
+        }
+
+        // dataStore.set('activities', []); { success: true }
+        "activity:clearAll" => {
+            write_activities(app, &[]);
+            json!({ "success": true })
+        }
+
         _ => Value::Null,
     }
 }

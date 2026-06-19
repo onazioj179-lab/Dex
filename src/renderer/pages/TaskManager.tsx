@@ -10,6 +10,7 @@ import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useVirtualList } from '../improvements500/virtualList';
+import { DexSearchInput } from '../styles/components';
 
 // Progressive detail (information priority): show what matters first, reveal
 // diagnostics and advanced data only on request -- never everything at once.
@@ -81,7 +82,7 @@ const formatUptime = (seconds: number): string => {
   return `${m}m`;
 };
 
-const toneFor = (percent: number): string => (percent > 80 ? '#FF453A' : percent > 55 ? '#FF9F0A' : '#30D158');
+const toneFor = (percent: number): string => (percent > 80 ? 'var(--color-error)' : percent > 55 ? 'var(--color-warning)' : 'var(--color-success)');
 
 const batteryTone = (percent: number, charging: boolean): string => {
   if (charging) return '#30D158';
@@ -226,8 +227,13 @@ const TaskManager: React.FC = () => {
   const [netRxHistory, setNetRxHistory] = useState<number[]>([]);
   const [netTxHistory, setNetTxHistory] = useState<number[]>([]);
   const [detailLevel, setDetailLevel] = useState<DetailLevel>(loadDetailLevel);
+  // Process-table sort: local-only (no backend). Default mirrors the previous
+  // hardcoded behaviour (CPU, highest first); clicking a header cycles it.
+  const [sortKey, setSortKey] = useState<'name' | 'pid' | 'cpu' | 'memory'>('cpu');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [killing, setKilling] = useState<number | null>(null);
-  const [killConfirm, setKillConfirm] = useState<{ pid: number; name: string; force: boolean } | null>(null);
+  const [hoveredPid, setHoveredPid] = useState<number | null>(null);
+  const [killConfirm, setKillConfirm] = useState<{ pid: number; name: string; force: boolean; tree?: boolean } | null>(null);
 
   // Pulse v2: workspace grouping + governance state.
   const stages = useStageStore(s => s.stages);
@@ -349,14 +355,31 @@ const TaskManager: React.FC = () => {
 
   const visibleProcesses = useMemo(() => {
     const query = filter.trim().toLowerCase();
-    const sortedProcesses = [...processes].sort((first, second) => (second.cpu || 0) - (first.cpu || 0));
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const sortedProcesses = [...processes].sort((first, second) => {
+      if (sortKey === 'name') return dir * first.name.localeCompare(second.name);
+      const a = sortKey === 'pid' ? first.pid : sortKey === 'memory' ? (first.memory || 0) : (first.cpu || 0);
+      const b = sortKey === 'pid' ? second.pid : sortKey === 'memory' ? (second.memory || 0) : (second.cpu || 0);
+      return dir * (a - b);
+    });
     // No hard cap: the list is windowed (useVirtualList), so only on-screen rows
     // ever mount even with thousands of processes.
     if (!query) return sortedProcesses;
     return sortedProcesses.filter(
       process => process.name.toLowerCase().includes(query) || String(process.pid).includes(query),
     );
-  }, [filter, processes]);
+  }, [filter, processes, sortKey, sortDir]);
+
+  // Header click: toggle direction on the active column, else switch column with
+  // a sensible default (numbers high-first, name A->Z).
+  const handleSort = useCallback((key: 'name' | 'pid' | 'cpu' | 'memory') => {
+    setSortKey(prev => {
+      if (prev === key) { setSortDir(d => (d === 'asc' ? 'desc' : 'asc')); return prev; }
+      setSortDir(key === 'name' ? 'asc' : 'desc');
+      return key;
+    });
+  }, []);
+  const sortArrow = (key: 'name' | 'pid' | 'cpu' | 'memory') => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
 
   // Windowed process table: drives padTop/visible-rows/padBottom from scrollTop.
   const procVirtual = useVirtualList({ itemCount: visibleProcesses.length, rowHeight: PROCESS_ROW_H, bufferRows: 6 });
@@ -435,21 +458,32 @@ const TaskManager: React.FC = () => {
     setKillConfirm({ pid, name, force: false });
   }, []);
 
+  // Kill-tree (Tier 5 / 45): terminate the process AND all of its descendants,
+  // so closing a parent never leaves orphaned/zombie children behind.
+  const handleEndTree = useCallback((pid: number, name: string) => {
+    if (typeof pid !== 'number' || pid <= 0) return;
+    const dexApi = (window as any).dex;
+    if (!dexApi?.system?.killProcessTree) return;
+    setKillConfirm({ pid, name, force: false, tree: true });
+  }, []);
+
   const executeKill = useCallback(async () => {
     if (!killConfirm) return;
-    const { pid, name, force } = killConfirm;
+    const { pid, name, force, tree } = killConfirm;
     setKillConfirm(null);
     setKilling(pid);
     try {
       const dexApi = (window as any).dex;
-      const result = await dexApi.system.killProcess(pid, force);
+      const result = tree
+        ? await dexApi.system.killProcessTree(pid, force)
+        : await dexApi.system.killProcess(pid, force);
       if (result && result.success === false && !force) {
-        setKillConfirm({ pid, name, force: true });
+        setKillConfirm({ pid, name, force: true, tree });
       } else {
         await refreshProcesses();
       }
     } catch (e) {
-      console.warn('[TaskManager] killProcess failed', e);
+      console.warn('[TaskManager] kill failed', e);
     } finally {
       setKilling(null);
     }
@@ -459,11 +493,15 @@ const TaskManager: React.FC = () => {
     <div style={styles.container}>
       <ConfirmDialog
         open={killConfirm !== null}
-        title={killConfirm?.force ? `Force Kill "${killConfirm.name}"?` : `End Process "${killConfirm?.name}"?`}
+        title={killConfirm?.force
+          ? `Force Kill "${killConfirm.name}"${killConfirm?.tree ? ' + children' : ''}?`
+          : killConfirm?.tree ? `End "${killConfirm?.name}" and all children?` : `End Process "${killConfirm?.name}"?`}
         message={killConfirm?.force
           ? 'Could not end gracefully. Force kill will immediately terminate the process.'
-          : 'Unsaved work in this process will be lost.'}
-        confirmLabel={killConfirm?.force ? 'Force Kill' : 'End Process'}
+          : killConfirm?.tree
+            ? 'This ends the process and every child process it spawned. Unsaved work in any of them will be lost.'
+            : 'Unsaved work in this process will be lost.'}
+        confirmLabel={killConfirm?.force ? 'Force Kill' : killConfirm?.tree ? 'End Tree' : 'End Process'}
         tone="destructive"
         onConfirm={executeKill}
         onCancel={() => setKillConfirm(null)}
@@ -568,6 +606,12 @@ const TaskManager: React.FC = () => {
               tone="#5E5CE6"
               max={Math.max(50, ...processHistory)}
             />
+          </>
+        )}
+        {/* Lower-signal diagnostics (uptime, throughput, disk) live in Advanced so
+            the default Diagnostics view stays focused on CPU/Memory/Processes. */}
+        {detailLevel >= 3 && (
+          <>
             <div style={styles.statCard}>
               <div style={styles.statLabel}>Uptime</div>
               <div style={{ ...styles.statValue, color: 'var(--color-accent, #0A84FF)', fontSize: 20 }}>{formatUptime(uptimeSeconds)}</div>
@@ -716,19 +760,21 @@ const TaskManager: React.FC = () => {
         <section style={styles.panel}>
           <div style={styles.panelHeader}>
             <span>System Processes</span>
-            <input
+            <DexSearchInput
+              size="sm"
               value={filter}
               onChange={event => setFilter(event.target.value)}
-              placeholder="Filter"
+              onClear={() => setFilter('')}
+              placeholder="Filter by name"
               aria-label="Filter system processes"
-              style={styles.filterInput}
+              style={{ width: 170 }}
             />
           </div>
           <div style={styles.processTableHead}>
-            <span>Name</span>
-            <span style={{ textAlign: 'right' }}>PID</span>
-            <span style={{ textAlign: 'right' }}>CPU</span>
-            <span style={{ textAlign: 'right' }}>Memory</span>
+            <button type="button" style={styles.sortHeader} onClick={() => handleSort('name')} aria-label="Sort by name">Name{sortArrow('name')}</button>
+            <button type="button" style={{ ...styles.sortHeader, justifyContent: 'flex-end' }} onClick={() => handleSort('pid')} aria-label="Sort by PID">PID{sortArrow('pid')}</button>
+            <button type="button" style={{ ...styles.sortHeader, justifyContent: 'flex-end' }} onClick={() => handleSort('cpu')} aria-label="Sort by CPU">CPU{sortArrow('cpu')}</button>
+            <button type="button" style={{ ...styles.sortHeader, justifyContent: 'flex-end' }} onClick={() => handleSort('memory')} aria-label="Sort by memory">RAM{sortArrow('memory')}</button>
             <span style={{ textAlign: 'right' }}>Action</span>
           </div>
           <div ref={procVirtual.ref as React.RefObject<HTMLDivElement>} onScroll={procVirtual.onScroll} style={styles.processTable}>
@@ -743,8 +789,14 @@ const TaskManager: React.FC = () => {
                   const cpuValue = process.cpu || 0;
                   const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
                   const isKilling = killing === process.pid;
+                  const hovered = hoveredPid === process.pid;
                   return (
-                    <div key={`${process.pid}-${process.name}`} style={styles.processRow}>
+                    <div
+                      key={`${process.pid}-${process.name}`}
+                      style={{ ...styles.processRow, ...(hovered ? styles.processRowHover : null) }}
+                      onMouseEnter={() => setHoveredPid(process.pid)}
+                      onMouseLeave={() => setHoveredPid(prev => (prev === process.pid ? null : prev))}
+                    >
                       <span style={styles.processName} title={process.name}>{process.name}</span>
                       <span style={styles.processPid}>{process.pid}</span>
                       <span style={{ ...styles.processMetric, color: cpuColor }}>{cpuValue.toFixed(1)}%</span>
@@ -757,6 +809,15 @@ const TaskManager: React.FC = () => {
                         title={`End ${process.name}`}
                       >
                         {isKilling ? '...' : 'End'}
+                      </button>
+                      <button
+                        style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, marginLeft: 4, opacity: isKilling ? 0.5 : 1 }}
+                        onClick={() => handleEndTree(process.pid, process.name)}
+                        disabled={isKilling}
+                        aria-label={`End process tree ${process.name}`}
+                        title={`End ${process.name} and all child processes`}
+                      >
+                        Tree
                       </button>
                     </div>
                   );
@@ -809,13 +870,14 @@ const styles: Record<string, React.CSSProperties> = {
   appDetail: { marginTop: 2, fontSize: 11, color: 'var(--color-text-tertiary)' },
   ghostButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
   endButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer' },
-  filterInput: { width: 150, height: 28, borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', padding: '0 9px', outline: 'none' },
   processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  sortHeader: { display: 'flex', alignItems: 'center', height: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', textTransform: 'inherit', letterSpacing: 'inherit', cursor: 'pointer' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },
   processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 56px', gap: 'var(--space-2)', height: PROCESS_ROW_H, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12, boxSizing: 'border-box' },
+  processRowHover: { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' },
   processName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  processPid: { color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
-  processMetric: { color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
+  processPid: { color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono, monospace)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
+  processMetric: { color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
   empty: { padding: 18, color: 'var(--color-text-tertiary)', fontSize: 12, lineHeight: 1.5 },
 };
 

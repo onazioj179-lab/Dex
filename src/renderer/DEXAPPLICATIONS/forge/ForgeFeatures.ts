@@ -571,6 +571,19 @@ export const estimateEncodingTime = (
   return fileDuration * baseMultiplier * codecMultiplier * hwMultiplier * resMultiplier * 0.5;
 };
 
+// Estimate output file size (bytes) from bitrate * duration, with container
+// overhead (~5%). Pure + unit-tested -- lets users plan disk/quota before encoding.
+export const estimateOutputFileSize = (
+  durationSec: number,
+  videoBitrateKbps: number,
+  audioBitrateKbps: number,
+  overhead = 1.05,
+): number => {
+  const totalKbps = Math.max(0, videoBitrateKbps) + Math.max(0, audioBitrateKbps);
+  const bits = totalKbps * 1000 * Math.max(0, durationSec); // kbps -> bits
+  return (bits / 8) * overhead;
+};
+
 // Apply naming pattern
 export const applyNamingPattern = (
   pattern: string,

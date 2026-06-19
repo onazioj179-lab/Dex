@@ -12,6 +12,7 @@
 
 import React, { useEffect, useCallback, useRef, useState, memo, useMemo } from 'react';
 import { DexLoader } from './LoadingStates';
+import { DexSearchInput } from '../styles/components';
 import {
   useJournalStore,
   type JournalEntry,
@@ -56,16 +57,6 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--color-accent-soft, rgba(10,132,255,0.15))',
     color: 'var(--color-accent)',
     borderColor: 'var(--color-accent-muted, rgba(10,132,255,0.3))',
-  },
-  searchBox: {
-    flex: 1,
-    padding: '5px 10px',
-    fontSize: 12,
-    background: 'var(--color-border-subtle)',
-    border: '1px solid var(--color-bg-hover)',
-    borderRadius: 4,
-    color: 'var(--color-text-primary)',
-    outline: 'none',
   },
   manageBtn: {
     padding: '4px 10px',
@@ -823,12 +814,17 @@ const JournalView: React.FC = () => {
           </button>
         ))}
 
-        <input
-          style={S.searchBox}
-          type="text"
+        <DexSearchInput
+          size="sm"
+          fullWidth
           placeholder="Search journal entries..."
           value={searchQuery}
           onChange={handleSearchChange}
+          onClear={() => {
+            if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+            setSearchQuery('');
+            loadEntries();
+          }}
         />
 
         <button

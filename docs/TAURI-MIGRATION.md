@@ -12,8 +12,253 @@
 ## RESUME HERE  ← next session starts here
 
 **Status:** Electron is the shipping build (v5.0.1). Tauri shell boots and serves
-the same renderer; **~80 namespaces are natively backed** (24 platform + 57
-SQLite subsystem modules sharing `dex.db`); the rest degrade to `null`.
+the same renderer; **~210 namespaces are natively backed** after the round-2 sweep;
+the rest degrade to `null`.
+
+**!!! INCIDENT + LESSON (2026-06-19) — never repeat:** a porting workflow told its
+agents to add a temp `mod` line, `cargo check`, then `git checkout src-tauri/src/
+main.rs` to revert. With ~130 agents, that reverted main.rs to HEAD and **wiped ALL
+uncommitted wiring** (dev-platform/projects/rewind/fs/watch glue + that session's
+work). Not recoverable from git/stash/IDE-history (working-tree text was never
+hashed). RECOVERED by re-wiring from the surviving module files. RULES GOING
+FORWARD: (1) **COMMIT before running any multi-agent workflow.** (2) Workflow port
+agents must NEVER `git checkout`/edit shared files (main.rs, capabilities.ts) — they
+write ONLY their own new module file; the orchestrator wires centrally. (3) Lost
+inline helpers were rebuilt as revert-proof MODULES (modes.rs, projects.rs).
+
+**Round-2 bulk sweep DONE (2026-06-19): ~119 subsystems / 264 channels wired.** A
+multi-agent workflow ported the data/CRUD surface of nearly every remaining
+namespace to its own `src-tauri/src/<name>.rs` (KV/JSON CRUD + live-metric reads),
+each `pub fn dispatch`. Wired via prefix routes (sole owners) or explicit arms
+(shared prefixes). Heavy channels (execution/network/live-window/LLM/timers) are
+NOT faked — they degrade to null / `{success:false,error:"not ported"}`. Namespaces
+added across accessibility/adaptive/api/archive/autofill/battery/behavior/browser/
+budget/cli/cloudsync/code/connectors/context/crash-reporter/device/documents/editor/
+encryption/export/extensions/gallery/games/gpu/hardware/history/http-transfer/import/
+input/intelligence/launcher/learning/maintenance/monitor/network/nexus/performance/
+plugins/privacy/pty/recovery/render/scheduler/scripting/security/session/snapshot/
+store/sync/tagging/tasks/thermal/timeline/transfer/uki/undo/update/video/vinx/voice/
+watchdog/workflow/xenon (+ more). Verified: `cargo check` EXIT 0 (0 errors, 9
+dead-code warnings), `tsc --noEmit` EXIT 0. mod count 74 -> 222.
+
+**DEFERRED (lost inline helpers not yet rebuilt — small, degrade to null):**
+`rewind:getDaySummary`, `auth:setup:pin|password|biometric`, `files:organizeByType`.
+Re-port from their .ts sources (each is small/pure-data).
+
+**Earlier this session (re-applied after the incident):** analytics:* (11),
+power:* (10, via power::dispatch), mode:* (6, modes.rs), and round-1's 22 subsystems
+(activity/duplicates/focus/memory/operations/perf/reader/resource/rule/sessions/
+split/splitview/stability/startup/systemHealth/tags/user/voiceNotes/logs/patterns/
+permissions/notes). `kv_get`/`kv_set` are now `pub(crate)`.
+
+**Bulk clean-tier sweep (2026-06-19): 22 subsystems / ~110 channels ported via a
+multi-agent workflow.** A discover-then-fan-out workflow (1 discovery agent + 27
+porting agents) enumerated every unported renderer-facing namespace, classified
+clean-data vs heavy-engine, and wrote one self-contained `src-tauri/src/<name>.rs`
+per clean subsystem (each following the analytics.rs / modes_dispatch templates,
+exact Electron shapes, no main.rs edits -> no write conflicts). Integration was done
+centrally by the orchestrator and is `cargo check` + `tsc --noEmit` GREEN.
+WIRED (22): `activity` (DataStore-KV `dispatch_kv`, additive in activity_feed.rs;
+the SQLite `activity-feed:` route is untouched), `duplicates`, `focus`, `memory`,
+`operations` (getLogs; execute/undo honest shaped-degrade), `perf`, `reader`
+(extractive summarizer, regex-free), `resource`, `rule`, `sessions`, `split`,
+`splitview`, `stability`, `startup`, `systemHealth`, `tags`, `user`, `voiceNotes`
+(save degraded — binary over bridge), plus explicit-arm namespaces `logs`,
+`patterns`, `permissions`, `notes` (these share their prefix with other Electron
+subsystems, so they are routed by exact channel, not by prefix). All KV-backed ones
+reuse the shared `dex-kv.json` store via the now `pub(crate)` `kv_get`/`kv_set`,
+matching the modes/projects precedent. SKIPPED (5, deleted): `auth`/`settings`/
+`theme` (already native in dex_ipc — kept the existing inline handlers), and
+`render-error`/`renderer` heartbeat (intercepted client-side in rendererShims /
+in-memory no-ops). HEAVY channels inside the wired namespaces are NOT faked — they
+return null or an honest `{success:false,error:"not ported (needs native runtime)"}`
+and are listed per-module: process/OS-mutation execs (operations execute/undo),
+live OS-timer/interval engines (sessions timers start/pause/stop, stability metrics,
+patterns detection-engine siblings), binary I/O (voiceNotes save), and all
+webContents.send broadcasts (splitview/focus events). DOCUMENTED divergences mirror
+the analytics precedent (UTC bucketing for patterns; stateless read-modify-write per
+call; epoch-ms ids via util::pseudo_uuid_v4). 22 namespaces added to
+`TAURI_NATIVE_SUBSYSTEMS`. Verified: `cargo check` EXIT 0 (0 errors), `tsc --noEmit`
+EXIT 0. Electron untouched (additive). Uncommitted — owner reviews and commits.
+
+**Modes tier (2026-06-19): `mode:*` (6 channels) ported to Tauri.**
+KV-backed CRUD over the `modes` key in `modes_dispatch` (main.rs), same pattern as
+`projects_dispatch` / DataStore: `getAll`, `getActive` (active-flag lookup), `save`
+(create with the DataStore defaults or merge-update; id-present-but-absent -> null,
+matching Electron's `modes.find(...)!`), `delete`, and `activate`/`deactivate` (set
+the `active` flag = `DataStore.setActiveMode`). DATA-STATE port: activate/deactivate
+do NOT run the mode's actions, toggle rules, or (re)schedule node-schedule jobs —
+ActionController / RuleEngine / the scheduler aren't ported, so those side effects
+are deliberately omitted (documented in the fn header). `'mode'` added to
+`TAURI_NATIVE_SUBSYSTEMS`. Verified: `cargo check` EXIT 0 (5.1s); `tsc --noEmit`
+EXIT 0. Electron untouched (additive). Uncommitted — owner reviews and commits.
+
+**Power tier (2026-06-19): `power:*` rounded out to Tauri parity.**
+Port of `controllers/PowerController.ts` in new `src-tauri/src/power.rs`. The
+`power` namespace was only half-native (`getStats` -> `system_status` [wrong
+shape], `closeProcess`, `getDiskUsage`). Now native at exact Electron shape:
+`getStats` (real `PowerStats`: profile + cpu{usage,cores} + memory{total,used,
+available,percent} + topProcesses), `getProfile`, `getState`, `setProfile`
+(applies the SAME OS power plans — Windows `powercfg` GUIDs / macOS `pmset` /
+Linux `cpupower` — via `std::process::Command`, `CREATE_NO_WINDOW` on Windows),
+`quickBoost` (boost + background-thread revert after N min), `getResourceHogs`
+(sysinfo; cpu+mem*2 ranking, top 20; SYSTEM_PROCESSES / BACKGROUND classification
++ canClose), `freeMemory`, `getSuggestedCleanup`, and the advisory
+`setCpuLimit`/`setGpuLimit`/`setFanCurve` (echo, matching main.ts). Current
+profile is SESSION state in Tauri-managed `PowerProfileState` (registered in
+`setup()`), matching Electron's reset-to-`balanced`-each-launch; `power:getStats`
+fixed from the placeholder `system_status()` to the real shape. HONEST DIVERGENCES
+(documented in the module header): no battery readout (sysinfo has none and no new
+crate added -> `hasBattery:false`/`ac`/100%); `setProfile` applies the power PLAN
+only, NOT Electron's background-process deprioritize/kill step; `freeMemory` has
+no native working-set trim (Electron's path was a near-no-op too). `'power'` was
+already in `TAURI_NATIVE_SUBSYSTEMS`. Verified: `cargo check` EXIT 0 (11.6s).
+Runtime check needs `npm run dev:tauri` (WebView2). Electron untouched (additive).
+Uncommitted — owner reviews and commits.
+
+**Analytics tier (2026-06-19): `analytics:*` (11 channels) ported to Tauri.**
+New `src-tauri/src/analytics.rs` — faithful port of `analytics/AnalyticsManager.ts`,
+the pure-data `electron-store` subsystem. The three stores map to JSON under
+`<appData>` (`dex-analytics-config`/`-records`/`-daily`, same `{records}`/`{data}`
+wrappers Electron used). All 11 handlers at exact Electron shape: `record` (id-gen +
+retention trim + daily rollup; honors `enabled=false` -> `{id:'',...record}`),
+`get-records` (type/since/success filter, newest-first, limit), `get-summary`,
+`get-daily`, `get-weekly-digest`, `get-heatmap`, `get-recommendations`,
+`get-item-metrics`, `export`, `cleanup`, `get-config`. Routed by the `analytics:`
+prefix in `dex_ipc` (beside git/env/ssh); reuses `cmd_export_bundle`'s
+`civil_from_ms`/`utc_date` (no tz dep) + `util::pseudo_uuid_v4`. DOCUMENTED
+divergence (same rewind precedent): hour/weekday histograms are UTC, not local —
+Electron mixed UTC date strings (`toISOString`) with LOCAL `getHours`/`getDay`; the
+date strings already matched, the hour/weekday buckets shift by the local offset.
+The Electron-side daily `setInterval` cleanup has no IPC surface (renderer calls
+`analytics:cleanup` explicitly). `'analytics'` added to `TAURI_NATIVE_SUBSYSTEMS`.
+Verified: `cargo check` EXIT 0 (7.9s); renderer `tsc --noEmit` EXIT 0. Electron
+untouched (additive). Uncommitted — owner reviews and commits.
+
+**Dev-platform slice (2026-06-19): Tier 5 channels ported to Tauri at parity.**
+The new dev-platform features (Git 43, ENV 44, SSH 42, process kill-tree 45) were
+first built on the Electron side (controllers + `window.dex.{git,env,ssh}` +
+`system:killProcessTree`); this slice ports them to `dex_ipc` so the SAME renderer
+apps (GitClient/EnvManager/SshClient + TaskManager's Tree button) work on the
+Tauri shell too. All pure-Rust, non-DB, exact-shape ports of the TS controllers:
+- `src-tauri/src/git.rs` — shells `git` via `std::process::Command` (arg arrays,
+  no shell). Full `git:` set: check/status (porcelain v1 -b parse)/log/branches/
+  stage/unstage/commit/push/pull/checkout/diff. Routed by `git:` prefix in dex_ipc.
+- `src-tauri/src/env_manager.rs` — `env:listSystem` (sorted `std::env::vars()`),
+  `env:getManaged`/`setManaged`/`deleteManaged` persisted to `<appData>/dex-env.json`
+  (global + per-app scopes, name validation). Routed by `env:` prefix.
+- `src-tauri/src/ssh.rs` — `ssh:check` (binary-probe), profile CRUD in
+  `<appData>/ssh-profiles.json`, `listKeys` (scan ~/.ssh + DEX keydir via
+  `ssh-keygen -lf`), `generateKey` (ed25519/rsa, guarded), `connectCommand`.
+  Routed by `ssh:` prefix. PTY interactive session out of scope (both shells).
+- `system:killProcessTree` — new `system_kill_tree` fn in main.rs builds the tree
+  from `sysinfo` parent links (cross-platform, no taskkill/pgrep), kills leaves-
+  first; matches Electron `{success,message}`.
+`TAURI_NATIVE_SUBSYSTEMS` += `git`/`env`/`ssh` (killProcessTree rides under the
+already-native `system`). Verified: `cd src-tauri && cargo check` EXIT 0 (1m54s);
+renderer `tsc --noEmit` EXIT 0. Electron untouched (additive). Uncommitted — owner
+reviews and commits. Runtime check needs `npm run dev:tauri` (WebView2).
+
+**Filesystem-read slice (2026-06-19): `fs:readdir` + `media:getMediaFiles` ported.**
+Worked the `NATIVE_PENDING` (rendererShims.ts) backlog — the curated, honest list
+of still-degraded channels — picking the pure-`std::fs` tier. New
+`src-tauri/src/fs_ops.rs`: `fs:readdir` (file names) and `media:getMediaFiles`
+(recursive ~/Music|Pictures|Videos scan, max depth 3 / 500 results, exact
+{path,name,extension,size,modified} shape). Wired as explicit dex_ipc arms in the
+Files section; `'fs'` added to TAURI_NATIVE_SUBSYSTEMS (`media` already listed);
+both channels removed from NATIVE_PENDING so the degrade report stays truthful.
+DEFERRED in NATIVE_PENDING with reasons: `fs:readFileHead` (returns ArrayBuffer —
+binary-over-bridge, needs base64 plumbing) and `files:organizeByType` (mutating +
+undo-history parity). Verified: `cargo check` EXIT 0 (6s incremental); renderer
+`tsc --noEmit` EXIT 0. Uncommitted.
+
+**Binary-over-bridge standard DONE (2026-06-19).** Implemented the reusable binary
+protocol the migration doc called for: a self-describing `{ __dexBinary: "<base64>" }`
+envelope. `tauriCompat.ts` now encodes any ArrayBuffer/TypedArray ARG into the
+envelope on the way out and decodes a `{__dexBinary}` RESULT back into a real
+ArrayBuffer on the way in (chunked base64, SharedArrayBuffer-safe), so renderer
+call sites that expect binary work unchanged. First consumer: `fs:readFileHead`
+(`fs_ops::read_file_head` returns the envelope; default 131072 / 2MB cap, exact
+Electron parity) — this unlocks EXIF (exifParser.ts) and ID3 (id3Parser.ts) media
+metadata under Tauri. Existing base64-string channels (voice-memo save) are
+untouched: the encoder only fires on RAW binary args, and those callers already
+pass base64 strings. Removed from NATIVE_PENDING. Verified: `cargo check` EXIT 0;
+`tsc --noEmit` EXIT 0.
+
+**Data-store slice (2026-06-19): `projects:*` ported.** The Electron projects
+handlers are thin CRUD over `dataStore.get/set('projects')` — a JSON array — so
+they map straight onto the already-native KV store. New `projects_dispatch` in
+main.rs (beside kv_get/kv_set) implements getAll/getActive/create/update/delete/
+setActive with exact Electron shapes (create seeds `proj-<ts>` id then lets input
+override, forces active:false + createdAt; update merges + updatedAt; delete/
+setActive return {success:true}). Wired as one `ch @ (...)` arm; `'projects'` added
+to TAURI_NATIVE_SUBSYSTEMS; both removed from NATIVE_PENDING. Verified: `cargo
+check` EXIT 0; `tsc --noEmit` EXIT 0.
+
+**Data-store tier COMPLETE (2026-06-19): `rewind:getDaySummary` ported.** Reads
+`<appData>/rewind/<date>.json` (`{entries:[{type,appName,timestamp}]}`) and
+aggregates byType / topApps(10) / hours[24] / totalEntries — exact Electron shape
+(`rewind_day_summary` in main.rs, explicit arm ahead of the `rewind:` prefix arm).
+Reuses cmd_export_bundle's `civil_from_ms`/`utc_date` (now pub(crate)) — no tz dep;
+today-default + hour bucketing are UTC (documented). The rewind CAPTURE engine
+(which WRITES the day files) is not ported, so this returns the honest empty
+summary until capture lands. Removed from NATIVE_PENDING. `cargo check` + `tsc` EXIT 0.
+
+**Process-tier slice (2026-06-19): `watch:start`/`watch:stop` ported; `app:launch`
+resolved as a non-gap.** New `src-tauri/src/watch.rs` (notify-backed, Tauri-managed
+`GenericWatchState` registered in setup()) mirrors the Electron generic dir watcher:
+`watch:start({id,path})` watches NonRecursive and pushes `watch:fileAdded {id,
+files:[path]}` on new files (Create / Modify(Name), is_file guard = the existsSync
+check); `watch:stop({id})` drops the watcher. Wired as a `ch @ (...)` arm; `'watch'`
+added to TAURI_NATIVE_SUBSYSTEMS. `app:launch` was MISLABELLED 'process' in
+NATIVE_PENDING — it opens an INTERNAL DEX app via the running-apps store and has NO
+`ipcMain.handle` in Electron either, so it is a renderer action, not a native port
+(re-annotated, not ported). Verified: `cargo check` EXIT 0; `tsc --noEmit` EXIT 0.
+
+**Keychain + Notes tier slice (2026-06-19): NATIVE_PENDING nearly drained.**
+- `auth:setup:pin/password/biometric` — `auth_setup` in main.rs. FAITHFUL port: the
+  Electron handlers just sha256 the secret into KV `appliedSettings`
+  (pinHash/pinEnabled, passwordHash/passwordEnabled); biometric reports
+  `{success, supported: win|mac}`. Reuses `licensing::sha256_hex`. (The
+  NATIVE_PENDING 'keychain' label was aspirational — Electron never used a keychain;
+  hardening to Argon2id would break existing hashes, so it's an owner-gated decision,
+  NOT this parity port.)
+- `dexnotes:pick-attachment-file`/`pick-import-file` — `native_ops::note_pick_file`
+  (tauri-plugin-dialog `blocking_pick_file` -> `{ filePath }`; renderer then copies
+  via the already-native `dexnotes:addAttachment`/importFile). These had NO Electron
+  handler — implemented for Tauri from the DexNotes.tsx contract (`result.filePath`).
+- `dexnotes:get-word-suggestions` -> `[]` (honest; no dictionary source — autocomplete
+  degrades gracefully). 
+- `renderer:save-emergency-state` / `memory-critical` / `render-error:report` moved to
+  rendererShims TELEMETRY_SINKS (fire-and-forget accept-discard; no main-process
+  reader is ported, so this is the honest behaviour). `app:launch` confirmed a
+  renderer action (running-apps store), not a native channel.
+Verified: `cargo check` EXIT 0; `tsc --noEmit` EXIT 0.
+
+**files:organizeByType PORTED (2026-06-19).** `files_organize_by_type` in main.rs
+(match arm next to the other `files:*` ops) — faithful port of the Electron
+`FileManager.organizeByType`: resolves the dir, sorts each non-dir file into a
+kind subfolder (images/documents/spreadsheets/audio/video/archives/other, same
+typeMap order so the first bucket wins identically), creates subfolders on demand,
+and returns a `FileOperation[]` move-log in the exact renderer shape ({ id, type:
+'move', sourcePath, targetPath, timestamp, success, error?, undoable, undoData }).
+Reuses `resolve_path`; cross-volume moves fall back to copy+remove like
+`files_move`; a target name clash yields a failed op ("Target file already
+exists"), never an overwrite. DOCUMENTED GAP: no server-side undo history yet
+(Electron pushed each move into an op-history for `files:undo`); `undoData` is
+shaped for parity but there's no native undo log — that's the one behaviour not at
+parity. Removed from NATIVE_PENDING. Verified: `cargo check` EXIT 0; renderer
+`tsc --noEmit` EXIT 0.
+
+NEXT (resume here): NATIVE_PENDING now holds ONE genuine item —
+`workflow:runScript` (sandboxed script execution — security-sensitive; design
+the sandbox before porting). Beyond the catalogue, the long-tail heavy controllers
+(the ~2,369 raw handlers) are ported by REAL usage: run `npm run dev:tauri`, exercise
+the app, and `__dexDegradeReport()` lists exactly what's hit + degraded, most-first.
+MILESTONE CHECK DUE: run `npm run build:tauri` to confirm the installer still bundles
+green after this batch of slices (last verified 2026-06-09, 15 MB NSIS).
+The live `__dexDegradeReport()` (run `npm run dev:tauri`, exercise the app) orders
+this by REAL usage — prefer it over the static list when WebView2 is available.
 
 **Renderer slice (2026-06-12): v5.5 "DEX Sharp" UI program, batch 1 (shell-wide,
 applies identically to both shells — pure renderer).** Foundation: dex token

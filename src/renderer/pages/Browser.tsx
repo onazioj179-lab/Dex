@@ -16,6 +16,7 @@ import { Select } from '../components/Select';
 import DexIcon from '../components/DexIcon';
 import DOMPurify from 'dompurify';
 import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
+import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 
 // ===========================================================================
 // TYPES
@@ -132,6 +133,53 @@ const HISTORY_LIMIT = 2000; // Max history entries — auto-trims beyond this
 const BOOKMARK_LIMIT = 5000; // Max bookmarks
 const KEYCHAIN_STORAGE_KEY = 'dex-browser-keychain';
 const CARDS_STORAGE_KEY = 'dex-browser-cards';
+const SESSION_STORAGE_KEY = 'dex-browser-session'; // Persisted open tabs + active tab for restore
+
+// Shape persisted under SESSION_STORAGE_KEY. Only durable fields are stored —
+// transient state (loading, background, crash flags, nav stacks) is dropped and
+// rebuilt fresh on restore.
+interface SavedSession {
+  tabs: Array<{ id: string; title: string; url: string; pinned?: boolean }>;
+  activeTab: string;
+}
+
+// Default single blank tab — used as the fresh state and the restore fallback.
+const makeDefaultTabs = (): Tab[] => [
+  { id: '1', title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1 },
+];
+
+// Restore tabs + active tab from the saved session. Only durable fields (id,
+// title, url, pinned) are persisted; transient state (loading, background,
+// crash flags, nav stacks) is rebuilt fresh here. Falls back to a single blank
+// tab when the saved session is absent or malformed — never throws.
+const loadSession = (): { tabs: Tab[]; activeTab: string } => {
+  const fallback = { tabs: makeDefaultTabs(), activeTab: '1' };
+  try {
+    const saved = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    if (!parsed || !Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return fallback;
+    const tabs: Tab[] = parsed.tabs
+      .filter((t: any) => t && typeof t.id === 'string')
+      .slice(0, MAX_TABS)
+      .map((t: any) => ({
+        id: t.id,
+        title: typeof t.title === 'string' && t.title ? t.title : 'New Tab',
+        url: typeof t.url === 'string' ? t.url : '',
+        loading: false,
+        pinned: t.pinned === true ? true : undefined,
+        navHistory: typeof t.url === 'string' && t.url ? [t.url] : [],
+        navIndex: typeof t.url === 'string' && t.url ? 0 : -1,
+      }));
+    if (tabs.length === 0) return fallback;
+    const activeTab = typeof parsed.activeTab === 'string' && tabs.some(t => t.id === parsed.activeTab)
+      ? parsed.activeTab
+      : tabs[0].id;
+    return { tabs, activeTab };
+  } catch {
+    return fallback;
+  }
+};
 
 // Direct inline SVG icons — guaranteed rendering, no DOMPurify dependency
 const _svg = (sz: number, children: React.ReactNode, sw = 2) => (
@@ -188,11 +236,17 @@ export const Browser: React.FC = () => {
   useAppTracking('browser');
   const toast = useToastHelpers();
 
-  const [tabs, setTabs] = useState<Tab[]>([
-    { id: '1', title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1 },
-  ]);
-  const [activeTab, setActiveTab] = useState('1');
-  const [urlInput, setUrlInput] = useState('');
+  // Restore the previous session (open tabs + active tab) on mount; falls back
+  // to a single blank tab when no valid session is saved. Computed once so the
+  // tabs and activeTab initializers stay in sync.
+  const initialSessionRef = useRef<{ tabs: Tab[]; activeTab: string }>();
+  if (!initialSessionRef.current) initialSessionRef.current = loadSession();
+  const [tabs, setTabs] = useState<Tab[]>(() => initialSessionRef.current!.tabs);
+  const [activeTab, setActiveTab] = useState(() => initialSessionRef.current!.activeTab);
+  const [urlInput, setUrlInput] = useState(() => {
+    const s = initialSessionRef.current!;
+    return s.tabs.find(t => t.id === s.activeTab)?.url ?? '';
+  });
   const [tabErrors, setTabErrors] = useState<Record<string, string | null>>({});
   const [crashedTabs, setCrashedTabs] = useState<Set<string>>(new Set());
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
@@ -436,6 +490,7 @@ export const Browser: React.FC = () => {
   }, [readingMode, tabs, activeTab]);
   const historySaveRef = useRef<ReturnType<typeof setTimeout>>();
   const settingsSaveRef = useRef<ReturnType<typeof setTimeout>>();
+  const sessionSaveRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Settings panel
   const [showSettings, setShowSettings] = useState(false);
@@ -461,6 +516,7 @@ export const Browser: React.FC = () => {
       if (bookmarkSaveRef.current) clearTimeout(bookmarkSaveRef.current);
       if (historySaveRef.current) clearTimeout(historySaveRef.current);
       if (settingsSaveRef.current) clearTimeout(settingsSaveRef.current);
+      if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
     };
   }, []);
 
@@ -616,6 +672,27 @@ export const Browser: React.FC = () => {
       (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-history', json).catch((e: unknown) => { console.warn('[DEX]', e); });
     }, 1000);
   }, [history]);
+
+  // Persist the open session (tabs + active tab) for restore on next open
+  // (debounced). Only durable fields are stored — transient loading/background/
+  // nav state is dropped and rebuilt on restore.
+  useEffect(() => {
+    if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
+    sessionSaveRef.current = setTimeout(() => {
+      try {
+        const session: SavedSession = {
+          tabs: tabs.map(t => ({
+            id: t.id,
+            title: t.title,
+            url: t.url,
+            ...(t.pinned ? { pinned: true } : {}),
+          })),
+          activeTab,
+        };
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      } catch (e) { console.warn('[DEX]', e); }
+    }, 500);
+  }, [tabs, activeTab]);
 
   // Auto-clear: trim history beyond limit + prune entries older than 30 days
   useEffect(() => {
@@ -925,6 +1002,40 @@ export const Browser: React.FC = () => {
       window.electron?.ipcRenderer?.off?.('download:progress', handleProgress);
     };
   }, []);
+
+  // Mirror file downloads into the Home "Live Activity" feed so download
+  // progress shows as a live card on the Home screen. Centralized + throttled to
+  // whole-percent changes so the stream of progress events doesn't spam the feed.
+  const liveActivityRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const tracked = liveActivityRef.current;
+    const seen = new Set<string>();
+    downloads.forEach(d => {
+      seen.add(d.id);
+      const actId = `browser-${d.id}`;
+      const pct = Math.round(d.progress);
+      if (d.status === 'downloading') {
+        if (!tracked.has(d.id)) {
+          tracked.set(d.id, pct);
+          dispatchActivity({ id: actId, type: 'download', label: `Downloading ${d.fileName}`, progress: pct, app: 'browser' });
+        } else if (tracked.get(d.id) !== pct) {
+          tracked.set(d.id, pct);
+          updateActivity(actId, pct);
+        }
+      } else if (tracked.has(d.id)) {
+        // Reached a terminal state (completed / error) — close the card.
+        tracked.delete(d.id);
+        completeActivity(actId);
+      }
+    });
+    // A download item removed from the list while still in flight — close it too.
+    tracked.forEach((_pct, id) => {
+      if (!seen.has(id)) {
+        tracked.delete(id);
+        completeActivity(`browser-${id}`);
+      }
+    });
+  }, [downloads]);
 
   // Fast download function
   const startDownload = useCallback(async (url: string) => {

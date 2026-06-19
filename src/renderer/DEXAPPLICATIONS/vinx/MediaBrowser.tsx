@@ -19,6 +19,7 @@ import {
   VIDEO_TRANSITIONS, AUDIO_TRANSITIONS, TITLE_PRESETS,
 } from './VinxTypes';
 import { Z_DROPDOWN_MAX } from '../../../shared/zIndex';
+import { EmptyState } from '../../components/EmptyState';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -47,9 +48,9 @@ const searchBarStyle: React.CSSProperties = {
 };
 
 const searchInputStyle: React.CSSProperties = {
-  flex: 1, height: 22, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)',
-  borderRadius: 3, padding: '0 6px', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
-  fontFamily: 'inherit',
+  flex: 1, height: 24, background: 'var(--color-bg-inset)', border: '1px solid var(--color-border)',
+  borderRadius: 6, padding: '0 var(--space-2)', fontSize: 11, color: 'var(--color-text-primary)', outline: 'none',
+  fontFamily: 'inherit', boxSizing: 'border-box',
 };
 
 const listItemStyle = (selected: boolean): React.CSSProperties => ({
@@ -378,9 +379,19 @@ const MediaTab: React.FC = memo(() => {
           ))
         )}
         {filtered.length === 0 && (
-          <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
-            {search ? 'No results' : 'Import media to get started'}
-          </div>
+          search ? (
+            <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
+              No results for "{search}"
+            </div>
+          ) : (
+            <EmptyState
+              compact
+              title="No media yet"
+              description="Import video, audio, or images to start building your timeline."
+              icon={<ImportIcon />}
+              actions={[{ label: 'Import media', onClick: handleImport }]}
+            />
+          )
         )}
       </div>
       {ctxMenu && (
@@ -502,7 +513,7 @@ const EffectsTab: React.FC = memo(() => {
   return (
     <div style={panelStyle}>
       <div style={searchBarStyle}>
-        <input style={searchInputStyle} placeholder="Search effects..." aria-label="Search effects" value={search} onChange={e => setSearch(e.target.value)} />
+        <input style={searchInputStyle} placeholder="Search" aria-label="Search effects" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {Array.from(grouped.entries()).map(([category, effects]) => (
@@ -564,7 +575,7 @@ const TransitionsTab: React.FC = memo(() => {
   return (
     <div style={panelStyle}>
       <div style={searchBarStyle}>
-        <input style={searchInputStyle} placeholder="Search transitions..." aria-label="Search transitions" value={search} onChange={e => setSearch(e.target.value)} />
+        <input style={searchInputStyle} placeholder="Search" aria-label="Search transitions" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {Array.from(grouped.entries()).map(([group, transitions]) => (

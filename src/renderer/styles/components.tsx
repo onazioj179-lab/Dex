@@ -1611,7 +1611,9 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
   const [focused, setFocused] = useState(false);
   const hasValue = value !== undefined && value !== '';
 
-  const heights = { sm: 32, md: 36, lg: 44 };
+  // Canonical control rhythm -- identical to Button/TextInput heights so a search
+  // field lines up pixel-for-pixel with every other control on the same row.
+  const heights = { sm: 28, md: 32, lg: 40 };
 
   const containerStyle: React.CSSProperties = {
     display: 'inline-flex',
@@ -1620,11 +1622,15 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
     height: heights[size],
     padding: `0 ${space[3]}px`,
     background: 'var(--color-bg-inset)',
-    border: `1px solid ${focused ? 'var(--color-accent)' : 'var(--color-border)'}`,
+    border: `1px solid ${focused ? 'var(--dex-focus-color, #fff)' : 'var(--color-border)'}`,
     borderRadius: radius.md,
-    transition: `border-color ${transition.fast}`,
+    boxShadow: focused ? '0 0 0 3px var(--dex-focus-glow, rgba(255,255,255,0.22))' : 'none',
+    transition: `border-color ${transition.fast}, box-shadow ${transition.fast}`,
     width: fullWidth ? '100%' : 'auto',
-    minWidth: 200,
+    // No hard 200px floor -- it broke compact toolbars (e.g. Vinx side panels).
+    // Callers size via fullWidth or an explicit width in style.
+    minWidth: fullWidth ? 0 : 140,
+    boxSizing: 'border-box',
     ...style,
   };
 

@@ -258,7 +258,7 @@ const HeaderBtn: React.FC<{ label: string; active: boolean; onClick: () => void;
     aria-pressed={active}
     style={{
       width: 18, height: 14, fontSize: 8, fontWeight: 600,
-      border: '1px solid var(--color-border)', borderRadius: 2,
+      border: '1px solid var(--color-border)', borderRadius: 9999,
       background: active ? `${activeColor}20` : 'transparent',
       color: active ? activeColor : 'var(--color-text-tertiary)',
       cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -460,12 +460,8 @@ const TrackLane: React.FC<{
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {track.clips.length === 0 && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', color: 'var(--color-text-muted)', fontSize: 11, opacity: 0.5, gap: 6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Drop media here
-        </div>
-      )}
+      {/* Empty tracks stay clean -- the "Drop media here" placeholder text was
+          removed at the owner's request. Drag-and-drop still works on the track. */}
       {track.clips.map(clip => (
         <ClipVisual
           key={clip.id}
@@ -536,6 +532,53 @@ const MarkerVisual: React.FC<{ marker: Marker; zoom: number; scrollX: number; he
 MarkerVisual.displayName = 'MarkerVisual';
 
 // ---------------------------------------------------------------------------
+// MARKER FLAGS (ruler overlay)
+// ---------------------------------------------------------------------------
+
+/**
+ * Clickable marker flags drawn on the ruler row. Uses the SAME frame->pixel
+ * mapping (frameToPixels + scrollX) as the ruler ticks and playhead, so flags
+ * stay aligned through zoom and scroll. Clicking a flag seeks the playhead to
+ * the marker; right-click removes it. The layer sits above the ruler canvas but
+ * leaves the gaps between flags click-through (pointerEvents handled per-flag)
+ * so the ruler's own scrub-to-seek still works.
+ */
+const MarkerFlags: React.FC<{
+  markers: Marker[]; zoom: number; scrollX: number; viewportWidth: number; frameRate: number;
+  onSeek: (frame: number) => void; onRemove: (id: string) => void;
+}> = memo(({ markers, zoom, scrollX, viewportWidth, frameRate, onSeek, onRemove }) => (
+  <div style={{ position: 'absolute', left: 0, top: 0, height: RULER_HEIGHT, right: 0, pointerEvents: 'none' }}>
+    {markers.map(m => {
+      const x = frameToPixels(m.frame, zoom) - scrollX;
+      if (x < -8 || x > viewportWidth + 8) return null;
+      return (
+        <div
+          key={m.id}
+          role="button"
+          tabIndex={0}
+          aria-label={`Marker ${m.name} at ${formatTimecode(m.frame, frameRate)}`}
+          title={`${m.name} — ${formatTimecode(m.frame, frameRate)} (right-click to delete)`}
+          style={{
+            position: 'absolute', left: x - 4, top: RULER_HEIGHT - 9, width: 8, height: 9,
+            background: m.color, clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)',
+            cursor: 'pointer', pointerEvents: 'auto', zIndex: 6,
+          }}
+          onPointerDown={e => { e.stopPropagation(); }}
+          onClick={e => { e.stopPropagation(); onSeek(m.frame); }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSeek(m.frame); }
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onRemove(m.id); }
+          }}
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onRemove(m.id); }}
+        />
+      );
+    })}
+  </div>
+));
+
+MarkerFlags.displayName = 'MarkerFlags';
+
+// ---------------------------------------------------------------------------
 // TIMELINE TOOLBAR
 // ---------------------------------------------------------------------------
 
@@ -547,6 +590,7 @@ const TimelineToolbar: React.FC = memo(() => {
   const zoom = useVinxStore(s => s.timelineZoom);
   const setZoom = useVinxStore(s => s.setTimelineZoom);
   const addTrack = useVinxStore(s => s.addTrack);
+  const addMarker = useVinxStore(s => s.addMarker);
 
   const tools: Array<{ tool: VinxTool; label: string }> = [
     { tool: 'select', label: 'V' },
@@ -572,7 +616,7 @@ const TimelineToolbar: React.FC = memo(() => {
           aria-pressed={activeTool === t.tool}
           style={{
             width: 22, height: 20, fontSize: 10, fontWeight: 600,
-            border: '1px solid var(--color-border-subtle)', borderRadius: 2,
+            border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
             background: activeTool === t.tool ? 'var(--color-accent-soft, rgba(74,158,255,0.15))' : 'transparent',
             color: activeTool === t.tool ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
             cursor: 'pointer', padding: 0,
@@ -587,11 +631,26 @@ const TimelineToolbar: React.FC = memo(() => {
       <div style={{ width: 1, height: 14, background: 'var(--color-bg-hover)', margin: '0 4px' }} />
 
       <button
+        aria-label="Add marker at playhead"
+        title="Add marker at playhead (M)"
+        style={{
+          height: 20, fontSize: 9, fontWeight: 600, padding: '0 6px',
+          border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
+          background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
+        }}
+        onClick={() => addMarker(useVinxStore.getState().currentFrame, '')}
+      >
+        + Marker
+      </button>
+
+      <div style={{ width: 1, height: 14, background: 'var(--color-bg-hover)', margin: '0 4px' }} />
+
+      <button
         aria-label="Toggle snapping"
         aria-pressed={snapEnabled}
         style={{
           height: 20, fontSize: 9, fontWeight: 600, padding: '0 6px',
-          border: '1px solid var(--color-border-subtle)', borderRadius: 2,
+          border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
           background: snapEnabled ? 'var(--color-accent-soft, rgba(74,158,255,0.15))' : 'transparent',
           color: snapEnabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
         }}
@@ -623,13 +682,13 @@ TimelineToolbar.displayName = 'TimelineToolbar';
 
 const addTrackBtnStyle: React.CSSProperties = {
   height: 20, fontSize: 9, fontWeight: 600, padding: '0 4px',
-  border: '1px solid var(--color-border-subtle)', borderRadius: 2,
+  border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
   background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
 };
 
 const zoomBtnStyle: React.CSSProperties = {
   width: 20, height: 20, fontSize: 12,
-  border: '1px solid var(--color-border-subtle)', borderRadius: 2,
+  border: '1px solid var(--color-border-subtle)', borderRadius: 9999,
   background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
 };
@@ -658,6 +717,7 @@ export const Timeline: React.FC<{
   const getActiveSequence = useVinxStore(s => s.getActiveSequence);
   const getSequenceDuration = useVinxStore(s => s.getSequenceDuration);
   const markers = useVinxStore(s => s.project.markers);
+  const removeMarker = useVinxStore(s => s.removeMarker);
   const snapEnabled = useVinxStore(s => s.snapEnabled);
 
   const sequence = getActiveSequence();
@@ -920,11 +980,18 @@ export const Timeline: React.FC<{
         {/* Ruler row */}
         <div style={{ display: 'flex', flexShrink: 0 }}>
           <div style={{ width: TRACK_HEADER_WIDTH, height: RULER_HEIGHT, flexShrink: 0, background: 'var(--color-bg-base)', borderRight: '1px solid var(--color-bg-hover)', borderBottom: '1px solid var(--color-bg-hover)' }} />
-          <TimelineRuler
-            zoom={zoom} scrollX={scrollX} width={laneWidth > 0 ? laneWidth : 1}
-            frameRate={frameRate} currentFrame={currentFrame}
-            onSeek={onSeek} duration={duration}
-          />
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <TimelineRuler
+              zoom={zoom} scrollX={scrollX} width={laneWidth > 0 ? laneWidth : 1}
+              frameRate={frameRate} currentFrame={currentFrame}
+              onSeek={onSeek} duration={duration}
+            />
+            {/* Clickable marker flags, aligned via the same frame->pixel mapping */}
+            <MarkerFlags
+              markers={markers} zoom={zoom} scrollX={scrollX} viewportWidth={laneWidth}
+              frameRate={frameRate} onSeek={onSeek} onRemove={removeMarker}
+            />
+          </div>
         </div>
 
         {/* Tracks */}

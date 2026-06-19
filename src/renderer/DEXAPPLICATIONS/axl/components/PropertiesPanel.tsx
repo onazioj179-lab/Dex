@@ -14,11 +14,17 @@ import { MATERIAL_DB } from '../constants';
 import { useProjectStore } from '../stores/projectStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useUIStore, type PanelTab } from '../stores/uiStore';
+import DesignTokensPanel from './DesignTokensPanel';
 
 const PropertiesPanel: React.FC = () => {
   const { project, pushUndo, setPartMaterial, updatePartTransform, duplicatePart, deletePart, togglePartVisibility, addConstraint, solveConstraints } = useProjectStore();
   const { selectedPartId, setSelectedPartId } = useViewportStore();
   const { panelTab, setPanelTab, showToast } = useUIStore();
+
+  // Design Tokens tab lives in local state so it stays additive — no change to
+  // the shared PanelTab type or the UI store. When active it overrides the
+  // store-driven tab content below.
+  const [tokensActive, setTokensActive] = useState(false);
 
   const selectedPart = project.assembly.parts.find(p => p.id === selectedPartId) || null;
   const parts = project.assembly.parts;
@@ -43,20 +49,31 @@ const PropertiesPanel: React.FC = () => {
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)', borderLeft: '1px solid var(--color-bg-hover)', overflow: 'hidden' }}>
       {/* Panel tabs - Blender N-panel style */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset, rgba(0,0,0,0.15))' }}>
-        {(['properties', 'material', 'constraints'] as PanelTab[]).map(tab => (
-          <button key={tab} onClick={() => setPanelTab(tab)}
-            style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: panelTab === tab ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: panelTab === tab ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: panelTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+        {(['properties', 'material', 'constraints'] as PanelTab[]).map(tab => {
+          const active = !tokensActive && panelTab === tab;
+          return (
+          <button key={tab} onClick={() => { setTokensActive(false); setPanelTab(tab); }}
+            style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: active ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             {tab === 'properties' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}
             {tab === 'material' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17.08 8.94a10.68 10.68 0 0 0-.94 2.06c-.47 1.58-.79 3.27-.79 5 0 3.31 2.69 6 6 6"/><path d="M7.08 16a10.68 10.68 0 0 0-.94 2.06C5.67 19.64 5.35 21.33 5.35 23"/><circle cx="7.5" cy="10.5" r="2.5"/></svg>}
             {tab === 'constraints' && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
             {tab.toUpperCase()}
           </button>
-        ))}
+          );
+        })}
+        <button key="tokens" onClick={() => setTokensActive(true)} title="Design Tokens"
+          style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', color: tokensActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)', background: tokensActive ? 'var(--color-accent-soft)' : 'transparent', border: 'none', borderBottom: tokensActive ? '2px solid var(--color-accent)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.12s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2a10 10 0 0 0 0 20 1.5 1.5 0 0 0 1.06-2.56A1.5 1.5 0 0 1 14.5 17H16a4 4 0 0 0 4-4 10 10 0 0 0-8-11z"/></svg>
+          TOKENS
+        </button>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-2) 10px' }}>
+        {/* Design Tokens tab (local-state override) */}
+        {tokensActive && <DesignTokensPanel />}
+
         {/* Properties tab */}
-        {panelTab === 'properties' && selectedPart && (
+        {!tokensActive && panelTab === 'properties' && selectedPart && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: selectedPart.color }} />
@@ -103,17 +120,17 @@ const PropertiesPanel: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => duplicatePart(selectedPart.id)} style={{ flex: 1, fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <button onClick={() => duplicatePart(selectedPart.id)} style={{ flex: 1, fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 9999, color: 'var(--color-text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 Duplicate
               </button>
-              <button onClick={() => { deletePart(selectedPart.id); setSelectedPartId(null); }} style={{ flex: 1, fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-error-muted, rgba(255,68,58,0.08))', border: '1px solid var(--color-error-muted, rgba(255,68,58,0.15))', borderRadius: 4, color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <button onClick={() => { deletePart(selectedPart.id); setSelectedPartId(null); }} style={{ flex: 1, fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-error-muted, rgba(255,68,58,0.08))', border: '1px solid var(--color-error-muted, rgba(255,68,58,0.15))', borderRadius: 9999, color: 'var(--color-error)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Delete
               </button>
             </div>
             <button onClick={() => togglePartVisibility(selectedPart.id)}
-              style={{ fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 4, color: selectedPart.visible ? 'var(--color-text-primary)' : 'var(--color-warning)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              style={{ fontSize: 9, padding: '5px var(--space-2)', background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', borderRadius: 9999, color: selectedPart.visible ? 'var(--color-text-primary)' : 'var(--color-warning)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               {selectedPart.visible ? (
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               ) : (
@@ -124,14 +141,14 @@ const PropertiesPanel: React.FC = () => {
           </div>
         )}
 
-        {panelTab === 'properties' && !selectedPart && (
+        {!tokensActive && panelTab === 'properties' && !selectedPart && (
           <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: 'var(--space-5) 0', textAlign: 'center' }}>
             Select a part to view properties
           </div>
         )}
 
         {/* Material tab */}
-        {panelTab === 'material' && selectedPart && (
+        {!tokensActive && panelTab === 'material' && selectedPart && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>MATERIAL LIBRARY</div>
             {MATERIAL_DB.map(mat => (
@@ -153,7 +170,7 @@ const PropertiesPanel: React.FC = () => {
         )}
 
         {/* Constraints tab */}
-        {panelTab === 'constraints' && selectedPart && (
+        {!tokensActive && panelTab === 'constraints' && selectedPart && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>ADD CONSTRAINT</div>
             <select value={constraintType} onChange={e => setConstraintType(e.target.value as ConstraintType)}
@@ -175,7 +192,7 @@ const PropertiesPanel: React.FC = () => {
                 style={{ background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', borderRadius: 3, color: 'var(--color-text-primary)', fontSize: 10, padding: '4px 6px', outline: 'none' }} />
             )}
             <button onClick={handleAddConstraint} disabled={!constraintPartB}
-              style={{ padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 4, cursor: constraintPartB ? 'pointer' : 'default' }}>
+              style={{ padding: '6px var(--space-3)', fontSize: 10, fontWeight: 600, background: !constraintPartB ? 'var(--color-border-subtle)' : 'var(--color-accent-light)', color: !constraintPartB ? 'var(--color-text-tertiary)' : 'var(--color-accent)', border: '1px solid var(--color-accent-muted)', borderRadius: 9999, cursor: constraintPartB ? 'pointer' : 'default', boxShadow: 'none' }}>
               Apply Constraint
             </button>
 

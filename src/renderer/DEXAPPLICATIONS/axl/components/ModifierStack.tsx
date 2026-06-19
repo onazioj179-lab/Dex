@@ -48,8 +48,8 @@ const styles = {
   },
   addBtn: {
     padding: '4px var(--space-3)', background: 'var(--color-accent)',
-    border: 'none', borderRadius: 4, color: 'var(--color-text-inverse, #fff)', fontSize: 12,
-    cursor: 'pointer', fontWeight: 500,
+    border: 'none', borderRadius: 9999, color: 'var(--color-text-inverse, #fff)', fontSize: 12,
+    cursor: 'pointer', fontWeight: 500, boxShadow: 'none',
   },
   modItem: {
     background: 'var(--color-bg-base)', borderRadius: 6,
@@ -431,7 +431,13 @@ export const ModifierStack: React.FC<ModifierStackProps> = ({
       </div>
 
       {modifiers.length === 0 ? (
-        <div style={styles.empty}>No modifiers applied.<br />Click "Add Modifier" to start.</div>
+        <button
+          type="button"
+          style={{ ...styles.empty, background: 'none', border: 'none', cursor: 'pointer', width: '100%', font: 'inherit' }}
+          onClick={() => setDropdownOpen(true)}
+        >
+          No modifiers yet -- add one to reshape this part
+        </button>
       ) : (
         modifiers.map(mod => (
           <ModifierItem

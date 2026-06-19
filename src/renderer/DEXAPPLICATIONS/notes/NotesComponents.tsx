@@ -18,6 +18,7 @@ import { useFocusTrap } from '../../utils/useFocusTrap';
 import { formatBytes as sharedFormatBytes } from '../../../shared/format/units';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../../components/ContextMenu';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
+import { DexSearchInput } from '../../styles/components';
 
 // ---------------------------------------------------------------------------
 // Shared Styles
@@ -111,8 +112,8 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             paddingLeft: 8 + depth * 16,
             borderRadius: 3,
             cursor: 'pointer',
-            background: isSelected ? colors.bgSelected : 'transparent',
-            color: isSelected ? colors.accent : colors.text,
+            background: isSelected ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+            color: isSelected ? 'var(--color-text-primary)' : colors.text,
             fontSize: 13,
             transition: 'background 0.1s',
           }}
@@ -181,8 +182,8 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           padding: '6px var(--space-2)',
           borderRadius: 3,
           cursor: 'pointer',
-          background: selectedFolderId === null ? colors.bgSelected : 'transparent',
-          color: selectedFolderId === null ? colors.accent : colors.text,
+          background: selectedFolderId === null ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+          color: selectedFolderId === null ? 'var(--color-text-primary)' : colors.text,
           fontSize: 13,
           fontWeight: 500,
         }}
@@ -257,6 +258,8 @@ interface NoteListPanelProps {
   selectedNoteId: string | null;
   onSelect: (noteId: string) => void;
   onCreate: () => void;
+  onCreateFromTemplate?: (templateId: string) => void;
+  templates?: NoteTemplate[];
   onDelete: (noteId: string) => void;
   onTogglePin: (noteId: string) => void;
   onToggleFavorite?: (noteId: string) => void;
@@ -277,6 +280,8 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   selectedNoteId,
   onSelect,
   onCreate,
+  onCreateFromTemplate,
+  templates,
   onDelete,
   onTogglePin,
   onToggleFavorite,
@@ -292,6 +297,9 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   onSearchChange,
 }) => {
   const { menuState, show: showCtx, close: closeCtx } = useContextMenu();
+  // "New from template" picker -- a small dropdown beside the New Note button.
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const hasTemplates = !!onCreateFromTemplate && !!templates && templates.length > 0;
   // Partition into three sections, each note appearing once: Favorites first,
   // then Pinned (non-favorite), then everything else. Favorites take priority
   // so a starred note surfaces at the very top regardless of pin state.
@@ -368,8 +376,8 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
           padding: viewMode === 'compact' ? '6px 10px' : '8px 12px',
           borderRadius: 4,
           cursor: 'pointer',
-          background: isSelected ? colors.bgSelected : 'transparent',
-          borderLeft: isSelected ? `2px solid ${colors.accent}` : '2px solid transparent',
+          background: isSelected ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+          borderLeft: isSelected ? '2px solid var(--dex-focus-color, #fff)' : '2px solid transparent',
           transition: 'background 0.1s',
           marginBottom: 1,
         }}
@@ -451,38 +459,14 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Search */}
       <div style={{ padding: 'var(--space-2) var(--space-2) 4px', flexShrink: 0 }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'var(--color-border-subtle)',
-          borderRadius: 4,
-          padding: '6px 10px',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            placeholder="Search notes..."
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: colors.text,
-              fontSize: 13,
-            }}
-          />
-          {searchQuery && (
-            <button
-              aria-label="Clear search"
-              onClick={() => onSearchChange('')}
-              style={{ background: 'none', border: 'none', color: colors.textDim, cursor: 'pointer', fontSize: 14 }}
-            >x</button>
-          )}
-        </div>
+        <DexSearchInput
+          size="sm"
+          fullWidth
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
+          onClear={() => onSearchChange('')}
+          placeholder="Search notes..."
+        />
       </div>
 
       {/* Sort controls */}
@@ -607,26 +591,103 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         )}
       </div>
 
-      {/* New note button */}
-      <div style={{ padding: 'var(--space-2)', flexShrink: 0 }}>
-        <button
-          aria-label="Create new note"
-          onClick={onCreate}
-          style={{
-            width: '100%',
-            padding: 'var(--space-2) 0',
-            background: colors.accentDim,
-            border: 'none',
-            borderRadius: 4,
-            color: colors.accent,
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
-            transition: 'background 0.12s',
-          }}
-        >
-          + New Note
-        </button>
+      {/* New note button (with optional "from template" picker) */}
+      <div style={{ padding: 'var(--space-2)', flexShrink: 0, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 1 }}>
+          <button
+            aria-label="Create new note"
+            onClick={() => { setShowTemplateMenu(false); onCreate(); }}
+            style={{
+              flex: 1,
+              padding: 'var(--space-2) 0',
+              background: colors.accentDim,
+              border: 'none',
+              borderRadius: hasTemplates ? '4px 0 0 4px' : 4,
+              color: colors.accent,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'background 0.12s',
+            }}
+          >
+            + New Note
+          </button>
+          {hasTemplates && (
+            <button
+              aria-label="New note from template"
+              title="New from template"
+              onClick={() => setShowTemplateMenu(v => !v)}
+              style={{
+                width: 30,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: colors.accentDim,
+                border: 'none',
+                borderRadius: '0 4px 4px 0',
+                color: colors.accent,
+                cursor: 'pointer',
+                transition: 'background 0.12s',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M3 5L7 9L11 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {hasTemplates && showTemplateMenu && (
+          <>
+            {/* Click-away catcher */}
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-max)' }}
+              onClick={() => setShowTemplateMenu(false)}
+            />
+            <div
+              role="menu"
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% - var(--space-2))',
+                left: 'var(--space-2)',
+                right: 'var(--space-2)',
+                marginBottom: 4,
+                background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
+                border: `1px solid ${colors.border}`,
+                borderRadius: 6,
+                padding: '4px 0',
+                maxHeight: 280,
+                overflow: 'auto',
+                zIndex: 'var(--z-max)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              }}
+            >
+              <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 6px' }}>
+                New from template
+              </div>
+              {(templates || []).map(tmpl => (
+                <div
+                  key={tmpl.id}
+                  role="menuitem"
+                  onClick={() => { setShowTemplateMenu(false); onCreateFromTemplate?.(tmpl.id); }}
+                  style={{
+                    padding: '6px var(--space-3)',
+                    fontSize: 13,
+                    color: colors.text,
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = colors.bgHover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {tmpl.title}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       {menuState && <ContextMenu items={menuState.items} position={menuState.position} onClose={closeCtx} />}
     </div>
