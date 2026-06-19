@@ -10,7 +10,7 @@
  * `max_tokens` is required, and responses are content blocks. Pure build/parse.
  */
 
-import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo, ProviderConfig, HttpRequest } from './types';
+import { parseDataUrl, type LLMProvider, type ChatRequest, type ChatResponse, type ModelInfo, type ProviderConfig, type HttpRequest } from './types';
 
 const DEFAULT_BASE = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
@@ -35,7 +35,19 @@ export const anthropicProvider: LLMProvider = {
     const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
     const messages = req.messages
       .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        // Vision: Anthropic wants a content-block array with base64 image sources.
+        content: m.images && m.images.length
+          ? [
+              ...(m.content ? [{ type: 'text', text: m.content }] : []),
+              ...m.images.map((url) => {
+                const { mediaType, base64 } = parseDataUrl(url);
+                return { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } };
+              }),
+            ]
+          : m.content,
+      }));
     return {
       url: `${base}/v1/messages`,
       method: 'POST',

@@ -70,10 +70,11 @@ void main() {
   vec3 V = normalize(uCameraPos - vWorldPos);
   vec3 H = normalize(L + V);
 
-  // Ambient
-  float ambient = 0.15;
-  // Diffuse
-  float diff = max(dot(N, L), 0.0);
+  // Ambient -- raised so shadowed faces stay clearly visible instead of sinking
+  // into the dark viewport (parts were rendering as near-background dim grey).
+  float ambient = 0.34;
+  // Diffuse (+ a small wrap so back faces aren't flat black)
+  float diff = max(dot(N, L), 0.0) * 0.85 + max(dot(N, -L), 0.0) * 0.12;
   // Specular (Blinn-Phong)
   float spec = 0.0;
   if (uShading >= 1) {
@@ -833,7 +834,7 @@ export class AXLRenderer {
         if (sm) color = this.parseColor(stressColor(sm.ratio));
       }
       gl.uniform3f(this.uColor, color[0], color[1], color[2]);
-      gl.uniform1f(this.uAlpha, xray ? 0.4 : 0.85);
+      gl.uniform1f(this.uAlpha, xray ? 0.4 : 1.0); // opaque solids -- 0.85 bled the dark bg through and washed parts out
       gl.uniform1i(this.uSelected, part.id === state.selectedPartId ? 1 : 0);
 
       gl.bindVertexArray(mesh.vao);
@@ -1009,8 +1010,16 @@ export class AXLRenderer {
     if (!canvas) return;
     const parent = canvas.parentElement;
     if (parent) {
-      canvas.width = parent.clientWidth;
-      canvas.height = parent.clientHeight;
+      // Back the canvas at the device pixel ratio so the WebGL viewport renders
+      // crisp on high-DPI displays. Previously this reset width/height to the CSS
+      // size (dpr 1), which ran AFTER Axl.tsx's dpr-scaled sizing and clobbered
+      // it -- making the whole 3D view render at 1x and upscale blurry. Capped at
+      // 2x so a 3x/retina panel doesn't quadruple the fragment cost.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(parent.clientWidth * dpr);
+      canvas.height = Math.round(parent.clientHeight * dpr);
+      canvas.style.width = parent.clientWidth + 'px';
+      canvas.style.height = parent.clientHeight + 'px';
     }
   }
 
@@ -1031,6 +1040,12 @@ export class AXLRenderer {
       if (this.gridVAO) this.gl.deleteVertexArray(this.gridVAO);
       if (this.mainProgram) this.gl.deleteProgram(this.mainProgram);
       if (this.gridProgram) this.gl.deleteProgram(this.gridProgram);
+      // Explicitly release the GL context so the driver frees it immediately
+      // instead of waiting for GC. Browsers cap live WebGL contexts (~16); without
+      // this, repeatedly opening/closing AXL can exhaust them and wedge the
+      // compositor. WEBGL_lose_context is the standard, safe teardown path.
+      const loseCtx = this.gl.getExtension('WEBGL_lose_context');
+      if (loseCtx) loseCtx.loseContext();
     }
     this.gl = null;
     this.canvas = null;

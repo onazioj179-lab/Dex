@@ -383,6 +383,7 @@ const SystemStatusWidget: React.FC = () => {
   const [mem, setMem] = useState(0);
   const [network, setNetwork] = useState({ online: true, type: '' });
   const [gpu, setGpu] = useState(0);
+  const [disk, setDisk] = useState(0);
   
   // CPU estimation via requestAnimationFrame frame budget. Higher load = longer frames.
   const cpuEstimateRef = React.useRef<number>(0);
@@ -452,6 +453,24 @@ const SystemStatusWidget: React.FC = () => {
       window.removeEventListener('offline', updateNetwork);
     };
   }, []);
+
+  // Disk usage changes slowly -- poll it on its own relaxed cadence so the live
+  // system surface shows CPU + Memory + GPU + Disk together (DEX Now / DEX 5.7).
+  useEffect(() => {
+    const fetchDisk = async () => {
+      try {
+        const ipc = (window as any).electron;
+        if (ipc?.invoke) {
+          const s = await ipc.invoke('system:getStorage');
+          if (s?.total) setDisk(Math.round((s.used / s.total) * 100));
+        }
+      } catch { /* best-effort */ }
+    };
+    fetchDisk();
+    const tickId = `system-status-disk-${Date.now()}`;
+    sharedTick.subscribe(tickId, fetchDisk, 30000);
+    return () => sharedTick.unsubscribe(tickId);
+  }, []);
   
   const StatBar: React.FC<{ label: string; value: number; warningAt?: number; errorAt?: number; color?: string }> = 
     ({ label, value, warningAt = 70, errorAt = 85, color }) => {
@@ -481,6 +500,7 @@ const SystemStatusWidget: React.FC = () => {
       <StatBar label="CPU" value={cpu} />
       <StatBar label="Memory" value={mem} warningAt={80} />
       {gpu > 0 && <StatBar label="GPU" value={gpu} color="var(--color-accent)" />}
+      {disk > 0 && <StatBar label="Disk" value={disk} warningAt={80} />}
     </div>
   );
 };
@@ -1117,10 +1137,8 @@ const WidgetPicker: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       >
       <div style={{
         width: 'min(380px, calc(100vw - 48px))', maxHeight: 'min(440px, calc(100vh - 48px))',
-        background: 'rgba(24,24,28,0.60)',
-        backdropFilter: 'var(--blur-xl) saturate(180%)',
-        WebkitBackdropFilter: 'var(--blur-xl) saturate(180%)',
-        borderRadius: 12, border: '1px solid var(--color-border, rgba(255,255,255,0.10))',
+        background: 'var(--color-bg-elevated, #1a1a1e)',
+        borderRadius: 10, border: '1px solid var(--color-border, rgba(255,255,255,0.14))',
         boxShadow: 'var(--pg-shadow-popover)',
         padding: 'var(--space-5)', overflow: 'auto',
       }}>

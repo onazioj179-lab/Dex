@@ -5,9 +5,10 @@
  * Apple-Calendar-inspired event manager with month / week views,
  * drag-to-create slots, recurring events, and ICS import/export.
  */
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
+import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
 
 interface CalendarEvent {
   id: string;
@@ -18,6 +19,7 @@ interface CalendarEvent {
   color: string;
   description: string;
   recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  icon?: string;
 }
 
 const Calendar: React.FC = () => {
@@ -37,10 +39,15 @@ const Calendar: React.FC = () => {
     color: 'var(--color-accent)',
     description: '',
     recurring: 'none' as CalendarEvent['recurring'],
+    icon: '',
   });
 
   const colors = ['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff2d55', '#64d2ff'];
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // Event icons use the DexIcon glyph set (no emoji, per project rules). Names
+  // chosen to avoid the legacy alias map so they render as-is.
+  const eventIcons = ['calendar', 'users', 'video', 'music', 'film', 'tv', 'gamepad', 'gift', 'code', 'palette', 'bell', 'map-pin'];
+  // Week is Monday-first to match the calendar grid design.
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   useEffect(() => {
@@ -79,7 +86,8 @@ const Calendar: React.FC = () => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDay = firstDay.getDay();
+    // Monday-first offset: Mon=0 ... Sun=6.
+    const startingDay = (firstDay.getDay() + 6) % 7;
     
     const days: (Date | null)[] = [];
     for (let i = 0; i < startingDay; i++) days.push(null);
@@ -87,7 +95,18 @@ const Calendar: React.FC = () => {
     return days;
   };
 
-  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  // Format as a LOCAL calendar day (YYYY-MM-DD). Using toISOString() here would
+  // convert to UTC first, which lands on the wrong day for any timezone whose
+  // local date differs from UTC at the current moment (e.g. evenings in the
+  // Americas) — that caused the "today" marker and event matching to be off by
+  // one day. The grid cells are built with local-time `new Date(y, m, d)`, so
+  // identity comparisons must be local too.
+  const formatDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
   
   const getEventsForDate = (date: Date) => {
     const dateStr = formatDate(date);
@@ -106,10 +125,13 @@ const Calendar: React.FC = () => {
 
   const isToday = (date: Date) => formatDate(date) === formatDate(new Date());
   const isSelected = (date: Date) => selectedDate && formatDate(date) === formatDate(selectedDate);
+  // Index of today's weekday in the Monday-first header (Mon=0 ... Sun=6).
+  const todayDow = (new Date().getDay() + 6) % 7;
 
   const getWeekStart = (date: Date) => {
     const d = new Date(date);
-    d.setDate(d.getDate() - d.getDay());
+    const dow = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - dow);
     d.setHours(0, 0, 0, 0);
     return d;
   };
@@ -138,6 +160,23 @@ const Calendar: React.FC = () => {
     });
   };
 
+  // "HH:MM" -> minutes from midnight; tolerant of malformed input.
+  const toMinutes = (t: string): number => {
+    const [h, m] = (t || '').split(':');
+    return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
+  };
+
+  // Ids of events that overlap another event on the same day (double-booked).
+  const conflictIds = useMemo(
+    () => findEventConflicts(events.map(e => ({
+      id: e.id,
+      date: e.date,
+      start: toMinutes(e.time),
+      end: Math.max(toMinutes(e.endTime), toMinutes(e.time) + 1),
+    }))),
+    [events],
+  );
+
   const handleSaveEvent = () => {
     if (!newEvent.title || !selectedDate) return;
     
@@ -150,11 +189,12 @@ const Calendar: React.FC = () => {
       color: newEvent.color,
       description: newEvent.description,
       recurring: newEvent.recurring,
+      icon: newEvent.icon || undefined,
     };
-    
+
     setEvents(prev => [...prev, event]);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'calendarEventsCreated', amount: 1 } }));
-    setNewEvent({ title: '', time: '09:00', endTime: '10:00', color: 'var(--color-accent)', description: '', recurring: 'none' });
+    setNewEvent({ title: '', time: '09:00', endTime: '10:00', color: 'var(--color-accent)', description: '', recurring: 'none', icon: '' });
     setShowEventModal(false);
   };
 
@@ -382,7 +422,14 @@ const Calendar: React.FC = () => {
                     ) : (
                       getEventsForDate(selectedDate).map(event => (
                         <div key={event.id} style={{ ...styles.eventItem, borderLeftColor: event.color }}>
-                          <div style={styles.eventTime}>{event.time} - {event.endTime}</div>
+                          <div style={styles.eventTime}>
+                            {event.time} - {event.endTime}
+                            {conflictIds.has(event.id) && (
+                              <span style={styles.conflictTag} title="Overlaps another event">
+                                <DexIcon name="alert-triangle" size={10} /> Conflict
+                              </span>
+                            )}
+                          </div>
                           <div style={styles.eventTitle}>{event.title}</div>
                           <button style={styles.deleteEventBtn} onClick={() => deleteEvent(event.id)} aria-label={`Delete ${event.title}`}><DexIcon name="close" size={12} /></button>
                         </div>
@@ -407,40 +454,52 @@ const Calendar: React.FC = () => {
           {view === 'month' ? (
             <>
               <div style={styles.weekHeader}>
-                {days.map(day => (
-                  <div key={day} style={styles.weekDay}>{day}</div>
+                {days.map((day, idx) => (
+                  <div
+                    key={day}
+                    style={{ ...styles.weekDayPill, ...(idx === todayDow ? styles.weekDayPillToday : {}) }}
+                  >
+                    {day.toUpperCase()}
+                  </div>
                 ))}
               </div>
               <div style={styles.calendarGrid}>
-                {getDaysInMonth(currentDate).map((day, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      ...styles.dayCell,
-                      ...(day && isToday(day) ? styles.dayCellToday : {}),
-                      ...(day && isSelected(day) ? styles.dayCellSelected : {}),
-                    }}
-                    onClick={() => day && setSelectedDate(day)}
-                  >
-                    {day && (
-                      <>
-                        <div style={{ ...styles.dayNumber, ...(isToday(day) ? styles.dayNumberToday : {}) }}>
-                          {day.getDate()}
-                        </div>
-                        <div style={styles.dayEventsPreview}>
-                          {getEventsForDate(day).slice(0, 3).map(event => (
-                            <div key={event.id} style={{ ...styles.eventDot, background: event.color }}>
-                              <span style={styles.eventDotText}>{event.title}</span>
-                            </div>
+                {getDaysInMonth(currentDate).map((day, idx) => {
+                  if (!day) return <div key={idx} style={styles.dayCellEmpty} />;
+                  const dayEvents = getEventsForDate(day);
+                  const iconEvent = dayEvents.find(e => e.icon);
+                  const today = isToday(day);
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        ...styles.dayCell,
+                        ...(today ? styles.dayCellToday : {}),
+                        ...(isSelected(day) ? styles.dayCellSelected : {}),
+                      }}
+                      onClick={() => setSelectedDate(day)}
+                      title={dayEvents.length ? dayEvents.map(e => `${e.time} ${e.title}`).join('\n') : undefined}
+                    >
+                      {dayEvents.length > 0 && (
+                        <div style={styles.cellDots}>
+                          {dayEvents.slice(0, 3).map(ev => (
+                            <span key={ev.id} style={{ ...styles.cellDot, background: ev.color }} />
                           ))}
-                          {getEventsForDate(day).length > 3 && (
-                            <div style={styles.moreEvents}>+{getEventsForDate(day).length - 3} more</div>
-                          )}
                         </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                      )}
+                      <div style={styles.cellIcon}>
+                        {iconEvent && (
+                          <span style={{ color: iconEvent.color, display: 'inline-flex' }}>
+                            <DexIcon name={iconEvent.icon!} size={20} color="currentColor" />
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ ...styles.dayNumber, ...(today ? styles.dayNumberToday : {}) }}>
+                        {day.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </>
           ) : (
@@ -503,8 +562,10 @@ const Calendar: React.FC = () => {
                               style={{
                                 ...styles.weekViewEvent,
                                 background: event.color,
+                                ...(conflictIds.has(event.id) ? styles.weekViewEventConflict : {}),
                               }}
                               onClick={e => e.stopPropagation()}
+                              title={conflictIds.has(event.id) ? 'Overlaps another event' : undefined}
                             >
                               <span style={styles.weekViewEventTitle}>{event.title}</span>
                               <span style={styles.weekViewEventTime}>{event.time}</span>
@@ -567,6 +628,27 @@ const Calendar: React.FC = () => {
                     aria-label={`Repeat ${r}`}
                   >
                     {r === 'none' ? 'No Repeat' : r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <div style={styles.iconPicker}>
+                <button
+                  type="button"
+                  style={{ ...styles.iconBtn, ...(newEvent.icon === '' ? styles.iconBtnActive : {}) }}
+                  onClick={() => setNewEvent({ ...newEvent, icon: '' })}
+                  aria-label="No icon"
+                >
+                  <DexIcon name="close" size={12} />
+                </button>
+                {eventIcons.map(ic => (
+                  <button
+                    key={ic}
+                    type="button"
+                    style={{ ...styles.iconBtn, ...(newEvent.icon === ic ? styles.iconBtnActive : {}) }}
+                    onClick={() => setNewEvent({ ...newEvent, icon: ic })}
+                    aria-label={`Select icon ${ic}`}
+                  >
+                    <DexIcon name={ic} size={16} color="currentColor" />
                   </button>
                 ))}
               </div>
@@ -687,8 +769,8 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
   },
   viewBtnActive: {
-    background: 'var(--color-accent)',
-    color: 'var(--color-text-inverse)',
+    background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
+    color: 'var(--color-text-primary)',
   },
   addBtn: {
     width: '32px',
@@ -779,8 +861,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-inverse)',
   },
   miniDaySelected: {
-    background: 'var(--color-accent-light, rgba(74,158,255,0.2))',
-    border: '1px solid var(--color-accent-soft, rgba(74,158,255,0.4))',
+    background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
+    border: '1px solid var(--dex-focus-color, #fff)',
   },
   dayEvents: {
     marginTop: 'var(--space-3)',
@@ -832,6 +914,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-primary)',
   },
+  conflictTag: {
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    marginLeft: 6, padding: '0 4px', borderRadius: 4,
+    color: 'var(--color-warning)',
+    background: 'var(--color-warning-muted, rgba(255,159,10,0.15))',
+    fontWeight: 600, letterSpacing: 0,
+  },
   deleteEventBtn: {
     position: 'absolute',
     top: '8px',
@@ -855,81 +944,83 @@ const styles: Record<string, React.CSSProperties> = {
   weekHeader: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
-    marginBottom: 'var(--space-2)',
+    gap: '6px',
+    marginBottom: '8px',
   },
-  weekDay: {
+  weekDayPill: {
     textAlign: 'center',
     fontSize: '10px',
     color: 'var(--color-text-muted)',
     fontWeight: 600,
-    padding: 'var(--space-2)',
-    letterSpacing: '0.5px',
-    textTransform: 'uppercase' as const,
+    padding: '6px 0',
+    borderRadius: '8px',
+    letterSpacing: '0.6px',
+    background: 'var(--color-bg-surface)',
+    border: '1px solid var(--color-border-subtle)',
+  },
+  weekDayPillToday: {
+    color: 'var(--color-text-primary)',
+    background: 'var(--color-bg-hover)',
   },
   calendarGrid: {
     flex: 1,
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
     gridAutoRows: '1fr',
-    gap: '1px',
-    background: 'var(--color-border-subtle)',
-    borderRadius: '6px',
+    gap: '6px',
+    background: 'transparent',
     overflow: 'hidden',
-    boxShadow: 'var(--shadow-md)',
   },
   dayCell: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
     background: 'var(--color-bg-surface)',
-    padding: 'var(--space-2)',
-    minHeight: '80px',
+    border: '1px solid var(--color-border-subtle)',
+    borderRadius: '14px',
+    padding: '8px 10px',
+    minHeight: '60px',
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+  },
+  dayCellEmpty: {
+    background: 'transparent',
   },
   dayCellToday: {
-    background: 'var(--color-accent-light)',
+    borderColor: 'var(--color-border-default)',
   },
   dayCellSelected: {
-    background: 'var(--color-accent-light)',
-    boxShadow: 'inset 0 0 0 1px var(--color-accent-soft, rgba(74,158,255,0.3))',
+    boxShadow: 'inset 0 0 0 1.5px var(--color-accent)',
+    borderColor: 'transparent',
   },
-  dayNumber: {
-    fontSize: '12px',
-    fontWeight: 600,
-    marginBottom: '4px',
-    color: 'var(--color-text-tertiary)',
+  cellDots: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    display: 'flex',
+    gap: '3px',
   },
-  dayNumberToday: {
-    background: 'var(--color-accent)',
-    color: 'var(--color-text-inverse)',
-    width: '24px',
-    height: '24px',
+  cellDot: {
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
+  },
+  cellIcon: {
+    flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: '20px',
   },
-  dayEventsPreview: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
+  dayNumber: {
+    fontSize: '13px',
+    fontWeight: 500,
+    color: 'var(--color-text-tertiary)',
+    alignSelf: 'flex-start',
   },
-  eventDot: {
-    padding: '2px 6px',
-    borderRadius: '2px',
-    fontSize: '9px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    boxShadow: 'var(--shadow-sm)',
-  },
-  eventDotText: {
-    color: 'var(--color-text-inverse)',
-    fontWeight: 600,
-  },
-  moreEvents: {
-    fontSize: '9px',
-    color: 'var(--color-text-muted)',
-    padding: '2px 6px',
-    fontWeight: 600,
+  dayNumberToday: {
+    color: 'var(--color-text-primary)',
+    fontWeight: 700,
   },
   // -- Week View Styles --------------------------------------
   weekViewContainer: {
@@ -1030,6 +1121,9 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'default',
     boxShadow: 'var(--shadow-sm)',
   },
+  weekViewEventConflict: {
+    boxShadow: 'inset 0 0 0 1.5px var(--color-warning)',
+  },
   weekViewEventTitle: {
     fontSize: '10px',
     fontWeight: 600,
@@ -1125,6 +1219,30 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-muted)',
     fontSize: '11px',
     fontWeight: 600,
+  },
+  iconPicker: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  iconBtn: {
+    width: '30px',
+    height: '30px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '16px',
+    background: 'var(--color-bg-hover)',
+    border: '1px solid var(--color-border-subtle)',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    color: 'var(--color-text-tertiary)',
+    transition: 'all 0.15s ease',
+  },
+  iconBtnActive: {
+    border: '1px solid var(--color-accent)',
+    background: 'var(--color-accent-light, rgba(74,158,255,0.15))',
+    color: 'var(--color-accent)',
   },
   colorPicker: {
     display: 'flex',

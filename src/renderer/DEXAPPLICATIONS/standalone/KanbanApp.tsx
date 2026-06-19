@@ -126,6 +126,13 @@ const CardDetail: React.FC<{
   const [newCheckItem, setNewCheckItem] = useState('');
   const [labelColor, setLabelColor] = useState(LABEL_COLORS[0]);
 
+  // Close on Escape (the overlay already closes on click-outside).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const handleSave = () => {
     onSave({ ...card, title: title.trim() || 'Untitled', description, priority, dueDate: dueDate || undefined, labels, checklist });
   };
@@ -275,6 +282,13 @@ const KanbanApp: React.FC = () => {
   // Card CRUD
   const addCard = useCallback((colId: string) => {
     if (!newCardTitle.trim()) return;
+    // Enforce the column's WIP limit (the `limit` field existed but was never
+    // checked). Blocking over-limit adds is the core Kanban discipline.
+    const col = boards[activeBoardIdx]?.columns.find(c => c.id === colId);
+    if (col?.limit && col.cards.length >= col.limit) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: `WIP limit reached: max ${col.limit} cards in "${col.title}"` } }));
+      return;
+    }
     updateBoard(b => ({
       ...b,
       columns: b.columns.map(c => c.id === colId ? {
@@ -285,7 +299,7 @@ const KanbanApp: React.FC = () => {
     setNewCardTitle('');
     setAddingToCol(null);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'kanbanCardsCreated', amount: 1 } }));
-  }, [newCardTitle, updateBoard]);
+  }, [newCardTitle, updateBoard, boards, activeBoardIdx]);
 
   const saveCard = useCallback((colId: string, cardIdx: number, card: KanbanCard) => {
     updateBoard(b => ({
@@ -567,7 +581,7 @@ const styles: Record<string, React.CSSProperties> = {
   boardTabActive: { background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #fafafa)' },
   boardTabAdd: { width: 28, height: 28, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   board: { flex: 1, display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-5)', overflowX: 'auto', overflowY: 'hidden', alignItems: 'flex-start' },
-  column: { minWidth: 300, maxWidth: 340, background: 'var(--color-border-subtle)', borderRadius: 14, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
+  column: { minWidth: 300, maxWidth: 340, background: 'var(--color-border-subtle)', borderRadius: 10, border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', maxHeight: '100%', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
   colHeader: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-border-subtle)', borderRadius: '10px 10px 0 0' },
   colDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
   colTitle: { fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', flex: 1 },

@@ -854,7 +854,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: space[5],
-    borderRadius: 14,
+    borderRadius: 10,
     transition: 'background 0.15s ease',
   },
   biometricLabel: {

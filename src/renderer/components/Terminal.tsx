@@ -22,7 +22,7 @@
 // ===========================================================================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_DEFINITIONS } from '../store/runningApps';
-import { buildDexCommands, matchTerminalCommand, resolveShortcut } from '../../shared/commands/dexCommands';
+import { buildDexCommands, matchTerminalCommand, resolveShortcut, suggestDexCommands } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { describeCapabilities, type CapabilityStatus } from '../uki/permissions';
 
@@ -124,6 +124,10 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   // Reverse history search (Ctrl+R): `q` is the query, `idx` selects among
   // matches (newest first); null means search mode is off.
   const [revSearch, setRevSearch] = useState<{ q: string; idx: number } | null>(null);
+  // Live `dex <cmd>` suggestion dropdown: `suggestIdx` selects among the ranked
+  // matches as the user types. The matches themselves are derived (useMemo) from
+  // the input below, so there is no parallel suggestion store to keep in sync.
+  const [suggestIdx, setSuggestIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const retriesRef = useRef(0);
@@ -364,7 +368,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
             `UKI access — what UKI can and cannot do right now\r\n` +
             `  \x1b[32m●\x1b[0m granted   \x1b[90m○\x1b[0m not granted   \x1b[31m✕\x1b[0m blocked by this build\r\n` +
             rows.join('\r\n') + '\r\n' +
-            `Grant or revoke from UKI settings; session grants lapse automatically.\r\n`,
+            `Grant or revoke in Settings -> Permissions -> UKI Assistant Access; session grants lapse automatically.\r\n`,
           );
         } catch {
           appendOutput(`dex: could not read UKI permissions\r\n`);
@@ -405,6 +409,48 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     [dexCommands],
   );
 
+  // Live suggestion dropdown for `dex <partial>`. Shows ONLY while the line is a
+  // `dex` command being typed (exactly "dex", or "dex <word…>") -- never for a
+  // normal shell command. `null` query means "don't show"; '' means the catalog
+  // head. Suppressed in reverse-search mode so the two affordances never overlap.
+  const dexSuggestQuery = useMemo<string | null>(() => {
+    if (revSearch) return null;
+    const m = /^\s*dex(?:\s+(.*))?$/i.exec(input);
+    if (!m) return null;
+    return m[1] ?? '';
+  }, [input, revSearch]);
+
+  // Ranked `dex` matches, sharing the same typo-tolerant resolver as UKI/palette.
+  const dexSuggestions = useMemo(
+    () => (dexSuggestQuery === null ? [] : suggestDexCommands(dexCommands, dexSuggestQuery, 6)),
+    [dexCommands, dexSuggestQuery],
+  );
+  // Escape hides the open dropdown WITHOUT clearing what the user typed. The
+  // suppression lifts as soon as the query changes again (see the effect below),
+  // so the next keystroke brings the suggestions back.
+  const [suggestDismissed, setSuggestDismissed] = useState<string | null>(null);
+  useEffect(() => {
+    setSuggestDismissed((d) => (d !== null && d !== dexSuggestQuery ? null : d));
+  }, [dexSuggestQuery]);
+  const showSuggest = dexSuggestions.length > 0 && suggestDismissed !== dexSuggestQuery;
+
+  // Clamp the selection whenever the candidate list changes (e.g. the user typed
+  // another character and the match set shrank), so it never points past the end.
+  useEffect(() => { setSuggestIdx((i) => (i >= dexSuggestions.length ? 0 : i)); }, [dexSuggestions.length]);
+
+  // Accept a suggestion: fill the prompt with `dex <alias>` and run it through the
+  // SAME local dex path Enter uses (handleDexInput), then record history -- no new
+  // executor. Mirrors the Enter branch in onKey so behaviour stays identical.
+  const acceptSuggestion = useCallback((cmd: typeof dexCommands[number]) => {
+    const value = `dex ${cmd.terminal}`;
+    setHistory((h) => (h[h.length - 1] !== value ? [...h, value] : h));
+    setHistoryIdx(null);
+    setInput('');
+    setSuggestIdx(0);
+    if (handleDexInput(value)) return;
+    send(value);
+  }, [handleDexInput, send]);
+
   const onKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     // --- Reverse history search mode intercepts navigation/commit keys. Typing
     // and Backspace fall through to the input's onChange, which edits the query.
@@ -421,6 +467,31 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         setRevSearch((p) => (p ? { ...p, idx: p.idx + 1 } : p)); // cycle to older match
       }
       return;
+    }
+
+    // --- `dex <cmd>` suggestion dropdown intercepts navigation/commit/dismiss.
+    // It only fires while the dropdown is visible; Tab is intentionally left to
+    // the existing completion below, so muscle memory is preserved.
+    if (showSuggest) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSuggestIdx((i) => (i + 1) % dexSuggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSuggestIdx((i) => (i - 1 + dexSuggestions.length) % dexSuggestions.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const pick = dexSuggestions[Math.min(suggestIdx, dexSuggestions.length - 1)];
+        if (pick) { acceptSuggestion(pick.command); return; }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSuggestDismissed(dexSuggestQuery);
+        return;
+      }
     }
 
     if (e.key === 'Enter') {
@@ -474,7 +545,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (b && sessionId) b.invoke('pty:write', { sessionId, data: '\x03' }).catch(() => {});
       setInput('');
     }
-  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput]);
+  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput, showSuggest, dexSuggestions, suggestIdx, dexSuggestQuery, acceptSuggestion]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -568,6 +639,45 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           {revMatches.length > 1 && (
             <span style={{ color: '#666' }}>{`  (${Math.min(revSearch.idx, revMatches.length - 1) + 1}/${revMatches.length})`}</span>
           )}
+        </div>
+      )}
+      {showSuggest && (
+        <div
+          role="listbox"
+          aria-label="DEX command suggestions"
+          style={{
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            background: '#0a0a0a',
+            fontSize: 11,
+            maxHeight: 156,
+            overflowY: 'auto',
+          }}
+        >
+          {dexSuggestions.map((s, i) => {
+            const active = i === Math.min(suggestIdx, dexSuggestions.length - 1);
+            const sc = resolveShortcut(s.command, isMac);
+            return (
+              <div
+                key={s.command.id}
+                role="option"
+                aria-selected={active}
+                // mousedown (not click) so the row commits before the input blurs.
+                onMouseDown={(e) => { e.preventDefault(); acceptSuggestion(s.command); }}
+                onMouseEnter={() => setSuggestIdx(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                  background: active ? '#1d1d1d' : 'transparent',
+                  color: active ? '#e0e0e0' : '#b8b8b8',
+                }}
+              >
+                <span style={{ color: '#3da66a', fontWeight: 600, flexShrink: 0 }}>{`dex ${s.command.terminal}`}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.command.label}</span>
+                {sc && <span style={{ color: '#666', flexShrink: 0, letterSpacing: '0.02em' }}>{sc}</span>}
+              </div>
+            );
+          })}
         </div>
       )}
       <div

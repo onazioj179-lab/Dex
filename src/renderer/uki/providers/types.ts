@@ -24,6 +24,23 @@ export interface ChatMessage {
   role: Role;
   content: string;
   name?: string;
+  /**
+   * Optional image attachments (data URLs, e.g. `data:image/png;base64,...`) for
+   * vision-capable models — used by UKI's "look at my screen" feature. Providers
+   * that don't support vision ignore this and fall back to text-only.
+   */
+  images?: string[];
+}
+
+/**
+ * Split a `data:<mediaType>;base64,<data>` URL into its parts. Anthropic + Google
+ * need the media type and raw base64 separately (OpenAI takes the whole URL).
+ * Falls back to image/png if the prefix is malformed.
+ */
+export function parseDataUrl(dataUrl: string): { mediaType: string; base64: string } {
+  const m = /^data:([^;,]+)?(?:;base64)?,(.*)$/s.exec(dataUrl);
+  if (!m) return { mediaType: 'image/png', base64: dataUrl };
+  return { mediaType: m[1] || 'image/png', base64: m[2] || '' };
 }
 
 export interface ChatRequest {

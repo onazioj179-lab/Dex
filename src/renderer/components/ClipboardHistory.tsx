@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { sharedTick } from '../services/SharedTick';
+import { DexSearchInput } from '../styles/components';
 
 // ==================== TYPES ====================
 
@@ -39,7 +40,6 @@ const Icons = {
   copy: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
   trash: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
   pin: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 17v5M9 11V6a3 3 0 016 0v5M5 11h14l-1 6H6l-1-6z"/></svg>,
-  search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
 };
 
 // ==================== STORAGE ====================
@@ -266,17 +266,6 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
       padding: 'var(--space-3) var(--space-4)',
       borderBottom: '1px solid var(--color-border)',
     },
-    searchIcon: {
-      color: 'var(--color-text-muted)',
-    },
-    searchInput: {
-      flex: 1,
-      background: 'transparent',
-      border: 'none',
-      outline: 'none',
-      fontSize: '14px',
-      color: 'var(--color-text-primary)',
-    },
     list: {
       maxHeight: '360px',
       overflow: 'auto',
@@ -370,15 +359,14 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
         </div>
 
         <div style={styles.searchWrapper}>
-          <span style={styles.searchIcon}>{Icons.search}</span>
-          <input
+          <DexSearchInput
             ref={inputRef}
-            type="text"
-            placeholder="Search clipboard..."
+            placeholder="Search"
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onClear={() => { setQuery(''); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
-            style={styles.searchInput}
+            fullWidth
           />
         </div>
 

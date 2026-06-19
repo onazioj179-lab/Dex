@@ -60,6 +60,7 @@ const DiagnosticsPanel = lazy(() => import('./components/DiagnosticsPanel'));
 const LockScreen = lazy(() => import('./components/LockScreen').then(m => ({ default: m.LockScreen })));
 const KeyboardShortcuts = lazy(() => import('./components/KeyboardShortcuts'));
 const WorkspacePresetsPanel = lazy(() => import('./components/WorkspacePresetsPanel'));
+const PermissionCenter = lazy(() => import('./components/PermissionCenter'));
 
 // Services - OS-Grade System Layer
 import {
@@ -256,6 +257,8 @@ export const App: React.FC = () => {
   const wpMode = useWallpaperStore(s => s.mode);
   const wpValue = useWallpaperStore(s => s.value);
   const wpBlur = useWallpaperStore(s => s.blur);
+  const wpTint = useWallpaperStore(s => s.tint);
+  const wpOpacity = useWallpaperStore(s => s.opacity);
   const wallpaperBg = useMemo((): React.CSSProperties => {
     if (wpMode === 'image') return { backgroundImage: `url("${wpValue}")`, backgroundSize: 'cover', backgroundPosition: 'center' };
     if (wpMode === 'gradient') return { backgroundImage: wpValue };
@@ -555,6 +558,7 @@ export const App: React.FC = () => {
         <BatchActionBar />
         <KeyboardShortcuts />
         <WorkspacePresetsPanel />
+        <PermissionCenter />
       </Suspense>
       </AppErrorBoundary>
       
@@ -645,7 +649,23 @@ export const App: React.FC = () => {
         willChange: wpBlur > 0 ? 'transform, filter' : 'auto',
       }} />
 
-      <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+      {/* Global wallpaper tint scrim -- applies the stored tint at the configured
+          strength so the Settings tint/opacity controls are live everywhere a
+          surface is transparent. Solid wallpapers need no dimming. */}
+      {wpMode !== 'solid' && wpTint && wpTint !== 'transparent' && (
+        <div aria-hidden="true" style={{
+          position: 'fixed', inset: 0, zIndex: -1,
+          background: wpTint,
+          opacity: Math.min(1, Math.max(0, wpOpacity ?? 0.3)),
+          pointerEvents: 'none',
+          transition: 'opacity 0.4s ease, background 0.4s ease',
+        }} />
+      )}
+
+      {/* Solid base behind all apps: an open app is NEVER see-through to the
+          wallpaper. The wallpaper shows only on the Home desktop, which paints its
+          own wallpaper layer on top of this base. */}
+      <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'var(--color-bg-base)' }}>
         <AppErrorBoundary instanceId="appmanager" appId="appmanager" appName="App Shell" appColor="var(--color-accent, #0a84ff)">
         <Suspense fallback={(
           <div style={{

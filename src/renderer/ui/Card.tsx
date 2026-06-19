@@ -31,7 +31,7 @@ const PAD: Record<CardPadding, number> = {
 };
 
 const variantStyle = (v: CardVariant, selected: boolean): React.CSSProperties => {
-  const ring = selected ? '0 0 0 1px var(--color-accent, #4A9EFF)' : undefined;
+  const ring = selected ? '0 0 0 1px var(--dex-focus-color, #fff)' : undefined;
   switch (v) {
     case 'elevated':
       return {
@@ -55,7 +55,7 @@ const variantStyle = (v: CardVariant, selected: boolean): React.CSSProperties =>
     default:
       return {
         background: 'var(--color-bg-surface, #161618)',
-        border: `1px solid ${selected ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border-subtle, rgba(255,255,255,0.08))'}`,
+        border: `1px solid ${selected ? 'var(--dex-focus-color, #fff)' : 'var(--color-border-subtle, rgba(255,255,255,0.08))'}`,
         boxShadow: ring,
       };
   }

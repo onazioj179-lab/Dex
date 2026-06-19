@@ -4,8 +4,9 @@
  * Professional unit converter — length, weight, temperature, volume, speed, data
  */
 import React, { useState, useMemo, useCallback, memo } from 'react';
+import { resolveUnitQuery } from '../../../shared/format/unitSearch';
 
-type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data';
+type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data' | 'energy';
 
 interface UnitDef { label: string; symbol: string; toBase: (v: number) => number; fromBase: (v: number) => number }
 
@@ -54,21 +55,41 @@ const UNITS: Record<Category, UnitDef[]> = {
     { label: 'Gigabytes', symbol: 'GB', toBase: v => v * 1073741824, fromBase: v => v / 1073741824 },
     { label: 'Terabytes', symbol: 'TB', toBase: v => v * 1099511627776, fromBase: v => v / 1099511627776 },
   ],
+  energy: [
+    { label: 'Joules', symbol: 'J', toBase: v => v, fromBase: v => v },
+    { label: 'Kilojoules', symbol: 'kJ', toBase: v => v * 1000, fromBase: v => v / 1000 },
+    { label: 'Calories', symbol: 'cal', toBase: v => v * 4.184, fromBase: v => v / 4.184 },
+    { label: 'Kilocalories', symbol: 'kcal', toBase: v => v * 4184, fromBase: v => v / 4184 },
+    { label: 'Watt-hours', symbol: 'Wh', toBase: v => v * 3600, fromBase: v => v / 3600 },
+    { label: 'Kilowatt-hours', symbol: 'kWh', toBase: v => v * 3.6e6, fromBase: v => v / 3.6e6 },
+  ],
 };
 
 const CAT_ICONS: Record<Category, string> = {
-  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D',
+  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D', energy: 'E',
 };
 
-const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data'];
+const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data', 'energy'];
 
 const UnitConverter: React.FC = () => {
   const [category, setCategory] = useState<Category>('length');
   const [fromIdx, setFromIdx] = useState(0);
   const [toIdx, setToIdx] = useState(1);
   const [inputValue, setInputValue] = useState('1');
+  const [unitQuery, setUnitQuery] = useState('');
 
   const units = UNITS[category];
+
+  // Jump to a unit typed into the search box (e.g. "km", "pounds", "MB").
+  const runUnitSearch = useCallback(() => {
+    const match = resolveUnitQuery(UNITS, unitQuery);
+    if (!match) return;
+    const cat = match.category as Category;
+    setCategory(cat);
+    setFromIdx(match.index);
+    setToIdx(prev => prev === match.index ? (match.index + 1) % UNITS[cat].length : prev);
+    setUnitQuery('');
+  }, [unitQuery]);
 
   const result = useMemo(() => {
     const val = parseFloat(inputValue);
@@ -92,6 +113,20 @@ const UnitConverter: React.FC = () => {
 
   return (
     <div style={s.container}>
+      {/* Unit search */}
+      <div style={s.searchBar}>
+        <input
+          type="text"
+          value={unitQuery}
+          onChange={e => setUnitQuery(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') runUnitSearch(); }}
+          onBlur={runUnitSearch}
+          placeholder="Find a unit — e.g. km, pounds, MB, kWh"
+          style={s.search}
+          aria-label="Find a unit"
+        />
+      </div>
+
       {/* Category tabs */}
       <div style={s.tabs}>
         {CATEGORIES.map(cat => (
@@ -186,6 +221,15 @@ const s: Record<string, React.CSSProperties> = {
     height: '100%', display: 'flex', flexDirection: 'column',
     background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)', overflow: 'hidden',
+  },
+  searchBar: {
+    padding: 'var(--space-3) var(--space-4) 0', flexShrink: 0,
+  },
+  search: {
+    width: '100%', padding: '8px var(--space-3)', borderRadius: 8,
+    border: '1px solid var(--color-border)', background: 'var(--color-bg-inset)',
+    color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
+    fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
   tabs: {
     display: 'flex', gap: 4, padding: 'var(--space-3) var(--space-4)', flexShrink: 0,

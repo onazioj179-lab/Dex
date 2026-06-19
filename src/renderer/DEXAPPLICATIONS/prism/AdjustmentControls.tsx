@@ -151,12 +151,11 @@ function CurvesEditor({ onChange }: { onChange: (patch: Partial<AdjustmentParams
           />
         ))}
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Click to add - drag to shape - right-click to remove</span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: 6 }}>
         <button
           type="button"
           onClick={reset}
-          style={{ fontSize: 10, fontWeight: 600, padding: '3px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+          style={{ fontSize: 10, fontWeight: 600, padding: '3px var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
         >Reset</button>
       </div>
     </div>

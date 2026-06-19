@@ -1611,7 +1611,7 @@ export const Gallery: React.FC = () => {
                            'scaleIn 0.6s ease',
               }}
             />
-            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-2) var(--space-5)', background: 'rgba(0,0,0,0.80)', borderRadius: 14 }}>
+            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-2) var(--space-5)', background: 'rgba(0,0,0,0.80)', borderRadius: 10 }}>
               <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>{current.name}</span>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{slideshowIndex + 1} / {images.length}</span>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Click to exit</span>

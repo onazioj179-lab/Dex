@@ -10,6 +10,24 @@
 // Items 451-475 of the 1000-item improvement plan
 // =============================================================================
 
+// ---------------------------------------------------------------------------
+// Color keyframe interpolation (v6 Track G): the engine previously STEPPED string
+// values (no color tween at all). Interpolate hex colors in linear-light sRGB so
+// fades are perceptually smooth (a naive sRGB lerp darkens mid-transition). Pure
+// + unit-tested.
+// ---------------------------------------------------------------------------
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+export function isHexColor(s: string): boolean { return HEX_COLOR_RE.test(s.trim()); }
+function srgbToLinear(c: number): number { const cs = c / 255; return cs <= 0.04045 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4); }
+function linearToSrgb(l: number): number { const cs = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(Math.max(0, l), 1 / 2.4) - 0.055; return Math.round(Math.min(1, Math.max(0, cs)) * 255); }
+export function lerpHexColor(a: string, b: string, t: number): string {
+  const pa = a.trim(), pb = b.trim();
+  const ch = (s: string, i: number) => parseInt(s.slice(i, i + 2), 16);
+  const mix = (x: number, y: number) => linearToSrgb(srgbToLinear(x) + (srgbToLinear(y) - srgbToLinear(x)) * t);
+  const h2 = (n: number) => n.toString(16).padStart(2, '0');
+  return '#' + h2(mix(ch(pa, 1), ch(pb, 1))) + h2(mix(ch(pa, 3), ch(pb, 3))) + h2(mix(ch(pa, 5), ch(pb, 5)));
+}
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -689,6 +707,11 @@ export class AnimationEngine {
       } as T;
     }
     
+    // Hex color strings: interpolate (linear-light) instead of stepping.
+    if (typeof a === 'string' && typeof b === 'string' && isHexColor(a) && isHexColor(b)) {
+      return lerpHexColor(a, b, t) as T;
+    }
+
     // For non-interpolatable values, return a until we reach b
     return t < 1 ? a : b;
   }

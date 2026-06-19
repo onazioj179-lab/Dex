@@ -16,6 +16,8 @@ import { glassSidebar } from '../styles/glassMenu';
 import { useToastHelpers } from '../components/Toast';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import DexIcon from '../components/DexIcon';
+import { DexSearchInput } from '../styles/components';
+import { validateWorkflow } from '../../shared/workflow/validate';
 
 // ===========================================================================
 // TYPES
@@ -682,6 +684,13 @@ export const Workflows: React.FC = () => {
 
   // ---- Execution engine with variable passing ----
 
+  // Structural validation (cycles / dangling connections / orphans) for the
+  // editor -- surfaced as an advisory chip so users catch broken graphs.
+  const validationIssues = useMemo(
+    () => validateWorkflow(nodes, connections),
+    [nodes, connections],
+  );
+
   const executeWorkflow = useCallback(async () => {
     if (nodes.length === 0) return;
     setIsRunning(true);
@@ -887,12 +896,14 @@ export const Workflows: React.FC = () => {
                 <span style={styles.subtitle}>{workflows.length} shortcuts</span>
               </div>
               <div style={styles.headerRight}>
-                <div style={styles.searchBox}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-                  </svg>
-                  <input type="text" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={styles.searchInput} />
-                </div>
+                <DexSearchInput
+                  size="md"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onClear={() => setSearchQuery('')}
+                  style={{ width: 150, flexShrink: 0 }}
+                />
                 <button style={styles.createBtn} aria-label="Create new shortcut" onClick={createWorkflow}>
                   {Icons.plus}
                   <span>New Shortcut</span>
@@ -964,6 +975,25 @@ export const Workflows: React.FC = () => {
                 style={styles.workflowNameInput}
               />
               <div style={styles.editorActions}>
+                {validationIssues.length > 0 && (() => {
+                  const hasError = validationIssues.some(i => i.severity === 'error');
+                  return (
+                    <span
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                        color: hasError ? 'var(--color-error)' : 'var(--color-warning)',
+                        background: hasError
+                          ? 'var(--color-error-muted, rgba(255,69,58,0.15))'
+                          : 'var(--color-warning-muted, rgba(255,159,10,0.15))',
+                      }}
+                      title={validationIssues.map(i => i.message).join('\n')}
+                    >
+                      <DexIcon name="alert-triangle" size={12} />
+                      {validationIssues.length} issue{validationIssues.length === 1 ? '' : 's'}
+                    </span>
+                  );
+                })()}
                 <button
                   style={{ ...styles.backBtn, color: 'var(--color-text-muted)' }}
                   onClick={() => setShowTemplates(!showTemplates)} aria-label="Templates"
@@ -1155,12 +1185,14 @@ export const Workflows: React.FC = () => {
                       <span style={styles.libraryTitle}>Actions</span>
                     </div>
                     <div style={{ padding: 'var(--space-2) var(--space-2) 0' }}>
-                      <div style={styles.actionSearchBox}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-                        </svg>
-                        <input type="text" placeholder="Search actions..." value={actionSearch} onChange={e => setActionSearch(e.target.value)} style={styles.actionSearchInput} />
-                      </div>
+                      <DexSearchInput
+                        size="sm"
+                        fullWidth
+                        placeholder="Search"
+                        value={actionSearch}
+                        onChange={e => setActionSearch(e.target.value)}
+                        onClear={() => setActionSearch('')}
+                      />
                     </div>
                     <div style={styles.actionList}>
                       {filteredActions.map(action => (

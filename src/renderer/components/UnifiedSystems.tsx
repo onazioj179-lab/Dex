@@ -387,7 +387,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
           maxHeight: '70vh',
           background: 'var(--color-bg-surface)',
           border: '1px solid var(--color-border, #3a3a3c)',
-          borderRadius: '12px',
+          borderRadius: '10px',
           boxShadow: 'var(--pg-shadow-popover)',
           overflow: 'hidden',
           display: 'flex',
@@ -399,7 +399,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
             ref={inputRef}
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
-            placeholder="Search everything in DEX..."
+            placeholder="Search"
             style={{
               width: '100%',
               background: 'var(--color-bg-hover)',

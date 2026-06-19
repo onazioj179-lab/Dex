@@ -13,6 +13,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { space, radius, fontSize, zIndex, transition } from '../styles/tokens';
+import { DexSearchInput } from '../styles/components';
 
 // ---------------------------------------------------------------------------
 // Emoji Data Structure
@@ -1018,17 +1019,6 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     borderBottom: '1px solid var(--color-border-subtle)',
   };
 
-  const searchStyle: React.CSSProperties = {
-    width: '100%',
-    padding: `${space[2]}px ${space[3]}px`,
-    background: 'var(--color-bg-inset)',
-    border: '1px solid var(--color-border)',
-    borderRadius: radius.md,
-    color: 'var(--color-text-primary)',
-    fontSize: fontSize.sm,
-    outline: 'none',
-  };
-
   const categoryTabsStyle: React.CSSProperties = {
     display: 'flex',
     padding: `${space[1]}px ${space[2]}px`,
@@ -1087,12 +1077,12 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
       {/* Header with search and skin tone */}
       <div style={headerStyle}>
         <div style={{ display: 'flex', gap: space[2], alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder="Search emojis..."
+          <DexSearchInput
+            placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={searchStyle}
+            onClear={() => setSearch('')}
+            fullWidth
             autoFocus
           />
           <div style={{ position: 'relative' }}>

@@ -11,6 +11,7 @@ import DexIcon from '../../components/DexIcon';
 import { TerminalTabs } from '../../components/TerminalTabs';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
+import { findMatchingBracket } from '../../../shared/format/bracketMatcher';
 import { highlightDexScript } from './dexCode/highlight';
 import {
   getRecentFiles,
@@ -20,10 +21,16 @@ import {
   saveFileDialog,
   saveFile,
 } from './dexCode/fileIO';
+import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
 export { transpileDexScript, executeDexScript, highlightDexScript };
+
+// Bottom terminal panel sizing. Min keeps the panel usable; max is clamped to
+// 70% of the editor area at drag time so the editor never collapses.
+const PANEL_HEIGHT_KEY = 'dex-code-panel-height';
+const PANEL_MIN_HEIGHT = 120;
 
 const DexCode: React.FC = () => {
   const [code, setCode] = useState(() => {
@@ -39,22 +46,69 @@ const DexCode: React.FC = () => {
   const [showRecentFiles, setShowRecentFiles] = useState(false);
   
   const [output, setOutput] = useState<string[]>([]);
+  const [replInput, setReplInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  // Collapsible sidebar (DEX 5.6: IDE-like, "nothing locked"). Toggle from the
+  // Navigator activity-bar button or Ctrl+B (VS Code convention). Persisted.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('dex-code-sidebar-collapsed') === 'true'; } catch { return false; }
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(v => {
+      const next = !v;
+      try { localStorage.setItem('dex-code-sidebar-collapsed', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  // Bottom terminal panel height — resizable + persisted (DEX 5.6: nothing locked).
+  const [panelHeight, setPanelHeight] = useState(() => {
+    try {
+      const stored = parseInt(localStorage.getItem(PANEL_HEIGHT_KEY) || '', 10);
+      return Number.isFinite(stored) && stored >= PANEL_MIN_HEIGHT ? stored : 240;
+    } catch { return 240; }
+  });
+  const workspaceRef = useRef<HTMLElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(13);
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+  const [selStats, setSelStats] = useState<{ chars: number; lines: number } | null>(null);
   const [showFind, setShowFind] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   // Track original content for modified detection
   const originalCodeRef = useRef(code);
+
+  // UKI dev-workspace awareness (DEX 5.6): expose the open file + language +
+  // dirty state + cursor so UKI knows what code the user is editing. A ref keeps
+  // the resolver reading live state without re-registering on every keystroke.
+  const ukiCtxRef = useRef({ fileName, currentFilePath, code, isModified, cursorPos });
+  ukiCtxRef.current = { fileName, currentFilePath, code, isModified, cursorPos };
+  useEffect(() => {
+    registerUkiAppContext('dexcode', () => {
+      const s = ukiCtxRef.current;
+      const ext = (s.fileName.split('.').pop() || '').toLowerCase();
+      const language = ext === 'dex' ? 'DexScript' : (ext || 'text');
+      return {
+        appId: 'dexcode',
+        currentFile: s.currentFilePath || s.fileName,
+        focusedItemId: s.fileName,
+        custom: {
+          language,
+          lines: s.code ? s.code.split('\n').length : 0,
+          status: s.isModified ? 'unsaved changes' : 'saved',
+          cursor: `line ${s.cursorPos.line}, col ${s.cursorPos.col}`,
+        },
+      };
+    });
+    return () => unregisterUkiAppContext('dexcode');
+  }, []);
 
   // File system handlers
   const handleOpenFile = useCallback(async () => {
@@ -145,6 +199,51 @@ const DexCode: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [code, fileName]);
 
+  // Persist the bottom panel height (debounced) so it restores on next mount.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try { localStorage.setItem(PANEL_HEIGHT_KEY, String(panelHeight)); } catch { /* ignore */ }
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [panelHeight]);
+
+  // Drag the divider at the top edge of the panel to resize it. Listeners are
+  // attached on press and torn down on release (and on unmount as a safety net).
+  const resizeStateRef = useRef<{ startY: number; startHeight: number; max: number } | null>(null);
+  const handlePanelResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const workspaceH = workspaceRef.current?.clientHeight ?? window.innerHeight;
+    resizeStateRef.current = {
+      startY: e.clientY,
+      startHeight: panelHeight,
+      max: Math.max(PANEL_MIN_HEIGHT, Math.round(workspaceH * 0.7)),
+    };
+    const onMove = (ev: MouseEvent) => {
+      const st = resizeStateRef.current;
+      if (!st) return;
+      // Dragging up (smaller clientY) grows the panel.
+      const next = st.startHeight + (st.startY - ev.clientY);
+      setPanelHeight(Math.min(st.max, Math.max(PANEL_MIN_HEIGHT, next)));
+    };
+    const onUp = () => {
+      resizeStateRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelHeight]);
+
+  // Safety net: if the editor unmounts mid-drag, reset the global cursor styles.
+  useEffect(() => () => {
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
   // Sync scroll between editor and highlight overlay
   const handleScroll = useCallback(() => {
     if (editorRef.current && highlightRef.current) {
@@ -158,19 +257,39 @@ const DexCode: React.FC = () => {
     setIsRunning(true);
     setOutput([]);
     setError(null);
-    // Use requestAnimationFrame so UI updates before execution
-    requestAnimationFrame(() => {
+    // Defer with setTimeout (not requestAnimationFrame) so the "running" state
+    // paints first AND execution still fires when the DEX window is backgrounded
+    // -- rAF is paused for hidden/unfocused tabs, which silently dropped runs.
+    setTimeout(() => {
       const result = executeDexScript(code);
       setOutput(result.output);
       setError(result.error);
       setDuration(result.duration);
       setIsRunning(false);
-      // Scroll output to bottom
-      requestAnimationFrame(() => {
+      // Scroll output to bottom once it has rendered.
+      setTimeout(() => {
         if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
-      });
-    });
+      }, 0);
+    }, 0);
   }, [code]);
+
+  // -- REPL: evaluate a single DexScript expression in isolation and append its
+  // output to the console (DEX 5.7). The runtime is stateless per call, so each
+  // entry runs independently -- a quick scratchpad for testing expressions
+  // without running the whole file.
+  const runRepl = useCallback(() => {
+    const expr = replInput.trim();
+    if (!expr) return;
+    const result = executeDexScript(expr);
+    setOutput(prev => [
+      ...prev,
+      `> ${expr}`,
+      ...(result.error ? [result.error] : (result.output.length ? result.output : ['(no output)'])),
+    ]);
+    setError(null);
+    setReplInput('');
+    setTimeout(() => { if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight; }, 0);
+  }, [replInput]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -194,6 +313,10 @@ const DexCode: React.FC = () => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleNewFile();
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault();
@@ -228,13 +351,27 @@ const DexCode: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [code, fileName, runCode, showFind, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile]);
+  }, [code, fileName, runCode, showFind, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar]);
 
   // Tab key, bracket auto-close, auto-indent
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
+
+    // Jump to matching bracket (Ctrl/Cmd+M): partner of the bracket at, or just
+    // before, the caret.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
+      let p = start;
+      let m = findMatchingBracket(code, start);
+      if (!m && start > 0) { p = start - 1; m = findMatchingBracket(code, start - 1); }
+      if (m) {
+        e.preventDefault();
+        const target = p === m.openPos ? m.closePos : m.openPos;
+        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = target; ta.focus(); });
+        return;
+      }
+    }
 
     // Tab indent
     if (e.key === 'Tab') {
@@ -325,11 +462,19 @@ const DexCode: React.FC = () => {
   // Cursor position tracking
   const updateCursorPos = useCallback(() => {
     if (!editorRef.current) return;
-    const pos = editorRef.current.selectionStart;
+    const ta = editorRef.current;
+    const pos = ta.selectionStart;
     const textBefore = code.substring(0, pos);
     const line = textBefore.split('\n').length;
     const col = pos - textBefore.lastIndexOf('\n');
     setCursorPos({ line, col });
+    const selLen = ta.selectionEnd - ta.selectionStart;
+    if (selLen > 0) {
+      const selected = code.substring(ta.selectionStart, ta.selectionEnd);
+      setSelStats({ chars: selLen, lines: selected.split('\n').length });
+    } else {
+      setSelStats(null);
+    }
   }, [code]);
 
   // Find/replace logic
@@ -407,7 +552,15 @@ const DexCode: React.FC = () => {
     <div style={S.container}>
       {/* Activity bar (Xcode-style) -- slim icon column on far left */}
       <nav style={S.activityBar} aria-label="DexCode activity bar">
-        <button title="Navigator" aria-label="Navigator" style={S.activityBtnActive}>
+        <button
+          title="Toggle sidebar (Ctrl+B)"
+          aria-label="Toggle sidebar"
+          aria-pressed={!sidebarCollapsed}
+          style={sidebarCollapsed ? S.activityBtn : S.activityBtnActive}
+          onClick={toggleSidebar}
+          onMouseEnter={e => { if (sidebarCollapsed) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => { if (sidebarCollapsed) e.currentTarget.style.background = 'transparent'; }}
+        >
           <DexIcon name="folder" size={16} />
         </button>
         <button
@@ -444,7 +597,8 @@ const DexCode: React.FC = () => {
         <div style={{ flex: 1 }} />
       </nav>
 
-      {/* Sidebar */}
+      {/* Sidebar — collapsible (Ctrl+B / Navigator button) */}
+      {!sidebarCollapsed && (
       <aside style={S.sidebar}>
         <div style={S.sidebarHeader}>
           <span style={S.sidebarTitle}>DEXCODE</span>
@@ -533,9 +687,10 @@ const DexCode: React.FC = () => {
           </div>
         </div>
       </aside>
+      )}
 
       {/* Main workspace */}
-      <section style={S.workspace}>
+      <section ref={workspaceRef} style={S.workspace}>
         {/* Top bar */}
         <div style={S.topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -673,6 +828,7 @@ const DexCode: React.FC = () => {
                 onKeyDown={handleKeyDown}
                 onKeyUp={updateCursorPos}
                 onClick={updateCursorPos}
+                onSelect={updateCursorPos}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -711,6 +867,19 @@ const DexCode: React.FC = () => {
                 </div>
               )}
             </div>
+            {/* REPL: evaluate a single expression and append its output */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderTop: '1px solid var(--color-border-subtle)', flexShrink: 0 }}>
+              <span style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)', fontSize: 12 }} aria-hidden="true">{'>'}</span>
+              <input
+                value={replInput}
+                onChange={e => setReplInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); runRepl(); } }}
+                placeholder="Evaluate expression"
+                aria-label="DexScript REPL input"
+                spellCheck={false}
+                style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
+              />
+            </div>
           </div>
         </div>
 
@@ -718,7 +887,13 @@ const DexCode: React.FC = () => {
         <div style={S.statusBar}>
           <span>DexScript</span>
           <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
-          <span>{stats.lines} lines</span>
+          {selStats ? (
+            <span style={{ color: 'var(--color-accent)' }}>
+              Sel {selStats.chars} ch{selStats.lines > 1 ? `, ${selStats.lines} ln` : ''}
+            </span>
+          ) : (
+            <span>{stats.lines} lines</span>
+          )}
           <span>{stats.chars} chars</span>
           <span style={{ fontSize: 9 }}>{fontSize}px</span>
           <button
@@ -745,8 +920,21 @@ const DexCode: React.FC = () => {
         </div>
 
         {terminalOpen && (
-          <div style={{ height: 240, padding: '0 var(--space-3) var(--space-3)', flexShrink: 0 }}>
-            <TerminalTabs onClose={() => setTerminalOpen(false)} />
+          <div style={{ ...S.panelDock, height: panelHeight }}>
+            {/* Draggable divider — drag up/down to resize the panel */}
+            <div
+              style={S.panelResizer}
+              onMouseDown={handlePanelResizeStart}
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize terminal panel"
+              title="Drag to resize"
+            >
+              <div style={S.panelResizerGrip} aria-hidden="true" />
+            </div>
+            <div style={S.panelBody}>
+              <TerminalTabs onClose={() => setTerminalOpen(false)} />
+            </div>
           </div>
         )}
       </section>
@@ -1175,6 +1363,34 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 10,
     fontWeight: 700,
     padding: 0,
+  },
+  panelDock: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    flexShrink: 0,
+    minHeight: 0,
+    padding: '0 var(--space-3) var(--space-3)',
+  },
+  panelResizer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 7,
+    flexShrink: 0,
+    cursor: 'row-resize',
+    borderTop: '1px solid var(--color-border)',
+    background: 'var(--color-bg-secondary)',
+  },
+  panelResizerGrip: {
+    width: 36,
+    height: 2,
+    borderRadius: 1,
+    background: 'var(--color-border)',
+  },
+  panelBody: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
   },
 };
 

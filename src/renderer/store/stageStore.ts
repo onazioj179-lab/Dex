@@ -21,8 +21,58 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
 import { ContextBus } from '../services/ContextBus';
+import { recordStageActivity } from './stageActivityLog';
 
 export type StagePosture = 'work' | 'edit' | 'focus' | 'music' | 'play' | 'custom';
+
+/**
+ * Semantic "Project Space" kind (DEX 5.6 Workspace Intelligence). A Stage is the
+ * desktop context (windows + posture + ambiance); `kind` adds the missing
+ * dimension — what KIND of work this space is for — so the space reads as a
+ * dedicated environment (Development / Design / Audio / Video / Research /
+ * Personal) and UKI can reason about the active project type. `general` is the
+ * neutral default for ad-hoc spaces.
+ */
+export type StageKind =
+  | 'general'
+  | 'development'
+  | 'design'
+  | 'audio'
+  | 'video'
+  | 'research'
+  | 'personal';
+
+/**
+ * Presentation + UKI metadata for each Project Space kind — the single source of
+ * truth so the palette, panels, and UKI prompt all describe a kind identically.
+ * `hint` is the natural-language phrase UKI folds into its prompt.
+ */
+export const STAGE_KIND_META: Record<StageKind, { label: string; accent: string; hint: string }> = {
+  general:     { label: 'General',     accent: 'var(--color-text-tertiary)', hint: 'a general workspace' },
+  development: { label: 'Development', accent: '#0A84FF', hint: 'a coding / development project' },
+  design:      { label: 'Design',      accent: '#BF5AF2', hint: 'a visual / design project' },
+  audio:       { label: 'Audio',       accent: '#FF6B35', hint: 'an audio production project' },
+  video:       { label: 'Video',       accent: '#FF375F', hint: 'a video editing project' },
+  research:    { label: 'Research',    accent: '#64D2FF', hint: 'a research / reading session' },
+  personal:    { label: 'Personal',    accent: '#30D158', hint: 'personal planning and organization' },
+};
+
+/** All kinds in display order. */
+export const STAGE_KINDS: StageKind[] = Object.keys(STAGE_KIND_META) as StageKind[];
+
+/**
+ * Default any stage missing a `kind` (persisted before 5.6) to 'general'. Pure +
+ * exported so the persist `migrate` hook and unit tests share one implementation.
+ */
+export function migrateStagePersist(persisted: unknown): unknown {
+  if (persisted && typeof persisted === 'object' && Array.isArray((persisted as { stages?: unknown }).stages)) {
+    const p = persisted as { stages: Array<Record<string, unknown>> };
+    p.stages = p.stages.map((s) =>
+      s && typeof s === 'object' && !s.kind ? { ...s, kind: 'general' } : s
+    );
+  }
+  return persisted;
+}
 
 export interface StageWindowRef {
   /** App id from runningApps. */
@@ -33,12 +83,23 @@ export interface StageWindowRef {
   z?: number;
   /** Last known minimized state at the time the stage was captured. */
   minimized?: boolean;
+  // DEX 5.6: optional window geometry. When present, switching INTO this space
+  // restores the layout (position + size), not just the set of apps. Absent for
+  // id-only refs, in which case the auto-arrange tiler places the window.
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  maximized?: boolean;
 }
 
 export interface Stage {
   id: string;
   name: string;
   posture: StagePosture;
+  /** Semantic Project Space kind (DEX 5.6). Optional for stages persisted before
+   *  5.6; readers should treat a missing value as 'general'. */
+  kind?: StageKind;
   /** Windows that belong to this stage. */
   windows: StageWindowRef[];
   /** Optional dock pin overrides for this stage (app ids). Falls back to global pins. */
@@ -70,6 +131,8 @@ interface StageState {
   /** Replace the windows snapshot of a stage (called by WindowManager on debounce). */
   captureWindows: (id: string, windows: StageWindowRef[], focusedAppId?: string) => void;
   setPosture: (id: string, posture: StagePosture) => void;
+  /** Set the semantic Project Space kind for a stage (DEX 5.6). */
+  setKind: (id: string, kind: StageKind) => void;
   setAccent: (id: string, accent: string | null) => void;
   setWallpaper: (id: string, wallpaperId: string | null) => void;
   setDnd: (id: string, dnd: boolean) => void;
@@ -88,6 +151,7 @@ const DEFAULT_STAGE: Stage = {
   id: DEFAULT_STAGE_ID,
   name: 'Workspace',
   posture: 'work',
+  kind: 'general',
   windows: [],
   accent: null,
   wallpaperId: null,
@@ -121,6 +185,7 @@ export const useStageStore = create<StageState>()(
           id,
           name: input.name?.trim() || `Stage ${stages.length + 1}`,
           posture: input.posture ?? 'custom',
+          kind: input.kind ?? 'general',
           windows: input.windows ?? [],
           dockOverrides: input.dockOverrides,
           accent: input.accent ?? null,
@@ -170,6 +235,11 @@ export const useStageStore = create<StageState>()(
         try {
           ContextBus.emit('continuity:stage', { stageId: id, previousStageId: previous });
         } catch { /* bus errors are non-fatal */ }
+        // Record the transition with a timestamp so time-based surfaces (Rewind)
+        // can attribute past activity to the space active at the time.
+        try {
+          recordStageActivity({ stageId: id, name: stage.name, kind: stage.kind || 'general', ts: now });
+        } catch { /* logging never blocks a switch */ }
       },
 
       captureWindows: (id, windows, focusedAppId) => {
@@ -186,6 +256,14 @@ export const useStageStore = create<StageState>()(
         set({
           stages: get().stages.map((s) =>
             s.id === id ? { ...s, posture, updatedAt: Date.now() } : s
+          ),
+        });
+      },
+
+      setKind: (id, kind) => {
+        set({
+          stages: get().stages.map((s) =>
+            s.id === id ? { ...s, kind, updatedAt: Date.now() } : s
           ),
         });
       },
@@ -231,9 +309,19 @@ export const useStageStore = create<StageState>()(
     {
       name: 'dex-stage-store',
       storage: debouncedJsonStorage,
-      version: 1,
+      // v2 (DEX 5.6): stages gained a semantic `kind`. Old stages are coerced to
+      // 'general' so the field is always present for readers (UKI, palette).
+      version: 2,
+      migrate: (persisted) => migrateStagePersist(persisted),
     }
   )
 );
 
 export const STAGE_DEFAULT_ID = DEFAULT_STAGE_ID;
+
+// Expose the store globally so dependency-light consumers (UKI context, command
+// palette tooling) can read the active Project Space without a static import —
+// mirrors `window.__dexRunningApps`. Guarded for non-browser (test) contexts.
+if (typeof window !== 'undefined') {
+  (window as unknown as { __dexStageStore?: typeof useStageStore }).__dexStageStore = useStageStore;
+}

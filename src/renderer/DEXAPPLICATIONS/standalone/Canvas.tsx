@@ -13,11 +13,30 @@ interface Point {
   y: number;
 }
 
+type Tool = 'pen' | 'eraser' | 'highlighter' | 'line' | 'rectangle' | 'circle';
+const SHAPE_TOOLS: ReadonlyArray<Tool> = ['line', 'rectangle', 'circle'];
+const isShapeTool = (t: Tool): boolean => SHAPE_TOOLS.includes(t);
+
+// Draw a shape's PATH only (the caller sets the stroke style + calls stroke()).
+// Rectangle uses the drag bounding box; circle is centered on the start point
+// with radius = drag distance; line connects start->end.
+function drawShapePath(ctx: CanvasRenderingContext2D, tool: Tool, a: Point, b: Point): void {
+  ctx.beginPath();
+  if (tool === 'rectangle') {
+    ctx.rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+  } else if (tool === 'circle') {
+    ctx.arc(a.x, a.y, Math.hypot(b.x - a.x, b.y - a.y), 0, Math.PI * 2);
+  } else {
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  }
+}
+
 interface Stroke {
   points: Point[];
   color: string;
   size: number;
-  tool: 'pen' | 'eraser' | 'highlighter';
+  tool: Tool;
 }
 
 const COLORS = [
@@ -35,7 +54,7 @@ const Canvas: React.FC = () => {
   // truth for the live stroke until it is committed to `strokes` on release).
   const currentStrokeRef = useRef<Point[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [tool, setTool] = useState<'pen' | 'eraser' | 'highlighter'>('pen');
+  const [tool, setTool] = useState<Tool>('pen');
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(4);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -96,11 +115,10 @@ const Canvas: React.FC = () => {
     // Draw all strokes
     strokes.forEach(stroke => {
       if (stroke.points.length < 2) return;
-      
-      ctx.beginPath();
+
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      
+
       if (stroke.tool === 'eraser') {
         ctx.strokeStyle = bgColor;
         ctx.lineWidth = stroke.size * 3;
@@ -115,11 +133,17 @@ const Canvas: React.FC = () => {
         ctx.globalAlpha = 1;
       }
 
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      if (isShapeTool(stroke.tool)) {
+        drawShapePath(ctx, stroke.tool, stroke.points[0], stroke.points[stroke.points.length - 1]);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     });
 
     ctx.globalAlpha = 1;
@@ -224,6 +248,26 @@ const Canvas: React.FC = () => {
     // the wrong origin.
     const prevPoints = currentStrokeRef.current;
     const lastPoint = prevPoints[prevPoints.length - 1];
+
+    // Shapes: keep the START point fixed and update the END; redraw committed
+    // strokes, then draw a live preview of the shape (it morphs as you drag).
+    if (isShapeTool(tool)) {
+      const start = prevPoints[0] || point;
+      currentStrokeRef.current = [start, point];
+      const shapeCanvas = canvasRef.current;
+      const shapeCtx = shapeCanvas?.getContext('2d');
+      if (!shapeCtx) return;
+      redraw();
+      shapeCtx.lineCap = 'round';
+      shapeCtx.lineJoin = 'round';
+      shapeCtx.strokeStyle = color;
+      shapeCtx.lineWidth = brushSize;
+      shapeCtx.globalAlpha = 1;
+      drawShapePath(shapeCtx, tool, start, point);
+      shapeCtx.stroke();
+      return;
+    }
+
     currentStrokeRef.current = [...prevPoints, point];
 
     // Draw current stroke in real-time
@@ -311,6 +355,29 @@ const Canvas: React.FC = () => {
               title={t.charAt(0).toUpperCase() + t.slice(1)}
             >
               <DexIcon name={t === 'pen' ? 'edit' : t === 'eraser' ? 'delete' : 'marker'} size={16} />
+            </button>
+          ))}
+        </div>
+
+        <div style={s.divider} />
+
+        {/* Shapes */}
+        <div style={s.toolGroup}>
+          {(['line', 'rectangle', 'circle'] as const).map(t => (
+            <button
+              key={t}
+              style={{ ...s.toolBtn, ...(tool === t ? s.toolBtnActive : {}) }}
+              onClick={() => setTool(t)}
+              title={t.charAt(0).toUpperCase() + t.slice(1)}
+              aria-label={t}
+            >
+              {t === 'line' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="19" x2="19" y2="5" /></svg>
+              ) : t === 'rectangle' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="6" width="16" height="12" rx="1" /></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /></svg>
+              )}
             </button>
           ))}
         </div>

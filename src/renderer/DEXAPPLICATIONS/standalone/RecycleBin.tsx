@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { DexSearchInput } from '../../styles/components';
 
 // ── IPC helper ─────────────────────────────────────────────────
 async function ipc(channel: string, ...args: any[]): Promise<any> {
@@ -76,13 +77,14 @@ const headerStyle: React.CSSProperties = {
   background: 'var(--color-bg-surface-solid, #1C1C1E)',
   borderBottom: '1px solid var(--color-border-subtle)',
 };
-const searchInput: React.CSSProperties = {
-  width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6,
-  border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)',
-  color: 'var(--color-text-primary, #e5e5ea)', fontSize: 13, outline: 'none',
-};
 const listArea: React.CSSProperties = {
   flex: 1, overflowY: 'auto', padding: 'var(--space-3) var(--space-5) var(--space-5)',
+};
+const selectToolbar: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  padding: '8px var(--space-6)', flexShrink: 0,
+  borderBottom: '1px solid var(--color-border-subtle)',
+  background: 'var(--color-bg-surface)',
 };
 const groupHeader: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
@@ -102,8 +104,10 @@ const emptyState: React.CSSProperties = {
 };
 
 // ── Row component ──────────────────────────────────────────────
-const ItemRow = memo(({ item, onRestore, onDelete }: {
+const ItemRow = memo(({ item, selected, onToggleSelect, onRestore, onDelete }: {
   item: RecycleBinItem;
+  selected: boolean;
+  onToggleSelect: (id: number) => void;
   onRestore: (id: number) => void;
   onDelete: (id: number) => void;
 }) => {
@@ -113,10 +117,19 @@ const ItemRow = memo(({ item, onRestore, onDelete }: {
 
   return (
     <div
-      style={{ ...rowStyle, background: hover ? 'var(--color-bg-hover)' : 'transparent' }}
+      style={{ ...rowStyle, background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.18))' : hover ? 'var(--color-bg-hover)' : 'transparent' }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
+      {/* Select */}
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={() => onToggleSelect(item.id)}
+        aria-label={`Select ${item.item_name || 'item'}`}
+        style={{ cursor: 'pointer', accentColor: 'var(--color-accent)', flexShrink: 0 }}
+      />
+
       {/* Badge */}
       <span style={{
         display: 'inline-block', minWidth: 38, textAlign: 'center',
@@ -162,6 +175,7 @@ const RecycleBin: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [appFilter, setAppFilter] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   // Load items
   const reload = useCallback(async () => {
@@ -222,6 +236,53 @@ const RecycleBin: React.FC = () => {
 
   const totalVisible = visibleGroups.reduce((s, g) => s + g.items.length, 0);
 
+  // ── Multi-select ───────────────────────────────────────────
+  const visibleIds = useMemo(
+    () => visibleGroups.flatMap(g => g.items.map(i => i.id)),
+    [visibleGroups],
+  );
+
+  // Never keep a selection on items the current filter/search has hidden —
+  // a bulk action should only ever touch what the user can actually see.
+  useEffect(() => {
+    const visible = new Set(visibleIds);
+    setSelected(prev => {
+      let changed = false;
+      const next = new Set<number>();
+      for (const id of prev) {
+        if (visible.has(id)) next.add(id); else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [visibleIds]);
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const allVisibleSelected = visibleIds.length > 0 && selected.size === visibleIds.length;
+  const toggleSelectAll = useCallback(() => {
+    setSelected(prev => prev.size === visibleIds.length ? new Set() : new Set(visibleIds));
+  }, [visibleIds]);
+
+  const handleRestoreSelected = useCallback(async () => {
+    const ids = [...selected];
+    for (const id of ids) await ipc('recycle-bin:restore', id);
+    setSelected(new Set());
+    reload();
+  }, [selected, reload]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    const ids = [...selected];
+    for (const id of ids) await ipc('recycle-bin:permanentlyDelete', id);
+    setSelected(new Set());
+    reload();
+  }, [selected, reload]);
+
   // ── Render ─────────────────────────────────────────────────
   return (
     <div style={rootStyle}>
@@ -281,14 +342,49 @@ const RecycleBin: React.FC = () => {
         )}
 
         {/* Search */}
-        <input
-          type="text"
+        <DexSearchInput
+          size="sm"
+          fullWidth
           placeholder="Search trash..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={searchInput}
+          onClear={() => setSearch('')}
         />
       </div>
+
+      {/* Selection toolbar */}
+      {!loading && totalVisible > 0 && (
+        <div style={selectToolbar}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAll}
+              aria-label="Select all visible items"
+              style={{ cursor: 'pointer', accentColor: 'var(--color-accent)' }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+              {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+            </span>
+          </label>
+          {selected.size > 0 && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                style={{ ...btnSmall, background: 'rgba(48,209,88,0.18)', color: 'var(--color-success)' }}
+                onClick={handleRestoreSelected}
+              >Restore {selected.size}</button>
+              <button
+                style={{ ...btnSmall, background: 'rgba(255,69,58,0.15)', color: 'var(--color-error)' }}
+                onClick={handleDeleteSelected}
+              >Delete {selected.size}</button>
+              <button
+                style={{ ...btnSmall, background: 'var(--color-border-subtle)', color: 'var(--color-text-primary, #e5e5ea)' }}
+                onClick={() => setSelected(new Set())}
+              >Clear</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* List */}
       {loading ? (
@@ -319,6 +415,8 @@ const RecycleBin: React.FC = () => {
                 <ItemRow
                   key={item.id}
                   item={item}
+                  selected={selected.has(item.id)}
+                  onToggleSelect={toggleSelect}
                   onRestore={handleRestore}
                   onDelete={handleDelete}
                 />

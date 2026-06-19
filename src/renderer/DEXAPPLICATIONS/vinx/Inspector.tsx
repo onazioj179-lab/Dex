@@ -268,7 +268,7 @@ const AudioTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
           aria-label={clip.muted ? 'Unmute clip' : 'Mute clip'}
           style={{
             padding: '2px var(--space-2)', fontSize: 10, border: '1px solid var(--color-border)',
-            borderRadius: 2, background: clip.muted ? 'rgba(255,80,80,0.2)' : 'var(--color-border-subtle)',
+            borderRadius: 9999, background: clip.muted ? 'rgba(255,80,80,0.2)' : 'var(--color-border-subtle)',
             color: clip.muted ? '#FF6B6B' : 'var(--color-text-secondary)', cursor: 'pointer',
           }}
           onClick={() => _updateClip(clip.id, { muted: !clip.muted })}
@@ -364,7 +364,7 @@ const EffectSection: React.FC<{
                 aria-label={`Toggle ${param.name} ${val ? 'off' : 'on'}`}
                 style={{
                   padding: '2px var(--space-2)', fontSize: 10, border: '1px solid var(--color-border)',
-                  borderRadius: 2, background: val ? 'rgba(74,158,255,0.2)' : 'var(--color-border-subtle)',
+                  borderRadius: 9999, background: val ? 'rgba(74,158,255,0.2)' : 'var(--color-border-subtle)',
                   color: val ? 'var(--color-accent)' : 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0,
                 }}
                 onClick={() => onUpdateParam(param.id, !val)}
@@ -523,7 +523,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
               aria-label={`Live ${m} scope`}
               style={{
                 padding: '2px var(--space-2)', fontSize: 9, border: '1px solid var(--color-border)',
-                borderRadius: 2, background: liveScopeMode === m ? 'rgba(74,158,255,0.15)' : 'transparent',
+                borderRadius: 9999, background: liveScopeMode === m ? 'rgba(74,158,255,0.15)' : 'transparent',
                 color: liveScopeMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                 cursor: 'pointer', textTransform: 'capitalize',
               }}
@@ -576,7 +576,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
           aria-label={showScopes ? 'Hide scopes' : 'Show scopes'}
           style={{
             padding: '1px 6px', fontSize: 9, border: '1px solid var(--color-border)',
-            borderRadius: 2, background: showScopes ? 'rgba(74,158,255,0.15)' : 'transparent',
+            borderRadius: 9999, background: showScopes ? 'rgba(74,158,255,0.15)' : 'transparent',
             color: showScopes ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
           }}
           onClick={toggleScopes}
@@ -593,7 +593,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
                 aria-label={`Select ${type} scope`}
                 style={{
                   padding: '2px 6px', fontSize: 9, border: '1px solid var(--color-border)',
-                  borderRadius: 2, background: scopeType === type ? 'rgba(74,158,255,0.15)' : 'transparent',
+                  borderRadius: 9999, background: scopeType === type ? 'rgba(74,158,255,0.15)' : 'transparent',
                   color: scopeType === type ? 'var(--color-accent)' : 'var(--color-text-tertiary)', cursor: 'pointer',
                   textTransform: 'capitalize', whiteSpace: 'nowrap', flexShrink: 0,
                 }}
@@ -613,7 +613,7 @@ const ColorTab: React.FC<{ clip: Clip }> = memo(({ clip }) => {
           aria-label="Reset color grade"
           style={{
             width: '100%', padding: '4px 0', fontSize: 10, border: '1px solid var(--color-border-subtle)',
-            borderRadius: 3, background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', cursor: 'pointer',
+            borderRadius: 9999, background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', cursor: 'pointer',
           }}
           onClick={() => setColorGrade({ ...DEFAULT_COLOR_GRADE })}
         >
@@ -754,7 +754,7 @@ const CurvesEditor: React.FC<{
       <div style={{ ...sectionHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Curves</span>
         <button
-          style={{ padding: '1px 6px', fontSize: 9, border: '1px solid var(--color-border)', borderRadius: 2, background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}
+          style={{ padding: '1px 6px', fontSize: 9, border: '1px solid var(--color-border)', borderRadius: 9999, background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer' }}
           onClick={resetCurve}
           aria-label="Reset curve"
         >
@@ -770,7 +770,7 @@ const CurvesEditor: React.FC<{
               aria-pressed={activeChannel === ch.key}
               style={{
                 padding: '2px var(--space-2)', fontSize: 9, fontWeight: 600,
-                border: '1px solid var(--color-border)', borderRadius: 2,
+                border: '1px solid var(--color-border)', borderRadius: 9999,
                 background: activeChannel === ch.key ? `${ch.color}20` : 'transparent',
                 color: activeChannel === ch.key ? ch.color : 'var(--color-text-tertiary)',
                 cursor: 'pointer', flexShrink: 0,
@@ -814,9 +814,6 @@ const CurvesEditor: React.FC<{
             return <circle key={i} cx={sv.x} cy={sv.y} r={dragging === i ? 5 : 3.5} fill={channelColor} stroke="#000" strokeWidth={1} style={{ cursor: 'grab' }} />;
           })}
         </svg>
-        <div style={{ fontSize: 9, color: 'var(--color-text-tertiary)', marginTop: 2, textAlign: 'center' }}>
-          Click to add · Drag to adjust · Double-click to remove
-        </div>
       </div>
     </div>
   );

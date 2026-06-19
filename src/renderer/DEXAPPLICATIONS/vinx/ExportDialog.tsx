@@ -81,11 +81,11 @@ const selectStyle: React.CSSProperties = {
 
 const btnPrimaryStyle: React.CSSProperties = {
   padding: '6px var(--space-5)', fontSize: 11, fontWeight: 600, border: 'none',
-  borderRadius: 3, background: 'var(--color-accent)', color: '#000000', cursor: 'pointer',
+  borderRadius: 9999, background: 'var(--color-accent)', color: '#000000', cursor: 'pointer',
 };
 
 const btnSecondaryStyle: React.CSSProperties = {
-  padding: '6px var(--space-4)', fontSize: 11, fontWeight: 600, borderRadius: 3,
+  padding: '6px var(--space-4)', fontSize: 11, fontWeight: 600, borderRadius: 9999,
   border: '1px solid var(--color-border)', background: 'transparent',
   color: 'var(--color-text-secondary)', cursor: 'pointer',
 };

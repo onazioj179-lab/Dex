@@ -11,7 +11,9 @@
 
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useToastHelpers } from '../components/Toast';
+import { DexSearchInput } from '../styles/components';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
+import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 
 // QR Code encoder — Version 1-4 byte mode with L error correction (item 108)
@@ -398,6 +400,39 @@ const Transfers: React.FC = () => {
       if (httpExpiryTimerRef.current) clearTimeout(httpExpiryTimerRef.current);
     };
   }, []);
+
+  // Mirror active DTP transfers into the Home "Live Activity" feed so transfer
+  // progress shows as a live card on the Home screen. Centralized + throttled to
+  // whole-percent changes so the rapid progress events don't spam the feed.
+  const liveActivityRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const tracked = liveActivityRef.current;
+    activeTransfers.forEach(t => {
+      const actId = `transfers-${t.transferId}`;
+      const pct = Math.round(t.progress);
+      const done = t.status === 'complete' || pct >= 100;
+      if (!done) {
+        if (!tracked.has(t.transferId)) {
+          tracked.set(t.transferId, pct);
+          dispatchActivity({ id: actId, type: 'transfer', label: `Sending ${formatSize(t.totalBytes)}`, progress: pct, app: 'transfers' });
+        } else if (tracked.get(t.transferId) !== pct) {
+          tracked.set(t.transferId, pct);
+          updateActivity(actId, pct);
+        }
+      } else if (tracked.has(t.transferId)) {
+        // Transfer finished while still in the list — close the card.
+        tracked.delete(t.transferId);
+        completeActivity(actId);
+      }
+    });
+    // Sweep ids no longer present (cancelled transfers are removed from the list).
+    tracked.forEach((_, transferId) => {
+      if (!activeTransfers.some(t => t.transferId === transferId)) {
+        tracked.delete(transferId);
+        completeActivity(`transfers-${transferId}`);
+      }
+    });
+  }, [activeTransfers]);
 
   // DTP Handlers
   const refreshDevices = useCallback(() => {
@@ -914,13 +949,10 @@ const Transfers: React.FC = () => {
           <div>
             {history.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 14 }}>
-                <input
+                <DexSearchInput
                   value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search history..." style={{
-                    flex: 1, padding: 'var(--space-2) 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
-                    background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)',
-                    fontSize: 12, outline: 'none',
-                  }}
+                  onClear={() => setSearchQuery('')}
+                  placeholder="Search" size="md" fullWidth
                 />
                 <button onClick={clearHistory} style={{
                   padding: 'var(--space-2) 14px', borderRadius: 6, border: '1px solid rgba(255,69,58,0.2)',

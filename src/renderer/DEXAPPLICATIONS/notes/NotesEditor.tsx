@@ -28,6 +28,7 @@ import { askConfiguredLLM, hasConfiguredProvider } from '../../uki/providers/con
 import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemplates';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
+import DexIcon from '../../components/DexIcon';
 
 // ---------------------------------------------------------------------------
 // Document statistics helpers
@@ -63,6 +64,8 @@ interface ToolbarAction {
   id: string;
   label: string;
   icon: string;
+  /** DexIcon glyph name; when set it renders instead of the text `icon` (declutter). */
+  glyph?: string;
   command: string;
   arg?: string;
   shortcut?: string;
@@ -87,9 +90,9 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'h3', label: 'Heading 3', icon: 'H3', command: 'formatBlock', arg: 'h3' },
   ],
   [
-    { id: 'ul', label: 'Bullet List', icon: 'UL', command: 'insertUnorderedList' },
+    { id: 'ul', label: 'Bullet List', icon: 'UL', glyph: 'list', command: 'insertUnorderedList' },
     { id: 'ol', label: 'Numbered List', icon: 'OL', command: 'insertOrderedList' },
-    { id: 'checklist', label: 'Checklist', icon: 'CL', command: 'checklist' },
+    { id: 'checklist', label: 'Checklist', icon: 'CL', glyph: 'check-square', command: 'checklist' },
   ],
   [
     { id: 'blockquote', label: 'Quote', icon: 'Q', command: 'formatBlock', arg: 'blockquote' },
@@ -97,17 +100,33 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'hr', label: 'Divider', icon: '--', command: 'insertHorizontalRule' },
   ],
   [
-    { id: 'highlight', label: 'Highlight', icon: 'HL', command: 'highlight' },
-    { id: 'inlinecode', label: 'Inline Code', icon: '`', command: 'inlineCode' },
-    { id: 'link', label: 'Link', icon: 'LK', command: 'link' },
+    { id: 'highlight', label: 'Highlight', icon: 'HL', glyph: 'highlighter', command: 'highlight' },
+    { id: 'inlinecode', label: 'Inline Code', icon: '`', glyph: 'code', command: 'inlineCode' },
+    { id: 'link', label: 'Link', icon: 'LK', glyph: 'link', command: 'link' },
   ],
   [
-    { id: 'table', label: 'Insert Table', icon: 'TBL', command: 'table' },
-    { id: 'callout-note', label: 'Callout: Note', icon: 'Note', command: 'callout', arg: 'note' },
-    { id: 'callout-warning', label: 'Callout: Warning', icon: 'Warn', command: 'callout', arg: 'warning' },
-    { id: 'callout-tip', label: 'Callout: Tip', icon: 'Tip', command: 'callout', arg: 'tip' },
+    { id: 'table', label: 'Insert Table', icon: 'TBL', glyph: 'grid', command: 'table' },
+    { id: 'callout-note', label: 'Callout: Note', icon: 'Note', glyph: 'info', command: 'callout', arg: 'note' },
+    { id: 'callout-warning', label: 'Callout: Warning', icon: 'Warn', glyph: 'alert-triangle', command: 'callout', arg: 'warning' },
+    { id: 'callout-tip', label: 'Callout: Tip', icon: 'Tip', glyph: 'lightbulb', command: 'callout', arg: 'tip' },
   ],
 ];
+
+// ---------------------------------------------------------------------------
+// Editor typography (DEX 5.7) — a Word-style default-font picker. The chosen
+// family + size apply to the whole editor (body text; headings keep their CSS
+// scale but adopt the family) and persist across notes via localStorage.
+// ---------------------------------------------------------------------------
+
+const NOTE_FONTS: { label: string; value: string }[] = [
+  { label: 'Sans', value: 'var(--dex-font-ui)' },
+  { label: 'Serif', value: 'Georgia, "Iowan Old Style", "Times New Roman", serif' },
+  { label: 'Mono', value: 'var(--font-mono)' },
+  { label: 'System', value: 'system-ui, -apple-system, sans-serif' },
+];
+const NOTE_SIZES = [13, 14, 15, 16, 18, 20, 24];
+const NOTE_FONT_KEY = 'dex-notes-font-family';
+const NOTE_SIZE_KEY = 'dex-notes-font-size';
 
 // ---------------------------------------------------------------------------
 // uki AI writing actions (roadmap: "Writing assistance in Notes")
@@ -376,6 +395,22 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   // -- Outline (document headings -> navigable table of contents) -------------
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [headings, setHeadings] = useState<{ level: number; text: string }[]>([]);
+
+  // -- Editor typography (DEX 5.7): persisted default font family + size -------
+  const [fontFamily, setFontFamily] = useState<string>(() => {
+    try { return localStorage.getItem(NOTE_FONT_KEY) || 'var(--dex-font-ui)'; } catch { return 'var(--dex-font-ui)'; }
+  });
+  const [fontSize, setFontSize] = useState<number>(() => {
+    try { const v = Number(localStorage.getItem(NOTE_SIZE_KEY)); return v >= 10 && v <= 40 ? v : 15; } catch { return 15; }
+  });
+  const setEditorFont = useCallback((family: string) => {
+    setFontFamily(family);
+    try { localStorage.setItem(NOTE_FONT_KEY, family); } catch { /* best-effort pref persistence */ }
+  }, []);
+  const setEditorSize = useCallback((size: number) => {
+    setFontSize(size);
+    try { localStorage.setItem(NOTE_SIZE_KEY, String(size)); } catch { /* best-effort pref persistence */ }
+  }, []);
 
   // Rebuild the heading list straight off the live editor DOM (cheap; runs with
   // the other live counts). Order matches the DOM so the outline can scroll to
@@ -1093,13 +1128,35 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                     title={action.label + (action.shortcut ? ` (${action.shortcut})` : '')}
                     onMouseDown={e => { e.preventDefault(); handleToolbarAction(action); }}
                   >
-                    {action.icon}
+                    {action.glyph ? <DexIcon name={action.glyph} size={15} /> : action.icon}
                   </button>
                 ))}
               </div>
               {gi < TOOLBAR_GROUPS.length - 1 && <div style={styles.toolbarSep} />}
             </React.Fragment>
           ))}
+          {/* Typography: default font family + size for the editor (persisted) */}
+          <div style={styles.toolbarSep} />
+          <div style={styles.toolbarGroup}>
+            <select
+              aria-label="Editor font"
+              title="Editor font family"
+              value={fontFamily}
+              onChange={e => setEditorFont(e.target.value)}
+              style={{ height: 28, borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
+            >
+              {NOTE_FONTS.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
+            </select>
+            <select
+              aria-label="Font size"
+              title="Font size"
+              value={fontSize}
+              onChange={e => setEditorSize(Number(e.target.value))}
+              style={{ height: 28, borderRadius: 3, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'var(--dex-font-ui)', padding: '0 4px', cursor: 'pointer' }}
+            >
+              {NOTE_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
+            </select>
+          </div>
           {/* uki AI writing actions */}
           <div style={styles.toolbarSep} />
           <div style={styles.toolbarGroup}>
@@ -1154,6 +1211,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 style={{
                   ...styles.editable,
                   ...(focusMode ? styles.focusModeEditable : {}),
+                  fontFamily,
+                  fontSize,
                 }}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
@@ -1374,18 +1433,28 @@ div[contenteditable] blockquote {
 .dexnotes-preview blockquote.callout .callout-body > *:first-child { margin-top: 0; }
 .dexnotes-editable blockquote.callout .callout-body > *:last-child,
 .dexnotes-preview blockquote.callout .callout-body > *:last-child { margin-bottom: 0; }
-div[contenteditable] pre {
-  background: rgba(0,0,0,0.3);
-  border-radius: 4px;
+/* === Code blocks: <pre><code> === */
+/* Flat monospace block: a subtle solid surface, hairline border, small radius.
+   Whitespace and newlines are preserved (white-space: pre) so multi-line code
+   survives the save/reload round-trip and renders identically in edit + preview.
+   Both the contenteditable and the read-only preview are targeted so the block
+   looks the same in every editor mode. */
+.dexnotes-editable pre,
+.dexnotes-preview pre {
+  background: var(--color-bg-inset, rgba(0,0,0,0.3));
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08));
+  border-radius: var(--radius-sm, 6px);
   padding: 12px 16px;
   margin: 12px 0;
   overflow-x: auto;
+  white-space: pre;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
   color: #c8d6e5;
 }
-div[contenteditable] code {
+.dexnotes-editable code,
+.dexnotes-preview code {
   background: rgba(100,210,255,0.08);
   padding: 1px 5px;
   border-radius: 2px;
@@ -1393,9 +1462,12 @@ div[contenteditable] code {
   font-size: 13px;
   color: #64d2ff;
 }
-div[contenteditable] pre code {
+.dexnotes-editable pre code,
+.dexnotes-preview pre code {
   background: none;
+  border: none;
   padding: 0;
+  white-space: inherit;
   color: inherit;
 }
 div[contenteditable] mark {

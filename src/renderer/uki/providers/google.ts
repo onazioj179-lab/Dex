@@ -11,7 +11,7 @@
  * build/parse.
  */
 
-import type { LLMProvider, ChatRequest, ChatResponse, ModelInfo, ProviderConfig, HttpRequest } from './types';
+import { parseDataUrl, type LLMProvider, type ChatRequest, type ChatResponse, type ModelInfo, type ProviderConfig, type HttpRequest } from './types';
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -33,7 +33,17 @@ export const googleProvider: LLMProvider = {
     const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
     const contents = req.messages
       .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        // Vision: Gemini takes inline_data parts (mime_type + base64) alongside text.
+        parts: [
+          ...(m.content ? [{ text: m.content }] : []),
+          ...((m.images ?? []).map((url) => {
+            const { mediaType, base64 } = parseDataUrl(url);
+            return { inline_data: { mime_type: mediaType, data: base64 } };
+          })),
+        ],
+      }));
     return {
       url: `${base}/models/${req.model}:${method}?key=${config.apiKey ?? ''}`,
       method: 'POST',

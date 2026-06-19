@@ -5,17 +5,21 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * DEX Spotlight Engine — Powered by Xenon
+ * DEX Spotlight Engine
  * Adaptive search index with learning, deep host search, settings discovery.
  * Categories: top, recent, apps, settings, notes, tasks, files, actions, calculator, web.
- * Co-occurrence graph with time decay, prefix type-ahead, Xenon throttle awareness.
+ * Co-occurrence graph with time decay, prefix type-ahead, throttle awareness.
  * Safe math parser (no eval), fuzzy matching with character-level highlight spans.
  * First result under 30ms.
  */
 
 import { sharedTick } from '../services/SharedTick';
 import { useXenonStore } from '../store/xenonStore';
-import { useRunningApps } from '../store/runningApps';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useStageStore, STAGE_KIND_META, type StageKind } from '../store/stageStore';
+import { buildDexCommands } from '../../shared/commands/dexCommands';
+import { executeDexCommand } from '../services/dexCommandRunner';
+import { openWorkflowSpace, WORKFLOW_TEMPLATES } from '../services/projectSpaces';
 
 export type SpotlightCategory =
   | 'top'
@@ -1038,12 +1042,144 @@ export class SpotlightEngine {
         subtitle: `Settings > ${setting.section.charAt(0).toUpperCase() + setting.section.slice(1)}`,
         searchText: [setting.label, ...setting.keywords, setting.section].join(' ').toLowerCase(),
         icon: 'settings',
-        color: '#8E8E93',
+        color: 'var(--color-text-tertiary)',
         action: () => this._launchAppWithContext('settings', setting.section),
         frequency: this._usageFrequency.get(id) || 0,
         lastUsed: 0,
       });
     }
+
+    // Project Spaces (DEX 5.6) — make the active workspace context switchable
+    // straight from universal search ("development" -> Switch to Development).
+    // Synchronous read of the renderer stage store, like settings/actions above.
+    try {
+      const { stages, activeStageId } = useStageStore.getState();
+      for (const s of stages) {
+        if (s.id === activeStageId) continue; // can't switch to the current space
+        const meta = STAGE_KIND_META[(s.kind ?? 'general') as StageKind];
+        const id = `space-${s.id}`;
+        items.push({
+          id,
+          category: 'actions',
+          title: `Switch to ${s.name}`,
+          subtitle: `Workspace · ${meta.label}`,
+          searchText: `${s.name} ${meta.label} workspace space switch project context`.toLowerCase(),
+          icon: 'workflows',
+          color: meta.accent.startsWith('#') ? meta.accent : 'var(--color-accent)',
+          action: () => { try { useStageStore.getState().setActiveStage(s.id); } catch { /* store not ready */ } },
+          frequency: this._usageFrequency.get(id) || 0,
+          lastUsed: s.lastActiveAt || 0,
+        });
+      }
+    } catch { /* stage store unavailable -> omit spaces */ }
+
+    // DEX command catalog (DEX 5.6 "Universal Command Layer") — run system /
+    // window / navigation actions straight from universal search, Raycast-style.
+    // App-launch commands are already indexed above, so only ACTION commands are
+    // added here; each runs through the one canonical executor (no duplication).
+    try {
+      for (const cmd of buildDexCommands(APP_DEFINITIONS)) {
+        if (cmd.appId || !cmd.action) continue;
+        const id = `cmd-${cmd.id}`;
+        items.push({
+          id,
+          category: 'commands',
+          title: cmd.label,
+          subtitle: `${cmd.group} command`,
+          searchText: [cmd.label, cmd.terminal, cmd.group, ...(cmd.keywords ?? []), ...(cmd.uki ?? [])].join(' ').toLowerCase(),
+          icon: 'workflows',
+          color: 'var(--color-accent)',
+          action: () => { try { executeDexCommand(cmd); } catch { /* command run failed */ } },
+          frequency: this._usageFrequency.get(id) || 0,
+          lastUsed: 0,
+        });
+      }
+    } catch { /* catalog unavailable -> omit commands */ }
+
+    // Starter workspaces (DEX 5.6) — "open development workspace" spins up a new
+    // kind-tagged Project Space with its apps tiled (one workflow-template source).
+    try {
+      for (const t of WORKFLOW_TEMPLATES) {
+        const id = `wf-${t.id}`;
+        items.push({
+          id,
+          category: 'actions',
+          title: `Open ${t.name}`,
+          subtitle: 'Starter workspace',
+          searchText: `${t.name} ${t.description} ${t.tags.join(' ')} workspace open start project`.toLowerCase(),
+          icon: 'workflows',
+          color: t.accent.startsWith('#') ? t.accent : 'var(--color-accent)',
+          action: () => { try { openWorkflowSpace(t.id); } catch { /* open failed */ } },
+          frequency: this._usageFrequency.get(id) || 0,
+          lastUsed: 0,
+        });
+      }
+    } catch { /* templates unavailable -> omit */ }
+
+    // Open browser tabs (DEX 5.6 Global Search 2.0) — the user's open browser
+    // tabs become searchable; picking one opens the browser to that page. Reads
+    // the persisted browser session from renderer localStorage (no IPC), and
+    // routes through the same spotlight->browser navigate path as web results.
+    try {
+      const raw = localStorage.getItem('dex-browser-session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        const tabs: Array<{ id?: string; title?: string; url?: string }> = Array.isArray(session?.tabs) ? session.tabs : [];
+        for (const t of tabs) {
+          if (!t || typeof t.url !== 'string' || !t.url) continue; // skip blank "New Tab"
+          const url = t.url;
+          const id = `tab-${t.id ?? url}`;
+          const title = (typeof t.title === 'string' && t.title) ? t.title : url;
+          items.push({
+            id,
+            category: 'web',
+            title,
+            subtitle: `Browser tab · ${url.replace(/^https?:\/\//, '').slice(0, 60)}`,
+            searchText: `${title} ${url} browser tab open page web`.toLowerCase(),
+            icon: 'browser',
+            color: '#5E5CE6',
+            action: () => this._launchAppWithContext('browser', url),
+            frequency: this._usageFrequency.get(id) || 0,
+            lastUsed: 0,
+          });
+        }
+      }
+    } catch { /* no/invalid browser session -> omit tabs */ }
+
+    // Browser history (DEX 5.6 Global Search) — recently-visited pages are
+    // searchable; picking one reopens it. Reads the browser's persisted history
+    // (renderer localStorage), most-recent-first and deduped by URL, capped so a
+    // long history never floods the index.
+    try {
+      const raw = localStorage.getItem('dex-browser-history');
+      if (raw) {
+        const hist: Array<{ url?: string; title?: string; visitedAt?: number }> = JSON.parse(raw);
+        if (Array.isArray(hist)) {
+          const seen = new Set<string>();
+          const recent = [...hist].sort((a, b) => (b?.visitedAt || 0) - (a?.visitedAt || 0));
+          for (const h of recent) {
+            if (!h || typeof h.url !== 'string' || !h.url || seen.has(h.url)) continue;
+            seen.add(h.url);
+            if (seen.size > 40) break;
+            const url = h.url;
+            const id = `hist-${url}`;
+            const title = (typeof h.title === 'string' && h.title) ? h.title : url;
+            items.push({
+              id,
+              category: 'web',
+              title,
+              subtitle: `History · ${url.replace(/^https?:\/\//, '').slice(0, 60)}`,
+              searchText: `${title} ${url} history visited recent page web`.toLowerCase(),
+              icon: 'browser',
+              color: '#5E5CE6',
+              action: () => this._launchAppWithContext('browser', url),
+              frequency: this._usageFrequency.get(id) || 0,
+              lastUsed: h.visitedAt || 0,
+            });
+          }
+        }
+      }
+    } catch { /* no/invalid history -> omit */ }
 
     // Fetch real files from filesystem via IPC
     this._fetchFilesFromBackend();
@@ -1760,7 +1896,7 @@ export class SpotlightEngine {
       // owns it. Centralised so the icon/color/navigation stay consistent.
       const DEEP_TYPE_MAP: Record<string, { category: SpotlightCategory; app: string; icon: string; color: string }> = {
         file: { category: 'files', app: 'files', icon: 'files', color: '#5B8FBF' },
-        setting: { category: 'settings', app: 'settings', icon: 'settings', color: '#8E8E93' },
+        setting: { category: 'settings', app: 'settings', icon: 'settings', color: 'var(--color-text-tertiary)' },
         app: { category: 'apps', app: 'home', icon: 'forge', color: 'var(--color-accent)' },
         note: { category: 'notes', app: 'notes', icon: 'notes', color: 'var(--color-warning)' },
         task: { category: 'tasks', app: 'tasks', icon: 'tasks', color: 'var(--color-warning)' },

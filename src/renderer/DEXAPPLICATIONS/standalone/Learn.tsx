@@ -15,6 +15,7 @@ import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from '
 import DexIcon from '../../components/DexIcon';
 import { useLearningStore } from '../../store/learningStore';
 import { platform } from '../../utils';
+import { findPeakHourWindow, peakIndex } from '../../../shared/format/activityInsights';
 
 // -- Helpers ---------------------------------------------------------------
 const fmtMs = (ms: number): string => {
@@ -143,6 +144,12 @@ const STAT_ROW: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '6px 0', fontSize: 13,
 };
+const PEAK_PILL: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+  background: 'var(--color-accent-soft, rgba(94,92,230,0.18))',
+  color: 'var(--color-accent)',
+};
 const BAR_BG: React.CSSProperties = {
   flex: 1, height: 4, borderRadius: 2, marginLeft: 'var(--space-3)',
   background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden',
@@ -268,6 +275,18 @@ const Learn: React.FC = () => {
   const maxPageVisits = rankedPages.length ? rankedPages[0][1] : 1;
   const maxActionFreq = rankedActions.length ? rankedActions[0][1] : 1;
   const maxPageTime = pageTimeEntries.length ? pageTimeEntries[0][1] : 1;
+
+  // Synthesize the heatmaps into a one-line "you're most active..." insight.
+  const activityPeak = useMemo(() => {
+    const hourTotals = HOUR_LABELS.map((_, i) =>
+      (hourlyPatterns[String(i)] || []).reduce((s, d) => s + d.count, 0));
+    const dayTotals = DAY_LABELS.map((_, i) =>
+      (dayPatterns[String(i)] || []).reduce((s, d) => s + d.count, 0));
+    return {
+      window: findPeakHourWindow(hourTotals, 3),
+      dayIdx: peakIndex(dayTotals),
+    };
+  }, [hourlyPatterns, dayPatterns]);
 
   const handleReset = useCallback(() => {
     reset();
@@ -539,6 +558,27 @@ const Learn: React.FC = () => {
         {/* ── INSIGHTS TAB ──────────────────────────────────────────── */}
         {tab === 'insights' && (
           <>
+            {/* Peak-activity summary */}
+            {(activityPeak.window || activityPeak.dayIdx !== null) && (
+              <div style={CARD}>
+                <div style={CARD_TITLE}>When You Work</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
+                  {activityPeak.window && (
+                    <span style={PEAK_PILL}>
+                      <DexIcon name="clock" size={12} />
+                      Most active {activityPeak.window.startHour}:00&ndash;{activityPeak.window.endHour}:00
+                    </span>
+                  )}
+                  {activityPeak.dayIdx !== null && (
+                    <span style={PEAK_PILL}>
+                      <DexIcon name="calendar" size={12} />
+                      Busiest day {DAY_LABELS[activityPeak.dayIdx]}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Day-of-Week Heatmap */}
             {Object.keys(dayPatterns).length > 0 && (
               <div style={CARD}>

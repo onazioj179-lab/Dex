@@ -50,6 +50,39 @@ export function peakAbs(input: SampleBlock): number {
   return peak;
 }
 
+export interface SignalLevels {
+  /** Peak level in dBFS (-120 for silence). */
+  peakDb: number;
+  /** RMS level in dBFS (-120 for silence). */
+  rmsDb: number;
+  /** Crest factor (peak - rms) in dB; 0 for silence. A dynamics indicator: low
+   *  crest = squashed/limited, high crest = peaky/dynamic. */
+  crestDb: number;
+}
+
+/**
+ * Compute peak, RMS and crest factor for a block of samples (DEX v6 Track G).
+ * Pure + unit-tested; Imosion's meter uses it instead of duplicating the math.
+ */
+export function computeSignalLevels(input: SampleBlock): SignalLevels {
+  let peak = 0;
+  let sumSq = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    const s = input[i];
+    const abs = s < 0 ? -s : s;
+    if (abs > peak) peak = abs;
+    sumSq += s * s;
+  }
+  const rms = input.length > 0 ? Math.sqrt(sumSq / input.length) : 0;
+  const peakDb = gainToDb(peak);
+  const rmsDb = gainToDb(rms);
+  return {
+    peakDb,
+    rmsDb,
+    crestDb: peak > 0 && rms > 0 ? peakDb - rmsDb : 0,
+  };
+}
+
 export function normalisePeak(input: SampleBlock, targetDb: number = -1): Float32Array {
   const peak = peakAbs(input);
   if (peak === 0) return copyBlock(input);
@@ -327,6 +360,38 @@ export function envelopeFollower(input: SampleBlock, params: EnvelopeFollowerPar
     out[i] = env;
   }
   return out;
+}
+
+// -------- loudness normalization -------------------------------------------
+
+export interface LoudnessGainResult {
+  /** dB gain to apply to reach the target loudness (true-peak clamped). */
+  gainDb: number;
+  /** Projected true peak (dBTP) after the gain is applied. */
+  truePeakAfterDb: number;
+  /** True when the gain was reduced to keep the true peak under the ceiling. */
+  clampedForTruePeak: boolean;
+}
+
+/**
+ * Gain needed to move `measuredLUFS` to `targetLUFS`, clamped so the projected
+ * true peak never exceeds `maxTruePeakDb` (default -1 dBTP, the streaming-safe
+ * ceiling). Pure -- the previous normalizer applied a flat gain with NO headroom
+ * check, so loud masters could clip when pushed to a high target.
+ */
+export function loudnessTargetGain(
+  measuredLUFS: number,
+  targetLUFS: number,
+  truePeakDb: number,
+  maxTruePeakDb = -1,
+): LoudnessGainResult {
+  let gainDb = targetLUFS - measuredLUFS;
+  let clampedForTruePeak = false;
+  if (truePeakDb + gainDb > maxTruePeakDb) {
+    gainDb = maxTruePeakDb - truePeakDb;
+    clampedForTruePeak = true;
+  }
+  return { gainDb, truePeakAfterDb: truePeakDb + gainDb, clampedForTruePeak };
 }
 
 export interface CompressorParams extends EnvelopeFollowerParams {

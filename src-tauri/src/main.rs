@@ -12,6 +12,154 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod activity_feed;
+mod git;
+mod env_manager;
+mod ssh;
+mod fs_ops;
+mod watch;
+mod analytics;
+mod power;
+mod modes;
+mod projects;
+mod duplicates_resolver;
+mod focus_sessions;
+mod memory_tracking;
+mod operations_log;
+mod performance_tier;
+mod text_summarizer;
+mod resource_monitoring;
+mod rule_engine;
+mod sessions_manager;
+mod splitview_presets;
+mod split_view;
+mod stability_check;
+mod startup_timeline;
+mod system_health;
+mod tag_manager;
+mod user_profile;
+mod voice_notes;
+mod log_manager;
+mod notes_metadata;
+mod permissions_manager;
+mod pattern_tracking;
+mod accessibility_ctl;
+mod adaptive_ctl;
+mod advisor_ctl;
+mod api_server;
+mod archive_ctl;
+mod autofill_ctl;
+mod background_tasks;
+mod batch_ctl;
+mod battery_ctl;
+mod behavior_ctl;
+mod browser_ctl;
+mod budget_ctl;
+mod cli_ctl;
+mod cloudsync_ctl;
+mod code_ctl;
+mod connectors_ctl;
+mod containment_ctl;
+mod context_ctl;
+mod controls_ctl;
+mod corepc_ctl;
+mod crash_reporter;
+mod creator_ctl;
+mod db_perf_ctl;
+mod deeplink_ctl;
+mod devplatform_ctl;
+mod documents_ctl;
+mod dtp_ctl;
+mod editor_ctl;
+mod embedding_ctl;
+mod encryption_ctl;
+mod enforce_ctl;
+mod engine_ctl;
+mod export_ctl;
+mod extensions_ctl;
+mod failure_ctl;
+mod features_ctl;
+mod folderrules_ctl;
+mod gallery_ctl;
+mod gpu_ctl;
+mod guardrails_ctl;
+mod hardware_ctl;
+mod healing_ctl;
+mod history_ctl;
+mod hotkey_ctl;
+mod http_transfer_ctl;
+mod idle_ctl;
+mod import_ctl;
+mod input_ctl;
+mod ipc_perf;
+mod keys_ctl;
+mod largefile_ctl;
+mod launcher_ctl;
+mod longevity_ctl;
+mod maintenance_ctl;
+mod mediaorg_ctl;
+mod mental_ctl;
+mod motion_ctl;
+mod multiuser_ctl;
+mod nextgen_ctl;
+mod nexus_ctl;
+mod observability_ctl;
+mod optimistic_ctl;
+mod performance_ctl;
+mod permission_ctl;
+mod phase1_ctl;
+mod pipeline_ctl;
+mod plugin_gate;
+mod plugins_ctl;
+mod prerender_ctl;
+mod privacy_ctl;
+mod quickactions_ctl;
+mod recovery_ctl;
+mod reliability_ctl;
+mod render_ctl;
+mod renderer_health;
+mod resource_governor;
+mod scheduler_ctl;
+mod scripting_ctl;
+mod selftest_ctl;
+mod session_ctl;
+mod shutdown_sequencer;
+mod snapshot_ctl;
+mod softero_ctl;
+mod startup_sequencer;
+mod state_ctl;
+mod state_sync;
+mod sync_ctl;
+mod task_queue;
+mod thermal_ctl;
+mod transfer_ctl;
+mod uki_ctl;
+mod undo_ctl;
+mod uninstall_ctl;
+mod update_service;
+mod video_ctl;
+mod vinx_ctl;
+mod visual_ctl;
+mod voice_ctl;
+mod wake_ctl;
+mod watchdog_ctl;
+mod xenon_ctl;
+mod contract_ctl;
+mod device_ctl;
+mod games;
+mod governance_ctl;
+mod intelligence_ctl;
+mod learning_ctl;
+mod monitor_ctl;
+mod network_ctl;
+mod security_ctl;
+mod store_ctl;
+mod tagging_ctl;
+mod tasks_ctl;
+mod timeline_ctl;
+mod trust_ctl;
+mod update_ctl;
+mod updates_ctl;
+mod workflow_ctl;
 mod changelog;
 mod color_labels;
 mod content_expiry;
@@ -384,10 +532,10 @@ fn kv_load(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
         .and_then(|v| v.as_object().cloned())
         .unwrap_or_default()
 }
-fn kv_get(app: &tauri::AppHandle, key: &str) -> Value {
+pub(crate) fn kv_get(app: &tauri::AppHandle, key: &str) -> Value {
     kv_load(app).get(key).cloned().unwrap_or(Value::Null)
 }
-fn kv_set(app: &tauri::AppHandle, key: &str, value: Value) -> Value {
+pub(crate) fn kv_set(app: &tauri::AppHandle, key: &str, value: Value) -> Value {
     let mut map = kv_load(app);
     map.insert(key.to_string(), value);
     let data = serde_json::to_string(&Value::Object(map)).unwrap_or_default();
@@ -993,6 +1141,32 @@ fn security_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Val
 /// Shared-database dispatch — routes the SQLite-backed subsystems (which all
 /// share `dex.db`) to their handlers. Locks the one connection; degrades to
 /// `null` when SQLite is unavailable (no persistence), mirroring Electron.
+/// `system:killProcessTree` — terminate a pid AND all of its descendants (sysinfo
+/// parent links, leaves-first). Restored after a git-checkout revert.
+fn system_kill_tree(pid: u32) -> Value {
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_processes();
+    let root = sysinfo::Pid::from_u32(pid);
+    let mut to_kill: Vec<sysinfo::Pid> = vec![root];
+    let mut i = 0;
+    while i < to_kill.len() {
+        let parent = to_kill[i];
+        for (cpid, proc_) in sys.processes() {
+            if proc_.parent() == Some(parent) && !to_kill.contains(cpid) {
+                to_kill.push(*cpid);
+            }
+        }
+        i += 1;
+    }
+    let mut killed = 0;
+    for p in to_kill.iter().rev() {
+        if let Some(proc_) = sys.process(*p) {
+            if proc_.kill() { killed += 1; }
+        }
+    }
+    json!({ "success": true, "message": format!("Terminated {} process(es)", killed) })
+}
+
 fn db_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let state = app.state::<db::DbState>();
     let guard = match state.lock() {
@@ -1253,8 +1427,163 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
     let arg_str = |i: usize| args.get(i).and_then(|v| v.as_str()).map(|s| s.to_string());
     let arg_u64 = |i: usize| args.get(i).and_then(|v| v.as_u64());
 
+    // === Migration wiring (modules; revert-proof) ===
+    if channel.starts_with("git:") { return git::dispatch(&channel, &args); }
+    if channel.starts_with("env:") { return env_manager::dispatch(&app, &channel, &args); }
+    if channel.starts_with("ssh:") { return ssh::dispatch(&app, &channel, &args); }
+    if channel.starts_with("analytics:") { return analytics::dispatch(&app, &channel, &args); }
+    if channel.starts_with("mode:") { return modes::dispatch(&app, &channel, &args); }
+    if channel.starts_with("activity:") { return activity_feed::dispatch_kv(&app, &channel, &args); }
+    if channel.starts_with("duplicates:") { return duplicates_resolver::dispatch(&app, &channel, &args); }
+    if channel.starts_with("focus:") { return focus_sessions::dispatch(&app, &channel, &args); }
+    if channel.starts_with("memory:") { return memory_tracking::dispatch(&app, &channel, &args); }
+    if channel.starts_with("operations:") { return operations_log::dispatch(&app, &channel, &args); }
+    if channel.starts_with("perf:") { return performance_tier::dispatch(&app, &channel, &args); }
+    if channel.starts_with("reader:") { return text_summarizer::dispatch(&app, &channel, &args); }
+    if channel.starts_with("resource:") { return resource_monitoring::dispatch(&app, &channel, &args); }
+    if channel.starts_with("rule:") { return rule_engine::dispatch(&app, &channel, &args); }
+    if channel.starts_with("sessions:") { return sessions_manager::dispatch(&app, &channel, &args); }
+    if channel.starts_with("splitview:") { return splitview_presets::dispatch(&app, &channel, &args); }
+    if channel.starts_with("split:") { return split_view::dispatch(&app, &channel, &args); }
+    if channel.starts_with("stability:") { return stability_check::dispatch(&app, &channel, &args); }
+    if channel.starts_with("startup:") { return startup_timeline::dispatch(&app, &channel, &args); }
+    if channel.starts_with("systemHealth:") { return system_health::dispatch(&app, &channel, &args); }
+    if channel.starts_with("tags:") { return tag_manager::dispatch(&app, &channel, &args); }
+    if channel.starts_with("user:") { return user_profile::dispatch(&app, &channel, &args); }
+    if channel.starts_with("voiceNotes:") { return voice_notes::dispatch(&app, &channel, &args); }
+    if channel.starts_with("accessibility:") { return accessibility_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("adaptive:") { return adaptive_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("advisory:") { return advisor_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("api:") { return api_server::dispatch(&app, &channel, &args); }
+    if channel.starts_with("archive:") { return archive_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("autofill:") { return autofill_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("background-tasks:") { return background_tasks::dispatch(&app, &channel, &args); }
+    if channel.starts_with("batch:") { return batch_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("battery:") { return battery_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("behavior:") { return behavior_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("browser:") { return browser_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("budget:") { return budget_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("cli:") { return cli_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("cloudsync:") { return cloudsync_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("code:") { return code_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("connectors:") { return connectors_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("containment:") { return containment_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("context:") { return context_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("controls:") { return controls_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("corepc:") { return corepc_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("crash-reporter:") { return crash_reporter::dispatch(&app, &channel, &args); }
+    if channel.starts_with("creator:") { return creator_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("db-perf:") { return db_perf_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("deeplink:") { return deeplink_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("devplatform:") { return devplatform_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("documents:") { return documents_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("dtp:") { return dtp_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("editor:") { return editor_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("embedding:") { return embedding_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("encryption:") { return encryption_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("enforce:") { return enforce_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("engine:") { return engine_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("export:") { return export_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("extensions:") { return extensions_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("failure:") { return failure_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("features:") { return features_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("folderrules:") { return folderrules_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("gallery:") { return gallery_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("gpu:") { return gpu_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("guardrails:") { return guardrails_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("hardware:") { return hardware_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("healing:") { return healing_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("history:") { return history_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("hotkeys:") { return hotkey_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("http-transfer:") { return http_transfer_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("idle:") { return idle_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("import:") { return import_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("input:") { return input_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("ipc-perf:") { return ipc_perf::dispatch(&app, &channel, &args); }
+    if channel.starts_with("keys:") { return keys_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("largefile:") { return largefile_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("launcher:") { return launcher_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("longevity:") { return longevity_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("maintenance:") { return maintenance_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("mediaorg:") { return mediaorg_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("mental:") { return mental_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("motion:") { return motion_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("multiuser:") { return multiuser_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("nextgen:") { return nextgen_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("nexus:") { return nexus_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("observability:") { return observability_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("optimistic:") { return optimistic_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("performance:") { return performance_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("permission:") { return permission_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("phase1:") { return phase1_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("pipeline:") { return pipeline_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("plugin-gate:") { return plugin_gate::dispatch(&app, &channel, &args); }
+    if channel.starts_with("plugins:") { return plugins_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("prerender:") { return prerender_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("privacy:") { return privacy_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("pty:") { return terminal::dispatch(&app, &channel, &args); }
+    if channel.starts_with("quickactions:") { return quickactions_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("recovery:") { return recovery_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("reliability:") { return reliability_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("render:") { return render_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("renderer-health:") { return renderer_health::dispatch(&app, &channel, &args); }
+    if channel.starts_with("resource-governor:") { return resource_governor::dispatch(&app, &channel, &args); }
+    if channel.starts_with("scheduler:") { return scheduler_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("scripting:") { return scripting_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("selftest:") { return selftest_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("session:") { return session_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("shutdown-sequencer:") { return shutdown_sequencer::dispatch(&app, &channel, &args); }
+    if channel.starts_with("snapshot:") { return snapshot_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("softero:") { return softero_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("startup-sequencer:") { return startup_sequencer::dispatch(&app, &channel, &args); }
+    if channel.starts_with("state:") { return state_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("state-sync:") { return state_sync::dispatch(&app, &channel, &args); }
+    if channel.starts_with("sync:") { return sync_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("task-queue:") { return task_queue::dispatch(&app, &channel, &args); }
+    if channel.starts_with("thermal:") { return thermal_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("transfer:") { return transfer_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("uki:") { return uki_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("undo:") { return undo_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("uninstall:") { return uninstall_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("update-service:") { return update_service::dispatch(&app, &channel, &args); }
+    if channel.starts_with("video:") { return video_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("vinx:") { return vinx_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("visual:") { return visual_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("voice:") { return voice_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("wake:") { return wake_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("watchdog:") { return watchdog_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("xenon:") { return xenon_ctl::dispatch(&app, &channel, &args); }
     match channel.as_str() {
         "app:getVersion" => json!(env!("CARGO_PKG_VERSION")),
+        // === Migration wiring (arms) ===
+        "fs:readdir" => fs_ops::readdir(&arg_str(0).unwrap_or_default()),
+        "fs:readFileHead" => fs_ops::read_file_head(&arg_str(0).unwrap_or_default(), arg_u64(1).unwrap_or(0)),
+        "media:getMediaFiles" => { let home = app.path().home_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")); fs_ops::get_media_files(&arg_str(0).unwrap_or_default(), &home) }
+        ch @ ("watch:start" | "watch:stop") => watch::dispatch(&app, ch, &args),
+        "system:killProcessTree" => system_kill_tree(arg_u64(0).unwrap_or(0) as u32),
+        ch @ ("projects:getAll" | "projects:getActive" | "projects:create" | "projects:update" | "projects:delete" | "projects:setActive") => projects::dispatch(&app, ch, &args),
+        ch @ ("power:getProfile" | "power:getState" | "power:setProfile" | "power:quickBoost" | "power:getResourceHogs" | "power:freeMemory" | "power:getSuggestedCleanup" | "power:setCpuLimit" | "power:setGpuLimit" | "power:setFanCurve") => power::dispatch(&app, ch, &args),
+        ch @ ("logs:get" | "logs:clear") => log_manager::dispatch(&app, ch, &args),
+        ch @ ("notes:start-server" | "notes:stop-server") => notes_metadata::dispatch(&app, ch, &args),
+        ch @ ("permissions:getAll" | "permissions:grant" | "permissions:revoke") => permissions_manager::dispatch(&app, ch, &args),
+        ch @ ("patterns:recordAppOpen" | "patterns:recordAppClose" | "patterns:recordFileOpen" | "patterns:recordToolUse" | "patterns:recordAction" | "patterns:recordToolCombo" | "patterns:getSuggestions" | "patterns:getFrequent" | "patterns:getRecent" | "patterns:getToolCombos" | "patterns:getDayPatterns" | "patterns:getHourlyPatterns" | "patterns:getPreferredApp" | "patterns:getSessionStats" | "patterns:getAllPatterns" | "patterns:cleanup") => pattern_tracking::dispatch(&app, ch, &args),
+        ch @ ("contract:getConfig" | "contract:getGuarantees" | "contract:getViolations") => contract_ctl::dispatch(&app, ch, &args),
+        ch @ ("device:getThisDevice" | "device:getAll") => device_ctl::dispatch(&app, ch, &args),
+        ch @ ("games:list" | "games:playtime") => games::dispatch(&app, ch, &args),
+        ch @ ("governance:getPolicies" | "governance:getPolicy") => governance_ctl::dispatch(&app, ch, &args),
+        ch @ ("intelligence:getState" | "intelligence:getConfig") => intelligence_ctl::dispatch(&app, ch, &args),
+        ch @ ("learning:getModels") => learning_ctl::dispatch(&app, ch, &args),
+        ch @ ("monitor:getBaseline" | "monitor:getDigests") => monitor_ctl::dispatch(&app, ch, &args),
+        ch @ ("network:summary" | "network:getStatus") => network_ctl::dispatch(&app, ch, &args),
+        ch @ ("security:getPolicy") => security_ctl::dispatch(&app, ch, &args),
+        ch @ ("store:list" | "store:installed") => store_ctl::dispatch(&app, ch, &args),
+        ch @ ("tags:list" | "tags:get") => tagging_ctl::dispatch(&app, ch, &args),
+        ch @ ("tasks:list" | "tasks:get") => tasks_ctl::dispatch(&app, ch, &args),
+        ch @ ("timeline:getEvents" | "timeline:getEvent") => timeline_ctl::dispatch(&app, ch, &args),
+        ch @ ("trust:list") => trust_ctl::dispatch(&app, ch, &args),
+        ch @ ("update:getStatus" | "updates:getInfo") => update_ctl::dispatch(&app, ch, &args),
+        ch @ ("updates:getInfo" | "updates:getPreferences" | "update:getConfig") => updates_ctl::dispatch(&app, ch, &args),
+        ch @ ("workflow:getAll" | "workflow:get") => workflow_ctl::dispatch(&app, ch, &args),
         "app:ping" => json!("pong"),
 
         // --- Files ----------------------------------------------------------
@@ -1788,6 +2117,8 @@ fn main() {
             start_index_watcher(app.handle().clone());
             // Security permissions store (session-scoped; SecurityController parity).
             app.manage(std::sync::Mutex::new(security::SecurityState::default()));
+            app.manage(watch::GenericWatchState::default());
+            app.manage(power::PowerProfileState::default());
             // HTTP file-transfer server slot (started on demand via httpTransfer:start).
             app.manage::<http_transfer::HttpTransferState>(std::sync::Mutex::new(None));
             // Background reminder scheduler — polls due reminders every 30s and
@@ -1801,3 +2132,4 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running the DEX Tauri shell");
 }
+

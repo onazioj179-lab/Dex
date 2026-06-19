@@ -18,6 +18,7 @@
 import React, { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { platform } from '../utils';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { DexSearchInput } from '../styles/components';
 
 interface ShortcutEntry {
   keys: string;
@@ -261,18 +262,14 @@ const KeyboardShortcuts: React.FC = () => {
         </div>
 
         {sticky && (
-          <input
+          <DexSearchInput
             ref={searchRef}
-            type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search shortcuts…"
+            onClear={() => setQuery('')}
+            placeholder="Search"
             aria-label="Search keyboard shortcuts"
-            style={{
-              width: '100%', padding: '9px var(--space-3)', fontSize: 13,
-              color: 'var(--color-text-primary)', background: 'var(--color-bg-hover)',
-              border: '1px solid var(--color-border)', borderRadius: 6, outline: 'none',
-            }}
+            fullWidth
           />
         )}
 

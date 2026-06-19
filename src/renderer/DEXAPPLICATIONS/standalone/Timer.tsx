@@ -31,6 +31,12 @@ const Timer: React.FC = () => {
   const [customMin, setCustomMin] = useState(5);
   const [customSec, setCustomSec] = useState(0);
   const [showCustom, setShowCustom] = useState(false);
+  // Persisted user presets (v6 Track G): the built-in quick timers are fixed; let
+  // users save their own custom durations and reuse them across sessions.
+  const [customPresets, setCustomPresets] = useState<TimerPreset[]>(() => {
+    try { const raw = localStorage.getItem('dex-timer-presets'); const p = raw ? JSON.parse(raw) : null; if (Array.isArray(p)) return p; } catch { /* ignore */ }
+    return [];
+  });
   const intervalRef = useRef<number | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
 
@@ -134,6 +140,22 @@ const Timer: React.FC = () => {
     }
   };
 
+  // Persist user presets whenever they change.
+  useEffect(() => {
+    try { localStorage.setItem('dex-timer-presets', JSON.stringify(customPresets)); } catch { /* ignore */ }
+  }, [customPresets]);
+
+  const saveCustomPreset = useCallback(() => {
+    const seconds = customMin * 60 + customSec;
+    if (seconds <= 0) return;
+    const label = customMin > 0 ? (customSec > 0 ? `${customMin}m ${customSec}s` : `${customMin} min`) : `${customSec} sec`;
+    setCustomPresets(prev => (prev.some(p => p.seconds === seconds) ? prev : [...prev, { label, seconds }].slice(-12)));
+  }, [customMin, customSec]);
+
+  const removeCustomPreset = useCallback((seconds: number) => {
+    setCustomPresets(prev => prev.filter(p => p.seconds !== seconds));
+  }, []);
+
   // Circular progress
   const radius = 120;
   const circumference = 2 * Math.PI * radius;
@@ -236,6 +258,9 @@ const Timer: React.FC = () => {
             <button style={s.setBtn} onClick={setCustomTime}>
               Set
             </button>
+            <button style={s.setBtn} onClick={saveCustomPreset} title="Save as a reusable quick timer">
+              Save
+            </button>
           </div>
         ) : (
           <div style={s.presetsGrid}>
@@ -248,6 +273,22 @@ const Timer: React.FC = () => {
                   color: totalSeconds === preset.seconds ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-primary)',
                 }}
                 onClick={() => selectPreset(preset)}
+              >
+                {preset.label}
+              </button>
+            ))}
+            {customPresets.map(preset => (
+              <button
+                key={`custom-${preset.seconds}`}
+                style={{
+                  ...s.presetBtn,
+                  background: totalSeconds === preset.seconds ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+                  color: totalSeconds === preset.seconds ? 'var(--color-text-inverse, #fff)' : 'var(--color-text-primary)',
+                  border: '1px dashed var(--color-border-strong, var(--color-border))',
+                }}
+                onClick={() => selectPreset(preset)}
+                onContextMenu={(e) => { e.preventDefault(); removeCustomPreset(preset.seconds); }}
+                title="Saved timer — right-click to remove"
               >
                 {preset.label}
               </button>
