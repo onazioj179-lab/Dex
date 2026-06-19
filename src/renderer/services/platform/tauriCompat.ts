@@ -287,4 +287,15 @@ export function installTauriCompat(): void {
   // Expose the migration telemetry for live inspection from devtools.
   w.__dexDegradeReport = dexDegradeReport;
   console.info('[dex] Tauri IPC compatibility layer installed (degraded backend; channels port incrementally). Run __dexDegradeReport() to see what to port next.');
+
+  // Migration aid (dev only): persist the live degrade report to the KV store
+  // every few seconds so it can be read from disk (dex-kv.json -> "__dex_degrade")
+  // without opening devtools. Removed once the second-half build is done.
+  try {
+    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
+      setInterval(() => {
+        try { void dexIpc('storage:set', ['__dex_degrade', dexDegradeReport()]); } catch { /* ignore */ }
+      }, 5000);
+    }
+  } catch { /* no timer available */ }
 }

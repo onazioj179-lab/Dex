@@ -1,28 +1,31 @@
 # DEX — Roadmap (single source of truth)
 
-> **Active goal (2026-06-19): Calendar redesign + Tauri migration push.**
-> (1) Calendar reskinned to the icon-grid design (the mock): Monday-first week,
-> pill day headers, true-black rounded tile cells, per-event app icons +
-> notification dots, bold "today". Added an optional `icon` field to events with an
-> icon picker in the New Event modal; mirrored the Monday-first + icon change into
-> the FloatingLauncher calendar widget so the two stay consistent. Renderer-only,
-> `tsc` 0. (2) Tauri migration resumed: ported `analytics:*` (11 channels,
-> `src-tauri/src/analytics.rs`) and the rest of `power:*` (`PowerController.ts` ->
-> `src-tauri/src/power.rs`: profiles/stats/resource-hogs/quick-boost/cleanup) and
-> `mode:*` (6 channels, KV-backed CRUD + active-state via `modes_dispatch`) at
-> Electron parity. THEN a multi-agent workflow bulk-ported 22 more clean subsystems
-> (~110 channels: activity/duplicates/focus/memory/operations/perf/reader/resource/
-> rule/sessions/split/splitview/stability/startup/systemHealth/tags/user/voiceNotes
-> + logs/patterns/permissions/notes); 5 over-included namespaces (auth/settings/theme
-> already native; render-error/renderer shimmed) were dropped; heavy channels degrade
-> honestly (not faked). THEN round-2: a workflow bulk-ported ~119 more subsystems
-> (264 channels) across nearly every remaining namespace. main.rs mod count 74->222;
-> `cargo check` 0 errors, `tsc` GREEN. INCIDENT: round-2 agents ran `git checkout
-> main.rs`, wiping all uncommitted wiring; recovered by re-wiring from the surviving
-> module files (lost helpers rebuilt as modules modes.rs/projects.rs). LESSON: COMMIT
-> before workflows; agents must never touch shared files. Deferred (degrade to null):
-> rewind:getDaySummary, auth:setup:*, files:organizeByType. Details in
-> docs/TAURI-MIGRATION.md. Calendar follow-up still parked (15/16 icon render).
+> **CHECKPOINT (2026-06-19) — Tauri migration FIRST HALF done; SECOND HALF is next.**
+> This block is the single consolidated current plan (older per-slice goals folded in;
+> full detail in docs/TAURI-MIGRATION.md).
+>
+> **DONE & committed.** Calendar redesigned to the icon-grid (Mon-first pill headers,
+> true-black rounded tiles, per-event DexIcon glyphs + notification dots, bold today).
+> Tauri migration first half complete: **~210 namespaces natively backed** via `dex_ipc`
+> — analytics, power, mode, projects, dev-platform (git/env/ssh/fs/watch), and ~140
+> data/CRUD subsystems (round 1+2), each its own `src-tauri/src/<name>.rs`. main.rs mod
+> count 74 -> 222; `cargo check` 0 errors, `tsc` GREEN.
+>
+> **NEXT MIGRATION — second half (the path to scrapping Electron): ~630 heavy channels**
+> that need REAL native backends (not shape-ports), by category: live-runtime-state 137,
+> execution 107, network/transport 83, live-window/events 75, timers/scheduler 24,
+> binary/io 18, LLM/agent 6, other ~180. STRATEGY: usage-driven — run `npm run dev:tauri`,
+> exercise DEX, read the auto-saved degrade report (`dex-kv.json` -> `__dex_degrade`, or
+> `__dexDegradeReport()` in the app-window console) and build the channels actually hit,
+> top-down, until empty -> then flip the default shell to Tauri and retire Electron.
+>
+> **Deferred (small, currently degrade to null):** rewind:getDaySummary, auth:setup:*,
+> files:organizeByType. **Parked:** Calendar 15/16 icon-render edge case.
+>
+> **HARD RULES (from the round-2 git-checkout incident that wiped uncommitted wiring):**
+> COMMIT before any multi-agent workflow; workflow agents write ONLY their own new module
+> file and must NEVER `git checkout` or edit shared files (main.rs / capabilities.ts) —
+> the orchestrator wires centrally.
 
 > **v6 program (started 2026-06-18, in progress).** Full-system audit + refinement;
 > plan in `.claude/plans/i-need-a-prompt-stateless-harp.md`. **Phase 0 DONE + VERIFIED**
