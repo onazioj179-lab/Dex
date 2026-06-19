@@ -202,6 +202,14 @@ const TELEMETRY_SINKS = new Set<string>([
   'stability:reportFrameTime',
   'stability:reportIdle',
   'enforce:reportMetrics',
+  // Crash/memory fire-and-forget reporters. In Electron these wrote to a
+  // main-process state file / crash log / alert sink; under Tauri there is no
+  // such collector (the recovery READER isn't ported either), so the honest
+  // behaviour is accept-and-discard — exactly what a sink is. No data lost that
+  // anything currently reads. (Wire to a real native sink if/when recovery lands.)
+  'renderer:save-emergency-state',
+  'renderer:memory-critical',
+  'render-error:report',
 ]);
 
 /**
@@ -217,25 +225,21 @@ const TELEMETRY_SINKS = new Set<string>([
  *   process     — launch/execute an external program or watcher
  */
 export const NATIVE_PENDING: ReadonlyArray<{ channel: string; needs: string }> = [
-  { channel: 'fs:readFileHead', needs: 'filesystem' },
-  { channel: 'fs:readdir', needs: 'filesystem' },
-  { channel: 'media:getMediaFiles', needs: 'filesystem' },
-  { channel: 'files:organizeByType', needs: 'filesystem' },
-  { channel: 'auth:setup:pin', needs: 'keychain' },
-  { channel: 'auth:setup:password', needs: 'keychain' },
-  { channel: 'auth:setup:biometric', needs: 'keychain' },
-  { channel: 'app:launch', needs: 'process' },
-  { channel: 'watch:start', needs: 'process' },
-  { channel: 'workflow:runScript', needs: 'process' },
-  { channel: 'dexnotes:pick-attachment-file', needs: 'filesystem (native dialog returning bytes)' },
-  { channel: 'dexnotes:pick-import-file', needs: 'filesystem (native dialog returning bytes)' },
-  { channel: 'dexnotes:get-word-suggestions', needs: 'data-store (native dictionary)' },
-  { channel: 'projects:getActive', needs: 'data-store' },
-  { channel: 'projects:getAll', needs: 'data-store' },
-  { channel: 'rewind:getDaySummary', needs: 'data-store' },
-  { channel: 'renderer:save-emergency-state', needs: 'process (main-process state file)' },
-  { channel: 'renderer:memory-critical', needs: 'process (main-process alert sink)' },
-  { channel: 'render-error:report', needs: 'process (main-process crash log)' },
+  // PORTED to dex_ipc (no longer degraded): fs:readdir / fs:readFileHead (binary
+  // {__dexBinary} envelope) / media:getMediaFiles (fs_ops.rs); projects:* +
+  // rewind:getDaySummary (main.rs); watch:start/stop (watch.rs); auth:setup:* (KV
+  // sha256, Electron parity); dexnotes:pick-attachment-file / pick-import-file
+  // (native picker -> {filePath}) + get-word-suggestions ([] until a dictionary
+  // source exists). renderer:save-emergency-state / memory-critical /
+  // render-error:report are fire-and-forget sinks (see TELEMETRY_SINKS). app:launch
+  // is a renderer action (running-apps store), not a native channel.
+  //
+  // files:organizeByType (main.rs files_organize_by_type — faithful FileOperation[]
+  // move-log port; server-side undo-history is the one documented gap, see
+  // docs/TAURI-MIGRATION.md).
+  //
+  // GENUINE REMAINDER (still degraded until ported):
+  { channel: 'workflow:runScript', needs: 'process (sandboxed script execution)' },
 ];
 
 /** True when `channel` has a complete renderer-native answer below. */

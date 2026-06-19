@@ -1058,6 +1058,14 @@ declare global {
       };
       subscribe: (listener: (state: unknown) => void) => () => void;
     };
+
+    // Active Project Space (DEX 5.6) — exposed for UKI workspace-awareness.
+    __dexStageStore?: {
+      getState: () => {
+        activeStageId: string;
+        stages: Array<{ id: string; name: string; kind?: string }>;
+      };
+    };
   }
 
   // Battery Status API (still vendor-prefixed in some browsers)

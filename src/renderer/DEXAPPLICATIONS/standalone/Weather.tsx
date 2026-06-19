@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { AppErrorState, AppLoadingState } from '../../ui/AppStates';
+import { evaluateWeatherAlerts } from '../../../shared/weather/alerts';
 
 interface WeatherDay {
   day: string;
@@ -165,6 +166,17 @@ const Weather: React.FC = () => {
   const hourly = weather?.hourly ?? [];
   const detail = selectedDay !== null ? forecast[selectedDay] : null;
 
+  const alerts = current
+    ? evaluateWeatherAlerts({
+        tempC: current.temp,
+        feelsLikeC: current.feelsLike,
+        windKph: current.wind,
+        uvIndex: current.uvIndex,
+        visibilityKm: current.visibility,
+        condition: current.condition,
+      })
+    : [];
+
   return (
     <div style={s.container}>
       {/* Header */}
@@ -238,6 +250,27 @@ const Weather: React.FC = () => {
           <div style={s.detailItem}><span style={s.detailLabel}>Pressure</span><span style={s.detailValue}>{current.pressure} hPa</span></div>
         </div>
       </div>
+
+      {/* Advisories */}
+      {alerts.length > 0 && (
+        <div style={s.alertRow}>
+          {alerts.map((a, i) => (
+            <span
+              key={i}
+              style={{
+                ...s.alertChip,
+                color: a.severity === 'warning' ? 'var(--color-error)' : 'var(--color-warning)',
+                background: a.severity === 'warning'
+                  ? 'var(--color-error-muted, rgba(255,69,58,0.15))'
+                  : 'var(--color-warning-muted, rgba(255,159,10,0.15))',
+              }}
+            >
+              <DexIcon name="alert-triangle" size={12} />
+              {a.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Hourly Scroll */}
       <div style={s.section}>
@@ -335,9 +368,17 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   currentCard: {
-    padding: 'var(--space-5)', margin: 'var(--space-2) var(--space-5) var(--space-3)', borderRadius: 12,
+    padding: 'var(--space-5)', margin: 'var(--space-2) var(--space-5) var(--space-3)', borderRadius: 10,
     background: 'linear-gradient(135deg, rgba(10,132,255,0.15), rgba(94,92,230,0.1))',
     border: '1px solid var(--color-bg-hover)',
+  },
+  alertRow: {
+    display: 'flex', flexWrap: 'wrap' as const, gap: 'var(--space-2)',
+    margin: '0 var(--space-5) var(--space-3)',
+  },
+  alertChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '3px 9px', borderRadius: 8, fontSize: 11, fontWeight: 600,
   },
   currentMain: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)',

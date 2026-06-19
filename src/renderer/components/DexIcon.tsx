@@ -151,6 +151,7 @@ const ICON_PATHS: Record<string, string> = {
 
   // -- Location & Travel --------------------------------------------------
   'map-pin': '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  maps: '<polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>',
   globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
   navigation: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
 
@@ -588,7 +589,7 @@ const DexIcon: React.FC<DexIconProps> & {
         className={className}
         title={title || name}
       >
-        {name.charAt(0).toUpperCase()}
+        {(typeof name === 'string' && name.length > 0 ? name.charAt(0) : '?').toUpperCase()}
       </span>
     );
   }

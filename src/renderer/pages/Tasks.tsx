@@ -17,6 +17,7 @@ import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { DexSearchInput } from '../styles/components';
 
 // ===========================================================================
 // TYPES
@@ -701,17 +702,13 @@ export const Tasks: React.FC = () => {
         </div>
         {/* Search Bar */}
         <div style={{ padding: '0 var(--space-4) var(--space-2)' }}>
-          <input
-            type="text"
-            placeholder="Search tasks... (Ctrl+F)"
+          <DexSearchInput
+            size="sm"
+            fullWidth
+            placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6,
-              background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
-              color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
-              fontFamily: 'inherit', boxSizing: 'border-box',
-            }}
+            onClear={() => setSearchQuery('')}
           />
         </div>
 
@@ -830,7 +827,7 @@ export const Tasks: React.FC = () => {
           <div style={styles.checkbox} />
           <input
             type="text"
-            placeholder="Add a task...  (try: Email Sam tomorrow high priority)"
+            placeholder="Add a task"
             ref={newTaskInputRef}
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}

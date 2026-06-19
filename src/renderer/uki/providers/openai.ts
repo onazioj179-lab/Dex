@@ -38,7 +38,17 @@ export const openaiProvider: LLMProvider = {
       },
       body: JSON.stringify({
         model: req.model,
-        messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: req.messages.map((m) => ({
+          role: m.role,
+          // Vision: when a message carries images, send OpenAI's multimodal
+          // content array (text part + image_url parts, data URLs accepted).
+          content: m.images && m.images.length
+            ? [
+                ...(m.content ? [{ type: 'text', text: m.content }] : []),
+                ...m.images.map((url) => ({ type: 'image_url', image_url: { url } })),
+              ]
+            : m.content,
+        })),
         ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
         stream: !!req.stream,

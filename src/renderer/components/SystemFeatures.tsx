@@ -334,7 +334,7 @@ const GlobalSearchOverlay: React.FC<GlobalSearchOverlayProps> = memo(({ onClose,
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Search everything..."
+          placeholder="Search"
           autoFocus
           style={launcherStyles.input}
         />

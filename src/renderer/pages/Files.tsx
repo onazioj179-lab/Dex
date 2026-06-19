@@ -13,8 +13,10 @@
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
 import { formatBytes } from '../../shared/format/units';
+import { naturalCompare } from '../../shared/format/naturalSort';
 import { useAppTracking, useFileTracking } from '../services/usePatternLearning';
 import DexIcon from '../components/DexIcon';
+import { DexSearchInput } from '../styles/components';
 import { useToastHelpers } from '../components/Toast';
 import { getAppsForFile, inferCategoryFromFilename } from '../services/FileTypeRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
@@ -949,7 +951,8 @@ export const Files: React.FC = () => {
       let comparison = 0;
       switch (filters.sortBy) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          // Natural order so "file2" sorts before "file10" (not lexical).
+          comparison = naturalCompare(a.name, b.name);
           break;
         case 'date':
           comparison = a.modified.getTime() - b.modified.getTime();
@@ -1232,25 +1235,14 @@ export const Files: React.FC = () => {
           
           <div style={styles.toolbarRight}>
             {/* Smart Search */}
-            <div style={styles.searchBox}>
-              <Icons.search size={14} />
-              <input
-                type="text"
-                placeholder="Search by name, type..."
-                value={filters.query}
-                onChange={(e) => setFilters(f => ({ ...f, query: e.target.value }))}
-                style={styles.searchInput}
-              />
-              {filters.query && (
-                <button
-                  onClick={() => setFilters(f => ({ ...f, query: '' }))}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0 }}
-                  aria-label="Clear search"
-                >
-                  <Icons.close size={12} />
-                </button>
-              )}
-            </div>
+            <DexSearchInput
+              size="sm"
+              placeholder="Search"
+              value={filters.query}
+              onChange={(e) => setFilters(f => ({ ...f, query: e.target.value }))}
+              onClear={() => setFilters(f => ({ ...f, query: '' }))}
+              style={{ width: 240 }}
+            />
 
             {/* Filter Toggle */}
             <button
@@ -1502,7 +1494,7 @@ export const Files: React.FC = () => {
         <div style={styles.content}>
           {loadError ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)' }}>
-              <div style={{ width: 64, height: 64, borderRadius: 12, background: 'var(--color-error-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+              <div style={{ width: 64, height: 64, borderRadius: 10, background: 'var(--color-error-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-error, #ff453a)" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>Failed to load files</span>
@@ -1534,7 +1526,7 @@ export const Files: React.FC = () => {
               {filteredFiles.length === 0 ? (
                 hasActiveFilter ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)' }}>
-                    <div style={{ width: 64, height: 64, borderRadius: 12, background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                    <div style={{ width: 64, height: 64, borderRadius: 10, background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>No matches</span>
@@ -1543,7 +1535,7 @@ export const Files: React.FC = () => {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)' }}>
-                    <div style={{ width: 64, height: 64, borderRadius: 12, background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                    <div style={{ width: 64, height: 64, borderRadius: 10, background: 'var(--color-accent-soft, rgba(10,132,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>

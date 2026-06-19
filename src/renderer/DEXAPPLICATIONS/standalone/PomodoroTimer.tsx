@@ -22,14 +22,31 @@ const PHASE_LABELS: Record<Phase, string> = {
 const PHASE_COLORS: Record<Phase, string> = {
   work: 'var(--color-error)',
   shortBreak: 'var(--color-success)',
-  longBreak: '#5E5CE6',
+  longBreak: 'var(--color-accent)',
 };
+
+// Today-scoped focus stats (v6 Track G): completed sessions + focus minutes were
+// reset on every reload. Persist them per calendar day so progress survives a
+// restart and rolls over at midnight.
+const STATS_KEY = 'dex-pomodoro-stats';
+const todayKey = () => new Date().toISOString().slice(0, 10);
+function loadStats(): { sessions: number; focusMin: number } {
+  try {
+    const raw = localStorage.getItem(STATS_KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && s.date === todayKey()) return { sessions: s.sessions || 0, focusMin: s.focusMin || 0 }; }
+  } catch { /* ignore */ }
+  return { sessions: 0, focusMin: 0 };
+}
+function saveStats(sessions: number, focusMin: number): void {
+  try { localStorage.setItem(STATS_KEY, JSON.stringify({ date: todayKey(), sessions, focusMin })); } catch { /* ignore */ }
+}
 
 const PomodoroTimer: React.FC = () => {
   const [phase, setPhase] = useState<Phase>('work');
   const [remaining, setRemaining] = useState(PHASE_DURATIONS.work);
   const [running, setRunning] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState(0);
+  const [completedSessions, setCompletedSessions] = useState(() => loadStats().sessions);
+  const [focusMin, setFocusMin] = useState(() => loadStats().focusMin);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
   const totalDuration = PHASE_DURATIONS[phase];
@@ -40,6 +57,9 @@ const PomodoroTimer: React.FC = () => {
     if (phase === 'work') {
       const newCount = completedSessions + 1;
       setCompletedSessions(newCount);
+      const newFocus = focusMin + Math.round(PHASE_DURATIONS.work / 60);
+      setFocusMin(newFocus);
+      saveStats(newCount, newFocus);
       const nextPhase: Phase = newCount % 4 === 0 ? 'longBreak' : 'shortBreak';
       setPhase(nextPhase);
       setRemaining(PHASE_DURATIONS[nextPhase]);
@@ -48,7 +68,7 @@ const PomodoroTimer: React.FC = () => {
       setRemaining(PHASE_DURATIONS.work);
     }
     setRunning(false);
-  }, [phase, completedSessions]);
+  }, [phase, completedSessions, focusMin]);
 
   useEffect(() => {
     if (!running) return;
@@ -167,7 +187,7 @@ const PomodoroTimer: React.FC = () => {
           ))}
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          {completedSessions} session{completedSessions !== 1 ? 's' : ''} completed
+          {completedSessions} session{completedSessions !== 1 ? 's' : ''} · {focusMin} min focused today
         </div>
       </div>
     </div>

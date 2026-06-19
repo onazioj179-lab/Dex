@@ -4,6 +4,7 @@
  * Professional stopwatch with lap tracking
  */
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { computeLapStats } from '../../../shared/format/lapStats';
 
 const Stopwatch: React.FC = () => {
   const [elapsed, setElapsed] = useState(0);
@@ -54,10 +55,11 @@ const Stopwatch: React.FC = () => {
   // Lap deltas depend only on `laps`, but the component re-renders ~60x/sec
   // via the RAF `elapsed` tick while running — memoize so the two passes over
   // `laps` don't run every frame.
-  const { bestLap, worstLap } = useMemo(() => {
-    if (laps.length <= 1) return { bestLap: -1, worstLap: -1 };
-    const deltas = laps.map((l, i) => i === 0 ? l - (laps[1] ?? 0) : l - (laps[i + 1] ?? 0));
-    return { bestLap: Math.min(...deltas), worstLap: Math.max(...deltas) };
+  const { bestLap, worstLap, stats } = useMemo(() => {
+    // Per-lap split durations (oldest lap counts from zero, hence the last entry).
+    const splits = laps.map((l, i) => i === laps.length - 1 ? l : l - (laps[i + 1] ?? 0));
+    if (laps.length <= 1) return { bestLap: -1, worstLap: -1, stats: null };
+    return { bestLap: Math.min(...splits), worstLap: Math.max(...splits), stats: computeLapStats(splits) };
   }, [laps]);
 
   return (
@@ -108,6 +110,22 @@ const Stopwatch: React.FC = () => {
               );
             })}
           </div>
+          {stats && stats.count > 1 && (
+            <div style={s.statsBar}>
+              <div style={s.statCell}>
+                <span className="dex-label-caps" style={s.statLabel}>Avg</span>
+                <span style={s.statVal}>{fmt(stats.average)}</span>
+              </div>
+              <div style={s.statCell}>
+                <span className="dex-label-caps" style={s.statLabel}>Median</span>
+                <span style={s.statVal}>{fmt(stats.median)}</span>
+              </div>
+              <div style={s.statCell}>
+                <span className="dex-label-caps" style={s.statLabel}>Spread</span>
+                <span style={s.statVal}>&plusmn;{fmt(stats.stdDev)}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -174,6 +192,20 @@ const s: Record<string, React.CSSProperties> = {
   lapNum: { flex: 1 },
   lapSplit: { flex: 1, textAlign: 'center' },
   lapTime: { flex: 1, textAlign: 'right' },
+  statsBar: {
+    display: 'flex', flexShrink: 0,
+    borderTop: '1px solid var(--color-border-subtle)',
+    background: 'var(--color-bg-surface)',
+  },
+  statCell: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+    gap: 2, padding: 'var(--space-3) var(--space-2)',
+  },
+  statLabel: { fontSize: 9, color: 'var(--color-text-tertiary)' },
+  statVal: {
+    fontSize: 14, fontVariantNumeric: 'tabular-nums',
+    color: 'var(--color-text-primary)',
+  },
 };
 
 Stopwatch.displayName = 'Stopwatch';

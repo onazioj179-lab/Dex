@@ -82,6 +82,8 @@ export interface UkiContextSnapshot {
   personality?: 'casual' | 'formal';
   /** Free-form tags (e.g. "coding", "writing", "designing"). */
   workflowTags?: readonly string[];
+  /** Active Project Space (DEX 5.6): the named workspace + its semantic kind. */
+  activeWorkspace?: { name: string; kind: string };
   /** Active project id (from the continuity:project channel), if any. */
   activeProjectId?: string;
   /** Workflow template ids relevant to / launchable from the current state. */
@@ -109,6 +111,7 @@ export function buildSystemPrompt(ctx: UkiContextSnapshot = {}): string {
   if (ctx.online === false) ctxBits.push('offline');
   if (ctx.tier) ctxBits.push(`tier=${ctx.tier}`);
   if (ctx.workflowTags && ctx.workflowTags.length > 0) ctxBits.push(`tags=${ctx.workflowTags.join(',')}`);
+  if (ctx.activeWorkspace) ctxBits.push(`workspace=${ctx.activeWorkspace.name}(${ctx.activeWorkspace.kind})`);
   if (ctx.activeProjectId) ctxBits.push(`project=${ctx.activeProjectId}`);
   if (ctx.activeWorkflows && ctx.activeWorkflows.length > 0) ctxBits.push(`workflows=${ctx.activeWorkflows.join(',')}`);
   if (ctxBits.length > 0) lines.push(`Context: ${ctxBits.join(' | ')}.`);

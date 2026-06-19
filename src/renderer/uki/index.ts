@@ -15,6 +15,7 @@ export * from './knowledge';
 export * from './schemas';
 export * as ukiCache from './cache';
 export * as ukiFreeApis from './freeApis';
+export * as ukiAnswerEngine from './answerEngine';
 export * as ukiMemory from './memory';
 export * as ukiContext from './context';
 export * as ukiOperator from './operator';

@@ -21,6 +21,20 @@ interface PasswordEntry {
   label?: string;
 }
 
+// Shannon entropy in bits = length * log2(poolSize), with the pool inferred from
+// the character classes actually present. Bits is the precise security measure
+// behind the categorical strength bar (60+ = strong, 80+ = excellent). Pure +
+// unit-tested.
+export function passwordEntropyBits(pwd: string): number {
+  if (!pwd) return 0;
+  let pool = 0;
+  if (/[a-z]/.test(pwd)) pool += 26;
+  if (/[A-Z]/.test(pwd)) pool += 26;
+  if (/[0-9]/.test(pwd)) pool += 10;
+  if (/[^a-zA-Z0-9]/.test(pwd)) pool += 32; // common symbol set
+  return pool > 0 ? pwd.length * Math.log2(pool) : 0;
+}
+
 const PasswordGenerator: React.FC = () => {
   // ===== PATTERN LEARNING =====
   useAppTracking('password');
@@ -180,6 +194,7 @@ const PasswordGenerator: React.FC = () => {
               <div style={{ ...styles.strengthFill, width: `${strength.pct}%`, background: strength.color }} />
             </div>
             <span style={{ ...styles.strengthLabel, color: strength.color }}>{strength.label}</span>
+            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }} title="Estimated entropy (length x log2 of the character pool)">~{Math.round(passwordEntropyBits(password))} bits</span>
           </div>
 
           {/* Action Buttons */}

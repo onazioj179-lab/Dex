@@ -14,7 +14,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Button } from '../../ui/Button';
-import { TextInput } from '../../ui/TextInput';
+import { DexSearchInput } from '../../styles/components';
 import {
   recallMemory, exportMemories, type MemoryStore, type MemoryItem, type MemoryKind,
 } from '../../../shared/uki/memory';
@@ -58,12 +58,13 @@ export function MemoryInspector({ store, onForget, onExport, now }: MemoryInspec
   return (
     <section data-testid="memory-inspector" style={{ display: 'flex', flexDirection: 'column', gap: space[3] }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: space[2] }}>
-        <TextInput
+        <DexSearchInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onClear={() => setQuery('')}
           placeholder="Search memory…"
           data-testid="memory-search"
-          style={{ flex: 1 }}
+          fullWidth
         />
         <Button variant="secondary" onClick={handleExport} data-testid="memory-export">Export</Button>
       </header>

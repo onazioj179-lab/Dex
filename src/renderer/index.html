@@ -4,23 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Phase 50: Security Hardening - Content Security Policy (Strict Mode) -->
+    <!-- 'unsafe-eval' is required by the DEX Code / DexScript runtime, which runs
+         the user's own transpiled script via new Function() (see
+         DEXAPPLICATIONS/standalone/dexCode/runtime.ts). Without it DexCode cannot
+         run ANY code. The runtime sandboxes the code by nulling window/fetch/eval/
+         Function/storage. SECURITY NOTE: this widens the renderer's XSS surface;
+         the harder-but-stricter alternative is executing DexScript in a
+         main-process Node vm sandbox over IPC (keeps the renderer eval-free). -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: file:;
+      img-src 'self' data: blob: file: https://tiles.openfreemap.org;
       font-src 'self' data:;
-      connect-src 'self' ws://localhost:* http://localhost:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com;
+      connect-src 'self' ws://localhost:* http://localhost:* https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://tiles.openfreemap.org https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api-inference.huggingface.co https://api.duckduckgo.com https://en.wikipedia.org;
       media-src 'self' blob: file:;
       frame-src https: http:;
       child-src https: http:;
+      worker-src 'self' blob:;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
-      frame-ancestors 'none';
     " />
+    <!-- NOTE: frame-ancestors (CSP) and X-Frame-Options are intentionally NOT set
+         here: browsers ignore both when delivered via <meta> (only valid as HTTP
+         headers), so they were dead no-ops that logged console errors on every
+         launch. A packaged file:// desktop app is not web-embeddable, so framing/
+         clickjacking protection is moot; if ever needed, set them as real HTTP
+         headers via session.webRequest.onHeadersReceived in the main process. -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
     <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
     <!-- camera/microphone allowed for self so UKI voice search and webview media work; payment/usb/magnetometer/etc. remain disabled. -->
     <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), display-capture=(self), fullscreen=(self)" />

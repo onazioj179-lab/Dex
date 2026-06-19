@@ -1082,13 +1082,15 @@ export const useVinxStore = create<VinxState>((set, get) => {
     }),
 
     // -- Markers --
-    addMarker: (frame, name) => set(s => ({
-      project: {
-        ...s.project,
-        markers: [...s.project.markers, { id: generateId('marker'), frame, name, color: '#FF6B6B', notes: '', duration: 0, type: 'standard' }],
-      },
-      isDirty: true,
-    })),
+    // Markers are kept sorted by frame so the ruler flags, Marker Manager list,
+    // and next/prev-marker navigation all stay in chronological order. An empty
+    // name falls back to a sequential "Marker N" default.
+    addMarker: (frame, name) => set(s => {
+      const resolvedName = name && name.trim() ? name : `Marker ${s.project.markers.length + 1}`;
+      const marker: Marker = { id: generateId('marker'), frame, name: resolvedName, color: '#FF6B6B', notes: '', duration: 0, type: 'standard' };
+      const markers = [...s.project.markers, marker].sort((a, b) => a.frame - b.frame);
+      return { project: { ...s.project, markers }, isDirty: true };
+    }),
     removeMarker: (id) => set(s => ({
       project: { ...s.project, markers: s.project.markers.filter(m => m.id !== id) },
       isDirty: true,
@@ -1509,9 +1511,12 @@ export const useVinxStore = create<VinxState>((set, get) => {
 
     // Marker Manager
     toggleMarkerManager: () => set(s => ({ showMarkerManager: !s.showMarkerManager })),
-    updateMarker: (id, updates) => set(s => ({
-      project: { ...s.project, markers: s.project.markers.map(m => m.id === id ? { ...m, ...updates } : m) }, isDirty: true,
-    })),
+    updateMarker: (id, updates) => set(s => {
+      let markers = s.project.markers.map(m => m.id === id ? { ...m, ...updates } : m);
+      // Re-sort only if a frame moved, so markers stay chronological.
+      if (updates.frame !== undefined) markers = [...markers].sort((a, b) => a.frame - b.frame);
+      return { project: { ...s.project, markers }, isDirty: true };
+    }),
 
     // Snap Settings
     toggleSnapSettings: () => set(s => ({ showSnapSettings: !s.showSnapSettings })),

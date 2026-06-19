@@ -5,15 +5,35 @@
  */
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import DOMPurify from 'dompurify';
+import { lintMarkdown } from '../../../shared/format/markdownLint';
 
 const MarkdownEditor: React.FC = () => {
   const [content, setContent] = useState('');
   const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('split');
   const [wordWrap, setWordWrap] = useState(true);
+  const [showToc, setShowToc] = useState(false);
   const [fileName, setFileName] = useState('untitled.md');
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   // Simple markdown to HTML parser
+  // Document outline (v6 Track G): parse ATX headings + their source offset so the
+  // TOC can jump the editor caret to a section. Pure derivation from content.
+  const headings = useMemo(() => {
+    const out: { level: number; text: string; index: number }[] = [];
+    const re = /^(#{1,6})\s+(.+)$/gm;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(content)) !== null) out.push({ level: m[1].length, text: m[2].trim(), index: m.index });
+    return out;
+  }, [content]);
+
+  const jumpToHeading = (index: number) => {
+    const ta = editorRef.current;
+    if (!ta) return;
+    if (viewMode === 'preview') setViewMode('split');
+    ta.focus();
+    ta.setSelectionRange(index, index); // Chromium scrolls the caret into view
+  };
+
   const renderMarkdown = useMemo(() => {
     let html = content;
     // Sanitize HTML entities to prevent XSS
@@ -126,6 +146,8 @@ const MarkdownEditor: React.FC = () => {
     return { words, chars, lines };
   }, [content]);
 
+  const lintIssues = useMemo(() => lintMarkdown(content), [content]);
+
   const exportMd = useCallback(() => {
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -158,6 +180,7 @@ const MarkdownEditor: React.FC = () => {
           <button style={s.fmtBtn} onClick={() => insertFormatting('```\n', '\n```')} title="Code block" aria-label="Code block">{ '{ }' }</button>
         </div>
         <div style={s.toolbarRight}>
+          <button style={{ ...s.fmtBtn, ...(showToc ? { color: 'var(--color-accent, #4a9eff)' } : {}) }} onClick={() => setShowToc(v => !v)} title="Outline" aria-label="Toggle outline" aria-pressed={showToc}>TOC</button>
           <div style={s.viewToggle}>
             {(['editor', 'split', 'preview'] as const).map(mode => (
               <button
@@ -181,6 +204,23 @@ const MarkdownEditor: React.FC = () => {
 
       {/* Editor / Preview Panes */}
       <div style={s.panes}>
+        {showToc && (
+          <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--color-border, rgba(255,255,255,0.08))', overflow: 'auto', padding: 'var(--space-2)' }}>
+            <div className="dex-label-caps" style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '4px 6px' }}>Outline</div>
+            {headings.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px 6px' }}>No headings yet</div>
+            ) : headings.map((h, i) => (
+              <button
+                key={i}
+                onClick={() => jumpToHeading(h.index)}
+                title={h.text}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '3px 6px', paddingLeft: 6 + (h.level - 1) * 10, background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              >
+                {h.text}
+              </button>
+            ))}
+          </div>
+        )}
         {viewMode !== 'preview' && (
           <div style={{ ...s.pane, borderRight: viewMode === 'split' ? '1px solid var(--color-border, rgba(255,255,255,0.08))' : 'none' }}>
             <textarea
@@ -208,6 +248,14 @@ const MarkdownEditor: React.FC = () => {
         <span>{stats.words} words</span>
         <span>{stats.chars} chars</span>
         <span>{stats.lines} lines</span>
+        {lintIssues.length > 0 && (
+          <span
+            style={{ color: 'var(--color-warning)', cursor: 'default' }}
+            title={lintIssues.map(i => `Line ${i.line}: ${i.message}`).join('\n')}
+          >
+            {lintIssues.length} issue{lintIssues.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
     </div>
   );

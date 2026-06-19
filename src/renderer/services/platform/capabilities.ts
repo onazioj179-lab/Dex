@@ -46,6 +46,20 @@ export const TAURI_NATIVE_SUBSYSTEMS: readonly string[] = [
   'notification-center', 'localization', 'global-search', 'fts', 'multiwindow',
   'multimonitor', 'migration', 'link-preview', 'live-collab', 'file-watcher',
   'backup', 'uki-chat',
+  // Dev-platform subsystems (Tier 5), ported to dex_ipc (git.rs / env_manager.rs /
+  // ssh.rs). system:killProcessTree rides under the already-native 'system'.
+  'git', 'env', 'ssh', 'fs', 'projects', 'watch',
+  // Analytics (pure-data, JSON-backed; port of AnalyticsManager.ts in analytics.rs).
+  'analytics',
+  // Focus/automation Modes (KV-backed CRUD + active-state; modes_dispatch in main.rs).
+  'mode',
+  // Workflow-ported clean subsystems (2026-06-19): KV/JSON CRUD + live-metric reads.
+  // Heavy channels within these namespaces degrade to null (documented per module).
+  'activity', 'duplicates', 'focus', 'memory', 'operations', 'perf', 'reader',
+  'resource', 'rule', 'sessions', 'split', 'splitview', 'stability', 'startup',
+  'systemHealth', 'tags', 'user', 'voiceNotes', 'logs', 'patterns', 'permissions',
+  'notes',
+  'accessibility', 'adaptive', 'advisory', 'api', 'archive', 'autofill', 'background-tasks', 'batch', 'battery', 'behavior', 'browser', 'budget', 'cli', 'cloudsync', 'code', 'connectors', 'containment', 'context', 'contract', 'controls', 'corepc', 'crash-reporter', 'creator', 'db-perf', 'deeplink', 'device', 'devplatform', 'documents', 'dtp', 'editor', 'embedding', 'encryption', 'enforce', 'engine', 'export', 'extensions', 'failure', 'features', 'folderrules', 'gallery', 'games', 'governance', 'gpu', 'guardrails', 'hardware', 'healing', 'history', 'hotkeys', 'http-transfer', 'idle', 'import', 'input', 'intelligence', 'ipc-perf', 'keys', 'largefile', 'launcher', 'learning', 'longevity', 'maintenance', 'mediaorg', 'mental', 'monitor', 'motion', 'multiuser', 'network', 'nextgen', 'nexus', 'observability', 'optimistic', 'performance', 'permission', 'phase1', 'pipeline', 'plugin-gate', 'plugins', 'prerender', 'privacy', 'pty', 'quickactions', 'recovery', 'reliability', 'render', 'renderer-health', 'resource-governor', 'scheduler', 'scripting', 'security', 'selftest', 'session', 'shutdown-sequencer', 'snapshot', 'softero', 'startup-sequencer', 'state', 'state-sync', 'store', 'sync', 'tagging', 'task-queue', 'tasks', 'thermal', 'timeline', 'transfer', 'trust', 'uki', 'undo', 'uninstall', 'update', 'update-service', 'updates', 'video', 'vinx', 'visual', 'voice', 'wake', 'watchdog', 'workflow', 'xenon',
 ];
 
 const TAURI_SET = new Set(TAURI_NATIVE_SUBSYSTEMS);

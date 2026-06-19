@@ -11,6 +11,7 @@
 
 import React, { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { DexSearchInput } from '../../styles/components';
 import {
   ACHIEVEMENTS, CATEGORY_META, RARITY_META,
   type Achievement, type AchievementCategory, type UserStats,
@@ -155,18 +156,14 @@ const Achievements: React.FC = () => {
           ))}
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 10px', borderRadius: 6,
-            background: 'var(--color-bg-hover, rgba(255,255,255,.04))',
-            border: '1px solid var(--color-border-subtle, rgba(255,255,255,.06))',
-            flex: 1, maxWidth: 280,
-          }}>
-            <DexIcon name="search" size={12} color="var(--color-text-tertiary, rgba(255,255,255,.35))" />
-            <input
-              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          <div style={{ flex: 1, maxWidth: 280 }}>
+            <DexSearchInput
+              size="sm"
+              fullWidth
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onClear={() => setSearchQuery('')}
               placeholder="Search..."
-              style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontSize: 12, width: '100%' }}
             />
           </div>
           <div style={{ display: 'flex', gap: 2, background: 'var(--color-bg-hover, rgba(255,255,255,.03))', borderRadius: 6, padding: 2 }}>

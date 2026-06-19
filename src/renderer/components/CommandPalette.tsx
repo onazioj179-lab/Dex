@@ -19,6 +19,8 @@ import { platform } from '../utils';
 import { scopedQuery } from '../services/commandScope';
 import { getRecentCommandIds, recordRecentCommand } from '../services/recentCommands';
 import { listPresets, type WorkspacePreset } from '../shell/WorkspacePresets';
+import { useStageStore, STAGE_KIND_META, type StageKind } from '../store/stageStore';
+import { openWorkflowSpace, WORKFLOW_TEMPLATES } from '../services/projectSpaces';
 import { exportDiagnostics, resetSettingsToDefaults } from '../services/ErrorBoundary';
 import { buildDexCommands, resolveShortcut } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
@@ -189,6 +191,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     return () => window.removeEventListener('dex-workspace-presets-changed', refresh);
   }, [isOpen]);
 
+  // Project Spaces (DEX 5.6) — switch the active workspace context, or spin up a
+  // new one. Subscribed so the "Switch Space" list stays current.
+  const stages = useStageStore((s) => s.stages);
+  const activeStageId = useStageStore((s) => s.activeStageId);
+
   // Build command list
   const commands: Command[] = useMemo(() => [
     // Apps — System
@@ -257,11 +264,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     ...(wsPresets.length > 0 ? [{ id: 'manage-workspaces', title: 'Manage Workspace Layouts', subtitle: 'Rename or delete saved layouts', icon: Icons.workflows, category: 'action' as const, action: () => window.dispatchEvent(new CustomEvent('dex-workspace-manage')), keywords: ['workspace', 'layout', 'manage', 'rename', 'delete', 'edit'] }] : []),
     ...wsPresets.map((p): Command => ({ id: 'restore-ws-' + p.id, title: `Restore Workspace: ${p.name}`, subtitle: `${p.windows.length} window${p.windows.length === 1 ? '' : 's'}`, icon: Icons.workflows, category: 'action', action: () => window.dispatchEvent(new CustomEvent('dex-workspace-restore', { detail: { id: p.id } })), keywords: ['workspace', 'layout', 'restore', 'open', p.name.toLowerCase()] })),
 
+    // Project Spaces (DEX 5.6) — the active workspace context (kind-aware).
+    { id: 'new-space', title: 'New Project Space', subtitle: 'Create a dedicated workspace and switch to it', icon: Icons.workflows, category: 'action', action: () => { const name = window.prompt('Name this project space:'); if (name && name.trim()) { const id = useStageStore.getState().createStage({ name: name.trim() }); useStageStore.getState().setActiveStage(id); } }, keywords: ['workspace', 'space', 'project', 'new', 'create', 'stage', 'context'] },
+    ...stages.filter(s => s.id !== activeStageId).map((s): Command => ({ id: 'switch-space-' + s.id, title: `Switch Space: ${s.name}`, subtitle: `${STAGE_KIND_META[(s.kind ?? 'general') as StageKind].label} space`, icon: Icons.workflows, category: 'action', action: () => useStageStore.getState().setActiveStage(s.id), keywords: ['workspace', 'space', 'switch', 'stage', 'project', 'context', s.name.toLowerCase()] })),
+    // Open a workflow template as a fresh, kind-tagged Project Space (apps tiled +
+    // UKI project awareness). Static list — no memo dep needed.
+    ...WORKFLOW_TEMPLATES.map((t): Command => ({ id: 'open-workflow-' + t.id, title: `Open Workspace: ${t.name}`, subtitle: t.description, icon: Icons.workflows, category: 'action', action: () => openWorkflowSpace(t.id), keywords: ['workspace', 'workflow', 'space', 'open', 'template', 'project', ...t.tags, t.name.toLowerCase()] })),
+
     // Settings
     { id: 'toggle-theme', title: 'Toggle Dark/Light Theme', subtitle: 'Switch appearance', icon: Icons.theme, category: 'settings', action: () => { toggleTheme(); }, keywords: ['dark', 'light', 'appearance'] },
     { id: 'open-appearance', title: 'Appearance Settings', subtitle: 'Colors, fonts, accent', icon: Icons.colorpicker, category: 'settings', action: () => { openApp('settings'); }, keywords: ['theme', 'color', 'font', 'accent'] },
     { id: 'open-keyboard', title: 'Keyboard Shortcuts', subtitle: 'View all shortcuts', icon: Icons.calculator, category: 'settings', action: () => { openApp('settings'); }, keywords: ['hotkey', 'keybind', 'shortcut'] },
     { id: 'open-privacy', title: 'Privacy Settings', subtitle: 'Security and privacy options', icon: Icons.password, category: 'settings', action: () => { openApp('settings'); }, keywords: ['security', 'privacy', 'encryption'] },
+    { id: 'uki-permissions', title: 'UKI Permissions', subtitle: 'Control what UKI can access (screen, files, shell, mic…)', icon: Icons.password, category: 'settings', action: () => window.dispatchEvent(new CustomEvent('dex-permission-center')), keywords: ['permission', 'permissions', 'capability', 'grant', 'revoke', 'access', 'security', 'uki', 'privacy'] },
     { id: 'reset-settings', title: 'Reset Appearance & Settings', subtitle: 'Restore UI preferences to defaults (your data is kept)', icon: Icons.theme, category: 'settings', action: () => { if (window.confirm('Reset appearance and UI settings to defaults?\n\nYour notes, tasks, files, and projects are NOT affected.')) { resetSettingsToDefaults(); window.location.reload(); } }, keywords: ['reset', 'defaults', 'settings', 'recover', 'fix', 'corrupt', 'restore', 'broken'] },
 
     // DEX catalog action commands not covered above (tile/maximize/uki/compact/nav),
@@ -278,7 +293,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         keywords: c.keywords,
         shortcut: resolveShortcut(c, platform.isMac) || undefined,
       })),
-  ], [openApp, wsPresets]);
+  ], [openApp, wsPresets, stages, activeStageId]);
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
@@ -517,7 +532,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a command or search..."
+            placeholder="Search"
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}

@@ -39,10 +39,10 @@ const sharedField = (size: InputSize, invalid: boolean): React.CSSProperties => 
 
 const focusOn = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, invalid: boolean) => {
   const el = e.currentTarget;
-  el.style.borderColor = invalid ? 'var(--color-error, #FF453A)' : 'var(--color-accent, #4A9EFF)';
+  el.style.borderColor = invalid ? 'var(--color-error, #FF453A)' : 'var(--dex-focus-color, #fff)';
   el.style.boxShadow = invalid
     ? '0 0 0 3px rgba(255, 69, 58, 0.18)'
-    : '0 0 0 3px rgba(74, 158, 255, 0.20)';
+    : '0 0 0 3px var(--dex-focus-glow, rgba(255, 255, 255, 0.22))';
 };
 
 const focusOff = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, invalid: boolean) => {

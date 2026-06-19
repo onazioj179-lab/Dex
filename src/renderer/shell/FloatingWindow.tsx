@@ -632,7 +632,10 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           // Use clip-path for visual corner rounding without clipping menus
           clipPath: maximized ? 'none' : 'inset(0 round 10px)',
           boxShadow: dragging ? '0 20px 50px rgba(0,0,0,0.4)' : shadowLevel,
-          opacity: isActive ? 1 : 0.94,
+          // Windows are always fully opaque -- never see-through to the wallpaper
+          // or windows behind. Inactive windows are distinguished by the dimmer
+          // title bar + lighter shadow, not by transparency.
+          opacity: 1,
           contain: 'layout style',
           willChange: 'auto',
           transition: 'none',

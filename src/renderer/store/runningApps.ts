@@ -324,8 +324,8 @@ export const useRecentlyUsedApps = () => useRunningApps(useShallow(s => {
 // `version`/`buildDate` overrides are still honoured (creative-suite apps
 // historically tracked independent versions but are now aligned to platform
 // release for the 4.4.0 wave to remove user confusion).
-const PLATFORM_VERSION = '4.4.0';
-const PLATFORM_BUILD_DATE = '2026-05-12';
+const PLATFORM_VERSION = '6.0.0';
+const PLATFORM_BUILD_DATE = '2026-06-18';
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 const _O = platform.isMac ? '⌥' : 'Alt';
@@ -338,6 +338,7 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   transfers: { name: 'Share', color: '#32D74B', icon: 'share', shortcut: `${_O}+T`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
   settings: { name: 'Settings', color: 'var(--color-text-tertiary)', icon: 'settings', shortcut: `${_M}+2`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system' },
   taskmanager: { name: 'Task Manager', color: 'var(--color-accent)', icon: 'taskmanager', shortcut: `${_M}+Shift+Esc`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Monitor open DEX apps, system load, and native processes' },
+  liveactivity: { name: 'Live Activity', color: '#32D74B', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'A live, browsable feed of everything happening across DEX' },
 
   // Productivity Apps
   notes: { name: 'Notes', color: 'var(--color-warning)', icon: 'notes', shortcut: `${_M}+4`, version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
@@ -379,6 +380,9 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   worldclock: { name: 'World Clock', color: 'var(--color-warning)', icon: 'worldclock', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility' },
   noisegenerator: { name: 'Noise', color: 'var(--color-success)', icon: 'noisegenerator', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'media' },
   dexcode: { name: 'DexCode', color: 'var(--color-text-primary)', icon: 'dexcode', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
+  git: { name: 'Git', color: '#F05133', icon: 'git-branch', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Source control — status, stage, commit, branches, pull/push, and log for any repo' },
+  env: { name: 'Environment', color: '#64D2FF', icon: 'code', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'View system environment variables and manage DEX-scoped overlays per app' },
+  ssh: { name: 'SSH', color: '#30D158', icon: 'terminal', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'SSH connection profiles, key generation, and quick connect commands' },
   nexus: { name: 'Nexus', color: 'var(--color-accent)', icon: 'nexus', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity' },
 
   // Utility Apps (standalone)
@@ -397,6 +401,7 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   presentation: { name: 'Presentation', color: '#FF9F0A', icon: 'presentation', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Build and present slide decks with transitions' },
   pdfviewer: { name: 'PDF Viewer', color: '#5E5CE6', icon: 'pdfviewer', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Read and annotate PDF documents' },
   pixelart: { name: 'Pixel Art', color: '#34C759', icon: 'pixelart', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative', description: 'NES-style pixel grid editor with frames' },
+  maps: { name: 'DEX Maps', color: 'var(--color-app-maps)', icon: 'maps', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Interactive vector maps, place search, and navigation' },
 
   // Storefront and Games surfaces (registry-backed so dock, Launchpad, UKI resolve metadata)
   store: { name: 'Store', color: '#0A84FF', icon: 'store', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Discover and install DEX apps and plugins from the catalog' },

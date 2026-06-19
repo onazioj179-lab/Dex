@@ -4,6 +4,7 @@
  * Generate QR codes from text, URLs, Wi-Fi, contacts
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react';
+import { qrMatrixToSVG } from '../../../shared/format/qrSvg';
 
 type QRMode = 'text' | 'url' | 'wifi' | 'contact';
 
@@ -76,6 +77,17 @@ const QRCodeGenerator: React.FC = () => {
     link.href = canvas.toDataURL('image/png');
     link.click();
   }, []);
+
+  const downloadSVG = useCallback(() => {
+    if (!qrMatrix) return;
+    const svg = qrMatrixToSVG(qrMatrix, { fg: fgColor, bg: bgColor });
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const link = document.createElement('a');
+    link.download = 'dex-qrcode.svg';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [qrMatrix, fgColor, bgColor]);
 
   const copyQR = useCallback(async () => {
     const canvas = canvasRef.current;
@@ -165,6 +177,10 @@ const QRCodeGenerator: React.FC = () => {
             <button onClick={downloadQR} style={s.actionBtn} aria-label="Download QR code as PNG">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download PNG
+            </button>
+            <button onClick={downloadSVG} style={s.actionBtn} aria-label="Download QR code as SVG">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              SVG
             </button>
             <button onClick={copyQR} style={s.actionBtn} aria-label="Copy QR code to clipboard">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>

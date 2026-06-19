@@ -543,18 +543,32 @@ export const Home: React.FC = () => {
         opacity: repaintNonce % 2 === 0 ? 1 : 0.999,
       }}
     >
-      {/* Wallpaper Layer -- Item 151: GPU-accelerated with will-change */}
+      {/* Desktop background -- honors the user's wallpaper choice (image, gradient,
+          or solid color). A solid preset (e.g. "Glass Black") still reads as a flat
+          surface; an image/gradient now actually shows, like a real OS desktop. Live
+          wallpapers paint via the animated layer just below. */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 0,
+        background: 'var(--color-bg-base)',
         ...wallpaperBg,
         filter: wpBlur > 0 ? `blur(${wpBlur}px)` : undefined,
-        transform: wpBlur > 0 ? 'scale(1.05)' : undefined,
-        transition: 'all 0.4s ease',
-        willChange: 'transform, filter',
+        transform: wpBlur > 0 ? 'scale(1.06)' : undefined,
+        transition: 'background 0.4s ease, filter 0.35s ease',
         contain: 'layout style paint',
       }} />
 
-      {/* Removed dark overlay per user request - full wallpaper visibility */}
+      {/* Readability scrim -- a gentle tint over the wallpaper so desktop text and
+          icons stay legible on bright or busy images. Skipped for solid wallpapers
+          (nothing to dim) and when the tint is transparent. */}
+      {wpMode !== 'solid' && wpTint && wpTint !== 'transparent' && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0, zIndex: 0,
+          background: wpTint,
+          opacity: Math.min(1, Math.max(0, wpOpacity ?? 0.3)),
+          pointerEvents: 'none',
+          transition: 'opacity 0.3s ease, background 0.3s ease',
+        }} />
+      )}
 
       {/* Live Wallpaper Animation Layer */}
       {wpMode === 'live' && (

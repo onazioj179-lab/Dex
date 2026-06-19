@@ -14,6 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { DexSearchInput } from '../styles/components';
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'success' | 'debug';
 
@@ -157,23 +158,14 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
             {LEVEL_LABELS[lvl].trim()}
           </button>
         ))}
-        <input
-          type="search"
+        <DexSearchInput
+          size="sm"
           placeholder="filter..."
           value={search}
           onChange={e => setSearch(e.currentTarget.value)}
+          onClear={() => setSearch('')}
           aria-label="Filter log messages"
-          style={{
-            marginLeft: 'auto',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 3,
-            color: 'var(--pg-text-primary, #fff)',
-            padding: '2px var(--space-2)',
-            fontSize: 11,
-            fontFamily: 'inherit',
-            width: 140,
-          }}
+          style={{ marginLeft: 'auto', width: 140 }}
         />
         <button
           onClick={clear}

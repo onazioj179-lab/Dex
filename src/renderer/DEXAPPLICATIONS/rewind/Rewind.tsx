@@ -11,10 +11,13 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import { RewindViewErrorBoundary } from './RewindViewErrorBoundary';
 import { getBundledAppVersion } from '../../utils/appVersion';
 import DexIcon from '../../components/DexIcon';
+import { DexSearchInput } from '../../styles/components';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { buildTimeline, sessionDuration } from '../../../shared/rewind/timeline';
 import { groupSessionsByDay, describeSession, formatDuration } from '../../../shared/rewind/timelineView';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { spaceAt } from '../../store/stageActivityLog';
+import { STAGE_KIND_META, type StageKind } from '../../store/stageStore';
 
 // ===========================================================================
 // TYPES
@@ -1146,9 +1149,8 @@ const timer = setInterval(check, 15000);
     <div style={S.root} className="rewind-app">
       <style>{`
         /* === REWIND - UI HOVER === */
-        .rewind-app button { font-family: inherit; transition: all 0.12s ease; }
-        .rewind-app button:active { transform: scale(0.97); }
-        .rewind-app button:hover { background: rgba(74,158,255,0.08) !important; color: var(--rewind-accent, #4A9EFF) !important; }
+        .rewind-app button { font-family: inherit; transition: background 0.12s ease, border-color 0.12s ease; }
+        .rewind-app button:hover { background: var(--color-surface-2) !important; }
         .rewind-app * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
         .rewind-app ::-webkit-scrollbar { width: 6px; height: 6px; }
         .rewind-app ::-webkit-scrollbar-track { background: transparent; }
@@ -1304,7 +1306,7 @@ const timer = setInterval(check, 15000);
                   setCommandPaletteOpen(false);
                 }
               }}
-              placeholder="Type a command or search activity"
+              placeholder="Search"
               style={{
                 width: '100%',
                 padding: '14px var(--space-4)',
@@ -1333,7 +1335,7 @@ const timer = setInterval(check, 15000);
                       padding: '10px var(--space-3)',
                       borderRadius: 6,
                       border: 'none',
-                      background: commandIndex === idx ? 'rgba(74,158,255,0.15)' : 'transparent',
+                      background: commandIndex === idx ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
                       color: 'var(--color-text-primary)',
                       cursor: 'pointer',
                     }}
@@ -1358,7 +1360,7 @@ const timer = setInterval(check, 15000);
                       padding: '10px var(--space-3)',
                       borderRadius: 6,
                       border: 'none',
-                      background: commandIndex === idx ? 'rgba(74,158,255,0.15)' : 'transparent',
+                      background: commandIndex === idx ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
                       color: 'var(--color-text-primary)',
                       cursor: 'pointer',
                     }}
@@ -1459,11 +1461,12 @@ const timer = setInterval(check, 15000);
           {/* Inline search input (only in search mode) */}
           {overviewSection === 'search' && (
             <div style={{ flex: 1, display: 'flex', gap: 10 }}>
-              <input
+              <DexSearchInput
                 ref={searchInputRef}
-                style={{ ...S.searchInput, flex: 1, height: 40, fontSize: 14 }}
+                fullWidth
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
+                onClear={() => setSearchQuery('')}
                 onKeyDown={e => e.key === 'Enter' && doSearch()}
                 placeholder="Search activity"
                 autoFocus
@@ -1483,7 +1486,7 @@ const timer = setInterval(check, 15000);
                     padding: 'var(--space-2) 14px',
                     borderRadius: 8,
                     fontSize: 12,
-                    ...(filterType === t ? { background: 'rgba(74,158,255,0.15)', color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))' } : {}),
+                    ...(filterType === t ? { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', color: 'var(--color-text-primary)' } : {}),
                   }}
                   onClick={() => setFilterType(t)}
                   aria-label={`Filter by ${t === 'all' ? 'all' : TYPE_LABELS[t] || t}`}
@@ -1699,7 +1702,7 @@ const timer = setInterval(check, 15000);
               key={t}
               style={{
                 ...S.filterBtn,
-                ...(filterType === t ? { background: 'rgba(74,158,255,0.15)', color: 'var(--rewind-accent, var(--color-accent, #4A9EFF))' } : {}),
+                ...(filterType === t ? { background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)', color: 'var(--color-text-primary)' } : {}),
               }}
               onClick={() => setFilterType(t)}
               aria-label={`Filter by ${t === 'all' ? 'all' : TYPE_LABELS[t] || t}`}
@@ -1719,24 +1722,43 @@ const timer = setInterval(check, 15000);
                   {day.heading}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {day.sessions.map(sess => (
+                  {day.sessions.map(sess => {
+                    // Which Project Space was active when this session happened?
+                    const space = spaceAt(sess.startTs);
+                    const spaceMeta = space ? STAGE_KIND_META[(space.kind as StageKind)] : undefined;
+                    return (
                     <div
                       key={sess.id}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '4px 10px', borderRadius: 999,
-                        background: 'rgba(74,158,255,0.10)',
-                        border: '1px solid rgba(74,158,255,0.18)',
+                        padding: '4px 10px', borderRadius: 6,
+                        background: 'var(--color-surface-1)',
+                        border: '1px solid var(--color-border-subtle)',
                         fontSize: 11, color: 'var(--rewind-text, #e4e4e7)',
                       }}
-                      title={describeSession(sess)}
+                      title={space ? `${describeSession(sess)} · ${space.name} space` : describeSession(sess)}
                     >
+                      {space && spaceMeta && (
+                        <span
+                          style={{
+                            fontSize: 9, fontWeight: 700, letterSpacing: '0.03em',
+                            padding: '1px 5px', borderRadius: 4,
+                            background: spaceMeta.accent.startsWith('#') ? `${spaceMeta.accent}26` : 'var(--color-accent-subtle)',
+                            color: spaceMeta.accent.startsWith('#') ? spaceMeta.accent : 'var(--color-accent)',
+                            textTransform: 'uppercase',
+                          }}
+                          title={`Workspace: ${space.name}`}
+                        >
+                          {spaceMeta.label}
+                        </span>
+                      )}
                       <span style={{ fontWeight: 600 }}>{sess.primaryAppId}</span>
                       <span style={{ opacity: 0.5 }}>{formatDuration(sessionDuration(sess))}</span>
                       <span style={{ opacity: 0.4 }}>·</span>
                       <span style={{ opacity: 0.6 }}>{sess.eventCount} event{sess.eventCount === 1 ? '' : 's'}</span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -1795,13 +1817,14 @@ const timer = setInterval(check, 15000);
 
         {/* Search bar */}
         <div style={S.searchBar}>
-          <input
+          <DexSearchInput
             ref={searchInputRef}
-            style={S.searchInput}
+            fullWidth
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            onClear={() => setSearchQuery('')}
             onKeyDown={e => e.key === 'Enter' && doSearch()}
-            placeholder="Search activity (e.g. copied password, opened Chrome, file report)"
+            placeholder="Search"
           />
           <button style={S.searchBtn} onClick={doSearch} aria-label="Search">Search</button>
         </div>
@@ -1949,8 +1972,8 @@ const timer = setInterval(check, 15000);
                 style={{
                   padding: '4px 10px', borderRadius: 4, border: 'none', fontSize: 11, fontWeight: 500,
                   cursor: 'pointer', fontFamily: 'inherit',
-                  background: journalFilter === f ? 'rgba(74,158,255,0.15)' : 'transparent',
-                  color: journalFilter === f ? 'var(--color-accent)' : 'var(--text-muted, #71717a)',
+                  background: journalFilter === f ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+                  color: journalFilter === f ? 'var(--color-text-primary)' : 'var(--text-muted, #71717a)',
                 }}
                 aria-label={`Filter: ${f}`}
               >
@@ -1961,16 +1984,12 @@ const timer = setInterval(check, 15000);
         </div>
 
         {/* Search across journal entries (title, body, tags) */}
-        <input
-          type="text"
-          placeholder="Search journal..."
+        <DexSearchInput
+          fullWidth
+          placeholder="Search"
           value={journalSearch}
           onChange={e => setJournalSearch(e.target.value)}
-          style={{
-            background: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)',
-            borderRadius: 6, padding: 'var(--space-2) var(--space-3)', color: 'inherit', fontSize: 13,
-            outline: 'none', fontFamily: 'inherit',
-          }}
+          onClear={() => setJournalSearch('')}
           aria-label="Search journal entries"
         />
         {q && filtered.length === 0 && (
@@ -2079,9 +2098,9 @@ const timer = setInterval(check, 15000);
                     onClick={() => linkActivityToJournal(journalEditing, act.id)}
                     style={{
                       padding: '3px var(--space-2)', borderRadius: 4, fontSize: 10, cursor: 'pointer',
-                      border: `1px solid ${linked ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)'}`,
-                      background: linked ? 'rgba(74,158,255,0.12)' : 'transparent',
-                      color: linked ? 'var(--color-accent)' : 'var(--text-muted, #71717a)',
+                      border: `1px solid ${linked ? 'var(--dex-focus-color, #fff)' : 'rgba(255,255,255,0.1)'}`,
+                      background: linked ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+                      color: linked ? 'var(--color-text-primary)' : 'var(--text-muted, #71717a)',
                       fontFamily: 'inherit',
                     }}
                     title={act.content}

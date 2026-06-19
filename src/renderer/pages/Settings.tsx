@@ -1430,9 +1430,9 @@ const TextDensityControls: React.FC<{
                 onClick={() => applyDensity(opt.id)}
                 style={{
                   padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                  background: active ? 'var(--color-accent-light)' : 'transparent',
-                  color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  border: active ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
+                  background: active ? 'var(--color-bg-active, #252528)' : 'transparent',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >
                 {opt.label}
@@ -2379,8 +2379,8 @@ export const Settings: React.FC = () => {
                 aria-pressed={prefs.dockEdge === edge}
                 style={{
                   ...styles.button,
-                  background: prefs.dockEdge === edge ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: prefs.dockEdge === edge ? 'var(--color-accent-text)' : 'var(--color-text-primary)',
+                  background: prefs.dockEdge === edge ? 'var(--color-bg-active, #252528)' : 'var(--color-bg-hover)',
+                  color: prefs.dockEdge === edge ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
                   textTransform: 'capitalize',
                 }}
                 onClick={() => prefs.setDockEdge(edge)}
@@ -2403,8 +2403,8 @@ export const Settings: React.FC = () => {
                 aria-pressed={prefs.dockPreset === preset}
                 style={{
                   ...styles.button,
-                  background: prefs.dockPreset === preset ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: prefs.dockPreset === preset ? 'var(--color-accent-text)' : 'var(--color-text-primary)',
+                  background: prefs.dockPreset === preset ? 'var(--color-bg-active, #252528)' : 'var(--color-bg-hover)',
+                  color: prefs.dockPreset === preset ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
                   textTransform: 'capitalize',
                 }}
                 onClick={() => prefs.setDockPreset(preset)}
@@ -2432,8 +2432,8 @@ export const Settings: React.FC = () => {
                 aria-pressed={prefs.glassMode === mode.id}
                 style={{
                   ...styles.button,
-                  background: prefs.glassMode === mode.id ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: prefs.glassMode === mode.id ? 'var(--color-accent-text)' : 'var(--color-text-primary)',
+                  background: prefs.glassMode === mode.id ? 'var(--color-bg-active, #252528)' : 'var(--color-bg-hover)',
+                  color: prefs.glassMode === mode.id ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
                 }}
                 onClick={() => prefs.setGlassMode(mode.id)}
               >{mode.label}</button>
@@ -2547,18 +2547,6 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Pin Stage Manager open</span>
-            <span style={styles.settingDesc}>Keep the left strip expanded; disable auto-collapse on mouse-leave or maximize.</span>
-          </div>
-          <input
-            type="checkbox"
-            checked={prefs.stageManagerPinned}
-            onChange={(e) => prefs.setStageManagerPinned(e.target.checked)}
-            aria-label="Pin Stage Manager open"
-          />
-        </div>
-        <div style={styles.settingRow}>
-          <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Mini Pulse monitor</span>
             <span style={styles.settingDesc}>Always-on-top pill showing CPU, memory, and FPS sparklines. Double-click to expand.</span>
           </div>
@@ -2641,9 +2629,9 @@ export const Settings: React.FC = () => {
               }}
               style={{
                 padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                border: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
-                color: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                border: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
+                background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-bg-active, #252528)' : 'transparent',
+                color: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               }}
             >
               {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -2735,9 +2723,9 @@ export const Settings: React.FC = () => {
                 }}
                 style={{
                   padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: active ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                  background: active ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
-                  color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  border: active ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
+                  background: active ? 'var(--color-bg-active, #252528)' : 'transparent',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >{mode.label}</button>
             );
@@ -2761,7 +2749,7 @@ export const Settings: React.FC = () => {
               onClick={() => useWallpaperStore.getState().setWallpaper(preset)}
               style={{
                 width: '100%', aspectRatio: '16/10', borderRadius: 6, cursor: 'pointer',
-                border: useWallpaperStore.getState().presetId === preset.id ? '2px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
+                border: useWallpaperStore.getState().presetId === preset.id ? '2px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border-subtle)',
                 background: preset.thumbnail?.startsWith('url(') ? undefined : (preset.thumbnail || preset.value),
                 backgroundImage: preset.thumbnail?.startsWith('url(') ? preset.thumbnail : (preset.mode === 'gradient' ? preset.value : undefined),
                 backgroundSize: 'cover', backgroundPosition: 'center',
@@ -2823,9 +2811,9 @@ export const Settings: React.FC = () => {
                 onClick={() => setSettings(prev => ({ ...prev, windowMaterial: mat }))}
                 style={{
                   padding: '5px var(--space-3)', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: settings.windowMaterial === mat ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                  background: settings.windowMaterial === mat ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
-                  color: settings.windowMaterial === mat ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  border: settings.windowMaterial === mat ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
+                  background: settings.windowMaterial === mat ? 'var(--color-bg-active, #252528)' : 'transparent',
+                  color: settings.windowMaterial === mat ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
               >
                 {mat === 'glass' ? 'Glass' : mat === 'frosted' ? 'Frosted' : 'Solid'}
@@ -2886,9 +2874,9 @@ export const Settings: React.FC = () => {
               style={{
                 padding: '6px 14px',
                 borderRadius: 6,
-                border: settings.windowControls === style ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                background: settings.windowControls === style ? 'var(--color-accent-muted, rgba(10,132,255,0.15))' : 'transparent',
-                color: settings.windowControls === style ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                border: settings.windowControls === style ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
+                background: settings.windowControls === style ? 'var(--color-bg-active, #252528)' : 'transparent',
+                color: settings.windowControls === style ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 fontSize: 12,
                 fontWeight: 500,
                 cursor: 'pointer',
@@ -2910,37 +2898,6 @@ export const Settings: React.FC = () => {
         </div>
       </div>
       
-      <h3 style={styles.sectionTitle}>Stage Manager</h3>
-      <div style={styles.settingRow}>
-        <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Stage Manager</span>
-          <span style={styles.settingDesc}>Show running apps as thumbnails on the left edge for quick switching</span>
-        </div>
-        <button
-          role="switch"
-          aria-checked={settings.stageManager}
-          aria-label="Toggle Stage Manager"
-          onClick={() => {
-            const next = !settings.stageManager;
-            setSettings(prev => ({ ...prev, stageManager: next }));
-            try { localStorage.setItem('dex-stage-manager', String(next)); } catch (e) { console.warn('[DEX]', e); }
-            window.dispatchEvent(new Event('dex-stage-manager-changed'));
-          }}
-          style={{
-            width: 44, height: 24, borderRadius: 12, padding: 2,
-            background: settings.stageManager ? 'var(--color-accent, #0a84ff)' : 'var(--color-bg-glass)',
-            border: 'none', cursor: 'pointer', position: 'relative',
-            transition: 'background 0.2s ease',
-          }}
-        >
-          <div style={{
-            width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
-            transition: 'transform 0.2s ease',
-            transform: settings.stageManager ? 'translateX(20px)' : 'translateX(0)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-          }} />
-        </button>
-      </div>
     </div>
   );
 
@@ -3759,8 +3716,8 @@ export const Settings: React.FC = () => {
                     }}
                     style={{
                       flex: 1, padding: 'var(--space-2) 4px', border: 'none', cursor: 'pointer',
-                      background: active ? 'var(--color-accent, #007AFF)' : 'var(--color-bg-secondary)',
-                      color: active ? 'var(--color-accent-text)' : 'var(--color-text-secondary)',
+                      background: active ? 'var(--color-bg-active, #252528)' : 'var(--color-bg-secondary)',
+                      color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                       fontSize: 11, fontWeight: active ? 700 : 500, transition: 'all 0.2s ease',
                     }}
                     title={getTierDescription(tier)}
@@ -3905,8 +3862,8 @@ export const Settings: React.FC = () => {
               onClick={() => setNetworkMode(m)}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)',
-                background: selected ? 'var(--color-accent-soft, rgba(74,158,255,0.10))' : 'transparent',
-                border: `1px solid ${selected ? 'var(--color-accent-light, rgba(74,158,255,0.40))' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
+                background: selected ? 'var(--color-bg-active, #252528)' : 'transparent',
+                border: `1px solid ${selected ? 'var(--dex-focus-color, #fff)' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
                 borderRadius: 6, padding: 'var(--space-3) 14px', cursor: 'pointer', textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.12s, border-color 0.12s',
@@ -4595,7 +4552,7 @@ export const Settings: React.FC = () => {
               ref={searchInputRef}
               type="text"
               role="searchbox"
-              placeholder="Search all settings..."
+              placeholder="Search"
               aria-label="Search all settings"
               aria-controls="settings-search-results"
               autoComplete="off"
@@ -4686,7 +4643,7 @@ export const Settings: React.FC = () => {
                   >
                     <span style={{
                       marginTop: 1, flexShrink: 0,
-                      color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                      color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                       display: 'flex',
                     }}>
                       {React.cloneElement(
@@ -4814,7 +4771,7 @@ export const Settings: React.FC = () => {
                       }}
                       onClick={() => jumpToSection(section.id)}
                     >
-                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-accent)' : 'currentColor' }}>{section.icon}</span>
+                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-text-primary)' : 'currentColor' }}>{section.icon}</span>
                       <span>{section.name}</span>
                     </button>
                   ))}
@@ -4843,7 +4800,7 @@ export const Settings: React.FC = () => {
                       }}
                       onClick={() => setActiveSection(section.id)}
                     >
-                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-accent)' : 'currentColor' }}>{section.icon}</span>
+                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-text-primary)' : 'currentColor' }}>{section.icon}</span>
                       <span>{section.name}</span>
                     </button>
                   ))}

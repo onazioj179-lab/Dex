@@ -40,12 +40,16 @@ export interface WindowManifest {
 }
 
 const STORAGE_KEY = 'dex-window-manifest';
-const DEBOUNCE_MS = 1500;
+// Throttle (NOT a pure trailing debounce): persist on the leading edge, then at
+// most once per THROTTLE_MS, ALWAYS keeping the latest snapshot. This guarantees a
+// write at least every THROTTLE_MS even under continuous changes -- so a force-kill
+// loses at most THROTTLE_MS of layout. The old pure-trailing debounce reset on
+// every change and could starve (never writing during a drag/resize storm), losing
+// far more than its nominal window.
+const THROTTLE_MS = 1000;
 let pending: ReturnType<typeof setTimeout> | null = null;
-let lastWritten: WindowManifest | null = null;
-// The most recent snapshot handed to scheduleWrite but not yet flushed -- so
-// flush() can persist the LATEST change. (The old flush wrote the previously-
-// committed manifest and silently dropped the pending one before exit/crash.)
+let lastWriteAt = 0;
+// The most recent snapshot handed to scheduleWrite but not yet persisted.
 let pendingWindows: { windows: WindowSnapshot[]; stageId?: string } | null = null;
 
 export function captureManifest(windows: WindowSnapshot[], stageId?: string): WindowManifest {
@@ -57,19 +61,29 @@ export function captureManifest(windows: WindowSnapshot[], stageId?: string): Wi
   };
 }
 
-/** Schedule a debounced write to localStorage. Safe to call on every change. */
+/** Persist the pending snapshot to localStorage right now (internal). */
+function writeNow(): void {
+  if (pending) { clearTimeout(pending); pending = null; }
+  if (!pendingWindows) return;
+  const manifest = captureManifest(pendingWindows.windows, pendingWindows.stageId);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(manifest));
+  } catch { /* storage full -- ignore */ }
+  lastWriteAt = Date.now();
+  pendingWindows = null;
+}
+
+/** Throttled write to localStorage. Safe to call on every change: writes on the
+ *  leading edge, then at most once per THROTTLE_MS, always persisting the latest. */
 export function scheduleWrite(windows: WindowSnapshot[], stageId?: string): void {
   pendingWindows = { windows, stageId };
-  if (pending) clearTimeout(pending);
-  pending = setTimeout(() => {
-    pending = null;
-    const manifest = captureManifest(windows, stageId);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(manifest));
-      lastWritten = manifest;
-      pendingWindows = null;
-    } catch { /* storage full -- ignore */ }
-  }, DEBOUNCE_MS);
+  if (pending) return; // a trailing write is already queued; it picks up the latest
+  const elapsed = Date.now() - lastWriteAt;
+  if (elapsed >= THROTTLE_MS) {
+    writeNow();
+  } else {
+    pending = setTimeout(writeNow, THROTTLE_MS - elapsed);
+  }
 }
 
 /** Read the most recently persisted manifest, or null if missing/invalid. */
@@ -85,24 +99,15 @@ export function loadManifest(): WindowManifest | null {
   }
 }
 
-/** Synchronously flush any pending debounced write. Call before app exit. */
+/** Synchronously flush any pending write. Call before app exit (beforeunload). */
 export function flush(): void {
-  if (!pending) return;
-  clearTimeout(pending);
-  pending = null;
-  // Persist the PENDING snapshot (the most recent change) -- the old code wrote
-  // lastWritten, dropping whatever changed since the last committed write.
-  const data = pendingWindows ?? (lastWritten ? { windows: lastWritten.windows, stageId: lastWritten.stageId } : null);
-  pendingWindows = null;
-  if (data) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(captureManifest(data.windows, data.stageId))); } catch { /* ignore */ }
-  }
+  if (pendingWindows) writeNow();
 }
 
 /** Clear the manifest -- used after a successful "discard" recovery choice. */
 export function clearManifest(): void {
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-  lastWritten = null;
+  pendingWindows = null;
   if (pending) { clearTimeout(pending); pending = null; }
 }
 

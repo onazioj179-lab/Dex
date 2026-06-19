@@ -243,6 +243,18 @@ fn attachments_dir(app: &tauri::AppHandle) -> std::path::PathBuf {
     dir
 }
 
+/// `dexnotes:pick-attachment-file` / `dexnotes:pick-import-file` — open the native
+/// file picker and return `{ filePath }` (or null on cancel). The renderer then
+/// copies/imports via the already-native `dexnotes:addAttachment` / importFile.
+/// (Electron had no handler for these; this implements the feature for Tauri from
+/// the renderer contract in DexNotes.tsx, which reads `result.filePath`.)
+pub fn note_pick_file(app: &tauri::AppHandle) -> Value {
+    match app.dialog().file().blocking_pick_file().and_then(fp_to_string) {
+        Some(p) => json!({ "filePath": p }),
+        None => Value::Null,
+    }
+}
+
 /// detectFileType for a note attachment (ext includes the leading dot).
 fn note_attachment_type(ext: &str) -> &'static str {
     const IMAGE: &[&str] = &[".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico"];

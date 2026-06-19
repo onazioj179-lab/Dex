@@ -39,6 +39,10 @@ is raw *capacity*: ~1000 slots, all unassigned. We do
 
 - **App launches** — `Ctrl/Cmd+1..9` and a few `Alt/Option+<letter>` (Notes=Ctrl+4,
   Calculator=Alt+C, VINX=Alt+V, …) — these already live in `APP_DEFINITIONS`.
+- **Project Spaces** — `Ctrl/Cmd+Alt+1..9` jumps to Project Space N (DEX 5.6
+  virtual-desktop switch); mirrors the app `Ctrl+1..9` idiom. Spaces are also
+  created/switched from the command palette ("New Project Space", "Switch Space",
+  "Open Workspace: …").
 - **System** — Search/Spotlight `Ctrl+K`, Command Palette `Ctrl+Shift+P`, UKI
   `Ctrl+Shift+U`, Compact `Ctrl+Shift+M`, Lock `Ctrl+Shift+L`.
 - **Window** — Close `Ctrl+W`, Maximize `Ctrl+Up`, Tile L/R `Ctrl+Alt+←/→`,
@@ -49,6 +53,16 @@ That is roughly **40 assigned slots**; the other ~960 stay **unbound and reserve
 (available for per-app or user bindings later). Adding a command = one entry in the
 catalog (or, for an app, it derives automatically) — and it appears in the terminal,
 palette, UKI, and keyboard at once.
+
+## Per-app shortcuts (in-app, not global)
+
+These live inside individual apps (part of the reserved per-app space above), so
+they are scoped to the focused app and do not appear in the global catalog:
+
+- **DexCode** — `Ctrl/Cmd+M` jump to the matching bracket; the status bar shows
+  live selection stats (chars / lines) while text is selected.
+- **Any modal / overlay** — `Escape` closes it (now uniformly, incl. the Kanban
+  card editor).
 
 ## Run a command from the terminal
 

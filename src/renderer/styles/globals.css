@@ -554,9 +554,11 @@ html[data-memory-pressure="high"] img:not([data-keep]) {
 html[data-memory-pressure="high"] video:not([data-playing]) {
   display: none !important;
 }
-html[data-memory-pressure="high"] canvas:not([data-active]) {
-  content-visibility: hidden;
-}
+/* The foreground app's canvas must stay visible even under memory pressure —
+   blanking `canvas:not([data-active])` here hid the active viewport (nothing in
+   the app ever sets data-active), contributing to the black-screen bug.
+   Off-screen app canvases are already released by the [data-app-state] rules
+   below, so no foreground-blanking rule is needed. */
 html[data-memory-pressure="high"] .decorative,
 html[data-memory-pressure="high"] .particle-bg,
 html[data-memory-pressure="high"] .ambient-glow {
@@ -585,10 +587,13 @@ html[data-memory-pressure="high"] .ambient-glow {
 html[data-window-focus="blurred"] * {
   animation-play-state: paused !important;
 }
-html[data-window-focus="blurred"] video:not([data-playing]),
-html[data-window-focus="blurred"] canvas:not([data-active]) {
-  content-visibility: hidden;
-}
+/* NOTE: we deliberately do NOT blank canvases/videos when the window loses
+   focus. Doing so (content-visibility:hidden) made every WebGL/2D viewport go
+   solid black the instant DEX wasn't the frontmost OS window, and it only
+   "recovered" once the user tapped back in — the black-until-tap bug. Pausing
+   animations above is enough power saving; a backgrounded canvas keeps showing
+   its last composited frame at zero render cost. Per-app render loops already
+   throttle themselves on document `visibilitychange`. */
 html[data-window-focus="blurred"] .decorative,
 html[data-window-focus="blurred"] .particle-bg,
 html[data-window-focus="blurred"] .ambient-glow {
@@ -4336,9 +4341,13 @@ textarea {
   transform: scale(0.97);
 }
 
-/* Item 48: Hover glow on interactive buttons */
+/* Item 48: Hover feedback -- the consistent app-menu-button treatment: a subtle
+   bg-hover fill, NOT a blue glow (the old `0 0 6px` glow was a decorative
+   highlight applied to every button system-wide; removed per the visual-
+   simplification brief). Inline-styled buttons keep their own look (inline wins);
+   bare buttons get this one standard tint, matching the launcher + menu tiles. */
 .dex-app-container button:hover:not(:disabled) {
-  box-shadow: 0 0 6px rgba(74, 158, 255, 0.1);
+  background-color: var(--color-bg-hover);
 }
 
 /* Item 49: Standardized disabled button style */
