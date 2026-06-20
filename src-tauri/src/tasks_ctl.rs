@@ -31,16 +31,37 @@
 // channels: tasks:today/upcoming/overdue). `tasks:list` itself does no
 // wall-clock work, so it is fully reproducible.
 //
-// HEAVY channels (create/update/delete/execute) are deliberately NOT ported and
-// NOT faked — see channelsSkipped. They need the live native runtime
-// (filesystem writes + reminder scheduler + recurrence engine + IPC events).
+// HEAVY channels (create/update/delete) ARE now ported with real native code:
+//   - tasks:create -> create_task  (mints task-<n>-<ts> id, auto-reminder on a
+//                                    future dueDate, writes <id>.json, emits
+//                                    `task:created`) -> full Task
+//   - tasks:update -> update_task  (patch-in-place + bump updatedAt + persist +
+//                                    emit `task:updated`) -> { success, task? }
+//   - tasks:delete -> delete_task  (unlink <id>.json + emit `task:deleted`)
+//                                    -> { success }
+// These mirror TaskReminderSystem.{createTask,updateTask,deleteTask} exactly,
+// including the per-file on-disk layout and the renderer push events (the Tauri
+// analog of webContents.send via native_ops::emit_event).
+//
+// tasks:execute has NO Electron handler anywhere in the `tasks:` namespace; it
+// is reported as not-ported rather than fabricated. See dispatch + the returned
+// degraded entry.
 // =============================================================================
 
 use serde_json::{json, Value};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 const TASKS_DIR: &str = "tasks";
+
+// epoch millis, the native analog of Date.now().
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
 
 // --- file IO ----------------------------------------------------------------
 
@@ -257,6 +278,207 @@ fn list_tasks(app: &tauri::AppHandle, filter: &Value) -> Vec<Value> {
     tasks
 }
 
+// --- config + id allocation -------------------------------------------------
+
+// Path to the per-task file. saveTask writes `<dataPath>/<task.id>.json`
+// (the id ALREADY begins with "task-"), and deleteTask unlinks the same path.
+fn task_path(app: &tauri::AppHandle, id: &str) -> PathBuf {
+    tasks_dir(app).join(format!("{}.json", id))
+}
+
+// Load config.json, merged over the same defaults TaskReminderSystem ships.
+// Only the two fields the create path needs (defaultList, defaultReminderMinutes)
+// are read; everything else mirrors the constructor defaults implicitly.
+fn config_default_list(app: &tauri::AppHandle) -> String {
+    read_config(app)
+        .get("defaultList")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| "inbox".to_string())
+}
+
+fn config_default_reminder_minutes(app: &tauri::AppHandle) -> i64 {
+    read_config(app)
+        .get("defaultReminderMinutes")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(30)
+}
+
+fn read_config(app: &tauri::AppHandle) -> Value {
+    let path = tasks_dir(app).join("config.json");
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .filter(|v| v.is_object())
+        .unwrap_or_else(|| json!({}))
+}
+
+// Mirror loadTasks()'s idCounter recovery: scan stored task ids for the
+// `task-(\d+)-` prefix and take the max, so freshly-minted ids never collide
+// with anything already on disk. Electron keeps this counter in memory across a
+// run; per-call we rebuild it from disk (the same value it would have had after
+// loadTasks ran), which keeps ids monotonic on a single-process native runtime.
+fn next_id_counter(app: &tauri::AppHandle) -> i64 {
+    let mut max = 0i64;
+    for t in read_all_tasks(app) {
+        if let Some(id) = t.get("id").and_then(|v| v.as_str()) {
+            // id shape: task-<n>-<ts>
+            if let Some(rest) = id.strip_prefix("task-") {
+                if let Some(dash) = rest.find('-') {
+                    if let Ok(n) = rest[..dash].parse::<i64>() {
+                        if n > max {
+                            max = n;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    max
+}
+
+// createTask(data) — build the Task exactly as TaskReminderSystem.createTask,
+// persist it to its own file, then emit `task:created`. Returns the full Task.
+fn create_task(app: &tauri::AppHandle, data: &Value) -> Value {
+    let now = now_ms();
+    let counter = next_id_counter(app) + 1; // ++this.idCounter
+    let id = format!("task-{}-{}", counter, now);
+
+    let priority = data
+        .get("priority")
+        .and_then(|v| v.as_str())
+        .unwrap_or("normal")
+        .to_string();
+    let title = data
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Untitled Task")
+        .to_string();
+    let list_id = data
+        .get("listId")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| config_default_list(app));
+
+    // Build the object, preserving Electron's key set + optional fields.
+    let mut task = json!({
+        "id": id.clone(),
+        "title": title,
+        "status": "pending",
+        "priority": priority,
+        "createdAt": now,
+        "updatedAt": now,
+        "listId": list_id,
+        "tags": data.get("tags").cloned().unwrap_or_else(|| json!([])),
+        "subtasks": [],
+        "reminders": [],
+    });
+    let obj = task.as_object_mut().unwrap();
+    // Optional passthrough fields (only present when supplied, mirroring how the
+    // TS spread leaves `undefined` props off the serialized JSON). NOTE: Electron's
+    // createTask object literal does NOT carry `recurrence` through (it is only set
+    // later via setRecurrence), so we deliberately omit it here for shape parity.
+    for key in [
+        "description",
+        "dueDate",
+        "dueTime",
+        "notes",
+        "estimatedMinutes",
+        "parentTaskId",
+    ] {
+        if let Some(v) = data.get(key) {
+            if !v.is_null() {
+                obj.insert(key.to_string(), v.clone());
+            }
+        }
+    }
+
+    // Auto-add reminder if a future due date is set.
+    let default_minutes = config_default_reminder_minutes(app);
+    if default_minutes > 0 {
+        if let Some(due) = data.get("dueDate").and_then(|v| v.as_i64()) {
+            let reminder_time = due - default_minutes * 60 * 1000;
+            if reminder_time > now {
+                // Electron uses `rem-${this.idCounter++}` here (post-increment of
+                // the same counter the id was minted from). The id used `++counter`
+                // (pre-increment to `counter`), so the reminder reuses `counter`.
+                let rem_id = format!("rem-{}", counter);
+                let reminder = json!({
+                    "id": rem_id,
+                    "taskId": id.clone(),
+                    "time": reminder_time,
+                    "triggered": false,
+                });
+                if let Some(arr) = obj.get_mut("reminders").and_then(|v| v.as_array_mut()) {
+                    arr.push(reminder);
+                }
+            }
+        }
+    }
+
+    let _ = std::fs::write(
+        task_path(app, &id),
+        serde_json::to_string_pretty(&task).unwrap_or_default(),
+    );
+
+    crate::native_ops::emit_event(app, "task:created", &task);
+    task
+}
+
+// updateTask(id, data) — patch the stored task in place, bump updatedAt, persist,
+// emit `task:updated`. Returns { success, task? }. Missing -> { success: false }.
+fn update_task(app: &tauri::AppHandle, id: &str, data: &Value) -> Value {
+    let mut task = get_task(app, id);
+    if !task.is_object() {
+        return json!({ "success": false });
+    }
+    let obj = task.as_object_mut().unwrap();
+
+    // Mirror the explicit `if (data.x !== undefined)` field set. We treat a
+    // present (non-absent) key as "defined"; null is a real value here for
+    // dueDate (setDueDate(undefined) clears it via updateTask({dueDate})), so
+    // we DO copy an explicit null through, matching the TS assignment.
+    for key in [
+        "title",
+        "description",
+        "priority",
+        "dueDate",
+        "dueTime",
+        "listId",
+        "tags",
+        "notes",
+        "estimatedMinutes",
+        "status",
+    ] {
+        if let Some(v) = data.get(key) {
+            obj.insert(key.to_string(), v.clone());
+        }
+    }
+
+    obj.insert("updatedAt".to_string(), json!(now_ms()));
+
+    let _ = std::fs::write(
+        task_path(app, id),
+        serde_json::to_string_pretty(&task).unwrap_or_default(),
+    );
+
+    crate::native_ops::emit_event(app, "task:updated", &task);
+    json!({ "success": true, "task": task })
+}
+
+// deleteTask(id) — unlink the per-task file, emit `task:deleted` (payload = id).
+// Returns { success }. Reminder map cleanup is in-memory-only in Electron and
+// has no on-disk effect, so it is a no-op here.
+fn delete_task(app: &tauri::AppHandle, id: &str) -> Value {
+    let task = get_task(app, id);
+    if !task.is_object() {
+        return json!({ "success": false });
+    }
+    let _ = std::fs::remove_file(task_path(app, id));
+    crate::native_ops::emit_event(app, "task:deleted", &json!(id));
+    json!({ "success": true })
+}
+
 /// Route a `tasks:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts). Only the data channels (list/get) are handled;
 /// every other `tasks:*` channel returns Value::Null so the prefix router can
@@ -275,6 +497,28 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "tasks:get" => {
             let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             get_task(app, id)
+        }
+        // createTask(data) — args[0] is the partial Task.
+        "tasks:create" => {
+            let data = args.get(0).cloned().unwrap_or_else(|| json!({}));
+            create_task(app, &data)
+        }
+        // updateTask(id, data) — args[0]=id, args[1]=partial Task.
+        "tasks:update" => {
+            let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            let data = args.get(1).cloned().unwrap_or_else(|| json!({}));
+            update_task(app, id, &data)
+        }
+        // deleteTask(id) — args[0]=id.
+        "tasks:delete" => {
+            let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            delete_task(app, id)
+        }
+        // tasks:execute has NO Electron handler in TaskReminderSystem (nor in the
+        // other two `tasks:` controllers' task-data surface). It is not a real
+        // channel here; report it honestly rather than fabricate behavior.
+        "tasks:execute" => {
+            json!({ "success": false, "error": "not ported (needs native runtime)" })
         }
         _ => Value::Null,
     }

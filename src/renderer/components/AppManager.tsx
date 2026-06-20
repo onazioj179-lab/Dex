@@ -3071,18 +3071,13 @@ export const AppManager: React.FC = () => {
                       <line x1="4" y1="18" x2="20" y2="18"/>
                     </svg>
                   </button>
-                  {/* Maximize button with snap layout picker */}
-                  <div style={{ position: 'relative' }}
-                    onMouseEnter={() => {
-                      if (snapLayoutTimer.current) clearTimeout(snapLayoutTimer.current);
-                      setSnapLayoutApp(appId);
-                    }}
-                    onMouseLeave={() => {
-                      snapLayoutTimer.current = setTimeout(() => setSnapLayoutApp(null), 200);
-                    }}>
+                  {/* Maximize button. The hover snap-layout popup was removed
+                      (intrusive); maximize/restore is a direct click, and edge-snap
+                      still works by dragging a window to a screen edge. */}
+                  <div style={{ position: 'relative' }}>
                     <button
                       onClick={() => tileWindow(appId, 'maximize')}
-                      title={isMaximized ? 'Restore' : 'Snap Layout'}
+                      title={isMaximized ? 'Restore' : 'Maximize'}
                       aria-label={isMaximized ? `Restore ${getLabel(appId)}` : `Maximize ${getLabel(appId)}`}
                       style={{
                         width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',

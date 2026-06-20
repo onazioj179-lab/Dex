@@ -1423,6 +1423,21 @@ fn notifications_dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -
 /// degrades gracefully (same as the browser preview) instead of crashing.
 #[tauri::command]
 fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
+    // Panic guard: a single ported module that panics must NOT crash the app — it
+    // degrades to null (same as an unported channel). Recovered panics are logged.
+    let ch_for_log = channel.clone();
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        dex_ipc_impl(app, window, channel, args)
+    })) {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!("[dex_ipc] recovered from panic in channel: {ch_for_log}");
+            Value::Null
+        }
+    }
+}
+
+fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
     // Positional arg helpers (the renderer sends method args as a JSON array).
     let arg_str = |i: usize| args.get(i).and_then(|v| v.as_str()).map(|s| s.to_string());
     let arg_u64 = |i: usize| args.get(i).and_then(|v| v.as_u64());
@@ -1581,7 +1596,7 @@ fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, args: 
         ch @ ("tasks:list" | "tasks:get") => tasks_ctl::dispatch(&app, ch, &args),
         ch @ ("timeline:getEvents" | "timeline:getEvent") => timeline_ctl::dispatch(&app, ch, &args),
         ch @ ("trust:list") => trust_ctl::dispatch(&app, ch, &args),
-        ch @ ("update:getStatus" | "updates:getInfo") => update_ctl::dispatch(&app, ch, &args),
+        ch @ "update:getStatus" => update_ctl::dispatch(&app, ch, &args),
         ch @ ("updates:getInfo" | "updates:getPreferences" | "update:getConfig") => updates_ctl::dispatch(&app, ch, &args),
         ch @ ("workflow:getAll" | "workflow:get") => workflow_ctl::dispatch(&app, ch, &args),
         "app:ping" => json!("pong"),

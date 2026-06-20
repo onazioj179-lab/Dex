@@ -55,16 +55,22 @@
 //     history-gated escalations (high+2 -> aggressive, critical+3 -> emergency)
 //     cannot occur without a sampler loop.
 //
-// SKIPPED (heavy / live-runtime channels — NOT implemented, NOT faked):
-//   - allocate   : memory allocation/budget mutation needs the live governor's
-//                  rss snapshot + subsystem budget counters (canAllocate); a
-//                  stateless read cannot reserve or mutate memory.
-//   - throttle   : forcing a throttle level drives renderer callbacks / GC / cache
-//                  pruning side-effects in the live process — no Tauri host.
-//   - prioritize : task prioritization acts on the live concurrency/throttle
-//                  config; no scheduler exists in this read tier.
-//   These fall to `_ => Value::Null` (honest degrade); the renderer never reads a
-//   shaped object back from them.
+// HEAVY CHANNELS (now implemented natively from the governor's REAL methods):
+//   - allocate   : ports canAllocate(requestedMB) — projects live rssMB +
+//                  requestedMB against the 90% MAX_TOTAL_MEMORY_MB threshold. The
+//                  governor's budget math is pure-compute; the only divergence is
+//                  the rss term (system used memory, same as the read tier).
+//   - throttle   : ports getThrottleConfig(level) + notifyThrottleChange(). The
+//                  throttle CONFIG is pure-compute and returned verbatim. The live
+//                  side-effects (forceGC, cache pruning) belong to the V8/Memory
+//                  Manager runtime that does not exist here; what IS real is the
+//                  renderer push (Electron's criticalPressureResponse sends
+//                  `resource-governor:reduce-memory`) — we emit it via
+//                  native_ops::emit_event so the renderer still reacts.
+//   - prioritize : ports getMaxConcurrency() + getThrottleConfig().limitConcurrency
+//                  — the concurrency budget the scheduler would consult, computed
+//                  from the live throttle level. Returns the concurrency the
+//                  governor would grant for a task at the current pressure.
 // =============================================================================
 
 use serde_json::{json, Value};
@@ -232,6 +238,49 @@ fn throttle_for(pressure: &str) -> &'static str {
     }
 }
 
+/// getThrottleConfig(level) — verbatim port of the Electron switch. Pure compute;
+/// returns the ThrottleConfig the governor associates with a throttle level.
+/// (Fields: deferBackgroundTasks, reduceCacheSize, pauseIndexing, forceGC,
+/// limitConcurrency.)
+fn throttle_config(level: &str) -> Value {
+    let (defer, reduce_cache, pause_index, force_gc, concurrency) = match level {
+        "emergency" => (true, true, true, true, 1),
+        "aggressive" => (true, true, true, true, 1),
+        "moderate" => (true, true, true, false, 2),
+        "light" => (true, false, false, false, 3),
+        _ => (false, false, false, false, 4),
+    };
+    json!({
+        "deferBackgroundTasks": defer,
+        "reduceCacheSize": reduce_cache,
+        "pauseIndexing": pause_index,
+        "forceGC": force_gc,
+        "limitConcurrency": concurrency,
+    })
+}
+
+/// limitConcurrency extracted from throttle_config (mirror of getMaxConcurrency()).
+fn max_concurrency(level: &str) -> i64 {
+    match level {
+        "emergency" | "aggressive" => 1,
+        "moderate" => 2,
+        "light" => 3,
+        _ => 4,
+    }
+}
+
+/// Live throttle level for the current machine state: sample metrics, derive
+/// instantaneous pressure, map to a throttle level (same history-free mapping the
+/// read tier uses). Shared by throttle/prioritize when no explicit level is given.
+fn current_throttle_level() -> (&'static str, Metrics, &'static str) {
+    let profile = detect_profile();
+    let limits = limits_for(profile.tier);
+    let m = sample_metrics();
+    let pressure = calculate_pressure(&limits, m.rss_mb, m.cpu_percent);
+    let throttle = throttle_for(pressure);
+    (throttle, m, pressure)
+}
+
 /// takeSnapshot() at the ResourceSnapshot shape (see header for field mapping).
 fn build_snapshot(m: &Metrics, pressure: &str, throttle: &str) -> Value {
     json!({
@@ -275,12 +324,136 @@ fn get_status() -> Value {
     })
 }
 
+// --- heavy channels ---------------------------------------------------------
+
+/// Extract a requested-MB number from the positional args (allocate(requestedMB)).
+/// Accepts a bare number, or a `{ requestedMB }` / `{ mb }` object.
+fn requested_mb(args: &Value) -> f64 {
+    let first = args.get(0);
+    if let Some(v) = first {
+        if let Some(n) = v.as_f64() {
+            return n.max(0.0);
+        }
+        if let Some(n) = v.get("requestedMB").and_then(|x| x.as_f64()) {
+            return n.max(0.0);
+        }
+        if let Some(n) = v.get("mb").and_then(|x| x.as_f64()) {
+            return n.max(0.0);
+        }
+    }
+    0.0
+}
+
+/// resource-governor:allocate — port of canAllocate(requestedMB).
+/// Electron: projectedMB = lastSnapshot.rssMB + requestedMB;
+///           allowed = projectedMB < MAX_TOTAL_MEMORY_MB * 0.9.
+/// We use live system rss (same divergence as the read tier). Returns the boolean
+/// plus the supporting figures so the renderer can show the budget decision.
+fn allocate(args: &Value) -> Value {
+    let req = requested_mb(args);
+    let profile = detect_profile();
+    let limits = limits_for(profile.tier);
+    let m = sample_metrics();
+    let projected = m.rss_mb as f64 + req;
+    let threshold = limits.max_total_memory_mb * 0.9;
+    let allowed = projected < threshold;
+    // getBudgetRemaining(): max(0, MAX_TOTAL - rss).
+    let remaining = (limits.max_total_memory_mb - m.rss_mb as f64).max(0.0);
+    json!({
+        "success": true,
+        "allowed": allowed,
+        "requestedMB": req,
+        "currentRssMB": m.rss_mb,
+        "projectedMB": projected,
+        "thresholdMB": threshold,
+        "maxTotalMemoryMB": limits.max_total_memory_mb,
+        "budgetRemainingMB": remaining,
+    })
+}
+
+/// resource-governor:throttle — port of getThrottleConfig(level) + the renderer
+/// push side of notifyThrottleChange / criticalPressureResponse.
+/// arg(0) may be an explicit level ("none"|"light"|"moderate"|"aggressive"|
+/// "emergency"); when absent/invalid the live level is computed from metrics.
+/// Emits `resource-governor:reduce-memory` to the renderer when the level is
+/// aggressive/emergency (Electron's criticalPressureResponse behavior).
+fn throttle(app: &tauri::AppHandle, args: &Value) -> Value {
+    let explicit = args.get(0).and_then(|v| v.as_str()).map(|s| s.to_string());
+    let valid = matches!(
+        explicit.as_deref(),
+        Some("none") | Some("light") | Some("moderate") | Some("aggressive") | Some("emergency")
+    );
+    let (level, pressure): (String, String) = if valid {
+        let lvl = explicit.unwrap();
+        // Pressure not derivable from an externally-forced level; report as unknown.
+        (lvl, "forced".to_string())
+    } else {
+        let (lvl, _m, p) = current_throttle_level();
+        (lvl.to_string(), p.to_string())
+    };
+
+    let config = throttle_config(&level);
+
+    // Renderer push: Electron sends `resource-governor:reduce-memory` on critical
+    // (aggressive/emergency) responses. Emit it honestly so the renderer reacts.
+    let pushed = if level == "aggressive" || level == "emergency" {
+        crate::native_ops::emit_event(
+            app,
+            "resource-governor:reduce-memory",
+            &json!({ "throttleLevel": level, "timestamp": now_ms() }),
+        );
+        true
+    } else {
+        false
+    };
+
+    json!({
+        "success": true,
+        "throttleLevel": level,
+        "pressure": pressure,
+        "config": config,
+        "reduceMemoryPushed": pushed,
+    })
+}
+
+/// resource-governor:prioritize — port of getMaxConcurrency() + shouldDeferWork().
+/// Returns the concurrency budget the scheduler would grant for a task at the
+/// current (or explicitly-supplied) throttle level. arg(0) optional explicit level.
+fn prioritize(args: &Value) -> Value {
+    let explicit = args.get(0).and_then(|v| v.as_str()).map(|s| s.to_string());
+    let valid = matches!(
+        explicit.as_deref(),
+        Some("none") | Some("light") | Some("moderate") | Some("aggressive") | Some("emergency")
+    );
+    let (level, pressure): (String, String) = if valid {
+        (explicit.unwrap(), "forced".to_string())
+    } else {
+        let (lvl, _m, p) = current_throttle_level();
+        (lvl.to_string(), p.to_string())
+    };
+
+    let concurrency = max_concurrency(&level);
+    let should_defer = level != "none";
+    json!({
+        "success": true,
+        "throttleLevel": level,
+        "pressure": pressure,
+        "maxConcurrency": concurrency,
+        "shouldDeferWork": should_defer,
+        "config": throttle_config(&level),
+    })
+}
+
 /// Route a `resource-governor:*` channel. Args are the positional JSON array the
 /// renderer sent; getStatus takes no arguments. Heavy channels (allocate/throttle/
-/// prioritize) and any unknown channel fall to Value::Null (honest degrade).
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+/// prioritize) are ported from the governor's real methods; unknown channels fall
+/// to Value::Null (honest degrade).
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "resource-governor:getStatus" => get_status(),
+        "resource-governor:allocate" => allocate(args),
+        "resource-governor:throttle" => throttle(app, args),
+        "resource-governor:prioritize" => prioritize(args),
         _ => Value::Null,
     }
 }

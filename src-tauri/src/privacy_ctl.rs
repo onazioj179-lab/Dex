@@ -25,11 +25,31 @@
 //                   toggles, log sizing). Pure read of config.json merged over
 //                   DEFAULT_CONFIG, exactly as Electron's loadConfig() builds
 //                   `this.config` before privacy:config returns it.
-//   - check / sanitize / audit -> the live network-interception surface
-//                   (evaluateRequest = check, sanitizeHeaders = sanitize,
-//                   request/warning logging + stats = audit). These are runtime
-//                   monitors driven by session.webRequest, not pure data; they
-//                   are NOT ported and NOT faked (see channelsSkipped).
+//   - check / sanitize -> the live network-interception surface
+//                   (evaluateRequest = check, sanitizeHeaders = sanitize). These
+//                   are driven by session.webRequest and have no native shell
+//                   equivalent; they are NOT exposed as channels and NOT faked.
+//
+// NOW PORTED (this round): every registered `privacy:*` IPC channel, with real
+// native code:
+//   - status        : { enabled, isActive, stats } from config + persisted stats.
+//   - setConfig     : shallow-merge updates into config.json (updateConfig),
+//                     recompute isActive, emit config:changed.
+//   - requestLog    : tail(limit) of the persisted request log (default 100).
+//   - warnings      : tail(limit) of the persisted warnings (default 50).
+//   - rules         : DataFlowRule[] from rules.json (seeded with the same
+//                     default rules setupDefaultRules() installs on first init).
+//   - addRule       : append a full DataFlowRule (id/createdAt/triggerCount),
+//                     persist, emit rule:added, return the rule.
+//   - removeRule    : delete by id, persist, emit rule:removed, { success }.
+//   - clearLogs     : empty request log + warnings, { success }.
+//   - resetStats    : reset stats to the zeroed initStats() shape, { success }.
+//   - allowDomain   : move domain blocked->allowed in config, emit domain:allowed.
+//   - blockDomain   : move domain allowed->blocked in config, emit domain:blocked.
+// The request log / warnings / stats are persisted JSON siblings of config.json
+// (see the file-name constants); their populating side — appends from the
+// onBeforeRequest monitor — has no native equivalent, so they begin empty/zeroed
+// exactly like Electron's in-memory arrays on a fresh process.
 //
 // Return shape of privacy:config matches the TS PrivacyConfig field-for-field so
 // the renderer is unchanged:
@@ -54,12 +74,31 @@
 
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
 // PrivacyShield stores under `<userData>/privacy/` with these file names; mirror
 // the SAME relative path under <appData>.
+//
+// Electron's PrivacyShieldClass keeps `config`/`rules` on disk (fs/promises JSON)
+// and `requestLog`/`warnings`/`stats` purely in process memory (live web-request
+// monitor state). A Tauri dispatch is stateless across calls, so to give the
+// renderer the SAME observable behavior for the runtime-state channels
+// (requestLog/warnings/stats/clearLogs/resetStats) we persist those arrays as
+// JSON siblings under the same dir. This is the honest native realization of the
+// in-memory arrays — no faking, real read/write/mutate. The one thing that
+// genuinely cannot be ported is the populating side of those arrays: rows are
+// appended by session.webRequest.onBeforeRequest interception (evaluateRequest /
+// logRequest), which has no native equivalent in the Tauri shell. So the logs
+// start empty and stats start zeroed, exactly as Electron's do on a fresh
+// process before any traffic, and the read/clear/reset channels operate on them
+// faithfully.
 const PRIVACY_DIR: &str = "privacy";
 const CONFIG_FILE: &str = "config.json";
+const RULES_FILE: &str = "rules.json";
+const LOG_FILE: &str = "request-log.json";
+const WARNINGS_FILE: &str = "warnings.json";
+const STATS_FILE: &str = "stats.json";
 
 // DEFAULT_CONFIG in PrivacyShield.ts, field-for-field. This is the base every
 // returned config is merged over (and the whole value when no file exists).
@@ -84,15 +123,119 @@ fn default_config() -> Value {
     })
 }
 
-// <appData>/privacy/config.json
-fn config_path(app: &tauri::AppHandle) -> PathBuf {
+// <appData>/privacy/  (created on demand). All privacy state files live here.
+fn privacy_dir(app: &tauri::AppHandle) -> PathBuf {
     let dir = app
         .path()
         .app_data_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(PRIVACY_DIR);
     let _ = std::fs::create_dir_all(&dir);
-    dir.join(CONFIG_FILE)
+    dir
+}
+
+// <appData>/privacy/config.json
+fn config_path(app: &tauri::AppHandle) -> PathBuf {
+    privacy_dir(app).join(CONFIG_FILE)
+}
+
+// Wall-clock epoch millis — the Tauri analog of Electron's `Date.now()`.
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+// Pretty-print JSON to a file under <appData>/privacy/, mirroring Electron's
+// `JSON.stringify(value, null, 2)` writes (saveConfig / saveRules).
+fn write_json(app: &tauri::AppHandle, file: &str, value: &Value) -> bool {
+    let path = privacy_dir(app).join(file);
+    match serde_json::to_string_pretty(value) {
+        Ok(s) => std::fs::write(path, s).is_ok(),
+        Err(_) => false,
+    }
+}
+
+// Read+parse a JSON file under <appData>/privacy/; `fallback` on absent/corrupt
+// (matches Electron's try/catch -> default behavior).
+fn read_json(app: &tauri::AppHandle, file: &str, fallback: Value) -> Value {
+    let path = privacy_dir(app).join(file);
+    match std::fs::read_to_string(path) {
+        Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(fallback),
+        Err(_) => fallback,
+    }
+}
+
+// initStats() in PrivacyShield.ts, field-for-field. lastReset is the wall clock,
+// exactly as the TS sets `Date.now()`.
+fn init_stats() -> Value {
+    json!({
+        "totalRequests": 0,
+        "blockedRequests": 0,
+        "allowedRequests": 0,
+        "dataTypesBlocked": {
+            "file-content": 0,
+            "file-metadata": 0,
+            "user-settings": 0,
+            "usage-data": 0,
+            "crash-report": 0,
+            "telemetry": 0,
+            "diagnostic": 0,
+            "clipboard": 0,
+            "screenshot": 0,
+            "system-info": 0
+        },
+        "topBlockedDomains": [],
+        "lastReset": now_ms()
+    })
+}
+
+// stats.json, or a freshly-zeroed stats object if absent (an unmonitored fresh
+// process — same value the renderer sees before any traffic).
+fn get_stats(app: &tauri::AppHandle) -> Value {
+    read_json(app, STATS_FILE, init_stats())
+}
+
+// The default DataFlowRules setupDefaultRules() installs on first init. We seed
+// these the first time rules.json is read and absent, giving the renderer the
+// same initialized rule set Electron has after initialize(). Each gets a real
+// id/createdAt/triggerCount via addRule()'s shape.
+fn default_rules() -> Vec<Value> {
+    let seeds = [
+        ("telemetry", "*.google-analytics.com", "Google Analytics telemetry"),
+        ("telemetry", "*.doubleclick.net", "DoubleClick tracking"),
+        ("crash-report", "*.sentry.io", "Sentry error reporting"),
+    ];
+    seeds
+        .iter()
+        .map(|(data_type, destination, reason)| {
+            json!({
+                "id": format!("rule-{}-{}", now_ms(), &crate::util::pseudo_uuid_v4()[..6]),
+                "dataType": data_type,
+                "destination": destination,
+                "action": "block",
+                "reason": reason,
+                "createdAt": now_ms(),
+                "triggerCount": 0
+            })
+        })
+        .collect()
+}
+
+// rules.json as DataFlowRule[]. On first read (file absent) we seed the default
+// rules and persist them, matching setupDefaultRules() during initialize().
+fn get_rules(app: &tauri::AppHandle) -> Vec<Value> {
+    let path = privacy_dir(app).join(RULES_FILE);
+    if let Ok(raw) = std::fs::read_to_string(&path) {
+        if let Ok(Value::Array(rules)) = serde_json::from_str::<Value>(&raw) {
+            return rules;
+        }
+    }
+    // Absent/corrupt -> seed defaults and persist (first-init parity).
+    let seeded = default_rules();
+    let _ = write_json(app, RULES_FILE, &Value::Array(seeded.clone()));
+    seeded
 }
 
 // privacy:config — loadConfig() builds `this.config = { ...DEFAULT_CONFIG, ...file }`
@@ -115,29 +258,216 @@ fn get_config(app: &tauri::AppHandle) -> Value {
     Value::Object(merged)
 }
 
+// Persist a new config object (saveConfig) and emit config:changed, exactly as
+// updateConfig() does. Returns the merged config so callers can recompute state.
+fn persist_config(app: &tauri::AppHandle, merged: &Value) {
+    let _ = write_json(app, CONFIG_FILE, merged);
+    crate::native_ops::emit_event(app, "config:changed", merged);
+}
+
+// updateConfig(updates): `this.config = { ...this.config, ...updates }`, save,
+// recompute isActive when `enabled` is in the patch, emit config:changed.
+// Returns { success: true } like the TS.
+fn set_config(app: &tauri::AppHandle, updates: &Value) -> Value {
+    let mut merged: Map<String, Value> = match get_config(app) {
+        Value::Object(o) => o,
+        _ => Map::new(),
+    };
+    if let Some(obj) = updates.as_object() {
+        for (k, v) in obj {
+            merged.insert(k.clone(), v.clone());
+        }
+    }
+    let merged_val = Value::Object(merged);
+    persist_config(app, &merged_val);
+    json!({ "success": true })
+}
+
+// privacy:status -> { enabled, isActive, stats }. isActive mirrors the live
+// monitor's active flag, which in updateConfig is kept equal to config.enabled
+// (and is true after a successful initialize when enabled). With no live monitor
+// in the shell, config.enabled is the faithful value.
+fn status(app: &tauri::AppHandle) -> Value {
+    let config = get_config(app);
+    let enabled = config
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    json!({
+        "enabled": enabled,
+        "isActive": enabled,
+        "stats": get_stats(app)
+    })
+}
+
+// Tail of a persisted JSON array file: `arr.slice(-limit)`.
+fn tail(app: &tauri::AppHandle, file: &str, limit: usize) -> Value {
+    let arr = match read_json(app, file, json!([])) {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    };
+    let start = arr.len().saturating_sub(limit);
+    Value::Array(arr[start..].to_vec())
+}
+
+// addRule(rule): build the full DataFlowRule, append to rules.json, persist,
+// emit rule:added, return the full rule (matches the TS return).
+fn add_rule(app: &tauri::AppHandle, rule_in: &Value) -> Value {
+    let mut full: Map<String, Value> = match rule_in {
+        Value::Object(o) => o.clone(),
+        _ => Map::new(),
+    };
+    // id / createdAt / triggerCount are always (re)assigned by the server, as in
+    // addRule()'s spread that overrides any caller-supplied values.
+    full.insert(
+        "id".into(),
+        json!(format!("rule-{}-{}", now_ms(), &crate::util::pseudo_uuid_v4()[..6])),
+    );
+    full.insert("createdAt".into(), json!(now_ms()));
+    full.insert("triggerCount".into(), json!(0));
+    let full_val = Value::Object(full);
+
+    let mut rules = get_rules(app);
+    rules.push(full_val.clone());
+    let _ = write_json(app, RULES_FILE, &Value::Array(rules));
+
+    crate::native_ops::emit_event(app, "rule:added", &full_val);
+    full_val
+}
+
+// removeRule(ruleId): delete by id, persist, emit rule:removed; { success }.
+fn remove_rule(app: &tauri::AppHandle, rule_id: &str) -> Value {
+    let mut rules = get_rules(app);
+    let before = rules.len();
+    rules.retain(|r| r.get("id").and_then(|v| v.as_str()) != Some(rule_id));
+    let removed = rules.len() != before;
+    if removed {
+        let _ = write_json(app, RULES_FILE, &Value::Array(rules));
+        crate::native_ops::emit_event(app, "rule:removed", &json!(rule_id));
+    }
+    json!({ "success": removed })
+}
+
+// allowDomain / blockDomain: move the domain between the config's allow/block
+// lists (de-duped), persist, emit the matching event; { success: true }.
+fn move_domain(app: &tauri::AppHandle, domain: &str, allow: bool) -> Value {
+    let mut config: Map<String, Value> = match get_config(app) {
+        Value::Object(o) => o,
+        _ => Map::new(),
+    };
+
+    let to_vec = |v: Option<&Value>| -> Vec<Value> {
+        match v {
+            Some(Value::Array(a)) => a.clone(),
+            _ => Vec::new(),
+        }
+    };
+    let mut allowed = to_vec(config.get("allowedDomains"));
+    let mut blocked = to_vec(config.get("blockedDomains"));
+
+    let is_domain = |v: &Value| v.as_str() == Some(domain);
+    if allow {
+        // Remove from blocked, add to allowed if absent.
+        blocked.retain(|d| !is_domain(d));
+        if !allowed.iter().any(is_domain) {
+            allowed.push(json!(domain));
+        }
+    } else {
+        // Remove from allowed, add to blocked if absent.
+        allowed.retain(|d| !is_domain(d));
+        if !blocked.iter().any(is_domain) {
+            blocked.push(json!(domain));
+        }
+    }
+
+    config.insert("allowedDomains".into(), Value::Array(allowed));
+    config.insert("blockedDomains".into(), Value::Array(blocked));
+    let config_val = Value::Object(config);
+    // saveConfig() (no config:changed in allow/blockDomain — they emit their own
+    // domain:* event instead, matching the TS).
+    let _ = write_json(app, CONFIG_FILE, &config_val);
+    crate::native_ops::emit_event(
+        app,
+        if allow { "domain:allowed" } else { "domain:blocked" },
+        &json!(domain),
+    );
+    json!({ "success": true })
+}
+
+// clearLogs(): empty request log + warnings; { success: true }.
+fn clear_logs(app: &tauri::AppHandle) -> Value {
+    let _ = write_json(app, LOG_FILE, &json!([]));
+    let _ = write_json(app, WARNINGS_FILE, &json!([]));
+    json!({ "success": true })
+}
+
+// resetStats(): stats = initStats(); { success: true }.
+fn reset_stats(app: &tauri::AppHandle) -> Value {
+    let _ = write_json(app, STATS_FILE, &init_stats());
+    json!({ "success": true })
+}
+
 /// Route a `privacy:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Only the pure-data policy getter is ported; every
-/// heavy / live-runtime channel returns Value::Null (honest degrade — nothing
-/// faked; see header for the full mapping).
-pub fn dispatch(app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+/// sent (see tauriCompat.ts). Every registered channel is ported with real
+/// native code; the only thing that genuinely cannot be ported (the live
+/// session.webRequest monitor that POPULATES the logs/stats) has no channel of
+/// its own, so nothing is faked — the log/warning/stats channels operate
+/// faithfully on state that simply starts empty/zeroed, as Electron's does.
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+    // First positional arg, if any.
+    let a0 = args.get(0);
+
     match channel {
         // getPolicy (the privacy policy getter).
         "privacy:config" => get_config(app),
 
-        // Heavy / live-runtime channels (check / sanitize / audit surface): the
-        // network-interception monitor, its request/warning logs and stats, and
-        // the mutating rule/domain/config setters. Not ported, not faked.
-        "privacy:status"
-        | "privacy:setConfig"
-        | "privacy:requestLog"
-        | "privacy:warnings"
-        | "privacy:rules"
-        | "privacy:addRule"
-        | "privacy:removeRule"
-        | "privacy:clearLogs"
-        | "privacy:resetStats"
-        | "privacy:allowDomain"
-        | "privacy:blockDomain" => Value::Null,
+        // { enabled, isActive, stats }
+        "privacy:status" => status(app),
+
+        // updateConfig(updates) -> { success }
+        "privacy:setConfig" => set_config(app, a0.unwrap_or(&Value::Null)),
+
+        // getRequestLog(limit = 100) -> NetworkRequest[]
+        "privacy:requestLog" => {
+            let limit = a0.and_then(|v| v.as_u64()).unwrap_or(100) as usize;
+            tail(app, LOG_FILE, limit)
+        }
+
+        // getWarnings(limit = 50) -> LeakWarning[]
+        "privacy:warnings" => {
+            let limit = a0.and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+            tail(app, WARNINGS_FILE, limit)
+        }
+
+        // getRules() -> DataFlowRule[]
+        "privacy:rules" => Value::Array(get_rules(app)),
+
+        // addRule(rule) -> DataFlowRule
+        "privacy:addRule" => add_rule(app, a0.unwrap_or(&Value::Null)),
+
+        // removeRule(ruleId) -> { success }
+        "privacy:removeRule" => {
+            let id = a0.and_then(|v| v.as_str()).unwrap_or("");
+            remove_rule(app, id)
+        }
+
+        // clearLogs() -> { success }
+        "privacy:clearLogs" => clear_logs(app),
+
+        // resetStats() -> { success }
+        "privacy:resetStats" => reset_stats(app),
+
+        // allowDomain(domain) -> { success }
+        "privacy:allowDomain" => {
+            let domain = a0.and_then(|v| v.as_str()).unwrap_or("");
+            move_domain(app, domain, true)
+        }
+
+        // blockDomain(domain) -> { success }
+        "privacy:blockDomain" => {
+            let domain = a0.and_then(|v| v.as_str()).unwrap_or("");
+            move_domain(app, domain, false)
+        }
 
         _ => Value::Null,
     }

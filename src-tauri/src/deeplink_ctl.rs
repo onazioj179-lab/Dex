@@ -22,7 +22,11 @@
 // those names do not exist in DeepLinkRouter.ts. The genuine data/pure channels
 // are resolve / parse / build / extractLinks (all referentially transparent),
 // and the one genuine heavy channel is `navigate`. We port all four pure
-// channels at their exact Electron shapes and skip `navigate`.
+// channels plus `navigate` at their exact Electron shapes. `navigate` reproduces
+// the VALID_APPS gate, appId resolution and the renderer push event (via
+// native_ops::emit_event, the parity of webContents.send); only window
+// show/focus and the localStorage title enrichment degrade headless. The
+// nonexistent register/unregister/list channels degrade honestly (no fake).
 //
 // DIVERGENCES (documented):
 //   - deeplink:resolve display-name lookup. Electron's resolveDisplayName runs
@@ -40,9 +44,8 @@
 
 use serde_json::{json, Value};
 
-// VALID_APPS — mirrors the Electron Set. Unused by the ported pure channels
-// (only `navigate`, which is skipped, gates on it), kept here as the faithful
-// reference list so the port is self-documenting.
+// VALID_APPS — mirrors the Electron Set. Gated on by `navigate` to reproduce
+// the `{ found:false, displayName:"Unknown app" }` rejection path exactly.
 const VALID_APPS: &[&str] = &[
     "home", "files", "browser", "settings", "transfers", "dashboard", "notes", "tasks", "power",
     "workflows", "gallery", "audio", "video", "vinx", "videoeditor", "imosion", "prism", "flux",
@@ -155,14 +158,102 @@ fn extract_links(text: &str) -> Vec<String> {
     out
 }
 
+/// deeplink:navigate(url) -> DeepLinkResolution
+///
+/// Native port of DeepLinkRouter.navigate. The portable behaviour is fully
+/// reproduced:
+///   - parseLink (pure)
+///   - VALID_APPS gate -> { found:false, ..., displayName:"Unknown app" }
+///   - appId resolution (`vinx`->`videoeditor`, `app`->resourceType||"home")
+///   - the renderer push: Electron's `mainWindow.webContents.send(
+///     'deeplink:navigate', { app, resourceType, resourceId })` maps 1:1 to
+///     crate::native_ops::emit_event(app, "deeplink:navigate", payload).
+///
+/// DEGRADED (headless, identical shape preserved):
+///   - window.show()/focus(): there is no live BrowserWindow handle here; the
+///     Tauri shell manages window visibility elsewhere, so this is a no-op.
+///   - displayName title enrichment: resolveDisplayName runs executeJavaScript
+///     against renderer localStorage (dex-notes/dex-tasks). Unreachable from
+///     native Rust, so we return Electron's own catch/no-match fallback
+///     `app/type/id` (see resolve_display_name) — the exact value Electron
+///     yields whenever the window is gone or the lookup misses. Shape is byte
+///     identical to the success path; only best-case title text is unavailable.
+fn navigate(app: &tauri::AppHandle, url: &str) -> Value {
+    let target = parse_link(url);
+    if target.is_null() {
+        return json!({
+            "found": false,
+            "app": "",
+            "resourceType": "",
+            "resourceId": "",
+            "displayName": "Invalid link"
+        });
+    }
+
+    let app_name = target.get("app").and_then(|v| v.as_str()).unwrap_or("");
+    let resource_type = target.get("resourceType").and_then(|v| v.as_str()).unwrap_or("");
+    let resource_id = target.get("resourceId").and_then(|v| v.as_str()).unwrap_or("");
+
+    if !VALID_APPS.contains(&app_name) {
+        return json!({
+            "found": false,
+            "app": app_name,
+            "resourceType": resource_type,
+            "resourceId": resource_id,
+            "displayName": "Unknown app"
+        });
+    }
+
+    // appId resolution mirrors Electron exactly.
+    let mut app_id = app_name.to_string();
+    if app_id == "vinx" {
+        app_id = "videoeditor".to_string();
+    }
+    if app_id == "app" {
+        app_id = if resource_type.is_empty() { "home".to_string() } else { resource_type.to_string() };
+    }
+
+    // Renderer push: parity with mainWindow.webContents.send('deeplink:navigate', …).
+    crate::native_ops::emit_event(
+        app,
+        "deeplink:navigate",
+        &json!({
+            "app": app_id,
+            "resourceType": resource_type,
+            "resourceId": resource_id,
+        }),
+    );
+
+    // displayName: headless fallback (see doc comment). Same shape as Electron.
+    let display_name = resolve_display_name(&target);
+
+    json!({
+        "found": true,
+        "app": app_name,
+        "resourceType": resource_type,
+        "resourceId": resource_id,
+        "displayName": display_name,
+    })
+}
+
 /// Route a `deeplink:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Pure data channels are handled; the heavy
-/// `navigate` channel (live BrowserWindow IPC + show/focus + renderer
-/// executeJavaScript) is not ported and returns Value::Null. Unknown channels
-/// also degrade to Value::Null.
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
-    let _ = VALID_APPS; // referenced only by the skipped `navigate` path.
+/// sent (see tauriCompat.ts). The pure data channels and the heavy `navigate`
+/// channel are handled here. The brief also listed `register`, `unregister` and
+/// `list`, but DeepLinkRouter.ts defines no such channels and backs them with no
+/// registry (see header) — there is nothing real to port, so per the no-fake
+/// rule they degrade explicitly. Unknown channels degrade to Value::Null.
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
+        "deeplink:navigate" => {
+            let url = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            navigate(app, url)
+        }
+        // These channels do not exist in DeepLinkRouter.ts and have no backing
+        // registry to operate on; implementing them would mean inventing state
+        // the real subsystem never had. Degrade honestly rather than fake.
+        "deeplink:register" | "deeplink:unregister" | "deeplink:list" => {
+            json!({ "success": false, "error": "not ported (channel does not exist in DeepLinkRouter)" })
+        }
         "deeplink:resolve" => {
             let url = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             resolve(url)
@@ -181,7 +272,7 @@ pub fn dispatch(_app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let text = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             json!(extract_links(text))
         }
-        // HEAVY (skipped): deeplink:navigate needs the live window. Not ported.
+        // Unknown deeplink:* channels degrade to null.
         _ => Value::Null,
     }
 }

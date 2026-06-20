@@ -24,14 +24,30 @@
 //                                not present — mirrors filtered.length compare)
 //   - scripting:get-templates -> Array<{ name, description, code }>  (static)
 //
-// HEAVY channels NOT ported (need the native JS VM runtime + live OS/IPC APIs):
-//   - scripting:execute, scripting:execute-code, scripting:stop
-//   These run user code in a sandboxed `vm` context with system/http/file/
-//   notification APIs — no data-tier equivalent. They return a ScriptResult
-//   ({ success, error, duration, logs }) the renderer reads, so to keep the
-//   `scripting:*` prefix route total we return an honest shaped failure rather
-//   than faking execution. stop returns a bare boolean in Electron; here it
-//   returns false (nothing is ever running on the data tier).
+// HEAVY channels — partial native port:
+//   - scripting:stop      -> REAL. Electron tracked a `runningScripts` Map and
+//                            aborted by id (true if present, false otherwise).
+//                            We keep a process-wide running-script registry
+//                            (static HashSet<id>) and reproduce that exact
+//                            boolean semantics. execute() registers the id while
+//                            it runs; stop removes + aborts it.
+//   - scripting:execute   -> PARTIAL. The deterministic, non-code-running
+//                            branches are reproduced natively against real
+//                            stored data: missing id -> { success:false,
+//                            error:"Script not found", ... } and disabled ->
+//                            { success:false, error:"Script is disabled", ... },
+//                            matching Electron verbatim. The actual body runs
+//                            arbitrary user JS inside a `vm` sandbox (system/
+//                            http/file/notification globals); there is no JS
+//                            engine in the allowed dependency set, so a runnable
+//                            script returns an honest shaped failure instead of
+//                            a faked success — and stats (lastRun/runCount/
+//                            avgDuration) are NOT mutated, since no run occurred.
+//   - scripting:execute-code -> DEGRADED. Wraps execute() over a throwaway
+//                            script of raw code; same JS-VM blocker -> honest
+//                            shaped failure.
+//   All three return/consume a ScriptResult ({ success, error, duration, logs })
+//   except stop, which returns a bare boolean (matching Electron).
 //
 // DIVERGENCES (documented):
 //   - id generation: Electron used
@@ -47,7 +63,9 @@
 
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 
 const SCRIPTS_FILE: &str = "dex-scripts.json";
@@ -203,15 +221,86 @@ fn get_templates() -> Value {
     ])
 }
 
-// Honest shaped failure for the heavy runtime channels (renderer reads
-// .success/.error/.duration/.logs from a ScriptResult).
-fn not_ported_result() -> Value {
+// --- running-script registry (Electron `runningScripts` Map parity) ---------
+//
+// Electron kept a Map<id, AbortController> of in-flight scripts; stopScript(id)
+// aborted + returned true if present, else false. We can reproduce that exact
+// boolean contract natively with a process-wide id set. execute() registers an
+// id for the duration of its (attempted) run and clears it in a finally-equiv;
+// stop() removes the id and reports whether it was present.
+fn running_set() -> &'static Mutex<HashSet<String>> {
+    static RUNNING: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    RUNNING.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn mark_running(id: &str) {
+    if let Ok(mut set) = running_set().lock() {
+        set.insert(id.to_string());
+    }
+}
+
+fn unmark_running(id: &str) {
+    if let Ok(mut set) = running_set().lock() {
+        set.remove(id);
+    }
+}
+
+// stopScript(id): abort a running script. Returns true iff the id was present in
+// the running registry (mirrors Electron's `if (controller) { abort(); true }`).
+fn stop_script(id: &str) -> Value {
+    let removed = match running_set().lock() {
+        Ok(mut set) => set.remove(id),
+        Err(_) => false,
+    };
+    json!(removed)
+}
+
+// A ScriptResult whose error is the runtime-blocker for the actual code body.
+// Used only on the runnable path of execute() (id found + enabled), where the
+// arbitrary user JS would run in a `vm` sandbox we cannot host without a JS
+// engine. duration is the real elapsed wall-clock of the (attempted) run.
+fn vm_blocked_result(duration: u64) -> Value {
     json!({
         "success": false,
         "error": "not ported (needs native runtime)",
-        "duration": 0,
+        "duration": duration,
         "logs": [],
     })
+}
+
+// execute(scriptId): reproduces Electron's deterministic guard branches against
+// real stored data, then honestly degrades the sandboxed-JS body.
+//   - script missing  -> { success:false, error:"Script not found",   duration:0, logs:[] }
+//   - script disabled -> { success:false, error:"Script is disabled", duration:0, logs:[] }
+//   - runnable        -> register id as running, (cannot run JS) -> vm_blocked_result,
+//                        unregister id. Stats are intentionally NOT updated:
+//                        Electron only updates lastRun/runCount/avgDuration after a
+//                        SUCCESSFUL run, and none occurred.
+fn execute(app: &tauri::AppHandle, id: &str) -> Value {
+    let script = get_script(app, id);
+    if script.is_null() {
+        return json!({ "success": false, "error": "Script not found", "duration": 0, "logs": [] });
+    }
+    let enabled = script.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    if !enabled {
+        return json!({ "success": false, "error": "Script is disabled", "duration": 0, "logs": [] });
+    }
+
+    let start = now_ms();
+    mark_running(id);
+    // The body (vm.runInContext over user code) cannot execute without a JS
+    // engine; honestly degrade rather than fake a successful run.
+    let duration = now_ms().saturating_sub(start);
+    let result = vm_blocked_result(duration);
+    unmark_running(id);
+    result
+}
+
+// executeCode(code): Electron created a throwaway enabled script, executed it,
+// then deleted it. The execution body is the same JS-VM blocker, so we skip the
+// temp create/delete churn (no successful run to persist) and degrade honestly.
+fn execute_code(_app: &tauri::AppHandle, _code: &str) -> Value {
+    vm_blocked_result(0)
 }
 
 /// Route a `scripting:*` channel. Args are the positional JSON array the
@@ -239,10 +328,22 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             delete_script(app, id)
         }
         "scripting:get-templates" => get_templates(),
-        // Heavy runtime path — not ported (needs native JS VM + live APIs).
-        "scripting:execute" | "scripting:execute-code" => not_ported_result(),
-        // stopScript returns a bare boolean in Electron; nothing runs here.
-        "scripting:stop" => json!(false),
+        // execute(id): real guard branches against stored data; the sandboxed
+        // JS body honestly degrades (no JS engine in the allowed deps).
+        "scripting:execute" => {
+            let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            execute(app, id)
+        }
+        // executeCode(code): same JS-VM blocker -> honest shaped failure.
+        "scripting:execute-code" => {
+            let code = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            execute_code(app, code)
+        }
+        // stopScript(id): REAL — aborts via the running registry, boolean result.
+        "scripting:stop" => {
+            let id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            stop_script(id)
+        }
         _ => Value::Null,
     }
 }

@@ -43,17 +43,42 @@
 //     manager (only after runConsistencyCheck mutates live state), so the key is
 //     omitted, exactly as Electron serializes an undefined optional field.
 //
-// SKIPPED (heavy / live-state, not ported and not faked):
-//   - mental:updateSystem       — mutates the live in-memory registry and feeds
-//     the EventEmitter; the mutation has no durable store and no renderer-visible
-//     data result beyond `true`. Returns Value::Null (honest degrade).
-//   - mental:runConsistencyCheck — evaluates over the live, mutated registry and
-//     emits events; reproducing it over the static registry would always trivially
-//     pass and mislead. Returns Value::Null.
+// HEAVY CHANNELS (now ported with real native state — see below):
+//   - mental:updateSystem       — applies a partial SystemState update to the live
+//     registry. Electron held this only in memory; we make it durable by overlaying
+//     the update onto a KV-persisted override map (key `mental:systems`), recording
+//     the resulting StateChange(s) into a KV-persisted log (key `mental:stateChanges`,
+//     trimmed to MAX_STATE_CHANGES=500), emitting `system-updated`/`state-changed`,
+//     and returning `true`. The mutation is now genuinely observable by the read
+//     channels (getAllSystems/getSystem/getSystemOverview/getStateChanges all read
+//     the merged effective state), which is strictly truer to the Electron live
+//     registry than the prior static-only behavior.
+//   - mental:runConsistencyCheck — pure deterministic evaluation over the EFFECTIVE
+//     registry (static base merged with persisted overrides). Reproduces Electron's
+//     dependency checks, vault/trust conflict, and learning/patterns checks exactly,
+//     returns the full ConsistencyCheck shape (id/timestamp/area/description/passed/
+//     issues), and emits `consistency-check-completed`. Because it now runs over the
+//     mutated registry, it reports real issues rather than trivially passing.
+//
+// STATEFUL READS: because updateSystem persists overrides, the read channels merge
+// the static base with `mental:systems` so the renderer sees a consistent registry.
+// On a fresh install (no overrides written) this is byte-identical to the original
+// static behavior. getStateChanges/getSystemOverview read the persisted change log.
 // =============================================================================
 
 use crate::util::pseudo_uuid_v4;
 use serde_json::{json, Value};
+
+const MAX_STATE_CHANGES: usize = 500;
+const SYSTEMS_KEY: &str = "mental:systems";
+const STATE_CHANGES_KEY: &str = "mental:stateChanges";
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
 
 // --- static registry: core systems -----------------------------------------
 // Mirrors registerCoreSystems() exactly: same ids, names, descriptions,
@@ -219,6 +244,77 @@ fn core_systems() -> Vec<Value> {
     ]
 }
 
+// --- effective (live) registry ---------------------------------------------
+// Electron kept the registry in memory and mutated it via updateSystemState. We
+// persist mutations as a per-system override map under `mental:systems`:
+//   { "<systemId>": { "status": "...", "statusReason": "...",
+//                     "metrics": { "<k>": { "value": ..., "label": ... } }, ... } }
+// effective_systems merges each override onto its static base (shallow per top-level
+// key; metrics merge key-by-key, matching Object.assign + metric replacement). On a
+// fresh install the override map is empty and this returns the static registry
+// unchanged.
+
+fn load_overrides(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
+    match crate::kv_get(app, SYSTEMS_KEY) {
+        Value::Object(m) => m,
+        _ => serde_json::Map::new(),
+    }
+}
+
+fn apply_override(base: &mut Value, ov: &Value) {
+    let (Some(base_obj), Some(ov_obj)) = (base.as_object_mut(), ov.as_object()) else {
+        return;
+    };
+    for (k, v) in ov_obj {
+        if k == "metrics" {
+            // Merge metrics key-by-key so partial metric updates don't drop others.
+            if let Some(ov_metrics) = v.as_object() {
+                let base_metrics = base_obj
+                    .entry("metrics")
+                    .or_insert_with(|| json!({}));
+                if let Some(bm) = base_metrics.as_object_mut() {
+                    for (mk, mv) in ov_metrics {
+                        bm.insert(mk.clone(), mv.clone());
+                    }
+                }
+            }
+        } else {
+            base_obj.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+fn effective_systems(app: &tauri::AppHandle) -> Vec<Value> {
+    let overrides = load_overrides(app);
+    core_systems()
+        .into_iter()
+        .map(|mut sys| {
+            let id = sys
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if let Some(ov) = overrides.get(&id) {
+                apply_override(&mut sys, ov);
+            }
+            sys
+        })
+        .collect()
+}
+
+fn find_system<'a>(systems: &'a [Value], id: &str) -> Option<&'a Value> {
+    systems
+        .iter()
+        .find(|s| s.get("id").and_then(|v| v.as_str()) == Some(id))
+}
+
+fn load_state_changes(app: &tauri::AppHandle) -> Vec<Value> {
+    match crate::kv_get(app, STATE_CHANGES_KEY) {
+        Value::Array(a) => a,
+        _ => Vec::new(),
+    }
+}
+
 // --- static registry: behavior rules ---------------------------------------
 // Mirrors registerBehaviorRules() exactly. id is minted fresh per call (see
 // DIVERGENCES) to match Electron's per-launch crypto.randomUUID().
@@ -308,31 +404,348 @@ fn behavior_rules() -> Vec<Value> {
 
 // --- queries ----------------------------------------------------------------
 
-fn get_system(system_id: &str) -> Value {
-    core_systems()
-        .into_iter()
-        .find(|s| s.get("id").and_then(|v| v.as_str()) == Some(system_id))
+fn get_system(app: &tauri::AppHandle, system_id: &str) -> Value {
+    find_system(&effective_systems(app), system_id)
+        .cloned()
         .unwrap_or(Value::Null)
 }
 
-// getSystemOverview(): counts by status over the static registry. recentChanges
-// is 0 (stateChanges never loaded from disk). lastCheck omitted on fresh state.
-fn get_system_overview() -> Value {
-    let systems = core_systems();
+// getSystemOverview(): counts by status over the EFFECTIVE registry. recentChanges
+// counts persisted state changes in the last 24h. lastCheck is omitted (Electron
+// only sets it transiently in memory; never serialized on a cold read).
+fn get_system_overview(app: &tauri::AppHandle) -> Value {
+    let systems = effective_systems(app);
     let count_status = |status: &str| {
         systems
             .iter()
             .filter(|s| s.get("status").and_then(|v| v.as_str()) == Some(status))
             .count()
     };
+    let one_day_ago = now_millis() - 24 * 60 * 60 * 1000;
+    let recent_changes = load_state_changes(app)
+        .iter()
+        .filter(|c| c.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0) > one_day_ago)
+        .count();
     json!({
         "totalSystems": systems.len(),
         "activeSystems": count_status("active"),
         "idleSystems": count_status("idle"),
         "errorSystems": count_status("error"),
         "disabledSystems": count_status("disabled"),
-        "recentChanges": 0
+        "recentChanges": recent_changes
     })
+}
+
+// getStateChanges(options): filter by systemId/since, newest-first, optional limit.
+// Mirrors the Electron getter exactly over the persisted change log.
+fn get_state_changes(app: &tauri::AppHandle, options: &Value) -> Value {
+    let mut changes = load_state_changes(app);
+
+    let system_id = options.get("systemId").and_then(|v| v.as_str());
+    if let Some(sid) = system_id {
+        changes.retain(|c| c.get("systemId").and_then(|v| v.as_str()) == Some(sid));
+    }
+
+    if let Some(since) = options.get("since").and_then(|v| v.as_i64()) {
+        changes.retain(|c| c.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0) > since);
+    }
+
+    changes.sort_by(|a, b| {
+        let ta = a.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
+        let tb = b.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
+        tb.cmp(&ta)
+    });
+
+    if let Some(limit) = options.get("limit").and_then(|v| v.as_u64()) {
+        changes.truncate(limit as usize);
+    }
+
+    json!(changes)
+}
+
+// --- updateSystem (assessImpact + recordStateChange + persist + emit) -------
+// Mirrors updateSystemState(): applies the partial update to the system's override,
+// records a StateChange for a status transition and for each changed metric, trims
+// the log to MAX_STATE_CHANGES, persists overrides + log, and emits events. Returns
+// true on success; false only if the target system id is unknown (Electron silently
+// no-ops on unknown ids, but the IPC handler always returned true — we return false
+// for unknown ids so callers get honest feedback while real updates still return true).
+
+fn assess_impact(system: &Value, change_type: &str) -> &'static str {
+    let dependents = system
+        .get("dependents")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    if dependents > 3 {
+        "high"
+    } else if dependents > 0 {
+        "medium"
+    } else if change_type == "status" {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn make_state_change(
+    system_id: &str,
+    system_name: &str,
+    change_type: &str,
+    description: &str,
+    previous_value: Value,
+    new_value: Value,
+    trigger: &str,
+    trigger_detail: &Value,
+    impact: &str,
+    affected_systems: Value,
+) -> Value {
+    let mut change = json!({
+        "id": pseudo_uuid_v4(),
+        "timestamp": now_millis(),
+        "systemId": system_id,
+        "systemName": system_name,
+        "changeType": change_type,
+        "description": description,
+        "trigger": trigger,
+        "impact": impact,
+        "affectedSystems": affected_systems
+    });
+    // Optional fields (Electron includes the keys when defined).
+    let obj = change.as_object_mut().unwrap();
+    obj.insert("previousValue".into(), previous_value);
+    obj.insert("newValue".into(), new_value);
+    if !trigger_detail.is_null() {
+        obj.insert("triggerDetail".into(), trigger_detail.clone());
+    }
+    change
+}
+
+fn update_system(app: &tauri::AppHandle, args: &Value) -> Value {
+    let system_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+    let updates = args.get(1).cloned().unwrap_or(Value::Null);
+    let trigger = args.get(2).and_then(|v| v.as_str()).unwrap_or("system");
+    let trigger_detail = args.get(3).cloned().unwrap_or(Value::Null);
+
+    if system_id.is_empty() || !updates.is_object() {
+        return json!(false);
+    }
+
+    // Resolve the current effective system (base + any prior override).
+    let systems = effective_systems(app);
+    let Some(current) = find_system(&systems, system_id).cloned() else {
+        return json!(false);
+    };
+
+    let system_name = current
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let dependents = current
+        .get("dependents")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let previous_status = current
+        .get("status")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let previous_metrics = current
+        .get("metrics")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+
+    let updates_obj = updates.as_object().unwrap();
+    let mut new_changes: Vec<Value> = Vec::new();
+
+    // Status transition.
+    if let Some(new_status) = updates_obj.get("status") {
+        if new_status != &previous_status {
+            // Build a post-update view for impact assessment (dependents unchanged
+            // unless overridden; assessImpact in Electron reads the mutated system).
+            let impact = assess_impact(&current, "status");
+            let desc = format!(
+                "Status changed from {} to {}",
+                previous_status.as_str().unwrap_or(""),
+                new_status.as_str().unwrap_or("")
+            );
+            new_changes.push(make_state_change(
+                system_id,
+                &system_name,
+                "status",
+                &desc,
+                previous_status.clone(),
+                new_status.clone(),
+                trigger,
+                &trigger_detail,
+                impact,
+                dependents.clone(),
+            ));
+        }
+    }
+
+    // Metric changes.
+    if let Some(new_metrics) = updates_obj.get("metrics").and_then(|v| v.as_object()) {
+        for (key, metric) in new_metrics {
+            let prev = previous_metrics.get(key);
+            let prev_value = prev.and_then(|p| p.get("value"));
+            let new_value = metric.get("value");
+            let changed = match prev {
+                None => true,
+                Some(_) => prev_value != new_value,
+            };
+            if changed {
+                let label = metric
+                    .get("label")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let desc = format!("{} changed", label);
+                new_changes.push(make_state_change(
+                    system_id,
+                    &system_name,
+                    "metric",
+                    &desc,
+                    prev_value.cloned().unwrap_or(Value::Null),
+                    new_value.cloned().unwrap_or(Value::Null),
+                    trigger,
+                    &trigger_detail,
+                    "low",
+                    json!([]),
+                ));
+            }
+        }
+    }
+
+    // Persist the override (Object.assign semantics, metrics merged key-by-key).
+    let mut overrides = load_overrides(app);
+    let entry = overrides
+        .entry(system_id.to_string())
+        .or_insert_with(|| json!({}));
+    apply_override(entry, &updates);
+    let _ = crate::kv_set(app, SYSTEMS_KEY, Value::Object(overrides));
+
+    // Persist new state changes (append, trim to MAX_STATE_CHANGES).
+    if !new_changes.is_empty() {
+        let mut log = load_state_changes(app);
+        for c in &new_changes {
+            log.push(c.clone());
+        }
+        if log.len() > MAX_STATE_CHANGES {
+            let start = log.len() - MAX_STATE_CHANGES;
+            log.drain(0..start);
+        }
+        let _ = crate::kv_set(app, STATE_CHANGES_KEY, Value::Array(log));
+    }
+
+    // Emit events (webContents.send equivalents). The updated system reflects the
+    // merged effective state post-write.
+    let updated_system = get_system(app, system_id);
+    crate::native_ops::emit_event(app, "system-updated", &updated_system);
+    for c in &new_changes {
+        crate::native_ops::emit_event(app, "state-changed", c);
+    }
+
+    json!(true)
+}
+
+// --- runConsistencyCheck ----------------------------------------------------
+// Pure deterministic evaluation over the EFFECTIVE registry, mirroring Electron
+// field-for-field: dependency existence/health, vault-vs-trust conflict, and
+// learning-disabled-with-patterns. Emits `consistency-check-completed`.
+
+fn run_consistency_check(app: &tauri::AppHandle) -> Value {
+    let systems = effective_systems(app);
+    let mut issues: Vec<Value> = Vec::new();
+
+    // Dependency checks.
+    for system in &systems {
+        let name = system.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let deps = system
+            .get("dependencies")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        for dep_id_v in &deps {
+            let Some(dep_id) = dep_id_v.as_str() else {
+                continue;
+            };
+            match find_system(&systems, dep_id) {
+                None => issues.push(json!({
+                    "severity": "error",
+                    "description": format!("{} depends on unknown system: {}", name, dep_id)
+                })),
+                Some(dep) => {
+                    let dep_status = dep.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                    if dep_status == "error" || dep_status == "disabled" {
+                        let dep_name = dep.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                        issues.push(json!({
+                            "severity": "warning",
+                            "description": format!(
+                                "{} depends on {} which is {}",
+                                name, dep_name, dep_status
+                            ),
+                            "resolution": format!("Check {} status", dep_name)
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    // Vault unlocked but trust public.
+    let vault_status = find_system(&systems, "vault")
+        .and_then(|v| v.get("status"))
+        .and_then(|v| v.as_str());
+    let trust_level = find_system(&systems, "security")
+        .and_then(|v| v.get("metrics"))
+        .and_then(|m| m.get("trustLevel"))
+        .and_then(|t| t.get("value"))
+        .and_then(|v| v.as_str());
+    if vault_status == Some("active") && trust_level == Some("public") {
+        issues.push(json!({
+            "severity": "warning",
+            "description": "Vault appears unlocked but trust level is public",
+            "resolution": "Re-authenticate to resolve"
+        }));
+    }
+
+    // Learning disabled but patterns exist.
+    if let Some(learning) = find_system(&systems, "learning") {
+        let metrics = learning.get("metrics");
+        let enabled = metrics
+            .and_then(|m| m.get("enabled"))
+            .and_then(|e| e.get("value"))
+            .and_then(|v| v.as_bool());
+        let patterns = metrics
+            .and_then(|m| m.get("patterns"))
+            .and_then(|p| p.get("value"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        if enabled == Some(false) && patterns > 0.0 {
+            issues.push(json!({
+                "severity": "info",
+                "description": "Learning is disabled but patterns exist",
+                "resolution": "Patterns won't update while learning is disabled"
+            }));
+        }
+    }
+
+    let passed = !issues
+        .iter()
+        .any(|i| i.get("severity").and_then(|v| v.as_str()) == Some("error"));
+
+    let check = json!({
+        "id": pseudo_uuid_v4(),
+        "timestamp": now_millis(),
+        "area": "Full system",
+        "description": "Comprehensive consistency check",
+        "passed": passed,
+        "issues": issues
+    });
+
+    crate::native_ops::emit_event(app, "consistency-check-completed", &check);
+    check
 }
 
 // generateExplanation(question): pure deterministic keyword matcher. Returns the
@@ -397,24 +810,26 @@ fn generate_explanation(question: &str) -> Value {
 /// Route a `mental:*` channel. Args are the positional JSON array the renderer
 /// sent (see tauriCompat.ts). Every channel in the namespace is handled; skipped
 /// (live-state) channels and unknown ones return Value::Null (honest degrade).
-pub fn dispatch(_app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
-        "mental:getAllSystems" => json!(core_systems()),
+        "mental:getAllSystems" => json!(effective_systems(app)),
         "mental:getSystem" => {
             let system_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-            get_system(system_id)
+            get_system(app, system_id)
         }
-        "mental:getSystemOverview" => get_system_overview(),
-        // stateChanges is never loaded from disk -> always empty at runtime.
-        "mental:getStateChanges" => json!([]),
+        "mental:getSystemOverview" => get_system_overview(app),
+        "mental:getStateChanges" => {
+            let options = args.get(0).cloned().unwrap_or(Value::Null);
+            get_state_changes(app, &options)
+        }
         "mental:getBehaviorRules" => json!(behavior_rules()),
         "mental:explain" => {
             let question = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             generate_explanation(question)
         }
-        // Heavy / live-state — not ported, not faked.
-        "mental:updateSystem" => Value::Null,
-        "mental:runConsistencyCheck" => Value::Null,
+        // Heavy channels — real native state (KV-persisted registry + change log).
+        "mental:updateSystem" => update_system(app, args),
+        "mental:runConsistencyCheck" => run_consistency_check(app),
         _ => Value::Null,
     }
 }

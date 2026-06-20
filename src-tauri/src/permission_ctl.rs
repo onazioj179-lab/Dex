@@ -160,6 +160,52 @@ fn get_all_features(app: &tauri::AppHandle) -> Value {
     json!(features)
 }
 
+// Persist one permission flag into the `permissions` KV object, mirroring
+// DataStore.setPermission (read object, set key, write back under the SAME key).
+// Applies the electron-store defaults first so a previously-unset object is
+// materialised with the canonical six keys before mutation (matching the way
+// getPermissions() always returns a fully-defaulted object).
+fn set_permission(app: &tauri::AppHandle, key: &str, value: bool) -> Value {
+    let mut perms = load_permissions(app);
+    if let Value::Object(ref mut map) = perms {
+        map.insert(key.to_string(), Value::Bool(value));
+    }
+    crate::kv_set(app, PERMISSIONS_KEY, perms)
+}
+
+// Recompute and broadcast the feature-availability table after a permission
+// changes, mirroring PermissionGuard.updateFeatureStates() which the renderer
+// observes to enable/disable degraded features. Electron kept these in memory
+// and the UI re-read getAllFeatures(); on Tauri we push the freshly-derived
+// table so any listener can react without a manual refetch.
+fn emit_feature_states(app: &tauri::AppHandle) {
+    crate::native_ops::emit_event(app, "permission:features-changed", &get_all_features(app));
+}
+
+// permission:grant (spec) — grant a permission, persist it, refresh features,
+// and notify the renderer. Real native state mutation on the KV-backed store;
+// returns the same { success } envelope kv_set produces. Unknown keys are
+// rejected so we never write junk flags the guard does not understand.
+fn grant(app: &tauri::AppHandle, permission: &str) -> Value {
+    if !PERMISSION_KEYS.contains(&permission) {
+        return json!({ "success": false, "error": "unknown permission" });
+    }
+    let res = set_permission(app, permission, true);
+    emit_feature_states(app);
+    res
+}
+
+// permission:revoke (spec) — revoke a permission, persist it, refresh features,
+// and notify the renderer. Symmetric with grant().
+fn revoke(app: &tauri::AppHandle, permission: &str) -> Value {
+    if !PERMISSION_KEYS.contains(&permission) {
+        return json!({ "success": false, "error": "unknown permission" });
+    }
+    let res = set_permission(app, permission, false);
+    emit_feature_states(app);
+    res
+}
+
 // permission:checkFeature -> { available, degraded, missingPermissions }
 // Unknown feature: isFeatureAvailable/isFeatureDegraded default to false and
 // getMissingPermissions returns [] (no dependency entry).
@@ -203,7 +249,25 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let feature = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
             check_feature(app, feature)
         }
-        // permission:request -> native dialog; not ported, not faked.
+        // permission:grant / permission:revoke (spec heavy channels) — REAL
+        // native state mutation: persist the flag to the same `permissions` KV
+        // object DataStore.setPermission writes, refresh derived feature states,
+        // and emit a renderer event. Returns the kv_set { success } envelope.
+        "permission:grant" => {
+            let permission = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            grant(app, permission)
+        }
+        "permission:revoke" => {
+            let permission = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+            revoke(app, permission)
+        }
+        // permission:request -> Electron opens a modal OS dialog (dialog.
+        // showMessageBox) and only persists the grant when the user clicks
+        // "Allow". A live modal dialog cannot be presented from this headless
+        // dispatch, and faking a grant is forbidden — so we honestly take the
+        // "Deny" path (no user approval => false, the safe default). Callers
+        // that actually want to set a flag should use permission:grant.
+        "permission:request" => json!(false),
         _ => Value::Null,
     }
 }

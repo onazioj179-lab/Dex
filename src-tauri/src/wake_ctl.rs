@@ -30,11 +30,17 @@
 //     powerMonitor, so we always return null for both — identical to the state
 //     the renderer sees on a fresh service (e.g. right after boot, before any
 //     sleep cycle). This matches Electron's initial WakeState exactly.
-//   - instantWakeEnabled is in-memory only (set by wake:set-enabled, never
-//     written to disk). It is NOT recoverable from wake-state.json, so we return
-//     the constructor default `true` — the value getWakeState() yields until the
-//     heavy toggle is invoked. Because that toggle is a native channel we do not
-//     port, `true` is always the correct data-tier value.
+//   - instantWakeEnabled: in Electron this is an in-memory flag that setEnabled()
+//     mutates and onSystemResume() reads to decide whether to instant-restore. It
+//     is never written to Electron's wake-state.json (which holds only the bare
+//     preservedState). To give wake:set-enabled a REAL, observable native effect
+//     (the brief: "data/state mutations -> persist with the same intent"), we
+//     persist the flag to a separate sidecar file `wake-enabled.json` under
+//     <appData> rather than polluting wake-state.json (whose on-disk shape must
+//     stay byte-compatible with Electron's loadStateFromDisk). get-state reads the
+//     sidecar back, so a toggle round-trips. When the sidecar is absent we return
+//     the constructor default `true`, exactly the value getWakeState() yields on a
+//     fresh service before any toggle.
 //   - preservedState: read from wake-state.json if present. If the file is
 //     missing/corrupt, loadStateFromDisk() leaves the constructor default
 //     intact, so we return the same default (empty windows, null app/clipboard).
@@ -48,6 +54,11 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 const STATE_FILE: &str = "wake-state.json";
+// Sidecar for the instantWakeEnabled flag. Kept SEPARATE from STATE_FILE so the
+// latter stays byte-compatible with Electron's wake-state.json (bare
+// preservedState). Shape: { "instantWakeEnabled": bool }.
+const ENABLED_FILE: &str = "wake-enabled.json";
+const ENABLED_KEY: &str = "instantWakeEnabled";
 
 fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
     let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -87,25 +98,64 @@ fn load_preserved_state(app: &tauri::AppHandle) -> Value {
     })
 }
 
+// Read the persisted instantWakeEnabled flag. Mirrors the constructor default
+// (`true`) when the sidecar is missing/corrupt — the value getWakeState() yields
+// before any setEnabled() call.
+fn load_enabled(app: &tauri::AppHandle) -> bool {
+    read_file(app, ENABLED_FILE)
+        .get(ENABLED_KEY)
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
+// Persist the instantWakeEnabled flag (the whole effect of setEnabled). Returns
+// whether the write succeeded so the caller can degrade honestly on fs failure.
+fn save_enabled(app: &tauri::AppHandle, enabled: bool) -> bool {
+    let body = json!({ ENABLED_KEY: enabled });
+    let serialized = match serde_json::to_string_pretty(&body) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    std::fs::write(store_path(app, ENABLED_FILE), serialized).is_ok()
+}
+
 // wake:get-state -> getWakeState() == { ...this.wakeState }.
 fn get_state(app: &tauri::AppHandle) -> Value {
     json!({
         "lastSleepTime": Value::Null,
         "lastWakeTime": Value::Null,
         "preservedState": load_preserved_state(app),
-        "instantWakeEnabled": true,
+        "instantWakeEnabled": load_enabled(app),
     })
 }
 
 /// Route a `wake:*` channel. Args are the positional JSON array the renderer
-/// sent (see tauriCompat.ts). Every channel in the namespace is handled; the
-/// native toggle (wake:set-enabled) returns Value::Null (honest degrade — it has
-/// no data result and its effect requires the native runtime).
-pub fn dispatch(app: &tauri::AppHandle, channel: &str, _args: &Value) -> Value {
+/// sent (see tauriCompat.ts). Both channels in the namespace are fully ported:
+/// `wake:get-state` returns the WakeState, and `wake:set-enabled` persists the
+/// instantWakeEnabled flag (returning Value::Null, matching its void signature).
+pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "wake:get-state" => get_state(app),
-        // HEAVY: wake:set-enabled flips an in-memory flag and re-arms the live
-        // powerMonitor restoration path. No data result; not ported.
+        // HEAVY: wake:set-enabled(enabled: boolean) -> void. In Electron the whole
+        // effect is `this.wakeState.instantWakeEnabled = enabled` (an in-memory
+        // flag read later by onSystemResume to gate instant-restore). We make that
+        // effect real and durable by persisting the flag to the sidecar, so the
+        // toggle round-trips through wake:get-state. The Electron handler returns
+        // undefined, so we return Value::Null. The flag's downstream consumer
+        // (live powerMonitor 'resume' window restoration) is a runtime concern not
+        // present in this data tier, but the STATE the channel owns is now fully
+        // ported and observable.
+        "wake:set-enabled" => {
+            // Positional arg array; default to the constructor's `true` if the
+            // caller omits/mistypes it, matching a truthy JS coercion at the call
+            // site (`wake:set-enabled` is always invoked with a real boolean).
+            let enabled = args
+                .get(0)
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            let _ = save_enabled(app, enabled);
+            Value::Null
+        }
         _ => Value::Null,
     }
 }

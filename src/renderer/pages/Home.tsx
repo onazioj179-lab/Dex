@@ -662,62 +662,9 @@ export const Home: React.FC = () => {
 
         {/* Quick Access Apps removed -- launch apps from dock or apps menu (Ctrl+Space). */}
 
-        {/* DEX 5.5 Home dashboard -- the seven-widget brief set (recent
-            projects/notes, current tasks, active workflows, rewind summary,
-            AI suggestions, pinned apps). Compact, flat, real data. */}
-        <div style={{
-          marginTop: 18,
-          padding: '0 var(--space-6)',
-          animation: 'fadeIn 0.35s ease-out 0.08s both',
-        }}>
-          <HomeDashboard />
-        </div>
-
-        {/* Recents */}
-        {recents.length > 0 && (
-          <div style={{
-            marginTop: 18,
-            padding: '0 var(--space-6)',
-            animation: 'fadeIn 0.35s ease-out 0.1s both',
-          }}>
-            <div className="dex-label-caps" style={{ marginBottom: 'var(--space-2)' }}>
-              Recent Files
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {recents.map((f, i) => (
-                <button
-                  key={f.path + i}
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'files' } }));
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 14px',
-                    // Unified desktop surface: a recent file is a row on the desktop,
-                    // not a floating card. No fill/border/elevation at rest; a soft
-                    // scrim appears on hover. Inherited text-shadow keeps it legible.
-                    background: 'transparent',
-                    border: '1px solid transparent',
-                    borderRadius: 10, cursor: 'pointer',
-                    color: 'var(--color-text-primary)', fontSize: 12,
-                    textAlign: 'left',
-                    textShadow: 'var(--dex-desktop-text-shadow)',
-                    boxShadow: 'none',
-                    transition: 'background 0.18s ease',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--dex-desktop-scrim-hover)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', opacity: 0.5 }}><DexIcon name="file-text" size={14} /></span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                    {new Date(f.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Home is intentionally minimal (macOS-style desktop): no recents list,
+            no dashboard bento. Apps launch from the dock / Ctrl+Space; widgets are
+            opt-in (right-click the desktop -> Add Widget) and empty by default. */}
 
         {/* Bottom spacing */}
         <div style={{ height: 80 }} />
